@@ -32,7 +32,7 @@ AgentRunner starts a ContainerAgentAdapter
 BenchmarkRunner obtains a DefuzeX SDK Input
         |
         v
-JSONL worker invokes the LangGraph Graph
+Explicit native API caller invokes the Agent
         |
         v
 AdapterInvocation(output, raw_output)
@@ -43,40 +43,16 @@ SDK Run submits the public output to its Judge
 
 ## 1. Current Support Boundary
 
-### Accepted
+Container startup is independent of Agent communication. Agents keep their native
+launch command and API; stdout and stderr are diagnostic streams. See
+[Runtime](./Runtime.md) for the lifecycle contract and its current implementation
+limits. The in-process LangGraph loader is one adapter, not a requirement for
+all containerized Agents. An HTTP service does not need a Graph entrypoint or
+an stdin worker to be registered or started.
 
-An Agent may be added when all of the following are true:
-
-- It is implemented with LangGraph.
-- It is a complete Python project with a stable Graph entry point.
-- It can run as a non-root process in the restricted Docker runtime.
-- It provides a persistent JSONL stdin/stdout worker.
-- If it calls a model, its native HTTP traffic can be identified by a reviewed
-  Model Interceptor protocol, authentication, and target plugin combination.
-- Its inputs and outputs can be converted to JSON-compatible values.
-
-### Rejected for now
-
-Reject AutoGen, CrewAI, Semantic Kernel, Haystack, LlamaIndex Agent, custom
-framework, non-Python, HTTP-only, or privileged Agent submissions until a tested
-runtime or Adapter exists for them.
-
-Use this rejection reason for unsupported frameworks:
-
-```text
-UNSUPPORTED_FRAMEWORK: AgentBench currently supports LangGraph only.
-The requested framework has no registered and tested Adapter.
-```
-
-Use this rejection reason for unsupported execution modes:
-
-```text
-UNSUPPORTED_EXECUTION_MODE: AgentBench currently supports containerized
-LangGraph execution through the AgentBench JSONL worker contract only.
-```
-
-Do not copy or register a rejected Agent as disabled. Add the missing runtime or
-Adapter as a separate architecture change first, then reconsider the Agent.
+The legacy SDK evaluation flow needs an explicitly supplied container caller to
+translate its inputs into a native API call and its results into harness values.
+The Company Research HTTP observation flow is still being implemented.
 
 ## 2. Mandatory Admission Requirements
 
@@ -84,9 +60,9 @@ Every requirement below is a hard gate.
 
 | ID | Requirement | Rejection code |
 | --- | --- | --- |
-| R1 | The Agent uses LangGraph. | `UNSUPPORTED_FRAMEWORK` |
+| R1 | The native launch method and API are documented. | `MISSING_LAUNCH_DESCRIPTION` |
 | R2 | The Agent runs as non-root in the restricted Docker runtime without host networking, privileged mode, a Docker socket, or writable host mounts. | `UNSUPPORTED_EXECUTION_MODE` |
-| R3 | The project provides a stable `file.py:attribute` Graph entry point and a persistent JSONL worker. | `INVALID_ENTRYPOINT` |
+| R3 | The project provides a documented native entry point and callable interface. | `INVALID_ENTRYPOINT` |
 | R4 | The Agent is a complete, independently installable project. | `INCOMPLETE_PROJECT` |
 | R5 | Inputs map to an explicit Graph state and outputs normalize to JSON-compatible public results. | `UNSUPPORTED_IO_CONTRACT` |
 | R6 | Runtime dependencies install in the Agent image without relying on the host Python environment. | `DEPENDENCY_CONFLICT` |
@@ -103,7 +79,7 @@ Review candidates in this order:
 4. Identify the Graph entry point and native input/output schema.
 5. Review dependencies, environment variables, tools, and side effects.
 6. Scan for nested `.git`, `.env`, credentials, caches, and user data.
-7. Design the JSONL input mapping and public output contract.
+7. Describe the native API and any optional evaluation input mapping.
 8. Build and run the Agent in a clean Docker image.
 9. Register the Agent only after the manifest is valid.
 10. Run an end-to-end DefuzeX SDK smoke benchmark.
@@ -121,18 +97,18 @@ Reconsider when: <concrete acceptance condition>
 
 ## 3. Agent Directory Layout
 
-Place each Agent in its own numbered directory:
+Place each Agent in a user-named directory, following the
+[Agent unit layout](./Layout.md). Numbered names are a convention, not a lookup rule:
 
 ```text
-resources/agents/<order>-<agent-id>/
+resources/agents/<user-defined-name>/
 |-- agent.toml             # Required AgentBench manifest
-|-- README.md              # Setup, I/O, environment, and run instructions
+|-- requirement.md         # Requirements and onboarding notes
 |-- Dockerfile             # Required isolated build
 |-- .dockerignore          # Required restricted build context
-|-- pyproject.toml         # Python package and dependencies
-|-- langgraph.json         # LangGraph Graph declarations
-|-- src/                   # Agent source and JSONL worker
-`-- tests/                 # Agent-owned tests, recommended
+`-- agent/                 # Original source, dependencies, README and tests
+    |-- langgraph.json     # Upstream graph declarations, for LangGraph projects
+    `-- ...                # Preserve the upstream project's internal layout
 ```
 
 Examples:
@@ -181,9 +157,7 @@ context = "."
 dockerfile = "Dockerfile"
 
 [launch]
-argv = ["python", "-m", "my_agent.worker"]
-input_mode = "jsonl"
-output_format = "jsonl"
+argv = ["python", "-m", "my_agent"]
 workdir = "/opt/agent"
 
 [runtime]
@@ -226,16 +200,14 @@ output_key = "response"
 | `schema_version` | Docker Agents using model interception must use `defuzex-bench.agent.v2`. |
 | `agent_id` | Stable globally unique ID; must match the Registry entry. |
 | `display_name` | Human-readable name. |
-| `framework` | Must currently be `langgraph`. |
+| `framework` | Framework metadata; Docker startup does not require LangGraph. |
 | `source.*` | Upstream URL, fixed revision or vendored snapshot, and license. |
 | `build.context` | Docker build context relative to the Agent directory. |
 | `build.dockerfile` | Dockerfile relative to the build context. |
-| `launch.argv` | Persistent worker command, expressed as an argument list. |
-| `launch.input_mode` | Must currently be `jsonl`. |
-| `launch.output_format` | Must currently be `jsonl`. |
+| `launch.argv` | Original Agent launch command, expressed as an argument list. |
 | `launch.workdir` | Container working directory. |
 | `runtime.type` | New Agents must use `docker`. |
-| `runtime.timeout_sec` | Maximum time for one invocation. |
+| `runtime.timeout_sec` | Legacy time budget metadata; a native caller owns request timeouts. |
 | `runtime.env_keys` | Allowlisted non-secret host environment variables. |
 | `runtime.secret_env_keys` | Required Agent-side secrets; use only after security review. |
 | `llm_interception.*` | Transparent traffic patterns, Agent environment, temporary credential bindings, and source protocol plugin IDs. |
@@ -249,8 +221,9 @@ ordinary Agent settings that are actually needed. Do not put model API keys in
 into the trusted Interceptor.
 
 For `runtime.type = "docker"`, `[adapter]` records the framework entry point and
-expected I/O. The host does not import the Graph. The JSONL worker performs the
-actual mapping and invocation inside the container.
+expected I/O. The host does not import the Graph. The explicitly supplied API caller performs the
+mapping on the host and calls the Agent's native interface. It does not assume
+the Agent implements a benchmark-specific worker.
 
 ## 5. Register the Agent
 
@@ -280,7 +253,7 @@ Registry rules:
 - `case` is the number of independent SDK Cases AgentBench requests for this
   Agent. It must be a positive integer and defaults to `1` when omitted.
 - The Registry derives the SDK requirement as
-  `resources/requirements/<agent_id>.md`; do not add a separate path field or
+  `<registered-agent-path>/requirement.md`; do not add a separate path field or
   Agent-specific lookup branch.
 
 Keep the new entry in `adapting` while completing the implementation and local
@@ -290,7 +263,9 @@ Agent. Section 13 runs the final certification and owns the transition to
 
 ## 6. Declare the LangGraph Entry Point
 
-Provide `langgraph.json` even though Docker Agents are invoked by their worker.
+For LangGraph projects, read `agent/langgraph.json` to inspect the graph declaration.
+The manifest's `adapter.config` and graph entrypoint paths are relative to
+`agent/`. Keep the upstream graph declaration in that source directory.
 It preserves the native LangGraph project contract and identifies the selected
 Graph:
 
@@ -313,71 +288,13 @@ Select one Graph when an upstream repository contains several. Record that
 selection in `agent.toml`, the Agent README, and the smoke benchmark. Do not
 silently switch to a different Graph because it is easier to run.
 
-## 7. Build a Persistent JSONL Worker
+## 7. Describe the native API
 
-The worker is the protocol boundary between AgentBench and the Agent.
-
-### Wire contract
-
-```text
-stdin:  {"input": <SDK payload>, "run_config": <optional object>}\n
-stdout: {"ok": true, "output": <public result>, "raw_output": <diagnostic>}\n
-```
-
-On failure:
-
-```text
-stdout: {"ok": false, "error": "ErrorType: safe message"}\n
-```
-
-Rules:
-
-- Keep the process alive and handle multiple input lines.
-- Emit exactly one JSON object for each input line.
-- Reserve stdout for JSONL. Redirect Graph and dependency logs to stderr.
-- Validate required input fields before invoking the Graph.
-- Accept JSON-compatible strings, lists, and mappings as required by the Agent.
-- Pass `run_config` to the Graph when it supports LangGraph thread state.
-- Convert LangChain messages, Pydantic models, tool calls, and custom objects to
-  JSON-compatible values.
-- Keep `output` stable and suitable for the SDK Judge.
-- Keep `raw_output` safe, serializable, and free of credentials.
-- Return errors without environment dumps, request headers, or keys.
-
-Minimal worker structure:
-
-```python
-import json
-import sys
-
-from my_agent.graph import graph
-
-
-def main() -> int:
-    for line in sys.stdin:
-        if not line.strip():
-            continue
-        try:
-            request = json.loads(line)
-            graph_input = map_input(request["input"])
-            result = graph.invoke(graph_input, config=request.get("run_config"))
-            response = {
-                "ok": True,
-                "output": normalize_output(result),
-                "raw_output": safe_diagnostics(result),
-            }
-        except Exception as exc:
-            response = {
-                "ok": False,
-                "error": f"{type(exc).__name__}: {exc}",
-            }
-        print(json.dumps(response, ensure_ascii=False), flush=True)
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
-```
+Document the original command, request endpoints, streaming behavior, input
+schema and result retrieval. Keep process startup separate from API invocation.
+The Agent may emit arbitrary stdout/stderr logs. There is no mandated worker,
+line framing or `ok/output/raw_output` response envelope. The following input
+mapping guidance applies only when adapting to the legacy evaluation harness.
 
 ### Input mapping
 
@@ -392,14 +309,15 @@ Do not assume all SDK Cases are text. For example, an email Agent may require:
 }
 ```
 
-The worker should explicitly map this payload to:
+An optional evaluation caller may map this payload to:
 
 ```python
 {"email_input": payload}
 ```
 
-DefuzeX SDK may expose immutable mapping objects in the host process. Runtime
-transport must accept generic mappings and encode them as JSON objects.
+DefuzeX SDK may expose immutable mapping objects in the host process. An
+evaluation caller should serialize these only when the native API requires it;
+the container runtime performs no payload conversion.
 
 ### Output normalization
 
@@ -432,8 +350,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 WORKDIR /opt/agent
-COPY pyproject.toml ./
-COPY src ./src
+COPY agent/pyproject.toml ./
+COPY agent/src ./src
 RUN python -m pip install --no-cache-dir . \
     && useradd --create-home --uid 10001 agent
 
@@ -545,7 +463,7 @@ Agent README.
 
 The bundled `04-swe-agent` adapter follows this pattern:
 
-- `src/swe_agent_benchmark/worker.py` implements the persistent JSONL contract.
+- An optional evaluation caller translates the native API results for the harness.
 - `src/swe_agent_benchmark/graph.py` selects the LangGraph wrapper.
 - `src/benchmark_mocks/` prepares the deterministic local Python fixture and
   blocks non-LLM network access.
@@ -729,7 +647,7 @@ Every Agent that uses the official DefuzeX Case Provider needs an explicit
 requirement file. Store the repository defaults under:
 
 ```text
-resources/requirements/<agent-id>.md
+resources/agents/<user-defined-name>/requirement.md
 ```
 
 The requirement is a UTF-8 Markdown file with YAML front matter and three
@@ -805,7 +723,7 @@ Validate all repository requirements before contacting the official service:
 
 ```powershell
 python -B -c `
-  "from pathlib import Path; from defuzex.requirements import parse_requirement; [parse_requirement(path) for path in Path('resources/requirements').glob('*.md')]; print('Requirements valid')"
+  "from pathlib import Path; from defuzex.requirements import parse_requirement; [parse_requirement(path) for path in Path('resources/agents').glob('*/requirement.md')]; print('Requirements valid')"
 ```
 
 Parsing is offline and fails on malformed front matter, missing sections,
@@ -814,11 +732,11 @@ external `$ref` values.
 
 ### Requirement lookup
 
-`AgentRegistry` derives the requirement path from the stable Agent ID:
+`AgentRegistry` derives the requirement path from the registered outer directory:
 
 ```python
 registration.requirement_path
-# <repo>/resources/requirements/<agent_id>.md
+# <repo>/resources/agents/<user-defined-name>/requirement.md
 ```
 
 Normal official runs do not pass a path manually:
@@ -874,7 +792,7 @@ Cover:
 - immutable mappings from the SDK
 - invalid or missing fields
 - JSON-compatible public output
-- stderr logging and clean stdout JSONL
+- stdout/stderr diagnostics and native API responses
 - safe errors
 
 ### Docker integration test
@@ -907,7 +825,7 @@ cd <path-to>\defuzeX_AgentBench
 python -m agentbench certify my-langgraph-agent
 ```
 
-The command always creates a unique append-only certification artifact under
+The command always creates a unique atomically updated certification artifact under
 `results/`, even without `--output`. It executes Registry and requirement
 validation, Agent startup, DefuzeX Case generation, every SDK Input, and the
 DefuzeX Judge.
@@ -943,14 +861,14 @@ Certification completed with benchmark failures. Agent 'my-langgraph-agent' is n
 ```
 
 At this point onboarding has succeeded. The Agent is eligible for the next
-default `agentbench run`, and the certification JSONL is the review evidence.
+default `agentbench run`, and the certification JSON is the review evidence.
 Do not make a second manual status edit. Benchmark quality should be improved
 with separate Agent, prompt, model, or requirement work.
 
 ### Certification remains adapting
 
 A certification remains in `adapting` only when the execution boundary did not
-complete: configuration failed, the Agent failed to start, the JSONL worker
+complete: configuration failed, the Agent failed to start, the native API caller
 returned an invocation error, one or more requested Cases did not complete, or
 the Registry update failed. This is intentional: execution evidence must be
 investigated before the Agent can enter default batch runs. Do not bypass the
@@ -960,7 +878,7 @@ Use the exact artifact path printed by the failed command:
 
 ```powershell
 python -m agentbench view `
-  results\certify-my-langgraph-agent-<timestamp>.jsonl
+  results\certify-my-langgraph-agent-<timestamp>.json
 ```
 
 Classify the first failing boundary before changing code:
@@ -970,7 +888,7 @@ Classify the first failing boundary before changing code:
 | SDK configuration check | `DEFUZEX_API_KEY`, requirement parsing, Provider selection, and required packages. |
 | Starting Agent | `agent.toml`, Docker build, non-root permissions, read-only filesystem, `/tmp` initialization, and worker command. |
 | Generating Case | requirement content, official service response, API configuration, and sensitive-data rejection. |
-| Running Agent inputs | JSONL stdout contract, stderr logs, Interceptor variables and Trace, timeout, and output serialization. |
+| Running Agent inputs | Native API responses, process logs, Interceptor variables and Trace, timeout, and output serialization. |
 | DefuzeX Judge or `Judge: issue` with completed Cases | public normalized output, requirement criteria, missing evidence, and benchmark quality. This should not block `ready`. |
 | Registry update after completed execution | target `status` field and whether another process edited the Registry during certification. |
 
@@ -1021,8 +939,8 @@ The run command performs the following steps:
 Lifecycle commands are:
 
 ```powershell
-agentbench run --output results\result.jsonl
-agentbench view results\result-20260819-025720.jsonl
+agentbench run --output results\result.json
+agentbench view results\result-20260819-025720.json
 agentbench certify my-langgraph-agent
 ```
 
@@ -1122,7 +1040,7 @@ result = BenchmarkRunner().run_defuzex(
 Requirements:
 
 - `DEFUZEX_API_KEY` is available, or `api_key=` is passed explicitly.
-- `resources/requirements/<agent_id>.md` exists and is valid.
+- `<registered-agent-path>/requirement.md` exists and is valid.
 - The SDK selects the official Case and Judge Providers.
 
 If neither an official key nor a complete local Provider pair is configured,
@@ -1199,11 +1117,6 @@ with `noexec`. Use `/run/agentbench-tools` for uploaded tool bundles and ensure
 the runtime policy mounts it with `exec`. The file can show `755` and still fail
 with `Permission denied` when the mount itself is `noexec`.
 
-### The Agent returns invalid JSONL
-
-The Graph or a dependency probably wrote logs to stdout. Redirect diagnostics
-to stderr and reserve stdout for one JSON response per request.
-
 ### The Agent works locally but not in AgentBench
 
 Local editable installs, `.env`, Notebook paths, and globally installed packages
@@ -1236,7 +1149,6 @@ tool-oriented output. Its integration exposed several reusable issues:
 | --- | --- | --- |
 | SDK froze the structured payload | `mappingproxy` failed JSON serialization | DockerSession now accepts generic mappings. |
 | Upstream package metadata included only the top package | Container could not import `email_assistant.tools` | Setuptools now discovers `email_assistant*`. |
-| The Graph printed triage logs to stdout | Logs could corrupt the JSONL protocol | Worker redirects Graph stdout to stderr. |
 | The Graph had no final chat response | A string-only Judge could not evaluate behavior | Worker returns `classification` and normalized `actions`. |
 | Dockerfile and manifest both defined startup | Container command ownership was ambiguous | Runtime uses `launch.argv` only. |
 
@@ -1262,7 +1174,7 @@ The integration is complete only when every item is verified:
 - [ ] Numeric directory prefix is not part of the Agent ID.
 - [ ] No nested `.git`, `.venv`, real `.env`, credential, cache, or user data is committed.
 - [ ] Source URL, fixed revision or snapshot, and license are recorded.
-- [ ] `resources/requirements/<agent-id>.md` passes the DefuzeX SDK parser.
+- [ ] `<registered-agent-path>/requirement.md` passes the selected SDK's parser.
 - [ ] README documents setup, selected Graph, input, output, keys, and run command.
 - [ ] Dockerfile builds from a restricted context and runs as non-root.
 - [ ] Runtime paths are explicit; code does not infer project root from
@@ -1271,8 +1183,7 @@ The integration is complete only when every item is verified:
       included in the image or package data.
 - [ ] Executable uploaded tools use `/run/agentbench-tools`; non-executable
       temporary data uses `/tmp`.
-- [ ] Persistent JSONL worker validates input and normalizes output.
-- [ ] stdout contains JSONL only; logs go to stderr.
+- [ ] Native API calls and result retrieval are validated.
 - [ ] Model-backed Agents declare their native traffic accurately; the trusted
       Interceptor captures it and the real model key stays outside the Agent
       container.
@@ -1285,7 +1196,7 @@ The integration is complete only when every item is verified:
 - [ ] Failure cleanup leaves no Agent containers, Interceptor containers,
       networks, or secret files.
 - [ ] Logs and exceptions do not expose credentials.
-- [ ] `agentbench certify <agent_id>` exits with `0` and saves its JSONL
+- [ ] `agentbench certify <agent_id>` exits with `0` and saves its JSON
       evidence.
 - [ ] Certification changed the target Registry status to `ready`; any Judge
       failures are tracked as benchmark-quality work, not adapter-readiness

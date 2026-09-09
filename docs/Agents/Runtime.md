@@ -1,7 +1,7 @@
 # Runtime Contract
 
 This page covers the details that most often break Agent onboarding: Docker
-filesystem layout, Python packaging, JSONL workers, and model interception.
+filesystem layout, Python packaging, native Agent communication, and model interception.
 
 ## Docker Filesystem
 
@@ -21,6 +21,10 @@ executable uploaded tools under `/run/agentbench-tools`.
 
 ## Dockerfile Rules
 
+The [Agent unit layout](./Layout.md) uses an outer Dockerfile with
+`build.context = "."` and `build.dockerfile = "Dockerfile"`. Source stays
+in `agent/`, so `COPY` paths are relative to the outer unit, as below.
+
 Use a non-root image and let `agent.toml` own the launch command:
 
 ```dockerfile
@@ -30,8 +34,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
 WORKDIR /opt/agent
-COPY pyproject.toml README.md ./
-COPY src ./src
+COPY agent/pyproject.toml agent/README.md ./
+COPY agent/src ./src
 RUN python -m pip install --no-cache-dir . \
     && useradd --create-home --uid 10001 agent
 
@@ -93,24 +97,28 @@ benchmark_mocks = [
 
 Add a test that every declared package-data file exists.
 
-## JSONL Worker
+## Native Agent communication
 
-The container must run a persistent stdin/stdout worker:
+DockerSession owns process lifecycle and bounded stdout/stderr diagnostic logs.
+It does not parse Agent output, write requests to stdin, or require a response
+shape. Remove `launch.input_mode` and `launch.output_format` from manifests;
+only the native launch command and environment belong to container startup.
 
-```text
-stdin:  {"input": <SDK payload>, "run_config": <optional object>}\n
-stdout: {"ok": true, "output": <public result>, "raw_output": <diagnostic>}\n
-stdout: {"ok": false, "error": "ErrorType: safe message"}\n
-```
+Use `DockerRuntime.start(agent)` to manage a process directly. A service may
+keep running and a batch command may exit normally. `wait()`, `is_running`,
+`returncode`, `stdout`, `stderr` and `close()` expose lifecycle and diagnostics.
 
-Rules:
+The legacy evaluation harness can receive an explicit `container_caller` through
+`RuntimeFactory`. It receives `(session, input, run_config)` and calls the
+Agent's native API, returning an `AdapterInvocation` for that harness only.
+There is no default container caller or forced wire protocol. Without a caller,
+evaluation invocation raises a clear configuration error; it does not reinterpret
+logs as answers. Model trace checkpoints remain available to the caller boundary.
 
-- Keep stdout as JSONL only; send logs to stderr.
-- Handle multiple input lines in one process.
-- Accept text and structured JSON-compatible inputs.
-- Pass `run_config` to LangGraph when thread state is used.
-- Normalize output to stable public behavior, not raw LangChain objects.
-- Keep `raw_output` safe and serializable.
+Company Research will use its original HTTP API and SSE progress stream.
+Host port publishing, service readiness, its HTTP caller and the observation UI
+still need implementation. Removing the old transport does not implement those
+features automatically.
 
 ## Model Interceptor
 

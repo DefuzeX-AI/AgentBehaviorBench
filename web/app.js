@@ -192,7 +192,7 @@ function renderDetail(item, data) {
   );
 
   if ((data.parse_errors || []).length > 0) {
-    root.append(notice(`${data.parse_errors.length} malformed JSONL line(s) skipped.`));
+    root.append(notice(`${data.parse_errors.length} JSON snapshot error(s). Some data could not be displayed.`));
   }
   if (data.suite_error) {
     root.append(

@@ -5,10 +5,10 @@ from __future__ import annotations
 import sys
 import time
 from argparse import ArgumentParser, Namespace
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
-from agentbench.harness import SuiteRunner
+from agentbench.harness import SDK, SuiteRunner
 
 from .features import FEATURES
 from .features.run import DEFAULT_REGISTRY_PATH, run
@@ -44,6 +44,8 @@ def main(
     input_fn: Callable[[str], str] = input,
     output_fn: Callable[[str], None] = print,
     suite_runner: SuiteRunner | None = None,
+    sdk: SDK | None = None,
+    sdk_options: Mapping[str, object] | None = None,
     sleep_fn: Callable[[float], None] = time.sleep,
     output_path: str | Path | None = None,
     viewer_starter: Callable[[Path], RunningViewer] = start_viewer_server,
@@ -51,12 +53,16 @@ def main(
 ) -> int:
     """Backward-compatible Python API for the run feature."""
 
-    if _is_stale_console_entry(
-        output_path=output_path,
-        input_fn=input_fn,
-        output_fn=output_fn,
-        suite_runner=suite_runner,
-        sleep_fn=sleep_fn,
+    if (
+        sdk is None
+        and sdk_options is None
+        and _is_stale_console_entry(
+            output_path=output_path,
+            input_fn=input_fn,
+            output_fn=output_fn,
+            suite_runner=suite_runner,
+            sleep_fn=sleep_fn,
+        )
     ):
         return cli(sys.argv[1:])
 
@@ -69,6 +75,8 @@ def main(
         output_path=output_path,
         viewer_starter=viewer_starter,
         post_run_input_fn=post_run_input_fn,
+        sdk=sdk,
+        sdk_options=sdk_options,
     )
 
 

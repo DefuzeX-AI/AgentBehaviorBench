@@ -61,12 +61,12 @@ Certification passed. Agent is now ready.
 
 ## Artifacts
 
-`certify` always writes an append-only JSONL result under `results/`.
+`certify` always writes an atomically updated JSON result under `results/`.
 
 Open it later:
 
 ```powershell
-python -m agentbench view results\certify-<agent-id>-<timestamp>.jsonl
+python -m agentbench view results\certify-<agent-id>-<timestamp>.json
 ```
 
 When diagnosing, inspect the first boundary that failed:

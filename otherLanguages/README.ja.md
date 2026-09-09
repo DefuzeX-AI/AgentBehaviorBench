@@ -32,7 +32,7 @@
 
 AgentBehaviorBench (ABB) は、対象 Agent を呼び出し、その出力と実行トレースを収集し、要求されたワークフローを正しく完了したかを判定する必要があるエンドツーエンドのタスクで AI Agent を評価するためのベンチマークです。
 
-登録済みの Agent と benchmark Case が与えられると、AgentBehaviorBench (ABB) は信頼されたホスト harness を通じてその Agent を実行します。この harness は、framework 固有またはコンテナ化された Agent を起動し、credential-safe な Model Interceptor を通じてモデル通信をルーティングし、各 SDK input と Agent response を append-only の JSONL events として記録し、完了した run を DefuzeX Judge に送信できます。
+登録済みの Agent と benchmark Case が与えられると、AgentBehaviorBench (ABB) は信頼されたホスト harness を通じてその Agent を実行します。この harness は、framework 固有またはコンテナ化された Agent を起動し、credential-safe な Model Interceptor を通じてモデル通信をルーティングし、各 SDK input と Agent response を 原子的に更新する JSON events として記録し、完了した run を DefuzeX Judge に送信できます。
 
 AgentBehaviorBench (ABB) は Agent 評価を再現可能にするために設計されています。Agent は registry で宣言され、LangGraph などの framework adapter を通じて適応され、`adapting` から `ready` へ認証されます。認証に成功した Agent だけがデフォルトの benchmark run に含まれます。
 
@@ -116,7 +116,7 @@ run を保存し、local result viewer で live benchmark events を確認する
 python -m agentbench --output results\result.json
 ```
 
-`--output` を指定しない場合、AgentBehaviorBench (ABB) はターミナルで実行され、JSONL result artifact は作成されません。`--output` を指定すると、AgentBehaviorBench (ABB) は append-only の JSONL result file を書き込み、local viewer を起動します。これにより、benchmark の実行中に events を更新して確認できます。
+`--output` を指定しない場合、AgentBehaviorBench (ABB) はターミナルで実行され、JSON result artifact は作成されません。`--output` を指定すると、AgentBehaviorBench (ABB) は 原子的に更新する JSON result file を書き込み、local viewer を起動します。これにより、benchmark の実行中に events を更新して確認できます。
 
 official Case または Judge providers を使う場合は、DefuzeX API key を設定します：
 

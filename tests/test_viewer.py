@@ -7,8 +7,8 @@ import pytest
 from agentbench.cli.viewer import parse_result_log, start_viewer_server
 
 
-def test_parse_result_log_groups_events_and_skips_bad_lines(tmp_path) -> None:
-    result_log = tmp_path / "result-20260819-010101.jsonl"
+def test_parse_result_log_groups_events_and_reports_invalid_entries(tmp_path) -> None:
+    result_log = tmp_path / "result-20260819-010101.json"
     events = [
         {
             "event": "run_started",
@@ -53,7 +53,7 @@ def test_parse_result_log_groups_events_and_skips_bad_lines(tmp_path) -> None:
         {"event": "suite_completed", "summary": {"suite_passed": True}},
     ]
     result_log.write_text(
-        "\n".join(json.dumps(event) for event in events) + "\n{bad",
+        json.dumps([*events, "invalid event"]),
         encoding="utf-8",
     )
 
@@ -65,7 +65,7 @@ def test_parse_result_log_groups_events_and_skips_bad_lines(tmp_path) -> None:
     assert parsed["summary"] == {"suite_passed": True}
     assert parsed["event_count"] == 5
     assert parsed["parse_errors"] == [
-        {"line": 6, "message": "Expecting property name enclosed in double quotes"}
+        {"index": 5, "message": "Expected JSON object"}
     ]
     assert parsed["agents"][0]["agent_id"] == "agent-a"
     assert [event["event"] for event in parsed["agents"][0]["step_events"]] == [
@@ -75,23 +75,12 @@ def test_parse_result_log_groups_events_and_skips_bad_lines(tmp_path) -> None:
 
 
 def test_parse_result_log_surfaces_step_events_without_agent_result(tmp_path) -> None:
-    result_log = tmp_path / "result.jsonl"
-    result_log.write_text(
-        "\n".join(
-            [
-                json.dumps({"event": "run_started", "selected_agent_ids": ["agent-a"]}),
-                json.dumps(
-                    {
-                        "event": "step_started",
-                        "agent_id": "agent-a",
-                        "input_id": "input-a",
-                        "payload": {"prompt": "kept case"},
-                    }
-                ),
-            ]
-        ),
-        encoding="utf-8",
-    )
+    result_log = tmp_path / "result.json"
+    result_log.write_text(json.dumps([
+        {"event": "run_started", "selected_agent_ids": ["agent-a"]},
+        {"event": "step_started", "agent_id": "agent-a", "input_id": "input-a",
+         "payload": {"prompt": "kept case"}},
+    ]), encoding="utf-8")
 
     parsed = parse_result_log(result_log)
 
@@ -118,17 +107,10 @@ def test_parse_result_log_surfaces_step_events_without_agent_result(tmp_path) ->
 
 
 def test_viewer_serves_static_app_and_live_result_api(tmp_path) -> None:
-    result_log = tmp_path / "result.jsonl"
-    result_log.write_text(
-        json.dumps(
-            {
-                "event": "run_started",
-                "suite_id": "suite_test",
-                "selected_agent_ids": ["agent-a"],
-            }
-        ),
-        encoding="utf-8",
-    )
+    result_log = tmp_path / "result.json"
+    result_log.write_text(json.dumps([
+        {"event": "run_started", "suite_id": "suite_test", "selected_agent_ids": ["agent-a"]},
+    ]), encoding="utf-8")
     viewer = start_viewer_server(result_log, port=0)
 
     try:

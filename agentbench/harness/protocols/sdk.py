@@ -1,4 +1,4 @@
-"""DefuzeX SDK interfaces consumed by AgentBench."""
+"""SDK interfaces consumed by AgentBench."""
 
 from __future__ import annotations
 
@@ -22,15 +22,14 @@ class SDKTestInput(Protocol):
 
 
 class SDKRun(Protocol):
-    """Strict-handshake subset of a DefuzeX SDK Run."""
+    """Input/submission handshake required by the current AgentBench runner."""
 
     run_id: str
     state: str
     report: SDKReport | None
     history: tuple[object, ...]
 
-    def get_input(self, *, full: bool = False) -> SDKTestInput | None:
-        ...
+    def get_input(self, *, full: bool = False) -> SDKTestInput | None: ...
 
     def submit(
         self,
@@ -38,12 +37,20 @@ class SDKRun(Protocol):
         *,
         status: str = "completed",
         error: str | None = None,
-    ) -> SDKReport | None:
-        ...
+    ) -> SDKReport | None: ...
 
 
 class SDKRunFactory(Protocol):
     """Callable shape of ``defuzex.create_run``."""
 
-    def __call__(self, **kwargs: object) -> SDKRun:
-        ...
+    def __call__(self, **kwargs: object) -> SDKRun: ...
+
+
+class SDK(Protocol):
+    """A module or object which creates compatible Runs.
+
+    create_run receives the Agent repo_path and user-supplied sdk_options.
+    Other SDKs can wrap their own API to return SDKRun-compatible objects.
+    """
+
+    def create_run(self, **kwargs: object) -> SDKRun: ...

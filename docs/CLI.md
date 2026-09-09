@@ -43,7 +43,7 @@ Current subcommands:
 | Command | Purpose |
 | --- | --- |
 | `run` | Run all enabled Agents whose status is `ready`. |
-| `view` | Open an existing JSONL result in the local web viewer. |
+| `view` | Open an existing JSON result in the local web viewer. |
 | `certify` | Verify one `adapting` Agent can complete its requested Cases and promote it to `ready`. |
 
 ## 2. Default Command and Compatibility
@@ -94,27 +94,28 @@ python -m agentbench run --llm-trace terminal
 | --- | --- | --- | --- |
 | `-h`, `--help` | No | - | Show `run` help and exit. |
 | `--env-file PATH` | No | Repository `.env` | Load host-only secrets and defaults from another dotenv file. |
-| `--output PATH` | No | Do not save | Save a unique append-only JSONL result and start the local viewer. |
+| `--output PATH` | No | Do not save | Save a unique atomically updated JSON result and start the local viewer. |
 | `--model OPENROUTER_MODEL` | No | `OPENROUTER_MODEL` | Force every intercepted Agent request to use this OpenRouter model slug. |
 | `--llm-trace {off,terminal}` | No | `off` | Print sanitized model requests and responses captured by the transparent Interceptor. |
 | `--llm-trace-max-bytes BYTES` | No | `262144` | Maximum payload bytes displayed for each request or response. |
 
 `PATH` is the naming base for the result file, not the final file name.
-AgentBench adds a timestamp and always writes `.jsonl`:
+AgentBench adds a timestamp and always writes `.json`:
 
 ```text
 --output results\result.json
--> results\result-20260820-162500.jsonl
+-> results\result-20260820-162500.json
 ```
 
 If a file name collides within the same second, AgentBench appends `-2`, `-3`,
-and so on. Existing files are never overwritten. Each event is appended as soon
-as it is produced, so data already written before an interruption is preserved.
+and so on. Each run gets a new file. Within that run, every event updates a JSON
+array by writing a temporary file and atomically replacing the previous snapshot.
+If an update fails before replacement, the previous complete snapshot remains.
 
 When `--output` is omitted:
 
 - the benchmark still runs normally;
-- no JSONL trace/result artifact is generated;
+- no JSON trace/result artifact is generated;
 - the local viewer is not started;
 - the terminal still shows each Agent result and the final suite result.
 
@@ -197,17 +198,17 @@ python -m agentbench certify swe-agent
 | --- | --- | --- | --- |
 | `agent_id` | Yes | - | Stable Agent ID from `resources/registry.toml`. |
 | `--env-file PATH` | No | Repository `.env` | Load host-only secrets and defaults from another dotenv file. |
-| `--output PATH` | No | `results\certify-<agent_id>.jsonl` | Custom naming base for the certification result. |
+| `--output PATH` | No | `results\certify-<agent_id>.json` | Custom naming base for the certification result. |
 | `--model OPENROUTER_MODEL` | No | `OPENROUTER_MODEL` | Force intercepted calls to use this OpenRouter model slug. |
 | `--llm-trace {off,terminal}` | No | `off` | Print sanitized intercepted model traffic during certification. |
 | `--llm-trace-max-bytes BYTES` | No | `262144` | Maximum displayed bytes per model request or response. |
 | `-h`, `--help` | No | - | Show `certify` help and exit. |
 
-Unlike normal `run`, `certify` always saves a unique JSONL result whether or not
+Unlike normal `run`, `certify` always saves a unique JSON result whether or not
 `--output` is passed. Default example:
 
 ```text
-results\certify-swe-agent-20260820-162500.jsonl
+results\certify-swe-agent-20260820-162500.json
 ```
 
 Custom naming base:
@@ -239,7 +240,7 @@ Certification uses the same trusted host flow as normal benchmarks:
 4. Generate a Case from the DefuzeX Server.
 5. Run each SDK Input.
 6. Submit to the DefuzeX Judge.
-7. Append complete events and results to the certification JSONL.
+7. Append complete events and results to the certification JSON.
 8. Atomically update the Registry status from `adapting` to `ready` only when
    all requested Cases complete without startup, runtime, or invocation errors.
 
@@ -270,7 +271,7 @@ View a certification result after it finishes:
 
 ```powershell
 python -m agentbench view `
-  results\certify-swe-agent-20260820-162500.jsonl
+  results\certify-swe-agent-20260820-162500.json
 ```
 
 ## 5. `view`
@@ -282,14 +283,14 @@ agentbench view [-h] [--host HOST] [--port PORT] result_log
 ```
 
 ```powershell
-python -m agentbench view results\result-20260820-162500.jsonl
+python -m agentbench view results\result-20260820-162500.json
 ```
 
 ### 5.2 Arguments
 
 | Argument | Required | Default | Description |
 | --- | --- | --- | --- |
-| `result_log` | Yes | - | AgentBench `.jsonl` result file to read. |
+| `result_log` | Yes | - | AgentBench `.json` result file to read. |
 | `--host HOST` | No | `127.0.0.1` | Viewer HTTP server bind address. |
 | `--port PORT` | No | `8765` | Preferred bind port. |
 | `-h`, `--help` | No | - | Show `view` help and exit. |
@@ -297,8 +298,8 @@ python -m agentbench view results\result-20260820-162500.jsonl
 Examples:
 
 ```powershell
-python -m agentbench view results\result.jsonl --port 9000
-python -m agentbench view results\result.jsonl --host 127.0.0.1 --port 0
+python -m agentbench view results\result.json --port 9000
+python -m agentbench view results\result.json --host 127.0.0.1 --port 0
 ```
 
 If the requested port is already in use, the viewer automatically chooses an
@@ -310,15 +311,26 @@ The terminal prints the real URL and absolute result path:
 
 ```text
 View: http://127.0.0.1:8765/suite/suite_xxx/
-Result log: <absolute-path>\result-20260820-162500.jsonl
+Result log: <absolute-path>\result-20260820-162500.json
 ```
 
 Press `Ctrl+C` to stop the server. A missing result path raises an error
 immediately and does not create an empty file.
 
-## 6. JSONL Results and Interruption Recovery
+## 6. JSON Results and Interruption Recovery
 
-Result files are append-only event streams and may contain:
+Result files are JSON arrays of events and may contain:
+
+```json
+[
+  {"event": "run_started", "suite_id": "suite_example", "selected_agent_ids": []},
+  {"event": "suite_completed", "suite_id": "suite_example", "summary": {"selected": 0}}
+]
+```
+
+This is ABB's storage format, independent of an Agent's communication protocol.
+The writer currently updates the whole document per event. Large, long-running
+observation sessions will need the planned trace storage service.
 
 | Event | Meaning |
 | --- | --- |
@@ -354,7 +366,7 @@ for `view`, usually exit Python with a non-zero status and print the exception.
 
 ## 8. FAQ
 
-### Normal run did not generate JSONL or trace output
+### Normal run did not generate JSON or trace output
 
 Make sure `--output` was provided:
 
@@ -390,7 +402,7 @@ Use the URL printed by the terminal. If port `8765` is occupied, the CLI chooses
 another port. If firewall or proxy behavior is unusual, explicitly use:
 
 ```powershell
-python -m agentbench view <result.jsonl> --host 127.0.0.1 --port 0
+python -m agentbench view <result.json> --host 127.0.0.1 --port 0
 ```
 
 ### Docker Agent fails during startup
@@ -411,7 +423,7 @@ agentbench/cli/
   execution.py            shared benchmark execution and result writing
   presentation.py         terminal display and interaction
   registry_status.py      Registry status updates
-  result_export.py        append-only JSONL writer
+  result_export.py        atomic JSON snapshot writer
   viewer.py               local HTTP viewer server
   features/
     base.py               CommandFeature contract
@@ -434,3 +446,26 @@ When adding a subcommand:
 
 There must be exactly one `default=True` feature. The current default feature is
 `run`.
+
+## Evaluation SDK selection
+
+Both `run` and `certify` accept `--sdk MODULE[:OBJECT]` and
+`--sdk-options PATH`. The module, or an exported configured object, must expose
+`create_run()` and return the Run interface documented in [SDK.md](SDK.md).
+Modules must be importable in the active Python environment; AgentBench does
+not download or install code during selection.
+
+```powershell
+python -m agentbench run --sdk my_evaluation_sdk --sdk-options sdk-options.json
+python -m agentbench certify my-agent --sdk my_evaluation_sdk
+```
+
+`sdk-options.json` must contain a JSON object. Its fields are passed to the SDK;
+`repo_path` is supplied by ABB per Agent. Credentials and validation belong to
+the selected SDK. CLI callbacks and result output are shared across SDKs.
+
+Omitting `--sdk` preserves the existing DefuzeX default and its local-development
+configuration (`allow_local=True`, `track_files=False`). An explicitly selected
+SDK receives no such implicit options, even when it is `--sdk defuzex`.
+Supply options appropriate to its actual execution environment. This change
+does not move the SDK into an Agent container.

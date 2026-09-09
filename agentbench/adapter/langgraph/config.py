@@ -26,6 +26,11 @@ class LangGraphAdapterConfig:
     output_key: str | None
     mode: str
 
+    @property
+    def source_root(self) -> Path:
+        """Source checkout, separate from the outer ABB configuration directory."""
+        return (self.agent_root / "agent").resolve()
+
     @classmethod
     def from_agent_dir(cls, agent_root: str | Path) -> "LangGraphAdapterConfig":
         """Read LangGraph settings from one agent folder."""
@@ -45,8 +50,13 @@ class LangGraphAdapterConfig:
                 f"Unsupported LangGraph execution mode: {mode!r}"
             )
 
+        source_root = _resolve_inside(root, "agent")
+        if not source_root.is_dir():
+            raise LangGraphConfigurationError(
+                f"Agent source directory does not exist: {source_root}"
+            )
         config_name = _required_string(adapter, "config")
-        config_path = _resolve_inside(root, config_name)
+        config_path = _resolve_inside(source_root, config_name)
         langgraph_config = _read_json(config_path)
         graphs = _required_mapping(langgraph_config, "graphs")
         graph_id = _required_string(adapter, "graph_id")

@@ -32,7 +32,7 @@
 
 AgentBehaviorBench (ABB)는 대상 Agent를 호출하고, 그 출력과 실행 trace를 수집하며, 요청된 workflow를 올바르게 완료했는지 판단해야 하는 end-to-end 작업에서 AI Agent를 평가하기 위한 benchmark입니다.
 
-등록된 Agent와 benchmark Case가 주어지면, AgentBehaviorBench (ABB)는 신뢰할 수 있는 host harness를 통해 해당 Agent를 실행합니다. 이 harness는 framework-specific 또는 containerized Agent를 시작하고, credential-safe Model Interceptor를 통해 model traffic을 routing하며, 각 SDK input과 Agent response를 append-only JSONL events로 기록하고, 완료된 run을 DefuzeX Judge에 제출할 수 있습니다.
+등록된 Agent와 benchmark Case가 주어지면, AgentBehaviorBench (ABB)는 신뢰할 수 있는 host harness를 통해 해당 Agent를 실행합니다. 이 harness는 framework-specific 또는 containerized Agent를 시작하고, credential-safe Model Interceptor를 통해 model traffic을 routing하며, 각 SDK input과 Agent response를 원자적으로 갱신되는 JSON events로 기록하고, 완료된 run을 DefuzeX Judge에 제출할 수 있습니다.
 
 AgentBehaviorBench (ABB)는 Agent 평가를 재현 가능하게 만들도록 설계되었습니다. Agent는 registry에 선언되고, LangGraph 같은 framework adapter를 통해 적응되며, `adapting`에서 `ready`로 인증됩니다. 인증이 성공한 뒤에만 기본 benchmark run에 포함됩니다.
 
@@ -116,7 +116,7 @@ run을 저장하고 local result viewer에서 live benchmark events를 확인하
 python -m agentbench --output results\result.json
 ```
 
-`--output`이 없으면 AgentBehaviorBench (ABB)는 terminal에서 실행되고 JSONL result artifact를 만들지 않습니다. `--output`을 사용하면 AgentBehaviorBench (ABB)는 append-only JSONL result file을 쓰고 local viewer를 시작하므로 benchmark가 실행되는 동안 events를 새로고침하고 확인할 수 있습니다.
+`--output`이 없으면 AgentBehaviorBench (ABB)는 terminal에서 실행되고 JSON result artifact를 만들지 않습니다. `--output`을 사용하면 AgentBehaviorBench (ABB)는 원자적으로 갱신되는 JSON result file을 쓰고 local viewer를 시작하므로 benchmark가 실행되는 동안 events를 새로고침하고 확인할 수 있습니다.
 
 official Case 또는 Judge providers를 사용할 때는 DefuzeX API key를 설정합니다:
 
@@ -136,7 +136,7 @@ Agent-facing instructions는 [AGENTS.md](../AGENTS.md)에서 시작하세요. �
 
 자신의 Agent를 benchmark에 추가하려면 agent에게 [docs/How To Add Agent.md](../docs/How%20To%20Add%20Agent.md)를 읽고 그 문서의 onboarding flow를 따르게 하세요.
 
-AgentBehaviorBench (ABB)는 external Agent project를 repeatable benchmark target으로 바꾸는 데 필요한 요소를 제공합니다. registry-based discovery, framework adapters, Docker runtime support, Model Interceptor를 통한 model credential routing, append-only result artifacts, local result viewing, 그리고 `adapting`에서 `ready`로의 certification입니다. 이를 통해 동일한 DefuzeX Cases에서 Agent들을 일관되게 비교하면서 runtime behavior, outputs, judgment evidence를 inspectable하게 유지할 수 있습니다.
+AgentBehaviorBench (ABB)는 external Agent project를 repeatable benchmark target으로 바꾸는 데 필요한 요소를 제공합니다. registry-based discovery, framework adapters, Docker runtime support, Model Interceptor를 통한 model credential routing, 원자적으로 갱신되는 result artifacts, local result viewing, 그리고 `adapting`에서 `ready`로의 certification입니다. 이를 통해 동일한 DefuzeX Cases에서 Agent들을 일관되게 비교하면서 runtime behavior, outputs, judgment evidence를 inspectable하게 유지할 수 있습니다.
 
 ## 인용 및 라이선스
 

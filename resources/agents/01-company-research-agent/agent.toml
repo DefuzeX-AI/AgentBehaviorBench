@@ -1,0 +1,29 @@
+# ABB configuration; upstream source files live unchanged in agent/.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "company-research-agent"
+display_name = "01 Company Research Agent"
+framework = "langgraph"
+
+[source]
+repository = "https://github.com/guy-hartstein/company-research-agent"
+revision = "c7142035a1cd413e34ad0595dbe9b5ca8b0308e8"
+downloaded_on = "2026-09-08"
+
+[runtime]
+type = "docker"
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+# Still adapting: launch bridge and llm_interception are not configured yet.
+# The runtime must not fall back to importing the Agent on the host.
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+# Source paths below are relative to agent/, not this manifest's directory.
+config = "langgraph.json"
+graph_id = "agent"
+input_key = "company"
+output_key = "report"

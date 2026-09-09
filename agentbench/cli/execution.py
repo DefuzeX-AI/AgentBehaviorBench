@@ -15,8 +15,6 @@ from agentbench.harness import (
 from agentbench.harness.registry import AgentRegistration
 from agentbench.harness.result import BenchmarkSuiteResult
 
-from .progress import ProgressPrinter, configuration_error
-from .TerminalUI import LLMActivity
 from .presentation import (
     agent_view_url,
     print_agent_complete,
@@ -24,7 +22,9 @@ from .presentation import (
     print_suite_summary,
     print_viewer_footer,
 )
+from .progress import ProgressPrinter, configuration_error
 from .result_export import ResultLogWriter, start_result_log
+from .TerminalUI import LLMActivity
 from .viewer import RunningViewer
 
 ViewerStarter = Callable[[Path], RunningViewer]
@@ -67,11 +67,9 @@ def run_benchmark_once(
     progress_printer = ProgressPrinter(output_fn, llm_activity=activity)
     try:
         try:
-            result = runner.run_defuzex(
+            result = runner.run(
                 agents,
                 suite_id=suite_id,
-                allow_local=True,
-                track_files=False,
                 on_agent_start=lambda agent, index, total: print_agent_start(
                     agent, index, total, output_fn
                 ),

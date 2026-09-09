@@ -86,9 +86,16 @@ Only after stage 5 should the Agent move to `DoneAgents/`.
 When an Agent reaches `DoneAgents/`, copy a minimal reviewed version into:
 
 ```text
-resources/agents/<order>-<agent-id>/
-resources/requirements/<agent-id>.md
+resources/agents/<user-defined-name>/
+  agent/           # upstream source
+  requirement.md
+  Dockerfile       # ABB build, context = outer directory
+  agent.toml       # ABB runtime and launch declaration
 ```
+
+The [Agent unit layout](./Layout.md) defines how these paths are read. Keep
+source configuration and dependency files inside `agent/`; keep ABB adaptation
+files outside it.
 
 Then register it as:
 

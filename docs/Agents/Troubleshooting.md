@@ -4,10 +4,10 @@ Search this page by the error text you see in the terminal or result artifact.
 
 ## `AgentInvocationError`
 
-This is a wrapper. Open the JSONL artifact and find the inner error:
+This is a wrapper. Open the JSON artifact and find the inner error:
 
 ```powershell
-python -m agentbench view results\certify-<agent-id>-<timestamp>.jsonl
+python -m agentbench view results\certify-<agent-id>-<timestamp>.json
 ```
 
 Common inner errors are below.
@@ -56,18 +56,11 @@ still fail if the mount is `noexec`.
 
 Fix: upload executable tools to `/run/agentbench-tools`, not `/tmp`.
 
-## Invalid JSONL
+## No native Agent caller configured
 
-Cause: logs or dependency output were written to stdout.
-
-Fix: reserve stdout for exactly one JSON object per input line and redirect
-Graph/dependency logs to stderr.
-
-## `mappingproxy is not JSON serializable`
-
-Cause: SDK payloads may be immutable mappings.
-
-Fix: transport and worker code must accept generic mappings, not only `dict`.
+Container startup and invocation are separate. Use the native service API or
+supply `RuntimeFactory(container_caller=...)` for legacy evaluation. Do not
+change the Agent's log output to satisfy an invocation protocol.
 
 ## Agent Works Locally But Not In Docker
 

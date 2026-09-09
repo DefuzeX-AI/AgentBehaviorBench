@@ -32,7 +32,7 @@
 
 AgentBehaviorBench (ABB) 是一个用于评估 AI Agent 的基准测试工具，面向需要调用目标 Agent、收集其输出和执行轨迹，并判断其是否正确完成指定工作流的端到端任务。
 
-给定一个已注册的 Agent 和一个 benchmark Case，AgentBehaviorBench (ABB) 会通过受信任的宿主 harness 运行该 Agent。该 harness 可以启动特定框架或容器化的 Agent，通过凭据安全的 Model Interceptor 路由模型流量，将每个 SDK input 和 Agent response 记录为只追加的 JSONL 事件，并把完成的运行提交给 DefuzeX Judge。
+给定一个已注册的 Agent 和一个 benchmark Case，AgentBehaviorBench (ABB) 会通过受信任的宿主 harness 运行该 Agent。该 harness 可以启动特定框架或容器化的 Agent，通过凭据安全的 Model Interceptor 路由模型流量，将每个 SDK input 和 Agent response 记录为原子更新的 JSON 事件，并把完成的运行提交给 DefuzeX Judge。
 
 AgentBehaviorBench (ABB) 旨在让 Agent 评估具备可复现性。Agent 在 registry 中声明，通过 LangGraph 等框架 adapter 接入，从 `adapting` 认证到 `ready`，并且只有在认证成功后才会进入默认 benchmark 运行。
 
@@ -116,7 +116,7 @@ python -m agentbench
 python -m agentbench --output results\result.json
 ```
 
-不传 `--output` 时，AgentBehaviorBench (ABB) 会在终端中运行，并且不会创建 JSONL result artifact。传入 `--output` 时，AgentBehaviorBench (ABB) 会写入一个只追加的 JSONL result file，并启动本地 viewer，便于你在 benchmark 运行期间刷新和检查 events。
+不传 `--output` 时，AgentBehaviorBench (ABB) 会在终端中运行，并且不会创建 JSON result artifact。传入 `--output` 时，AgentBehaviorBench (ABB) 会写入一个原子更新的 JSON result file，并启动本地 viewer，便于你在 benchmark 运行期间刷新和检查 events。
 
 使用官方 Case 或 Judge providers 时，请设置 DefuzeX API key：
 

@@ -1,4 +1,4 @@
-"""Local result viewer server for AgentBench JSONL artifacts."""
+"""Local result viewer server for AgentBench JSON snapshots."""
 
 from __future__ import annotations
 
@@ -99,7 +99,7 @@ def create_viewer_server(
 def build_viewer_handler(
     result_log: Path, *, expected_suite_id: str | None
 ) -> type[SimpleHTTPRequestHandler]:
-    """Build a request handler bound to one JSONL result artifact."""
+    """Build a request handler bound to one JSON result artifact."""
 
     class ViewerHandler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):  # type: ignore[no-untyped-def]
@@ -159,28 +159,23 @@ def build_viewer_handler(
 
 
 def parse_result_log(path: str | Path) -> dict[str, object]:
-    """Parse a JSONL result log into the shape consumed by the viewer."""
+    """Read a JSON event array into the shape consumed by the viewer."""
 
     result_path = Path(path)
     events: list[dict[str, object]] = []
     parse_errors: list[dict[str, object]] = []
 
-    for line_number, line in enumerate(
-        result_path.read_text(encoding="utf-8").splitlines(), start=1
-    ):
-        if not line.strip():
-            continue
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError as exc:
-            parse_errors.append({"line": line_number, "message": exc.msg})
-            continue
-        if isinstance(event, dict):
-            events.append(event)
-        else:
-            parse_errors.append(
-                {"line": line_number, "message": "Expected JSON object"}
-            )
+    try:
+        document = json.loads(result_path.read_text(encoding="utf-8"))
+        if not isinstance(document, list):
+            raise ValueError("Expected an array of event objects")
+        for index, event in enumerate(document):
+            if isinstance(event, dict):
+                events.append(event)
+            else:
+                parse_errors.append({"index": index, "message": "Expected JSON object"})
+    except (json.JSONDecodeError, ValueError) as exc:
+        parse_errors.append({"message": str(exc)})
 
     suite_id: str | None = None
     selected_agent_ids: list[str] = []
@@ -237,16 +232,8 @@ def parse_result_log(path: str | Path) -> dict[str, object]:
 def _result_log_suite_id(path: Path) -> str | None:
     """Read the Suite ID from the first valid run-start event."""
 
-    for line in path.read_text(encoding="utf-8").splitlines():
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if not isinstance(event, dict) or event.get("event") != "run_started":
-            continue
-        suite_id = event.get("suite_id")
-        return suite_id if isinstance(suite_id, str) else None
-    return None
+    suite_id = parse_result_log(path)["suite_id"]
+    return suite_id if isinstance(suite_id, str) else None
 
 
 def _locked_viewer_url(base_url: str, suite_id: str | None) -> str:

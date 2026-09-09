@@ -10,7 +10,7 @@ covers:
 
 - complete usage for `run`, `view`, and `certify`;
 - all positional arguments, options, defaults, and compatibility forms;
-- interactive prompts, exit codes, JSONL results, and viewer lifecycle;
+- interactive prompts, exit codes, JSON results, and viewer lifecycle;
 - certification and Registry update rules from `adapting` to `ready`;
 - the CLI feature registration structure and implementation rules for new
   commands.
@@ -33,7 +33,7 @@ Continue reading based on the task scope:
 
 - A downloaded Agent has not been converted yet: read
   [`Agents/Factory.md`](./Agents/Factory.md).
-- Docker, package data, JSONL worker behavior, or the Model Interceptor is involved:
+- Docker, package data, native Agent API behavior, or the Model Interceptor is involved:
   read [`Agents/Runtime.md`](./Agents/Runtime.md).
 - You need to understand `certify`, `ready`, Judge FAIL, or result files:
   read [`Agents/Certify.md`](./Agents/Certify.md).

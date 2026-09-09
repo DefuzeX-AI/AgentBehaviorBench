@@ -4,18 +4,13 @@ from __future__ import annotations
 
 import time
 from argparse import ArgumentParser, Namespace
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 
-from agentbench.harness import SuiteRunner
-from agentbench.harness.registry import load_registry
-from agentbench.runtime.interception import DEFAULT_TRACE_MAX_BYTES
-
 from agentbench.cli.constants import ANSI_GREEN, LOGO_PAUSE_SECONDS
-from agentbench.cli.execution import run_benchmark_once, stop_viewer
 from agentbench.cli.environment import load_project_environment
+from agentbench.cli.execution import run_benchmark_once, stop_viewer
 from agentbench.cli.logo import print_logo
-from agentbench.cli.TerminalUI import LLMActivity
 from agentbench.cli.presentation import (
     confirm_agents,
     panel_line,
@@ -23,8 +18,13 @@ from agentbench.cli.presentation import (
     print_agents,
     request_viewer_action,
 )
-from agentbench.cli.viewer import RunningViewer, start_viewer_server
+from agentbench.cli.sdk import configure_sdk_parser, sdk_arguments
+from agentbench.cli.TerminalUI import LLMActivity
 from agentbench.cli.trace_runtime import build_trace_suite_runner
+from agentbench.cli.viewer import RunningViewer, start_viewer_server
+from agentbench.harness import SDK, ProviderSelectionError, SuiteRunner
+from agentbench.harness.registry import load_registry
+from agentbench.runtime.interception import DEFAULT_TRACE_MAX_BYTES
 
 from .base import CommandFeature
 
@@ -34,6 +34,7 @@ DEFAULT_REGISTRY_PATH = (
 
 
 def configure_parser(parser: ArgumentParser) -> None:
+    configure_sdk_parser(parser)
     parser.add_argument(
         "--env-file",
         metavar="PATH",
@@ -43,7 +44,7 @@ def configure_parser(parser: ArgumentParser) -> None:
         "--output",
         metavar="PATH",
         help=(
-            "Write a unique append-only JSONL result artifact, including "
+            "Write a unique JSON result snapshot, including "
             "trace-like step data."
         ),
     )
@@ -69,7 +70,11 @@ def configure_parser(parser: ArgumentParser) -> None:
 
 def execute(args: Namespace) -> int:
     load_project_environment(args.env_file)
-    kwargs: dict[str, object] = {"output_path": args.output}
+    try:
+        kwargs: dict[str, object] = {"output_path": args.output, **sdk_arguments(args)}
+    except ProviderSelectionError as exc:
+        print(f"SDK configuration error: {exc}")
+        return 2
     if args.model is not None:
         kwargs["model"] = args.model
     if args.llm_trace != "off":
@@ -85,6 +90,8 @@ def run(
     input_fn: Callable[[str], str] = input,
     output_fn: Callable[[str], None] = print,
     suite_runner: SuiteRunner | None = None,
+    sdk: SDK | None = None,
+    sdk_options: Mapping[str, object] | None = None,
     sleep_fn: Callable[[float], None] = time.sleep,
     output_path: str | Path | None = None,
     viewer_starter: Callable[[Path], RunningViewer] = start_viewer_server,
@@ -94,6 +101,10 @@ def run(
     model: str | None = None,
 ) -> int:
     """Confirm ready Agents, run the suite, and return a shell exit code."""
+    if suite_runner is not None and (sdk is not None or sdk_options is not None):
+        raise ValueError(
+            "Configure sdk on the supplied suite_runner, or omit suite_runner"
+        )
 
     print_logo(output_fn)
     sleep_fn(LOGO_PAUSE_SECONDS)
@@ -128,6 +139,8 @@ def run(
         output_fn=output_fn,
         model=model,
         activity_sink=llm_activity,
+        sdk=sdk,
+        sdk_options=sdk_options,
     )
     while True:
         execution = run_benchmark_once(

@@ -96,9 +96,19 @@ def _parse_agent(item: dict[str, object], repo_root: Path) -> AgentRegistration:
     if manifest.get("agent_id") != agent_id:
         raise ValueError(f"Registry and manifest agent_id differ for {agent_id}")
 
-    requirement_path = (
-        repo_root / "resources" / "requirements" / f"{agent_id}.md"
-    ).resolve()
+    source_path = (agent_path / "agent").resolve()
+    if not source_path.is_relative_to(agent_path):
+        raise ValueError(f"Agent source escapes agent directory: {source_path}")
+    if not source_path.is_dir():
+        raise FileNotFoundError(f"Agent source directory does not exist: {source_path}")
+
+    dockerfile = agent_path / "Dockerfile"
+    if not dockerfile.is_file():
+        raise FileNotFoundError(f"Agent Dockerfile does not exist: {dockerfile}")
+
+    requirement_path = (agent_path / "requirement.md").resolve()
+    if not requirement_path.is_relative_to(agent_path):
+        raise ValueError(f"Agent requirement escapes agent directory: {requirement_path}")
     if not requirement_path.is_file():
         raise FileNotFoundError(
             f"Agent requirement does not exist: {requirement_path}"

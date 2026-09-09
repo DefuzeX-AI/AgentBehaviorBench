@@ -1,136 +1,113 @@
+"""Container contracts use a dedicated fixture, independent of the Agent catalog."""
 from pathlib import Path
 
 import pytest
 
 from agentbench.adapter import DEFAULT_ADAPTER_FACTORY
-from agentbench.harness import AgentRegistry
-from agentbench.runtime.agentcontainer import (
-    AgentContainerConfig,
-    ContainerAgentAdapter,
-)
+from agentbench.adapter import AdapterInvocation
+from agentbench.harness import AgentRegistration
+from agentbench.runtime.agentcontainer import AgentContainerConfig, ContainerAgentAdapter
 from agentbench.runtime.contracts import EnvironmentSecretResolver
 from agentbench.runtime.factory import RuntimeFactory
 from agentbench.runtime.interception import InterceptionConfig
+from agentbench.runtime.agentcontainer.config import runtime_type
 
 
-@pytest.mark.parametrize(
-    "directory",
-    [
-        "02-langgraph-chat-agent",
-        "03-email-assistant",
-        "04-swe-agent",
-        "05-langgraph-customer-support-agent",
-    ],
-)
-def test_docker_agents_declare_manifest_v2_interception(
-    repo_root: Path, directory: str
-) -> None:
-    config = InterceptionConfig.from_agent_dir(
-        repo_root / "resources" / "agents" / directory
-    )
-
+def test_fixture_declares_manifest_v2_interception(repo_root: Path) -> None:
+    config = InterceptionConfig.from_agent_dir(repo_root / "tests/fixtures/interceptor-agent")
     assert config is not None
     assert config.required
     assert config.routes
 
 
-def test_chat_agent_container_configuration_is_machine_driven(
-    repo_root: Path,
-) -> None:
-    agent_root = repo_root / "resources" / "agents" / "02-langgraph-chat-agent"
-
+def test_container_configuration_is_machine_driven(repo_root: Path) -> None:
     config = AgentContainerConfig.from_agent_dir(
-        agent_root,
+        repo_root / "tests/fixtures/interceptor-agent",
         secret_resolver=EnvironmentSecretResolver({}),
         environ={},
     )
-
-    assert config.argv == ("python", "-m", "chat_agent.worker")
-    assert config.timeout_sec == 60
+    assert config.argv == ("python", "/opt/agent/worker.py")
+    assert config.timeout_sec == 30
     assert config.environment == {}
+    assert config.build_context == repo_root / "tests/fixtures/interceptor-agent"
+    assert config.dockerfile == config.build_context / "Dockerfile"
 
 
-def test_email_agent_declares_container_contract(repo_root: Path) -> None:
-    agent_root = repo_root / "resources" / "agents" / "03-email-assistant"
-    environ = {"OPENAI_API_KEY": "upstream-secret"}
-
-    config = AgentContainerConfig.from_agent_dir(
-        agent_root,
-        secret_resolver=EnvironmentSecretResolver(environ),
-        environ=environ,
+def test_company_research_selects_docker_without_importing_source(registry) -> None:
+    registration = registry.find("company-research-agent")
+    assert runtime_type(registration.path) == "docker"
+    adapter = RuntimeFactory().create_adapter(
+        registration, adapter_factory=DEFAULT_ADAPTER_FACTORY
     )
-
-    assert config.argv == ("python", "-m", "email_assistant.worker")
-    assert config.timeout_sec == 120
-
-
-def test_swe_agent_declares_container_contract(repo_root: Path) -> None:
-    agent_root = repo_root / "resources" / "agents" / "04-swe-agent"
-
-    config = AgentContainerConfig.from_agent_dir(
-        agent_root,
-        secret_resolver=EnvironmentSecretResolver({}),
-        environ={"AGENTBENCH_CALL_LIMIT": "20"},
-    )
-
-    assert config.argv == ("python", "-m", "swe_agent_benchmark.worker")
-    assert config.timeout_sec == 600
-    assert config.environment == {"AGENTBENCH_CALL_LIMIT": "20"}
-
-
-def test_swe_agent_declares_packaged_fixture_files(repo_root: Path) -> None:
-    try:
-        import tomllib
-    except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
-        import tomli as tomllib  # type: ignore[no-redef]
-
-    agent_root = repo_root / "resources" / "agents" / "04-swe-agent"
-    pyproject = tomllib.loads(
-        agent_root.joinpath("pyproject.toml").read_text(encoding="utf-8")
-    )
-    files = pyproject["tool"]["setuptools"]["package-data"]["benchmark_mocks"]
-
-    assert files
-    for relative in files:
-        assert agent_root.joinpath("src", "benchmark_mocks", relative).is_file()
-
-
-def test_swe_agent_declares_config_root_for_relative_tool_paths(repo_root: Path) -> None:
-    dockerfile = repo_root / "resources" / "agents" / "04-swe-agent" / "Dockerfile"
-
-    assert "SWE_AGENT_CONFIG_ROOT=/opt/agent" in dockerfile.read_text(encoding="utf-8")
-
-
-def test_customer_support_agent_declares_container_contract(repo_root: Path) -> None:
-    agent_root = (
-        repo_root / "resources" / "agents" / "05-langgraph-customer-support-agent"
-    )
-
-    config = AgentContainerConfig.from_agent_dir(
-        agent_root,
-        secret_resolver=EnvironmentSecretResolver({}),
-        environ={},
-    )
-
-    assert config.argv == ("python", "-m", "support_agent.worker")
-    assert config.timeout_sec == 120
-    assert config.environment == {}
-
-
-def test_runtime_factory_selects_container_without_starting_docker(
-    registry: AgentRegistry,
-) -> None:
-    class NeverStartedRuntime:
-        def start(self, agent):  # type: ignore[no-untyped-def]
-            raise AssertionError("Runtime should remain lazy")
-
-    registration = registry.find("langgraph-chat-agent", enabled_only=False)
-    factory = RuntimeFactory(docker_builder=NeverStartedRuntime)
-
-    adapter = factory.create_adapter(
-        registration,
-        adapter_factory=DEFAULT_ADAPTER_FACTORY,
-    )
-
     assert isinstance(adapter, ContainerAgentAdapter)
     assert not adapter.is_loaded
+
+
+def test_runtime_factory_selects_container_without_starting_docker(repo_root: Path) -> None:
+    class NeverStartedRuntime:
+        def start(self, agent):
+            raise AssertionError("Runtime should remain lazy")
+
+    registration = AgentRegistration(
+        agent_id="interceptor-smoke-agent",
+        path=repo_root / "tests/fixtures/interceptor-agent",
+        enabled=True,
+        status="ready",
+        framework="fixture",
+        source="test-fixture",
+    )
+    factory = RuntimeFactory(docker_builder=NeverStartedRuntime)
+    adapter = factory.create_adapter(registration, adapter_factory=DEFAULT_ADAPTER_FACTORY)
+    assert isinstance(adapter, ContainerAgentAdapter)
+    assert not adapter.is_loaded
+
+
+def test_explicit_caller_works_with_lifecycle_only_session(starter_agent):
+    events = []
+
+    class Session:
+        is_running = True
+
+        def trace_checkpoint(self):
+            events.append("checkpoint")
+            return "checkpoint-1"
+
+        def validate_trace(self, checkpoint):
+            assert checkpoint == "checkpoint-1"
+            events.append("validate")
+
+        def close(self):
+            self.is_running = False
+            events.append("close")
+
+    session = Session()
+
+    class Runtime:
+        def start(self, agent):
+            events.append("start")
+            return session
+
+    def caller(running, value, config):
+        assert running is session
+        assert config == {"job": 1}
+        events.append("native call")
+        return AdapterInvocation(output=value, raw_output="native response")
+
+    adapter = ContainerAgentAdapter(starter_agent, Runtime(), caller=caller)
+    try:
+        result = adapter.invoke("company", run_config={"job": 1})
+        assert result.output == "company"
+        assert result.raw_output == "native response"
+    finally:
+        adapter.close()
+    assert events == ["start", "checkpoint", "native call", "validate", "close"]
+
+
+def test_missing_caller_does_not_start_a_container(starter_agent):
+    class Runtime:
+        def start(self, agent):
+            raise AssertionError("Missing API caller must fail before startup")
+
+    adapter = ContainerAgentAdapter(starter_agent, Runtime())
+    with pytest.raises(RuntimeError, match="No native Agent caller configured"):
+        adapter.invoke("company")

@@ -4,23 +4,14 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from agentbench.adapter import AdapterInvocation, AgentDescriptor
+from agentbench.adapter import AgentDescriptor
 
 
 @runtime_checkable
 class RuntimeSession(Protocol):
+    """Process lifecycle only; native Agent communication belongs to a caller."""
     @property
     def is_running(self) -> bool:
-        ...
-
-    def invoke(
-        self, value: object, *, run_config: object | None = None
-    ) -> AdapterInvocation:
-        ...
-
-    async def ainvoke(
-        self, value: object, *, run_config: object | None = None
-    ) -> AdapterInvocation:
         ...
 
     def close(self) -> None:

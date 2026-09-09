@@ -32,7 +32,7 @@
 
 AgentBehaviorBench (ABB) 是一套用於評估 AI Agent 的 benchmark，面向需要呼叫目標 Agent、收集其輸出和執行 trace，並判斷其是否正確完成指定 workflow 的端到端任務。
 
-給定一個已註冊的 Agent 和一個 benchmark Case，AgentBehaviorBench (ABB) 會透過受信任的 host harness 執行該 Agent。這個 harness 可以啟動特定 framework 或容器化的 Agent，透過 credential-safe 的 Model Interceptor 路由 model traffic，將每個 SDK input 和 Agent response 記錄為 append-only JSONL events，並把完成的 run 提交給 DefuzeX Judge。
+給定一個已註冊的 Agent 和一個 benchmark Case，AgentBehaviorBench (ABB) 會透過受信任的 host harness 執行該 Agent。這個 harness 可以啟動特定 framework 或容器化的 Agent，透過 credential-safe 的 Model Interceptor 路由 model traffic，將每個 SDK input 和 Agent response 記錄為 原子更新的 JSON events，並把完成的 run 提交給 DefuzeX Judge。
 
 AgentBehaviorBench (ABB) 旨在讓 Agent 評估具備可重現性。Agent 會在 registry 中宣告，透過 LangGraph 等 framework adapters 接入，從 `adapting` 認證到 `ready`，並且只有在認證成功後才會被納入預設 benchmark runs。
 
@@ -116,7 +116,7 @@ python -m agentbench
 python -m agentbench --output results\result.json
 ```
 
-不傳 `--output` 時，AgentBehaviorBench (ABB) 會在 terminal 中執行，且不會建立 JSONL result artifact。傳入 `--output` 時，AgentBehaviorBench (ABB) 會寫入一個 append-only JSONL result file，並啟動 local viewer，讓你可以在 benchmark 執行期間重新整理並檢查 events。
+不傳 `--output` 時，AgentBehaviorBench (ABB) 會在 terminal 中執行，且不會建立 JSON result artifact。傳入 `--output` 時，AgentBehaviorBench (ABB) 會寫入一個 原子更新的 JSON result file，並啟動 local viewer，讓你可以在 benchmark 執行期間重新整理並檢查 events。
 
 使用 official Case 或 Judge providers 時，請設定 DefuzeX API key：
 
@@ -136,7 +136,7 @@ python -m pytest
 
 如果你想把自己的 Agent 加入 benchmark，請讓 agent 閱讀 [docs/How To Add Agent.md](../docs/How%20To%20Add%20Agent.md)，並按照其中記錄的 onboarding flow 操作。
 
-AgentBehaviorBench (ABB) 提供了把 external Agent project 轉換為 repeatable benchmark target 所需的元件：registry-based discovery、framework adapters、Docker runtime support、透過 Model Interceptor 路由 model credentials、append-only result artifacts、local result viewing，以及從 `adapting` 到 `ready` 的 certification。這讓你可以用同一組 DefuzeX Cases 一致地比較不同 Agent，同時讓 runtime behavior、outputs 和 judgment evidence 保持可檢查。
+AgentBehaviorBench (ABB) 提供了把 external Agent project 轉換為 repeatable benchmark target 所需的元件：registry-based discovery、framework adapters、Docker runtime support、透過 Model Interceptor 路由 model credentials、原子更新的 result artifacts、local result viewing，以及從 `adapting` 到 `ready` 的 certification。這讓你可以用同一組 DefuzeX Cases 一致地比較不同 Agent，同時讓 runtime behavior、outputs 和 judgment evidence 保持可檢查。
 
 ## 引用和授權
 

@@ -89,7 +89,7 @@ def test_benchmark_runner_drives_sdk_handshake(
     result = BenchmarkRunner().run(starter_agent, sdk_run)
 
     assert result.passed
-    assert result.agent_id == "langgraph-new-project"
+    assert result.agent_id == "test-echo"
     assert result.adapter_name == "LangGraphAdapter"
     assert result.run_state == "report_ready"
     assert result.history_count == 1
@@ -174,8 +174,8 @@ def test_benchmark_runner_emits_step_callbacks(
         ),
     )
 
-    assert started == [("langgraph-new-project", "input_test", "DEFUZEX_AGENT_READY")]
-    assert completed == [("langgraph-new-project", "input_test", "DEFUZEX_AGENT_READY")]
+    assert started == [("test-echo", "input_test", "DEFUZEX_AGENT_READY")]
+    assert completed == [("test-echo", "input_test", "DEFUZEX_AGENT_READY")]
 
 
 def test_benchmark_runner_emits_step_failure_after_judge_error(
@@ -199,7 +199,7 @@ def test_benchmark_runner_emits_step_failure_after_judge_error(
 
     assert len(failures) == 1
     agent_id, failure = failures[0]
-    assert agent_id == "langgraph-new-project"
+    assert agent_id == "test-echo"
     assert failure.input_id == "input_test"
     assert failure.payload == "DEFUZEX_AGENT_READY"
     assert failure.output == "DEFUZEX_AGENT_READY"

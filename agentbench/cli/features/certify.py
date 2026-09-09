@@ -4,24 +4,30 @@ from __future__ import annotations
 
 import re
 from argparse import ArgumentParser, Namespace
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 
-from agentbench.harness import BenchmarkSuiteResult, SuiteRunner
-from agentbench.harness.registry import load_registry
-from agentbench.runtime.interception import DEFAULT_TRACE_MAX_BYTES
-
-from agentbench.cli.execution import run_benchmark_once
 from agentbench.cli.environment import load_project_environment
+from agentbench.cli.execution import run_benchmark_once
 from agentbench.cli.registry_status import RegistryStatusError, update_agent_status
+from agentbench.cli.sdk import configure_sdk_parser, sdk_arguments
 from agentbench.cli.TerminalUI import LLMActivity
 from agentbench.cli.trace_runtime import build_trace_suite_runner
+from agentbench.harness import (
+    SDK,
+    BenchmarkSuiteResult,
+    ProviderSelectionError,
+    SuiteRunner,
+)
+from agentbench.harness.registry import load_registry
+from agentbench.runtime.interception import DEFAULT_TRACE_MAX_BYTES
 
 from .base import CommandFeature
 from .run import DEFAULT_REGISTRY_PATH
 
 
 def configure_parser(parser: ArgumentParser) -> None:
+    configure_sdk_parser(parser)
     parser.add_argument("agent_id", help="Registered adapting Agent to certify.")
     parser.add_argument(
         "--env-file",
@@ -31,7 +37,7 @@ def configure_parser(parser: ArgumentParser) -> None:
     parser.add_argument(
         "--output",
         metavar="PATH",
-        help="Optional base path for the append-only certification result.",
+        help="Optional base path for the JSON certification snapshot.",
     )
     parser.add_argument(
         "--model",
@@ -54,7 +60,11 @@ def configure_parser(parser: ArgumentParser) -> None:
 
 def execute(args: Namespace) -> int:
     load_project_environment(args.env_file)
-    kwargs: dict[str, object] = {"output_path": args.output}
+    try:
+        kwargs: dict[str, object] = {"output_path": args.output, **sdk_arguments(args)}
+    except ProviderSelectionError as exc:
+        print(f"SDK configuration error: {exc}")
+        return 2
     if args.model is not None:
         kwargs["model"] = args.model
     if args.llm_trace != "off":
@@ -71,11 +81,17 @@ def certify(
     output_path: str | Path | None = None,
     output_fn: Callable[[str], None] = print,
     suite_runner: SuiteRunner | None = None,
+    sdk: SDK | None = None,
+    sdk_options: Mapping[str, object] | None = None,
     llm_trace: str = "off",
     llm_trace_max_bytes: int = DEFAULT_TRACE_MAX_BYTES,
     model: str | None = None,
 ) -> int:
     """Run one adapting Agent and promote it after adapter execution succeeds."""
+    if suite_runner is not None and (sdk is not None or sdk_options is not None):
+        raise ValueError(
+            "Configure sdk on the supplied suite_runner, or omit suite_runner"
+        )
 
     registry = load_registry(registry_path)
     try:
@@ -110,6 +126,8 @@ def certify(
             output_fn=output_fn,
             model=model,
             activity_sink=llm_activity,
+            sdk=sdk,
+            sdk_options=sdk_options,
         ),
         output_path=artifact_base,
         output_fn=output_fn,
@@ -142,9 +160,7 @@ def certify(
     return 0
 
 
-def _agent_completed_certification(
-    result: BenchmarkSuiteResult, agent_id: str
-) -> bool:
+def _agent_completed_certification(result: BenchmarkSuiteResult, agent_id: str) -> bool:
     if result.skipped_count != 0:
         return False
     if len(result.items) != 1:
@@ -160,7 +176,7 @@ def _agent_completed_certification(
 def _default_output_path(registry_path: str | Path, agent_id: str) -> Path:
     repo_root = Path(registry_path).resolve().parent.parent
     safe_agent_id = re.sub(r"[^A-Za-z0-9._-]+", "-", agent_id).strip("-")
-    return repo_root / "results" / f"certify-{safe_agent_id or 'agent'}.jsonl"
+    return repo_root / "results" / f"certify-{safe_agent_id or 'agent'}.json"
 
 
 FEATURE = CommandFeature(

@@ -135,7 +135,6 @@ class DockerRuntime:
                 self._executable,
                 "run",
                 "--rm",
-                "--interactive",
                 "--init",
                 "--name",
                 agent_name,
@@ -164,7 +163,7 @@ class DockerRuntime:
 
             process = subprocess.Popen(
                 command,
-                stdin=subprocess.PIPE,
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -188,14 +187,13 @@ class DockerRuntime:
 
             return DockerSession(
                 process,
-                timeout_sec=config.timeout_sec,
                 close_callback=cleanup,
-                invoke_start_callback=(
+                trace_checkpoint=(
                     trace_state.checkpoint
                     if interception is not None and interception.required
                     else None
                 ),
-                invoke_complete_callback=(
+                trace_validator=(
                     self._required_trace_callback(trace_state)
                     if interception is not None and interception.required
                     else None

@@ -50,11 +50,6 @@ class AgentContainerConfig:
             raise ContainerConfigurationError(
                 f"Expected Docker runtime, got {runtime_type!r}"
             )
-        if _required_string(launch, "input_mode") != "jsonl":
-            raise ContainerConfigurationError("Docker launch input_mode must be 'jsonl'")
-        if _required_string(launch, "output_format") != "jsonl":
-            raise ContainerConfigurationError("Docker launch output_format must be 'jsonl'")
-
         context = _resolve_inside(root, _required_string(build, "context"))
         dockerfile = _resolve_inside(context, _required_string(build, "dockerfile"))
         if not dockerfile.is_file():

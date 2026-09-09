@@ -1,4 +1,4 @@
-"""Execute DefuzeX SDK benchmark runs through registered agents."""
+"""Execute SDK runs through registered agents."""
 
 from __future__ import annotations
 
@@ -6,9 +6,19 @@ import os
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
+from agentbench.sdk.defuzex import (
+    DefuzeConfiguration,
+)
+from agentbench.sdk.defuzex import (
+    create_run as _create_defuzex_run,
+)
+from agentbench.sdk.defuzex import (
+    validate_installation as _validate_defuzex_installation,
+)
+
 from ..errors import AgentInvocationError, ProviderSelectionError
 from ..progress import ProgressCallback, emit_progress
-from ..protocols import SDKReport, SDKRun, SDKRunFactory
+from ..protocols import SDK, SDKReport, SDKRun, SDKRunFactory
 from ..registry import AgentRegistration
 from ..result import BenchmarkResult, BenchmarkStepFailure, BenchmarkStepResult
 from .agent_runner import AgentRunner
@@ -20,15 +30,21 @@ StepFailureCallback = Callable[[str, BenchmarkStepFailure], None]
 
 
 class BenchmarkRunner:
-    """Drive one DefuzeX SDK Run through a registered agent."""
+    """Drive one compatible SDK Run through a registered agent."""
 
     def __init__(
         self,
         *,
+        sdk: SDK | None = None,
+        sdk_options: Mapping[str, object] | None = None,
         agent_runner: AgentRunner | None = None,
         sdk_run_factory: SDKRunFactory | None = None,
         environ: Mapping[str, str] | None = None,
     ) -> None:
+        if sdk is not None and sdk_run_factory is not None:
+            raise ValueError("Pass sdk or sdk_run_factory, not both")
+        self._sdk = sdk
+        self._sdk_options = dict(sdk_options or {})
         self._agent_runner = agent_runner or AgentRunner()
         self._sdk_run_factory = sdk_run_factory or _create_defuzex_run
         self._environ = os.environ if environ is None else environ
@@ -64,6 +80,27 @@ class BenchmarkRunner:
             save_local=save_local,
         )
 
+        return self._execute(
+            registration,
+            create_run=lambda: self._sdk_run_factory(**run_kwargs),
+            provider_mode=provider_mode,
+            on_progress=on_progress,
+            on_step_start=on_step_start,
+            on_step_complete=on_step_complete,
+            on_step_failure=on_step_failure,
+        )
+
+    def _execute(
+        self,
+        registration: AgentRegistration,
+        *,
+        create_run: Callable[[], SDKRun],
+        provider_mode: str,
+        on_progress: ProgressCallback | None = None,
+        on_step_start: StepStartCallback | None = None,
+        on_step_complete: StepCompleteCallback | None = None,
+        on_step_failure: StepFailureCallback | None = None,
+    ) -> BenchmarkResult:
         emit_progress(
             on_progress,
             stage="agent_start",
@@ -98,7 +135,7 @@ class BenchmarkRunner:
                 detail=provider_mode,
             )
             try:
-                sdk_run = self._sdk_run_factory(**run_kwargs)
+                sdk_run = create_run()
             except Exception as exc:
                 emit_progress(
                     on_progress,
@@ -163,11 +200,68 @@ class BenchmarkRunner:
             provider_mode=provider_mode,
         )
 
-    def run(self, registration: AgentRegistration, sdk_run: SDKRun) -> BenchmarkResult:
-        """Execute the SDK get_input/invoke/submit handshake to completion."""
+    def run(
+        self,
+        registration: AgentRegistration,
+        sdk_run: SDKRun | None = None,
+        *,
+        on_progress: ProgressCallback | None = None,
+        on_step_start: StepStartCallback | None = None,
+        on_step_complete: StepCompleteCallback | None = None,
+        on_step_failure: StepFailureCallback | None = None,
+    ) -> BenchmarkResult:
+        """Create a Run using sdk=..., or execute an already-created SDKRun.
 
-        with self._agent_runner.start(registration) as running:
-            return self._run_with_running(registration, sdk_run, running)
+        A supplied SDK receives repo_path plus sdk_options unchanged. It owns
+        credentials, providers, validation and judging. No DefuzeX settings are
+        added to that path. Omitting sdk preserves the DefuzeX default.
+        """
+        callbacks = dict(
+            on_progress=on_progress,
+            on_step_start=on_step_start,
+            on_step_complete=on_step_complete,
+            on_step_failure=on_step_failure,
+        )
+        if sdk_run is not None:
+            if self._sdk is not None or self._sdk_options:
+                raise ValueError(
+                    "An existing sdk_run cannot be combined with sdk or sdk_options"
+                )
+            with self._agent_runner.start(registration) as running:
+                return self._run_with_running(
+                    registration,
+                    sdk_run,
+                    running,
+                    on_step_start=on_step_start,
+                    on_step_complete=on_step_complete,
+                    on_step_failure=on_step_failure,
+                )
+        if self._sdk is None:
+            return self.run_defuzex(registration, **self._sdk_options, **callbacks)
+        mode = self.validate_sdk(registration)
+        kwargs = {"repo_path": registration.path, **self._sdk_options}
+        return self._execute(
+            registration,
+            create_run=lambda: self._sdk.create_run(**kwargs),
+            provider_mode=mode,
+            **callbacks,
+        )
+
+    def validate_sdk(self, registration: AgentRegistration) -> str:
+        """Check the selected SDK interface without starting an Agent or Run."""
+        if self._sdk is None:
+            return self.validate_defuzex(registration, **self._sdk_options)
+        if isinstance(self._sdk, type) or not callable(
+            getattr(self._sdk, "create_run", None)
+        ):
+            raise ProviderSelectionError(
+                "sdk must provide a callable create_run(**options)"
+            )
+        if "repo_path" in self._sdk_options:
+            raise ProviderSelectionError(
+                "repo_path is supplied per Agent; omit it from sdk_options"
+            )
+        return "custom"
 
     def validate_defuzex(
         self,
@@ -288,7 +382,9 @@ class BenchmarkRunner:
         track_files: bool,
         save_local: bool,
     ) -> tuple[str, dict[str, object]]:
-        provider_mode, run_kwargs = self._sdk_run_configuration(
+        if self._sdk is not None:
+            raise ValueError("Use run() and validate_sdk() with an injected sdk")
+        provider_mode, run_kwargs = DefuzeConfiguration(self._environ).prepare(
             registration=registration,
             requirement_path=requirement_path,
             case_provider=case_provider,
@@ -314,97 +410,6 @@ class BenchmarkRunner:
             )
         except Exception:
             pass
-
-    def _sdk_run_configuration(
-        self,
-        *,
-        registration: AgentRegistration,
-        requirement_path: str | Path | None,
-        case_provider: object | None,
-        judge_provider: object | None,
-        api_key: str | None,
-        max_inputs: int | None,
-        allow_local: bool,
-        track_files: bool,
-        save_local: bool,
-    ) -> tuple[str, dict[str, object]]:
-        has_case_provider = case_provider is not None
-        has_judge_provider = judge_provider is not None
-        if has_case_provider != has_judge_provider:
-            raise ProviderSelectionError(
-                "Provide both case_provider and judge_provider for local mode"
-            )
-
-        common: dict[str, object] = {
-            "repo_path": registration.path,
-            "allow_local": allow_local,
-            "track_files": track_files,
-            "save_local": save_local,
-        }
-        if has_case_provider and has_judge_provider:
-            if requirement_path is not None:
-                common["requirement_path"] = requirement_path
-            if max_inputs is None:
-                raise ProviderSelectionError(
-                    "Local custom Providers require max_inputs"
-                )
-            common.update(
-                case_provider=case_provider,
-                judge_provider=judge_provider,
-                max_inputs=max_inputs,
-            )
-            return "local", common
-
-        resolved_key = self._official_api_key(api_key)
-        if resolved_key is None:
-            raise ProviderSelectionError(
-                "No DefuzeX API key or local Provider pair is configured. Set "
-                "DEFUZEX_API_KEY or provide both case_provider and "
-                "judge_provider."
-            )
-        resolved_requirement = requirement_path or registration.requirement_path
-        if resolved_requirement is None:
-            raise ProviderSelectionError(
-                "Official DefuzeX Providers require a registered or explicit "
-                "requirement_path"
-            )
-        common["requirement_path"] = resolved_requirement
-        common["api_key"] = resolved_key
-        return "official", common
-
-    def _official_api_key(self, explicit: str | None) -> str | None:
-        """Resolve the API key without logging secrets."""
-
-        return explicit or self._environ.get("DEFUZEX_API_KEY")
-
-
-def _create_defuzex_run(**kwargs: object) -> SDKRun:
-    """Import the SDK lazily so agent-only usage remains lightweight."""
-
-    try:
-        from defuzex import create_run
-    except ModuleNotFoundError as exc:
-        raise ProviderSelectionError(
-            "DefuzeX SDK is not installed in the active Python environment"
-        ) from exc
-    return create_run(**kwargs)  # type: ignore[arg-type, return-value]
-
-
-def _validate_defuzex_installation(
-    provider_mode: str, run_kwargs: Mapping[str, object]
-) -> None:
-    """Import the SDK and validate official credentials without a request."""
-
-    try:
-        from defuzex import DefuzeClient
-    except ModuleNotFoundError as exc:
-        raise ProviderSelectionError(
-            "DefuzeX SDK is not installed in the active Python environment"
-        ) from exc
-
-    if provider_mode == "official":
-        api_key = run_kwargs.get("api_key")
-        DefuzeClient(api_key=api_key if isinstance(api_key, str) else None)
 
 
 def _error_detail(exc: Exception) -> str:

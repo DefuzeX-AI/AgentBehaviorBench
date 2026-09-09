@@ -10,7 +10,7 @@ from .base import CommandFeature
 
 
 def configure_parser(parser: ArgumentParser) -> None:
-    parser.add_argument("result_log", help="Path to an AgentBench .jsonl result log.")
+    parser.add_argument("result_log", help="Path to an AgentBench JSON result snapshot.")
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
 

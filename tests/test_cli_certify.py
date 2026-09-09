@@ -1,8 +1,8 @@
 import json
 from pathlib import Path
 
-from agentbench.cli.main import cli
 from agentbench.cli.features.certify import certify
+from agentbench.cli.main import cli
 from agentbench.harness import BenchmarkSuiteResult, SuiteAgentResult
 from agentbench.harness.registry import load_registry
 from tests.test_cli import FakeSuiteRunner
@@ -30,18 +30,21 @@ def test_cli_dispatches_certify_trace_options(monkeypatch) -> None:
 
     monkeypatch.setattr("agentbench.cli.features.certify.certify", fake_certify)
 
-    assert cli(
-        [
-            "certify",
-            "test-agent",
-            "--model",
-            "openai/gpt-4.1-mini",
-            "--llm-trace",
-            "terminal",
-            "--llm-trace-max-bytes",
-            "8192",
-        ]
-    ) == 0
+    assert (
+        cli(
+            [
+                "certify",
+                "test-agent",
+                "--model",
+                "openai/gpt-4.1-mini",
+                "--llm-trace",
+                "terminal",
+                "--llm-trace-max-bytes",
+                "8192",
+            ]
+        )
+        == 0
+    )
     assert calls == [
         (
             "test-agent",
@@ -68,17 +71,16 @@ def test_certify_promotes_passing_adapting_agent(tmp_path: Path) -> None:
 
     assert exit_code == 0
     assert load_registry(registry_path).find("test-agent").status == "ready"
-    artifacts = list(tmp_path.glob("results/certify-test-agent-*.jsonl"))
+    artifacts = list(tmp_path.glob("results/certify-test-agent-*.json"))
     assert len(artifacts) == 1
-    events = [
-        json.loads(line)
-        for line in artifacts[0].read_text(encoding="utf-8").splitlines()
-    ]
+    events = json.loads(artifacts[0].read_text(encoding="utf-8"))
     assert events[-1]["summary"]["suite_passed"] is True
     assert output[-1] == "Certification passed. Agent 'test-agent' is now ready."
 
 
-def test_certify_promotes_agent_that_completes_with_benchmark_failure(tmp_path: Path) -> None:
+def test_certify_promotes_agent_that_completes_with_benchmark_failure(
+    tmp_path: Path,
+) -> None:
     registry_path = _write_registry(tmp_path, status="adapting")
     output: list[str] = []
 
@@ -146,9 +148,10 @@ def test_certify_rejects_non_adapting_status(tmp_path: Path) -> None:
 def _write_registry(tmp_path: Path, *, status: str) -> Path:
     resources = tmp_path / "resources"
     agent_path = resources / "agents" / "test-agent"
-    requirement_path = resources / "requirements" / "test-agent.md"
+    requirement_path = agent_path / "requirement.md"
     agent_path.mkdir(parents=True)
-    requirement_path.parent.mkdir(parents=True)
+    (agent_path / "agent").mkdir()
+    (agent_path / "Dockerfile").write_text("FROM python:3.11-slim\n", encoding="utf-8")
     (agent_path / "agent.toml").write_text(
         'agent_id = "test-agent"\n', encoding="utf-8"
     )
@@ -157,10 +160,10 @@ def _write_registry(tmp_path: Path, *, status: str) -> Path:
     registry_path.write_text(
         'schema_version = "defuzex-bench.registry.v1"\n\n'
         "[[agents]]\n"
-        '# Keep this comment and field order.\n'
+        "# Keep this comment and field order.\n"
         'agent_id = "test-agent"\n'
         'path = "resources/agents/test-agent"\n'
-        'enabled = true\n'
+        "enabled = true\n"
         f'status = "{status}" # lifecycle\n'
         'framework = "langgraph"\n'
         'source = "https://example.com/test-agent"\n',
@@ -177,7 +180,7 @@ class InvocationErrorSuiteRunner:
         self.suite_count += 1
         return f"suite_test_{self.suite_count}"
 
-    def run_defuzex(self, agents, **kwargs):  # type: ignore[no-untyped-def]
+    def run(self, agents, **kwargs):  # type: ignore[no-untyped-def]
         selected = tuple(agents)
         return BenchmarkSuiteResult(
             suite_id=str(kwargs["suite_id"]),

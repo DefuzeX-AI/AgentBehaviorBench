@@ -39,7 +39,7 @@ Given a registered Agent and a benchmark Case, AgentBehaviorBench (ABB) runs the
 a trusted host harness. The harness can launch framework-specific or
 containerized Agents, transparently route model traffic through a
 credential-safe Model Interceptor into a run-selected OpenRouter model, record
-each SDK input and Agent response as append-only JSONL events,
+each SDK input and Agent response in a JSON event snapshot,
 and submit the completed run to the DefuzeX Judge.
 
 AgentBehaviorBench (ABB) is designed to make Agent evaluation reproducible. Agents are
@@ -64,7 +64,8 @@ The repository includes:
 - `agentbench/harness`: SDK handshake, suite execution, results, and registry.
 - `agentbench/adapter`: framework-neutral adapter contract and LangGraph support.
 - `agentbench/runtime`: local and Docker runtime integration.
-- `resources/agents`: reproducible benchmark agent fixtures.
+- `resources/agents`: user-named Agent units, with source in `agent/` and ABB
+  configuration alongside it. See [Agent directory layout](docs/Agents/Layout.md).
 - `services/model-interceptor`: transparent TLS, authentication, streaming, and
   OpenRouter routing and model Trace service for Docker runs.
 
@@ -72,7 +73,14 @@ The repository includes:
 
 ## Setup
 
-AgentBehaviorBench (ABB) requires Python 3.10 or later and the DefuzeX Python SDK.
+AgentBehaviorBench (ABB) requires Python 3.10 or later. Evaluation SDKs can be
+selected with `BenchmarkRunner(sdk=your_sdk, sdk_options={...})`,
+`SuiteRunner(sdk=your_sdk, sdk_options={...})`, or CLI `--sdk MODULE[:OBJECT]`.
+See [SDK selection and its interface](docs/SDK.md) for a complete offline example.
+
+DefuzeX remains the default evaluation integration and is now an optional
+dependency: install this checkout with `python -m pip install -e ".[defuzex]"`
+or install the local SDK separately. The following setup describes that default.
 The SDK provides the benchmark protocol used by AgentBehaviorBench (ABB): it parses benchmark
 requirements, creates DefuzeX Cases, drives each SDK input, records evidence,
 and submits completed runs for judging.
@@ -142,8 +150,8 @@ an output path:
 python -m agentbench --output results\result.json
 ```
 
-Without `--output`, AgentBehaviorBench (ABB) runs in the terminal and does not create a JSONL
-result artifact. With `--output`, AgentBehaviorBench (ABB) writes an append-only JSONL result
+Without `--output`, AgentBehaviorBench (ABB) runs in the terminal and does not create a JSON
+result artifact. With `--output`, AgentBehaviorBench (ABB) writes an atomically updated JSON result
 file and starts the local viewer so you can refresh and inspect events while the
 benchmark is running.
 
@@ -182,7 +190,7 @@ onboarding flow documented there.
 AgentBehaviorBench (ABB) provides the pieces needed to turn an external Agent project into a
 repeatable benchmark target: registry-based discovery, framework adapters,
 Docker runtime support, model credential routing through the Model Interceptor,
-append-only result artifacts, local result viewing, and certification from
+JSON result snapshots, local result viewing, and certification from
 `adapting` to `ready`. This gives you a consistent way to compare Agents across
 the same DefuzeX Cases while keeping runtime behavior, outputs, and judgment
 evidence inspectable.
