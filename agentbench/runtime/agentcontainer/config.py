@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -72,7 +73,7 @@ class AgentContainerConfig:
             environment[key] = secret_resolver.require(key)
 
         timeout = runtime.get("timeout_sec", 60)
-        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
+        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0:
             raise ContainerConfigurationError("runtime.timeout_sec must be positive")
 
         return cls(
@@ -94,6 +95,14 @@ def runtime_type(agent_root: str | Path) -> str:
     if not isinstance(runtime, dict):
         raise ContainerConfigurationError("Manifest field [runtime] must be a table")
     return _optional_string(runtime, "type") or "in_process"
+
+
+def execution_strategy(agent_root: str | Path) -> str:
+    with (Path(agent_root) / "agent.toml").open("rb") as stream:
+        value = tomllib.load(stream).get("runtime", {}).get("execution", "native")
+    if value not in {"native", "oneshot"}:
+        raise ContainerConfigurationError(f"Unsupported runtime.execution: {value}")
+    return value
 
 
 def _required_table(data: dict[str, object], key: str) -> dict[str, object]:

@@ -11,13 +11,17 @@ downloaded_on = "2026-09-08"
 
 [runtime]
 type = "docker"
+execution = "oneshot"
+timeout_sec = 1800
+secret_env_keys = ["TAVILY_API_KEY"]
 
 [build]
 context = "."
 dockerfile = "Dockerfile"
 
-# Still adapting: launch bridge and llm_interception are not configured yet.
-# The runtime must not fall back to importing the Agent on the host.
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
 
 [adapter]
 type = "langgraph"
@@ -27,3 +31,44 @@ config = "langgraph.json"
 graph_id = "agent"
 input_key = "company"
 output_key = "report"
+binding = "company.py:create_graph"
+
+[observe]
+input_fields = [
+    { name = "company", label = "公司名称", required = true },
+    { name = "company_url", label = "公司网址（可选）" },
+    { name = "hq_location", label = "总部地点（可选）" },
+    { name = "industry", label = "行业（可选）" },
+]
+
+[llm_interception]
+required = true
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.credentials]]
+id = "gemini"
+agent_env = "GEMINI_API_KEY"
+auth_plugin = "google-api-key"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
+
+[[llm_interception.routes]]
+id = "gemini-content"
+host_patterns = ["generativelanguage.googleapis.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1beta/models/*:generateContent*", "/v1beta/models/*:streamGenerateContent*"]
+protocol_plugin = "gemini-content"
+credential = "gemini"

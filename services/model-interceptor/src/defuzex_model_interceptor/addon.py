@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import fnmatch
 import time
+import json
 from uuid import uuid4
 
 from mitmproxy import http
@@ -13,6 +14,7 @@ from .config import Route, ServiceConfig
 from .events import emit, redact
 from .registry import load_authentication, load_protocols, load_targets
 from .targets import TargetRoutingError
+from .capture import ResponseCapture
 
 
 class ModelInterceptorAddon:
@@ -38,8 +40,15 @@ class ModelInterceptorAddon:
         flow.metadata["defuzex_route"] = route.route_id
         flow.metadata["defuzex_call_id"] = call_id
         flow.metadata["defuzex_started"] = time.monotonic()
+        span_id = flow.request.headers.pop("x-abb-framework-span", None)
+        # IDs are correlation hints, never authentication or proof of trace coverage.
+        flow.metadata["framework_span_id"] = span_id if span_id and len(span_id) <= 64 else None
         flow.metadata["defuzex_source_host"] = flow.request.pretty_host
-        flow.metadata["defuzex_source_path"] = flow.request.path
+        flow.metadata["defuzex_source_path"] = flow.request.path.split("?", 1)[0]
+        source_body = flow.request.content or b""
+        if route.protocol_plugin == "gemini-content":
+            flow.metadata["gemini"] = True
+            flow.metadata["gemini_sse"] = "alt=sse" in flow.request.path
         credential = self.credentials[route.credential_id]
         try:
             self.authentication[credential.auth_plugin].authorize(
@@ -61,9 +70,7 @@ class ModelInterceptorAddon:
                 target=self.config.target,
             )
         except TargetRoutingError as exc:
-            content, truncated = _limited(
-                flow.request.content or b"", self.config.max_trace_bytes
-            )
+            content = flow.request.content or b""
             payload = self.protocols[route.protocol_plugin].decode_request(
                 content, flow.request.headers.get("content-type", "")
             )
@@ -78,8 +85,10 @@ class ModelInterceptorAddon:
                 provider=self.config.target.provider_id,
                 model=_model(payload),
                 payload=redact(payload, self.secrets),
+                source_raw_body=redact(source_body.decode("utf-8", errors="replace"), self.secrets),
+                raw_body=redact(content.decode("utf-8", errors="replace"), self.secrets),
                 routing_error=str(exc),
-                truncated=truncated,
+                truncated=False,
             )
             flow.response = http.Response.make(
                 422,
@@ -89,9 +98,7 @@ class ModelInterceptorAddon:
             return
         flow.metadata["defuzex_provider"] = prepared.provider_id
         flow.metadata["defuzex_target_model"] = prepared.target_model
-        content, truncated = _limited(
-            flow.request.content or b"", self.config.max_trace_bytes
-        )
+        content = flow.request.content or b""
         payload = self.protocols[route.protocol_plugin].decode_request(
             content, flow.request.headers.get("content-type", "")
         )
@@ -109,30 +116,45 @@ class ModelInterceptorAddon:
             source_model=prepared.source_model,
             model=prepared.target_model,
             payload=redact(payload, self.secrets),
-            truncated=truncated,
+            source_raw_body=redact(source_body.decode("utf-8", errors="replace"), self.secrets),
+            raw_body=redact(content.decode("utf-8", errors="replace"), self.secrets),
+            truncated=False,
+            framework_span_id=flow.metadata.get("framework_span_id"),
         )
 
     def responseheaders(self, flow: http.HTTPFlow) -> None:
         if "defuzex_route" not in flow.metadata or flow.response is None:
             return
         content_type = flow.response.headers.get("content-type", "")
+        flow.metadata["upstream_content_type"] = content_type
         if "text/event-stream" not in content_type.lower():
             return
-        captured = bytearray()
-        truncated = False
+        captured = ResponseCapture(self.config.max_trace_bytes)
+        flow.metadata["defuzex_capture"] = captured
+        converter = None
+        if flow.metadata.get("gemini") and flow.response.status_code < 400:
+            from .gemini import GeminiStream
+            converter = GeminiStream(sse=flow.metadata["gemini_sse"])
+            flow.response.headers["content-type"] = (
+                "text/event-stream; charset=utf-8" if flow.metadata["gemini_sse"] else "application/json; charset=utf-8")
+            flow.response.headers.pop("content-length", None)
 
         def stream(chunk: bytes) -> bytes:
-            nonlocal truncated
-            if chunk:
-                remaining = self.config.max_trace_bytes - len(captured)
-                if remaining > 0:
-                    captured.extend(chunk[:remaining])
-                if len(chunk) > remaining:
-                    truncated = True
-            else:
-                self._emit_response(flow, bytes(captured), truncated, streaming=True)
+            try:
+                if chunk:
+                    captured.write(chunk)
+                forwarded = converter.feed(chunk) if converter is not None else chunk
+            except (ValueError, OSError) as exc:
+                captured.close()
                 flow.metadata["defuzex_stream_emitted"] = True
-            return chunk
+                emit("llm_error", agent_id=self.config.agent_id,
+                     call_id=flow.metadata["defuzex_call_id"], error=redact(str(exc), self.secrets),
+                     framework_span_id=flow.metadata.get("framework_span_id"))
+                raise
+            if not chunk:
+                self._emit_response(flow, captured.finish(), False, streaming=True)
+                flow.metadata["defuzex_stream_emitted"] = True
+            return forwarded
 
         flow.response.stream = stream
 
@@ -141,10 +163,17 @@ class ModelInterceptorAddon:
             return
         if flow.metadata.get("defuzex_stream_emitted"):
             return
-        content, truncated = _limited(
-            flow.response.content or b"", self.config.max_trace_bytes
-        )
-        self._emit_response(flow, content, truncated, streaming=False)
+        content = flow.response.content or b""
+        self._emit_response(flow, content, False, streaming=False)
+        if flow.metadata.get("gemini"):
+            from .gemini import response_from_chat
+            try:
+                payload = response_from_chat(json.loads(flow.response.content or b"{}"), status=flow.response.status_code)
+            except (ValueError, TypeError, KeyError) as exc:
+                flow.response.status_code = 502
+                payload = {"error": {"code": 502, "message": str(exc), "status": "INTERNAL"}}
+            flow.response.content = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            flow.response.headers["content-type"] = "application/json; charset=utf-8"
 
     def _emit_response(
         self, flow: http.HTTPFlow, content: bytes, truncated: bool, *, streaming: bool
@@ -154,8 +183,9 @@ class ModelInterceptorAddon:
         )
         payload = self.protocols[route.protocol_plugin].decode_response(
             content,
-            "" if flow.response is None else flow.response.headers.get("content-type", ""),
+            flow.metadata.get("upstream_content_type", "" if flow.response is None else flow.response.headers.get("content-type", "")),
         )
+
         started = float(flow.metadata.get("defuzex_started", time.monotonic()))
         emit(
             "llm_response",
@@ -175,8 +205,20 @@ class ModelInterceptorAddon:
             latency_ms=round((time.monotonic() - started) * 1000, 3),
             streaming=streaming,
             payload=redact(payload, self.secrets),
+            raw_body=redact(content.decode("utf-8", errors="replace"), self.secrets),
             truncated=truncated,
+            framework_span_id=flow.metadata.get("framework_span_id"),
         )
+
+    def error(self, flow: http.HTTPFlow) -> None:
+        capture = flow.metadata.pop("defuzex_capture", None)
+        if capture is not None:
+            capture.close()
+        if "defuzex_call_id" in flow.metadata:
+            emit("llm_error", agent_id=self.config.agent_id,
+                 call_id=flow.metadata["defuzex_call_id"],
+                 error=redact(str(flow.error), self.secrets),
+                 framework_span_id=flow.metadata.get("framework_span_id"))
 
     def _route(self, flow: http.HTTPFlow) -> Route | None:
         host = flow.request.pretty_host.rstrip(".").lower()
@@ -208,10 +250,6 @@ class ModelInterceptorAddon:
         if missing_protocols or missing_auth or missing_targets:
             missing = sorted(missing_protocols | missing_auth | missing_targets)
             raise RuntimeError(f"Unknown model interceptor plugins: {', '.join(missing)}")
-
-
-def _limited(content: bytes, maximum: int) -> tuple[bytes, bool]:
-    return content[:maximum], len(content) > maximum
 
 
 def _model(payload: object) -> object:

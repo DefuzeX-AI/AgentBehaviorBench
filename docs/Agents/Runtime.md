@@ -111,14 +111,21 @@ keep running and a batch command may exit normally. `wait()`, `is_running`,
 The legacy evaluation harness can receive an explicit `container_caller` through
 `RuntimeFactory`. It receives `(session, input, run_config)` and calls the
 Agent's native API, returning an `AdapterInvocation` for that harness only.
-There is no default container caller or forced wire protocol. Without a caller,
+For `execution="native"`, there is no default caller or forced wire protocol. Without a caller,
 evaluation invocation raises a clear configuration error; it does not reinterpret
 logs as answers. Model trace checkpoints remain available to the caller boundary.
 
-Company Research will use its original HTTP API and SSE progress stream.
-Host port publishing, service readiness, its HTTP caller and the observation UI
-still need implementation. Removing the old transport does not implement those
-features automatically.
+Company Research now uses the opt-in `runtime.execution = "oneshot"` strategy.
+The existing native service caller extension remains available and is not replaced.
+The common worker loads the framework Adapter inside Docker; Company initialization
+and final report extraction live in its outer `bindings/company.py`, with source
+unchanged in `agent/`. The image includes the current ABB execution package through
+the staged `.abb-runtime` build directory. Host Agent imports are not used.
+
+For each invocation the runtime mounts `/run/abb-input` read-only and
+`/run/abb-output` writable, waits for completion, checks exit code and result
+identity, and retains diagnostics before cleanup. This is not a persistent
+multi-turn service. See [Observe architecture](../observe/architecture.md).
 
 ## Model Interceptor
 

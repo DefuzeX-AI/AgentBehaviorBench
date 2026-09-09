@@ -66,7 +66,10 @@ class LangGraphAdapter:
 
     def close(self) -> None:
         """Drop the loaded graph."""
-        self._graph = None
+        graph, self._graph = self._graph, None
+        close = getattr(graph, "close", None)
+        if callable(close):
+            close()
 
     def _require_graph(self) -> InvokableGraph:
         """Return a loaded graph."""

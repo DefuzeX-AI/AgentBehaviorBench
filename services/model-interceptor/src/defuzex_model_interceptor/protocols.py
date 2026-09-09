@@ -52,3 +52,10 @@ JSON_HTTP_PROTOCOL = JsonHttpProtocol()
 OPENAI_CHAT_PROTOCOL = OpenAIChatProtocol()
 OPENAI_RESPONSES_PROTOCOL = OpenAIResponsesProtocol()
 ANTHROPIC_MESSAGES_PROTOCOL = AnthropicMessagesProtocol()
+
+
+class GeminiContentProtocol(JsonHttpProtocol):
+    name = "gemini-content"
+
+
+GEMINI_CONTENT_PROTOCOL = GeminiContentProtocol()

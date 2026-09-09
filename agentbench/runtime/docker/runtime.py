@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import secrets
 import shutil
@@ -40,6 +41,7 @@ from .interceptor_image import default_interceptor_image_provider
 from .interceptor_policy import InterceptorPolicy
 from .policy import DockerPolicy
 from .session import DockerSession
+from .worker_build import worker_build_context
 
 
 class DockerRuntimeError(RuntimeError):
@@ -59,9 +61,14 @@ class DockerRuntime:
         model_provider: ModelTargetProvider | None = None,
         trace_sink: TraceSink | None = None,
         trace_max_bytes: int = DEFAULT_TRACE_MAX_BYTES,
+        artifact_root: Path | None = None,
+        timeout_sec: float | None = None,
+        run_id: str | None = None,
     ) -> None:
         if trace_max_bytes < 1024:
             raise ValueError("trace_max_bytes must be at least 1024")
+        if timeout_sec is not None and (isinstance(timeout_sec, bool) or not math.isfinite(timeout_sec) or timeout_sec <= 0):
+            raise ValueError("timeout_sec must be finite and positive")
         self._executable = executable
         self._environ = os.environ if environ is None else environ
         self._secret_resolver = secret_resolver or EnvironmentSecretResolver(
@@ -77,8 +84,15 @@ class DockerRuntime:
         self._model_provider = model_provider or OpenRouterProvider()
         self._trace_sink = trace_sink or NullTraceSink()
         self._trace_max_bytes = trace_max_bytes
+        self.artifact_root = artifact_root
+        self._timeout_override = timeout_sec
+        self.run_id = run_id
 
-    def start(self, agent: AgentDescriptor) -> RuntimeSession:
+    def invocation_timeout(self, agent):
+        return self._timeout_override or AgentContainerConfig.from_agent_dir(
+            agent.path, secret_resolver=self._secret_resolver, environ=self._environ).timeout_sec
+
+    def start(self, agent: AgentDescriptor, *, invocation=None) -> RuntimeSession:
         self._check_available()
         config = AgentContainerConfig.from_agent_dir(
             agent.path,
@@ -86,11 +100,19 @@ class DockerRuntime:
             environ=self._environ,
         )
         interception = InterceptionConfig.from_agent_dir(agent.path)
-        image = self._images.build(
-            context=config.build_context,
-            dockerfile=config.dockerfile,
-            repository=config.agent_id,
-        )
+        if interception is not None:
+            target = self._model_provider.resolve(self._environ)
+            self._secret_resolver.require(target.credential_env)
+        if invocation is not None:
+            with worker_build_context(config) as (context, dockerfile):
+                image = self._images.build(context=context, dockerfile=dockerfile, repository=config.agent_id)
+            self._require_non_root_image(image)
+        else:
+            image = self._images.build(
+                context=config.build_context,
+                dockerfile=config.dockerfile,
+                repository=config.agent_id,
+            )
 
         suffix = uuid4().hex[:12]
         network_name = f"defuzex-{suffix}-egress"
@@ -153,6 +175,11 @@ class DockerRuntime:
                         ),
                     )
                 )
+            if invocation is not None:
+                inputs, outputs = invocation
+                command.extend(("--mount", _bind_mount(inputs, "/run/abb-input")))
+                # All other filesystem locations retain the existing read-only policy.
+                command.extend(("--mount", f"type=bind,source={outputs},target=/run/abb-output"))
             agent_environment.update(
                 PYTHONDONTWRITEBYTECODE="1",
                 PYTHONUNBUFFERED="1",
@@ -199,7 +226,7 @@ class DockerRuntime:
                     else None
                 ),
             )
-        except Exception:
+        except BaseException:
             self._run_quiet("container", "rm", "--force", agent_name)
             if interceptor is not None:
                 interceptor.close()
@@ -302,7 +329,7 @@ class DockerRuntime:
             if not ca_certificate.is_file():
                 raise DockerRuntimeError("Model interceptor CA was not exported")
             log_process = self._follow_trace(container_name, trace_state)
-        except Exception:
+        except BaseException:
             self._run_quiet("container", "rm", "--force", container_name)
             shutil.rmtree(secret_dir, ignore_errors=True)
             raise
@@ -341,8 +368,13 @@ class DockerRuntime:
             for line in process.stdout:
                 event = TraceEvent.from_log_line(line.rstrip("\r\n"))
                 if event is not None:
+                    try:
+                        # A pair is complete only after its full event is saved.
+                        self._trace_sink.emit(event)
+                    except Exception:
+                        trace_state.fail()
+                        return
                     trace_state.emit(event)
-                    self._trace_sink.emit(event)
 
         threading.Thread(
             target=consume,
@@ -361,6 +393,8 @@ class DockerRuntime:
                 raise DockerRuntimeError(
                     "Agent invocation completed without a matched LLM request/response trace"
                 )
+            if not trace_state.wait_for_idle():
+                raise DockerRuntimeError("Model trace is incomplete: unfinished pair, capture error, truncation, or failed persistence")
 
         return require_trace
 

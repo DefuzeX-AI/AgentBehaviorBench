@@ -55,6 +55,7 @@ def configure_parser(parser: ArgumentParser) -> None:
         type=int,
         default=DEFAULT_TRACE_MAX_BYTES,
         metavar="BYTES",
+        help="Legacy option: streaming memory spool threshold; payloads are never truncated.",
     )
 
 

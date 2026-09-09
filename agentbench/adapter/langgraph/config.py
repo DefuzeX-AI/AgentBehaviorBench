@@ -25,6 +25,7 @@ class LangGraphAdapterConfig:
     input_key: str | None
     output_key: str | None
     mode: str
+    binding: str | None = None
 
     @property
     def source_root(self) -> Path:
@@ -76,6 +77,7 @@ class LangGraphAdapterConfig:
             input_key=_optional_string(adapter, "input_key"),
             output_key=_optional_string(adapter, "output_key"),
             mode=mode,
+            binding=_optional_string(adapter, "binding"),
         )
 
 

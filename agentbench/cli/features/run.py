@@ -64,7 +64,7 @@ def configure_parser(parser: ArgumentParser) -> None:
         type=int,
         default=DEFAULT_TRACE_MAX_BYTES,
         metavar="BYTES",
-        help="Maximum intercepted payload bytes displayed per direction.",
+        help="Legacy option: streaming memory spool threshold; payloads are never truncated.",
     )
 
 

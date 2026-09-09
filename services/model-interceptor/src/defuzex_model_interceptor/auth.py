@@ -45,3 +45,16 @@ class AnthropicApiKeyAuthentication:
 
 BEARER_TOKEN_AUTH = BearerTokenAuthentication()
 ANTHROPIC_API_KEY_AUTH = AnthropicApiKeyAuthentication()
+
+
+class GoogleApiKeyAuthentication:
+    name = "google-api-key"
+
+    def authorize(self, headers, *, temporary_token, upstream_secret):
+        if not hmac.compare_digest(headers.get("x-goog-api-key", ""), temporary_token):
+            raise InterceptorAuthenticationError("Invalid per-run Google token")
+        headers.pop("x-goog-api-key", None)
+        headers["authorization"] = f"Bearer {upstream_secret}"
+
+
+GOOGLE_API_KEY_AUTH = GoogleApiKeyAuthentication()

@@ -106,7 +106,12 @@ def test_parse_result_log_surfaces_step_events_without_agent_result(tmp_path) ->
     ]
 
 
-def test_viewer_serves_static_app_and_live_result_api(tmp_path) -> None:
+def test_viewer_serves_static_app_and_live_result_api(tmp_path, monkeypatch) -> None:
+    from agentbench.cli import viewer as viewer_module
+    assets = tmp_path / "dist"
+    assets.mkdir()
+    (assets / "index.html").write_text('<html><head><title>ABB · Trace</title></head><body></body></html>')
+    monkeypatch.setattr(viewer_module, "WEB_ROOT", assets)
     result_log = tmp_path / "result.json"
     result_log.write_text(json.dumps([
         {"event": "run_started", "suite_id": "suite_test", "selected_agent_ids": ["agent-a"]},
@@ -133,5 +138,23 @@ def test_viewer_serves_static_app_and_live_result_api(tmp_path) -> None:
     assert viewer.url.endswith("/suite/suite_test/")
     assert result["selected_agent_ids"] == ["agent-a"]
     assert error.value.code == 409
-    assert "<title>AgentBench Result Viewer</title>" in html
+    assert "<title>ABB · Trace</title>" in html
+    assert 'name="abb-result-api"' in html
+    assert '/api/suites/suite_test/result' in html
+    assert result["events"][0]["event"] == "run_started"
     assert not viewer.thread.is_alive()
+
+
+def test_viewer_explains_missing_frontend_build(tmp_path, monkeypatch):
+    from agentbench.cli import viewer as viewer_module
+    monkeypatch.setattr(viewer_module, "WEB_ROOT", tmp_path / "missing-dist")
+    result = tmp_path / "result.json"
+    result.write_text('[]')
+    viewer = start_viewer_server(result, port=0)
+    try:
+        with pytest.raises(HTTPError) as error:
+            urlopen(viewer.url, timeout=2)
+        assert error.value.code == 503
+        assert b"npm run build" in error.value.read()
+    finally:
+        viewer.stop()

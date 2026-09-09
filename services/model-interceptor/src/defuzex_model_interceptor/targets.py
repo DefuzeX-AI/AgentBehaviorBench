@@ -30,6 +30,7 @@ class OpenRouterTarget:
         "openai-chat": "/chat/completions",
         "openai-responses": "/responses",
         "anthropic-messages": "/messages",
+        "gemini-content": "/chat/completions",
     }
 
     def prepare_request(
@@ -55,6 +56,14 @@ class OpenRouterTarget:
             raise TargetRoutingError("Model request body must be a JSON object")
 
         source_model = payload.get("model")
+        if route.protocol_plugin == "gemini-content":
+            from .gemini import request_to_chat
+            source_path = getattr(request, "path")
+            source_model = source_path.split("/models/", 1)[-1].split(":", 1)[0]
+            try:
+                payload = request_to_chat(payload, streaming=":streamGenerateContent" in source_path)
+            except (ValueError, KeyError, TypeError) as exc:
+                raise TargetRoutingError(str(exc)) from exc
         payload["model"] = target.model
         parsed = urlsplit(target.base_url)
         if parsed.scheme != "https" or not parsed.hostname:

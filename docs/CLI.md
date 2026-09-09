@@ -45,6 +45,7 @@ Current subcommands:
 | `run` | Run all enabled Agents whose status is `ready`. |
 | `view` | Open an existing JSON result in the local web viewer. |
 | `certify` | Verify one `adapting` Agent can complete its requested Cases and promote it to `ready`. |
+| `observe` | Select one enabled Agent, supply native input, and save execution traces without an evaluation SDK. |
 
 ## 2. Default Command and Compatibility
 
@@ -97,7 +98,7 @@ python -m agentbench run --llm-trace terminal
 | `--output PATH` | No | Do not save | Save a unique atomically updated JSON result and start the local viewer. |
 | `--model OPENROUTER_MODEL` | No | `OPENROUTER_MODEL` | Force every intercepted Agent request to use this OpenRouter model slug. |
 | `--llm-trace {off,terminal}` | No | `off` | Print sanitized model requests and responses captured by the transparent Interceptor. |
-| `--llm-trace-max-bytes BYTES` | No | `262144` | Maximum payload bytes displayed for each request or response. |
+| `--llm-trace-max-bytes BYTES` | No | `262144` | Legacy name: streaming memory spool threshold, not a content limit. Payloads are retained completely. |
 
 `PATH` is the naming base for the result file, not the final file name.
 AgentBench adds a timestamp and always writes `.json`:
@@ -201,7 +202,7 @@ python -m agentbench certify swe-agent
 | `--output PATH` | No | `results\certify-<agent_id>.json` | Custom naming base for the certification result. |
 | `--model OPENROUTER_MODEL` | No | `OPENROUTER_MODEL` | Force intercepted calls to use this OpenRouter model slug. |
 | `--llm-trace {off,terminal}` | No | `off` | Print sanitized intercepted model traffic during certification. |
-| `--llm-trace-max-bytes BYTES` | No | `262144` | Maximum displayed bytes per model request or response. |
+| `--llm-trace-max-bytes BYTES` | No | `262144` | Legacy name: streaming memory spool threshold, not a content limit. Payloads are retained completely. |
 | `-h`, `--help` | No | - | Show `certify` help and exit. |
 
 Unlike normal `run`, `certify` always saves a unique JSON result whether or not
@@ -275,6 +276,13 @@ python -m agentbench view `
 ```
 
 ## 5. `view`
+
+The old static result dashboard has been removed. `view` now serves the minimal
+Vite + React Trace page from `web/dist` and loads the bound run's raw events.
+Build it first with `cd web && npm install && npm run build`. If the build is
+missing, the page returns HTTP 503 with build instructions. The page supports
+local JSON/JSONL imports, source filtering and expandable raw JSON; it does not
+provide the old suite/Agent metric dashboard. Reload to fetch an updated snapshot.
 
 ### 5.1 Syntax
 
@@ -446,6 +454,44 @@ When adding a subcommand:
 
 There must be exactly one `default=True` feature. The current default feature is
 `run`.
+
+## Observe (SDK-independent)
+
+```sh
+agentbench observe [ID_OR_NUMBER] [--list] [--input JSON_PATH]
+                  [--registry PATH] [--env-file PATH] [--model MODEL]
+                  [--output DIRECTORY] [--timeout SECONDS] [--show RUN_DIRECTORY]
+```
+
+Without an Agent argument, the menu shows all enabled Agents in Registry order, including `adapting`.
+It asks for one number (or `q`), then native input fields declared by the Agent.
+Without field declarations, enter a JSON value. Invalid interactive selections
+can be retried. `--list` does not require Docker, credentials or an evaluation SDK.
+`observe 1` selects Agent 1 directly, without redisplaying the menu or asking for its number.
+The positional argument also accepts the stable Agent ID. `--agent ID_OR_NUMBER`
+remains a compatibility alias, mutually exclusive with the positional argument.
+Native input is still requested unless `--input` supplies it.
+`--model` selects a model name, not an Agent; numeric values are rejected with a
+hint to use `observe NUMBER`. Omit it to use `OPENROUTER_MODEL` from the environment.
+Only the selected unit's files are validated.
+Observe does not certify an Agent or change Registry status.
+
+Defaults: registry `resources/registry.toml`, output `results/observe`, environment
+repository `.env`, model `OPENROUTER_MODEL`, timeout from `runtime.timeout_sec`.
+Timeout must be finite and positive and applies to execution, not image building.
+Each run has a unique directory; the report, framework JSONL, network JSONL,
+invocation input/result and diagnostics are stored separately.
+`--show` reviews a saved run offline, displaying framework hierarchy and wire-call
+correlation without starting a viewer server.
+
+Current supported observe runtime: Docker `execution="oneshot"`.
+One invocation starts a new container, not a multi-turn memory session.
+Success or `q`: exit 0; configuration, execution or degraded trace: exit 1;
+argument parsing: exit 2; Ctrl+C/EOF: exit 130. Report presence is not a quality verdict.
+Observed operation failures mark an otherwise returned report as `degraded`.
+
+See [Observe guide](observe/README.md) for Company setup, environment, artifacts,
+protocol limits and verification evidence.
 
 ## Evaluation SDK selection
 

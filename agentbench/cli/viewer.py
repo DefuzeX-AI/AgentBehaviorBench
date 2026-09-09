@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from html import escape
 import threading
 from dataclasses import dataclass
 from http import HTTPStatus
@@ -12,7 +13,7 @@ from urllib.parse import quote, unquote, urlparse
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
-WEB_ROOT = Path(__file__).resolve().parents[2] / "web"
+WEB_ROOT = Path(__file__).resolve().parents[2] / "web" / "dist"
 
 
 @dataclass(frozen=True)
@@ -125,8 +126,20 @@ def build_viewer_handler(
 
             suite_path = _suite_view_path(expected_suite_id)
             if parsed.path.rstrip("/") == suite_path.rstrip("/"):
-                self.path = "/index.html"
-                super().do_GET()
+                index = WEB_ROOT / "index.html"
+                if not index.is_file():
+                    self.send_error(HTTPStatus.SERVICE_UNAVAILABLE,
+                                    "Trace UI not built. Run npm install and npm run build in web/.")
+                    return
+                html = index.read_text(encoding="utf-8").replace(
+                    "<head>", f'<head><meta name="abb-result-api" content="{escape(result_api_path, quote=True)}">', 1)
+                body = html.encode("utf-8")
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(body)
                 return
             if parsed.path in {"", "/"} and expected_suite_id is not None:
                 self._send_suite_mismatch()
@@ -226,6 +239,7 @@ def parse_result_log(path: str | Path) -> dict[str, object]:
         "suite_error": suite_error,
         "parse_errors": parse_errors,
         "event_count": len(events),
+        "events": events,
     }
 
 
