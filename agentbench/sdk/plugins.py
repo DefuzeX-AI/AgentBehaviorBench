@@ -54,16 +54,19 @@ class EvaluationPlan:
         object.__setattr__(self, "options", MappingProxyType(dict(self.options)))
 
 
-def builtin_sdk_selection() -> SDKSelection:
+def builtin_sdk_selection(name="kuma") -> SDKSelection:
     """Return the official KUMA adapter without importing KUMA itself."""
 
-    from .kuma import plugin
+    if name == "panda":
+        from .panda import plugin
+    else:
+        from .kuma import plugin
 
     return SDKSelection(
         reference=SDKReference(
             name=plugin.name,
             source="builtin",
-            object_ref="agentbench.sdk.kuma:plugin",
+            object_ref=f"agentbench.sdk.{name}:plugin",
             distribution="defuzex-agentbench",
             version=_distribution_version("defuzex-agentbench"),
         ),
@@ -114,6 +117,7 @@ def installed_sdk_references(
     points = _sdk_entry_points(entry_points_provider)
     references = [_reference_for_entry_point(point) for point in points]
     references.append(builtin_sdk_selection().reference)
+    references.append(builtin_sdk_selection("panda").reference)
     unique = {
         (
             reference.source,
@@ -145,8 +149,8 @@ def resolve_sdk(
     requested = spec.strip()
     if not requested:
         raise ProviderSelectionError("SDK selection cannot be empty")
-    if requested.casefold() == "kuma":
-        return builtin_sdk_selection()
+    if requested.casefold() in {"kuma", "panda"}:
+        return builtin_sdk_selection(requested.casefold())
     if requested.startswith("python:"):
         return _load_python_sdk(requested.removeprefix("python:"), explicit=True)
 

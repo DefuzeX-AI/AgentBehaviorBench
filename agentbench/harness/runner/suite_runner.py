@@ -122,6 +122,9 @@ class SuiteRunner:
             raise ValueError("Suite ID cannot be empty")
         selected = tuple(registrations)
         self._validate_selection(selected)
+        begin_suite = getattr(self._benchmark_runner, 'begin_suite', None)
+        if callable(begin_suite):
+            begin_suite(suite_id)
         items: list[SuiteAgentResult] = []
 
         emit_progress(

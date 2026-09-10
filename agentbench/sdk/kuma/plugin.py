@@ -6,7 +6,7 @@ from collections.abc import Mapping
 
 from agentbench.harness.protocols.evaluation import EvaluationRunner
 
-from .plugins import SDK_PLUGIN_API_VERSION, SDKRunnerContext
+from ..plugins import SDK_PLUGIN_API_VERSION, SDKRunnerContext
 
 
 class KumaEvaluationSDK:
@@ -19,7 +19,7 @@ class KumaEvaluationSDK:
     def create_benchmark_runner(
         self, *, context: SDKRunnerContext, options: Mapping[str, object]
     ) -> EvaluationRunner:
-        from .kuma_runtime.benchmark import KumaContainerRunner
+        from .benchmark import KumaContainerRunner
 
         environment = dict(context.environ)
         if context.model is not None:

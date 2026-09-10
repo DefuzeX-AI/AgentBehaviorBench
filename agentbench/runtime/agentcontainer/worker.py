@@ -7,12 +7,11 @@ import json
 import os
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 
-from agentbench.adapter.factory import DEFAULT_ADAPTER_FACTORY
 from agentbench.observe.store import TraceStore, atomic_json
 from agentbench.observe.correlation import model_correlation
 from agentbench.runtime.interception import InterceptionConfig
+from .session import AgentSession
 
 
 def configure_trust():
@@ -26,7 +25,7 @@ def configure_trust():
             os.environ[key] = str(bundle)
 
 
-async def execute(root: Path, request: Path, output: Path, *, provider=None):
+async def execute(root: Path, request: Path, output: Path, *, provider=None, session=None):
     envelope = json.loads(request.read_text(encoding="utf-8"))
     run_id = envelope["run_id"]
     if envelope.get("schema") != "abb.invocation.v1" or not isinstance(run_id, str):
@@ -39,22 +38,21 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None):
     observed = InvocationObservation(output, run_id, envelope.get("session_id", run_id),
                                      envelope["framework"], context=context, provider=provider)
     store = observed.store
-    adapter = None
+    owned_session = session is None
+    session = session or AgentSession()
     result = {"schema": "abb.result.v1", "run_id": run_id, **context}
     try:
         configure_trust()
         # Agent imports and later lazy imports live only in this worker process.
         sys.path[:0] = [str(root / "agent"), str(root / "agent" / "src")]
-        descriptor = SimpleNamespace(path=root, framework=envelope["framework"])
-        adapter = DEFAULT_ADAPTER_FACTORY.create(descriptor)
         config = dict(envelope.get("config") or {})
         if "callbacks" in config:
             raise ValueError("Host callbacks cannot cross a JSON process boundary")
         config = observed.config(config)
-        config.setdefault("configurable", {}).setdefault("thread_id", run_id)
+        config.setdefault("configurable", {}).setdefault("thread_id", envelope.get('session_id', run_id))
         config.setdefault("metadata", {}).update(abb_run_id=run_id)
         store.record("execution_start", input=envelope["input"])
-        adapter.load()
+        adapter = session.load(root, envelope)
         interception = InterceptionConfig.from_agent_dir(root)
         hosts = [host for route in (*interception.routes, *interception.tool_routes)
                  for host in route.host_patterns] if interception else []
@@ -66,13 +64,9 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None):
         result.update(status="failed", error_type=type(exc).__name__, error=str(exc))
         store.record("execution_error", error_type=type(exc).__name__, error=str(exc))
     finally:
-        if adapter is not None:
+        if owned_session:
             try:
-                close = getattr(adapter, "aclose", None)
-                if callable(close):
-                    await close()
-                else:
-                    adapter.close()
+                await session.aclose()
             except Exception as exc:
                 result.update(status="failed", error_type=type(exc).__name__, error=str(exc))
         atomic_json(output / "result.json", result)

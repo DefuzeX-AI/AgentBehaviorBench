@@ -1,5 +1,34 @@
 # Choosing an evaluation SDK
 
+## Integration ownership
+
+`agentbench/sdk/contracts.py`, `plugins.py`, and `runtime.py` define the public
+seam, discovery, and composition. `sdk/common/` owns artifact serialization,
+input binding, conversations, and Case identity. Each evaluator owns one
+directory: `sdk/kuma/` and `sdk/panda/` contain their plugin, image overlay,
+container orchestration, worker, and result validation. Older `evaluation/`
+and `sdk/kuma_runtime/` paths are compatibility aliases. Generic Agent loaders,
+Docker isolation, and tracing remain in `runtime/` and `observe/`.
+
+The external `Defuze-SDK` and `panda-sdk` packages contain evaluation logic;
+BBA's adapters install them into a temporary copy of the selected Agent image.
+Workers call the Agent inside the same Python process, so Python callbacks
+never cross the host JSON boundary. Panda uses separate `PANDA_API_KEY` and
+`PANDA_MODEL` runtime variables for evaluation; its `.env` is never baked in.
+
+Run a real Panda container evaluation from the BBA checkout:
+
+```bash
+PYTHONPATH=. .venv/bin/agentbench evaluate react-agent --sdk panda \
+  --sdk-options ../panda-sdk/panda-openrouter.json --cases 1
+```
+
+`--sdk panda` selects the BBA container adapter. `--sdk python:panda_sdk` still
+selects the external SDK's host implementation; these are distinct execution
+paths. New integrations implement `EvaluationSDKPlugin` in `sdk/<name>/`,
+register their selection, and return a validated `BenchmarkResult`. They do
+not need KUMA's private submission extensions. KUMA remains the default.
+
 AgentBench accepts a Python module or configured object through `sdk=...` and
 discovers CLI plugins from the `defuzex_agentbench.evaluation_sdks` package
 entry-point group. Both forms become the same immutable evaluation plan before
@@ -25,7 +54,10 @@ suite = SuiteRunner(
 ).run([agent])
 ```
 
-Each Case gets a fresh `sdk.create_run(repo_path=agent.path, **sdk_options)` call.
+For injected SDKs using the minimal interface, each Case gets a fresh
+`sdk.create_run(repo_path=agent.path, **sdk_options)` call. The built-in KUMA
+runner instead generates a batch once with the Registry Case count and imports
+one Case into each isolated execution container; see [CLI Case counts](CLI.md#case-counts-versus-dialogue-steps).
 `repo_path` is reserved for the selected Agent. AgentBench copies the options
 mapping and does not add DefuzeX keys or configuration to an injected SDK.
 Configure a supplied `benchmark_runner` or `suite_runner` directly; combining
