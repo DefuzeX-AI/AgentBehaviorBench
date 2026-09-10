@@ -22,7 +22,7 @@ from defuzex_model_interceptor.auth import (  # noqa: E402
     InterceptorAuthenticationError,
 )
 from defuzex_model_interceptor.events import redact  # noqa: E402
-from defuzex_model_interceptor.entrypoint import _allow_host_patterns  # noqa: E402
+from defuzex_model_interceptor.entrypoint import _configure_netfilter  # noqa: E402
 from defuzex_model_interceptor.config import Route, ServiceConfig, Target  # noqa: E402
 from defuzex_model_interceptor.protocols import (  # noqa: E402
     OPENAI_CHAT_PROTOCOL,
@@ -211,20 +211,12 @@ def test_trace_redaction_covers_headers_fields_and_literal_secrets() -> None:
     }
 
 
-def test_allow_host_regex_matches_exact_and_subdomain_sni() -> None:
-    config = object.__new__(ServiceConfig)
-    object.__setattr__(
-        config,
-        "routes",
-        (
-            type("Route", (), {"host_patterns": ("api.example.com", "*.models.example")})(),
-        ),
-    )
-
-    exact, wildcard = _allow_host_patterns(config)
-
-    import re
-
-    assert re.search(exact, "api.example.com:443")
-    assert re.search(wildcard, "edge.models.example")
-    assert not re.search(exact, "not-api.example.com")
+def test_netfilter_covers_all_non_root_tcp_and_blocks_untranslated_egress(monkeypatch) -> None:
+    commands = []
+    monkeypatch.setattr("defuzex_model_interceptor.entrypoint.subprocess.run", lambda command, **kwargs: commands.append(command))
+    _configure_netfilter()
+    redirects = [c for c in commands if "REDIRECT" in c]
+    assert len(redirects) == 1 and "--dport" not in redirects[0]
+    assert "--uid-owner" in redirects[0] and "!" in redirects[0]
+    assert any(c[0] == "ip6tables" and "REJECT" in c for c in commands)
+    assert any(c[0] == "iptables" and "REJECT" in c for c in commands)

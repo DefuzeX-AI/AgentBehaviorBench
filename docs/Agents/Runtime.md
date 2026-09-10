@@ -181,10 +181,32 @@ python -m agentbench run --model "openai/gpt-4.1-mini"
 `OPENROUTER_MODEL` may be used instead of `--model`. The real OpenRouter key
 stays in the trusted Interceptor. The Agent image must
 declare a non-root `USER`, trust the run-specific CA through the selected Trust
-plugin, and use a supported TCP-based HTTP protocol. Unmatched traffic is
-forwarded without model Trace output.
+plugin, and use a supported TCP-based HTTP protocol. All non-root TCP ports
+(including localhost Ollama) enter the proxy. Undeclared HTTP requests are
+rejected, not forwarded silently. Non-DNS UDP and IPv6 are blocked; these are
+not claimed as translated protocols. The private proxy port is not published.
 
-Source changes are a compatibility fallback, not an onboarding step. They are
-needed only for clients that cannot accept a temporary credential, cannot trust
-the runtime CA, pin certificates, use an unsupported protocol, or bypass normal
-TCP HTTP model requests.
+Declare required non-model tool egress explicitly, for example:
+
+```toml
+[[llm_interception.tool_routes]]
+host_patterns = ["api.tavily.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/search", "/extract", "/crawl"]
+```
+
+Tool exceptions cannot authorize a host already declared as a model host.
+They preserve tool credentials and results, and are never redirected to a model.
+This deny-by-default policy is a compatibility change: Agents using other web
+tools must declare those endpoints before running.
+
+Google gRPC uses the original SDK and `GRPC_DEFAULT_SSL_ROOTS_FILE_PATH`.
+Only the declared GenerativeService v1beta GenerateContent/StreamGenerateContent
+text subset is translated; unsupported semantics fail explicitly. No REST
+client replacement is installed. See [protocol acceptance](../interception/acceptance.md).
+
+Clients that cannot accept temporary credentials or trust the runtime CA,
+pin certificates, use an unsupported protocol, or perform in-process inference
+require a separately designed integration. Stop and report the gap; do not
+silently patch their transport or bypass interception.

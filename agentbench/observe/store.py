@@ -65,7 +65,9 @@ def summarize(directory: Path):
     for path in sorted(directory.rglob("*.jsonl")):
         if path.is_symlink():
             continue
-        for line in path.read_text(encoding="utf-8").splitlines():
+        for line in path.read_text(encoding="utf-8").split("\n"):
+            if not line:
+                continue
             try:
                 row = json.loads(line)
             except json.JSONDecodeError:
@@ -73,4 +75,7 @@ def summarize(directory: Path):
                 continue
             key = row["source"] + ":" + row["event"]
             counts[key] = counts.get(key, 0) + 1
+            if row["event"] == "tool_outcome" and row["data"].get("status") != "succeeded":
+                warning = row["source"] + ":tool_incomplete"
+                counts[warning] = counts.get(warning, 0) + 1
     return counts

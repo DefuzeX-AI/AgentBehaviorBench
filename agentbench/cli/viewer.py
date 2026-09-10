@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import quote, unquote, urlparse
+from urllib.parse import quote, unquote, urlparse, parse_qs
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
@@ -101,6 +101,15 @@ def build_viewer_handler(
     result_log: Path, *, expected_suite_id: str | None
 ) -> type[SimpleHTTPRequestHandler]:
     """Build a request handler bound to one JSON result artifact."""
+    run_api = None
+    if result_log.name == 'run.json':
+        try:
+            metadata = json.loads(result_log.read_text(encoding='utf-8'))
+            if isinstance(metadata, dict) and metadata.get('schema') in ('abb.observe.run.v1', 'abb.evaluate.run.v1'):
+                from agentbench.observe.view_api import RunCatalogAPI
+                run_api = RunCatalogAPI(result_log.parent)
+        except (OSError, ValueError):
+            pass
 
     class ViewerHandler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):  # type: ignore[no-untyped-def]
@@ -111,6 +120,18 @@ def build_viewer_handler(
 
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
+            if run_api is not None and parsed.path.startswith('/api/observe/'):
+                origin = self.headers.get('Origin')
+                host = self.headers.get('Host', '')
+                if (urlparse(f'http://{host}').hostname not in ('localhost', '127.0.0.1', '::1')
+                    or (origin and origin != f'http://{host}') or self.headers.get('Sec-Fetch-Site') == 'cross-site'):
+                    self._send_json({'error': 'Same-origin reads only'}, status=HTTPStatus.FORBIDDEN)
+                    return
+                try:
+                    self._send_json(run_api.route(parsed.path, parse_qs(parsed.query)))
+                except (OSError, ValueError, KeyError, StopIteration):
+                    self._send_json({'error': 'Artifact unavailable'}, status=HTTPStatus.NOT_FOUND)
+                return
             result_api_path = _suite_result_api_path(expected_suite_id)
             if parsed.path == result_api_path:
                 self._send_json(parse_result_log(result_log))
@@ -131,8 +152,9 @@ def build_viewer_handler(
                     self.send_error(HTTPStatus.SERVICE_UNAVAILABLE,
                                     "Trace UI not built. Run npm install and npm run build in web/.")
                     return
-                html = index.read_text(encoding="utf-8").replace(
-                    "<head>", f'<head><meta name="abb-result-api" content="{escape(result_api_path, quote=True)}">', 1)
+                html = index.read_text(encoding="utf-8")
+                if run_api is None:
+                    html = html.replace("<head>", f'<head><meta name="abb-result-api" content="{escape(result_api_path, quote=True)}">', 1)
                 body = html.encode("utf-8")
                 self.send_response(HTTPStatus.OK)
                 self.send_header("Content-Type", "text/html; charset=utf-8")

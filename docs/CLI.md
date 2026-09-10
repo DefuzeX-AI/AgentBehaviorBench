@@ -1,5 +1,57 @@
 # AgentBench CLI
 
+## Official container evaluation (initial single-Case path)
+
+The default `run` and `certify` now share `ContainerBenchmarkRunner`, which invokes
+the same container-local KUMA/Agent/OTel core. `evaluate` is a single-Case
+compatibility entry to this core, not an independent SDK lifecycle. `observe`
+remains SDK-free. Only explicit custom SDK injection uses the legacy host-side
+generic SDK harness; it is not the official KUMA execution path.
+
+`run` still selects enabled ready Agents and executes Registry `case` counts.
+`certify` runs the adapting Agent's requested Cases and promotes only after
+host-side artifact identity/completion checks pass. A Judge `issue` is a benchmark
+failure for `run`, but does not prevent certification of an executable Agent.
+Each current official Case is limited to one Input; conversational state is not
+claimed. Raw artifacts are saved even without the suite `--output` option.
+
+`python -m agentbench evaluate 1` selects enabled Agent 1 directly and runs at most
+one official Case with one Input. Omitting the number opens selection once.
+No native-input prompt is shown: input comes unchanged from KUMA. This command
+can incur official Case/Judge and model charges. It does not promote Registry status.
+
+Options: `--registry`, `--env-file`, `--model`, `--sdk-source` (default sibling
+Defuze-SDK), `--output` (default results/observe for the shared webpage),
+`--timeout` (2400 seconds). The Agent needs evaluation/profile.md and
+evaluation/input-contract.json. KUMA_API_KEY or legacy DEFUZEX_API_KEY is required.
+SDK state is mounted writable under the actual Agent repository's .kuma only.
+The temporary evaluation build enables only official KUMA GET/POST egress in
+addition to the Agent's existing routes; original manifests are not changed.
+
+Exit 0 means execution and OTel completed and a Judge report was received, not
+necessarily a passing verdict. Failures exit 1, argument errors 2, interruption
+130. Artifacts remain under the printed run directory, with SDK files in
+evaluation/ and SDK recovery state in sdk-repo/.kuma/. The actual staged Agent
+source is mounted read-only at /opt/agent/agent; its nested .kuma mount is writable
+on the same filesystem, as required by SDK ledger validation.
+No automatic paid rerun occurs.
+
+Open a saved observe/evaluation run without Node.js using
+`python -m agentbench view results/observe/<run_id>/run.json`.
+The OTel tab offers a React Flow execution graph and a call tree. It checks JSON
+every second (serial requests, no overlap), with a pause control for the OTel view.
+The run list, SDK panel and current raw-event page also poll automatically.
+Graph arrows mean parent/child calls, not inferred dataflow or static LangGraph
+topology. New executions publish active span snapshots in `otel-live.jsonl`;
+completed spans in `otel.jsonl` supersede snapshots by trace/span ID. Existing
+images must be rebuilt to produce live snapshots; historical ended spans still
+display. Polling does not create Agent, model or SDK requests.
+
+Its local read-only API lists sibling runs under the selected run's parent
+directory, newest first, and initially selects the requested run. Refresh updates
+the list. Each run exposes OTel, SDK artifacts and paged raw events; paths cannot
+escape the selected artifact root. Vite/preview lists its configured observe root.
+
 This document is the complete usage guide for the AgentBench command-line
 interface. The CLI installation entry point is defined in `pyproject.toml`, and
 the implementation lives in `agentbench/cli/`.
@@ -46,6 +98,29 @@ Current subcommands:
 | `view` | Open an existing JSON result in the local web viewer. |
 | `certify` | Verify one `adapting` Agent can complete its requested Cases and promote it to `ready`. |
 | `observe` | Select one enabled Agent, supply native input, and save execution traces without an evaluation SDK. |
+| `clean` | Clear default local result history into a recoverable archive. |
+
+### Clean local history
+
+```bash
+python -m agentbench clean --dry-run  # Preview only
+python -m agentbench clean            # Preview and confirm
+python -m agentbench clean --yes      # Skip confirmation
+```
+
+Stop active runs and viewers first. `clean` moves all immediate children of the
+installed project's `results/` into a unique `.history-trash/` batch. This includes
+observe/evaluation traces, certification/suite JSON, interception artifacts, and
+SDK recovery state inside result directories. The results directory remains.
+It does not change Agent sources, `.env`, registry certification status, Docker
+images, SDK server records, or results written to custom paths outside `results/`.
+Symlinked result roots are rejected; child symlinks are moved, not followed.
+
+Cleanup is recoverable and does not free disk space. The command prints the archive
+path. To restore, stop runs/viewers and move its contents back into `results/`,
+without overwriting newer files. Restart viewers after cleanup; an existing viewer
+bound to a removed run may need a new result path. `--dry-run` never moves files,
+even with `--yes`. Cancellation exits 0, errors 1, interruption 130.
 
 ## 2. Default Command and Compatibility
 
@@ -116,7 +191,7 @@ If an update fails before replacement, the previous complete snapshot remains.
 When `--output` is omitted:
 
 - the benchmark still runs normally;
-- no JSON trace/result artifact is generated;
+- no aggregate suite JSON is generated; the default container core still saves raw Case, OTel, submission and Judge artifacts under `results/observe`;
 - the local viewer is not started;
 - the terminal still shows each Agent result and the final suite result.
 
@@ -382,8 +457,9 @@ Make sure `--output` was provided:
 python -m agentbench run --output results\result.json
 ```
 
-Normal `run` does not save results when `--output` is omitted. `certify` is
-different: it always saves certification results.
+Without `--output`, normal `run` omits only the aggregate suite result and viewer.
+The default container core still saves each Case's raw artifacts and prints their
+directory. `certify` additionally always saves an aggregate certification result.
 
 ### An `adapting` Agent does not appear in normal `run`
 
@@ -510,8 +586,10 @@ python -m agentbench certify my-agent --sdk my_evaluation_sdk
 `repo_path` is supplied by ABB per Agent. Credentials and validation belong to
 the selected SDK. CLI callbacks and result output are shared across SDKs.
 
-Omitting `--sdk` preserves the existing DefuzeX default and its local-development
-configuration (`allow_local=True`, `track_files=False`). An explicitly selected
-SDK receives no such implicit options, even when it is `--sdk defuzex`.
-Supply options appropriate to its actual execution environment. This change
-does not move the SDK into an Agent container.
+Omitting `--sdk` uses the official container-local KUMA core (`allow_local=False`).
+For that default, `--sdk-options` accepts `sdk_source`, `output` (raw artifact
+root), and `timeout`. Old SDK options such as `requirement_path` or `allow_local`
+are rejected instead of silently selecting the old execution path.
+An explicitly selected custom SDK still executes through the generic host-side
+extension and receives its own options; it does not provide the official
+same-container KUMA guarantee.

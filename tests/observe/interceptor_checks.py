@@ -95,7 +95,8 @@ class InterceptorChecks(unittest.TestCase):
             flow.response = http.Response.make(200, b"", {"content-type": "text/event-stream"})
             addon.responseheaders(flow)
             data = ('data: ' + json.dumps({"choices": [{"delta": {"content": "中文"}, "finish_reason": "stop"}]}, ensure_ascii=False) + '\n\ndata: [DONE]\n\n').encode()
-            output = b"".join(flow.response.stream(bytes([x])) for x in data) + flow.response.stream(b"")
+            parts = [flow.response.stream(bytes([x])) for x in data]
+            output = b"".join(p if isinstance(p, bytes) else b"".join(p) for p in parts) + flow.response.stream(b"")
             addon.response(flow)
             self.assertEqual(json.loads(output)[0]["candidates"][0]["content"]["parts"][0]["text"], "中文")
             responses = [call for call in emit.call_args_list if call.args[0] == "llm_response"]

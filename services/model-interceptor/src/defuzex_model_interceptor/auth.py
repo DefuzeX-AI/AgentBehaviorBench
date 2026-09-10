@@ -50,6 +50,16 @@ ANTHROPIC_API_KEY_AUTH = AnthropicApiKeyAuthentication()
 class GoogleApiKeyAuthentication:
     name = "google-api-key"
 
+    def authorize_request(self, request, *, temporary_token, upstream_secret):
+        keys = request.query.get_all("key")
+        header = request.headers.get("x-goog-api-key")
+        if len(keys) > 1 or (keys and header and keys[0] != header):
+            raise InterceptorAuthenticationError("Ambiguous Google API key")
+        if keys:
+            request.headers["x-goog-api-key"] = keys[0]
+            del request.query["key"]
+        self.authorize(request.headers, temporary_token=temporary_token, upstream_secret=upstream_secret)
+
     def authorize(self, headers, *, temporary_token, upstream_secret):
         if not hmac.compare_digest(headers.get("x-goog-api-key", ""), temporary_token):
             raise InterceptorAuthenticationError("Invalid per-run Google token")
@@ -58,3 +68,15 @@ class GoogleApiKeyAuthentication:
 
 
 GOOGLE_API_KEY_AUTH = GoogleApiKeyAuthentication()
+
+
+class NetworkIsolatedAuthentication:
+    """For declared local protocols without API keys, e.g. Ollama.
+
+    Only safe behind the per-Agent private network namespace. Never expose this
+    proxy as a public shared gateway. The route still requires explicit approval.
+    """
+    name = "network-isolated"
+
+    def authorize(self, headers, *, temporary_token, upstream_secret):
+        headers["authorization"] = f"Bearer {upstream_secret}"

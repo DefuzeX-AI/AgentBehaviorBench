@@ -27,6 +27,7 @@ class PemEnvironmentTrust:
             "SSL_CERT_FILE": certificate_path,
             "REQUESTS_CA_BUNDLE": certificate_path,
             "NODE_EXTRA_CA_CERTS": certificate_path,
+            "GRPC_DEFAULT_SSL_ROOTS_FILE_PATH": certificate_path,
         }
 
 

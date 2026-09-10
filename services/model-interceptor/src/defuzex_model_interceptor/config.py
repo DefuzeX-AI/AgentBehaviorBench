@@ -33,6 +33,14 @@ class Route:
 
 
 @dataclass(frozen=True, slots=True)
+class ToolRoute:
+    host_patterns: tuple[str, ...]
+    ports: tuple[int, ...]
+    methods: tuple[str, ...]
+    path_patterns: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class Target:
     provider_id: str
     target_plugin: str
@@ -48,6 +56,7 @@ class ServiceConfig:
     target: Target
     credentials: tuple[Credential, ...]
     routes: tuple[Route, ...]
+    tool_routes: tuple[ToolRoute, ...] = ()
 
     @classmethod
     def load(cls, path: str | Path) -> "ServiceConfig":
@@ -68,6 +77,7 @@ class ServiceConfig:
             target=_target(raw.get("target")),
             credentials=credentials,
             routes=routes,
+            tool_routes=_tool_routes(raw.get("tool_routes", [])),
         )
 
 
@@ -114,6 +124,26 @@ def _target(value: object) -> Target:
             {str(key).strip(): str(item).strip() for key, item in headers.items()}
         ),
     )
+
+
+def _tool_routes(value: object) -> tuple[ToolRoute, ...]:
+    if not isinstance(value, list):
+        raise ServiceConfigurationError("tool_routes must be a list")
+    result = []
+    for raw in value:
+        data = _object(raw, "tool route")
+        hosts, paths = _strings(data, "host_patterns"), _strings(data, "path_patterns")
+        if any(h == "*" or any(c in h for c in "?[]/") or
+               ("*" in h and (not h.startswith("*.") or h.count("*") != 1)) for h in hosts):
+            raise ServiceConfigurationError("Unsafe tool host pattern")
+        if any(not p.startswith("/") or p == "/*" or "**" in p or any(c in p for c in "?[]") for p in paths):
+            raise ServiceConfigurationError("Unsafe tool path pattern")
+        ports = _integers(data, "ports")
+        if any(not 1 <= p <= 65535 for p in ports):
+            raise ServiceConfigurationError("Invalid tool port")
+        result.append(ToolRoute(tuple(h.lower().rstrip(".") for h in hosts), ports,
+                                tuple(m.upper() for m in _strings(data, "methods")), paths))
+    return tuple(result)
 
 
 def _read_secret(path: str) -> str:

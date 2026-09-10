@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { parseTrace, sortEvents } from './trace.js';
 import RunSidebar from './RunSidebar.jsx';
+import TraceView from './otel/TraceView.jsx';
+import EvaluationView from './evaluation/EvaluationView.jsx';
+import RawRunView from './RawRunView.jsx';
+import useLiveJson from './useLiveJson.js';
 
 const PAGE_SIZE = 100;
 const MAX_BYTES = 20 * 1024 * 1024;
 
 export default function App() {
   const [events, setEvents] = useState([]);
+  const [view, setView] = useState('otel');
   const [files, setFiles] = useState([]);
   const [warnings, setWarnings] = useState([]);
   const [query, setQuery] = useState('');
@@ -21,46 +26,18 @@ export default function App() {
   const [listError, setListError] = useState('');
   const [revision, setRevision] = useState(0);
   const bound = Boolean(document.querySelector('meta[name="abb-result-api"]'));
+  const catalog = useLiveJson(bound ? null : '/api/observe/runs', revision);
+  useEffect(() => {
+    if (catalog.data?.runs) {
+      setRuns(catalog.data.runs);
+      setSelected(previous => previous || catalog.data.default_run || catalog.data.runs[0]?.id || null);
+    }
+  }, [catalog.data]);
 
   useEffect(() => {
-    if (bound) return;
-    const controller = new AbortController();
-    setListBusy(true);
-    fetch('/api/observe/runs', { signal: controller.signal }).then(async response => {
-      if (!response.ok) throw new Error('任务接口不可用，请使用 web 下的 npm run dev 或 npm run preview');
-      const result = await response.json();
-      if (!Array.isArray(result.runs)) throw new Error('任务接口不可用');
-      if (controller.signal.aborted) return;
-      setRuns(result.runs);
-      setListError('');
-      if (revision === 0) setSelected(previous => previous || result.runs[0]?.id || null);
-    }).catch(error => { if (!controller.signal.aborted) setListError(error.message); })
-      .finally(() => { if (!controller.signal.aborted) setListBusy(false); });
-    return () => controller.abort();
-  }, [bound, revision]);
-
-  useEffect(() => {
-    if (!selected) return;
-    const controller = new AbortController();
-    const current = ++request.current;
-    setLoading(true);
-    setEvents([]); setFiles([]); setWarnings([]);
-    setQuery(''); setSource(''); setLimit(PAGE_SIZE);
-    fetch(`/api/observe/runs/${encodeURIComponent(selected)}`, { signal: controller.signal }).then(async response => {
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || '无法读取任务');
-      const parsed = result.files.map(file => parseTrace(file.content, file.name));
-      if (request.current !== current || controller.signal.aborted) return;
-      setEvents(sortEvents(parsed.flatMap(item => item.events)));
-      setFiles(result.files.map(file => file.name));
-      setWarnings([...(result.warnings || []), ...parsed.flatMap(item => item.warnings)]);
-    }).catch(error => {
-      if (!controller.signal.aborted && request.current === current) setWarnings([error.message]);
-    }).finally(() => {
-      if (!controller.signal.aborted && request.current === current) setLoading(false);
-    });
-    return () => controller.abort();
-  }, [selected, revision]);
+    setListBusy(!catalog.data && !catalog.error);
+    setListError(catalog.error);
+  }, [catalog.data, catalog.error]);
 
   useEffect(() => {
     // Only the local Python viewer injects this marker. Vite/file import mode
@@ -95,6 +72,7 @@ export default function App() {
   async function loadFiles(selected) {
     if (!selected.length) return;
     setSelected(null);
+    setView('raw');
     const current = ++request.current;
     setLoading(true);
     const nextEvents = [];
@@ -151,8 +129,10 @@ export default function App() {
         <input ref={input} type="file" multiple accept=".jsonl,.json" hidden
           onChange={event => { loadFiles(Array.from(event.target.files)); event.target.value = ''; }} />
       </header>
-      <p className="description">{selected ? `Run ${selected}：${loading ? '正在读取运行记录。' : files.length ? '已加载可用 trace，按时间排列。' : '暂无可用 trace。'}` : '从左侧选择运行记录自动加载，也可以手动打开 trace 文件。'}</p>
+      <p className="description">{selected ? `Run ${selected}：选择下方视图查看运行记录。` : '从左侧选择运行记录自动加载，也可以手动打开 trace 文件。'}</p>
 
+      {!bound && <nav className="trace-tabs" aria-label="Trace 视图"><button aria-pressed={view === 'otel'} onClick={() => setView('otel')}>OTel 调用树</button><button aria-pressed={view === 'evaluation'} onClick={() => setView('evaluation')}>Case / SDK / Judge</button><button aria-pressed={view === 'raw'} onClick={() => setView('raw')}>原始事件／网络</button></nav>}
+      {!bound && view === 'otel' ? <TraceView run={selected} revision={revision} /> : !bound && view === 'evaluation' ? <EvaluationView run={selected} revision={revision} /> : !bound && selected ? <RawRunView key={`${selected}:${revision}`} run={selected} revision={revision} /> : <>
       <section className="toolbar" aria-label="筛选 trace">
         <label className="search"><span className="sr-only">搜索 trace</span>
           <input type="search" placeholder="搜索事件、节点、run ID 或内容…" value={query}
@@ -195,7 +175,8 @@ export default function App() {
           </details>)}
           {filtered.length > limit && <button className="more" onClick={() => setLimit(value => value + PAGE_SIZE)}>再显示 {Math.min(PAGE_SIZE, filtered.length - limit)} 条</button>}
         </section>}
-      <footer>ABB / OBSERVE <span>本地只读 · 点击刷新获取最新记录</span></footer>
+      </>}
+      <footer>ABB / OBSERVE <span>本地只读 · 运行记录每秒自动同步</span></footer>
     </main>
     </div>
   );

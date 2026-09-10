@@ -284,6 +284,11 @@ class DockerRuntime:
                         "headers": dict(target.headers),
                     },
                     "credentials": credentials,
+                    "tool_routes": [
+                        {"host_patterns": list(route.host_patterns), "ports": list(route.ports),
+                         "methods": list(route.methods), "path_patterns": list(route.path_patterns)}
+                        for route in interception.tool_routes
+                    ],
                     "routes": [
                         {
                             "id": route.route_id,

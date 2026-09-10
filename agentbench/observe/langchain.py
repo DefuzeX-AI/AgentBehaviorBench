@@ -12,7 +12,7 @@ class TraceCallback(BaseCallbackHandler):
 
     def _start(self, kind, serialized, value, run_id, parent_run_id, **kwargs):
         current_span.set(str(run_id))
-        if (kwargs.get("name") or "").startswith("tavily."):
+        if (kwargs.get("metadata") or {}).get("abb_span_kind") == "tool":
             kind = "tool"
         self.store.record("span_start", kind=kind, span_id=str(run_id),
                           parent_span_id=str(parent_run_id) if parent_run_id else None,
@@ -47,4 +47,7 @@ class TraceCallback(BaseCallbackHandler):
     on_tool_error = _error
 
     def on_custom_event(self, name, data, *, run_id, **kwargs):
+        if name == "abb.tool_outcome":
+            self.store.record("tool_outcome", span_id=str(run_id), **data)
+            return
         self.store.record("native_event", name=name, span_id=str(run_id), payload=data)

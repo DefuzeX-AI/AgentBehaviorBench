@@ -1,9 +1,8 @@
-"""Explicit text-only Gemini REST ↔ OpenAI Chat wire conversion.
+"""Explicit text-only Gemini ↔ OpenAI Chat semantic conversion.
 
 Unsupported semantics fail closed instead of silently degrading a research run.
 Google GAPIC REST streaming expects a JSON array; alt=sse clients expect SSE.
 """
-import json
 
 
 def _text(parts):
@@ -82,43 +81,13 @@ def response_from_chat(payload, *, status=200):
 
 
 class GeminiStream:
+    """Backward-compatible facade over the shared framing/translation engine."""
     def __init__(self, *, sse=False, max_event_bytes=1048576):
-        self.sse, self.maximum = sse, max_event_bytes
-        self.buffer = bytearray()
-        self.first, self.done = True, False
+        from .wire import GeminiWire, GeminiWireStream
+        wire = GeminiWire()
+        wire.sse = sse
+        self._stream = GeminiWireStream(wire)
+        self._stream.parser.maximum = max_event_bytes
 
     def feed(self, chunk):
-        self.buffer.extend(chunk)
-        # Parsing bytes preserves split UTF-8 codepoints and arbitrary TCP boundaries.
-        self.buffer[:] = self.buffer.replace(b"\r\n", b"\n")
-        output = bytearray()
-        while b"\n\n" in self.buffer:
-            event, _, rest = self.buffer.partition(b"\n\n")
-            self.buffer[:] = rest
-            if len(event) > self.maximum:
-                raise ValueError("Upstream SSE event exceeds limit")
-            data = b"\n".join(line[5:].lstrip() for line in event.split(b"\n") if line.startswith(b"data:"))
-            if not data:
-                continue
-            if data == b"[DONE]":
-                self.done = True
-                continue
-            if self.done:
-                raise ValueError("Upstream sent data after DONE")
-            payload = json.loads(data)
-            if isinstance(payload, dict) and "error" in payload:
-                raise ValueError(f"Upstream stream failed: {payload['error']}")
-            translated = json.dumps(response_from_chat(payload), ensure_ascii=False).encode("utf-8")
-            if self.sse:
-                output.extend(b"data: " + translated + b"\n\n")
-            else:
-                output.extend((b"[" if self.first else b",") + translated)
-            self.first = False
-        if len(self.buffer) > self.maximum:
-            raise ValueError("Upstream SSE event exceeds limit")
-        if not chunk:
-            if self.buffer.strip() or not self.done:
-                raise ValueError("Incomplete upstream Gemini stream")
-            if not self.sse:
-                output.extend(b"[]" if self.first else b"]")
-        return bytes(output)
+        return self._stream.feed(chunk)

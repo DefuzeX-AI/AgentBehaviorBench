@@ -41,6 +41,7 @@ def observe(agent, value, *, output: Path, environ, timeout=None):
             result["trace_summary"] = summarize(directory)
             if result["status"] == "succeeded" and (
                 result["trace_summary"].get("framework:span_error", 0)
+                or result["trace_summary"].get("framework:tool_incomplete", 0)
                 or result["trace_summary"].get("interceptor:llm_error", 0)
             ):
                 result["status"] = "degraded"

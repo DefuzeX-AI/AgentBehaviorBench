@@ -10,8 +10,9 @@
 | 框架适配 | `adapter/langgraph/` | 加载、异步调用、config 和输出提取 |
 | 特殊绑定 | Agent 外层 `bindings/` | 原生构造输入、生命周期和明确结果位置 |
 | 观察器 | `observe/observers.py`、`langchain.py`、`tools.py` | 可独立注册的观察策略 |
-| 传输兼容 | `observe/google_rest.py` | 固定版本 Google SDK 的异步 REST 调度 |
-| 网络协议 | 独立服务 `defuzex_model_interceptor/gemini.py` | 双向转换与增量流解码 |
+| 网络策略 | 独立服务 `defuzex_model_interceptor/policy.py` | 声明式模型路由、工具白名单、未知请求拒绝 |
+| 协议转换 | 独立服务 `defuzex_model_interceptor/wire/` | 每请求独立 Strategy；HTTP JSON/SSE、Gemini gRPC、Ollama NDJSON |
+| 目标路由 | 独立服务 `defuzex_model_interceptor/targets.py` | 选择 OpenRouter 端点与运行配置模型，不包含 Company 特判 |
 | 持久化/查看 | `observe/store.py`、`review.py` | JSONL 证据、运行摘要与终端层级 |
 
 ## 接入另一个 LangGraph Agent
@@ -42,6 +43,12 @@ worker 结果必须有正确 schema、Agent ID、run ID 和成功退出码。
 网络与框架以本次 run ID 归组，模型请求通过限于声明模型域名的临时 header 携带 framework span ID。
 Interceptor 消费并移除此 header，外部模型不会收到它。关联只是观测证据，不是权限凭据。
 
-Company 的 Google SDK 3.0.3 会将普通 async REST 配置切回 grpc_asyncio。
-独立桥调度原同步 REST SDK 到线程，并保留原 LangChain 异步解析路径。
-不能把“增加一个 decoder”视为 Gemini 协议兼容；请求、响应、错误、SSE/JSON-array 都有转换。
+Company 保留 Google SDK 原生 grpc_asyncio；不替换 client，不强制 REST。
+Gemini gRPC 的 protobuf 解包/封包、状态 trailers 与 SSE 转换都在独立网络服务中。
+原生 gRPC 的网络调用可按 run/call ID 对账，但当前不注入 gRPC metadata 关联
+LangChain span，不能把时间相近当作精确父子关系。
+
+Company 的 Tavily 返回值检查留在其 binding，通用 tools observer 仅接收结果检查函数。
+部分提取失败会记录 tool_outcome，observe 标为 degraded，但不修改 Agent 收到的返回值。
+JSONL 按 LF 读取，Unicode U+0085/U+2028/U+2029 不再误当记录分隔符。
+协议边界和复现命令见 [拦截验收](../interception/acceptance.md)。

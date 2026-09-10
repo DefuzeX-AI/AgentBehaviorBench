@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from urllib.parse import urlsplit
 
 from .config import Route, Target
+from .wire import load_wires
 
 
 class TargetRoutingError(ValueError):
@@ -21,17 +22,15 @@ class PreparedTargetRequest:
     host: str
     path: str
     payload: object
+    source_payload: object = None
+    wire: object = None
 
 
 class OpenRouterTarget:
     name = "openrouter"
 
-    _ENDPOINTS = {
-        "openai-chat": "/chat/completions",
-        "openai-responses": "/responses",
-        "anthropic-messages": "/messages",
-        "gemini-content": "/chat/completions",
-    }
+    def __init__(self, wires=None):
+        self.wires = load_wires() if wires is None else wires
 
     def prepare_request(
         self,
@@ -41,29 +40,18 @@ class OpenRouterTarget:
         target: Target,
     ) -> PreparedTargetRequest:
         try:
-            endpoint = self._ENDPOINTS[route.protocol_plugin]
+            wire = self.wires[route.protocol_plugin]()
+            endpoint = wire.endpoint
         except KeyError as exc:
             raise TargetRoutingError(
                 f"OpenRouter does not support source protocol {route.protocol_plugin!r}"
             ) from exc
 
-        content = getattr(request, "content", b"") or b""
         try:
-            payload = json.loads(content.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise TargetRoutingError("Model request body must be valid UTF-8 JSON") from exc
-        if not isinstance(payload, dict):
-            raise TargetRoutingError("Model request body must be a JSON object")
-
-        source_model = payload.get("model")
-        if route.protocol_plugin == "gemini-content":
-            from .gemini import request_to_chat
-            source_path = getattr(request, "path")
-            source_model = source_path.split("/models/", 1)[-1].split(":", 1)[0]
-            try:
-                payload = request_to_chat(payload, streaming=":streamGenerateContent" in source_path)
-            except (ValueError, KeyError, TypeError) as exc:
-                raise TargetRoutingError(str(exc)) from exc
+            source, payload = wire.decode(request)
+        except (ValueError, KeyError, TypeError) as exc:
+            raise TargetRoutingError(str(exc)) from exc
+        source_model = wire.source_model
         payload["model"] = target.model
         parsed = urlsplit(target.base_url)
         if parsed.scheme != "https" or not parsed.hostname:
@@ -83,6 +71,11 @@ class OpenRouterTarget:
             ),
         )
         headers = getattr(request, "headers")
+        headers["content-type"] = "application/json"
+        headers["accept-encoding"] = "identity"
+        for key in list(headers):
+            if key.lower().startswith("grpc-") or key.lower() in {"te", "x-goog-request-params", "content-encoding"}:
+                headers.pop(key, None)
         headers["host"] = parsed.netloc
         for key, value in target.headers.items():
             headers[key] = value
@@ -94,6 +87,8 @@ class OpenRouterTarget:
             host=parsed.hostname,
             path=target_path,
             payload=payload,
+            source_payload=source,
+            wire=wire,
         )
 
 

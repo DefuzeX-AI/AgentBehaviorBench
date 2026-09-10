@@ -22,3 +22,29 @@ does not promise unlimited capacity beyond container memory and temporary storag
 The service is configured only through the JSON file mounted at
 `/run/secrets/interceptor_config`. It emits machine-readable trace events to
 stdout with the `DEFUZEX_TRACE ` prefix.
+
+## Boundaries and extension points
+
+- `policy.py`: declared model routes and explicit tool exceptions. Unknown HTTP
+  egress is denied; non-root TCP is redirected on every port. IPv6 and non-DNS
+  UDP are blocked, not translated. Do not publish the private proxy externally.
+- `auth.py`: temporary-token validation. Google supports header or query API
+  keys (ambiguous credentials are rejected). `network-isolated` is only for
+  keyless local protocols in a private Agent namespace.
+- `targets.py`: target provider and model selection. Authentication and route
+  mutations are staged on a request copy; plugin failures cannot forward a real
+  key to the source provider.
+- `wire/`: per-call Strategy factories selected by protocol ID. Third-party
+  factories register under `defuzex.model_interceptor.wires`. The existing
+  `protocols` entry points remain observation decoders, not converters.
+- `gemini.py`: text semantic mapping; `wire/grpc.py`: bounded protobuf frames,
+  gzip and Google v1beta messages. There is no Google SDK patch in the Agent.
+- `addon.py`: lifecycle orchestration, status mapping, streaming capture and
+  trace events. Empty intermediate output suppresses HTTP data; it must not
+  create an HTTP/1 terminating chunk. Failed streams never get success trailers.
+
+Gemini and Ollama bridges currently support text, not tools, images, audio,
+cached content or provider-specific controls. Unsupported fields fail closed.
+The target is configurable OpenRouter, not a hard-coded DeepSeek model.
+32 original-client cases and separate fault checks are available in
+`tests/acceptance/interception`; see `docs/interception/acceptance.md`.

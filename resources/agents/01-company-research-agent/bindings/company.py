@@ -19,7 +19,6 @@ class CompanyGraph:
         from backend.graph import Graph
         from backend.classes.state import job_status
         from langchain_core.callbacks.manager import adispatch_custom_event
-        from agentbench.observe.google_rest import use_google_rest
         from agentbench.observe.tools import observe_async_methods
 
         if not isinstance(value, dict) or not isinstance(value.get("company"), str) or not value["company"].strip():
@@ -35,11 +34,10 @@ class CompanyGraph:
         job_status[job_id].update(status="processing", company=value["company"], events=[])
         self.graph = Graph(company=value["company"], url=value.get("company_url", value.get("url")),
                            hq_location=value.get("hq_location"), industry=value.get("industry"), job_id=job_id)
-        use_google_rest(self.graph.briefing.llm)
         for node in vars(self.graph).values():
             client = getattr(node, "tavily_client", None)
             if client is not None:
-                observe_async_methods(client, ("search", "extract", "crawl"), namespace="tavily")
+                observe_async_methods(client, ("search", "extract", "crawl"), namespace="tavily", inspect_result=tavily_outcome)
         report = None
         async for update in self.graph.run(config):
             for event in job_status[job_id]["events"]:
@@ -63,3 +61,15 @@ class CompanyGraph:
 
 def create_graph():
     return CompanyGraph()
+
+
+def tavily_outcome(result):
+    """Company-specific tool semantics, without changing the native return value."""
+    if not isinstance(result, dict):
+        return None
+    failed = result.get("failed_results") or []
+    succeeded = result.get("results") or []
+    if failed or result.get("error"):
+        return {"status": "partial_failure" if succeeded else "failed",
+                "failed_count": len(failed) or 1, "succeeded_count": len(succeeded)}
+    return {"status": "succeeded", "failed_count": 0, "succeeded_count": len(succeeded)}

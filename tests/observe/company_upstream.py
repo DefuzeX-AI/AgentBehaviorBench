@@ -1,7 +1,7 @@
-"""OFFLINE TEST ONLY: controlled HTTP responses for the unchanged Company graph.
+"""OFFLINE TEST ONLY: controlled responses for the unchanged Company graph.
 
-Never imported by production execution. Original SDK serializers, LangChain
-clients, Tavily methods, graph nodes and graph edges still execute.
+Never imported by production execution. Google RPC methods are stubbed here;
+real original-client protocol evidence belongs to acceptance/interception.
 """
 import json
 
@@ -9,6 +9,12 @@ import json
 def install():
     import httpx
     import requests
+    from google.ai.generativelanguage_v1beta import GenerativeServiceAsyncClient, GenerateContentResponse
+
+    async def generate_content(self, request=None, **kwargs):
+        return GenerateContentResponse(candidates=[{"content": {"role": "model", "parts": [{"text": "Offline evidence briefing."}]}, "finish_reason": "STOP"}])
+
+    GenerativeServiceAsyncClient.generate_content = generate_content
 
     class Body(httpx.AsyncByteStream):
         def __init__(self, data):

@@ -35,6 +35,14 @@ def build_trace_suite_runner(
         trace_output = getattr(activity_sink, "write_static", output_fn)
         sinks.append(TerminalTraceSink(trace_output))
     sink: TraceSink = _CompositeTraceSink(tuple(sinks)) if sinks else NullTraceSink()
+    if sdk is None:
+        import os
+        from agentbench.evaluation.benchmark import ContainerBenchmarkRunner
+        environ = dict(os.environ)
+        if model is not None:
+            environ['OPENROUTER_MODEL'] = model
+        return SuiteRunner(benchmark_runner=ContainerBenchmarkRunner(
+            environ=environ, options=sdk_options, trace_sink=sink, trace_max_bytes=max_bytes))
     runtime_factory = RuntimeFactory(
         docker_builder=lambda: DockerRuntime(
             model_provider=OpenRouterProvider(model=model),
@@ -43,10 +51,6 @@ def build_trace_suite_runner(
         )
     )
     agent_runner = AgentRunner(runtime_factory=runtime_factory)
-    if sdk is None:
-        from agentbench.sdk.defuzex import cli_options
-
-        sdk_options = cli_options(sdk_options)
     benchmark_runner = BenchmarkRunner(
         agent_runner=agent_runner,
         sdk=sdk,

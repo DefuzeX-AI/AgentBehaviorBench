@@ -49,12 +49,22 @@ class RouteConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class ToolRouteConfig:
+    """Explicit non-model HTTP egress; no credential substitution."""
+    host_patterns: tuple[str, ...]
+    ports: tuple[int, ...]
+    methods: tuple[str, ...]
+    path_patterns: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class InterceptionConfig:
     required: bool
     trust_plugin: str
     environment: Mapping[str, str]
     credentials: tuple[CredentialConfig, ...]
     routes: tuple[RouteConfig, ...]
+    tool_routes: tuple[ToolRouteConfig, ...] = ()
 
     @classmethod
     def from_agent_dir(cls, agent_root: str | Path) -> "InterceptionConfig | None":
@@ -94,7 +104,24 @@ class InterceptionConfig:
             environment=MappingProxyType(environment),
             credentials=credentials,
             routes=routes,
+            tool_routes=_tool_routes(section.get("tool_routes", [])),
         )
+
+
+def _tool_routes(value: object) -> tuple[ToolRouteConfig, ...]:
+    if not isinstance(value, list):
+        raise InterceptionConfigurationError("tool_routes must be a table array")
+    result = []
+    for raw in value:
+        if not isinstance(raw, dict):
+            raise InterceptionConfigurationError("Every tool route must be a table")
+        result.append(ToolRouteConfig(
+            host_patterns=_patterns(raw, "host_patterns", host=True),
+            ports=_ports(raw.get("ports", [443])),
+            methods=tuple(v.upper() for v in _string_list(raw, "methods")),
+            path_patterns=_patterns(raw, "path_patterns", host=False),
+        ))
+    return tuple(result)
 
 
 def _credentials(value: object) -> tuple[CredentialConfig, ...]:

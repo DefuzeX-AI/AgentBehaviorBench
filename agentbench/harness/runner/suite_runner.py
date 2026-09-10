@@ -45,9 +45,10 @@ class SuiteRunner:
             raise ValueError(
                 "Configure sdk on either SuiteRunner or benchmark_runner, not both"
             )
-        self._benchmark_runner = benchmark_runner or BenchmarkRunner(
-            sdk=sdk, sdk_options=sdk_options
-        )
+        if benchmark_runner is None and sdk is None:
+            from agentbench.evaluation.benchmark import ContainerBenchmarkRunner
+            benchmark_runner = ContainerBenchmarkRunner(options=sdk_options)
+        self._benchmark_runner = benchmark_runner or BenchmarkRunner(sdk=sdk, sdk_options=sdk_options)
 
     @staticmethod
     def new_suite_id() -> str:

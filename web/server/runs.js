@@ -1,5 +1,8 @@
 import { readdir, readFile, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
+import { otelSpans, otelPayload } from './otel.js';
+import { evaluation } from './evaluation.js';
+import { eventPage } from './events.js';
 
 const MAX_BYTES = 20 * 1024 * 1024;
 const validId = id => /^[a-zA-Z0-9_-]+$/.test(id);
@@ -72,6 +75,14 @@ export function runsPlugin(root) {
           req.headers['sec-fetch-site'] === 'cross-site') return reply(403, { error: '仅允许本地同源访问' });
       if (req.method !== 'GET') return reply(405, { error: '仅支持读取' });
       try {
+        const eventMatch = /^\/api\/observe\/runs\/([a-zA-Z0-9_-]+)\/events$/.exec(url.pathname);
+        if (eventMatch) return reply(200, await eventPage(root, eventMatch[1], Number(url.searchParams.get('offset') || 0)));
+        const evaluated = /^\/api\/observe\/runs\/([a-zA-Z0-9_-]+)\/evaluation$/.exec(url.pathname);
+        if (evaluated) return reply(200, await evaluation(root, evaluated[1]));
+        const otel = /^\/api\/observe\/runs\/([a-zA-Z0-9_-]+)\/otel(?:\/([0-9a-f]{16})\/payload\/(input|output|error|metadata|events))?$/.exec(url.pathname);
+        if (otel) return reply(200, otel[2]
+          ? { payload: await otelPayload(root, otel[1], otel[2], otel[3]) }
+          : await otelSpans(root, otel[1]));
         if (url.pathname === '/api/observe/runs') return reply(200, { runs: await listRuns(root) });
         const match = /^\/api\/observe\/runs\/([a-zA-Z0-9_-]+)$/.exec(url.pathname);
         if (match) return reply(200, await readRun(root, match[1]));

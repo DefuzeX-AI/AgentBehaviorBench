@@ -3,6 +3,11 @@
 Certification decides whether an adapting Agent is runnable enough to enter the
 default batch set.
 
+The default CLI now shares the container-local KUMA core with `run`. It requires
+the Agent's evaluation Profile and local SDK source, then checks Case/Input,
+Submission/output, OTel/Evidence and Judge identities on the host. Merely changing
+the Registry to ready, or passing an observe invocation, is not certification.
+
 ## Status Lifecycle
 
 Use this Registry state while integrating:

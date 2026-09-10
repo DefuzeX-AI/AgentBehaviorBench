@@ -26,12 +26,21 @@ def configure_trust():
             os.environ[key] = str(bundle)
 
 
-async def execute(root: Path, request: Path, output: Path):
+async def execute(root: Path, request: Path, output: Path, *, provider=None):
     envelope = json.loads(request.read_text(encoding="utf-8"))
     run_id = envelope["run_id"]
     if envelope.get("schema") != "abb.invocation.v1" or not isinstance(run_id, str):
         raise ValueError("Invalid invocation envelope")
     store = TraceStore(output / "framework.jsonl", envelope.get("session_id", run_id), source="framework")
+    # Optional dependency: images with OTel emit a second, independent trace.
+    try:
+        from agentbench.observe.otel.session import ObservedStore
+    except ModuleNotFoundError as exc:
+        if not (exc.name or '').startswith('opentelemetry'):
+            raise
+        atomic_json(output / 'otel-status.json', {'status': 'unavailable', 'reason': 'OTel SDK not installed'})
+    else:
+        store = ObservedStore(store, run_id, provider=provider)
     adapter = None
     result = {"schema": "abb.result.v1", "run_id": run_id, "agent_id": envelope["agent_id"]}
     try:
@@ -67,6 +76,8 @@ async def execute(root: Path, request: Path, output: Path):
             except Exception as exc:
                 result.update(status="failed", error_type=type(exc).__name__, error=str(exc))
         atomic_json(output / "result.json", result)
+        if hasattr(store, 'close'):
+            store.close()
     return 0 if result["status"] == "succeeded" else 1
 
 

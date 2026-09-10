@@ -7,7 +7,9 @@ def read_events(directory: Path):
     for path in sorted(directory.rglob("*.jsonl")):
         if path.is_symlink():
             continue
-        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):
+            if not line:
+                continue
             try:
                 yield json.loads(line)
             except json.JSONDecodeError:
@@ -30,6 +32,8 @@ def render_review(directory: Path):
             calls[data["call_id"]] = data
         elif event["event"] == "incomplete_line":
             lines.append(f"Warning: incomplete trace line in {data['file']}")
+        elif event["event"] == "tool_outcome" and data.get("status") != "succeeded":
+            lines.append(f"Warning: {data.get('name', 'tool')} [{data.get('status')}] failed={data.get('failed_count', '?')}")
     lines.append("Framework spans:")
     for span_id, span in spans.items():
         depth, parent, visited = 0, span.get("parent_span_id"), {span_id}

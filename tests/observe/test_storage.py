@@ -29,3 +29,39 @@ def test_redaction_and_incomplete_review(tmp_path, monkeypatch):
     rendered = render_review(tmp_path)
     assert "LangGraph [incomplete]" in rendered
     assert "node [error]" in rendered
+
+
+def test_unicode_line_separators_are_not_jsonl_record_boundaries(tmp_path):
+    from agentbench.observe.store import summarize
+    from agentbench.observe.review import read_events
+    store = TraceStore(tmp_path / "framework.jsonl", "run", source="framework")
+    value = "中文\u0085\u2028\u2029完整"
+    store.record("span_end", span_id="one", output=value)
+    assert list(read_events(tmp_path))[0]["data"]["output"] == value
+    assert summarize(tmp_path) == {"framework:span_end": 1}
+
+
+def test_partial_tool_failure_preserves_result_and_marks_trace(tmp_path):
+    import asyncio
+    import importlib.util
+    from pathlib import Path
+    from agentbench.observe.tools import observe_async_methods
+    from agentbench.observe.langchain import TraceCallback
+    from agentbench.observe.store import summarize
+    spec = importlib.util.spec_from_file_location("company_outcomes",
+        Path(__file__).resolve().parents[2] / "resources/agents/01-company-research-agent/bindings/company.py")
+    company = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(company)
+    original = {"results": [{"url": "good"}], "failed_results": [{"url": "bad", "error": "timeout"}]}
+    class Tool:
+        async def extract(self, value):
+            return original
+    client = Tool()
+    observe_async_methods(client, ("extract",), namespace="tavily", inspect_result=company.tavily_outcome)
+    store = TraceStore(tmp_path / "framework.jsonl", "run", source="framework")
+    from langchain_core.runnables import RunnableLambda
+    async def run(value):
+        return await client.extract(value)
+    result = asyncio.run(RunnableLambda(run).ainvoke("x", config={"callbacks": [TraceCallback(store)]}))
+    assert result is original
+    assert summarize(tmp_path)["framework:tool_incomplete"] == 1
