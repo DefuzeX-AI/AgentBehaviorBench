@@ -8,7 +8,8 @@ Verified locally on 2026-09-10 against the current checkout.
 - `agentbench/sdk/common/`: evaluator-neutral artifacts, input mapping, conversation and Case identity.
 - `agentbench/sdk/kuma/`: KUMA plugin, generation, image, service, worker and result validation.
 - `agentbench/sdk/panda/`: Panda plugin, image, worker and host orchestration/result validation.
-- `agentbench/evaluation/` and `agentbench/sdk/kuma_runtime/`: backwards-compatible imports.
+- No legacy evaluator package aliases are retained; callers import directly from
+  `agentbench/sdk/kuma/`, `agentbench/sdk/panda/`, or `agentbench/sdk/common/`.
 - External SDK packages retain CaseGen/Run/Judge; generic Docker/Agent/trace infrastructure remains shared.
 
 ## Real Run acceptance

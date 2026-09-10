@@ -91,8 +91,8 @@ def test_viewer_bind_failure_preserves_benchmark_execution(tmp_path, ready_agent
 
 
 def test_kuma_announces_artifacts_before_build_and_retains_failure(tmp_path, monkeypatch):
-    from agentbench.sdk.kuma_runtime import service
-    from agentbench.sdk.kuma_runtime.benchmark import KumaContainerRunner
+    from agentbench.sdk.kuma import service
+    from agentbench.sdk.kuma.benchmark import KumaContainerRunner
     events = []
     def failed_build(*_):
         assert events and events[0].artifact_directory

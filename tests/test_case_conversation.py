@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from agentbench.evaluation.input_binding import InputBinding
+from agentbench.sdk.common.input_binding import InputBinding
 from agentbench.runtime.agentcontainer.session import AgentSession
 
 
@@ -81,7 +81,7 @@ def test_evaluate_cli_executes_ten_cases_without_clamping(starter_agent, repo_ro
 
 
 def test_max_steps_validation():
-    from agentbench.sdk.kuma_runtime import benchmark
+    from agentbench.sdk.kuma import benchmark
     from agentbench.harness.errors import ProviderSelectionError
     for invalid in (True, 0, -1, 1.5):
         with pytest.raises(ProviderSelectionError):
@@ -89,7 +89,7 @@ def test_max_steps_validation():
 
 
 def test_case_identity_checks_content_not_ids_and_catches_whitespace_duplicates():
-    from agentbench.evaluation.case_identity import case_content_sha256
+    from agentbench.sdk.common.case_identity import case_content_sha256
     def case(case_id, step_id, text):
         return {'case_id': case_id, 'inputs': [{'input_id': step_id, 'payload_type': 'text', 'payload': text}]}
     first = case_content_sha256(case('one', 'step1', 'Compare A with B'))

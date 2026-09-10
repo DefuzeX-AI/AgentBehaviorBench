@@ -6,14 +6,12 @@ from agentbench.sdk.plugins import resolve_sdk, plugin_execution
 from agentbench.sdk.panda.benchmark import read_result
 
 
-def test_container_selection_and_legacy_aliases():
+def test_container_selection_uses_canonical_sdk_packages():
     assert plugin_execution(resolve_sdk('panda').value) == 'container'
-    from agentbench.sdk.kuma_runtime import benchmark as old
-    from agentbench.sdk.kuma import benchmark as new
-    assert old is new
-    from agentbench.evaluation.input_binding import InputBinding as old_binding
+    from agentbench.sdk.kuma import benchmark
     from agentbench.sdk.common.input_binding import InputBinding
-    assert old_binding is InputBinding
+    assert benchmark.KumaContainerRunner
+    assert InputBinding
 
 
 @pytest.fixture

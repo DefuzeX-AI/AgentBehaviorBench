@@ -8,10 +8,11 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 
 from agentbench.cli.environment import load_project_environment
-from agentbench.cli.execution import run_benchmark_once
+from agentbench.cli.execution import run_benchmark_session
+from agentbench.cli.viewer import start_viewer_server
 from agentbench.cli.registry_status import RegistryStatusError, update_agent_status
 from agentbench.cli.sdk import configure_sdk_parser, sdk_arguments
-from agentbench.cli.TerminalUI import LLMActivity
+from agentbench.cli.terminal_ui import LLMActivity
 from agentbench.cli.trace_runtime import build_trace_suite_runner
 from agentbench.harness import (
     SDK,
@@ -30,6 +31,7 @@ from .run import DEFAULT_REGISTRY_PATH
 def configure_parser(parser: ArgumentParser) -> None:
     parser.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY_PATH, help="Agent registry path")
     configure_sdk_parser(parser)
+    parser.add_argument('--no-view', action='store_true', help='Save results without starting the live viewer.')
     parser.add_argument("agent_id", help="Registered adapting Agent to certify.")
     parser.add_argument(
         "--env-file",
@@ -72,6 +74,8 @@ def execute(args: Namespace) -> int:
         return 2
     if args.model is not None:
         kwargs["model"] = args.model
+    if args.no_view:
+        kwargs['viewer_starter'] = None
     if args.llm_trace != "off":
         kwargs["llm_trace"] = args.llm_trace
     if args.llm_trace_max_bytes != DEFAULT_TRACE_MAX_BYTES:
@@ -92,6 +96,8 @@ def certify(
     llm_trace: str = "off",
     llm_trace_max_bytes: int = DEFAULT_TRACE_MAX_BYTES,
     model: str | None = None,
+    viewer_starter=start_viewer_server,
+    post_run_input_fn=input,
 ) -> int:
     """Run one adapting Agent and promote it after adapter execution succeeds."""
     if sdk is not None and sdk_selection is not None:
@@ -127,7 +133,7 @@ def certify(
         "without invocation errors."
     )
     llm_activity = LLMActivity(output_fn)
-    execution = run_benchmark_once(
+    execution = run_benchmark_session(
         (agent,),
         runner=suite_runner
         or build_trace_suite_runner(
@@ -142,7 +148,8 @@ def certify(
         ),
         output_path=artifact_base,
         output_fn=output_fn,
-        viewer_starter=None,
+        viewer_starter=viewer_starter,
+        input_fn=post_run_input_fn,
         llm_activity=llm_activity,
     )
     if execution.result is None or not _agent_completed_certification(

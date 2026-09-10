@@ -117,7 +117,7 @@ def test_evaluate_retains_one_case_three_inputs(starter_agent, tmp_path, monkeyp
         'expected_output': 'different' if wrong_answer else f'hello-{i}'} for i in range(3)]}))
     options = tmp_path / 'options.json'
     options.write_text(json.dumps({'case_file': str(case)}))
-    assert cli(['evaluate', '1', '--sdk', 'python:examples.case_file_sdk', '--sdk-options', str(options),
+    assert cli(['evaluate', '1', '--cases', '1', '--sdk', 'python:examples.case_file_sdk', '--sdk-options', str(options),
                 '--result-output', str(tmp_path / 'evaluation.json')]) == 0
     logs = list(tmp_path.glob('evaluation-*.json'))
     assert len(logs) == 1

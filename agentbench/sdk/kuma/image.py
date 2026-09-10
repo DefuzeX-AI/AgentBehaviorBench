@@ -38,7 +38,7 @@ def evaluation_agent(agent, sdk):
             raise ValueError('Evaluation build must not contain symlinks')
         source = (root / 'agent.toml').read_text()
         source, count = re.subn(r'(?m)^argv = .*$',
-                               'argv = ["python", "-m", "agentbench.sdk.kuma_runtime.worker"]', source)
+                               'argv = ["python", "-m", "agentbench.sdk.kuma.worker"]', source)
         if count != 1:
             raise ValueError('Expected one explicit launch.argv')
         source = source.replace('[runtime]\n', '[runtime]\nenv_keys = ["KUMA_API_KEY", "DEFUZEX_API_KEY"]\n', 1)

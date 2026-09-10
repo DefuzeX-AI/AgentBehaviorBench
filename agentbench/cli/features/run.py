@@ -7,19 +7,16 @@ from argparse import ArgumentParser, Namespace
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
-from agentbench.cli.constants import ANSI_GREEN, LOGO_PAUSE_SECONDS
+from agentbench.cli.terminal_ui.constants import LOGO_PAUSE_SECONDS
 from agentbench.cli.environment import load_project_environment
-from agentbench.cli.execution import run_benchmark_once, stop_viewer
-from agentbench.cli.logo import print_logo
-from agentbench.cli.presentation import (
+from agentbench.cli.execution import run_benchmark_session
+from agentbench.cli.terminal_ui.logo import print_logo
+from agentbench.cli.terminal_ui.presentation import (
     confirm_agents,
-    panel_line,
-    panel_rule,
     print_agents,
-    request_viewer_action,
 )
 from agentbench.cli.sdk import configure_sdk_parser, sdk_arguments
-from agentbench.cli.TerminalUI import LLMActivity
+from agentbench.cli.terminal_ui import LLMActivity
 from agentbench.cli.trace_runtime import build_trace_suite_runner
 from agentbench.cli.viewer import RunningViewer, start_viewer_server
 from agentbench.harness import SDK, ProviderSelectionError, SuiteRunner
@@ -157,34 +154,10 @@ def run(
         sdk_selection=sdk_selection,
         sdk_options=sdk_options,
     )
-    while True:
-        execution = run_benchmark_once(
-            agents,
-            runner=runner,
-            output_path=output_path,
-            output_fn=output_fn,
-            viewer_starter=viewer_starter,
-            llm_activity=llm_activity,
-        )
-        if execution.result_log is None or execution.viewer is None:
-            return execution.exit_code
-
-        try:
-            action = request_viewer_action(
-                execution.result_log.path,
-                execution.viewer.url,
-                input_fn=post_run_input_fn,
-                output_fn=output_fn,
-            )
-        finally:
-            stop_viewer(execution.viewer)
-        if action == "rerun":
-            output_fn("")
-            output_fn(panel_rule("RERUN QUEUED", ANSI_GREEN))
-            output_fn(panel_line("Starting a fresh benchmark run"))
-            output_fn(panel_rule("", ANSI_GREEN))
-            continue
-        return execution.exit_code
+    execution = run_benchmark_session(agents, runner=runner, output_path=output_path,
+        output_fn=output_fn, viewer_starter=viewer_starter, llm_activity=llm_activity,
+        input_fn=post_run_input_fn)
+    return execution.exit_code
 
 
 FEATURE = CommandFeature(

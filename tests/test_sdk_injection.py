@@ -15,7 +15,7 @@ def forbid_defuzex(monkeypatch):
     def guarded(name, *args, **kwargs):
         if name.split('.')[0] in {"kuma", "defuzex"} or name in {
             "agentbench.sdk.defuzex", "agentbench.sdk.kuma",
-        } or name.startswith("agentbench.sdk.kuma_runtime"):
+        }:
             raise AssertionError("A custom SDK must not import a KUMA/DefuzeX integration")
         return original(name, *args, **kwargs)
 

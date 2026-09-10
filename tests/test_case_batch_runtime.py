@@ -3,7 +3,7 @@ from dataclasses import replace
 import json
 from types import SimpleNamespace
 import pytest
-from agentbench.sdk.kuma_runtime import benchmark
+from agentbench.sdk.kuma import benchmark
 from agentbench.harness.result import BenchmarkResult
 from agentbench.harness.runner.suite_runner import SuiteRunner
 
@@ -62,8 +62,8 @@ def test_invalid_batch_stops_before_any_agent_execution(batch_runtime, starter_a
 
 
 def test_fallback_collects_ten_before_return_and_preserves_batch_identity(tmp_path):
-    from agentbench.sdk.kuma_runtime.generation import generate_collection
-    from agentbench.evaluation.artifacts import Artifacts
+    from agentbench.sdk.kuma.generation import generate_collection
+    from agentbench.sdk.common.artifacts import Artifacts
     calls=[]
     def generate(*, count):
         calls.append(count)
@@ -84,8 +84,8 @@ def test_fallback_collects_ten_before_return_and_preserves_batch_identity(tmp_pa
 
 @pytest.mark.parametrize('code',['invalid_request','model_timeout','quota_exhausted','invalid_response'])
 def test_fallback_is_not_a_general_error_retry(tmp_path,code):
-    from agentbench.sdk.kuma_runtime.generation import generate_collection
-    from agentbench.evaluation.artifacts import Artifacts
+    from agentbench.sdk.kuma.generation import generate_collection
+    from agentbench.sdk.common.artifacts import Artifacts
     calls=[]
     def generate(**kw):
         calls.append(kw)
@@ -97,8 +97,8 @@ def test_fallback_is_not_a_general_error_retry(tmp_path,code):
 
 
 def test_fallback_failure_keeps_collected_cases_without_claiming_completion(tmp_path):
-    from agentbench.sdk.kuma_runtime.generation import generate_collection
-    from agentbench.evaluation.artifacts import Artifacts
+    from agentbench.sdk.kuma.generation import generate_collection
+    from agentbench.sdk.common.artifacts import Artifacts
     calls=[]
     def generate(*,count):
         calls.append(count)
@@ -132,7 +132,7 @@ def test_saved_collection_import_does_not_generate(batch_runtime, starter_agent,
 @pytest.mark.parametrize('generation_count',[None,2])
 def test_only_agent_execution_requires_a_model_trace(monkeypatch,tmp_path,generation_count):
     from contextlib import contextmanager
-    from agentbench.sdk.kuma_runtime import service
+    from agentbench.sdk.kuma import service
     root=tmp_path/'unit';(root/'agent').mkdir(parents=True)
     agent=SimpleNamespace(path=root,agent_id='a')
     @contextmanager

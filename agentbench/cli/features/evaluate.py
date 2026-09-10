@@ -1,8 +1,10 @@
 """Evaluate one Agent on independent Cases using the selected evaluation SDK."""
 import math
 from dataclasses import replace
-from agentbench.harness import SuiteRunner
-from agentbench.cli.execution import run_benchmark_once
+from agentbench.cli.execution import run_benchmark_session
+from agentbench.cli.trace_runtime import build_trace_suite_runner
+from agentbench.cli.terminal_ui import LLMActivity
+from agentbench.cli.viewer import start_viewer_server
 from agentbench.cli.features.certify import _default_output_path
 from pathlib import Path
 from .base import CommandFeature
@@ -11,9 +13,8 @@ from .observe import model_name
 from ..environment import load_project_environment
 from ..sdk import configure_sdk_parser, sdk_arguments
 from agentbench.observe.catalog import enabled_agents, select_agent, resolve_agent
-from agentbench.runtime.interception import NullTraceSink
+from agentbench.runtime.interception import DEFAULT_TRACE_MAX_BYTES
 from agentbench.sdk import evaluation_plan
-from agentbench.sdk.runtime import build_evaluation_runner
 
 
 def configure_parser(parser):
@@ -22,6 +23,9 @@ def configure_parser(parser):
     parser.add_argument('--env-file', type=Path)
     parser.add_argument('--model', type=model_name)
     configure_sdk_parser(parser)
+    parser.add_argument('--no-view', action='store_true', help='Save results without starting the live viewer.')
+    parser.add_argument('--llm-trace', choices=('off', 'terminal'), default='off')
+    parser.add_argument('--llm-trace-max-bytes', type=int, default=DEFAULT_TRACE_MAX_BYTES)
     parser.add_argument('--sdk-source', type=Path, help='Override the SDK sdk_source option')
     parser.add_argument('--result-output', type=Path, help='ABB result JSON naming base (independent of SDK output)')
     parser.add_argument('--output', type=Path, help='Override the SDK output option')
@@ -47,8 +51,6 @@ def execute(args):
                 options[name] = value
         plan = evaluation_plan(selection=selected.get('sdk_selection'), options=options)
         load_project_environment(args.env_file)
-        runner = build_evaluation_runner(plan, model=args.model, trace_sink=NullTraceSink(),
-                                         trace_max_bytes=262144)
         records = enabled_agents(args.registry)
         selection = args.selection
         if selection is None:
@@ -66,9 +68,13 @@ def execute(args):
         output = args.result_output or _default_output_path(args.registry, agent.agent_id, command="evaluate")
         if args.output is not None:
             print('--output configures the SDK only; --result-output selects the ABB result JSON.')
-        execution = run_benchmark_once((agent,),
-            runner=SuiteRunner(benchmark_runner=runner), output_path=output,
-            output_fn=print, viewer_starter=None)
+        activity = LLMActivity(print)
+        runner = build_trace_suite_runner(mode=args.llm_trace, max_bytes=args.llm_trace_max_bytes,
+            output_fn=print, model=args.model, activity_sink=activity,
+            sdk_selection=plan.selection, sdk_options=plan.options)
+        execution = run_benchmark_session((agent,), runner=runner, output_path=output,
+            output_fn=print, viewer_starter=None if args.no_view else start_viewer_server,
+            llm_activity=activity, input_fn=input)
         if execution.result is None:
             return execution.exit_code
         items = execution.result.items

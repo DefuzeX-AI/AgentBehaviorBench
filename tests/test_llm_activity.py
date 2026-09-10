@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 
-from agentbench.cli.TerminalUI.LLMactivity import DOT_FRAMES, LLMActivity
+from agentbench.cli.terminal_ui.llm_activity import DOT_FRAMES, LLMActivity
 from agentbench.runtime.interception import TraceEvent
 
 

@@ -4,14 +4,14 @@ import json
 import pytest
 from dataclasses import dataclass
 
-from agentbench.cli.constants import (
+from agentbench.cli.terminal_ui.constants import (
     AGENT_REVEAL_DELAY_SECONDS,
     ANSI_GREEN,
     ANSI_RED,
     ANSI_RESET,
     LOGO_PAUSE_SECONDS,
 )
-from agentbench.cli.logo import BBA_LOGO
+from agentbench.cli.terminal_ui.logo import BBA_LOGO
 from agentbench.cli.main import (
     cli,
     confirm_agents,

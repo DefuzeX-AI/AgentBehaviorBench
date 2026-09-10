@@ -91,7 +91,7 @@ my-evaluator = "my_package:sdk"
 ## 5. 当前边界
 
 - KUMA 的导入、密钥、镜像构建、worker、提交记录和证据解析集中在
-  `agentbench/sdk/`。`evaluation/` 下旧路径保留兼容转发。
+  `agentbench/sdk/kuma/`；共享合同和输入绑定位于 `agentbench/sdk/common/`。
 - 省略 `--sdk` 时，CLI 与 SuiteRunner 仍默认选择 KUMA；显式选择其他 SDK
   不会注入 KUMA 的源码路径、密钥参数、输出目录或超时默认值。
 - 简单 `create_run` SDK 在宿主 Python 进程中执行；Agent 使用自己声明的 runtime。

@@ -15,17 +15,47 @@ from agentbench.harness import (
 from agentbench.harness.registry import AgentRegistration
 from agentbench.harness.result import BenchmarkSuiteResult
 
-from .presentation import (
+from .terminal_ui.presentation import (
     agent_view_url,
     print_agent_complete,
     print_agent_start,
     print_suite_summary,
     print_viewer_footer,
 )
-from .progress import ProgressPrinter, configuration_error
+from .terminal_ui.progress import ProgressPrinter, configuration_error
 from .result_export import ResultLogWriter, start_result_log
-from .TerminalUI import LLMActivity
+from .terminal_ui import LLMActivity
 from .viewer import RunningViewer
+
+
+def run_benchmark_session(
+    agents: tuple[AgentRegistration, ...], *, runner: SuiteRunner,
+    output_path: str | Path | None, output_fn: Callable[[str], None],
+    viewer_starter: Callable[[Path], RunningViewer] | None,
+    llm_activity: LLMActivity | None = None,
+    input_fn: Callable[[str], str] = input,
+) -> BenchmarkExecution:
+    """Own viewer lifetime and fresh-suite reruns for every evaluation command."""
+    from .terminal_ui.presentation import request_viewer_action, panel_rule, panel_line
+    from .terminal_ui.constants import ANSI_GREEN
+    while True:
+        execution = run_benchmark_once(agents, runner=runner, output_path=output_path,
+            output_fn=output_fn, viewer_starter=viewer_starter, llm_activity=llm_activity)
+        if execution.viewer is None:
+            return execution
+        try:
+            if execution.result_log is None:
+                return execution
+            action = request_viewer_action(execution.result_log.path, execution.viewer.url,
+                                           input_fn=input_fn, output_fn=output_fn)
+        finally:
+            stop_viewer(execution.viewer)
+        if action != 'rerun':
+            return execution
+        output_fn('')
+        output_fn(panel_rule('RERUN QUEUED', ANSI_GREEN))
+        output_fn(panel_line('Starting a fresh benchmark run'))
+        output_fn(panel_rule('', ANSI_GREEN))
 
 ViewerStarter = Callable[[Path], RunningViewer]
 

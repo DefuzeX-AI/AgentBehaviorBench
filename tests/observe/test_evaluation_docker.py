@@ -4,8 +4,8 @@ import shutil
 import subprocess
 from types import SimpleNamespace
 import pytest
-from agentbench.evaluation.image import evaluation_agent
-from agentbench.evaluation.service import EvaluationPolicy
+from agentbench.sdk.kuma.image import evaluation_agent
+from agentbench.sdk.kuma.service import EvaluationPolicy
 from agentbench.runtime.agentcontainer.config import AgentContainerConfig
 from agentbench.runtime.contracts import EnvironmentSecretResolver
 from agentbench.runtime.docker.worker_build import worker_build_context

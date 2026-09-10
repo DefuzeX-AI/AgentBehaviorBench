@@ -6,8 +6,7 @@
 seam, discovery, and composition. `sdk/common/` owns artifact serialization,
 input binding, conversations, and Case identity. Each evaluator owns one
 directory: `sdk/kuma/` and `sdk/panda/` contain their plugin, image overlay,
-container orchestration, worker, and result validation. Older `evaluation/`
-and `sdk/kuma_runtime/` paths are compatibility aliases. Generic Agent loaders,
+container orchestration, worker, and result validation. Generic Agent loaders,
 Docker isolation, and tracing remain in `runtime/` and `observe/`.
 
 The external `Defuze-SDK` and `panda-sdk` packages contain evaluation logic;

@@ -1,11 +1,11 @@
 # AgentBench CLI
 
-## Official container evaluation (initial single-Case path)
+## Container evaluation and Case-local conversations
 
 The default `run`, `certify` and `evaluate` select the built-in `kuma` evaluation
 plugin, which invokes the same container-local KUMA/Agent/OTel core. All three
 commands accept `--sdk` and `--sdk-options` through the same SDK selection factory.
-`evaluate` runs one Case for one selected Agent.
+`evaluate` runs the selected Agent for its Registry `case` count, or `--cases N`.
 `observe` remains SDK-free. A plain `create_run()` SDK uses the host-side adapter;
 an `EvaluationSDKPlugin` can supply another formal runner.
 
@@ -13,12 +13,14 @@ an `EvaluationSDKPlugin` can supply another formal runner.
 `certify` runs the adapting Agent's requested Cases and promotes only after
 host-side artifact identity/completion checks pass. A Judge `issue` is a benchmark
 failure for `run`, but does not prevent certification of an executable Agent.
-Each current official Case is limited to one Input; conversational state is not
-claimed. Raw artifacts are saved even without the suite `--output` option.
+Each Case gets a fresh container and one Agent adapter for all its Inputs.
+Case-local context delivery is declared in `evaluation/input-contract.json`.
+Raw artifacts are saved even without the suite `--output` option.
 
-`python -m agentbench evaluate 1` selects enabled Agent 1 directly and runs at most
-one official Case with one Input. Omitting the number opens selection once.
-No native-input prompt is shown: input comes unchanged from KUMA. This command
+`python -m agentbench evaluate 02 --cases 2 --max-steps 4` runs two independent
+Cases, each with up to four SDK Inputs. Omitting the selection opens a prompt once.
+SDK Inputs remain unchanged in the ledger; the configured context policy prepares
+the actual Agent input separately and records it in `mapped-input.json`. This command
 can incur official Case/Judge and model charges. It does not promote Registry status.
 
 For this default KUMA adapter, the Agent needs evaluation/profile.md and
@@ -39,7 +41,9 @@ No automatic paid rerun occurs.
 
 | Argument | Default | Meaning |
 | --- | --- | --- |
-| `selection` | Prompt once | Enabled Agent number or ID; evaluates one Case regardless of its Registry Case count. |
+| `selection` | Prompt once | Enabled Agent number or ID. |
+| `--cases N` | Registry `case` | Positive number of independent Case executions; no ABB upper cap. |
+| `--max-steps N` | SDK default | Positive upper bound on Inputs per Case, subject to SDK limits. |
 | `--registry PATH` | Bundled registry | Agent registry to read. |
 | `--env-file PATH` | Project environment search | Load environment settings. |
 | `--model NAME` | Environment configuration | Model used for intercepted Agent calls. |
@@ -50,7 +54,7 @@ No automatic paid rerun occurs.
 | `--output PATH` | Selected SDK's default | Explicit override for its `output` option. KUMA defaults to `results/observe`. |
 | `--timeout SECONDS` | Selected SDK's default | Positive finite override for its `timeout` option. KUMA defaults to 2400 seconds. |
 
-`--sdk-source`, `--output`, and `--timeout` are SDK option aliases retained for compatibility. They override
+`--sdk-source`, `--output`, `--timeout`, and `--max-steps` are explicit SDK option aliases. They override
 matching keys in `--sdk-options` only when explicitly supplied. Other SDKs receive
 none of KUMA's defaults and must support any aliases the caller explicitly passes.
 For another SDK, Input count, credentials, deployment and artifact support follow
@@ -124,7 +128,7 @@ Current subcommands:
 | `view` | Open an existing JSON result in the local web viewer. |
 | `certify` | Verify one `adapting` Agent can complete its requested Cases and promote it to `ready`. |
 | `observe` | Select one enabled Agent, supply native input, and save execution traces without an evaluation SDK. |
-| `evaluate` | Evaluate one enabled Agent on one Case with the selected SDK. |
+| `evaluate` | Evaluate one enabled Agent on independent Cases with the selected SDK. |
 | `sdk` | List or inspect evaluation SDK plugins. |
 | `clean` | Clear default local result history into a recoverable archive. |
 
@@ -655,7 +659,8 @@ the selected SDK. CLI callbacks and result output are shared across SDKs.
 Omitting `--sdk`, or using `--sdk kuma`, selects the official container-local
 KUMA plugin (`allow_local=False`).
 For that default, `--sdk-options` accepts `sdk_source`, `output` (raw artifact
-root), and `timeout`. Old SDK options such as `requirement_path` or `allow_local`
+root), `timeout` (per preparation/Case container), `max_steps`, and `case_collection`
+(an existing saved collection to execute without generation). Old SDK options such as `requirement_path` or `allow_local`
 are rejected instead of silently selecting the old execution path.
 A selected plain `create_run()` SDK executes through the generic host-side
 adapter. A plugin implementing `EvaluationSDKPlugin` can provide a formal
@@ -684,3 +689,59 @@ The viewer requires prebuilt `web/dist` assets. In the repository's `web` folder
 run `npm ci` then `npm run build`. Missing index or referenced assets produce an
 actionable error before opening a socket; automatic viewing failure never discards
 the result. Existing assets need no Node runtime. `run --no-view` skips viewing.
+
+### Case counts versus dialogue steps
+
+`case = N` in the Registry is the default Case count. An explicit
+`evaluate --cases N` overrides it. With the built-in KUMA adapter, ABB first
+requests `generate_cases(count=N)`. If the backend explicitly rejects
+batch generation with `case_batch_unsupported`, ABB makes N single-Case
+generation calls in the preparation phase. It saves the original public batches
+and an ordered `case-collection.json`, validates total size/content uniqueness,
+then starts one fresh execution container per Case. Each execution imports its selected Case with
+`create_run(case_batch=batch, case_index=i)` and never requests another Case.
+A separate preparation container generates the batch without loading the Agent.
+There are N Agent execution containers, plus that preparation container.
+
+ABB rejects too few/many Cases, duplicate IDs, or normalized duplicate content
+before any Agent step. No truncation or replacement draws are performed.
+The single-Case fallback applies only to explicit batch rejection; timeouts,
+quota failures and unrelated validation errors stop preparation. The SDK validates every Case's repository/strategy/batch binding and
+opaque signature metadata. The content check ignores IDs and whitespace changes;
+it is not a semantic paraphrase detector. Non-KUMA SDK plugins retain their
+existing create_run contract unless their runner implements batch preparation.
+
+A Case execution or Judge service failure stops the remaining executions for
+that Agent and reports actual completed/requested counts. The already generated
+Case collection remains in the preparation artifact directory. To reuse an already collected set without generation, pass an SDK options JSON
+containing `{"case_collection":"/absolute/path/to/case-collection.json"}` via
+`--sdk-options`. Its selected entry count must match the Registry/CLI count;
+each imported Case is revalidated by the SDK. The original collection is retained.
+
+`max_steps` limits inputs inside each Case, independently of Case count. When
+omitted, KUMA chooses its default (currently a ceiling of ten). Explicit limits
+are checked against service entitlements. The service may return fewer steps.
+
+**Current deployed service limitation (2026-09-10):** a real `count=2` request to
+`/sdk/v2/cases/generate/` returned HTTP 400 `invalid_request`, with detail
+`Async Case generation currently requires count=1.` The SDK normalizes this specific rejection to `case_batch_unsupported`,
+without exposing raw diagnostics. ABB records `mode=single_fallback` and
+collects N individual results before execution. If any generation fails, partial
+results are retained and no Agent execution starts. When native batching becomes
+available, the first count=N request succeeds and the fallback is not used.
+# Shared evaluation sessions
+
+`run`, `certify`, and `evaluate` use the same trace-aware runner factory and
+`run_benchmark_session` lifecycle. All three start the live viewer by default,
+retain it after completion, and support `r` to run a fresh suite and `q` to close
+the viewer. Use `--no-view` for noninteractive execution. Viewer startup failure
+is reported and does not discard the result log.
+
+`run` selects ready Agents; `evaluate` selects one enabled Agent for debugging;
+`certify` checks an adapting Agent and updates registry status after the final
+session result qualifies. `observe` remains Agent-only, without SDK CaseGen or
+Judge. Existing certification and evaluate exit-code semantics are unchanged.
+
+`evaluate` also supports `--llm-trace terminal` and `--llm-trace-max-bytes` through
+the same trace factory as `run` and `certify`. Its existing `--output` remains an
+SDK option; use `--result-output` for the BBA result file.

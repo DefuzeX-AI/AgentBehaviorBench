@@ -3,8 +3,8 @@ import json
 from pathlib import Path
 import pytest
 from opentelemetry.sdk.trace import TracerProvider
-from agentbench.evaluation.input_binding import InputBinding
-from agentbench.evaluation.runner import drive_run
+from agentbench.sdk.common.input_binding import InputBinding
+from agentbench.sdk.kuma.runner import drive_run
 from agentbench.observe.otel.session import OtelSession
 
 
@@ -13,7 +13,7 @@ CONTRACT = Path(__file__).resolve().parents[2] / 'resources/agents/01-company-re
 
 def test_build_overlay_preserves_original_and_sdk_only_egress():
     from types import SimpleNamespace
-    from agentbench.evaluation.image import evaluation_agent
+    from agentbench.sdk.kuma.image import evaluation_agent
     from agentbench.runtime.agentcontainer.config import tomllib
     root = CONTRACT.parents[1]
     original = (root / 'agent.toml').read_bytes()
@@ -25,7 +25,7 @@ def test_build_overlay_preserves_original_and_sdk_only_egress():
         assert profile.strategy_group.id == 'CAND-009'
         assert profile.strategy_group.version == '1'
         config = tomllib.loads((staged.path / 'agent.toml').read_text())
-        assert config['launch']['argv'][-1] == 'agentbench.sdk.kuma_runtime.worker'
+        assert config['launch']['argv'][-1] == 'agentbench.sdk.kuma.worker'
         route = config['llm_interception']['tool_routes'][-1]
         assert route['host_patterns'] == ['defuzex.ai']
         assert route['methods'] == ['GET', 'POST']

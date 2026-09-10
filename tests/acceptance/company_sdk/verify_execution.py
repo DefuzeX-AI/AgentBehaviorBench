@@ -5,8 +5,8 @@ from pathlib import Path
 from kuma import create_run
 from kuma.otel import configure_trace_evidence
 from opentelemetry.sdk.trace import TracerProvider
-from agentbench.evaluation.runner import drive_run
-from agentbench.evaluation.input_binding import InputBinding
+from agentbench.sdk.kuma.runner import drive_run
+from agentbench.sdk.common.input_binding import InputBinding
 from agentbench.runtime.agentcontainer.worker import execute
 from company_upstream import install
 

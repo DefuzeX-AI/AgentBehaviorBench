@@ -112,8 +112,8 @@ Company 只接受公司及可选网址/行业/总部字段。官方文本 Case �
 
 ### A. 先固定公共合同及正式入口
 
-- 新建 `agentbench/evaluation/contracts.py`：评测请求、阶段状态、关联 ID、产物目录合同。
-- 新建 `agentbench/evaluation/input_binding.py`：注册式 Case Input 转换接口；默认支持忠实原样 JSON/文本输入，特定映射只在 Agent 外层绑定中声明。
+- 新建 `agentbench/sdk/contracts.py`：评测请求、阶段状态、关联 ID、产物目录合同。
+- 新建 `agentbench/sdk/common/input_binding.py`：注册式 Case Input 转换接口；默认支持忠实原样 JSON/文本输入，特定映射只在 Agent 外层绑定中声明。
 - Company 增加独立的 `evaluation/profile.md` 与输入合同，不修改上游代码；Profile 描述固定研究流程而非可执行任意指令的通用助手。
 - 首次验收一条官方 Case、`max_steps=1`，先验证真实单步闭环；公共循环支持多个 Input，但 Company 当前不宣称多轮记忆，不拼接或截断历史假装会话。
 - 建议新增独立 `evaluate` 命令，沿用 observe 的编号选择体验，例如拟议 `python -m agentbench evaluate 1 --cases 1 --max-steps 1`。此命令尚未实现；observe 继续免 SDK，旧 run/certify 的迁移另行处理，不静默改变默认行为或认证状态。
@@ -122,8 +122,8 @@ Company 只接受公司及可选网址/行业/总部字段。官方文本 Case �
 
 ### B. 将 SDK 安装验收升级为正式容器交付
 
-- 新建 `agentbench/evaluation/image.py`，提取现有 `tests/acceptance/company_sdk` 的安全源码打包能力，复用现有镜像构建器，不另写 Docker 管理器。
-- 新建 `agentbench/evaluation/service.py`：宿主机只调度，不 import Company、不调用官方 SDK 生成 Case。
+- 新建 `agentbench/sdk/kuma/image.py`，提取现有 `tests/acceptance/company_sdk` 的安全源码打包能力，复用现有镜像构建器，不另写 Docker 管理器。
+- 新建 `agentbench/sdk/kuma/service.py`：宿主机只调度，不 import Company、不调用官方 SDK 生成 Case。
 - 将本地 SDK 与 Company 安装进同一解释器，保存 SDK 版本/源代码指纹、Agent revision、镜像 ID、进程 PID 和容器标识。
 - 只对实际 Agent 仓库内 SDK 所需 `.kuma` 状态目录提供专用可写挂载；验证 SDK 是否还需其他路径。不得传一个空的无关 repo 冒充 Company，也不得因此放开整个只读根。
 - 凭据只在运行时注入；优先 `KUMA_API_KEY`，兼容显式读取 `DEFUZEX_API_KEY` 传入 `api_key`，不复制 `.env` 进镜像。
@@ -133,7 +133,7 @@ Company 只接受公司及可选网址/行业/总部字段。官方文本 Case �
 
 ### C. 公共 Worker 与同 Provider 证据
 
-- 新建 `agentbench/evaluation/worker.py` 与 `agentbench/evaluation/kuma_session.py`，分别负责执行编排、当前 KUMA API/序列化/状态处理。
+- 新建 `agentbench/sdk/kuma/worker.py` 与 `agentbench/sdk/kuma/runner.py`，分别负责执行编排、当前 KUMA API/序列化/状态处理。
 - 从现有执行 Worker 复用 Agent 加载和调用边界，提供显式 Provider/Observer 注入；不复制图执行逻辑，不从容器内再进入 Docker 分支。
 - Provider 在 Case 开始时创建一次，KUMA `configure_trace_evidence(provider)` 在 Agent 执行前挂载；每个 Input 的 OTel 根 span 完成并 flush 后才提交。
 - ABB 当前仅写 `abb.*_ref` 的全文引用，不能假设 KUMA 会读取这些文件。按 SDK 实际允许的 OTel 属性映射工具名、操作等必要语义；显式 `submit(output=...)` 提交真实报告，并验证最终 Evidence 内容。

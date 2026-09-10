@@ -72,3 +72,14 @@ Dockerfile and build/launch configuration are required only for `runtime.type =
 "docker"`; in-process units need no placeholder Dockerfile. Build file paths are
 resolved relative to `build.context`, with the same validation at registration
 and execution, without loading credentials during registration.
+
+## ReAct candidate (02)
+
+`resources/agents/02-react-agent/` vendors the unchanged official
+`langchain-ai/react-agent` source at `9bbd82d84905acc37f527b1f372dae841016f3b4`.
+The outer binding converts text to native messages and extracts the final answer;
+Docker, Context, native OpenAI interception and real Tavily routes are declared
+outside upstream source. It is registered as `adapting`. Initial offline Docker
+validation covers the original graph, tool loop, explicit conversation history
+and framework/OTel output. Cross-invocation persistence and real certification
+remain pending. See the unit's README for configuration and smoke commands.

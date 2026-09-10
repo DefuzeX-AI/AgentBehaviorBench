@@ -1,5 +1,6 @@
 """Replacement SDKs work without importing KUMA or inheriting its settings."""
 
+import importlib
 import json
 import os
 import shutil
@@ -11,6 +12,16 @@ from types import SimpleNamespace
 import pytest
 
 from tests.test_sdk_injection import forbid_defuzex
+
+
+@pytest.mark.parametrize(
+    "module_name", ("agentbench.evaluation", "agentbench.sdk.kuma_runtime")
+)
+def test_legacy_sdk_packages_are_unavailable(module_name):
+    """Prevent reintroducing compatibility packages after the SDK layout migration."""
+
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module(module_name)
 
 
 def test_contracts_import_without_harness_or_evaluators(repo_root):
@@ -83,7 +94,7 @@ class NoKuma(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
         if fullname.split(".")[0] in {"kuma", "defuzex"} or fullname in {
             "agentbench.sdk.kuma", "agentbench.sdk.defuzex",
-        } or fullname.startswith("agentbench.sdk.kuma_runtime"):
+        }:
             raise ImportError("Evaluator deliberately unavailable: " + fullname)
 sys.meta_path.insert(0, NoKuma())
 from agentbench.cli.main import cli
@@ -102,7 +113,7 @@ raise SystemExit(cli(sys.argv[1:]))
 def test_evaluate_defaults_and_explicit_options_use_selected_factory(starter_agent, monkeypatch, tmp_path):
     from agentbench.cli.main import cli
     from agentbench.cli.features import evaluate
-    from agentbench.sdk.kuma_runtime.benchmark import KumaContainerRunner
+    from agentbench.sdk.kuma.benchmark import KumaContainerRunner
 
     monkeypatch.setattr(evaluate, 'enabled_agents', lambda _: [{'agent_id': starter_agent.agent_id}])
     monkeypatch.setattr(evaluate, 'resolve_agent', lambda *_: starter_agent)

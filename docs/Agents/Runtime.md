@@ -238,3 +238,57 @@ Optional `[adapter.context]` TOML data is passed as a fresh deep copy via graph
 coercion. Omit the table for graphs without context. An explicitly configured
 context on an incompatible entrypoint fails clearly. Agent-specific context
 field names belong in the manifest, never in the adapter.
+
+## Case-local conversation execution
+
+The KUMA container worker creates one `AgentSession` for a Case, runs all Inputs
+on one event loop, and closes the adapter once at the end. Each Input still gets
+a fresh observation scope, callbacks, invocation ID and output directory. The
+Agent's default `configurable.thread_id` is the stable Case execution session ID.
+A new Case starts a new container and fresh memory. No cross-Case database is
+required. A stable thread ID alone does not enable native graph checkpointing.
+
+Optional `conversation` in `evaluation/input-contract.json` selects context
+delivery without Agent-specific code:
+
+```json
+{"encoding":"identity","conversation":{"mode":"messages","input_key":"messages","history_key":"messages","max_chars":1000000}}
+```
+
+- `none` (default): pass each SDK input unchanged, without history augmentation.
+- `native`: pass inputs unchanged and rely on the Agent's existing native state.
+- `messages`: append the current text as a user message. `input_key` optionally
+  wraps the list. `history_key` optionally reads a complete native messages list
+  from `raw_output`; otherwise append the public output as an assistant message.
+- `text`: render prior public user/assistant exchanges as JSON followed by the
+  current text. Optional `input_key` wraps the resulting string.
+
+`messages` and `text` require text SDK payloads. No semantic field guessing or
+state-key repair occurs. The configured character budget fails explicitly;
+there is no silent summary/truncation. Raw SDK Inputs and actual mapped inputs
+are recorded separately; `context.json` records the strategy and prior message
+count. A native history result replaces the prior list, preventing duplicate
+replay and preserving tool-call/result structure. Do not enable replay on a
+graph that independently appends the same history through a Checkpointer.
+
+This enables sequential dialogue and ordinary tool actions. Native interrupt/
+resume protocols, restart recovery, and external workspace provisioning remain
+separate capabilities. Session resources close even when execution or judging
+fails; failed Agent outputs are not added as successful assistant replies.
+
+### Batch preparation and Case execution
+
+The built-in KUMA runner maps Registry `case` (or the CLI override) to one
+`generate_cases(count=N)` request in a preparation container. It retains the
+complete original batches in `evaluation/case-collection.json`, checks size/uniqueness, then passes the
+public batch and selected index through the read-only request mount to each
+Case container. Each Case worker calls `create_run(case_batch=..., case_index=...)`
+without another generation POST. Preparation never loads the Agent; its
+`session.json` has zero adapter initializations. Existing Docker/network/trace
+policies apply to both phases. Single-Case conversation ownership is unchanged.
+
+If the backend explicitly reports `case_batch_unsupported`, the preparation
+container generates N single-Case batches first. Collection entries reference
+original batch/index pairs; ABB never combines or rewrites signed backend batch
+identities. Partial collections are persisted after each successful generation.
+Execution begins only after the complete collection passes validation.

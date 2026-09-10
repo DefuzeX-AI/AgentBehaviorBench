@@ -1,9 +1,9 @@
 from agentbench.cli.trace_runtime import build_trace_suite_runner
-from agentbench.evaluation.benchmark import ContainerBenchmarkRunner
+from agentbench.sdk.kuma.benchmark import ContainerBenchmarkRunner
 from agentbench.harness.runner.suite_runner import SuiteRunner
 import json
 import pytest
-from agentbench.evaluation.benchmark import read_result
+from agentbench.sdk.kuma.benchmark import read_result
 from agentbench.harness.errors import ProviderSelectionError
 
 
@@ -66,7 +66,7 @@ def test_invalid_timeout_rejected_before_execution(timeout):
 
 def test_host_rejection_marks_run_failed(completed_run, monkeypatch):
     from types import SimpleNamespace
-    from agentbench.sdk.kuma_runtime import benchmark
+    from agentbench.sdk.kuma import benchmark
     folder, save = completed_run
     save('evaluation/inputs/0001/evidence.json', {'spans': []})
     runner = ContainerBenchmarkRunner()

@@ -12,7 +12,7 @@ from agentbench.harness import SDK, SuiteRunner
 
 from .features import FEATURES
 from .features.run import DEFAULT_REGISTRY_PATH, run
-from .presentation import confirm_agents
+from .terminal_ui.presentation import confirm_agents
 from .viewer import RunningViewer, start_viewer_server
 
 
@@ -31,8 +31,9 @@ def build_parser() -> ArgumentParser:
 
 def cli(argv: Sequence[str] | None = None) -> int:
     """Parse command-line arguments and dispatch a registered feature."""
-
+    
     args_list = list(sys.argv[1:] if argv is None else argv)
+    
     args = build_parser().parse_args(_normalize_argv(args_list))
     handler = _command_handler(args)
     return handler(args)
