@@ -12,11 +12,10 @@ from uuid import uuid4
 
 from ..errors import ProviderSelectionError, SuiteConfigurationError
 from ..progress import ProgressCallback, emit_progress
-from ..protocols import SDK
+from ..protocols import EvaluationRunner, SDK
 from ..registry import AgentRegistration
 from ..result import BenchmarkSuiteResult, SuiteAgentResult
 from .benchmark_runner import (
-    BenchmarkRunner,
     StepCompleteCallback,
     StepFailureCallback,
     StepStartCallback,
@@ -37,7 +36,7 @@ class SuiteRunner:
         *,
         sdk: SDK | None = None,
         sdk_options: Mapping[str, object] | None = None,
-        benchmark_runner: BenchmarkRunner | None = None,
+        benchmark_runner: EvaluationRunner | None = None,
     ) -> None:
         if benchmark_runner is not None and (
             sdk is not None or sdk_options is not None
@@ -45,10 +44,18 @@ class SuiteRunner:
             raise ValueError(
                 "Configure sdk on either SuiteRunner or benchmark_runner, not both"
             )
-        if benchmark_runner is None and sdk is None:
-            from agentbench.evaluation.benchmark import ContainerBenchmarkRunner
-            benchmark_runner = ContainerBenchmarkRunner(options=sdk_options)
-        self._benchmark_runner = benchmark_runner or BenchmarkRunner(sdk=sdk, sdk_options=sdk_options)
+        if benchmark_runner is None:
+            from agentbench.runtime.interception import NullTraceSink
+            from agentbench.sdk.plugins import evaluation_plan
+            from agentbench.sdk.runtime import build_evaluation_runner
+
+            benchmark_runner = build_evaluation_runner(
+                evaluation_plan(sdk=sdk, options=sdk_options),
+                model=None,
+                trace_sink=NullTraceSink(),
+                trace_max_bytes=262144,
+            )
+        self._benchmark_runner = benchmark_runner
 
     @staticmethod
     def new_suite_id() -> str:

@@ -1,1 +1,1 @@
-"""Container-local evaluation, separate from Agent framework adapters."""
+"""Shared evaluation handshake, input binding, and artifact primitives."""

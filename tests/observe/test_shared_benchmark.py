@@ -66,7 +66,7 @@ def test_invalid_timeout_rejected_before_execution(timeout):
 
 def test_host_rejection_marks_run_failed(completed_run, monkeypatch):
     from types import SimpleNamespace
-    from agentbench.evaluation import benchmark
+    from agentbench.sdk.kuma_runtime import benchmark
     folder, save = completed_run
     save('evaluation/inputs/0001/evidence.json', {'spans': []})
     runner = ContainerBenchmarkRunner()

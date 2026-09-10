@@ -8,7 +8,7 @@ from .errors import (
     SuiteConfigurationError,
 )
 from .progress import BenchmarkProgress, ProgressCallback
-from .protocols import SDK, SDKReport, SDKRun, SDKRunFactory, SDKTestInput
+from .protocols import EvaluationRunner, SDK, SDKReport, SDKRun, SDKRunFactory, SDKTestInput
 from .registry import AgentRegistration, AgentRegistry, load_registry
 from .result import (
     BenchmarkResult,
@@ -32,6 +32,7 @@ __all__ = [
     "BenchmarkStepFailure",
     "BenchmarkStepResult",
     "BenchmarkSuiteResult",
+    "EvaluationRunner",
     "ProviderSelectionError",
     "ProgressCallback",
     "RunningAgent",

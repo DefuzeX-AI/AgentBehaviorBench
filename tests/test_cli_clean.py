@@ -23,7 +23,7 @@ def test_clean_parser():
 def test_dry_run_preserves_history(history):
     assert clean.execute(Namespace(dry_run=True, yes=True)) == 0
     assert len(history_targets(history)) == 2
-    assert not (history / '.history-trash').exists()
+    assert not (history / 'cache/history-trash').exists()
 
 
 def test_cancel_preserves_history(history, monkeypatch):
@@ -35,7 +35,7 @@ def test_cancel_preserves_history(history, monkeypatch):
 def test_clean_is_recoverable_and_preserves_config(history):
     assert clean.execute(Namespace(dry_run=False, yes=True)) == 0
     assert not history_targets(history)
-    archive, = (history / '.history-trash').iterdir()
+    archive, = (history / 'cache/history-trash').iterdir()
     assert (archive / 'observe/run/run.json').read_text() == '{}'
     assert (archive / 'certify.json').read_text() == '[]'
     assert (history / '.env').read_text() == 'untouched'
@@ -61,3 +61,11 @@ def test_changed_preview_rejected(history):
     (history / 'results/new.json').write_text('{}')
     with pytest.raises(ValueError):
         archive_history(targets, history)
+
+
+def test_symlinked_cache_rejected(history):
+    outside = history / 'outside'; outside.mkdir()
+    (history / 'cache').symlink_to(outside, target_is_directory=True)
+    with pytest.raises(ValueError, match='cache'):
+        archive_history(history_targets(history), history)
+    assert len(history_targets(history)) == 2

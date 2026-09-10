@@ -22,7 +22,7 @@ def execute(args):
         print('Stop active runs and viewers before cleaning. History is archived, not permanently erased.')
         if args.dry_run:
             return 0
-        if not args.yes and input('Move this history to .history-trash? [y/N]: ').strip().lower() not in ('y', 'yes'):
+        if not args.yes and input('Move this history to cache/history-trash? [y/N]: ').strip().lower() not in ('y', 'yes'):
             print('Cancelled; history unchanged.')
             return 0
         archive = archive_history(targets, PROJECT_ROOT)
@@ -30,7 +30,7 @@ def execute(args):
         print('To restore, stop runs/viewers and move archive contents back into results without overwriting newer files.')
         return 0
     except (KeyboardInterrupt, EOFError):
-        print('Cleanup interrupted; check .history-trash if moving had started.')
+        print('Cleanup interrupted; check cache/history-trash if moving had started.')
         return 130
     except (OSError, ValueError, RuntimeError) as exc:
         print(f'Cleanup failed: {exc}')

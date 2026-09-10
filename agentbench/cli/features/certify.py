@@ -21,6 +21,7 @@ from agentbench.harness import (
 )
 from agentbench.harness.registry import load_registry
 from agentbench.runtime.interception import DEFAULT_TRACE_MAX_BYTES
+from agentbench.sdk.plugins import SDKSelection
 
 from .base import CommandFeature
 from .run import DEFAULT_REGISTRY_PATH
@@ -83,13 +84,18 @@ def certify(
     output_fn: Callable[[str], None] = print,
     suite_runner: SuiteRunner | None = None,
     sdk: SDK | None = None,
+    sdk_selection: SDKSelection | None = None,
     sdk_options: Mapping[str, object] | None = None,
     llm_trace: str = "off",
     llm_trace_max_bytes: int = DEFAULT_TRACE_MAX_BYTES,
     model: str | None = None,
 ) -> int:
     """Run one adapting Agent and promote it after adapter execution succeeds."""
-    if suite_runner is not None and (sdk is not None or sdk_options is not None):
+    if sdk is not None and sdk_selection is not None:
+        raise ValueError("Pass sdk or sdk_selection, not both")
+    if suite_runner is not None and (
+        sdk is not None or sdk_selection is not None or sdk_options is not None
+    ):
         raise ValueError(
             "Configure sdk on the supplied suite_runner, or omit suite_runner"
         )
@@ -128,6 +134,7 @@ def certify(
             model=model,
             activity_sink=llm_activity,
             sdk=sdk,
+            sdk_selection=sdk_selection,
             sdk_options=sdk_options,
         ),
         output_path=artifact_base,

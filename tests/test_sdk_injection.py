@@ -136,7 +136,8 @@ def test_cli_module_selection_and_options_reach_run(monkeypatch, tmp_path):
     assert (
         cli(["run", "--sdk", "examples.local_sdk", "--sdk-options", str(options)]) == 0
     )
-    assert received[0]["sdk"] is local_sdk
+    assert received[0]["sdk_selection"].value is local_sdk
+    assert received[0]["sdk_selection"].reference.source == "python"
     assert received[0]["sdk_options"] == {"expected": "hello"}
 
 

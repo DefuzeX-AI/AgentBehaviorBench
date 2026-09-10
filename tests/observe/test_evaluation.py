@@ -25,7 +25,7 @@ def test_build_overlay_preserves_original_and_sdk_only_egress():
         assert profile.strategy_group.id == 'CAND-009'
         assert profile.strategy_group.version == '1'
         config = tomllib.loads((staged.path / 'agent.toml').read_text())
-        assert config['launch']['argv'][-1] == 'agentbench.evaluation.worker'
+        assert config['launch']['argv'][-1] == 'agentbench.sdk.kuma_runtime.worker'
         route = config['llm_interception']['tool_routes'][-1]
         assert route['host_patterns'] == ['defuzex.ai']
         assert route['methods'] == ['GET', 'POST']

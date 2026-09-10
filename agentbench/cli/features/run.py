@@ -25,6 +25,7 @@ from agentbench.cli.viewer import RunningViewer, start_viewer_server
 from agentbench.harness import SDK, ProviderSelectionError, SuiteRunner
 from agentbench.harness.registry import load_registry
 from agentbench.runtime.interception import DEFAULT_TRACE_MAX_BYTES
+from agentbench.sdk.plugins import SDKSelection
 
 from .base import CommandFeature
 
@@ -91,6 +92,7 @@ def run(
     output_fn: Callable[[str], None] = print,
     suite_runner: SuiteRunner | None = None,
     sdk: SDK | None = None,
+    sdk_selection: SDKSelection | None = None,
     sdk_options: Mapping[str, object] | None = None,
     sleep_fn: Callable[[float], None] = time.sleep,
     output_path: str | Path | None = None,
@@ -101,7 +103,11 @@ def run(
     model: str | None = None,
 ) -> int:
     """Confirm ready Agents, run the suite, and return a shell exit code."""
-    if suite_runner is not None and (sdk is not None or sdk_options is not None):
+    if sdk is not None and sdk_selection is not None:
+        raise ValueError("Pass sdk or sdk_selection, not both")
+    if suite_runner is not None and (
+        sdk is not None or sdk_selection is not None or sdk_options is not None
+    ):
         raise ValueError(
             "Configure sdk on the supplied suite_runner, or omit suite_runner"
         )
@@ -140,6 +146,7 @@ def run(
         model=model,
         activity_sink=llm_activity,
         sdk=sdk,
+        sdk_selection=sdk_selection,
         sdk_options=sdk_options,
     )
     while True:

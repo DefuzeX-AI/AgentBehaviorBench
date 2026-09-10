@@ -1,20 +1,23 @@
-"""Load a user-selected SDK without interpreting its configuration."""
+"""Resolve a CLI-selected SDK without interpreting its configuration."""
 
 from __future__ import annotations
 
-import importlib
 import json
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
 from agentbench.harness.errors import ProviderSelectionError
+from agentbench.sdk.plugins import resolve_sdk
 
 
 def configure_sdk_parser(parser: ArgumentParser) -> None:
     parser.add_argument(
         "--sdk",
-        metavar="MODULE[:OBJECT]",
-        help="Import a module or configured object exposing create_run().",
+        metavar="NAME|DISTRIBUTION::NAME|python:MODULE[:OBJECT]",
+        help=(
+            "Select an installed SDK plugin by entry-point name. "
+            "Use python:MODULE[:OBJECT] for host-side development imports."
+        ),
     )
     parser.add_argument(
         "--sdk-options",
@@ -26,20 +29,7 @@ def configure_sdk_parser(parser: ArgumentParser) -> None:
 def sdk_arguments(args: Namespace) -> dict[str, object]:
     result: dict[str, object] = {}
     if args.sdk is not None:
-        module_name, separator, attribute = args.sdk.partition(":")
-        if not module_name or (separator and not attribute):
-            raise ProviderSelectionError("--sdk must use MODULE or MODULE:OBJECT")
-        try:
-            sdk = importlib.import_module(module_name)
-            if separator:
-                sdk = getattr(sdk, attribute)
-        except (ImportError, AttributeError) as exc:
-            raise ProviderSelectionError("Could not import the selected SDK") from exc
-        if isinstance(sdk, type) or not callable(getattr(sdk, "create_run", None)):
-            raise ProviderSelectionError(
-                "SDK must be a module or object with create_run()"
-            )
-        result["sdk"] = sdk
+        result["sdk_selection"] = resolve_sdk(args.sdk)
     if args.sdk_options is not None:
         try:
             options = json.loads(Path(args.sdk_options).read_text(encoding="utf-8-sig"))

@@ -24,7 +24,11 @@ def archive_history(targets, root=PROJECT_ROOT):
     root = root.resolve()
     if tuple(targets) != history_targets(root):
         raise ValueError('History changed after preview; run clean again')
-    trash = root / '.history-trash'
+    cache = root / 'cache'
+    if cache.is_symlink():
+        raise ValueError('Refusing to use a symlinked cache directory')
+    cache.mkdir(exist_ok=True)
+    trash = cache / 'history-trash'
     if trash.is_symlink():
         raise ValueError('Refusing to use a symlinked history archive')
     trash.mkdir(exist_ok=True)

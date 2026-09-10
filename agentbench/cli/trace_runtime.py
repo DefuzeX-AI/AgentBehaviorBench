@@ -4,16 +4,15 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 
-from agentbench.harness import SDK, AgentRunner, BenchmarkRunner, SuiteRunner
-from agentbench.runtime import RuntimeFactory
-from agentbench.runtime.docker import DockerRuntime
+from agentbench.harness import SDK, SuiteRunner
 from agentbench.runtime.interception import (
     NullTraceSink,
-    OpenRouterProvider,
     TerminalTraceSink,
     TraceEvent,
     TraceSink,
 )
+from agentbench.sdk.plugins import SDKSelection, evaluation_plan
+from agentbench.sdk.runtime import build_evaluation_runner
 
 
 def build_trace_suite_runner(
@@ -24,6 +23,7 @@ def build_trace_suite_runner(
     model: str | None = None,
     activity_sink: TraceSink | None = None,
     sdk: SDK | None = None,
+    sdk_selection: SDKSelection | None = None,
     sdk_options: Mapping[str, object] | None = None,
 ) -> SuiteRunner:
     if mode not in {"off", "terminal"}:
@@ -35,26 +35,16 @@ def build_trace_suite_runner(
         trace_output = getattr(activity_sink, "write_static", output_fn)
         sinks.append(TerminalTraceSink(trace_output))
     sink: TraceSink = _CompositeTraceSink(tuple(sinks)) if sinks else NullTraceSink()
-    if sdk is None:
-        import os
-        from agentbench.evaluation.benchmark import ContainerBenchmarkRunner
-        environ = dict(os.environ)
-        if model is not None:
-            environ['OPENROUTER_MODEL'] = model
-        return SuiteRunner(benchmark_runner=ContainerBenchmarkRunner(
-            environ=environ, options=sdk_options, trace_sink=sink, trace_max_bytes=max_bytes))
-    runtime_factory = RuntimeFactory(
-        docker_builder=lambda: DockerRuntime(
-            model_provider=OpenRouterProvider(model=model),
-            trace_sink=sink,
-            trace_max_bytes=max_bytes,
-        )
-    )
-    agent_runner = AgentRunner(runtime_factory=runtime_factory)
-    benchmark_runner = BenchmarkRunner(
-        agent_runner=agent_runner,
+    plan = evaluation_plan(
         sdk=sdk,
-        sdk_options=sdk_options,
+        selection=sdk_selection,
+        options=sdk_options,
+    )
+    benchmark_runner = build_evaluation_runner(
+        plan,
+        model=model,
+        trace_sink=sink,
+        trace_max_bytes=max_bytes,
     )
     return SuiteRunner(benchmark_runner=benchmark_runner)
 

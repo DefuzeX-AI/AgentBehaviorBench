@@ -2,11 +2,11 @@
 
 ## Official container evaluation (initial single-Case path)
 
-The default `run` and `certify` now share `ContainerBenchmarkRunner`, which invokes
-the same container-local KUMA/Agent/OTel core. `evaluate` is a single-Case
-compatibility entry to this core, not an independent SDK lifecycle. `observe`
-remains SDK-free. Only explicit custom SDK injection uses the legacy host-side
-generic SDK harness; it is not the official KUMA execution path.
+The default `run` and `certify` select the built-in `kuma` evaluation plugin,
+which invokes the same container-local KUMA/Agent/OTel core. `evaluate` is a
+single-Case compatibility entry to this core, not an independent SDK lifecycle.
+`observe` remains SDK-free. A plain `create_run()` SDK uses the host-side adapter;
+an `EvaluationSDKPlugin` can supply another formal runner.
 
 `run` still selects enabled ready Agents and executes Registry `case` counts.
 `certify` runs the adapting Agent's requested Cases and promotes only after
@@ -109,7 +109,7 @@ python -m agentbench clean --yes      # Skip confirmation
 ```
 
 Stop active runs and viewers first. `clean` moves all immediate children of the
-installed project's `results/` into a unique `.history-trash/` batch. This includes
+installed project's `results/` into a unique `cache/history-trash/` batch. This includes
 observe/evaluation traces, certification/suite JSON, interception artifacts, and
 SDK recovery state inside result directories. The results directory remains.
 It does not change Agent sources, `.env`, registry certification status, Docker
@@ -571,25 +571,35 @@ protocol limits and verification evidence.
 
 ## Evaluation SDK selection
 
-Both `run` and `certify` accept `--sdk MODULE[:OBJECT]` and
-`--sdk-options PATH`. The module, or an exported configured object, must expose
-`create_run()` and return the Run interface documented in [SDK.md](SDK.md).
-Modules must be importable in the active Python environment; AgentBench does
-not download or install code during selection.
+Both `run` and `certify` accept `--sdk NAME` and `--sdk-options PATH`. `NAME`
+comes from the `defuzex_agentbench.evaluation_sdks` entry-point group declared
+by an installed Python distribution. AgentBench does not download or install
+code during selection.
 
 ```powershell
-python -m agentbench run --sdk my_evaluation_sdk --sdk-options sdk-options.json
-python -m agentbench certify my-agent --sdk my_evaluation_sdk
+python -m pip install acme-evaluation-sdk==2.1.0
+python -m agentbench sdk list
+python -m agentbench sdk show acme
+python -m agentbench run --sdk acme --sdk-options sdk-options.json
+python -m agentbench certify my-agent --sdk acme
 ```
+
+`sdk list` reads package metadata without importing third-party plugin code.
+`sdk show` and an actual run load only the selected plugin. If two distributions
+publish the same name, use `DISTRIBUTION::NAME`. For an explicit development
+import, use `--sdk python:MODULE[:OBJECT]`. The old `MODULE[:OBJECT]` spelling
+remains compatible.
 
 `sdk-options.json` must contain a JSON object. Its fields are passed to the SDK;
 `repo_path` is supplied by ABB per Agent. Credentials and validation belong to
 the selected SDK. CLI callbacks and result output are shared across SDKs.
 
-Omitting `--sdk` uses the official container-local KUMA core (`allow_local=False`).
+Omitting `--sdk`, or using `--sdk kuma`, selects the official container-local
+KUMA plugin (`allow_local=False`).
 For that default, `--sdk-options` accepts `sdk_source`, `output` (raw artifact
 root), and `timeout`. Old SDK options such as `requirement_path` or `allow_local`
 are rejected instead of silently selecting the old execution path.
-An explicitly selected custom SDK still executes through the generic host-side
-extension and receives its own options; it does not provide the official
-same-container KUMA guarantee.
+A selected plain `create_run()` SDK executes through the generic host-side
+adapter. A plugin implementing `EvaluationSDKPlugin` can provide a formal
+container runner. See [SDK.md](SDK.md) and the
+[plugin architecture](architecture/evaluation-sdk-plugins.md).

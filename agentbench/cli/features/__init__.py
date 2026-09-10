@@ -7,6 +7,7 @@ from .view import FEATURE as VIEW_FEATURE
 from .observe import FEATURE as OBSERVE_FEATURE
 from .evaluate import FEATURE as EVALUATE_FEATURE
 from .clean import FEATURE as CLEAN_FEATURE
+from .sdk import FEATURE as SDK_FEATURE
 
 FEATURES: tuple[CommandFeature, ...] = (
     RUN_FEATURE,
@@ -15,6 +16,7 @@ FEATURES: tuple[CommandFeature, ...] = (
     OBSERVE_FEATURE,
     EVALUATE_FEATURE,
     CLEAN_FEATURE,
+    SDK_FEATURE,
 )
 
 __all__ = ["FEATURES", "CommandFeature"]

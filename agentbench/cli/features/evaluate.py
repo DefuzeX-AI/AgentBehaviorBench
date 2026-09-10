@@ -8,7 +8,7 @@ from .run import DEFAULT_REGISTRY_PATH
 from .observe import model_name
 from ..environment import load_project_environment
 from agentbench.observe.catalog import enabled_agents, select_agent, resolve_agent
-from agentbench.evaluation.benchmark import ContainerBenchmarkRunner
+from agentbench.sdk.kuma_runtime.benchmark import ContainerBenchmarkRunner
 
 
 def configure_parser(parser):

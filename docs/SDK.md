@@ -1,8 +1,11 @@
 # Choosing an evaluation SDK
 
-AgentBench accepts a Python module or configured object through `sdk=...`.
-The selected SDK owns Case generation, credentials, Providers and judging.
-AgentBench owns Agent invocation and the existing suite/progress/result flow.
+AgentBench accepts a Python module or configured object through `sdk=...` and
+discovers CLI plugins from the `defuzex_agentbench.evaluation_sdks` package
+entry-point group. Both forms become the same immutable evaluation plan before
+runner construction. The selected SDK owns Case generation, credentials,
+Providers and judging. AgentBench owns Agent invocation and the existing
+suite/progress/result flow.
 
 ```python
 import my_evaluation_sdk
@@ -52,6 +55,33 @@ need a small user-owned adapter implementing this interface. This change does
 not claim arbitrary SDK modules work without adaptation. A configured object
 can retain SDK-specific state; do not pass an uninstantiated class.
 
+## Installed CLI plugins
+
+A PyPI distribution can give its SDK a stable CLI name:
+
+```toml
+[project.entry-points."defuzex_agentbench.evaluation_sdks"]
+acme = "acme_evaluation:sdk"
+```
+
+After installation, inspect and select it without coupling scripts to a Python
+module path:
+
+```bash
+agentbench sdk list
+agentbench sdk show acme
+agentbench run --sdk acme --sdk-options sdk-options.json
+```
+
+`sdk list` reads only installed package metadata. Selection loads only the
+chosen entry point. Duplicate short names fail with the qualified alternatives;
+use `DISTRIBUTION::NAME` to disambiguate them. `kuma` is reserved for the
+built-in adapter, so an external plugin with that name also needs a distribution
+qualifier. An entry point exposing the plain
+`create_run()` interface executes host-side. A formal container plugin implements
+`EvaluationSDKPlugin` and returns its `EvaluationRunner` Strategy. See
+[Evaluation SDK plugin architecture](architecture/evaluation-sdk-plugins.md).
+
 ## DefuzeX
 
 The existing default and `run_defuzex()` / `validate_defuzex()` compatibility
@@ -81,12 +111,12 @@ and other options your installed SDK version expects. It does not apply the
 legacy Provider-pair policy, credential lookup or registered-requirement default.
 The SDK itself may resolve its credentials from its supported environment.
 
-**Execution placement has not changed.** This seam is in the current process;
-it does not transfer a module/object into Docker. DefuzeX formal mode requires
-the SDK and Agent in the same container. Host-side local development still
-requires explicit `allow_local=True`; the existing default CLI preserves its
-previous local-development settings. Container Worker migration and cross-process
-OTel are separate work and are not certified by these interface tests.
+A plain `create_run()` module/object is local to the current process; ABB does
+not pretend it can serialize an arbitrary Python value into Docker. The built-in
+`kuma` plugin implements the formal container Strategy. Other formal plugins
+must implement `EvaluationSDKPlugin` so their package owns runner construction
+and deployment. The next migration step is a shared, versioned container worker
+protocol for those formal plugins.
 
 ## Offline example
 
@@ -108,3 +138,9 @@ print(result.report.status)  # pass
 For CLI selection, see `CLI.md`. Python CLI callers can also pass
 `sdk=local_sdk, sdk_options={...}` to `agentbench.cli.main.main`, the run feature
 or the certify feature. Normal registry selection rules still apply.
+
+The equivalent explicit development CLI selection is:
+
+```bash
+agentbench run --sdk python:examples.local_sdk
+```
