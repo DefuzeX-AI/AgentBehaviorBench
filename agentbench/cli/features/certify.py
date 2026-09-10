@@ -28,6 +28,7 @@ from .run import DEFAULT_REGISTRY_PATH
 
 
 def configure_parser(parser: ArgumentParser) -> None:
+    parser.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY_PATH, help="Agent registry path")
     configure_sdk_parser(parser)
     parser.add_argument("agent_id", help="Registered adapting Agent to certify.")
     parser.add_argument(
@@ -64,6 +65,8 @@ def execute(args: Namespace) -> int:
     load_project_environment(args.env_file)
     try:
         kwargs: dict[str, object] = {"output_path": args.output, **sdk_arguments(args)}
+        if args.registry != DEFAULT_REGISTRY_PATH:
+            kwargs["registry_path"] = args.registry
     except ProviderSelectionError as exc:
         print(f"SDK configuration error: {exc}")
         return 2
@@ -181,10 +184,10 @@ def _agent_completed_certification(result: BenchmarkSuiteResult, agent_id: str) 
     )
 
 
-def _default_output_path(registry_path: str | Path, agent_id: str) -> Path:
+def _default_output_path(registry_path: str | Path, agent_id: str, *, command="certify") -> Path:
     repo_root = Path(registry_path).resolve().parent.parent
     safe_agent_id = re.sub(r"[^A-Za-z0-9._-]+", "-", agent_id).strip("-")
-    return repo_root / "results" / f"certify-{safe_agent_id or 'agent'}.json"
+    return repo_root / "results" / f"{command}-{safe_agent_id or 'agent'}.json"
 
 
 FEATURE = CommandFeature(

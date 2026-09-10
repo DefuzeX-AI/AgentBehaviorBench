@@ -172,6 +172,15 @@ class InteractionIndex:
             identifier = _id(key)
             self.groups.setdefault(identifier, []).append(record)
 
+        # Only recorded framework IDs establish causality; no timestamp fallback.
+        wire = [r for r in records if r['raw'].get('event') in ('llm_request', 'tool_request')
+                and _data(r).get('purpose') != 'evaluation']
+        linked = sum(any(r['raw'].get('event') == 'span_start' for r in spans.get(_data(call).get('framework_span_id'), [])) for call in wire)
+        self.correlation = {'requests': len(wire), 'linked': linked, 'uncorrelated': len(wire) - linked,
+                            'status': 'captured' if wire else 'no_requests_observed'}
+        if len(wire) > linked:
+            self.warnings.append(f'{len(wire) - linked}/{len(wire)} captured requests have no matching framework span; correlation coverage is incomplete.')
+
         for identifier, group in self.groups.items():
             group.sort(key=lambda r: (_time_order(r['raw'].get('timestamp')), r['file'], r['line']))
             first = group[0]; data = first['raw'].get('data') or {}
@@ -330,7 +339,7 @@ class InteractionIndex:
                 'kinds': dict(Counter(r['kind'] for r in self.rows)),
                 'inputs': [{'input_id': c['input_id'], 'case_id': c['case_id']} for c in self.contexts.values()],
                 'origin': next((r['timestamp'] for r in self.rows if stamp(r['timestamp']) is not None), None),
-                'warnings': self.warnings}
+                'warnings': self.warnings, 'correlation': self.correlation}
 
 
 def interactions(directory, query):

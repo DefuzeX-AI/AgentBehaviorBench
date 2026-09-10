@@ -7,35 +7,16 @@ from agentbench.harness.registry import load_registry
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-@pytest.mark.parametrize(
-    ("agent_id", "directory", "enabled", "status", "case_count"),
-    [
-        (
-            "company-research-agent",
-            "01-company-research-agent",
-            True,
-            "adapting",
-            1,
-        ),
-    ],
-)
-def test_registry_resolves_registered_agents(
-    agent_id: str, directory: str, enabled: bool, status: str, case_count: int
-) -> None:
-    registry = load_registry(REPO_ROOT / "resources" / "registry.toml")
-
-    agent = registry.find(agent_id, enabled_only=False)
-
-    assert agent.agent_id == agent_id
-    assert agent.enabled is enabled
-    assert agent.framework == "langgraph"
-    assert agent.status == status
-    assert agent.case_count == case_count
-    assert agent.path == REPO_ROOT / "resources" / "agents" / directory
-    assert agent.path.joinpath("agent.toml").is_file()
-    assert agent.requirement_path == agent.path / "requirement.md"
-    assert (agent.path / "agent").is_dir()
-    assert (agent.path / "Dockerfile").is_file()
+def test_registry_resolves_registered_agents():
+    from agentbench.runtime.agentcontainer.config import tomllib
+    registry = load_registry(REPO_ROOT / 'resources/registry.toml')
+    data = tomllib.loads((REPO_ROOT / 'resources/registry.toml').read_text())
+    for entry in data['agents']:
+        agent = registry.find(entry['agent_id'], enabled_only=False)
+        assert agent.path == (REPO_ROOT / entry['path']).resolve()
+        assert agent.status == entry['status']
+        assert (agent.path / 'agent').is_dir()
+        assert agent.requirement_path.is_file()
 
 
 def test_every_enabled_agent_has_an_sdk_requirement() -> None:
@@ -47,17 +28,27 @@ def test_every_enabled_agent_has_an_sdk_requirement() -> None:
         assert agent.requirement_path == requirement
 
 
-def test_ready_agents_are_the_default_runnable_subset() -> None:
-    registry = load_registry(REPO_ROOT / "resources" / "registry.toml")
+def test_ready_agents_are_the_default_runnable_subset(tmp_path):
+    from dataclasses import replace
+    from agentbench.harness.registry import AgentRegistry
+    agent = load_registry(_write_registry(tmp_path)).find('test-agent')
+    records = [replace(agent, agent_id=f'fixture-{i}', status=status, enabled=enabled)
+               for i, (status, enabled) in enumerate([
+                   ('ready', True), ('ready', False), ('adapting', True), ('blocked', True)])]
+    registry = AgentRegistry(records)
+    assert registry.ready() == (records[0],)
+    assert registry.enabled_with_status('adapting') == (records[2],)
 
-    assert registry.ready() == ()
-    assert {agent.agent_id for agent in registry.enabled()} == {"company-research-agent"}
-    assert {path.name for path in (REPO_ROOT / "resources" / "agents").iterdir() if path.is_dir()} == {
-        "01-company-research-agent",
-    }
-    assert {agent.agent_id for agent in registry.enabled_with_status("adapting")} == {
-        "company-research-agent",
-    }
+
+def test_registered_units_have_matching_manifest_identity():
+    # Downloaded but unregistered units may coexist with the benchmark registry.
+    registry = load_registry(REPO_ROOT / 'resources/registry.toml')
+    from agentbench.runtime.agentcontainer.config import tomllib
+    data = tomllib.loads((REPO_ROOT / 'resources/registry.toml').read_text())
+    for entry in data['agents']:
+        agent = registry.find(entry['agent_id'], enabled_only=False)
+        manifest = tomllib.loads((agent.path / 'agent.toml').read_text())
+        assert manifest['agent_id'] == agent.agent_id
 
 
 def test_registry_defaults_case_count_to_one(tmp_path: Path) -> None:
@@ -98,6 +89,9 @@ def test_registry_does_not_fall_back_to_global_requirement(tmp_path: Path) -> No
 @pytest.mark.parametrize("missing", ["agent", "Dockerfile"])
 def test_registry_rejects_incomplete_unit(tmp_path: Path, missing: str) -> None:
     registry_path = _write_registry(tmp_path)
+    if missing == "Dockerfile":
+        manifest = tmp_path / "resources/agents/test-agent/agent.toml"
+        manifest.write_text(manifest.read_text() + '\n[runtime]\ntype="docker"\n[build]\ncontext="."\ndockerfile="Dockerfile"\n[launch]\nargv=["python"]\n')
     path = tmp_path / "resources/agents/test-agent" / missing
     if path.is_dir():
         path.rmdir()

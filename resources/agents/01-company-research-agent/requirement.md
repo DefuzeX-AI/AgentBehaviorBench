@@ -11,9 +11,11 @@ the outer unit. The upstream checkout is unchanged, including its Dockerfile.
 Upstream
 models, Tavily searches, frontend and backend files are unchanged.
 
-Current status: downloaded and registered as `adapting`; dependencies, execution,
-trace coverage and benchmark certification have not been validated. This is
-the sole current ABB Agent, numbered 01. It is not marked `ready`.
+Current status: `adapting`, pending a retained full certification record for
+this checkout. Docker execution, model interception and evaluation have existing
+local run artifacts; these are not a retained `certify` transition record.
+The readiness audit on 2026-09-10 did not find that record and removed the
+unsupported `ready` claim. Judge `issue` is not the reason for this status.
 
 Native execution: `backend.graph.Graph(...).run(config)` compiles and streams
 the research workflow. `langgraph_entry.py` also exposes a compiled graph.
@@ -21,21 +23,20 @@ The upstream FastAPI application accepts a company name and optional company
 URL, industry and headquarters information, and the React frontend displays
 research progress and the final report.
 
-Intended ABB execution uses Docker and the existing trusted Model Interceptor.
-The Interceptor holds the real OpenRouter credential and selects the target
-model; the Agent receives temporary model tokens, not real OpenAI/Gemini keys.
-The current manifest selects Docker and declares an outer build context and
-Dockerfile. The image has not been built or tested. The launch declaration,
-interception routes and container bridge remain to be implemented; the runtime
-does not fall back to host execution. The built-in OpenRouter target does not yet map Gemini-native
-requests; that compatibility must be addressed before claiming all model calls
-are routed. Python and Agent dependencies belong in the Agent image.
+ABB execution uses the outer lifecycle binding and Docker worker with the trusted
+Model Interceptor. Real target credentials remain outside the Agent; temporary
+OpenAI/Gemini tokens and the public CA are supplied at runtime. Both OpenAI and
+Gemini native gRPC routes are declared. Tavily remains a real external tool.
 
-Real Tavily search is a separate service configuration. Do not replace search
-with fixed example results. No evaluation SDK is executed at this stage.
-Before adapting the Agent, verify its dependency versions, input/state
-requirements, actual search calls and cross-process OTel coverage.
+Existing evidence includes `results/result-20260910-030918.json` and its referenced
+`results/observe/1fbe5f79bac54b55987a7a36ed5f3dda` evaluation artifacts in the ABB
+workspace. Execution completed and the Judge reported issues about output format
+and company identity. Report generation does not establish research quality.
+See `docs/interception/acceptance.md` for the historical compatibility matrix;
+this is bounded evidence, not universal SDK/protocol certification.
 
-Future behavior checks should assess company identity, evidence-backed claims,
-source citations and explicit handling of missing information. These are
-research criteria, not claims of completed tests or certification.
+Before promotion, run full `certify` on the current configuration and retain its
+result and source/configuration identity. Do not substitute fixed search results.
+Assess company identity, evidence-backed claims, citations and truthful handling
+of missing information. Native company-name input is not a general instruction
+interface; the evaluation profile documents that limitation.

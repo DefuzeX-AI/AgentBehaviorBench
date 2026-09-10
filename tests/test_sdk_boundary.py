@@ -109,10 +109,10 @@ def test_evaluate_defaults_and_explicit_options_use_selected_factory(starter_age
     monkeypatch.setattr(evaluate, 'load_project_environment', lambda _: None)
     received = []
 
-    def run(self, registration):
-        assert registration is starter_agent
+    def run(self, registration, **callbacks):
+        assert registration == replace(starter_agent, case_count=1)
         received.append((self.sdk, self.output, self.timeout, self.environ['OPENROUTER_MODEL']))
-        return SimpleNamespace(report=SimpleNamespace(status='issue'))
+        return _benchmark(registration, 'issue')
 
     monkeypatch.setattr(KumaContainerRunner, 'run', run)
     monkeypatch.setattr(KumaContainerRunner, 'validate_sdk', lambda *_: 'official-container')
@@ -135,16 +135,16 @@ def test_evaluate_plugin_validates_before_execution(starter_agent, monkeypatch, 
 
     class Runner:
         def validate_sdk(self, registration):
-            assert registration is starter_agent
+            assert registration == replace(starter_agent, case_count=1)
             calls.append('validate')
             if preflight_fails:
                 raise ValueError('Replacement evaluator unavailable')
             return 'custom'
 
-        def run(self, registration):
-            assert registration is starter_agent
+        def run(self, registration, **callbacks):
+            assert registration == replace(starter_agent, case_count=1)
             calls.append('run')
-            return SimpleNamespace(report=SimpleNamespace(status='pass'))
+            return _benchmark(registration, 'pass')
 
     class Plugin:
         name = 'replacement'
@@ -173,3 +173,9 @@ def test_case_file_rejects_duplicate_ids_before_delivery(tmp_path):
     path.write_text(json.dumps({'inputs': [row, row]}))
     with pytest.raises(ValueError, match='unique'):
         create_run(repo_path=tmp_path, case_file=path)
+
+
+def _benchmark(registration, status):
+    from agentbench.harness.result import BenchmarkResult
+    return BenchmarkResult(registration.agent_id, 'test', 'fixture-run', 'completed',
+                           SimpleNamespace(status=status, confidence=1, issues=[], evidence_gaps=[]), (), 0)

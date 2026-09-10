@@ -35,16 +35,10 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None):
     context = {key: supplied[key] for key in ('case_id', 'input_id')
                if isinstance(supplied, dict) and isinstance(supplied.get(key), str)}
     context.update(invocation_id=run_id, agent_id=envelope['agent_id'])
-    store = TraceStore(output / "framework.jsonl", envelope.get("session_id", run_id), source="framework", context=context)
-    # Optional dependency: images with OTel emit a second, independent trace.
-    try:
-        from agentbench.observe.otel.session import ObservedStore
-    except ModuleNotFoundError as exc:
-        if not (exc.name or '').startswith('opentelemetry'):
-            raise
-        atomic_json(output / 'otel-status.json', {'status': 'unavailable', 'reason': 'OTel SDK not installed'})
-    else:
-        store = ObservedStore(store, run_id, provider=provider)
+    from agentbench.observe.invocation import InvocationObservation
+    observed = InvocationObservation(output, run_id, envelope.get("session_id", run_id),
+                                     envelope["framework"], context=context, provider=provider)
+    store = observed.store
     adapter = None
     result = {"schema": "abb.result.v1", "run_id": run_id, **context}
     try:
@@ -56,10 +50,7 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None):
         config = dict(envelope.get("config") or {})
         if "callbacks" in config:
             raise ValueError("Host callbacks cannot cross a JSON process boundary")
-        from agentbench.observe.observers import DEFAULT_OBSERVERS
-        callbacks = DEFAULT_OBSERVERS.callbacks(descriptor.framework, store)
-        if callbacks:
-            config["callbacks"] = callbacks
+        config = observed.config(config)
         config.setdefault("configurable", {}).setdefault("thread_id", run_id)
         config.setdefault("metadata", {}).update(abb_run_id=run_id)
         store.record("execution_start", input=envelope["input"])
@@ -77,7 +68,11 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None):
     finally:
         if adapter is not None:
             try:
-                adapter.close()
+                close = getattr(adapter, "aclose", None)
+                if callable(close):
+                    await close()
+                else:
+                    adapter.close()
             except Exception as exc:
                 result.update(status="failed", error_type=type(exc).__name__, error=str(exc))
         atomic_json(output / "result.json", result)

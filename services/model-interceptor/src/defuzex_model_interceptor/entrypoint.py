@@ -18,6 +18,7 @@ PROXY_PORT = 8080
 def main() -> int:
     config_path = os.environ.get(CONFIG_ENV, DEFAULT_CONFIG)
     ServiceConfig.load(config_path)  # Validate before modifying the namespace.
+    Path("/run/defuzex/ca").mkdir(mode=0o700, parents=True, exist_ok=True)
     _configure_netfilter()
     addon_path = Path(__file__).with_name("loader.py")
     command = [

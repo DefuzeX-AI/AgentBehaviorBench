@@ -106,9 +106,11 @@ class RunViewAPI:
         return {'spans': list(latest.values()), 'statuses': statuses, 'warnings': warnings}
 
     def evaluation(self):
+        public = (self.read('run.json') or {}).get('evaluation_result') or {}
         return {**{key: self.read('evaluation/' + name) for key, name in {
             'manifest': 'manifest.json', 'process': 'process.json', 'case': 'case.json',
             'judge': 'judge/report.json', 'error': 'error.json'}.items()},
+            'public_result': public, 'execution_status': (self.read('run.json') or {}).get('status'),
             'inputs': [{'step': Path(folder).name, **{key: self.read(f'{folder}/{name}.json')
                        for key, name in {'input': 'input', 'result': 'result',
                                          'submission': 'submission', 'evidence': 'evidence'}.items()}}
@@ -146,6 +148,8 @@ class RunViewAPI:
         if not path.startswith(prefix):
             raise ValueError('Run does not match this viewer')
         route = path[len(prefix):]
+        if route == 'metadata':
+            return self.read('run.json') or {}
         if route == 'interactions':
             from .interactions import interactions
             return interactions(self.directory, query)

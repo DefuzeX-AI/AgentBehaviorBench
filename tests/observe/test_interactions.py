@@ -108,7 +108,7 @@ def test_append_partial_record_recovery_and_pagination(run):
     with (run / 'network.jsonl').open('a') as stream:
         stream.write('"new_event","data":null}\n')
     after = interactions(run, {})
-    assert not after['warnings'] and after['total'] == before['total'] + 1
+    assert after['warnings'] == before['warnings'] and after['total'] == before['total'] + 1
     assert after['revision'] != before['revision']
     assert RunViewAPI(run).route(f'/api/observe/runs/{run.name}/interactions', {})['total'] == after['total']
     for args in ({'page': '0'}, {'page_size': '999'}, {'id': 'missing'}):

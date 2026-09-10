@@ -248,67 +248,67 @@ class DockerRuntime:
         secret_dir = Path(tempfile.mkdtemp(prefix="defuzex-model-interceptor-"))
         config_file = secret_dir / "interceptor_config.json"
         ca_dir = secret_dir / "ca"
-        ca_dir.mkdir()
         ca_certificate = ca_dir / "mitmproxy-ca-cert.pem"
-        token_environment: dict[str, str] = {}
-        credentials: list[dict[str, object]] = []
-        target = self._model_provider.resolve(self._environ)
-        upstream_secret = self._secret_resolver.require(target.credential_env)
-        target_secret_file = secret_dir / "target.secret"
-        target_secret_file.write_text(upstream_secret, encoding="utf-8")
+        try:
+            ca_dir.mkdir()
+            token_environment: dict[str, str] = {}
+            credentials: list[dict[str, object]] = []
+            target = self._model_provider.resolve(self._environ)
+            upstream_secret = self._secret_resolver.require(target.credential_env)
+            target_secret_file = secret_dir / "target.secret"
+            target_secret_file.write_text(upstream_secret, encoding="utf-8")
 
-        for credential in interception.credentials:
-            token = secrets.token_urlsafe(32)
-            token_file = secret_dir / f"{credential.credential_id}.token"
-            token_file.write_text(token, encoding="utf-8")
-            token_environment[credential.agent_env] = token
-            credentials.append(
-                {
-                    "id": credential.credential_id,
-                    "auth_plugin": credential.auth_plugin,
-                    "token_file": f"/run/secrets/{token_file.name}",
-                    "secret_file": "/run/secrets/target.secret",
-                }
+            for credential in interception.credentials:
+                token = secrets.token_urlsafe(32)
+                token_file = secret_dir / f"{credential.credential_id}.token"
+                token_file.write_text(token, encoding="utf-8")
+                token_environment[credential.agent_env] = token
+                credentials.append(
+                    {
+                        "id": credential.credential_id,
+                        "auth_plugin": credential.auth_plugin,
+                        "token_file": f"/run/secrets/{token_file.name}",
+                        "secret_file": "/run/secrets/target.secret",
+                    }
+                )
+
+            config_file.write_text(
+                json.dumps(
+                    {
+                        "agent_id": agent_id,
+                        "max_trace_bytes": self._trace_max_bytes,
+                        "target": {
+                            "provider_id": target.provider_id,
+                            "target_plugin": target.target_plugin,
+                            "base_url": target.base_url,
+                            "model": target.model,
+                            "headers": dict(target.headers),
+                        },
+                        "credentials": credentials,
+                        "tool_routes": [
+                            {"host_patterns": list(route.host_patterns), "ports": list(route.ports),
+                             "methods": list(route.methods), "path_patterns": list(route.path_patterns),
+                             "purpose": route.purpose}
+                            for route in interception.tool_routes
+                        ],
+                        "routes": [
+                            {
+                                "id": route.route_id,
+                                "host_patterns": list(route.host_patterns),
+                                "ports": list(route.ports),
+                                "methods": list(route.methods),
+                                "path_patterns": list(route.path_patterns),
+                                "protocol_plugin": route.protocol_plugin,
+                                "credential": route.credential_id,
+                            }
+                            for route in interception.routes
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
             )
 
-        config_file.write_text(
-            json.dumps(
-                {
-                    "agent_id": agent_id,
-                    "max_trace_bytes": self._trace_max_bytes,
-                    "target": {
-                        "provider_id": target.provider_id,
-                        "target_plugin": target.target_plugin,
-                        "base_url": target.base_url,
-                        "model": target.model,
-                        "headers": dict(target.headers),
-                    },
-                    "credentials": credentials,
-                    "tool_routes": [
-                        {"host_patterns": list(route.host_patterns), "ports": list(route.ports),
-                         "methods": list(route.methods), "path_patterns": list(route.path_patterns),
-                         "purpose": route.purpose}
-                        for route in interception.tool_routes
-                    ],
-                    "routes": [
-                        {
-                            "id": route.route_id,
-                            "host_patterns": list(route.host_patterns),
-                            "ports": list(route.ports),
-                            "methods": list(route.methods),
-                            "path_patterns": list(route.path_patterns),
-                            "protocol_plugin": route.protocol_plugin,
-                            "credential": route.credential_id,
-                        }
-                        for route in interception.routes
-                    ],
-                },
-                ensure_ascii=False,
-            ),
-            encoding="utf-8",
-        )
-
-        try:
             command = [
                 "run",
                 "--detach",
@@ -320,8 +320,6 @@ class DockerRuntime:
                 *self._interceptor_policy.run_arguments(),
                 "--mount",
                 _bind_mount(config_file, "/run/secrets/interceptor_config"),
-                "--mount",
-                _writable_bind_mount(ca_dir, "/run/defuzex/ca"),
             ]
             for path in sorted(secret_dir.glob("*.token")) + sorted(
                 secret_dir.glob("*.secret")
@@ -413,9 +411,8 @@ class DockerRuntime:
             if (
                 logs is not None
                 and '"event": "interceptor_ready"' in logs.stdout
-                and ca_certificate.is_file()
-                and ca_certificate.stat().st_size > 0
             ):
+                self._export_ca(container_name, ca_certificate)
                 return
             state = self._run_quiet(
                 "inspect",
@@ -435,6 +432,25 @@ class DockerRuntime:
         raise DockerRuntimeError(
             f"Model interceptor did not become ready{': ' + detail if detail else ''}"
         )
+
+    def _export_ca(self, container_name: str, destination: Path) -> None:
+        """Copy only the public CA; private key stays in interceptor tmpfs."""
+        import ssl
+        # Docker's archive/cp endpoint cannot reliably read a live tmpfs mount.
+        # Read the single public PEM through exec; never export the CA directory.
+        pem = self._run("exec", container_name, "cat", "/run/defuzex/ca/mitmproxy-ca-cert.pem").stdout
+        if "PRIVATE KEY" in pem or "-----BEGIN CERTIFICATE-----" not in pem:
+            raise DockerRuntimeError("Invalid interceptor public CA export")
+        ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT).load_verify_locations(cadata=pem)
+        with tempfile.NamedTemporaryFile(mode="w", encoding="ascii", dir=destination.parent, delete=False) as stream:
+            owned = Path(stream.name)
+            try:
+                stream.write(pem)
+                stream.flush()
+                owned.chmod(0o644)
+                owned.replace(destination)
+            finally:
+                owned.unlink(missing_ok=True)
 
     def _require_non_root_image(self, image: str) -> None:
         result = self._run(

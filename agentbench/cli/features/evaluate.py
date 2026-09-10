@@ -1,5 +1,9 @@
 """Evaluate one Agent on one Case using the selected evaluation SDK."""
 import math
+from dataclasses import replace
+from agentbench.harness import SuiteRunner
+from agentbench.cli.execution import run_benchmark_once
+from agentbench.cli.features.certify import _default_output_path
 from pathlib import Path
 from .base import CommandFeature
 from .run import DEFAULT_REGISTRY_PATH
@@ -19,6 +23,7 @@ def configure_parser(parser):
     parser.add_argument('--model', type=model_name)
     configure_sdk_parser(parser)
     parser.add_argument('--sdk-source', type=Path, help='Override the SDK sdk_source option')
+    parser.add_argument('--result-output', type=Path, help='ABB result JSON naming base (independent of SDK output)')
     parser.add_argument('--output', type=Path, help='Override the SDK output option')
     parser.add_argument('--timeout', type=float, help='Override the SDK timeout option (seconds)')
 
@@ -50,11 +55,22 @@ def execute(args):
         agent = resolve_agent(select_agent(records, selection), args.registry)
         print(f'Evaluation: one Case using {plan.selection.reference.name}; '
               'selected services may incur charges.', flush=True)
-        runner.validate_sdk(agent)
-        result = runner.run(agent)
-        if result.report is None:
-            raise RuntimeError('The selected SDK completed without a Judge report')
-        print(f'Judge: {result.report.status}')
+        output = args.result_output or _default_output_path(args.registry, agent.agent_id, command="evaluate")
+        if args.output is not None:
+            print('--output configures the SDK only; --result-output selects the ABB result JSON.')
+        execution = run_benchmark_once((replace(agent, case_count=1),),
+            runner=SuiteRunner(benchmark_runner=runner), output_path=output,
+            output_fn=print, viewer_starter=None)
+        if execution.result is None:
+            return execution.exit_code
+        items = execution.result.items
+        if any(item.error_type or item.completed_case_count != 1 for item in items):
+            return 1
+        reports = [benchmark.report for item in items for benchmark in item.benchmarks]
+        if not reports or any(report is None for report in reports):
+            print('Evaluation failed: SDK completed without a Judge report')
+            return 1
+        print(f'Judge: {reports[-1].status}')
         return 0
     except (KeyboardInterrupt, EOFError):
         print('Evaluation interrupted; artifacts retained.')

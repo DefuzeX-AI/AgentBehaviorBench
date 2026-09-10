@@ -35,6 +35,7 @@ DEFAULT_REGISTRY_PATH = (
 
 
 def configure_parser(parser: ArgumentParser) -> None:
+    parser.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY_PATH, help="Agent registry path")
     configure_sdk_parser(parser)
     parser.add_argument(
         "--env-file",
@@ -76,6 +77,8 @@ def execute(args: Namespace) -> int:
     load_project_environment(args.env_file)
     try:
         kwargs: dict[str, object] = {"output_path": args.output, **sdk_arguments(args)}
+        if args.registry != DEFAULT_REGISTRY_PATH:
+            kwargs["registry_path"] = args.registry
     except ProviderSelectionError as exc:
         print(f"SDK configuration error: {exc}")
         return 2

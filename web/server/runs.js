@@ -76,6 +76,8 @@ export function runsPlugin(root) {
           req.headers['sec-fetch-site'] === 'cross-site') return reply(403, { error: '仅允许本地同源访问' });
       if (req.method !== 'GET') return reply(405, { error: '仅支持读取' });
       try {
+        const metadata = /^\/api\/observe\/runs\/([a-zA-Z0-9_-]+)\/metadata$/.exec(url.pathname);
+        if (metadata) return reply(200, JSON.parse(await readBounded(await contained(root, path.join(root, metadata[1], 'run.json')))));
         const interactions = /^\/api\/observe\/runs\/([a-zA-Z0-9_-]+)\/interactions$/.exec(url.pathname);
         if (interactions) {
           const controller = new AbortController();

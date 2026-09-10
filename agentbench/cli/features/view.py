@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from argparse import ArgumentParser, Namespace
 
-from agentbench.cli.viewer import DEFAULT_HOST, DEFAULT_PORT, serve_result_log
+from agentbench.cli.viewer import DEFAULT_HOST, DEFAULT_PORT, serve_result_log, ViewerUnavailable
 
 from .base import CommandFeature
 
@@ -16,7 +16,11 @@ def configure_parser(parser: ArgumentParser) -> None:
 
 
 def execute(args: Namespace) -> int:
-    serve_result_log(args.result_log, host=args.host, port=args.port)
+    try:
+        serve_result_log(args.result_log, host=args.host, port=args.port)
+    except ViewerUnavailable as exc:
+        print(str(exc))
+        return 1
     return 0
 
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import os
 import threading
+from collections.abc import Mapping
+from dataclasses import fields, is_dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -11,8 +13,10 @@ from pathlib import Path
 def json_value(value):
     if value is None or isinstance(value, (str, bool, int, float)):
         return value
-    if isinstance(value, dict):
+    if isinstance(value, Mapping):
         return {str(k): json_value(v) for k, v in value.items()}
+    if is_dataclass(value) and not isinstance(value, type):
+        return {f.name: json_value(getattr(value, f.name)) for f in fields(value)}
     if isinstance(value, (list, tuple)):
         return [json_value(v) for v in value]
     if hasattr(value, "model_dump"):

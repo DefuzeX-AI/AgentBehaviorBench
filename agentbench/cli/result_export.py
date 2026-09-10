@@ -157,7 +157,9 @@ def append_result_event(path: str | Path, event: Mapping[str, object]) -> None:
         events = json.loads(result_path.read_text(encoding="utf-8")) if result_path.exists() else []
         if not isinstance(events, list) or not all(isinstance(item, dict) for item in events):
             raise ValueError("Result snapshot must contain an array of event objects")
-        events.append(_json_value(event))
+        from agentbench.observe.store import redact
+        secrets = tuple(v for k, v in os.environ.items() if any(x in k.upper() for x in ("KEY", "TOKEN", "SECRET", "PASSWORD")))
+        events.append(redact(_json_value(event), secrets))
         temporary_path: Path | None = None
         try:
             with tempfile.NamedTemporaryFile(

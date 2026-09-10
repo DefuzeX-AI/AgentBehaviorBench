@@ -42,27 +42,9 @@ class AgentContainerConfig:
         root = Path(agent_root).resolve()
         with (root / "agent.toml").open("rb") as stream:
             manifest = tomllib.load(stream)
-        build = _required_table(manifest, "build")
-        launch = _required_table(manifest, "launch")
         runtime = _required_table(manifest, "runtime")
-
-        runtime_type = _optional_string(runtime, "type") or "in_process"
-        if runtime_type != "docker":
-            raise ContainerConfigurationError(
-                f"Expected Docker runtime, got {runtime_type!r}"
-            )
-        context = _resolve_inside(root, _required_string(build, "context"))
-        dockerfile = _resolve_inside(context, _required_string(build, "dockerfile"))
-        if not dockerfile.is_file():
-            raise ContainerConfigurationError(f"Dockerfile does not exist: {dockerfile}")
-
-        argv_value = launch.get("argv")
-        if (
-            not isinstance(argv_value, list)
-            or not argv_value
-            or not all(isinstance(item, str) and item for item in argv_value)
-        ):
-            raise ContainerConfigurationError("launch.argv must be a non-empty string list")
+        context, dockerfile, argv_value = docker_structure(root, manifest)
+        launch = _required_table(manifest, "launch")
 
         values = os.environ if environ is None else environ
         environment: dict[str, str] = {}
@@ -91,10 +73,17 @@ class AgentContainerConfig:
 def runtime_type(agent_root: str | Path) -> str:
     with (Path(agent_root).resolve() / "agent.toml").open("rb") as stream:
         manifest = tomllib.load(stream)
+    return manifest_runtime_type(manifest)
+
+
+def manifest_runtime_type(manifest):
     runtime = manifest.get("runtime", {})
     if not isinstance(runtime, dict):
         raise ContainerConfigurationError("Manifest field [runtime] must be a table")
-    return _optional_string(runtime, "type") or "in_process"
+    selected = _optional_string(runtime, "type") or "in_process"
+    if selected not in {"in_process", "docker"}:
+        raise ContainerConfigurationError(f"Unsupported agent runtime: {selected!r}")
+    return selected
 
 
 def execution_strategy(agent_root: str | Path) -> str:
@@ -142,3 +131,21 @@ def _resolve_inside(root: Path, value: str) -> Path:
     if not path.is_relative_to(root):
         raise ContainerConfigurationError(f"Path escapes agent directory: {value}")
     return path
+
+
+def docker_structure(root: Path, manifest):
+    """Validate build paths and launch without resolving environment or secrets."""
+    if manifest_runtime_type(manifest) != "docker":
+        raise ContainerConfigurationError("Expected Docker runtime")
+    build = _required_table(manifest, "build")
+    launch = _required_table(manifest, "launch")
+    context = _resolve_inside(root, _required_string(build, "context"))
+    if not context.is_dir():
+        raise ContainerConfigurationError(f"build.context directory does not exist: {context}")
+    dockerfile = _resolve_inside(context, _required_string(build, "dockerfile"))
+    if not dockerfile.is_file():
+        raise FileNotFoundError(f"Dockerfile does not exist: {dockerfile}")
+    argv = launch.get("argv")
+    if not isinstance(argv, list) or not argv or not all(isinstance(x, str) and x for x in argv):
+        raise ContainerConfigurationError("launch.argv must be a non-empty string list")
+    return context, dockerfile, argv

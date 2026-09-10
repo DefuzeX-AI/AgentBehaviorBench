@@ -16,6 +16,27 @@ DEFAULT_PORT = 8765
 WEB_ROOT = Path(__file__).resolve().parents[2] / "web" / "dist"
 
 
+class ViewerUnavailable(OSError):
+    """Prebuilt UI assets are absent or incomplete."""
+
+
+def require_viewer_assets():
+    import re
+    index = WEB_ROOT / 'index.html'
+    missing = not index.is_file()
+    if not missing:
+        for target in re.findall(r'(?:src|href)=["\']([^"\']+)["\']', index.read_text()):
+            if target.startswith(('http:', 'https:', 'data:', '#')):
+                continue
+            asset = (WEB_ROOT / target.split('?')[0].lstrip('/')).resolve()
+            if not asset.is_relative_to(WEB_ROOT.resolve()) or not asset.is_file():
+                missing = True
+                break
+    if missing:
+        import shlex
+        raise ViewerUnavailable(f'Trace UI not built or incomplete. Run: cd {shlex.quote(str(WEB_ROOT.parent))} && npm ci && npm run build')
+
+
 @dataclass(frozen=True)
 class RunningViewer:
     """Background local viewer server."""
@@ -43,6 +64,7 @@ def serve_result_log(
     if not path.exists():
         raise FileNotFoundError(f"Result log not found: {path}")
 
+    require_viewer_assets()
     server = create_viewer_server(path, host=host, port=port)
     base_url = f"http://{host}:{server.server_port}"
     url = _locked_viewer_url(base_url, _result_log_suite_id(path))
@@ -66,6 +88,7 @@ def start_viewer_server(
 
     path = Path(result_log).resolve()
     suite_id = _result_log_suite_id(path)
+    require_viewer_assets()
     server = create_viewer_server(path, host=host, port=port)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

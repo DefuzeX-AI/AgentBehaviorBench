@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import asyncio
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
@@ -30,16 +31,25 @@ class BenchmarkRunner:
         agent_runner: AgentRunner | None = None,
         sdk_run_factory: SDKRunFactory | None = None,
         environ: Mapping[str, str] | None = None,
+        observation_factory=None,
     ) -> None:
         if sdk is not None and sdk_run_factory is not None:
             raise ValueError("Pass sdk or sdk_run_factory, not both")
+        self._observation_factory = observation_factory
         self._sdk = sdk
         self._sdk_options = dict(sdk_options or {})
         self._agent_runner = agent_runner or AgentRunner()
         self._sdk_run_factory = sdk_run_factory
         self._environ = os.environ if environ is None else environ
 
-    def run_defuzex(
+    def run(self, *args, **kwargs) -> BenchmarkResult:
+        """Synchronous entry; all Inputs and cleanup share one event loop."""
+        return _run_sync(self.arun, *args, **kwargs)
+
+    def run_defuzex(self, *args, **kwargs) -> BenchmarkResult:
+        return _run_sync(self.arun_defuzex, *args, **kwargs)
+
+    async def arun_defuzex(
         self,
         registration: AgentRegistration,
         *,
@@ -72,7 +82,7 @@ class BenchmarkRunner:
             save_local=save_local,
         )
 
-        return self._execute(
+        return await self._execute(
             registration,
             create_run=lambda: (self._sdk_run_factory or create_run)(**run_kwargs),
             provider_mode=provider_mode,
@@ -82,7 +92,7 @@ class BenchmarkRunner:
             on_step_failure=on_step_failure,
         )
 
-    def _execute(
+    async def _execute(
         self,
         registration: AgentRegistration,
         *,
@@ -118,7 +128,7 @@ class BenchmarkRunner:
             agent_id=registration.agent_id,
             detail=running.adapter_name,
         )
-        with running:
+        async with running:
             emit_progress(
                 on_progress,
                 stage="case_generation",
@@ -152,10 +162,11 @@ class BenchmarkRunner:
                 agent_id=registration.agent_id,
             )
             try:
-                result = self._run_with_running(
+                result = await self._run_with_running(
                     registration,
                     sdk_run,
                     running,
+                    on_progress=on_progress,
                     on_step_start=on_step_start,
                     on_step_complete=on_step_complete,
                     on_step_failure=on_step_failure,
@@ -192,7 +203,7 @@ class BenchmarkRunner:
             provider_mode=provider_mode,
         )
 
-    def run(
+    async def arun(
         self,
         registration: AgentRegistration,
         sdk_run: SDKRun | None = None,
@@ -219,20 +230,21 @@ class BenchmarkRunner:
                 raise ValueError(
                     "An existing sdk_run cannot be combined with sdk or sdk_options"
                 )
-            with self._agent_runner.start(registration) as running:
-                return self._run_with_running(
+            async with self._agent_runner.start(registration) as running:
+                return await self._run_with_running(
                     registration,
                     sdk_run,
                     running,
+                    on_progress=on_progress,
                     on_step_start=on_step_start,
                     on_step_complete=on_step_complete,
                     on_step_failure=on_step_failure,
                 )
         if self._sdk is None:
-            return self.run_defuzex(registration, **self._sdk_options, **callbacks)
+            return await self.arun_defuzex(registration, **self._sdk_options, **callbacks)
         mode = self.validate_sdk(registration)
         kwargs = {"repo_path": registration.path, **self._sdk_options}
-        return self._execute(
+        return await self._execute(
             registration,
             create_run=lambda: self._sdk.create_run(**kwargs),
             provider_mode=mode,
@@ -283,12 +295,41 @@ class BenchmarkRunner:
         )
         return provider_mode
 
-    def _run_with_running(
+    async def _run_with_running(
         self,
         registration: AgentRegistration,
         sdk_run: SDKRun,
         running: RunningAgent,
         *,
+        on_progress: ProgressCallback | None = None,
+        on_step_start: StepStartCallback | None = None,
+        on_step_complete: StepCompleteCallback | None = None,
+        on_step_failure: StepFailureCallback | None = None,
+    ) -> BenchmarkResult:
+        """Execute an SDK handshake through an Agent that is already running."""
+
+        observed = self._observation_factory(registration, sdk_run) if self._observation_factory else None
+        if observed:
+            emit_progress(on_progress, stage="benchmark_execution", status="started",
+                          agent_id=registration.agent_id, artifact_directory=str(observed.directory))
+        try:
+            result = await self._drive_inputs(registration, sdk_run, running, observation=observed,
+                on_step_start=on_step_start, on_step_complete=on_step_complete, on_step_failure=on_step_failure)
+        except BaseException as exc:
+            if observed:
+                observed.finish(error=exc)
+            raise
+        if observed:
+            observed.finish(result=result)
+        return result
+
+    async def _drive_inputs(
+        self,
+        registration: AgentRegistration,
+        sdk_run: SDKRun,
+        running: RunningAgent,
+        *,
+        observation=None,
         on_step_start: StepStartCallback | None = None,
         on_step_complete: StepCompleteCallback | None = None,
         on_step_failure: StepFailureCallback | None = None,
@@ -308,10 +349,10 @@ class BenchmarkRunner:
                     test_input.payload,
                 )
             try:
-                invocation = running.invoke(
-                    test_input.payload,
-                    run_config=run_config,
-                )
+                if observation:
+                    invocation = await observation.invoke(running, test_input, run_config)
+                else:
+                    invocation = await running.ainvoke(test_input.payload, run_config=run_config)
             except Exception as exc:
                 if on_step_failure is not None:
                     on_step_failure(
@@ -321,7 +362,7 @@ class BenchmarkRunner:
                 self._record_failed_submission(sdk_run, exc)
                 raise AgentInvocationError(
                     f"Agent {registration.agent_id!r} failed for "
-                    f"SDK Input {test_input.input_id!r}"
+                    f"SDK Input {test_input.input_id!r}: {_error_detail(exc)}"
                 ) from exc
 
             step = BenchmarkStepResult(
@@ -406,8 +447,14 @@ class BenchmarkRunner:
             pass
 
 
+def _error_message(exc: Exception) -> str:
+    from agentbench.observe.store import redact
+    secrets = tuple(v for k, v in os.environ.items() if any(x in k.upper() for x in ("KEY", "TOKEN", "SECRET", "PASSWORD")))
+    return redact(str(exc), secrets)
+
+
 def _error_detail(exc: Exception) -> str:
-    message = str(exc).strip()
+    message = _error_message(exc).strip()
     return type(exc).__name__ if not message else f"{type(exc).__name__}: {message}"
 
 
@@ -425,5 +472,13 @@ def _step_failure(
         output=output,
         raw_output=raw_output,
         error_type=type(exc).__name__,
-        error_message=str(exc),
+        error_message=_error_message(exc),
     )
+
+
+def _run_sync(method, *args, **kwargs):
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(method(*args, **kwargs))
+    raise RuntimeError("A loop is already running; await BenchmarkRunner.arun() instead")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 from agentbench.harness import AgentRunner, BenchmarkRunner
 from agentbench.harness.errors import ProviderSelectionError
@@ -60,7 +61,9 @@ def build_evaluation_runner(
             trace_max_bytes=trace_max_bytes,
         )
     )
+    from agentbench.observe.host import host_observation_factory
     return BenchmarkRunner(
+        observation_factory=host_observation_factory(Path.cwd() / "results" / "observe"),
         agent_runner=AgentRunner(runtime_factory=runtime_factory),
         sdk=selected,  # type: ignore[arg-type]
         sdk_options=plan.options,

@@ -52,3 +52,25 @@ Company 的 Tavily 返回值检查留在其 binding，通用 tools observer 仅�
 部分提取失败会记录 tool_outcome，observe 标为 degraded，但不修改 Agent 收到的返回值。
 JSONL 按 LF 读取，Unicode U+0085/U+2028/U+2029 不再误当记录分隔符。
 协议边界和复现命令见 [拦截验收](../interception/acceptance.md)。
+
+
+## Shared Host and worker observation
+
+`InvocationObservation` owns TraceStore, registered framework callbacks and the
+live OTel converter. Both worker and Host SDK driver use it; runtime-specific
+input/trust/process setup remains separate. Every Input has an authoritative
+invocation ID and output directory. A shared OTel provider retains at most one
+ABB routing processor, with exporters only for active invocations. ABB never
+shuts down a caller-owned provider.
+
+Scoped transport hooks cover httpx, httpx2, requests and aiohttp. ContextVars
+isolate concurrent calls; hooks act on every request including redirects. Headers
+are sent only to configured hosts and removed from reusable requests after send.
+The interceptor strips the private header before upstream delivery. Interaction
+indexing reports requests lacking a matching framework span as uncorrelated,
+retains raw records and warns about incomplete coverage. Zero observed requests
+is not evidence of zero network use.
+
+Host artifacts include public SDK results and framework/OTel availability.
+Network/private SDK evidence is unavailable when no collector exists. The viewer
+reads this metadata instead of presenting missing evidence as successful zero calls.

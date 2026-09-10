@@ -46,10 +46,11 @@ No automatic paid rerun occurs.
 | `--sdk NAME` | Built-in `kuma` | Installed plugin name or `python:MODULE[:OBJECT]`. |
 | `--sdk-options PATH` | Empty options | JSON object passed to the selected SDK. |
 | `--sdk-source PATH` | Selected SDK's default | Explicit override for its `sdk_source` option. KUMA defaults to the sibling `Defuze-SDK` checkout. |
+| `--result-output PATH` | `results/evaluate-<agent_id>.json` naming base | ABB-owned suite result JSON, independent of private SDK files. |
 | `--output PATH` | Selected SDK's default | Explicit override for its `output` option. KUMA defaults to `results/observe`. |
 | `--timeout SECONDS` | Selected SDK's default | Positive finite override for its `timeout` option. KUMA defaults to 2400 seconds. |
 
-The last three flags are option aliases retained for compatibility. They override
+`--sdk-source`, `--output`, and `--timeout` are SDK option aliases retained for compatibility. They override
 matching keys in `--sdk-options` only when explicitly supplied. Other SDKs receive
 none of KUMA's defaults and must support any aliases the caller explicitly passes.
 For another SDK, Input count, credentials, deployment and artifact support follow
@@ -178,7 +179,7 @@ Root-level `-h` or `--help` shows all subcommands and is not rewritten to
 ### 3.1 Syntax
 
 ```text
-agentbench run [-h] [--env-file PATH] [--output PATH] [--no-view]
+agentbench run [-h] [--registry PATH] [--env-file PATH] [--output PATH] [--no-view]
                [--model OPENROUTER_MODEL]
                [--llm-trace {off,terminal}]
                [--llm-trace-max-bytes BYTES]
@@ -196,6 +197,7 @@ python -m agentbench run --llm-trace terminal
 | Argument | Required | Default | Description |
 | --- | --- | --- | --- |
 | `-h`, `--help` | No | - | Show `run` help and exit. |
+| `--registry PATH` | No | Bundled Registry | Read this registry; `certify` updates this same file. Agent paths resolve from its parent directory's parent. |
 | `--env-file PATH` | No | Repository `.env` | Load host-only secrets and defaults from another dotenv file. |
 | `--output PATH` | No | `results/result.json` | Naming base for the unique, atomically updated suite JSON. |
 | `--no-view` | No | Viewer enabled | Save results and run without starting a web server or waiting at the viewer prompt. |
@@ -324,6 +326,7 @@ python -m agentbench certify swe-agent
 | Argument | Required | Default | Description |
 | --- | --- | --- | --- |
 | `agent_id` | Yes | - | Stable Agent ID from `resources/registry.toml`. |
+| `--registry PATH` | No | Bundled Registry | Read this registry; `certify` updates this same file. Agent paths resolve from its parent directory's parent. |
 | `--env-file PATH` | No | Repository `.env` | Load host-only secrets and defaults from another dotenv file. |
 | `--output PATH` | No | `results\certify-<agent_id>.json` | Custom naming base for the certification result. |
 | `--model OPENROUTER_MODEL` | No | `OPENROUTER_MODEL` | Force intercepted calls to use this OpenRouter model slug. |
@@ -658,3 +661,26 @@ A selected plain `create_run()` SDK executes through the generic host-side
 adapter. A plugin implementing `EvaluationSDKPlugin` can provide a formal
 container runner. See [SDK.md](SDK.md) and the
 [plugin architecture](architecture/evaluation-sdk-plugins.md).
+
+
+### Host evidence and fresh-checkout viewer requirements
+
+`evaluate` creates the ABB suite snapshot before SDK validation/execution, using
+`--result-output` as a timestamped naming base. It retains progress, Inputs, Agent
+outputs and the public SDK report even when the SDK writes no files. The default
+base is relative to the selected Registry's project root. `--output` continues to
+configure the SDK only. Failed/interrupted execution retains partial artifacts.
+Execution failure or a missing Judge report exits 1; interruption exits 130;
+a completed Judge `issue` exits 0 for `evaluate`.
+
+Plain injected SDKs produce Host framework evidence at `results/observe/<run-id>`
+under the working directory. Suite progress records the absolute directory, so
+`agentbench view <suite-result.json>` finds Inputs, framework/OTel spans and public
+Judge results. Host network/private SDK wire capture is explicitly unavailable.
+Third-party execution plugins retain their own observation implementation and
+return the common result contract.
+
+The viewer requires prebuilt `web/dist` assets. In the repository's `web` folder,
+run `npm ci` then `npm run build`. Missing index or referenced assets produce an
+actionable error before opening a socket; automatic viewing failure never discards
+the result. Existing assets need no Node runtime. `run --no-view` skips viewing.

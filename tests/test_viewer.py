@@ -150,11 +150,5 @@ def test_viewer_explains_missing_frontend_build(tmp_path, monkeypatch):
     monkeypatch.setattr(viewer_module, "WEB_ROOT", tmp_path / "missing-dist")
     result = tmp_path / "result.json"
     result.write_text('[]')
-    viewer = start_viewer_server(result, port=0)
-    try:
-        with pytest.raises(HTTPError) as error:
-            urlopen(viewer.url, timeout=2)
-        assert error.value.code == 503
-        assert b"npm run build" in error.value.read()
-    finally:
-        viewer.stop()
+    with pytest.raises(viewer_module.ViewerUnavailable, match="npm ci.*npm run build"):
+        start_viewer_server(result, port=0)

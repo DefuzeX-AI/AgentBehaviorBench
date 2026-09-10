@@ -62,9 +62,13 @@ that branch executes the configured container command.
 
 ## Current Company Research status
 
-The original GitHub checkout has been relocated unchanged into `agent/`.
-Its outer manifest selects Docker, and its outer Dockerfile describes a backend
-image. The native service launch, HTTP caller and model routes remain unconfigured,
-so status stays `adapting`. Image build, real research, full model routing and
-cross-process OTel collection have not been validated by this layout migration.
-No evaluation SDK is required to perform the migration.
+See the unit's `requirement.md` and retained certification results for current
+readiness evidence. Docker execution and evaluation have been observed, but no
+complete certification transition record was retained in this checkout at the
+2026-09-10 audit, so the registry is `adapting` pending certification. Judge
+quality issues alone never determine readiness.
+
+Dockerfile and build/launch configuration are required only for `runtime.type =
+"docker"`; in-process units need no placeholder Dockerfile. Build file paths are
+resolved relative to `build.context`, with the same validation at registration
+and execution, without loading credentials during registration.

@@ -4,10 +4,10 @@ from opentelemetry import trace
 from opentelemetry.context import Context
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.trace import Status, StatusCode
 from agentbench.observe.store import atomic_json, redact
 from .exporter import FileExporter
+from .routing import attach
 
 
 class OtelSession:
@@ -16,7 +16,7 @@ class OtelSession:
         self.owned = not isinstance(existing, TracerProvider)
         self.provider = TracerProvider(resource=Resource.create({'service.name': 'abb-agent'})) if self.owned else existing
         self.exporter = FileExporter(directory, invocation_id, session_id, secrets)
-        self.provider.add_span_processor(SimpleSpanProcessor(self.exporter))
+        self.router = attach(self.provider, self.exporter)
         self.tracer = self.provider.get_tracer('agentbench.observe')
         self.invocation_id, self.directory = invocation_id, directory
         self.spans = {}
@@ -78,14 +78,18 @@ class OtelSession:
             if self.root:
                 self.root.end()
                 self.root = None
-            flushed = self.provider.force_flush()
-            error = self.exporter.error or self.error
-            atomic_json(self.directory / 'otel-status.json', {
-                'status': 'complete' if not error and not unfinished and flushed else 'incomplete',
-                'unfinished_spans': unfinished, 'error': error})
-            self.exporter.shutdown()
-            if self.owned:
-                self.provider.shutdown()
+            try:
+                flushed = self.provider.force_flush()
+                error = self.exporter.error or self.error
+                atomic_json(self.directory / 'otel-status.json', {
+                    'status': 'complete' if not error and not unfinished and flushed else 'incomplete',
+                    'unfinished_spans': unfinished, 'error': error})
+            finally:
+                self.router.detach(self.exporter)
+                self.exporter.shutdown()
+                if self.owned:
+                    self.provider.shutdown()
+
 
 
 class ObservedStore:

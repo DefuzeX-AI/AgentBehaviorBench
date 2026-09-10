@@ -19,7 +19,13 @@ export async function evaluation(root, run) {
     if (!inputs.startsWith(directory + path.sep)) throw new Error('Path outside evaluation');
     steps = (await readdir(inputs)).filter(name => /^\d{4}$/.test(name)).sort();
   } catch (error) { if (error.code !== 'ENOENT') throw error; }
-  return { manifest: await read('manifest.json'), process: await read('process.json'),
+  let metadata = {};
+  try {
+    const metadataFile = await realpath(path.join(root, run, 'run.json'));
+    if (!metadataFile.startsWith(base + path.sep)) throw new Error('Path outside runs');
+    metadata = JSON.parse(await readFile(metadataFile, 'utf8'));
+  } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  return { public_result: metadata.evaluation_result || {}, execution_status: metadata.status, manifest: await read('manifest.json'), process: await read('process.json'),
     case: await read('case.json'), judge: await read('judge/report.json'), error: await read('error.json'),
     inputs: await Promise.all(steps.map(async step => ({ step,
       input: await read(`inputs/${step}/input.json`), result: await read(`inputs/${step}/result.json`),

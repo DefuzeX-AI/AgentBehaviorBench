@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,7 @@ class LangGraphAdapterConfig:
     output_key: str | None
     mode: str
     binding: str | None = None
+    context: dict[str, object] | None = None
 
     @property
     def source_root(self) -> Path:
@@ -78,6 +80,7 @@ class LangGraphAdapterConfig:
             output_key=_optional_string(adapter, "output_key"),
             mode=mode,
             binding=_optional_string(adapter, "binding"),
+            context=_context(adapter),
         )
 
 
@@ -148,3 +151,16 @@ def _optional_string(data: dict[str, Any], key: str) -> str | None:
     if not isinstance(value, str) or not value.strip():
         raise LangGraphConfigurationError(f"Field must be a non-empty string: {key}")
     return value
+
+
+def _context(adapter):
+    if "context" not in adapter:
+        return None
+    value = adapter["context"]
+    if not isinstance(value, dict):
+        raise LangGraphConfigurationError("Manifest [adapter.context] must be a table")
+    try:
+        json.dumps(value, allow_nan=False)
+    except (TypeError, ValueError) as exc:
+        raise LangGraphConfigurationError("[adapter.context] must contain JSON-compatible data") from exc
+    return deepcopy(value)

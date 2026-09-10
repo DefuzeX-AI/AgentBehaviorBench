@@ -102,9 +102,9 @@ def _parse_agent(item: dict[str, object], repo_root: Path) -> AgentRegistration:
     if not source_path.is_dir():
         raise FileNotFoundError(f"Agent source directory does not exist: {source_path}")
 
-    dockerfile = agent_path / "Dockerfile"
-    if not dockerfile.is_file():
-        raise FileNotFoundError(f"Agent Dockerfile does not exist: {dockerfile}")
+    from agentbench.runtime.agentcontainer.config import manifest_runtime_type, docker_structure
+    if manifest_runtime_type(manifest) == "docker":
+        docker_structure(agent_path, manifest)
 
     requirement_path = (agent_path / "requirement.md").resolve()
     if not requirement_path.is_relative_to(agent_path):

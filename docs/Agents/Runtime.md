@@ -210,3 +210,31 @@ Clients that cannot accept temporary credentials or trust the runtime CA,
 pin certificates, use an unsupported protocol, or perform in-process inference
 require a separately designed integration. Stop and report the gap; do not
 silently patch their transport or bypass interception.
+
+
+## Portable CA lifecycle and structural validation
+
+The interceptor generates its CA under `/run/defuzex/ca` in private tmpfs; there
+is no writable host CA mount. After readiness the host reads only the public
+`mitmproxy-ca-cert.pem` via `docker exec`, validates it with TLS, and atomically
+creates a host-owned certificate for the Agent's read-only trust mount. Docker's
+archive/cp endpoint cannot reliably read live tmpfs. Private keys never leave the
+interceptor. Read-only filesystem, dropped capabilities, NET_ADMIN/NET_RAW and
+cleanup policy are retained.
+
+Registry discovery validates structure without resolving secrets or probing Docker.
+`in_process` needs no Dockerfile. For `docker`, `build.context` is relative to the
+Agent unit and `build.dockerfile` is relative to that context. Both stay within
+their respective roots after symlink resolution. Nonempty launch argv is required.
+The launch loader uses the same validator.
+
+Host benchmark execution uses `ainvoke` for all Inputs on one event loop per SDK
+Run, including asynchronous close. Sync graphs use the adapter's thread fallback.
+Python callers with an active event loop await `BenchmarkRunner.arun(...)`;
+synchronous callers keep `run(...)`.
+
+Optional `[adapter.context]` TOML data is passed as a fresh deep copy via graph
+`context=`, independently of `configurable`. LangGraph owns dataclass/Pydantic
+coercion. Omit the table for graphs without context. An explicitly configured
+context on an incompatible entrypoint fails clearly. Agent-specific context
+field names belong in the manifest, never in the adapter.

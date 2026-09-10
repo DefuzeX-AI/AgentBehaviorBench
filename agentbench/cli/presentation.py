@@ -176,6 +176,11 @@ def print_viewer_footer(
     output_fn(panel_line(f"Result saved: {result_log_path}"))
     if viewer_url is not None:
         output_fn(panel_line(f"Live viewer: {viewer_url}"))
+    from .viewer import require_viewer_assets, ViewerUnavailable
+    try:
+        require_viewer_assets()
+    except ViewerUnavailable as exc:
+        output_fn(panel_line(str(exc)))
     output_fn(panel_line(f"Open later: python -m agentbench view {result_log_path}"))
     output_fn(panel_rule("", ANSI_CYAN))
 
