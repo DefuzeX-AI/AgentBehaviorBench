@@ -11,7 +11,7 @@ from agentbench.cli.constants import (
     ANSI_RESET,
     LOGO_PAUSE_SECONDS,
 )
-from agentbench.cli.logo import DEFUZE_LOGO
+from agentbench.cli.logo import BBA_LOGO
 from agentbench.cli.main import (
     cli,
     confirm_agents,
@@ -137,7 +137,7 @@ def test_cli_detects_agent_and_accepts_yes(
     assert exit_code == 0
     assert len(runner.calls) == 1
     assert prompts == ["Continue? [yes/no]: "]
-    assert output[0] == DEFUZE_LOGO
+    assert output[0] == BBA_LOGO
     for agent in ready_agents:
         assert any(agent.agent_id in line for line in output)
         assert any(f"cases: {agent.case_count}" in line for line in output)
@@ -312,7 +312,7 @@ def test_cli_parses_terminal_llm_trace_options(monkeypatch) -> None:
     )
     assert calls == [
         {
-            "output_path": None,
+            "output_path": "results/result.json",
             "model": "openai/gpt-4.1-mini",
             "llm_trace": "terminal",
             "llm_trace_max_bytes": 4096,

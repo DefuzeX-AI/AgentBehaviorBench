@@ -110,6 +110,10 @@ def build_viewer_handler(
                 run_api = RunCatalogAPI(result_log.parent)
         except (OSError, ValueError):
             pass
+    suite_view = run_api is None
+    if suite_view:
+        from agentbench.observe.view_api import SuiteRunCatalogAPI
+        run_api = SuiteRunCatalogAPI(result_log)
 
     class ViewerHandler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):  # type: ignore[no-untyped-def]
@@ -153,7 +157,7 @@ def build_viewer_handler(
                                     "Trace UI not built. Run npm install and npm run build in web/.")
                     return
                 html = index.read_text(encoding="utf-8")
-                if run_api is None:
+                if suite_view:
                     html = html.replace("<head>", f'<head><meta name="abb-result-api" content="{escape(result_api_path, quote=True)}">', 1)
                 body = html.encode("utf-8")
                 self.send_response(HTTPStatus.OK)

@@ -86,9 +86,9 @@ def test_run_and_certify_factory_use_same_core_and_model():
     assert runner._benchmark_runner.environ['OPENROUTER_MODEL'] == 'selected-model'
 
 
-def test_evaluate_alias_uses_same_core():
-    from agentbench.cli.features import evaluate
-    assert evaluate.ContainerBenchmarkRunner is ContainerBenchmarkRunner
+def test_default_kuma_source_is_sibling_checkout(repo_root):
+    # Moving the adapter must not shift the default to inside AgentBehaviorBench.
+    assert ContainerBenchmarkRunner().sdk == repo_root.parent / 'Defuze-SDK'
 
 
 def test_custom_sdk_remains_explicit_injection():

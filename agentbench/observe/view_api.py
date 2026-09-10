@@ -146,6 +146,9 @@ class RunViewAPI:
         if not path.startswith(prefix):
             raise ValueError('Run does not match this viewer')
         route = path[len(prefix):]
+        if route == 'interactions':
+            from .interactions import interactions
+            return interactions(self.directory, query)
         if route == 'evaluation':
             return self.evaluation()
         if route == 'events':
@@ -164,3 +167,74 @@ class RunViewAPI:
                 payload = [json.loads(line) for line in stream if line.strip()] if match[2] == 'events' else json.load(stream)
             return {'payload': payload}
         raise ValueError('Unknown route')
+
+
+class SuiteRunCatalogAPI:
+    """Expose only artifact directories registered in the selected suite.
+
+    Paths come from host-side SDK progress records, never HTTP parameters.
+    Each directory must identify a selected Agent and a valid ABB artifact run;
+    RunViewAPI confines every subsequent file read to that directory.
+    """
+
+    def __init__(self, result_log):
+        self.result_log = Path(result_log).resolve()
+
+    def entries(self):
+        events = json.loads(self.result_log.read_text(encoding='utf-8'))
+        if not isinstance(events, list):
+            raise ValueError('Expected suite events')
+        selected = next((e.get('selected_agent_ids', []) for e in events
+                         if isinstance(e, dict) and e.get('event') == 'run_started'), [])
+        references = []
+        for event in events:
+            if not isinstance(event, dict):
+                continue
+            if event.get('event') == 'progress':
+                references.append((event.get('agent_id'), event.get('artifact_directory')))
+            elif event.get('event') == 'agent_completed':
+                item = event.get('item') or {}
+                if not isinstance(item, dict) or not isinstance(item.get('benchmarks', []), list):
+                    continue
+                for result in item.get('benchmarks', []):
+                    if not isinstance(result, dict):
+                        continue
+                    report = result.get('report') or {}
+                    if not isinstance(report, dict):
+                        continue
+                    extensions = report.get('extensions') or {}
+                    if not isinstance(extensions, dict):
+                        continue
+                    references.append((event.get('agent_id'),
+                                       extensions.get('abb_artifact_directory')))
+        entries = {}
+        for agent_id, value in references:
+            if agent_id not in selected or not isinstance(value, str):
+                continue
+            directory = Path(value)
+            if not directory.is_absolute() or directory.is_symlink():
+                continue
+            try:
+                api = RunViewAPI(directory)
+                metadata = api.read('run.json')
+                if (not isinstance(metadata, dict) or metadata.get('agent_id') != agent_id
+                    or metadata.get('run_id') != directory.name
+                    or metadata.get('schema') not in ('abb.observe.run.v1', 'abb.evaluate.run.v1')
+                    or not re.fullmatch(r'[a-zA-Z0-9_-]+', directory.name)):
+                    continue
+                updated = datetime.fromtimestamp(api.file('run.json').stat().st_mtime, timezone.utc).isoformat()
+                entries[directory.name] = (api, {'id': directory.name, 'agent': agent_id,
+                    'status': metadata.get('status'), 'updated': updated})
+            except (OSError, ValueError):
+                continue
+        return entries
+
+    def route(self, path, query):
+        entries = self.entries()
+        if path == '/api/observe/runs':
+            runs = [entry[1] for entry in entries.values()][::-1]
+            return {'runs': runs, 'default_run': runs[0]['id'] if runs else None}
+        match = re.fullmatch(r'/api/observe/runs/([a-zA-Z0-9_-]+)/(.+)', path)
+        if not match or match[1] not in entries:
+            raise ValueError('Run not registered in this suite')
+        return entries[match[1]][0].route(path, query)

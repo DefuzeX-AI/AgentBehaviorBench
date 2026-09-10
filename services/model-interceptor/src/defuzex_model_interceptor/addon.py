@@ -31,9 +31,14 @@ class ModelInterceptorAddon:
             # Bind tool egress to the approved Host, not a possibly different
             # transparent destination IP/SNI supplied by the caller.
             flow.request.host = flow.request.pretty_host.rstrip(".").lower()
-            flow.request.headers.pop("x-abb-framework-span", None)
-            emit("tool_request", agent_id=self.config.agent_id, host=flow.request.pretty_host,
-                 path=flow.request.path.split("?", 1)[0])
+            span = flow.request.headers.pop("x-abb-framework-span", None)
+            tool = next(r for r in self.config.tool_routes if self.policy.matches(r, flow.request))
+            flow.metadata.update(abb_tool=True, purpose=tool.purpose,
+                defuzex_call_id=f"call_{uuid4().hex}", defuzex_started=time.monotonic(),
+                framework_span_id=span if span and len(span) <= 64 else None,
+                defuzex_source_host=flow.request.pretty_host,
+                defuzex_source_path=flow.request.path.split('?', 1)[0])
+            emit('tool_request', **self._tool_fields(flow), **self._body(flow.request))
             return
         span = flow.request.headers.pop("x-abb-framework-span", None)
         flow.metadata.update(defuzex_call_id=f"call_{uuid4().hex}", defuzex_started=time.monotonic(),
@@ -125,6 +130,11 @@ class ModelInterceptorAddon:
         flow.response.stream = stream
 
     def response(self, flow):
+        if flow.metadata.get('abb_tool') and flow.response is not None:
+            emit('tool_response', **self._tool_fields(flow), status=flow.response.status_code,
+                 latency_ms=round((time.monotonic()-flow.metadata['defuzex_started'])*1000, 3),
+                 **self._body(flow.response))
+            return
         wire = flow.metadata.get("wire")
         if wire is None or flow.response is None or flow.metadata.get("defuzex_stream_emitted"):
             return
@@ -162,6 +172,35 @@ class ModelInterceptorAddon:
                     path=flow.request.path, provider=flow.metadata.get("defuzex_provider"),
                     framework_span_id=flow.metadata.get("framework_span_id"))
 
+    def _tool_fields(self, flow):
+        fields = self._fields(flow)
+        # Query strings can carry credentials; retain the path and parsed body.
+        fields['path'] = flow.request.path.split('?', 1)[0]
+        fields['purpose'] = flow.metadata.get('purpose', 'tool')
+        return fields
+
+    def _body(self, message):
+        content = message.content or b''
+        content_type = message.headers.get('content-type', '')
+        try:
+            text = content.decode('utf-8')
+        except UnicodeDecodeError:
+            import base64
+            return {'payload': {'encoding': 'base64', 'data': base64.b64encode(content).decode('ascii')},
+                    'content_type': content_type, 'body_bytes': len(content), 'truncated': False}
+        try:
+            payload = redact(json.loads(text), self.secrets)
+            raw = json.dumps(payload, ensure_ascii=False)
+        except ValueError:
+            if 'application/x-www-form-urlencoded' in content_type:
+                from urllib.parse import parse_qs
+                payload = redact(parse_qs(text, keep_blank_values=True), self.secrets)
+                raw = json.dumps(payload, ensure_ascii=False)
+            else:
+                payload = raw = redact(text, self.secrets)
+        return {'payload': payload, 'raw_body': raw, 'content_type': content_type,
+                'body_bytes': len(content), 'truncated': False}
+
     def _emit_response(self, flow, content, *, streaming):
         route = next(r for r in self.config.routes if r.route_id == flow.metadata["defuzex_route"])
         payload = self.protocols[route.protocol_plugin].decode_response(
@@ -193,7 +232,9 @@ class ModelInterceptorAddon:
         capture = flow.metadata.pop("defuzex_capture", None)
         if capture:
             capture.close()
-        if "defuzex_call_id" in flow.metadata:
+        if flow.metadata.get('abb_tool'):
+            emit('tool_error', **self._tool_fields(flow), error=redact(str(flow.error), self.secrets))
+        elif "defuzex_call_id" in flow.metadata:
             self._emit_error(flow, str(flow.error))
 
     def _route(self, flow):

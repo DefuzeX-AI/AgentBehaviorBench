@@ -94,7 +94,10 @@ def test_result_log_records_suite_failure(tmp_path) -> None:
 
     writer.append_suite_error(RuntimeError("service unavailable"))
 
-    assert read_events(writer.path)[-1] == {
+    event = read_events(writer.path)[-1]
+    assert datetime.fromisoformat(event.pop('timestamp')).tzinfo is not None
+    assert event == {
+        "source": "abb",
         "event": "suite_failed",
         "suite_id": "suite_failed",
         "error": {

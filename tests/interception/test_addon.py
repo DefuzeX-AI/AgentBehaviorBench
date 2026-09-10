@@ -8,6 +8,40 @@ http = pytest.importorskip("mitmproxy.http")
 from defuzex_model_interceptor.addon import ModelInterceptorAddon
 from defuzex_model_interceptor.config import ServiceConfig, Credential, Route, Target
 
+
+@pytest.mark.parametrize('purpose', ['tool', 'evaluation'])
+def test_tool_exchange_captures_full_bodies_and_strips_correlation(build, purpose):
+    from dataclasses import replace
+    from defuzex_model_interceptor.config import ToolRoute
+    from defuzex_model_interceptor.policy import EgressPolicy
+    addon, flow = build()
+    addon.config = replace(addon.config, tool_routes=(ToolRoute(('service.example',), (443,), ('POST',), ('/callback',), purpose),))
+    addon.policy = EgressPolicy(addon.config)
+    body = json.dumps({'input_id': 'input-any', 'text': '中文' * 10000, 'api_key': 'real-secret'}).encode()
+    flow.request = http.Request.make('POST', 'https://service.example/callback?token=temporary', body,
+                                   {'content-type': 'application/json', 'x-abb-framework-span': 'span-any'})
+    with patch('defuzex_model_interceptor.addon.emit') as emit:
+        addon.request(flow)
+        assert flow.response is None and flow.request.content == body
+        assert 'x-abb-framework-span' not in flow.request.headers
+        request = emit.call_args.kwargs
+        assert request['payload']['text'] == '中文' * 10000
+        assert request['purpose'] == purpose and request['framework_span_id'] == 'span-any'
+        assert request['path'] == '/callback' and request['truncated'] is False
+        assert 'real-secret' not in json.dumps(request) and 'temporary' not in json.dumps(request)
+        response_body = b'{"accepted":true,"output":{"n":2}}'
+        flow.response = http.Response.make(200, response_body, {'content-type': 'application/json'})
+        addon.response(flow)
+        response = emit.call_args.kwargs
+        assert emit.call_args.args[0] == 'tool_response'
+        assert response['call_id'] == request['call_id']
+        assert response['payload']['output'] == {'n': 2}
+        assert response['latency_ms'] >= 0 and flow.response.content == response_body
+        flow.error = 'connection ended'
+        addon.error(flow)
+        assert emit.call_args.args[0] == 'tool_error'
+        assert emit.call_args.kwargs['call_id'] == request['call_id']
+
 @pytest.fixture
 def build():
     with patch("defuzex_model_interceptor.addon.emit"):
@@ -78,4 +112,3 @@ def test_grpc_stream_error_keeps_nonzero_trailers_at_eof(build):
     assert flow.response.trailers["grpc-status"] == "13"
     assert flow.response.stream(b"") == b""
     assert flow.response.trailers["grpc-status"] == "13"
-

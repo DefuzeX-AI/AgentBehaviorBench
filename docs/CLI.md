@@ -2,9 +2,10 @@
 
 ## Official container evaluation (initial single-Case path)
 
-The default `run` and `certify` select the built-in `kuma` evaluation plugin,
-which invokes the same container-local KUMA/Agent/OTel core. `evaluate` is a
-single-Case compatibility entry to this core, not an independent SDK lifecycle.
+The default `run`, `certify` and `evaluate` select the built-in `kuma` evaluation
+plugin, which invokes the same container-local KUMA/Agent/OTel core. All three
+commands accept `--sdk` and `--sdk-options` through the same SDK selection factory.
+`evaluate` runs one Case for one selected Agent.
 `observe` remains SDK-free. A plain `create_run()` SDK uses the host-side adapter;
 an `EvaluationSDKPlugin` can supply another formal runner.
 
@@ -20,9 +21,7 @@ one official Case with one Input. Omitting the number opens selection once.
 No native-input prompt is shown: input comes unchanged from KUMA. This command
 can incur official Case/Judge and model charges. It does not promote Registry status.
 
-Options: `--registry`, `--env-file`, `--model`, `--sdk-source` (default sibling
-Defuze-SDK), `--output` (default results/observe for the shared webpage),
-`--timeout` (2400 seconds). The Agent needs evaluation/profile.md and
+For this default KUMA adapter, the Agent needs evaluation/profile.md and
 evaluation/input-contract.json. KUMA_API_KEY or legacy DEFUZEX_API_KEY is required.
 SDK state is mounted writable under the actual Agent repository's .kuma only.
 The temporary evaluation build enables only official KUMA GET/POST egress in
@@ -35,6 +34,31 @@ evaluation/ and SDK recovery state in sdk-repo/.kuma/. The actual staged Agent
 source is mounted read-only at /opt/agent/agent; its nested .kuma mount is writable
 on the same filesystem, as required by SDK ledger validation.
 No automatic paid rerun occurs.
+
+### `evaluate` options
+
+| Argument | Default | Meaning |
+| --- | --- | --- |
+| `selection` | Prompt once | Enabled Agent number or ID; evaluates one Case regardless of its Registry Case count. |
+| `--registry PATH` | Bundled registry | Agent registry to read. |
+| `--env-file PATH` | Project environment search | Load environment settings. |
+| `--model NAME` | Environment configuration | Model used for intercepted Agent calls. |
+| `--sdk NAME` | Built-in `kuma` | Installed plugin name or `python:MODULE[:OBJECT]`. |
+| `--sdk-options PATH` | Empty options | JSON object passed to the selected SDK. |
+| `--sdk-source PATH` | Selected SDK's default | Explicit override for its `sdk_source` option. KUMA defaults to the sibling `Defuze-SDK` checkout. |
+| `--output PATH` | Selected SDK's default | Explicit override for its `output` option. KUMA defaults to `results/observe`. |
+| `--timeout SECONDS` | Selected SDK's default | Positive finite override for its `timeout` option. KUMA defaults to 2400 seconds. |
+
+The last three flags are option aliases retained for compatibility. They override
+matching keys in `--sdk-options` only when explicitly supplied. Other SDKs receive
+none of KUMA's defaults and must support any aliases the caller explicitly passes.
+For another SDK, Input count, credentials, deployment and artifact support follow
+that SDK's contract. A completed `evaluate` needs a report; `issue` still exits 0.
+
+```bash
+python -m agentbench evaluate my-agent --sdk python:my_package:configured_sdk \
+  --sdk-options evaluation.json
+```
 
 Open a saved observe/evaluation run without Node.js using
 `python -m agentbench view results/observe/<run_id>/run.json`.
@@ -75,7 +99,8 @@ The second form requires this project to be installed in the active Python
 environment. Before running a benchmark, make sure that:
 
 - Python 3.10 or later is available.
-- `DEFUZEX_API_KEY` is configured in the current terminal environment.
+- The selected evaluator's requirements are met; built-in KUMA needs
+  `KUMA_API_KEY` or the legacy `DEFUZEX_API_KEY`. Offline SDKs may need neither.
 - Docker Desktop is running when the target Agent uses the Docker runtime.
 - `OPENROUTER_API_KEY` is configured for intercepted Docker Agents.
 - A model is supplied with `--model` or `OPENROUTER_MODEL`.
@@ -98,6 +123,8 @@ Current subcommands:
 | `view` | Open an existing JSON result in the local web viewer. |
 | `certify` | Verify one `adapting` Agent can complete its requested Cases and promote it to `ready`. |
 | `observe` | Select one enabled Agent, supply native input, and save execution traces without an evaluation SDK. |
+| `evaluate` | Evaluate one enabled Agent on one Case with the selected SDK. |
+| `sdk` | List or inspect evaluation SDK plugins. |
 | `clean` | Clear default local result history into a recoverable archive. |
 
 ### Clean local history
@@ -151,7 +178,7 @@ Root-level `-h` or `--help` shows all subcommands and is not rewritten to
 ### 3.1 Syntax
 
 ```text
-agentbench run [-h] [--env-file PATH] [--output PATH]
+agentbench run [-h] [--env-file PATH] [--output PATH] [--no-view]
                [--model OPENROUTER_MODEL]
                [--llm-trace {off,terminal}]
                [--llm-trace-max-bytes BYTES]
@@ -170,7 +197,8 @@ python -m agentbench run --llm-trace terminal
 | --- | --- | --- | --- |
 | `-h`, `--help` | No | - | Show `run` help and exit. |
 | `--env-file PATH` | No | Repository `.env` | Load host-only secrets and defaults from another dotenv file. |
-| `--output PATH` | No | Do not save | Save a unique atomically updated JSON result and start the local viewer. |
+| `--output PATH` | No | `results/result.json` | Naming base for the unique, atomically updated suite JSON. |
+| `--no-view` | No | Viewer enabled | Save results and run without starting a web server or waiting at the viewer prompt. |
 | `--model OPENROUTER_MODEL` | No | `OPENROUTER_MODEL` | Force every intercepted Agent request to use this OpenRouter model slug. |
 | `--llm-trace {off,terminal}` | No | `off` | Print sanitized model requests and responses captured by the transparent Interceptor. |
 | `--llm-trace-max-bytes BYTES` | No | `262144` | Legacy name: streaming memory spool threshold, not a content limit. Payloads are retained completely. |
@@ -188,12 +216,11 @@ and so on. Each run gets a new file. Within that run, every event updates a JSON
 array by writing a temporary file and atomically replacing the previous snapshot.
 If an update fails before replacement, the previous complete snapshot remains.
 
-When `--output` is omitted:
-
-- the benchmark still runs normally;
-- no aggregate suite JSON is generated; the default container core still saves raw Case, OTel, submission and Judge artifacts under `results/observe`;
-- the local viewer is not started;
-- the terminal still shows each Agent result and the final suite result.
+When `--output` is omitted, CLI `run` saves a unique `results/result-<timestamp>.json`
+and starts its viewer before evaluation. The default container adapter separately
+saves raw Case, OTel, submission and Judge artifacts under `results/observe`.
+Use `--no-view` for unattended execution. The compatible Python `run()` / `main()`
+API retains `output_path=None`; pass an output path to opt into its result viewer.
 
 ### 3.3 Agent Selection Rules
 
@@ -230,13 +257,33 @@ Cancellation is not a benchmark failure and exits with code `0`.
 
 ### 3.5 Result Viewer Lifecycle
 
-`run` starts the viewer before the benchmark only when `--output` is provided.
+CLI `run` starts the viewer before the benchmark by default.
 The terminal prints the suite URL, and after each Agent completes it also prints
 a direct link with `#agent=<agent_id>`.
 
-You can open the URL while the benchmark is running. The viewer does not refresh
-automatically by default. Use the Refresh button to load the latest events
-without interrupting dropdowns or the current selection.
+The Python process serves the built `web/dist` assets and read-only APIs in a
+background HTTP thread. React executes in the browser; normal `run` does not
+start Vite or need an `npm run dev` process. If frontend source changes, rebuild
+once with `npm run build` from `web/` (install dependencies first if necessary).
+
+Open the printed URL during execution. Suite progress, the run list, OTel and
+Case/Judge views poll every second without reloading the page. The KUMA adapter
+registers its artifact directory through a generic progress event before image
+preparation, so details are available while the Case is running, not only after
+its final validation. Data appears as it is written; pending files show as pending.
+The suite viewer lists only registered runs associated with its selected Agents.
+Custom SDKs always get suite progress; detailed tabs require ABB-compatible
+artifacts registered through `BenchmarkProgress.artifact_directory`.
+Completed-step callbacks still represent accepted results, not live timing.
+
+The **交互时间线** tab groups network requests, streaming chunks and responses
+by `call_id`, and framework tool executions by `span_id`. Ant Design controls
+provide type/Input/status/time filters, full-payload search, page sizes and page
+jumps. New records show an update notice without moving the current page.
+Details show parsed chat/tool messages, JSON, Case/Input value matches, callbacks
+and independently paginated original records. See [交互时间线](交互时间线.md)
+for the evidence rules and instructions for adapting new Agents or SDKs.
+Append `#view=raw` to a viewer URL to open this tab directly.
 
 After the run finishes, the CLI keeps the viewer alive and asks:
 
@@ -250,6 +297,10 @@ Viewer action? [r rerun/q quit]:
 | Quit | `q`, `quit`, `exit`, or an empty response | Stop the viewer and return the benchmark exit code. |
 
 `Ctrl+C` or end-of-input also stops the viewer.
+During execution, Ctrl+C records an interruption, closes the viewer and exits 130.
+Unexpected execution errors also close the viewer. A port binding failure is
+reported without preventing evaluation or result saving. With `--no-view`, the
+command returns immediately after evaluation without the viewer action prompt.
 
 ## 4. `certify`
 
@@ -311,11 +362,11 @@ python -m agentbench certify swe-agent `
 Certification uses the same trusted host flow as normal benchmarks:
 
 1. Load and validate the Registry, Agent directory, manifest, and requirement.
-2. Check DefuzeX SDK configuration.
+2. Check the selected evaluation SDK configuration.
 3. Start the target Agent, including Docker build/runtime when applicable.
-4. Generate a Case from the DefuzeX Server.
+4. Generate a Case using the selected SDK.
 5. Run each SDK Input.
-6. Submit to the DefuzeX Judge.
+6. Submit to the selected SDK's Judge.
 7. Append complete events and results to the certification JSON.
 8. Atomically update the Registry status from `adapting` to `ready` only when
    all requested Cases complete without startup, runtime, or invocation errors.
@@ -412,18 +463,20 @@ Result files are JSON arrays of events and may contain:
 ```
 
 This is ABB's storage format, independent of an Agent's communication protocol.
+New suite events include source `abb` and a UTC timestamp.
 The writer currently updates the whole document per event. Large, long-running
 observation sessions will need the planned trace storage service.
 
 | Event | Meaning |
 | --- | --- |
 | `run_started` | Suite ID and selected Agents. |
+| `progress` | SDK lifecycle stage/status and optional host artifact directory for live inspection. |
 | `step_started` | One SDK Input started, including input ID and payload. |
 | `step_completed` | Input invocation succeeded, including standard output and trace-like raw state. |
 | `step_failed` | Input invocation failed, including error type, message, and any captured output. |
 | `agent_completed` | One Agent's Cases, report, and error summary. |
 | `suite_completed` | Suite summary for passed, failed, skipped, and selected Agents. |
-| `suite_failed` | Suite failed during shared configuration. |
+| `suite_failed` | Shared configuration failed, execution was interrupted, or an unexpected error escaped the runner. |
 
 If the process is interrupted, the file may not contain `suite_completed`. The
 viewer marks it as `running_or_interrupted`, but already appended Cases, steps,
@@ -443,23 +496,25 @@ Review result files for sensitive data before sharing or submitting them.
 | `1` | `certify` | Certification did not complete because of shared configuration, startup, runtime, or invocation failure. |
 | `2` | `certify` | Agent does not exist, is disabled, has a disallowed state, or Registry update failed after certification completed. |
 | `2` | all commands | `argparse` detected an unknown command, unknown argument, or missing required argument. |
+| `130` | `run` | Ctrl+C interrupted evaluation; written results are retained. |
 
 Unhandled exceptions that are not converted by the CLI, such as a missing file
 for `view`, usually exit Python with a non-zero status and print the exception.
 
 ## 8. FAQ
 
-### Normal run did not generate JSON or trace output
+### Normal run did not display a viewer URL
 
-Make sure `--output` was provided:
+Current CLI `run` saves a result and prints a URL by default:
 
 ```powershell
-python -m agentbench run --output results\result.json
+python -m agentbench run
 ```
 
-Without `--output`, normal `run` omits only the aggregate suite result and viewer.
-The default container core still saves each Case's raw artifacts and prints their
-directory. `certify` additionally always saves an aggregate certification result.
+Check that `--no-view` was not supplied and Agent selection was confirmed. If a
+local port could not be bound, the terminal reports it and still saves results.
+The Python compatibility API needs an explicit `output_path` to start a viewer.
+`certify` saves its aggregate result without keeping an interactive web server alive.
 
 ### An `adapting` Agent does not appear in normal `run`
 
@@ -571,7 +626,7 @@ protocol limits and verification evidence.
 
 ## Evaluation SDK selection
 
-Both `run` and `certify` accept `--sdk NAME` and `--sdk-options PATH`. `NAME`
+`run`, `certify` and `evaluate` accept `--sdk NAME` and `--sdk-options PATH`. `NAME`
 comes from the `defuzex_agentbench.evaluation_sdks` entry-point group declared
 by an installed Python distribution. AgentBench does not download or install
 code during selection.

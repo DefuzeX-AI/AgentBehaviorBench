@@ -41,8 +41,10 @@ def atomic_json(path: Path, value):
 
 
 class TraceStore:
-    def __init__(self, path: Path, run_id: str, *, source="runtime"):
+    def __init__(self, path: Path, run_id: str, *, source="runtime", context=None):
         self.path, self.run_id, self.source = path, run_id, source
+        # Authoritative invocation identity, shared by every event in this store.
+        self.context = dict(context or {})
         self._lock = threading.Lock()
         self._secrets = tuple(v for k, v in os.environ.items()
                               if any(x in k.upper() for x in ("KEY", "TOKEN", "SECRET", "PASSWORD")))
@@ -51,7 +53,7 @@ class TraceStore:
         row = {"schema": "abb.observe.event.v1", "run_id": self.run_id,
                "source": self.source, "event": event,
                "timestamp": datetime.now(timezone.utc).isoformat(),
-               "data": redact(json_value(data), self._secrets)}
+               "data": redact(json_value({**data, **self.context}), self._secrets)}
         with self._lock, self.path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(row, ensure_ascii=False) + "\n")
             stream.flush()

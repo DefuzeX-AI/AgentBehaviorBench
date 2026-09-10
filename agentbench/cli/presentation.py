@@ -62,7 +62,7 @@ def confirm_agents(
             f"{ANSI_GREEN}OK{ANSI_RESET}  {len(agents)} benchmark agent(s) selected"
         )
     )
-    output_fn(panel_line("Next stage: DefuzeX SDK configuration check"))
+    output_fn(panel_line("Next stage: evaluation SDK configuration check"))
     output_fn(panel_rule("", ANSI_GREEN))
     return True
 

@@ -143,10 +143,13 @@ shape。Plugin 安装或依赖解析不会在 benchmark run 中自动发生。
 
 ## 正式容器的下一层 interface
 
-当前纵向切片已经消除了 CLI 对 KUMA 的硬编码选择，并把 KUMA 的 image、service、
-worker 与 artifact interpretation 移入 `agentbench.sdk.kuma_runtime`。原来的
-`agentbench.evaluation.*` 路径只保留兼容 import；通用 evaluation module 只留下
-artifact 存储、input binding 和 handshake runner。要让多个容器 evaluator 共享
+`run`、`certify`、`evaluate` 都通过同一 SDK factory 选择实现。KUMA 的 image、service、
+worker、handshake 和 artifact interpretation 均在 `agentbench.sdk.kuma_runtime`。
+handshake 读取的 `history[*].submission.extensions.trace_evidence` 是 KUMA 约定，
+不作为通用接口强加给其他 SDK。旧的 `agentbench.evaluation.*` 对应路径只保留
+兼容 import；通用 evaluation module 只留下 artifact 存储和 input binding。
+公开接口统一在 `agentbench.sdk.contracts`，旧 harness protocol 路径兼容转发。
+要让多个容器 evaluator 共享
 镜像构建与 artifact 验证，下一层应把 runner factory 收窄成下面四个 port：
 
 ```python
@@ -214,7 +217,9 @@ OpenTelemetry 的 Python 指南把 SDK/provider 初始化归于 application，�
 - PyPA entry point 发现、名字冲突检测、distribution 限定选择；
 - `sdk list` 与 `sdk show`；
 - KUMA 作为显式 container Strategy；
-- KUMA 的 image、service、worker 和 result adapter 已集中到 `sdk/kuma_runtime`；
+- KUMA 的 image、service、worker、handshake 和 result adapter 已集中到 `sdk/kuma_runtime`；
+- `evaluate` 支持同一 SDK 选择入口，KUMA 默认参数仅由自身 adapter 提供；
+- 不依赖 KUMA 的 JSON Case 示例，以及替换 SDK 后调用真实 Agent 的离线测试；
 - Python object 和旧 import string 的兼容 adapter；
 - 缺失的离线 `examples.local_sdk` 示例。
 

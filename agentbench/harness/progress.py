@@ -24,6 +24,7 @@ class BenchmarkProgress:
     status: ProgressStatus
     agent_id: str | None = None
     detail: str | None = None
+    artifact_directory: str | None = None
 
 
 ProgressCallback = Callable[[BenchmarkProgress], None]
@@ -36,6 +37,7 @@ def emit_progress(
     status: ProgressStatus,
     agent_id: str | None = None,
     detail: str | None = None,
+    artifact_directory: str | None = None,
 ) -> None:
     """Emit an event only when the caller requested progress reporting."""
 
@@ -46,5 +48,6 @@ def emit_progress(
                 status=status,
                 agent_id=agent_id,
                 detail=detail,
+                artifact_directory=artifact_directory,
             )
         )

@@ -24,10 +24,12 @@ If you need to add, port, or validate an Agent, read
 [`How To Add Agent.md`](./How%20To%20Add%20Agent.md). It is the short entry
 point for the onboarding flow and reading path.
 
-For the current internal beta, users must also download the DefuzeX SDK from
+For the current internal beta's built-in KUMA evaluator, users must download the SDK from
 [`Defuze-SDK` dev branch](https://github.com/DefuzeX-AI/Defuze-SDK/tree/dev)
-and import it together with AgentBench in the same local workspace and Python
-environment.
+into a sibling `Defuze-SDK` checkout, or supply its path through `sdk_source`.
+The KUMA container adapter installs that source in its image. Other evaluation
+SDKs have their own requirements and do not require KUMA. See `SDK.md` and
+`SDK替换.md` when adapting another evaluator or Case source.
 
 Continue reading based on the task scope:
 

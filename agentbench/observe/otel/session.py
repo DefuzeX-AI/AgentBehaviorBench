@@ -26,9 +26,10 @@ class OtelSession:
 
     def record(self, event, **data):
         with self.lock:
+            identity = {f'abb.{key}': data[key] for key in ('input_id', 'case_id', 'agent_id') if isinstance(data.get(key), str)}
             if event == 'execution_start':
                 self.root = self.tracer.start_span('abb.execute', context=Context(), attributes={
-                    'abb.invocation_id': self.invocation_id, 'gen_ai.operation.name': 'invoke_agent'})
+                    'abb.invocation_id': self.invocation_id, 'gen_ai.operation.name': 'invoke_agent', **identity})
                 self.exporter.payload(self.root, 'input', data.get('input'))
             elif event == 'span_start':
                 parent_id = data.get('parent_span_id')
@@ -40,7 +41,7 @@ class OtelSession:
                 span = self.tracer.start_span(data.get('name', kind),
                     context=trace.set_span_in_context(parent, Context()) if parent else Context(),
                     attributes={'abb.invocation_id': self.invocation_id, 'abb.framework_span_id': data['span_id'],
-                                'abb.kind': kind, 'gen_ai.operation.name': operation})
+                                'abb.kind': kind, 'gen_ai.operation.name': operation, **identity})
                 if data['span_id'] in self.spans:
                     raise ValueError('Duplicate framework span start')
                 self.spans[data['span_id']] = span
@@ -95,6 +96,7 @@ class ObservedStore:
         self.otel = OtelSession(store.path.parent, invocation_id, store.run_id, store._secrets, provider=provider)
 
     def record(self, event, **data):
+        data = {**data, **self.store.context}
         self.store.record(event, **data)
         try:
             self.otel.record(event, **data)

@@ -122,14 +122,12 @@ def configuration_error(message: object) -> str:
 
 def _stage_label(event: BenchmarkProgress) -> str:
     if event.stage == "sdk_check":
-        return "Checking DefuzeX SDK configuration..."
+        return "Checking evaluation SDK configuration..."
     if event.stage == "agent_start":
         return "Starting Agent..."
     if event.stage == "case_generation":
-        if event.detail == "official":
-            return "Generating Case from DefuzeX Server..."
-        return "Generating Case with local Provider..."
-    return "Running Agent inputs and DefuzeX Judge..."
+        return "Generating Case from the selected SDK..."
+    return "Running Agent inputs and SDK Judge..."
 
 
 def _base_stage_label(label: str) -> str:

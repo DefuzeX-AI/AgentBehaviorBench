@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from agentbench.adapter import AdapterInvocation
 from agentbench.harness.errors import ProviderSelectionError
+from agentbench.harness.progress import emit_progress
 from agentbench.harness.result import BenchmarkResult, BenchmarkStepResult
 from agentbench.evaluation.artifacts import Artifacts
 
@@ -32,7 +33,7 @@ class KumaContainerRunner:
         unknown = set(options) - {'sdk_source', 'output', 'timeout'}
         if unknown:
             raise ProviderSelectionError(f'Unsupported container evaluation options: {sorted(unknown)}')
-        self.sdk = Path(options.get('sdk_source', Path(__file__).resolve().parents[3] / 'Defuze-SDK'))
+        self.sdk = Path(options.get('sdk_source', Path(__file__).resolve().parents[4] / 'Defuze-SDK'))
         self.output = Path(options.get('output', 'results/observe'))
         self.timeout = options.get('timeout', 2400)
         if (isinstance(self.timeout, bool) or not isinstance(self.timeout, (int, float))
@@ -61,7 +62,11 @@ class KumaContainerRunner:
         self.validate_sdk(registration)
         directory = evaluate(registration, output=self.output, sdk=self.sdk,
                              environ=self.environ, timeout=self.timeout, trace_sink=self.trace_sink,
-                             trace_max_bytes=self.trace_max_bytes)
+                             trace_max_bytes=self.trace_max_bytes,
+                             on_artifacts_ready=lambda path: emit_progress(
+                                 on_progress, stage='benchmark_execution', status='started',
+                                 agent_id=registration.agent_id, detail='Live artifacts available',
+                                 artifact_directory=str(path)))
         try:
             return read_result(directory, registration.agent_id, on_step_start, on_step_complete)
         except Exception as exc:

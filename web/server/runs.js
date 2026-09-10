@@ -3,6 +3,7 @@ import path from 'node:path';
 import { otelSpans, otelPayload } from './otel.js';
 import { evaluation } from './evaluation.js';
 import { eventPage } from './events.js';
+import { interactionPage } from './interactions.js';
 
 const MAX_BYTES = 20 * 1024 * 1024;
 const validId = id => /^[a-zA-Z0-9_-]+$/.test(id);
@@ -75,6 +76,12 @@ export function runsPlugin(root) {
           req.headers['sec-fetch-site'] === 'cross-site') return reply(403, { error: '仅允许本地同源访问' });
       if (req.method !== 'GET') return reply(405, { error: '仅支持读取' });
       try {
+        const interactions = /^\/api\/observe\/runs\/([a-zA-Z0-9_-]+)\/interactions$/.exec(url.pathname);
+        if (interactions) {
+          const controller = new AbortController();
+          res.on('close', () => { if (!res.writableEnded) controller.abort(); });
+          return reply(200, await interactionPage(root, interactions[1], Object.fromEntries(url.searchParams), controller.signal));
+        }
         const eventMatch = /^\/api\/observe\/runs\/([a-zA-Z0-9_-]+)\/events$/.exec(url.pathname);
         if (eventMatch) return reply(200, await eventPage(root, eventMatch[1], Number(url.searchParams.get('offset') || 0)));
         const evaluated = /^\/api\/observe\/runs\/([a-zA-Z0-9_-]+)\/evaluation$/.exec(url.pathname);

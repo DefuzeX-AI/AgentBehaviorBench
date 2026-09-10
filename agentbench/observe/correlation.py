@@ -1,7 +1,8 @@
 """Carry framework span IDs to the local Interceptor, not to upstream providers.
 
 Patches are scoped to the isolated worker and restored before process exit.
-Only declared model hosts receive the header; Tavily/other HTTP is untouched.
+Only declared intercepted hosts receive the header. The proxy strips it before
+forwarding both model and approved tool traffic.
 """
 from contextlib import contextmanager
 from contextvars import ContextVar

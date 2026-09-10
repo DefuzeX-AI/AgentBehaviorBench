@@ -1,17 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { parseTrace, sortEvents } from './trace.js';
 import RunSidebar from './RunSidebar.jsx';
 import TraceView from './otel/TraceView.jsx';
 import EvaluationView from './evaluation/EvaluationView.jsx';
-import RawRunView from './RawRunView.jsx';
+const RawRunView = lazy(() => import('./RawRunView.jsx'));
+const FlowPrototype = lazy(() => import('./flow-prototype/FlowPrototype.jsx'));
 import useLiveJson from './useLiveJson.js';
 
 const PAGE_SIZE = 100;
 const MAX_BYTES = 20 * 1024 * 1024;
 
 export default function App() {
+  const suiteEndpoint = document.querySelector('meta[name="abb-result-api"]')?.content || null;
+  const bound = Boolean(suiteEndpoint);
   const [events, setEvents] = useState([]);
-  const [view, setView] = useState('otel');
+  const [view, setView] = useState(() => {
+    const requested = new URLSearchParams(window.location.hash.slice(1)).get('view');
+    return ['otel', 'evaluation', 'raw', 'flow'].includes(requested) ? requested : bound ? 'suite' : 'otel';
+  });
+  const [imported, setImported] = useState(false);
   const [files, setFiles] = useState([]);
   const [warnings, setWarnings] = useState([]);
   const [query, setQuery] = useState('');
@@ -25,14 +32,14 @@ export default function App() {
   const [listBusy, setListBusy] = useState(false);
   const [listError, setListError] = useState('');
   const [revision, setRevision] = useState(0);
-  const bound = Boolean(document.querySelector('meta[name="abb-result-api"]'));
-  const catalog = useLiveJson(bound ? null : '/api/observe/runs', revision);
+  const catalog = useLiveJson('/api/observe/runs', revision);
+  const suite = useLiveJson(suiteEndpoint, revision);
   useEffect(() => {
     if (catalog.data?.runs) {
       setRuns(catalog.data.runs);
-      setSelected(previous => previous || catalog.data.default_run || catalog.data.runs[0]?.id || null);
+      if (!imported) setSelected(previous => previous || catalog.data.default_run || catalog.data.runs[0]?.id || null);
     }
-  }, [catalog.data]);
+  }, [catalog.data, imported]);
 
   useEffect(() => {
     setListBusy(!catalog.data && !catalog.error);
@@ -40,29 +47,16 @@ export default function App() {
   }, [catalog.data, catalog.error]);
 
   useEffect(() => {
-    // Only the local Python viewer injects this marker. Vite/file import mode
-    // does not probe a backend or upload file contents.
-    const endpoint = document.querySelector('meta[name="abb-result-api"]')?.content;
-    if (!endpoint?.startsWith('/api/')) return;
-    const controller = new AbortController();
-    const current = ++request.current;
-    setLoading(true);
-    fetch(endpoint, { signal: controller.signal }).then(async response => {
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const result = await response.json();
-      if (!Array.isArray(result.events)) throw new Error('运行结果缺少 events 数组');
-      const parsed = parseTrace(JSON.stringify(result.events), '当前运行');
-      if (request.current !== current) return;
-      setEvents(sortEvents(parsed.events));
-      setWarnings([...parsed.warnings, ...(result.parse_errors || []).map(error => error.message)]);
-      setFiles(['当前运行']);
-    }).catch(error => {
-      if (!controller.signal.aborted && request.current === current) setWarnings([`无法读取当前运行：${error.message}`]);
-    }).finally(() => {
-      if (!controller.signal.aborted && request.current === current) setLoading(false);
-    });
-    return () => controller.abort();
-  }, []);
+    if (imported || !suite.data) return;
+    if (!Array.isArray(suite.data.events)) {
+      setWarnings(['运行结果缺少 events 数组']);
+      return;
+    }
+    const parsed = parseTrace(JSON.stringify(suite.data.events), '当前 Suite');
+    setEvents(sortEvents(parsed.events));
+    setWarnings([...parsed.warnings, ...(suite.data.parse_errors || []).map(error => error.message)]);
+    setFiles(['当前 Suite']);
+  }, [suite.data, imported]);
 
   const sources = useMemo(() => [...new Set(events.map(event => event.source))], [events]);
   const filtered = useMemo(() => events.filter(event =>
@@ -71,6 +65,7 @@ export default function App() {
 
   async function loadFiles(selected) {
     if (!selected.length) return;
+    setImported(true);
     setSelected(null);
     setView('raw');
     const current = ++request.current;
@@ -105,6 +100,7 @@ export default function App() {
   }
 
   function clear() {
+    setImported(false);
     setSelected(null);
     request.current += 1;
     setEvents([]);
@@ -116,23 +112,30 @@ export default function App() {
   }
 
   return (
-    <div className={bound ? '' : 'workspace'}>
-    {!bound && <RunSidebar runs={runs} selected={selected} busy={listBusy} error={listError}
-      onSelect={id => { if (id === selected) setRevision(value => value + 1); else setSelected(id); }}
-      onRefresh={() => setRevision(value => value + 1)} />}
+    <div className="workspace">
+    <RunSidebar runs={runs} selected={selected} busy={listBusy} error={listError}
+      onSelect={id => { setImported(false); setView(current => current === 'flow' ? 'flow' : 'otel'); if (id === selected) setRevision(value => value + 1); else setSelected(id); }}
+      onRefresh={() => setRevision(value => value + 1)} />
     <main>
       <header>
-        <div><div className="brand">AGENT BEHAVIOR BENCH</div><h1>Trace</h1></div>
+        <div><div className="brand">AGENT BEHAVIOR BENCH</div><h1>{bound ? 'Benchmark' : 'Trace'}</h1></div>
         <button className="primary" onClick={() => input.current.click()} disabled={loading}>
           {loading ? '读取中…' : '打开 trace 文件'}
         </button>
         <input ref={input} type="file" multiple accept=".jsonl,.json" hidden
           onChange={event => { loadFiles(Array.from(event.target.files)); event.target.value = ''; }} />
       </header>
-      <p className="description">{selected ? `Run ${selected}：选择下方视图查看运行记录。` : '从左侧选择运行记录自动加载，也可以手动打开 trace 文件。'}</p>
+      <p className="description">{bound ? `Suite ${suite.data?.suite_id || '加载中'} · 每秒自动同步。选择左侧运行查看详细执行过程。` : selected ? `Run ${selected}：选择下方视图查看运行记录。` : '从左侧选择运行记录自动加载，也可以手动打开 trace 文件。'}</p>
+      {bound && <div className="summary" role="status">
+        <span>{suite.data?.state === 'complete' ? '评测已结束' : suite.data?.state === 'failed' ? '执行失败或已中断' : '评测进行中'}</span>
+        {suite.data?.summary && <span>通过 {suite.data.summary.passed} · 未通过 {suite.data.summary.failed} · 跳过 {suite.data.summary.skipped}</span>}
+        <span>{suite.updated ? `同步于 ${suite.updated}` : '连接中…'}</span>
+      </div>}
+      {suite.error && <p role="alert">{suite.error}；已显示的数据保留，连接恢复后继续同步。</p>}
+      {suite.data?.suite_error && <p role="alert">{suite.data.suite_error.message}</p>}
 
-      {!bound && <nav className="trace-tabs" aria-label="Trace 视图"><button aria-pressed={view === 'otel'} onClick={() => setView('otel')}>OTel 调用树</button><button aria-pressed={view === 'evaluation'} onClick={() => setView('evaluation')}>Case / SDK / Judge</button><button aria-pressed={view === 'raw'} onClick={() => setView('raw')}>原始事件／网络</button></nav>}
-      {!bound && view === 'otel' ? <TraceView run={selected} revision={revision} /> : !bound && view === 'evaluation' ? <EvaluationView run={selected} revision={revision} /> : !bound && selected ? <RawRunView key={`${selected}:${revision}`} run={selected} revision={revision} /> : <>
+      <nav className="trace-tabs" aria-label="Trace 视图">{bound && <button aria-pressed={view === 'suite'} onClick={() => { setImported(false); setView('suite'); }}>Suite 进度</button>}<button aria-pressed={view === 'otel'} onClick={() => setView('otel')}>OTel 调用树</button><button aria-pressed={view === 'evaluation'} onClick={() => setView('evaluation')}>Case / SDK / Judge</button><button aria-pressed={view === 'raw'} onClick={() => setView('raw')}>交互时间线</button><button aria-pressed={view === 'flow'} onClick={() => { setView('flow'); const url = new URL(location.href); const hash = new URLSearchParams(url.hash.slice(1)); hash.set('view', 'flow'); url.hash = hash.toString(); history.replaceState(null, '', url); }}>执行流程 · 原型</button></nav>
+      {view === 'flow' ? <Suspense fallback={<p>正在加载执行流程…</p>}><FlowPrototype key={selected} run={selected} revision={revision} /></Suspense> : view === 'otel' ? <TraceView run={selected} revision={revision} /> : view === 'evaluation' ? <EvaluationView run={selected} revision={revision} /> : view === 'raw' && selected ? <Suspense fallback={<p>正在加载交互时间线…</p>}><RawRunView key={selected} run={selected} revision={revision} /></Suspense> : <>
       <section className="toolbar" aria-label="筛选 trace">
         <label className="search"><span className="sr-only">搜索 trace</span>
           <input type="search" placeholder="搜索事件、节点、run ID 或内容…" value={query}

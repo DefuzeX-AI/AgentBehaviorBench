@@ -8,7 +8,7 @@ import tempfile
 from threading import Lock
 from collections.abc import Mapping
 from dataclasses import dataclass, fields, is_dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from agentbench.harness.result import (
@@ -30,7 +30,8 @@ class ResultLogWriter:
     suite_id: str
 
     def _append(self, event: Mapping[str, object]) -> None:
-        append_result_event(self.path, {"suite_id": self.suite_id, **event})
+        append_result_event(self.path, {"suite_id": self.suite_id, "source": "abb",
+                                       "timestamp": datetime.now(timezone.utc).isoformat(), **event})
 
     def append_step_started(
         self, agent_id: str, input_id: str, payload: object
@@ -43,6 +44,9 @@ class ResultLogWriter:
                 "payload": _json_value(payload),
             },
         )
+
+    def append_progress(self, progress) -> None:
+        self._append({"event": "progress", **_json_value(progress)})
 
     def append_step_completed(self, agent_id: str, step: BenchmarkStepResult) -> None:
         self._append(
@@ -109,6 +113,8 @@ def start_result_log(
         path,
         {
             "event": "run_started",
+            "source": "abb",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "suite_id": suite_id,
             "selected_agent_ids": list(selected_agent_ids),
         },

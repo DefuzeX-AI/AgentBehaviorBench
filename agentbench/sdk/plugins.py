@@ -8,10 +8,10 @@ import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Literal, Protocol, runtime_checkable
+from typing import Literal
 
 from agentbench.harness.errors import ProviderSelectionError
-from agentbench.harness.protocols.evaluation import EvaluationRunner
+from .contracts import EvaluationSDKPlugin, SDKRunnerContext
 
 
 SDK_ENTRY_POINT_GROUP = "defuzex_agentbench.evaluation_sdks"
@@ -52,29 +52,6 @@ class EvaluationPlan:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "options", MappingProxyType(dict(self.options)))
-
-
-@dataclass(frozen=True, slots=True)
-class SDKRunnerContext:
-    """Host facilities made available to an SDK plugin runner factory."""
-
-    environ: Mapping[str, str]
-    model: str | None
-    trace_sink: object
-    trace_max_bytes: int
-
-
-@runtime_checkable
-class EvaluationSDKPlugin(Protocol):
-    """Deployable SDK adapter selected by Python or a CLI entry point."""
-
-    name: str
-    api_version: str
-    execution: Literal["container", "local"]
-
-    def create_benchmark_runner(
-        self, *, context: SDKRunnerContext, options: Mapping[str, object]
-    ) -> EvaluationRunner: ...
 
 
 def builtin_sdk_selection() -> SDKSelection:

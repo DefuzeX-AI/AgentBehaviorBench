@@ -9,7 +9,7 @@ from uuid import uuid4
 from importlib.metadata import version
 from agentbench.evaluation.artifacts import Artifacts
 from agentbench.evaluation.input_binding import InputBinding
-from agentbench.evaluation.runner import drive_run
+from .runner import drive_run
 
 
 async def execute(root, output):
@@ -39,11 +39,16 @@ async def execute(root, output):
         # snapshot in the KUMA boundary; never manufacture an official Case ID.
         from kuma.serialization import to_json
         files.save('case.json', to_json(run._case))
+        from agentbench.observe.store import TraceStore
+        TraceStore(output / 'sdk.jsonl', run.run_id, source='sdk').record(
+            'case_generated', case_id=run.case_id, artifact='case.json')
         async def invoke(payload, folder, shared_provider):
             request = folder / 'request.json'
             invocation_id = uuid4().hex
+            observed_input = json.loads((folder / 'input.json').read_text())
             files.save(str(request.relative_to(output)), {
                 'schema': 'abb.invocation.v1', 'run_id': invocation_id, 'session_id': run.run_id,
+                'observation_context': {key: observed_input[key] for key in ('case_id', 'input_id') if isinstance(observed_input.get(key), str)},
                 'agent_id': manifest['agent_id'], 'framework': manifest['framework'], 'input': payload})
             await invoke_agent(root, request, folder, provider=shared_provider)
             return json.loads((folder / 'result.json').read_text())

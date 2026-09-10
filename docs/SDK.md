@@ -33,7 +33,9 @@ one with another `sdk`/`sdk_options` selection is rejected.
 
 ## Current interface
 
-The structural protocols are exported from `agentbench.harness`:
+The structural protocols live in `agentbench.sdk.contracts` and are exported
+from `agentbench.sdk`. The older `agentbench.harness` imports remain compatible.
+Importing these contracts does not import a concrete evaluator or its dependencies.
 
 | Object | Required interface |
 | --- | --- |
@@ -71,6 +73,7 @@ module path:
 agentbench sdk list
 agentbench sdk show acme
 agentbench run --sdk acme --sdk-options sdk-options.json
+agentbench evaluate my-agent --sdk acme --sdk-options sdk-options.json
 ```
 
 `sdk list` reads only installed package metadata. Selection loads only the
@@ -82,10 +85,12 @@ qualifier. An entry point exposing the plain
 `EvaluationSDKPlugin` and returns its `EvaluationRunner` Strategy. See
 [Evaluation SDK plugin architecture](architecture/evaluation-sdk-plugins.md).
 
-## DefuzeX
+## Legacy DefuzeX API
 
-The existing default and `run_defuzex()` / `validate_defuzex()` compatibility
-entry points remain available. Their credential and Provider policy lives in
+`BenchmarkRunner()` without an SDK still retains its legacy DefuzeX behavior;
+prefer explicit `sdk=...` on that low-level host runner. `SuiteRunner()` and the
+CLI default to the built-in KUMA container adapter. The legacy `run_defuzex()` /
+`validate_defuzex()` entry points remain available. Their policy lives in
 `agentbench/sdk/defuzex.py`. The SDK package is now optional:
 
 ```bash
@@ -144,3 +149,6 @@ The equivalent explicit development CLI selection is:
 ```bash
 agentbench run --sdk python:examples.local_sdk
 ```
+
+For a replaceable JSON Case with multiple Inputs, see the Chinese
+[SDK replacement guide](SDK替换.md) and `examples/case_file_sdk.py`.

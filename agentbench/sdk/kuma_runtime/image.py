@@ -44,7 +44,7 @@ def evaluation_agent(agent, sdk):
         source = source.replace('[runtime]\n', '[runtime]\nenv_keys = ["KUMA_API_KEY", "DEFUZEX_API_KEY"]\n', 1)
         # User-authorized SDK-only egress, scoped to this evaluation overlay.
         # No model routes/protocols are changed and no unrestricted network is used.
-        source += '\n[[llm_interception.tool_routes]]\nhost_patterns = ["defuzex.ai"]\nports = [443]\nmethods = ["GET", "POST"]\npath_patterns = ["/api/agentdefuze", "/api/agentdefuze/*"]\n'
+        source += '\n[[llm_interception.tool_routes]]\npurpose = "evaluation"\nhost_patterns = ["defuzex.ai"]\nports = [443]\nmethods = ["GET", "POST"]\npath_patterns = ["/api/agentdefuze", "/api/agentdefuze/*"]\n'
         (root / 'agent.toml').write_text(source)
         dockerfile = root / 'Dockerfile'
         original = dockerfile.read_text()

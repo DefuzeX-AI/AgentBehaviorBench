@@ -38,7 +38,8 @@ def test_evaluate_cli_selects_number_without_native_input():
     from agentbench.cli.main import build_parser
     args = build_parser().parse_args(['evaluate', '1'])
     assert args.selection == '1' and not hasattr(args, 'input')
-    assert args.sdk_source.name == 'Defuze-SDK' and args.sdk_source.is_dir()
+    assert args.sdk_source is None and args.output is None and args.timeout is None
+    assert args.sdk is None and args.sdk_options is None
 
 
 def test_company_contract_preserves_full_payload():

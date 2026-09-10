@@ -31,7 +31,11 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None):
     run_id = envelope["run_id"]
     if envelope.get("schema") != "abb.invocation.v1" or not isinstance(run_id, str):
         raise ValueError("Invalid invocation envelope")
-    store = TraceStore(output / "framework.jsonl", envelope.get("session_id", run_id), source="framework")
+    supplied = envelope.get('observation_context')
+    context = {key: supplied[key] for key in ('case_id', 'input_id')
+               if isinstance(supplied, dict) and isinstance(supplied.get(key), str)}
+    context.update(invocation_id=run_id, agent_id=envelope['agent_id'])
+    store = TraceStore(output / "framework.jsonl", envelope.get("session_id", run_id), source="framework", context=context)
     # Optional dependency: images with OTel emit a second, independent trace.
     try:
         from agentbench.observe.otel.session import ObservedStore
@@ -42,7 +46,7 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None):
     else:
         store = ObservedStore(store, run_id, provider=provider)
     adapter = None
-    result = {"schema": "abb.result.v1", "run_id": run_id, "agent_id": envelope["agent_id"]}
+    result = {"schema": "abb.result.v1", "run_id": run_id, **context}
     try:
         configure_trust()
         # Agent imports and later lazy imports live only in this worker process.
@@ -61,7 +65,8 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None):
         store.record("execution_start", input=envelope["input"])
         adapter.load()
         interception = InterceptionConfig.from_agent_dir(root)
-        hosts = [host for route in interception.routes for host in route.host_patterns] if interception else []
+        hosts = [host for route in (*interception.routes, *interception.tool_routes)
+                 for host in route.host_patterns] if interception else []
         with model_correlation(hosts):
             invocation = await adapter.ainvoke(envelope["input"], run_config=config)
         result.update(status="succeeded", output=invocation.output, raw_output=invocation.raw_output)

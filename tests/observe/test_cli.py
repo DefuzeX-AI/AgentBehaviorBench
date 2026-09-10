@@ -8,11 +8,14 @@ import sys
 from pathlib import Path
 
 
-def test_menu_includes_enabled_adapting_company(capsys):
+def test_menu_includes_enabled_company_with_registered_status(capsys):
+    from agentbench.observe.catalog import enabled_agents
+    registry = enabled_agents(Path(__file__).resolve().parents[2] / 'resources/registry.toml')
+    agent = select_agent(registry, 'company-research-agent')
     assert cli(["observe", "--list"]) == 0
     output = capsys.readouterr().out
     assert "1. company-research-agent" in output
-    assert "adapting" in output
+    assert f"status={agent['status']}" in output
 
 
 def test_quit_without_credentials(monkeypatch):

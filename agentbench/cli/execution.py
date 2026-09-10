@@ -57,7 +57,10 @@ def run_benchmark_once(
             selected_agent_ids=tuple(agent.agent_id for agent in agents),
         )
         if viewer_starter is not None:
-            viewer = viewer_starter(result_log.path)
+            try:
+                viewer = viewer_starter(result_log.path)
+            except OSError as exc:
+                output_fn(f'Live viewer unavailable: {exc}. Results will still be saved.')
         output_fn(f"Suite ID: {suite_id}")
         output_fn(f"Result artifact started: {result_log.path}")
         if viewer is not None:
@@ -65,6 +68,10 @@ def run_benchmark_once(
 
     activity = llm_activity or LLMActivity(output_fn)
     progress_printer = ProgressPrinter(output_fn, llm_activity=activity)
+    def on_progress(event):
+        if result_log is not None:
+            result_log.append_progress(event)
+        progress_printer(event)
     try:
         try:
             result = runner.run(
@@ -79,7 +86,7 @@ def run_benchmark_once(
                     result_log,
                     None if viewer is None else viewer.url,
                 ),
-                on_progress=progress_printer,
+                on_progress=on_progress,
                 on_step_start=(
                     None if result_log is None else result_log.append_step_started
                 ),
@@ -99,16 +106,34 @@ def run_benchmark_once(
                     result_log.path, None if viewer is None else viewer.url, output_fn
                 )
             return BenchmarkExecution(1, None, result_log, viewer)
+    except KeyboardInterrupt:
+        if viewer is not None:
+            stop_viewer(viewer)
+        if result_log is not None:
+            result_log.append_suite_error(RuntimeError('Benchmark interrupted'))
+        output_fn('Benchmark interrupted; results retained.')
+        return BenchmarkExecution(130, None, result_log, None)
+    except BaseException as exc:
+        if viewer is not None:
+            stop_viewer(viewer)
+        if result_log is not None:
+            result_log.append_suite_error(RuntimeError(str(exc)))
+        raise
     finally:
         progress_printer.close()
 
-    if result_log is not None:
-        result_log.append_suite_complete(result)
-    print_suite_summary(result, output_fn)
-    if result_log is not None:
-        print_viewer_footer(
-            result_log.path, None if viewer is None else viewer.url, output_fn
-        )
+    try:
+        if result_log is not None:
+            result_log.append_suite_complete(result)
+        print_suite_summary(result, output_fn)
+        if result_log is not None:
+            print_viewer_footer(
+                result_log.path, None if viewer is None else viewer.url, output_fn
+            )
+    except BaseException:
+        if viewer is not None:
+            stop_viewer(viewer)
+        raise
     return BenchmarkExecution(0 if result.passed else 1, result, result_log, viewer)
 
 

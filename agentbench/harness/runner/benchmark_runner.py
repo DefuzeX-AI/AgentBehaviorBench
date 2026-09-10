@@ -6,16 +6,6 @@ import os
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
-from agentbench.sdk.defuzex import (
-    DefuzeConfiguration,
-)
-from agentbench.sdk.defuzex import (
-    create_run as _create_defuzex_run,
-)
-from agentbench.sdk.defuzex import (
-    validate_installation as _validate_defuzex_installation,
-)
-
 from ..errors import AgentInvocationError, ProviderSelectionError
 from ..progress import ProgressCallback, emit_progress
 from ..protocols import SDK, SDKReport, SDKRun, SDKRunFactory
@@ -46,7 +36,7 @@ class BenchmarkRunner:
         self._sdk = sdk
         self._sdk_options = dict(sdk_options or {})
         self._agent_runner = agent_runner or AgentRunner()
-        self._sdk_run_factory = sdk_run_factory or _create_defuzex_run
+        self._sdk_run_factory = sdk_run_factory
         self._environ = os.environ if environ is None else environ
 
     def run_defuzex(
@@ -68,6 +58,8 @@ class BenchmarkRunner:
     ) -> BenchmarkResult:
         """Start one Agent, create its SDK Run, and execute the handshake."""
 
+        from agentbench.sdk.defuzex import create_run
+
         provider_mode, run_kwargs = self._prepare_defuzex(
             registration=registration,
             requirement_path=requirement_path,
@@ -82,7 +74,7 @@ class BenchmarkRunner:
 
         return self._execute(
             registration,
-            create_run=lambda: self._sdk_run_factory(**run_kwargs),
+            create_run=lambda: (self._sdk_run_factory or create_run)(**run_kwargs),
             provider_mode=provider_mode,
             on_progress=on_progress,
             on_step_start=on_step_start,
@@ -382,6 +374,8 @@ class BenchmarkRunner:
         track_files: bool,
         save_local: bool,
     ) -> tuple[str, dict[str, object]]:
+        from agentbench.sdk.defuzex import DefuzeConfiguration, validate_installation
+
         if self._sdk is not None:
             raise ValueError("Use run() and validate_sdk() with an injected sdk")
         provider_mode, run_kwargs = DefuzeConfiguration(self._environ).prepare(
@@ -395,8 +389,8 @@ class BenchmarkRunner:
             track_files=track_files,
             save_local=save_local,
         )
-        if self._sdk_run_factory is _create_defuzex_run:
-            _validate_defuzex_installation(provider_mode, run_kwargs)
+        if self._sdk_run_factory is None:
+            validate_installation(provider_mode, run_kwargs)
         return provider_mode, run_kwargs
 
     @staticmethod

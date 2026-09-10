@@ -38,6 +38,7 @@ class ToolRoute:
     ports: tuple[int, ...]
     methods: tuple[str, ...]
     path_patterns: tuple[str, ...]
+    purpose: str = 'tool'
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,8 +142,11 @@ def _tool_routes(value: object) -> tuple[ToolRoute, ...]:
         ports = _integers(data, "ports")
         if any(not 1 <= p <= 65535 for p in ports):
             raise ServiceConfigurationError("Invalid tool port")
+        purpose = data.get('purpose', 'tool')
+        if purpose not in ('tool', 'evaluation'):
+            raise ServiceConfigurationError('Tool route purpose must be tool or evaluation')
         result.append(ToolRoute(tuple(h.lower().rstrip(".") for h in hosts), ports,
-                                tuple(m.upper() for m in _strings(data, "methods")), paths))
+                                tuple(m.upper() for m in _strings(data, "methods")), paths, purpose))
     return tuple(result)
 
 

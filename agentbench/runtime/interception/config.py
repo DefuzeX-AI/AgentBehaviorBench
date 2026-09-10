@@ -55,6 +55,7 @@ class ToolRouteConfig:
     ports: tuple[int, ...]
     methods: tuple[str, ...]
     path_patterns: tuple[str, ...]
+    purpose: str = 'tool'
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,11 +116,15 @@ def _tool_routes(value: object) -> tuple[ToolRouteConfig, ...]:
     for raw in value:
         if not isinstance(raw, dict):
             raise InterceptionConfigurationError("Every tool route must be a table")
+        purpose = raw.get('purpose', 'tool')
+        if purpose not in ('tool', 'evaluation'):
+            raise InterceptionConfigurationError('Tool route purpose must be tool or evaluation')
         result.append(ToolRouteConfig(
             host_patterns=_patterns(raw, "host_patterns", host=True),
             ports=_ports(raw.get("ports", [443])),
             methods=tuple(v.upper() for v in _string_list(raw, "methods")),
             path_patterns=_patterns(raw, "path_patterns", host=False),
+            purpose=purpose,
         ))
     return tuple(result)
 

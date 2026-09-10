@@ -286,7 +286,8 @@ class DockerRuntime:
                     "credentials": credentials,
                     "tool_routes": [
                         {"host_patterns": list(route.host_patterns), "ports": list(route.ports),
-                         "methods": list(route.methods), "path_patterns": list(route.path_patterns)}
+                         "methods": list(route.methods), "path_patterns": list(route.path_patterns),
+                         "purpose": route.purpose}
                         for route in interception.tool_routes
                     ],
                     "routes": [

@@ -5,12 +5,13 @@ import sys
 import pytest
 
 
-def worker(agent, tmp_path, number):
+def worker(agent, tmp_path, number, context=None):
     output = tmp_path / f"output{number}"
     output.mkdir()
     request = tmp_path / f"request{number}.json"
     request.write_text(json.dumps({"schema": "abb.invocation.v1", "run_id": f"test{number}",
                                   "agent_id": agent.agent_id, "framework": agent.framework,
+                                  "observation_context": context,
                                   "input": {"number": number, "text": '中文"\n原样'}}))
     result = subprocess.run([sys.executable, "-m", "agentbench.runtime.agentcontainer.worker",
                              "--agent-root", str(agent.path), "--request", str(request),
@@ -34,6 +35,19 @@ def test_graph_failure_is_not_success(offline_agent, tmp_path):
     assert process.returncode == 1
     result = json.loads((directory / "result.json").read_text())
     assert result["status"] == "failed" and "negative input" in result["error"]
+
+
+def test_observation_identity_is_preserved_without_changing_agent_input(offline_agent, tmp_path):
+    process, directory = worker(offline_agent, tmp_path, 5, {'case_id': 'case-other-sdk', 'input_id': 'input-z', 'invocation_id': 'cannot-override'})
+    assert process.returncode == 0, process.stderr
+    result = json.loads((directory / 'result.json').read_text())
+    assert result['output'] == '中文"\n原样:13'
+    assert result['input_id'] == 'input-z' and result['invocation_id'] == 'test5'
+    events = [json.loads(line) for line in (directory / 'framework.jsonl').read_text().splitlines()]
+    assert all(e['data']['case_id'] == 'case-other-sdk' and e['data']['input_id'] == 'input-z' and e['data']['invocation_id'] == 'test5' for e in events)
+    if (directory / 'otel.jsonl').exists():
+        spans = [json.loads(line)['data'] for line in (directory / 'otel.jsonl').read_text().splitlines()]
+        assert all(s['attributes']['abb.input_id'] == 'input-z' and s['attributes']['abb.case_id'] == 'case-other-sdk' for s in spans)
 
 
 @pytest.mark.skipif(os.getenv("ABB_DOCKER_TEST") != "1", reason="Opt-in real Docker build")
