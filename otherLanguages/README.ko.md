@@ -1,145 +1,127 @@
 # AgentBehaviorBench (ABB)
 
-<p align="center">
-  <img
-    alt="AgentBehaviorBench (ABB)"
-    src="../figures/title.png"
-    width="720"
-    style="border-radius: 24px;"
-  >
-</p>
+> **ABB를 실행하기 전에:** Python 3.10 이상, 실행 중인 Docker Desktop 또는 Docker
+> Engine, 그리고 선택적 DefuzeX 의존성을 준비하세요. 포함된 실행 가능 Company Research
+> Agent에는 `KUMA_API_KEY`(또는 `DEFUZEX_API_KEY`), `OPENROUTER_API_KEY`,
+> `OPENROUTER_MODEL`, `TAVILY_API_KEY`가 필요합니다.
 
-<p align="center">
-  <a href="../README.md">English</a> |
-  <a href="README.fr.md">Français</a> |
-  <a href="README.ja.md">日本語</a> |
-  <a href="README.zh-CN.md">中文简体</a> |
-  <a href="README.zh-TW.md">中文繁體</a> |
-  한국어
-</p>
+AgentBehaviorBench는 등록된 AI Agent를 격리된 런타임에서 실행하고 실행 증거를 수집한
+뒤, 선택 가능한 SDK로 결과를 평가합니다. 기본 SDK는 내장 KUMA adapter입니다. 결과는
+로컬에 저장되며 ABB 브라우저 뷰어에서 확인할 수 있습니다.
 
-<p align="center">
-  <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-8a008a">
-  <img alt="License" src="https://img.shields.io/badge/License-MIT-0086c9">
-  <img alt="Package" src="https://img.shields.io/badge/pypi%20package-0.1.0-2acb16">
-</p>
+## 빠른 시작
 
-## 소식
+저장소 루트에서 가상 환경을 만들고 DefuzeX extra와 함께 ABB를 설치합니다.
 
-- AgentBehaviorBench (ABB)는 이제 DefuzeX SDK의 `get_input()` / `submit()` handshake를 통해 등록된 LangGraph Agent를 실행합니다.
+```bash
+python3 -m venv .venv
+source .venv/bin/activate              # Windows PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e ".[defuzex]"
+```
 
-## 개요
+로컬 환경 파일을 만들고 자격 증명을 입력합니다.
 
-AgentBehaviorBench (ABB)는 대상 Agent를 호출하고, 그 출력과 실행 trace를 수집하며, 요청된 workflow를 올바르게 완료했는지 판단해야 하는 end-to-end 작업에서 AI Agent를 평가하기 위한 benchmark입니다.
+```bash
+cp .env.example .env                   # Windows PowerShell: Copy-Item .env.example .env
+```
 
-등록된 Agent와 benchmark Case가 주어지면, AgentBehaviorBench (ABB)는 신뢰할 수 있는 host harness를 통해 해당 Agent를 실행합니다. 이 harness는 framework-specific 또는 containerized Agent를 시작하고, credential-safe Model Interceptor를 통해 model traffic을 routing하며, 각 SDK input과 Agent response를 원자적으로 갱신되는 JSON events로 기록하고, 완료된 run을 DefuzeX Judge에 제출할 수 있습니다.
+```dotenv
+KUMA_API_KEY=
+OPENROUTER_API_KEY=
+OPENROUTER_MODEL=openai/gpt-4.1-mini
+TAVILY_API_KEY=
+```
 
-AgentBehaviorBench (ABB)는 Agent 평가를 재현 가능하게 만들도록 설계되었습니다. Agent는 registry에 선언되고, LangGraph 같은 framework adapter를 통해 적응되며, `adapting`에서 `ready`로 인증됩니다. 인증이 성공한 뒤에만 기본 benchmark run에 포함됩니다.
+Docker를 시작한 뒤 registry에서 `enabled = true`이고 상태가 `ready`인 모든 Agent를
+실행합니다.
 
-현재 실행 흐름은 다음과 같습니다:
+```bash
+agentbench run
+```
+
+ABB는 선택된 Agent의 확인을 요청하고, `results/`에 결과 스냅샷을 저장한 뒤 로컬
+뷰어를 시작합니다. 헤드리스 또는 자동 실행에는 다음을 사용하세요.
+
+```bash
+agentbench run --no-view --output results/benchmark.json
+```
+
+## 요구 사항 및 환경 변수
+
+| 요구 사항 | 용도 |
+| --- | --- |
+| Python 3.10 이상 | ABB 호스트 CLI와 harness. |
+| Docker Desktop / Docker Engine | 포함된 ready Agent는 Docker 컨테이너에서 실행됩니다. `run`, `evaluate`, `certify`, `observe` 전에 Docker를 시작해야 합니다. |
+| `KUMA_API_KEY` 또는 `DEFUZEX_API_KEY` | 기본 KUMA SDK의 Case 및 Judge 접근 권한. |
+| `OPENROUTER_API_KEY` | Docker Agent의 모델 트래픽은 ABB interceptor를 거쳐 OpenRouter로 전달됩니다. |
+| `OPENROUTER_MODEL` | 실행에 사용할 모델 이름. |
+| `TAVILY_API_KEY` | 포함된 Company Research Agent의 웹 검색 자격 증명. |
+
+`.env`는 Git에서 무시됩니다. Shell에 이미 export된 변수는 `.env` 값을 덮어쓰며,
+`--env-file PATH`는 다른 dotenv 파일을 선택하고, `--model MODEL`은 한 번의 명령에만
+모델을 덮어씁니다.
+
+선택적 OpenRouter 설정:
+
+```dotenv
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_HTTP_REFERER=https://example.com
+OPENROUTER_APP_TITLE=AgentBehaviorBench
+```
+
+## CLI
+
+설치된 버전의 도움말은 `agentbench --help` 또는 `agentbench <command> --help`로 확인할
+수 있습니다.
+
+| 명령 | 용도 |
+| --- | --- |
+| `agentbench run` | 활성화되고 `ready`인 모든 Agent를 평가합니다. 기본 명령입니다. |
+| `agentbench evaluate company-research-agent --cases 1` | 선택한 수의 독립 Case로 하나의 Agent를 평가합니다. |
+| `agentbench observe company-research-agent` | 네이티브 입력으로 Agent를 실행하고 trace를 저장합니다. Case를 만들거나 Judge를 호출하지 않습니다. |
+| `agentbench certify react-agent` | `adapting` Agent를 인증하고 성공하면 `ready`로 승격합니다. |
+| `agentbench view results/benchmark.json` | 저장된 결과를 로컬 뷰어에서 다시 엽니다. |
+| `agentbench sdk list` | 내장 및 설치된 평가 SDK를 나열합니다. |
+| `agentbench clean --dry-run` | 복구 가능한 아카이브로 이동될 로컬 결과 기록을 표시합니다. |
+
+자주 쓰는 `run` 옵션:
+
+```bash
+agentbench run --model openai/gpt-4.1-mini
+agentbench run --sdk kuma --sdk-options sdk-options.json
+agentbench run --llm-trace terminal
+```
+
+전체 인수는 영어 [CLI reference](../docs/CLI.md)를, Agent 추가는
+[agent onboarding guide](../docs/How%20To%20Add%20Agent.md)를 참조하세요.
+
+## 저장소 구성
 
 ```text
-registry.toml
--> SuiteRunner
--> BenchmarkRunner
--> DefuzeX SDK Run
--> Agent Adapter / Runtime
--> Judge Report
+resources/registry.toml
+        -> CLI selection
+        -> SuiteRunner / evaluation SDK
+        -> Agent adapter and runtime
+        -> result snapshot and local viewer
 ```
 
-이 repository에는 다음이 포함됩니다:
+- `resources/registry.toml`은 Agent, 상태, runtime을 선언합니다.
+- `resources/agents/`는 각 Agent 단위와 ABB 설정을 포함합니다.
+- `agentbench/cli/`는 터미널 명령을 제공합니다.
+- `agentbench/harness/`는 suite 실행, 결과, registry 로드를 담당합니다.
+- `agentbench/runtime/`은 로컬 또는 Docker에서 Agent를 실행합니다.
+- `agentbench/sdk/`는 내장 SDK adapter와 플러그인 탐색을 포함합니다.
 
-- `agentbench/cli`: terminal entry point와 progress output.
-- `agentbench/harness`: SDK handshake, suite execution, results, registry.
-- `agentbench/adapter`: framework-neutral adapter contract와 LangGraph support.
-- `agentbench/runtime`: local 및 Docker runtime integration.
-- `resources/agents`: 재현 가능한 benchmark agent fixtures.
-- `services/model-interceptor`: Docker runs에서 model provider access를 위한 투명 interceptor.
+## 개발
 
-![AgentBehaviorBench (ABB) framework](../figures/framework.png)
-
-## 설정
-
-AgentBehaviorBench (ABB)에는 Python 3.10 이상과 DefuzeX Python SDK가 필요합니다. SDK는 AgentBehaviorBench (ABB)가 사용하는 benchmark protocol을 제공합니다. 즉 benchmark requirements를 parse하고, DefuzeX Cases를 만들고, 각 SDK input을 drive하며, evidence를 기록하고, 완료된 runs를 judging을 위해 제출합니다.
-
-이 repository를 포함하는 parent workspace에서 virtual environment를 만들고 활성화합니다:
-
-```powershell
-cd <workspace-root>
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-```
-
-AgentBehaviorBench (ABB)를 editable mode로 설치합니다:
-
-```powershell
-python -m pip install -e .\defuzeX_AgentBench
-```
-
-### 내부 SDK 빌드
-
-이 repository는 현재 내부 DefuzeX SDK `dev` branch에 의존합니다. SDK가 일반 package installation용으로 배포되기 전까지, `Defuze-SDK`가 아직 local에 clone되어 있지 않다면 SDK `dev` branch(`https://github.com/DefuzeX-AI/Defuze-SDK/tree/dev`)에서 `defuzeX_AgentBench` 옆에 clone한 뒤 같은 `.venv`에 설치합니다:
-
-```powershell
-cd <workspace-root>
-git clone --branch dev --single-branch https://github.com/DefuzeX-AI/Defuze-SDK
-python -m pip install -e .\Defuze-SDK
-python -m pip install -e .\defuzeX_AgentBench
-```
-
-일반적인 source checkout은 `Defuze-SDK`와 `defuzeX_AgentBench`를 같은 parent workspace 아래의 sibling directories로 두고, 둘 다 editable mode로 설치합니다.
-
-> [!NOTE]
-> PAT는 Personal Access Token을 뜻합니다. 내부 DefuzeX SDK repository가 private이면 GitHub가 HTTPS clone 시 PAT를 요구할 수 있습니다. PAT는 password처럼 다루세요. source files, README examples, notebooks, commit된 `.env` files에 넣지 마세요.
-
-## 사용법
-
-AgentBehaviorBench (ABB)를 설치한 뒤 benchmark workspace에서 launcher script로 시작합니다:
-
-```powershell
-cd <workspace-root>
-.\.venv\Scripts\Activate.ps1
-python .\run_agentbench.py
-```
-
-AgentBehaviorBench (ABB) repository에서 package를 직접 실행할 수도 있습니다:
-
-```powershell
-cd <workspace-root>\defuzeX_AgentBench
-python -m agentbench
-```
-
-run을 저장하고 local result viewer에서 live benchmark events를 확인하려면 output path를 전달합니다:
-
-```powershell
-python -m agentbench --output results\result.json
-```
-
-`--output`이 없으면 AgentBehaviorBench (ABB)는 terminal에서 실행되고 JSON result artifact를 만들지 않습니다. `--output`을 사용하면 AgentBehaviorBench (ABB)는 원자적으로 갱신되는 JSON result file을 쓰고 local viewer를 시작하므로 benchmark가 실행되는 동안 events를 새로고침하고 확인할 수 있습니다.
-
-official Case 또는 Judge providers를 사용할 때는 DefuzeX API key를 설정합니다:
-
-```powershell
-$env:DEFUZEX_API_KEY = "dfx_<public-id>.<secret>"
-```
-
-test suite를 실행합니다:
-
-```powershell
+```bash
 python -m pytest
 ```
 
-Agent-facing instructions는 [AGENTS.md](../AGENTS.md)에서 시작하세요. 더 긴 documentation guide는 [docs/AGENTS.md](../docs/AGENTS.md)에 있습니다.
+저장소 규칙은 [AGENTS.md](../AGENTS.md) 및 [docs/AGENTS.md](../docs/AGENTS.md)를
+참조하세요.
 
-## 테스트할 Agent 추가 방법
+## 라이선스
 
-자신의 Agent를 benchmark에 추가하려면 agent에게 [docs/How To Add Agent.md](../docs/How%20To%20Add%20Agent.md)를 읽고 그 문서의 onboarding flow를 따르게 하세요.
-
-AgentBehaviorBench (ABB)는 external Agent project를 repeatable benchmark target으로 바꾸는 데 필요한 요소를 제공합니다. registry-based discovery, framework adapters, Docker runtime support, Model Interceptor를 통한 model credential routing, 원자적으로 갱신되는 result artifacts, local result viewing, 그리고 `adapting`에서 `ready`로의 certification입니다. 이를 통해 동일한 DefuzeX Cases에서 Agent들을 일관되게 비교하면서 runtime behavior, outputs, judgment evidence를 inspectable하게 유지할 수 있습니다.
-
-## 인용 및 라이선스
-
-MIT License. [LICENSE](../LICENSE)를 참조하세요.
-
-저희 작업이 도움이 되었다면 다음과 같이 인용해 주세요:
+MIT. 자세한 내용은 [LICENSE](../LICENSE)를 참조하세요.
