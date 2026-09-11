@@ -70,4 +70,18 @@ class HostObservation:
 
 
 def host_observation_factory(root):
-    return lambda registration, sdk_run: HostObservation(root, registration, sdk_run)
+    """Observe the Agent from the host only when it runs in this process.
+
+    A containerised Agent already records framework and OTel evidence from its
+    own worker, and its run_config crosses a JSON process boundary that cannot
+    carry LangChain callbacks, so attaching a host observer to one makes the
+    invocation envelope unserialisable.
+    """
+    from agentbench.runtime.agentcontainer.config import runtime_type
+
+    def observe(registration, sdk_run):
+        if runtime_type(registration.path) != "in_process":
+            return None
+        return HostObservation(root, registration, sdk_run)
+
+    return observe

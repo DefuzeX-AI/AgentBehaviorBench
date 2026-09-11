@@ -216,3 +216,70 @@ def test_real_openai_and_tavily_clients(upstream):
             await client.close()
     asyncio.run(run())
     assert received == [('/v1/chat/completions', 'llm-span'), ('/search', 'tool-span')]
+
+
+def test_host_observation_is_limited_to_in_process_agents(starter_agent, tmp_path):
+    """A containerised Agent must not receive host callbacks in its run_config.
+
+    The container invocation envelope is JSON, and the worker rejects host
+    callbacks outright, so a HostObservation on that path makes json.dumps fail
+    before the Agent runs.
+    """
+    import shutil
+    from dataclasses import replace
+
+    from agentbench.observe.host import HostObservation, host_observation_factory
+
+    observe = host_observation_factory(tmp_path / 'observe')
+    run = SimpleNamespace(run_id='run-1')
+
+    assert isinstance(observe(starter_agent, run), HostObservation)
+
+    containerised = tmp_path / 'docker-agent'
+    shutil.copytree(starter_agent.path, containerised)
+    (containerised / 'agent.toml').write_text(
+        (containerised / 'agent.toml').read_text(encoding='utf-8')
+        + '\n[runtime]\ntype = "docker"\nexecution = "oneshot"\n',
+        encoding='utf-8',
+    )
+    assert observe(replace(starter_agent, path=containerised), run) is None
+
+
+@pytest.mark.parametrize('failure', [EOFError(), OSError('captured stdin')])
+def test_prompts_survive_a_console_that_cannot_answer(failure):
+    """A finished evaluation must not be reported as failed by its own prompt.
+
+    pytest's captured stdin raises OSError rather than EOFError, which
+    previously escaped and turned a completed run into a non-zero exit.
+    """
+    from pathlib import Path
+
+    from agentbench.cli.terminal_ui.presentation import (
+        request_confirmation,
+        request_viewer_action,
+    )
+
+    def refuse(_prompt):
+        raise failure
+
+    assert request_confirmation(refuse, lambda _: None) is False
+    assert request_viewer_action(
+        Path('result.json'), 'http://localhost/test',
+        input_fn=refuse, output_fn=lambda _: None,
+    ) == 'quit'
+
+
+def test_unexpected_prompt_errors_still_surface():
+    """Only an unusable console is absorbed; real defects must still raise."""
+    from pathlib import Path
+
+    from agentbench.cli.terminal_ui.presentation import request_viewer_action
+
+    def broken(_prompt):
+        raise RuntimeError('input failed')
+
+    with pytest.raises(RuntimeError, match='input failed'):
+        request_viewer_action(
+            Path('result.json'), 'http://localhost/test',
+            input_fn=broken, output_fn=lambda _: None,
+        )

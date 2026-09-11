@@ -119,7 +119,12 @@ def request_confirmation(
     input_fn: Callable[[str], str], output_fn: Callable[[str], None]
 ) -> bool:
     while True:
-        answer = input_fn("Continue? [yes/no]: ").strip().lower()
+        try:
+            answer = input_fn("Continue? [yes/no]: ").strip().lower()
+        except (EOFError, KeyboardInterrupt, OSError):
+            # No console to answer on: decline rather than abort the process.
+            output_fn("\nNo interactive input available; cancelled.")
+            return False
         if answer in {"confirm", "c", "yes", "y"}:
             return True
         if answer in {"cancel", "n", "no", ""}:
@@ -203,7 +208,9 @@ def request_viewer_action(
     while True:
         try:
             answer = input_fn("Viewer action? [r rerun/q quit]: ").strip().lower()
-        except (EOFError, KeyboardInterrupt):
+        # A captured or absent stdin raises OSError rather than EOFError, and
+        # that must not turn a completed evaluation into a failed one.
+        except (EOFError, KeyboardInterrupt, OSError):
             output_fn("\nViewer stopped.")
             return "quit"
         if answer in {"q", "quit", "exit", ""}:
