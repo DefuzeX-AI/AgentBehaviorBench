@@ -1,145 +1,123 @@
 # AgentBehaviorBench (ABB)
 
-<p align="center">
-  <img
-    alt="AgentBehaviorBench (ABB)"
-    src="../figures/title.png"
-    width="720"
-    style="border-radius: 24px;"
-  >
-</p>
+> **运行 ABB 前请先准备：**Python 3.10+、已启动的 Docker Desktop 或 Docker
+> Engine，以及 DefuzeX 可选依赖。内置且可运行的 Company Research Agent 需要
+> `KUMA_API_KEY`（或 `DEFUZEX_API_KEY`）、`OPENROUTER_API_KEY`、
+> `OPENROUTER_MODEL` 和 `TAVILY_API_KEY`。
 
-<p align="center">
-  <a href="../README.md">English</a> |
-  <a href="README.fr.md">Français</a> |
-  <a href="README.ja.md">日本語</a> |
-  中文简体 |
-  <a href="README.zh-TW.md">中文繁體</a> |
-  <a href="README.ko.md">한국어</a>
-</p>
+AgentBehaviorBench 在隔离运行时中执行已注册的 AI Agent，收集执行证据，并通过
+可选 SDK 评测结果。默认 SDK 是内置 KUMA adapter；结果保存在本地，并可在 ABB
+浏览器查看器中检查。
 
-<p align="center">
-  <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-8a008a">
-  <img alt="License" src="https://img.shields.io/badge/License-MIT-0086c9">
-  <img alt="Package" src="https://img.shields.io/badge/pypi%20package-0.1.0-2acb16">
-</p>
+## 快速开始
 
-## 最新动态
+在仓库根目录创建虚拟环境，并安装带 DefuzeX extra 的 ABB：
 
-- AgentBehaviorBench (ABB) 现在通过 DefuzeX SDK 的 `get_input()` / `submit()` 握手流程运行已注册的 LangGraph Agent。
+```bash
+python3 -m venv .venv
+source .venv/bin/activate              # Windows PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e ".[defuzex]"
+```
 
-## 概览
+创建本地环境文件并填写凭据：
 
-AgentBehaviorBench (ABB) 是一个用于评估 AI Agent 的基准测试工具，面向需要调用目标 Agent、收集其输出和执行轨迹，并判断其是否正确完成指定工作流的端到端任务。
+```bash
+cp .env.example .env                   # Windows PowerShell: Copy-Item .env.example .env
+```
 
-给定一个已注册的 Agent 和一个 benchmark Case，AgentBehaviorBench (ABB) 会通过受信任的宿主 harness 运行该 Agent。该 harness 可以启动特定框架或容器化的 Agent，通过凭据安全的 Model Interceptor 路由模型流量，将每个 SDK input 和 Agent response 记录为只追加的 JSONL 事件，并把完成的运行提交给 DefuzeX Judge。
+```dotenv
+KUMA_API_KEY=
+OPENROUTER_API_KEY=
+OPENROUTER_MODEL=openai/gpt-4.1-mini
+TAVILY_API_KEY=
+```
 
-AgentBehaviorBench (ABB) 旨在让 Agent 评估具备可复现性。Agent 在 registry 中声明，通过 LangGraph 等框架 adapter 接入，从 `adapting` 认证到 `ready`，并且只有在认证成功后才会进入默认 benchmark 运行。
+启动 Docker 后，运行所有注册表中 `enabled = true` 且状态为 `ready` 的 Agent：
 
-当前执行流程如下：
+```bash
+agentbench run
+```
+
+ABB 会要求确认选中的 Agent，在 `results/` 下保存结果快照并启动本地查看器。无
+界面或自动化运行请使用：
+
+```bash
+agentbench run --no-view --output results/benchmark.json
+```
+
+## 依赖与环境变量
+
+| 项目 | 用途 |
+| --- | --- |
+| Python 3.10 或更高版本 | ABB 主机 CLI 与 harness。 |
+| Docker Desktop / Docker Engine | 当前可运行的内置 Agent 在 Docker 中执行；执行前 Docker 必须已启动。 |
+| `KUMA_API_KEY` 或 `DEFUZEX_API_KEY` | 默认 KUMA SDK 的 Case 与 Judge 访问凭据。 |
+| `OPENROUTER_API_KEY` | Docker Agent 的模型流量经 ABB interceptor 转发到 OpenRouter。 |
+| `OPENROUTER_MODEL` | 本次运行使用的模型名称。 |
+| `TAVILY_API_KEY` | 内置 Company Research Agent 的网页搜索凭据。 |
+
+`.env` 被 Git 忽略。Shell 中已导出的变量会覆盖 `.env`；`--env-file PATH` 可选择
+其他 dotenv 文件；`--model MODEL` 可只覆盖单次命令的模型。
+
+可选 OpenRouter 设置：
+
+```dotenv
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_HTTP_REFERER=https://example.com
+OPENROUTER_APP_TITLE=AgentBehaviorBench
+```
+
+## CLI
+
+运行 `agentbench --help` 或 `agentbench <command> --help` 查看已安装版本的帮助。
+
+| 命令 | 用途 |
+| --- | --- |
+| `agentbench run` | 评测所有启用且 `ready` 的 Agent；这是默认命令。 |
+| `agentbench evaluate company-research-agent --cases 1` | 用指定数量的独立 Case 评测一个 Agent。 |
+| `agentbench observe company-research-agent` | 用原生输入运行一个 Agent 并保存 trace，不创建 Case，也不调用 Judge。 |
+| `agentbench certify react-agent` | 认证 `adapting` Agent；成功后将其提升为 `ready`。 |
+| `agentbench view results/benchmark.json` | 在本地查看器中重新打开结果。 |
+| `agentbench sdk list` | 列出内置和已安装的评测 SDK。 |
+| `agentbench clean --dry-run` | 预览将被移动到可恢复归档的本地结果历史。 |
+
+常用 `run` 选项：
+
+```bash
+agentbench run --model openai/gpt-4.1-mini
+agentbench run --sdk kuma --sdk-options sdk-options.json
+agentbench run --llm-trace terminal
+```
+
+完整参数请见英文 [CLI reference](../docs/CLI.md)，添加 Agent 请见
+[agent onboarding guide](../docs/How%20To%20Add%20Agent.md)。
+
+## 目录结构
 
 ```text
-registry.toml
--> SuiteRunner
--> BenchmarkRunner
--> DefuzeX SDK Run
--> Agent Adapter / Runtime
--> Judge Report
+resources/registry.toml
+        -> CLI selection
+        -> SuiteRunner / evaluation SDK
+        -> Agent adapter and runtime
+        -> result snapshot and local viewer
 ```
 
-仓库包含：
+- `resources/registry.toml` 声明 Agent、状态和运行时。
+- `resources/agents/` 保存每个 Agent 单元及其 ABB 配置。
+- `agentbench/cli/` 提供命令行入口。
+- `agentbench/harness/` 负责 suite 执行、结果和注册表加载。
+- `agentbench/runtime/` 在本地或 Docker 运行 Agent。
+- `agentbench/sdk/` 包含内置 SDK adapter 和插件发现逻辑。
 
-- `agentbench/cli`：终端入口和进度输出。
-- `agentbench/harness`：SDK 握手、suite 执行、结果和 registry。
-- `agentbench/adapter`：框架无关的 adapter contract 和 LangGraph 支持。
-- `agentbench/runtime`：本地和 Docker runtime 集成。
-- `resources/agents`：可复现的 benchmark Agent fixture。
-- `services/model-interceptor`：Docker 运行中用于模型 provider 访问的透明拦截服务。
+## 开发
 
-![AgentBehaviorBench (ABB) framework](../figures/framework.png)
-
-## 安装
-
-AgentBehaviorBench (ABB) 需要 Python 3.10 或更高版本，以及 DefuzeX Python SDK。SDK 提供 AgentBehaviorBench (ABB) 使用的 benchmark protocol：解析 benchmark requirements、创建 DefuzeX Cases、驱动每个 SDK input、记录 evidence，并提交完成的 runs 进行 judging。
-
-在包含本仓库的父级 workspace 中创建并激活虚拟环境：
-
-```powershell
-cd <workspace-root>
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-```
-
-以 editable mode 安装 AgentBehaviorBench (ABB)：
-
-```powershell
-python -m pip install -e .\defuzeX_AgentBench
-```
-
-### 内部 SDK 构建
-
-本仓库目前依赖内部 DefuzeX SDK 的 `dev` 分支。在 SDK 支持常规 package 安装之前，如果本地尚未 clone `Defuze-SDK`，请从 SDK `dev` 分支（`https://github.com/DefuzeX-AI/Defuze-SDK/tree/dev`）clone 到 `defuzeX_AgentBench` 旁边，然后安装到同一个 `.venv`：
-
-```powershell
-cd <workspace-root>
-git clone --branch dev --single-branch https://github.com/DefuzeX-AI/Defuze-SDK
-python -m pip install -e .\Defuze-SDK
-python -m pip install -e .\defuzeX_AgentBench
-```
-
-典型的源码 checkout 会把 `Defuze-SDK` 和 `defuzeX_AgentBench` 作为同一个父级 workspace 下的兄弟目录，并将二者都以 editable mode 安装。
-
-> [!NOTE]
-> PAT 表示 Personal Access Token。如果内部 DefuzeX SDK 仓库是私有的，GitHub 可能会要求在通过 HTTPS clone 时提供 PAT。请把 PAT 当作密码处理：不要把它写入源文件、README 示例、notebook 或已提交的 `.env` 文件。
-
-## 使用
-
-安装 AgentBehaviorBench (ABB) 后，从 benchmark workspace 使用 launcher script 启动：
-
-```powershell
-cd <workspace-root>
-.\.venv\Scripts\Activate.ps1
-python .\run_agentbench.py
-```
-
-也可以直接从 AgentBehaviorBench (ABB) 仓库运行 package：
-
-```powershell
-cd <workspace-root>\defuzeX_AgentBench
-python -m agentbench
-```
-
-如需保存一次运行并在本地 result viewer 中查看实时 benchmark events，请传入 output path：
-
-```powershell
-python -m agentbench --output results\result.json
-```
-
-不传 `--output` 时，AgentBehaviorBench (ABB) 会在终端中运行，并且不会创建 JSONL result artifact。传入 `--output` 时，AgentBehaviorBench (ABB) 会写入一个只追加的 JSONL result file，并启动本地 viewer，便于你在 benchmark 运行期间刷新和检查 events。
-
-使用官方 Case 或 Judge providers 时，请设置 DefuzeX API key：
-
-```powershell
-$env:DEFUZEX_API_KEY = "dfx_<public-id>.<secret>"
-```
-
-运行测试套件：
-
-```powershell
+```bash
 python -m pytest
 ```
 
-更多面向 Agent 的说明，请从 [AGENTS.md](../AGENTS.md) 开始。更完整的文档指南位于 [docs/AGENTS.md](../docs/AGENTS.md)。
+仓库约定见 [AGENTS.md](../AGENTS.md) 和 [docs/AGENTS.md](../docs/AGENTS.md)。
 
-## 如何添加待测试 Agent
+## 许可证
 
-如果你想把自己的 Agent 添加到 benchmark，请让 agent 阅读 [docs/How To Add Agent.md](../docs/How%20To%20Add%20Agent.md)，并按照其中记录的 onboarding flow 操作。
-
-AgentBehaviorBench (ABB) 提供了把外部 Agent project 转换为可重复 benchmark target 所需的组件：基于 registry 的 discovery、framework adapters、Docker runtime support、通过 Model Interceptor 路由模型凭据、只追加 result artifacts、本地 result viewing，以及从 `adapting` 到 `ready` 的 certification。这让你可以用同一组 DefuzeX Cases 一致地比较不同 Agent，同时保持 runtime behavior、outputs 和 judgment evidence 可检查。
-
-## 引用和许可证
-
-MIT License。见 [LICENSE](../LICENSE)。
-
-如果你觉得我们的工作有帮助，请按如下方式引用：
+MIT，见 [LICENSE](../LICENSE)。

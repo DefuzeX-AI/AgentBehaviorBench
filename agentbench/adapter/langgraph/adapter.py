@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
+from copy import deepcopy
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -40,7 +42,7 @@ class LangGraphAdapter:
         """Run the graph once."""
         graph = self._require_graph()
         graph_input = self._prepare_input(value)
-        raw_output = graph.invoke(graph_input, config=run_config)
+        raw_output = graph.invoke(graph_input, config=run_config, **self._context_kwargs(graph.invoke))
         return AdapterInvocation(
             output=self._extract_output(raw_output),
             raw_output=raw_output,
@@ -54,19 +56,40 @@ class LangGraphAdapter:
         graph_input = self._prepare_input(value)
         async_invoke = getattr(graph, "ainvoke", None)
         if callable(async_invoke):
-            raw_output = await async_invoke(graph_input, config=run_config)
+            raw_output = await async_invoke(graph_input, config=run_config, **self._context_kwargs(async_invoke))
         else:
             raw_output = await asyncio.to_thread(
-                graph.invoke, graph_input, config=run_config
+                graph.invoke, graph_input, config=run_config, **self._context_kwargs(graph.invoke)
             )
         return AdapterInvocation(
             output=self._extract_output(raw_output),
             raw_output=raw_output,
         )
 
+    def _context_kwargs(self, method):
+        if self.config.context is None:
+            return {}
+        parameters = inspect.signature(method).parameters
+        if "context" not in parameters and not any(p.kind == p.VAR_KEYWORD for p in parameters.values()):
+            raise LangGraphLoadError("Configured [adapter.context] is not supported by this entrypoint")
+        return {"context": deepcopy(self.config.context)}
+
+    async def aclose(self):
+        graph, self._graph = self._graph, None
+        close = getattr(graph, "aclose", None)
+        if callable(close):
+            await close()
+        else:
+            close = getattr(graph, "close", None)
+            if callable(close):
+                close()
+
     def close(self) -> None:
         """Drop the loaded graph."""
-        self._graph = None
+        graph, self._graph = self._graph, None
+        close = getattr(graph, "close", None)
+        if callable(close):
+            close()
 
     def _require_graph(self) -> InvokableGraph:
         """Return a loaded graph."""

@@ -1,15 +1,17 @@
 import importlib
 import json
+
+import pytest
 from dataclasses import dataclass
 
-from agentbench.cli.constants import (
+from agentbench.cli.terminal_ui.constants import (
     AGENT_REVEAL_DELAY_SECONDS,
     ANSI_GREEN,
     ANSI_RED,
     ANSI_RESET,
     LOGO_PAUSE_SECONDS,
 )
-from agentbench.cli.logo import DEFUZE_LOGO
+from agentbench.cli.terminal_ui.logo import BBA_LOGO
 from agentbench.cli.main import (
     cli,
     confirm_agents,
@@ -23,6 +25,15 @@ from agentbench.harness import (
     SuiteAgentResult,
 )
 from tests.support.results import benchmark_result
+
+
+@pytest.fixture(autouse=True)
+def isolated_cli_registry(monkeypatch, ready_agents):
+    from agentbench.harness import AgentRegistry
+    monkeypatch.setattr(
+        "agentbench.cli.features.run.load_registry",
+        lambda path: AgentRegistry(list(ready_agents)),
+    )
 
 
 @dataclass(frozen=True)
@@ -46,7 +57,7 @@ class FakeSuiteRunner:
         self.suite_count += 1
         return f"suite_test_{self.suite_count}"
 
-    def run_defuzex(self, agents, **kwargs):  # type: ignore[no-untyped-def]
+    def run(self, agents, **kwargs):  # type: ignore[no-untyped-def]
         selected = tuple(agents)
         self.calls.append((selected, kwargs))
         if self.error is not None:
@@ -126,7 +137,7 @@ def test_cli_detects_agent_and_accepts_yes(
     assert exit_code == 0
     assert len(runner.calls) == 1
     assert prompts == ["Continue? [yes/no]: "]
-    assert output[0] == DEFUZE_LOGO
+    assert output[0] == BBA_LOGO
     for agent in ready_agents:
         assert any(agent.agent_id in line for line in output)
         assert any(f"cases: {agent.case_count}" in line for line in output)
@@ -141,8 +152,8 @@ def test_cli_detects_agent_and_accepts_yes(
     )
     selected, kwargs = runner.calls[0]
     assert selected == ready_agents
-    assert kwargs["allow_local"] is True
-    assert kwargs["track_files"] is False
+    assert "allow_local" not in kwargs
+    assert "track_files" not in kwargs
     assert delays == [
         LOGO_PAUSE_SECONDS,
         *([AGENT_REVEAL_DELAY_SECONDS] * (len(ready_agents) + 1)),
@@ -200,7 +211,7 @@ def test_cli_reports_provider_configuration_error() -> None:
     )
 
 
-def test_main_writes_append_only_result_artifact(
+def test_main_writes_json_result_snapshot(
     tmp_path, enabled_agents: tuple[AgentRegistration, ...]
 ) -> None:
     output: list[str] = []
@@ -209,12 +220,9 @@ def test_main_writes_append_only_result_artifact(
     post_run_answers = iter(["r", "q"])
 
     def start_locked_viewer(path):  # type: ignore[no-untyped-def]
-        first_event = json.loads(path.read_text(encoding="utf-8").splitlines()[0])
+        first_event = json.loads(path.read_text(encoding="utf-8"))[0]
         return FakeViewer(
-            url=(
-                "http://127.0.0.1:8765/suite/"
-                f"{first_event['suite_id']}/"
-            )
+            url=(f"http://127.0.0.1:8765/suite/{first_event['suite_id']}/")
         )
 
     exit_code = main(
@@ -227,12 +235,9 @@ def test_main_writes_append_only_result_artifact(
         post_run_input_fn=lambda _: next(post_run_answers),
     )
 
-    artifacts = sorted(tmp_path.glob("result-*.jsonl"))
+    artifacts = sorted(tmp_path.glob("result-*.json"))
     assert len(artifacts) == 2
-    lines = [
-        json.loads(line)
-        for line in artifacts[0].read_text(encoding="utf-8").splitlines()
-    ]
+    lines = json.loads(artifacts[0].read_text(encoding="utf-8"))
     assert exit_code == 0
     assert f"Result artifact started: {artifacts[0]}" in output
     assert any(
@@ -256,13 +261,8 @@ def test_main_writes_append_only_result_artifact(
     assert lines[-1]["event"] == "suite_completed"
     suite_ids = []
     for artifact in artifacts:
-        events = [
-            json.loads(line)
-            for line in artifact.read_text(encoding="utf-8").splitlines()
-        ]
-        assert {event["suite_id"] for event in events} == {
-            events[0]["suite_id"]
-        }
+        events = json.loads(artifact.read_text(encoding="utf-8"))
+        assert {event["suite_id"] for event in events} == {events[0]["suite_id"]}
         suite_ids.append(events[0]["suite_id"])
     assert set(suite_ids) == {"suite_test_1", "suite_test_2"}
     assert any(event["event"] == "step_started" for event in lines)
@@ -296,20 +296,23 @@ def test_cli_parses_terminal_llm_trace_options(monkeypatch) -> None:
 
     monkeypatch.setattr("agentbench.cli.features.run.run", fake_run)
 
-    assert cli(
-        [
-            "run",
-            "--model",
-            "openai/gpt-4.1-mini",
-            "--llm-trace",
-            "terminal",
-            "--llm-trace-max-bytes",
-            "4096",
-        ]
-    ) == 0
+    assert (
+        cli(
+            [
+                "run",
+                "--model",
+                "openai/gpt-4.1-mini",
+                "--llm-trace",
+                "terminal",
+                "--llm-trace-max-bytes",
+                "4096",
+            ]
+        )
+        == 0
+    )
     assert calls == [
         {
-            "output_path": None,
+            "output_path": "results/result.json",
             "model": "openai/gpt-4.1-mini",
             "llm_trace": "terminal",
             "llm_trace_max_bytes": 4096,
@@ -319,7 +322,7 @@ def test_cli_parses_terminal_llm_trace_options(monkeypatch) -> None:
 
 def test_cli_dispatches_view_command(monkeypatch, tmp_path) -> None:
     calls: list[tuple[str, str, int]] = []
-    result_log = tmp_path / "result.jsonl"
+    result_log = tmp_path / "result.json"
 
     def fake_serve(path, *, host, port):  # type: ignore[no-untyped-def]
         calls.append((str(path), host, port))

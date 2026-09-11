@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
+from threading import Lock
 from collections.abc import Mapping
 from dataclasses import dataclass, fields, is_dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from agentbench.harness.result import (
@@ -16,16 +19,19 @@ from agentbench.harness.result import (
     SuiteAgentResult,
 )
 
+_RESULT_WRITE_LOCK = Lock()
+
 
 @dataclass(frozen=True)
 class ResultLogWriter:
-    """Append-only result artifact for interruption-tolerant benchmark runs."""
+    """JSON event snapshot replaced atomically after each update."""
 
     path: Path
     suite_id: str
 
     def _append(self, event: Mapping[str, object]) -> None:
-        append_result_event(self.path, {"suite_id": self.suite_id, **event})
+        append_result_event(self.path, {"suite_id": self.suite_id, "source": "abb",
+                                       "timestamp": datetime.now(timezone.utc).isoformat(), **event})
 
     def append_step_started(
         self, agent_id: str, input_id: str, payload: object
@@ -38,6 +44,9 @@ class ResultLogWriter:
                 "payload": _json_value(payload),
             },
         )
+
+    def append_progress(self, progress) -> None:
+        self._append({"event": "progress", **_json_value(progress)})
 
     def append_step_completed(self, agent_id: str, step: BenchmarkStepResult) -> None:
         self._append(
@@ -95,7 +104,7 @@ def start_result_log(
     selected_agent_ids: tuple[str, ...],
     now: datetime | None = None,
 ) -> ResultLogWriter:
-    """Create a unique JSONL result log and append the run-start event."""
+    """Create a unique JSON result snapshot with the run-start event."""
 
     if not suite_id.strip():
         raise ValueError("Suite ID cannot be empty")
@@ -104,6 +113,8 @@ def start_result_log(
         path,
         {
             "event": "run_started",
+            "source": "abb",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "suite_id": suite_id,
             "selected_agent_ids": list(selected_agent_ids),
         },
@@ -114,7 +125,7 @@ def start_result_log(
 def unique_result_log_path(
     output_path: str | Path, *, now: datetime | None = None
 ) -> Path:
-    """Return a timestamped JSONL path derived from the requested output path."""
+    """Return a timestamped JSON path derived from the requested output path."""
 
     base = Path(output_path)
     timestamp = (now or datetime.now()).strftime("%Y%m%d-%H%M%S")
@@ -129,22 +140,40 @@ def unique_result_log_path(
         stem = base.name or "result"
 
     directory.mkdir(parents=True, exist_ok=True)
-    candidate = directory / f"{stem}-{timestamp}.jsonl"
+    candidate = directory / f"{stem}-{timestamp}.json"
     index = 2
     while candidate.exists():
-        candidate = directory / f"{stem}-{timestamp}-{index}.jsonl"
+        candidate = directory / f"{stem}-{timestamp}-{index}.json"
         index += 1
     return candidate
 
 
 def append_result_event(path: str | Path, event: Mapping[str, object]) -> None:
-    """Append one JSON event line to a result log."""
+    """Add an event and atomically replace the complete JSON document."""
 
     result_path = Path(path)
     result_path.parent.mkdir(parents=True, exist_ok=True)
-    with result_path.open("a", encoding="utf-8") as file:
-        file.write(json.dumps(_json_value(event), ensure_ascii=False))
-        file.write("\n")
+    with _RESULT_WRITE_LOCK:
+        events = json.loads(result_path.read_text(encoding="utf-8")) if result_path.exists() else []
+        if not isinstance(events, list) or not all(isinstance(item, dict) for item in events):
+            raise ValueError("Result snapshot must contain an array of event objects")
+        from agentbench.observe.store import redact
+        secrets = tuple(v for k, v in os.environ.items() if any(x in k.upper() for x in ("KEY", "TOKEN", "SECRET", "PASSWORD")))
+        events.append(redact(_json_value(event), secrets))
+        temporary_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", dir=result_path.parent,
+                prefix=f".{result_path.name}.", suffix=".tmp", delete=False,
+            ) as file:
+                temporary_path = Path(file.name)
+                json.dump(events, file, ensure_ascii=False, indent=2)
+                file.flush()
+                os.fsync(file.fileno())
+            os.replace(temporary_path, result_path)
+        finally:
+            if temporary_path is not None:
+                temporary_path.unlink(missing_ok=True)
 
 
 def _summary_to_json(result: BenchmarkSuiteResult) -> dict[str, object]:

@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 
-from agentbench.harness import AgentRunner, BenchmarkRunner, SuiteRunner
-from agentbench.runtime import RuntimeFactory
-from agentbench.runtime.docker import DockerRuntime
+from agentbench.harness import SDK, SuiteRunner
 from agentbench.runtime.interception import (
     NullTraceSink,
-    OpenRouterProvider,
     TerminalTraceSink,
     TraceEvent,
     TraceSink,
 )
+from agentbench.sdk.plugins import SDKSelection, evaluation_plan
+from agentbench.sdk.runtime import build_evaluation_runner
 
 
 def build_trace_suite_runner(
@@ -23,6 +22,9 @@ def build_trace_suite_runner(
     output_fn: Callable[[str], None],
     model: str | None = None,
     activity_sink: TraceSink | None = None,
+    sdk: SDK | None = None,
+    sdk_selection: SDKSelection | None = None,
+    sdk_options: Mapping[str, object] | None = None,
 ) -> SuiteRunner:
     if mode not in {"off", "terminal"}:
         raise ValueError(f"Unsupported LLM trace mode: {mode!r}")
@@ -33,15 +35,17 @@ def build_trace_suite_runner(
         trace_output = getattr(activity_sink, "write_static", output_fn)
         sinks.append(TerminalTraceSink(trace_output))
     sink: TraceSink = _CompositeTraceSink(tuple(sinks)) if sinks else NullTraceSink()
-    runtime_factory = RuntimeFactory(
-        docker_builder=lambda: DockerRuntime(
-            model_provider=OpenRouterProvider(model=model),
-            trace_sink=sink,
-            trace_max_bytes=max_bytes,
-        )
+    plan = evaluation_plan(
+        sdk=sdk,
+        selection=sdk_selection,
+        options=sdk_options,
     )
-    agent_runner = AgentRunner(runtime_factory=runtime_factory)
-    benchmark_runner = BenchmarkRunner(agent_runner=agent_runner)
+    benchmark_runner = build_evaluation_runner(
+        plan,
+        model=model,
+        trace_sink=sink,
+        trace_max_bytes=max_bytes,
+    )
     return SuiteRunner(benchmark_runner=benchmark_runner)
 
 

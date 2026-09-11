@@ -61,3 +61,18 @@ class RunningAgent:
 
     def __exit__(self, *exc_info: object) -> None:
         self.stop()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc_info):
+        if self._stopped:
+            return
+        try:
+            close = getattr(self.adapter, "aclose", None)
+            if callable(close):
+                await close()
+            else:
+                self.adapter.close()
+        finally:
+            self._stopped = True

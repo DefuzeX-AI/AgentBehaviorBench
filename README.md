@@ -1,194 +1,144 @@
 # AgentBehaviorBench (ABB)
 
-<p align="center">
-  <img
-    alt="AgentBehaviorBench (ABB)"
-    src="figures/title.png"
-    width="720"
-    style="border-radius: 24px;"
-  >
-</p>
+> **Before you run ABB:** install Python 3.10+, Docker Desktop or Docker
+> Engine (running), and the optional DefuzeX dependency. The bundled ready
+> Company Research Agent needs `KUMA_API_KEY` (or `DEFUZEX_API_KEY`),
+> `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, and `TAVILY_API_KEY`.
 
-<p align="center">
-  English |
-  <a href="otherLanguages/README.fr.md">Français</a> |
-  <a href="otherLanguages/README.ja.md">日本語</a> |
-  <a href="otherLanguages/README.zh-CN.md">中文简体</a> |
-  <a href="otherLanguages/README.zh-TW.md">中文繁體</a> |
-  <a href="otherLanguages/README.ko.md">한국어</a>
-</p>
+AgentBehaviorBench runs registered AI agents in isolated runtimes, captures
+their execution evidence, and evaluates the result through a selectable SDK.
+The default SDK is the built-in KUMA adapter. Results are written locally and
+can be inspected in ABB's browser viewer.
 
-<p align="center">
-  <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-8a008a">
-  <img alt="License" src="https://img.shields.io/badge/License-MIT-0086c9">
-  <img alt="Package" src="https://img.shields.io/badge/pypi%20package-0.1.0-2acb16">
-</p>
+## Quick start
 
-## News
+From the repository root, create a virtual environment and install ABB with
+the DefuzeX extra:
 
-- AgentBehaviorBench (ABB) now runs registered LangGraph agents through the DefuzeX SDK
-  `get_input()` / `submit()` handshake.
+```bash
+python3 -m venv .venv
+source .venv/bin/activate              # Windows PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e ".[defuzex]"
+```
 
-## Overview
+Create the local environment file and add the required credentials:
 
-AgentBehaviorBench (ABB) is a benchmark for evaluating AI agents on end-to-end tasks
-that require calling a target Agent, collecting its outputs and execution trace,
-and judging whether it completed the requested workflow correctly.
+```bash
+cp .env.example .env                   # Windows PowerShell: Copy-Item .env.example .env
+```
 
-Given a registered Agent and a benchmark Case, AgentBehaviorBench (ABB) runs the Agent through
-a trusted host harness. The harness can launch framework-specific or
-containerized Agents, transparently route model traffic through a
-credential-safe Model Interceptor into a run-selected OpenRouter model, record
-each SDK input and Agent response as append-only JSONL events,
-and submit the completed run to the DefuzeX Judge.
+```dotenv
+# Required by the default KUMA evaluation SDK. DEFUZEX_API_KEY is accepted too.
+KUMA_API_KEY=
 
-AgentBehaviorBench (ABB) is designed to make Agent evaluation reproducible. Agents are
-declared in a registry, adapted through framework adapters such as LangGraph,
-certified from `adapting` to `ready`, and included in default benchmark runs only
-after certification succeeds.
+# Required for model calls made by Docker-based Agents.
+OPENROUTER_API_KEY=
+OPENROUTER_MODEL=openai/gpt-4.1-mini
 
-The current execution flow is:
+# Required by the bundled Company Research Agent for web research.
+TAVILY_API_KEY=
+```
+
+Start Docker, then run every enabled Agent whose registry status is `ready`:
+
+```bash
+agentbench run
+```
+
+ABB asks you to confirm the selected Agents, saves a result snapshot under
+`results/`, and starts the local viewer. Use `--no-view` for a non-interactive
+or headless run:
+
+```bash
+agentbench run --no-view --output results/benchmark.json
+```
+
+## Requirements and environment
+
+| Requirement | Why it is needed |
+| --- | --- |
+| Python 3.10 or newer | ABB host CLI and harness. |
+| Docker Desktop / Docker Engine | The bundled ready Agent runs in a Docker container. Docker must be running before `run`, `evaluate`, `certify`, or `observe`. |
+| `KUMA_API_KEY` or `DEFUZEX_API_KEY` | Case and Judge access for the default KUMA SDK. |
+| `OPENROUTER_API_KEY` | Model traffic from Docker Agents is routed through ABB's interceptor to OpenRouter. |
+| `OPENROUTER_MODEL` | Model slug for the run; a default is provided in `.env.example`, but choose a model your account can use. |
+| `TAVILY_API_KEY` | Web-search credential required by the bundled Company Research Agent. |
+
+`.env` is ignored by Git. Environment variables already exported by the shell
+override values in `.env`; `--env-file PATH` selects another dotenv file; and
+`--model MODEL` overrides `OPENROUTER_MODEL` for one command.
+
+The optional variables below are only needed when you want to identify
+OpenRouter requests or use a compatible endpoint:
+
+```dotenv
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_HTTP_REFERER=https://example.com
+OPENROUTER_APP_TITLE=AgentBehaviorBench
+```
+
+## CLI
+
+Run `agentbench --help` or any command with `--help` for the installed CLI.
+The most useful commands are:
+
+| Command | Use |
+| --- | --- |
+| `agentbench run` | Evaluate every enabled `ready` Agent with the selected SDK. This is the default command. |
+| `agentbench evaluate company-research-agent --cases 1` | Evaluate one enabled Agent on a chosen number of independent Cases. |
+| `agentbench observe company-research-agent` | Run one enabled Agent with native input and save traces, without creating Cases or calling a Judge. |
+| `agentbench certify react-agent` | Run an `adapting` Agent and promote it to `ready` only after certification succeeds. |
+| `agentbench view results/benchmark.json` | Reopen a saved benchmark result in the local viewer. |
+| `agentbench sdk list` | List built-in and installed evaluation SDK plugins. |
+| `agentbench clean --dry-run` | Show the local result history that would be moved to a recoverable archive. |
+
+Useful `run` options:
+
+```bash
+# Use an explicit model for this run.
+agentbench run --model openai/gpt-4.1-mini
+
+# Select a built-in or installed SDK and pass it a JSON options file.
+agentbench run --sdk kuma --sdk-options sdk-options.json
+
+# Print sanitized model activity while retaining the normal result artifact.
+agentbench run --llm-trace terminal
+```
+
+See [the CLI reference](docs/CLI.md) for the complete command and option
+reference, and [the agent onboarding guide](docs/How%20To%20Add%20Agent.md) to
+add another Agent.
+
+## How ABB is organized
 
 ```text
-registry.toml
--> SuiteRunner
--> BenchmarkRunner
--> DefuzeX SDK Run
--> Agent Adapter / Runtime
--> Judge Report
+resources/registry.toml
+        -> CLI selection
+        -> SuiteRunner / evaluation SDK
+        -> Agent adapter and runtime
+        -> result snapshot and local viewer
 ```
 
-The repository includes:
+- `resources/registry.toml` declares each Agent, its status, and its runtime.
+- `resources/agents/` contains each Agent unit and its ABB configuration.
+- `agentbench/cli/` provides the terminal commands.
+- `agentbench/harness/` owns suite execution, results, and registry loading.
+- `agentbench/runtime/` runs Agents locally or in Docker and intercepts model
+  traffic for Docker runtimes.
+- `agentbench/sdk/` contains built-in SDK adapters and plugin discovery.
 
-- `agentbench/cli`: terminal entry point and progress output.
-- `agentbench/harness`: SDK handshake, suite execution, results, and registry.
-- `agentbench/adapter`: framework-neutral adapter contract and LangGraph support.
-- `agentbench/runtime`: local and Docker runtime integration.
-- `resources/agents`: reproducible benchmark agent fixtures.
-- `services/model-interceptor`: transparent TLS, authentication, streaming, and
-  OpenRouter routing and model Trace service for Docker runs.
+## Development
 
-![AgentBehaviorBench (ABB) framework](figures/framework.png)
+Run the test suite after installing development dependencies:
 
-## Setup
-
-AgentBehaviorBench (ABB) requires Python 3.10 or later and the DefuzeX Python SDK.
-The SDK provides the benchmark protocol used by AgentBehaviorBench (ABB): it parses benchmark
-requirements, creates DefuzeX Cases, drives each SDK input, records evidence,
-and submits completed runs for judging.
-
-Create and activate a virtual environment from the parent workspace that
-contains this repository:
-
-```powershell
-cd <workspace-root>
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-```
-
-Install AgentBehaviorBench (ABB) in editable mode:
-
-```powershell
-python -m pip install -e .\defuzeX_AgentBench
-```
-
-### Internal SDK Build
-
-This repository currently depends on the internal DefuzeX SDK `dev` branch.
-Until the SDK is published for normal package installation, if `Defuze-SDK` has
-not been cloned locally yet, clone it from the SDK `dev` branch
-(`https://github.com/DefuzeX-AI/Defuze-SDK/tree/dev`) next to
-`defuzeX_AgentBench`, then install it into the same `.venv`:
-
-```powershell
-cd <workspace-root>
-git clone --branch dev --single-branch https://github.com/DefuzeX-AI/Defuze-SDK
-python -m pip install -e .\Defuze-SDK
-python -m pip install -e .\defuzeX_AgentBench
-```
-
-A typical source checkout has `Defuze-SDK` and `defuzeX_AgentBench` as sibling
-directories under the same parent workspace, both installed in editable mode.
-
-> [!NOTE]
-> PAT means Personal Access Token. If the internal DefuzeX SDK repository is
-> private, GitHub may require a PAT when cloning it over HTTPS. Treat the PAT
-> like a password: keep it out of source files, README examples, notebooks, and
-> committed `.env` files.
-
-## Usage
-
-After installing AgentBehaviorBench (ABB), start it from the benchmark workspace with the
-launcher script:
-
-```powershell
-cd <workspace-root>
-.\.venv\Scripts\Activate.ps1
-python .\run_agentbench.py
-```
-
-You can also run the package directly from the AgentBehaviorBench (ABB) repository:
-
-```powershell
-cd <workspace-root>\defuzeX_AgentBench
-python -m agentbench
-```
-
-To save a run and inspect live benchmark events in the local result viewer, pass
-an output path:
-
-```powershell
-python -m agentbench --output results\result.json
-```
-
-Without `--output`, AgentBehaviorBench (ABB) runs in the terminal and does not create a JSONL
-result artifact. With `--output`, AgentBehaviorBench (ABB) writes an append-only JSONL result
-file and starts the local viewer so you can refresh and inspect events while the
-benchmark is running.
-
-Set a DefuzeX API key when using official Case or Judge providers:
-
-```powershell
-$env:DEFUZEX_API_KEY = "dfx_<public-id>.<secret>"
-```
-
-Docker Agents route model traffic through OpenRouter. Configure its key and
-choose one model for the complete benchmark run:
-
-```powershell
-Copy-Item .env.example .env
-# Edit .env locally; it is ignored by Git and loaded automatically by the CLI.
-```
-
-PowerShell environment variables override `.env`, and
-`python -m agentbench run --model <slug>` overrides `OPENROUTER_MODEL`.
-
-Run the test suite:
-
-```powershell
+```bash
 python -m pytest
 ```
 
-For more agent-facing instructions, start with [AGENTS.md](AGENTS.md). The
-longer documentation guide is in [docs/AGENTS.md](docs/AGENTS.md).
+For repository conventions, see [AGENTS.md](AGENTS.md) and
+[docs/AGENTS.md](docs/AGENTS.md).
 
-## How to Add Agents to Testing
+## License
 
-If you want to add your own Agent to the benchmark, ask an agent to read
-[docs/How To Add Agent.md](docs/How%20To%20Add%20Agent.md) and follow the
-onboarding flow documented there.
-
-AgentBehaviorBench (ABB) provides the pieces needed to turn an external Agent project into a
-repeatable benchmark target: registry-based discovery, framework adapters,
-Docker runtime support, model credential routing through the Model Interceptor,
-append-only result artifacts, local result viewing, and certification from
-`adapting` to `ready`. This gives you a consistent way to compare Agents across
-the same DefuzeX Cases while keeping runtime behavior, outputs, and judgment
-evidence inspectable.
-
-## Citation and License
-
-MIT License. See [LICENSE](LICENSE).
-
-If you find our work helpful, please cite it as follows:
+MIT. See [LICENSE](LICENSE).

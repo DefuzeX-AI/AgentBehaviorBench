@@ -7,8 +7,8 @@ import pytest
 from agentbench.cli.viewer import parse_result_log, start_viewer_server
 
 
-def test_parse_result_log_groups_events_and_skips_bad_lines(tmp_path) -> None:
-    result_log = tmp_path / "result-20260819-010101.jsonl"
+def test_parse_result_log_groups_events_and_reports_invalid_entries(tmp_path) -> None:
+    result_log = tmp_path / "result-20260819-010101.json"
     events = [
         {
             "event": "run_started",
@@ -53,7 +53,7 @@ def test_parse_result_log_groups_events_and_skips_bad_lines(tmp_path) -> None:
         {"event": "suite_completed", "summary": {"suite_passed": True}},
     ]
     result_log.write_text(
-        "\n".join(json.dumps(event) for event in events) + "\n{bad",
+        json.dumps([*events, "invalid event"]),
         encoding="utf-8",
     )
 
@@ -65,7 +65,7 @@ def test_parse_result_log_groups_events_and_skips_bad_lines(tmp_path) -> None:
     assert parsed["summary"] == {"suite_passed": True}
     assert parsed["event_count"] == 5
     assert parsed["parse_errors"] == [
-        {"line": 6, "message": "Expecting property name enclosed in double quotes"}
+        {"index": 5, "message": "Expected JSON object"}
     ]
     assert parsed["agents"][0]["agent_id"] == "agent-a"
     assert [event["event"] for event in parsed["agents"][0]["step_events"]] == [
@@ -75,23 +75,12 @@ def test_parse_result_log_groups_events_and_skips_bad_lines(tmp_path) -> None:
 
 
 def test_parse_result_log_surfaces_step_events_without_agent_result(tmp_path) -> None:
-    result_log = tmp_path / "result.jsonl"
-    result_log.write_text(
-        "\n".join(
-            [
-                json.dumps({"event": "run_started", "selected_agent_ids": ["agent-a"]}),
-                json.dumps(
-                    {
-                        "event": "step_started",
-                        "agent_id": "agent-a",
-                        "input_id": "input-a",
-                        "payload": {"prompt": "kept case"},
-                    }
-                ),
-            ]
-        ),
-        encoding="utf-8",
-    )
+    result_log = tmp_path / "result.json"
+    result_log.write_text(json.dumps([
+        {"event": "run_started", "selected_agent_ids": ["agent-a"]},
+        {"event": "step_started", "agent_id": "agent-a", "input_id": "input-a",
+         "payload": {"prompt": "kept case"}},
+    ]), encoding="utf-8")
 
     parsed = parse_result_log(result_log)
 
@@ -117,18 +106,16 @@ def test_parse_result_log_surfaces_step_events_without_agent_result(tmp_path) ->
     ]
 
 
-def test_viewer_serves_static_app_and_live_result_api(tmp_path) -> None:
-    result_log = tmp_path / "result.jsonl"
-    result_log.write_text(
-        json.dumps(
-            {
-                "event": "run_started",
-                "suite_id": "suite_test",
-                "selected_agent_ids": ["agent-a"],
-            }
-        ),
-        encoding="utf-8",
-    )
+def test_viewer_serves_static_app_and_live_result_api(tmp_path, monkeypatch) -> None:
+    from agentbench.cli import viewer as viewer_module
+    assets = tmp_path / "dist"
+    assets.mkdir()
+    (assets / "index.html").write_text('<html><head><title>ABB · Trace</title></head><body></body></html>')
+    monkeypatch.setattr(viewer_module, "WEB_ROOT", assets)
+    result_log = tmp_path / "result.json"
+    result_log.write_text(json.dumps([
+        {"event": "run_started", "suite_id": "suite_test", "selected_agent_ids": ["agent-a"]},
+    ]), encoding="utf-8")
     viewer = start_viewer_server(result_log, port=0)
 
     try:
@@ -151,5 +138,17 @@ def test_viewer_serves_static_app_and_live_result_api(tmp_path) -> None:
     assert viewer.url.endswith("/suite/suite_test/")
     assert result["selected_agent_ids"] == ["agent-a"]
     assert error.value.code == 409
-    assert "<title>AgentBench Result Viewer</title>" in html
+    assert "<title>ABB · Trace</title>" in html
+    assert 'name="abb-result-api"' in html
+    assert '/api/suites/suite_test/result' in html
+    assert result["events"][0]["event"] == "run_started"
     assert not viewer.thread.is_alive()
+
+
+def test_viewer_explains_missing_frontend_build(tmp_path, monkeypatch):
+    from agentbench.cli import viewer as viewer_module
+    monkeypatch.setattr(viewer_module, "WEB_ROOT", tmp_path / "missing-dist")
+    result = tmp_path / "result.json"
+    result.write_text('[]')
+    with pytest.raises(viewer_module.ViewerUnavailable, match="npm ci.*npm run build"):
+        start_viewer_server(result, port=0)

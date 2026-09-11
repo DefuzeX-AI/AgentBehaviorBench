@@ -53,9 +53,16 @@ def main() -> int:
         path=root / "tests" / "fixtures" / "interceptor-agent",
     )
     with runtime.start(descriptor) as session:
-        invocation = session.invoke("hello")
+        assert session.wait(timeout=30) == 0, session.stderr
+        assert "Model request completed successfully" in session.stdout
+        # The log follower may receive the last trace after the process exits.
+        import time
+        deadline = time.monotonic() + 5
+        while not any(event.event == "llm_response" for event in sink.events):
+            if time.monotonic() >= deadline:
+                raise AssertionError("Interceptor response trace was not received")
+            time.sleep(0.05)
 
-    assert invocation.output == {"status": 200, "model": "openrouter-smoke-model"}
     requests = [event for event in sink.events if event.event == "llm_request"]
     responses = [event for event in sink.events if event.event == "llm_response"]
     assert len(requests) == len(responses) == 1

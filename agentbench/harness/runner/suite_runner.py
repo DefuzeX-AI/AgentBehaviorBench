@@ -1,21 +1,21 @@
 """
 
-Run a DefuzeX benchmark suite across registered agents.
+Run an evaluation SDK benchmark suite across registered agents.
 
 
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from uuid import uuid4
 
 from ..errors import ProviderSelectionError, SuiteConfigurationError
 from ..progress import ProgressCallback, emit_progress
+from ..protocols import EvaluationRunner, SDK
 from ..registry import AgentRegistration
 from ..result import BenchmarkSuiteResult, SuiteAgentResult
 from .benchmark_runner import (
-    BenchmarkRunner,
     StepCompleteCallback,
     StepFailureCallback,
     StepStartCallback,
@@ -25,14 +25,37 @@ from .benchmark_runner import (
 class SuiteRunner:
     """
 
-        Sequentially execute one benchmark for every selected Agent.
+    Sequentially execute one benchmark for every selected Agent.
 
-        create suit -> run benchmark for each agent -> collect results -> return suite result
+    create suit -> run benchmark for each agent -> collect results -> return suite result
 
     """
 
-    def __init__(self, *, benchmark_runner: BenchmarkRunner | None = None) -> None:
-        self._benchmark_runner = benchmark_runner or BenchmarkRunner()
+    def __init__(
+        self,
+        *,
+        sdk: SDK | None = None,
+        sdk_options: Mapping[str, object] | None = None,
+        benchmark_runner: EvaluationRunner | None = None,
+    ) -> None:
+        if benchmark_runner is not None and (
+            sdk is not None or sdk_options is not None
+        ):
+            raise ValueError(
+                "Configure sdk on either SuiteRunner or benchmark_runner, not both"
+            )
+        if benchmark_runner is None:
+            from agentbench.runtime.interception import NullTraceSink
+            from agentbench.sdk.plugins import evaluation_plan
+            from agentbench.sdk.runtime import build_evaluation_runner
+
+            benchmark_runner = build_evaluation_runner(
+                evaluation_plan(sdk=sdk, options=sdk_options),
+                model=None,
+                trace_sink=NullTraceSink(),
+                trace_max_bytes=262144,
+            )
+        self._benchmark_runner = benchmark_runner
 
     @staticmethod
     def new_suite_id() -> str:
@@ -40,10 +63,41 @@ class SuiteRunner:
 
         return f"suite_{uuid4().hex}"
 
+    def run(
+        self, registrations: Iterable[AgentRegistration], **kwargs: object
+    ) -> BenchmarkSuiteResult:
+        """Run a suite with the injected SDK and common progress callbacks.
+
+        Configure SDK-specific options in the constructor's sdk_options.
+        """
+        allowed = {
+            "suite_id",
+            "continue_on_error",
+            "on_agent_start",
+            "on_agent_complete",
+            "on_progress",
+            "on_step_start",
+            "on_step_complete",
+            "on_step_failure",
+        }
+        unexpected = set(kwargs) - allowed
+        if unexpected:
+            raise TypeError(
+                f"Pass SDK settings via sdk_options; unsupported run options: {sorted(unexpected)}"
+            )
+        return self._run_suite(registrations, _use_sdk=True, **kwargs)
+
     def run_defuzex(
+        self, registrations: Iterable[AgentRegistration], **kwargs: object
+    ) -> BenchmarkSuiteResult:
+        """Compatibility entry point for the original DefuzeX options."""
+        return self._run_suite(registrations, **kwargs)
+
+    def _run_suite(
         self,
         registrations: Iterable[AgentRegistration],
         *,
+        _use_sdk: bool = False,
         case_provider: object | None = None,
         judge_provider: object | None = None,
         api_key: str | None = None,
@@ -68,6 +122,9 @@ class SuiteRunner:
             raise ValueError("Suite ID cannot be empty")
         selected = tuple(registrations)
         self._validate_selection(selected)
+        begin_suite = getattr(self._benchmark_runner, 'begin_suite', None)
+        if callable(begin_suite):
+            begin_suite(suite_id)
         items: list[SuiteAgentResult] = []
 
         emit_progress(
@@ -76,16 +133,19 @@ class SuiteRunner:
             status="started",
         )
         try:
-            provider_mode = self._benchmark_runner.validate_defuzex(
-                selected[0],
-                case_provider=case_provider,
-                judge_provider=judge_provider,
-                api_key=api_key,
-                max_inputs=max_inputs,
-                allow_local=allow_local,
-                track_files=track_files,
-                save_local=save_local,
-            )
+            if _use_sdk:
+                provider_mode = self._benchmark_runner.validate_sdk(selected[0])
+            else:
+                provider_mode = self._benchmark_runner.validate_defuzex(
+                    selected[0],
+                    case_provider=case_provider,
+                    judge_provider=judge_provider,
+                    api_key=api_key,
+                    max_inputs=max_inputs,
+                    allow_local=allow_local,
+                    track_files=track_files,
+                    save_local=save_local,
+                )
         except Exception as exc:
             emit_progress(
                 on_progress,
@@ -109,20 +169,29 @@ class SuiteRunner:
             run_error: Exception | None = None
             for _ in range(registration.case_count):
                 try:
-                    benchmark = self._benchmark_runner.run_defuzex(
-                        registration,
-                        case_provider=case_provider,
-                        judge_provider=judge_provider,
-                        api_key=api_key,
-                        max_inputs=max_inputs,
-                        allow_local=allow_local,
-                        track_files=track_files,
-                        save_local=save_local,
-                        on_progress=on_progress,
-                        on_step_start=on_step_start,
-                        on_step_complete=on_step_complete,
-                        on_step_failure=on_step_failure,
-                    )
+                    if _use_sdk:
+                        benchmark = self._benchmark_runner.run(
+                            registration,
+                            on_progress=on_progress,
+                            on_step_start=on_step_start,
+                            on_step_complete=on_step_complete,
+                            on_step_failure=on_step_failure,
+                        )
+                    else:
+                        benchmark = self._benchmark_runner.run_defuzex(
+                            registration,
+                            case_provider=case_provider,
+                            judge_provider=judge_provider,
+                            api_key=api_key,
+                            max_inputs=max_inputs,
+                            allow_local=allow_local,
+                            track_files=track_files,
+                            save_local=save_local,
+                            on_progress=on_progress,
+                            on_step_start=on_step_start,
+                            on_step_complete=on_step_complete,
+                            on_step_failure=on_step_failure,
+                        )
                 except ProviderSelectionError as exc:
                     # Provider selection is shared suite configuration, so retrying
                     # it for every Agent cannot produce a different result.

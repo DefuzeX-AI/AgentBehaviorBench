@@ -1,49 +1,5 @@
-"""DefuzeX SDK interfaces consumed by AgentBench."""
+"""Compatibility exports; SDK contracts live at agentbench.sdk.contracts."""
 
-from __future__ import annotations
+from agentbench.sdk.contracts import SDK, SDKReport, SDKRun, SDKRunFactory, SDKTestInput
 
-from typing import Protocol
-
-
-class SDKReport(Protocol):
-    """Public report fields consumed by AgentBench."""
-
-    status: str
-    confidence: object
-    issues: tuple[object, ...]
-    evidence_gaps: tuple[object, ...]
-
-
-class SDKTestInput(Protocol):
-    """Public SDK input fields consumed by AgentBench."""
-
-    input_id: str
-    payload: object
-
-
-class SDKRun(Protocol):
-    """Strict-handshake subset of a DefuzeX SDK Run."""
-
-    run_id: str
-    state: str
-    report: SDKReport | None
-    history: tuple[object, ...]
-
-    def get_input(self, *, full: bool = False) -> SDKTestInput | None:
-        ...
-
-    def submit(
-        self,
-        output: object = None,
-        *,
-        status: str = "completed",
-        error: str | None = None,
-    ) -> SDKReport | None:
-        ...
-
-
-class SDKRunFactory(Protocol):
-    """Callable shape of ``defuzex.create_run``."""
-
-    def __call__(self, **kwargs: object) -> SDKRun:
-        ...
+__all__ = ["SDK", "SDKReport", "SDKRun", "SDKRunFactory", "SDKTestInput"]

@@ -31,10 +31,8 @@ def _decode(content: bytes, content_type: str) -> object:
     text = content.decode("utf-8", errors="replace")
     if "text/event-stream" in content_type.lower():
         events: list[object] = []
-        for line in text.splitlines():
-            if not line.startswith("data:"):
-                continue
-            value = line[5:].strip()
+        for frame in text.replace("\r\n", "\n").split("\n\n"):
+            value = "\n".join(line[5:].removeprefix(" ") for line in frame.split("\n") if line.startswith("data:"))
             if not value or value == "[DONE]":
                 continue
             try:
@@ -52,3 +50,10 @@ JSON_HTTP_PROTOCOL = JsonHttpProtocol()
 OPENAI_CHAT_PROTOCOL = OpenAIChatProtocol()
 OPENAI_RESPONSES_PROTOCOL = OpenAIResponsesProtocol()
 ANTHROPIC_MESSAGES_PROTOCOL = AnthropicMessagesProtocol()
+
+
+class GeminiContentProtocol(JsonHttpProtocol):
+    name = "gemini-content"
+
+
+GEMINI_CONTENT_PROTOCOL = GeminiContentProtocol()

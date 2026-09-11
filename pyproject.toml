@@ -8,11 +8,14 @@ version = "0.1.0"
 description = "Benchmark harness and framework adapters for DefuzeX agents."
 requires-python = ">=3.10"
 dependencies = [
-    "defuzex>=4,<5",
     "langgraph>=1.0,<2",
     "python-dotenv>=1,<2",
     "tomli>=2,<3; python_version < '3.11'",
 ]
+
+[project.optional-dependencies]
+otel = ["opentelemetry-sdk>=1.30,<2"]
+defuzex = ["defuzex>=4,<5"]
 
 [project.scripts]
 agentbench = "agentbench.cli.main:cli"
@@ -25,5 +28,6 @@ where = ["."]
 include = ["agentbench*"]
 
 [tool.pytest.ini_options]
+cache_dir = "cache/pytest"
 testpaths = ["tests"]
 addopts = ["--import-mode=importlib"]

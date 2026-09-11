@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import secrets
 import shutil
@@ -40,6 +41,7 @@ from .interceptor_image import default_interceptor_image_provider
 from .interceptor_policy import InterceptorPolicy
 from .policy import DockerPolicy
 from .session import DockerSession
+from .worker_build import worker_build_context
 
 
 class DockerRuntimeError(RuntimeError):
@@ -59,9 +61,14 @@ class DockerRuntime:
         model_provider: ModelTargetProvider | None = None,
         trace_sink: TraceSink | None = None,
         trace_max_bytes: int = DEFAULT_TRACE_MAX_BYTES,
+        artifact_root: Path | None = None,
+        timeout_sec: float | None = None,
+        run_id: str | None = None,
     ) -> None:
         if trace_max_bytes < 1024:
             raise ValueError("trace_max_bytes must be at least 1024")
+        if timeout_sec is not None and (isinstance(timeout_sec, bool) or not math.isfinite(timeout_sec) or timeout_sec <= 0):
+            raise ValueError("timeout_sec must be finite and positive")
         self._executable = executable
         self._environ = os.environ if environ is None else environ
         self._secret_resolver = secret_resolver or EnvironmentSecretResolver(
@@ -77,8 +84,15 @@ class DockerRuntime:
         self._model_provider = model_provider or OpenRouterProvider()
         self._trace_sink = trace_sink or NullTraceSink()
         self._trace_max_bytes = trace_max_bytes
+        self.artifact_root = artifact_root
+        self._timeout_override = timeout_sec
+        self.run_id = run_id
 
-    def start(self, agent: AgentDescriptor) -> RuntimeSession:
+    def invocation_timeout(self, agent):
+        return self._timeout_override or AgentContainerConfig.from_agent_dir(
+            agent.path, secret_resolver=self._secret_resolver, environ=self._environ).timeout_sec
+
+    def start(self, agent: AgentDescriptor, *, invocation=None) -> RuntimeSession:
         self._check_available()
         config = AgentContainerConfig.from_agent_dir(
             agent.path,
@@ -86,11 +100,19 @@ class DockerRuntime:
             environ=self._environ,
         )
         interception = InterceptionConfig.from_agent_dir(agent.path)
-        image = self._images.build(
-            context=config.build_context,
-            dockerfile=config.dockerfile,
-            repository=config.agent_id,
-        )
+        if interception is not None:
+            target = self._model_provider.resolve(self._environ)
+            self._secret_resolver.require(target.credential_env)
+        if invocation is not None:
+            with worker_build_context(config) as (context, dockerfile):
+                image = self._images.build(context=context, dockerfile=dockerfile, repository=config.agent_id)
+            self._require_non_root_image(image)
+        else:
+            image = self._images.build(
+                context=config.build_context,
+                dockerfile=config.dockerfile,
+                repository=config.agent_id,
+            )
 
         suffix = uuid4().hex[:12]
         network_name = f"defuzex-{suffix}-egress"
@@ -135,7 +157,6 @@ class DockerRuntime:
                 self._executable,
                 "run",
                 "--rm",
-                "--interactive",
                 "--init",
                 "--name",
                 agent_name,
@@ -154,6 +175,11 @@ class DockerRuntime:
                         ),
                     )
                 )
+            if invocation is not None:
+                inputs, outputs = invocation
+                command.extend(("--mount", _bind_mount(inputs, "/run/abb-input")))
+                # All other filesystem locations retain the existing read-only policy.
+                command.extend(("--mount", f"type=bind,source={outputs},target=/run/abb-output"))
             agent_environment.update(
                 PYTHONDONTWRITEBYTECODE="1",
                 PYTHONUNBUFFERED="1",
@@ -164,7 +190,7 @@ class DockerRuntime:
 
             process = subprocess.Popen(
                 command,
-                stdin=subprocess.PIPE,
+                stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -188,20 +214,19 @@ class DockerRuntime:
 
             return DockerSession(
                 process,
-                timeout_sec=config.timeout_sec,
                 close_callback=cleanup,
-                invoke_start_callback=(
+                trace_checkpoint=(
                     trace_state.checkpoint
                     if interception is not None and interception.required
                     else None
                 ),
-                invoke_complete_callback=(
+                trace_validator=(
                     self._required_trace_callback(trace_state)
                     if interception is not None and interception.required
                     else None
                 ),
             )
-        except Exception:
+        except BaseException:
             self._run_quiet("container", "rm", "--force", agent_name)
             if interceptor is not None:
                 interceptor.close()
@@ -223,61 +248,67 @@ class DockerRuntime:
         secret_dir = Path(tempfile.mkdtemp(prefix="defuzex-model-interceptor-"))
         config_file = secret_dir / "interceptor_config.json"
         ca_dir = secret_dir / "ca"
-        ca_dir.mkdir()
         ca_certificate = ca_dir / "mitmproxy-ca-cert.pem"
-        token_environment: dict[str, str] = {}
-        credentials: list[dict[str, object]] = []
-        target = self._model_provider.resolve(self._environ)
-        upstream_secret = self._secret_resolver.require(target.credential_env)
-        target_secret_file = secret_dir / "target.secret"
-        target_secret_file.write_text(upstream_secret, encoding="utf-8")
+        try:
+            ca_dir.mkdir()
+            token_environment: dict[str, str] = {}
+            credentials: list[dict[str, object]] = []
+            target = self._model_provider.resolve(self._environ)
+            upstream_secret = self._secret_resolver.require(target.credential_env)
+            target_secret_file = secret_dir / "target.secret"
+            target_secret_file.write_text(upstream_secret, encoding="utf-8")
 
-        for credential in interception.credentials:
-            token = secrets.token_urlsafe(32)
-            token_file = secret_dir / f"{credential.credential_id}.token"
-            token_file.write_text(token, encoding="utf-8")
-            token_environment[credential.agent_env] = token
-            credentials.append(
-                {
-                    "id": credential.credential_id,
-                    "auth_plugin": credential.auth_plugin,
-                    "token_file": f"/run/secrets/{token_file.name}",
-                    "secret_file": "/run/secrets/target.secret",
-                }
+            for credential in interception.credentials:
+                token = secrets.token_urlsafe(32)
+                token_file = secret_dir / f"{credential.credential_id}.token"
+                token_file.write_text(token, encoding="utf-8")
+                token_environment[credential.agent_env] = token
+                credentials.append(
+                    {
+                        "id": credential.credential_id,
+                        "auth_plugin": credential.auth_plugin,
+                        "token_file": f"/run/secrets/{token_file.name}",
+                        "secret_file": "/run/secrets/target.secret",
+                    }
+                )
+
+            config_file.write_text(
+                json.dumps(
+                    {
+                        "agent_id": agent_id,
+                        "max_trace_bytes": self._trace_max_bytes,
+                        "target": {
+                            "provider_id": target.provider_id,
+                            "target_plugin": target.target_plugin,
+                            "base_url": target.base_url,
+                            "model": target.model,
+                            "headers": dict(target.headers),
+                        },
+                        "credentials": credentials,
+                        "tool_routes": [
+                            {"host_patterns": list(route.host_patterns), "ports": list(route.ports),
+                             "methods": list(route.methods), "path_patterns": list(route.path_patterns),
+                             "purpose": route.purpose}
+                            for route in interception.tool_routes
+                        ],
+                        "routes": [
+                            {
+                                "id": route.route_id,
+                                "host_patterns": list(route.host_patterns),
+                                "ports": list(route.ports),
+                                "methods": list(route.methods),
+                                "path_patterns": list(route.path_patterns),
+                                "protocol_plugin": route.protocol_plugin,
+                                "credential": route.credential_id,
+                            }
+                            for route in interception.routes
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
             )
 
-        config_file.write_text(
-            json.dumps(
-                {
-                    "agent_id": agent_id,
-                    "max_trace_bytes": self._trace_max_bytes,
-                    "target": {
-                        "provider_id": target.provider_id,
-                        "target_plugin": target.target_plugin,
-                        "base_url": target.base_url,
-                        "model": target.model,
-                        "headers": dict(target.headers),
-                    },
-                    "credentials": credentials,
-                    "routes": [
-                        {
-                            "id": route.route_id,
-                            "host_patterns": list(route.host_patterns),
-                            "ports": list(route.ports),
-                            "methods": list(route.methods),
-                            "path_patterns": list(route.path_patterns),
-                            "protocol_plugin": route.protocol_plugin,
-                            "credential": route.credential_id,
-                        }
-                        for route in interception.routes
-                    ],
-                },
-                ensure_ascii=False,
-            ),
-            encoding="utf-8",
-        )
-
-        try:
             command = [
                 "run",
                 "--detach",
@@ -289,8 +320,6 @@ class DockerRuntime:
                 *self._interceptor_policy.run_arguments(),
                 "--mount",
                 _bind_mount(config_file, "/run/secrets/interceptor_config"),
-                "--mount",
-                _writable_bind_mount(ca_dir, "/run/defuzex/ca"),
             ]
             for path in sorted(secret_dir.glob("*.token")) + sorted(
                 secret_dir.glob("*.secret")
@@ -304,7 +333,7 @@ class DockerRuntime:
             if not ca_certificate.is_file():
                 raise DockerRuntimeError("Model interceptor CA was not exported")
             log_process = self._follow_trace(container_name, trace_state)
-        except Exception:
+        except BaseException:
             self._run_quiet("container", "rm", "--force", container_name)
             shutil.rmtree(secret_dir, ignore_errors=True)
             raise
@@ -343,8 +372,13 @@ class DockerRuntime:
             for line in process.stdout:
                 event = TraceEvent.from_log_line(line.rstrip("\r\n"))
                 if event is not None:
+                    try:
+                        # A pair is complete only after its full event is saved.
+                        self._trace_sink.emit(event)
+                    except Exception:
+                        trace_state.fail()
+                        return
                     trace_state.emit(event)
-                    self._trace_sink.emit(event)
 
         threading.Thread(
             target=consume,
@@ -363,6 +397,8 @@ class DockerRuntime:
                 raise DockerRuntimeError(
                     "Agent invocation completed without a matched LLM request/response trace"
                 )
+            if not trace_state.wait_for_idle():
+                raise DockerRuntimeError("Model trace is incomplete: unfinished pair, capture error, truncation, or failed persistence")
 
         return require_trace
 
@@ -375,9 +411,8 @@ class DockerRuntime:
             if (
                 logs is not None
                 and '"event": "interceptor_ready"' in logs.stdout
-                and ca_certificate.is_file()
-                and ca_certificate.stat().st_size > 0
             ):
+                self._export_ca(container_name, ca_certificate)
                 return
             state = self._run_quiet(
                 "inspect",
@@ -397,6 +432,25 @@ class DockerRuntime:
         raise DockerRuntimeError(
             f"Model interceptor did not become ready{': ' + detail if detail else ''}"
         )
+
+    def _export_ca(self, container_name: str, destination: Path) -> None:
+        """Copy only the public CA; private key stays in interceptor tmpfs."""
+        import ssl
+        # Docker's archive/cp endpoint cannot reliably read a live tmpfs mount.
+        # Read the single public PEM through exec; never export the CA directory.
+        pem = self._run("exec", container_name, "cat", "/run/defuzex/ca/mitmproxy-ca-cert.pem").stdout
+        if "PRIVATE KEY" in pem or "-----BEGIN CERTIFICATE-----" not in pem:
+            raise DockerRuntimeError("Invalid interceptor public CA export")
+        ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT).load_verify_locations(cadata=pem)
+        with tempfile.NamedTemporaryFile(mode="w", encoding="ascii", dir=destination.parent, delete=False) as stream:
+            owned = Path(stream.name)
+            try:
+                stream.write(pem)
+                stream.flush()
+                owned.chmod(0o644)
+                owned.replace(destination)
+            finally:
+                owned.unlink(missing_ok=True)
 
     def _require_non_root_image(self, image: str) -> None:
         result = self._run(

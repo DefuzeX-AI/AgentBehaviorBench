@@ -30,7 +30,8 @@ _IMPORT_LOCK = Lock()
 def load_graph(config: LangGraphAdapterConfig) -> InvokableGraph:
     """Load a graph from its file.py:attribute entrypoint."""
     source_path, attribute = _parse_entrypoint(config)
-    import_root, module_name = _module_location(config.agent_root, source_path)
+    entry_root = config.agent_root / "bindings" if config.binding else config.source_root
+    import_root, module_name = _module_location(entry_root, source_path)
 
     with _IMPORT_LOCK, _temporary_sys_path(import_root):
         importlib.invalidate_caches()
@@ -48,14 +49,17 @@ def load_graph(config: LangGraphAdapterConfig) -> InvokableGraph:
 
 def _parse_entrypoint(config: LangGraphAdapterConfig) -> tuple[Path, str]:
     """Split entrypoint into Python file and attribute."""
-    file_name, separator, attribute = config.entrypoint.rpartition(":")
+    file_name, separator, attribute = (config.binding or config.entrypoint).rpartition(":")
     if not separator or not file_name.strip() or not attribute.strip():
         raise LangGraphLoadError(
             f"Entrypoint must use 'file.py:attribute': {config.entrypoint!r}"
         )
 
-    source_path = (config.agent_root / file_name).resolve()
-    if not source_path.is_relative_to(config.agent_root):
+    entry_root = (config.agent_root / "bindings").resolve() if config.binding else config.source_root
+    if not entry_root.is_relative_to(config.agent_root):
+        raise LangGraphLoadError("Binding directory escapes agent unit")
+    source_path = (entry_root / file_name).resolve()
+    if not source_path.is_relative_to(entry_root):
         raise LangGraphLoadError(f"Entrypoint escapes agent directory: {file_name}")
     if source_path.suffix != ".py" or not source_path.is_file():
         raise LangGraphLoadError(f"Entrypoint Python file does not exist: {source_path}")

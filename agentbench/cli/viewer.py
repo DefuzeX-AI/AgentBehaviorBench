@@ -1,18 +1,40 @@
-"""Local result viewer server for AgentBench JSONL artifacts."""
+"""Local result viewer server for AgentBench JSON snapshots."""
 
 from __future__ import annotations
 
 import json
+from html import escape
 import threading
 from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import quote, unquote, urlparse
+from urllib.parse import quote, unquote, urlparse, parse_qs
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
-WEB_ROOT = Path(__file__).resolve().parents[2] / "web"
+WEB_ROOT = Path(__file__).resolve().parents[2] / "web" / "dist"
+
+
+class ViewerUnavailable(OSError):
+    """Prebuilt UI assets are absent or incomplete."""
+
+
+def require_viewer_assets():
+    import re
+    index = WEB_ROOT / 'index.html'
+    missing = not index.is_file()
+    if not missing:
+        for target in re.findall(r'(?:src|href)=["\']([^"\']+)["\']', index.read_text()):
+            if target.startswith(('http:', 'https:', 'data:', '#')):
+                continue
+            asset = (WEB_ROOT / target.split('?')[0].lstrip('/')).resolve()
+            if not asset.is_relative_to(WEB_ROOT.resolve()) or not asset.is_file():
+                missing = True
+                break
+    if missing:
+        import shlex
+        raise ViewerUnavailable(f'Trace UI not built or incomplete. Run: cd {shlex.quote(str(WEB_ROOT.parent))} && npm ci && npm run build')
 
 
 @dataclass(frozen=True)
@@ -42,6 +64,7 @@ def serve_result_log(
     if not path.exists():
         raise FileNotFoundError(f"Result log not found: {path}")
 
+    require_viewer_assets()
     server = create_viewer_server(path, host=host, port=port)
     base_url = f"http://{host}:{server.server_port}"
     url = _locked_viewer_url(base_url, _result_log_suite_id(path))
@@ -65,6 +88,7 @@ def start_viewer_server(
 
     path = Path(result_log).resolve()
     suite_id = _result_log_suite_id(path)
+    require_viewer_assets()
     server = create_viewer_server(path, host=host, port=port)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -99,7 +123,20 @@ def create_viewer_server(
 def build_viewer_handler(
     result_log: Path, *, expected_suite_id: str | None
 ) -> type[SimpleHTTPRequestHandler]:
-    """Build a request handler bound to one JSONL result artifact."""
+    """Build a request handler bound to one JSON result artifact."""
+    run_api = None
+    if result_log.name == 'run.json':
+        try:
+            metadata = json.loads(result_log.read_text(encoding='utf-8'))
+            if isinstance(metadata, dict) and metadata.get('schema') in ('abb.observe.run.v1', 'abb.evaluate.run.v1'):
+                from agentbench.observe.view_api import RunCatalogAPI
+                run_api = RunCatalogAPI(result_log.parent)
+        except (OSError, ValueError):
+            pass
+    suite_view = run_api is None
+    if suite_view:
+        from agentbench.observe.view_api import SuiteRunCatalogAPI
+        run_api = SuiteRunCatalogAPI(result_log)
 
     class ViewerHandler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):  # type: ignore[no-untyped-def]
@@ -110,6 +147,18 @@ def build_viewer_handler(
 
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
+            if run_api is not None and parsed.path.startswith('/api/observe/'):
+                origin = self.headers.get('Origin')
+                host = self.headers.get('Host', '')
+                if (urlparse(f'http://{host}').hostname not in ('localhost', '127.0.0.1', '::1')
+                    or (origin and origin != f'http://{host}') or self.headers.get('Sec-Fetch-Site') == 'cross-site'):
+                    self._send_json({'error': 'Same-origin reads only'}, status=HTTPStatus.FORBIDDEN)
+                    return
+                try:
+                    self._send_json(run_api.route(parsed.path, parse_qs(parsed.query)))
+                except (OSError, ValueError, KeyError, StopIteration):
+                    self._send_json({'error': 'Artifact unavailable'}, status=HTTPStatus.NOT_FOUND)
+                return
             result_api_path = _suite_result_api_path(expected_suite_id)
             if parsed.path == result_api_path:
                 self._send_json(parse_result_log(result_log))
@@ -125,8 +174,21 @@ def build_viewer_handler(
 
             suite_path = _suite_view_path(expected_suite_id)
             if parsed.path.rstrip("/") == suite_path.rstrip("/"):
-                self.path = "/index.html"
-                super().do_GET()
+                index = WEB_ROOT / "index.html"
+                if not index.is_file():
+                    self.send_error(HTTPStatus.SERVICE_UNAVAILABLE,
+                                    "Trace UI not built. Run npm install and npm run build in web/.")
+                    return
+                html = index.read_text(encoding="utf-8")
+                if suite_view:
+                    html = html.replace("<head>", f'<head><meta name="abb-result-api" content="{escape(result_api_path, quote=True)}">', 1)
+                body = html.encode("utf-8")
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(body)
                 return
             if parsed.path in {"", "/"} and expected_suite_id is not None:
                 self._send_suite_mismatch()
@@ -159,28 +221,23 @@ def build_viewer_handler(
 
 
 def parse_result_log(path: str | Path) -> dict[str, object]:
-    """Parse a JSONL result log into the shape consumed by the viewer."""
+    """Read a JSON event array into the shape consumed by the viewer."""
 
     result_path = Path(path)
     events: list[dict[str, object]] = []
     parse_errors: list[dict[str, object]] = []
 
-    for line_number, line in enumerate(
-        result_path.read_text(encoding="utf-8").splitlines(), start=1
-    ):
-        if not line.strip():
-            continue
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError as exc:
-            parse_errors.append({"line": line_number, "message": exc.msg})
-            continue
-        if isinstance(event, dict):
-            events.append(event)
-        else:
-            parse_errors.append(
-                {"line": line_number, "message": "Expected JSON object"}
-            )
+    try:
+        document = json.loads(result_path.read_text(encoding="utf-8"))
+        if not isinstance(document, list):
+            raise ValueError("Expected an array of event objects")
+        for index, event in enumerate(document):
+            if isinstance(event, dict):
+                events.append(event)
+            else:
+                parse_errors.append({"index": index, "message": "Expected JSON object"})
+    except (json.JSONDecodeError, ValueError) as exc:
+        parse_errors.append({"message": str(exc)})
 
     suite_id: str | None = None
     selected_agent_ids: list[str] = []
@@ -231,22 +288,15 @@ def parse_result_log(path: str | Path) -> dict[str, object]:
         "suite_error": suite_error,
         "parse_errors": parse_errors,
         "event_count": len(events),
+        "events": events,
     }
 
 
 def _result_log_suite_id(path: Path) -> str | None:
     """Read the Suite ID from the first valid run-start event."""
 
-    for line in path.read_text(encoding="utf-8").splitlines():
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if not isinstance(event, dict) or event.get("event") != "run_started":
-            continue
-        suite_id = event.get("suite_id")
-        return suite_id if isinstance(suite_id, str) else None
-    return None
+    suite_id = parse_result_log(path)["suite_id"]
+    return suite_id if isinstance(suite_id, str) else None
 
 
 def _locked_viewer_url(base_url: str, suite_id: str | None) -> str:

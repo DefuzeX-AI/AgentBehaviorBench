@@ -7,7 +7,7 @@ name = "defuzex-model-interceptor"
 version = "0.1.0"
 description = "Transparent model traffic interceptor for DefuzeX AgentBench."
 requires-python = ">=3.11"
-dependencies = ["mitmproxy>=11,<13"]
+dependencies = ["mitmproxy==12.2.3", "google-ai-generativelanguage==0.12.0"]
 
 [project.scripts]
 defuzex-model-interceptor = "defuzex_model_interceptor.entrypoint:main"
@@ -17,10 +17,12 @@ json-http = "defuzex_model_interceptor.protocols:JSON_HTTP_PROTOCOL"
 openai-chat = "defuzex_model_interceptor.protocols:OPENAI_CHAT_PROTOCOL"
 openai-responses = "defuzex_model_interceptor.protocols:OPENAI_RESPONSES_PROTOCOL"
 anthropic-messages = "defuzex_model_interceptor.protocols:ANTHROPIC_MESSAGES_PROTOCOL"
+gemini-content = "defuzex_model_interceptor.protocols:GEMINI_CONTENT_PROTOCOL"
 
 [project.entry-points."defuzex.model_interceptor.auth"]
 bearer-token = "defuzex_model_interceptor.auth:BEARER_TOKEN_AUTH"
 anthropic-api-key = "defuzex_model_interceptor.auth:ANTHROPIC_API_KEY_AUTH"
+google-api-key = "defuzex_model_interceptor.auth:GOOGLE_API_KEY_AUTH"
 
 [project.entry-points."defuzex.model_interceptor.targets"]
 openrouter = "defuzex_model_interceptor.targets:OPENROUTER_TARGET"

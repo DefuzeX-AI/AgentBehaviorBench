@@ -4,27 +4,25 @@ from __future__ import annotations
 
 import time
 from argparse import ArgumentParser, Namespace
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 
-from agentbench.harness import SuiteRunner
+from agentbench.cli.terminal_ui.constants import LOGO_PAUSE_SECONDS
+from agentbench.cli.environment import load_project_environment
+from agentbench.cli.execution import run_benchmark_session
+from agentbench.cli.terminal_ui.logo import print_logo
+from agentbench.cli.terminal_ui.presentation import (
+    confirm_agents,
+    print_agents,
+)
+from agentbench.cli.sdk import configure_sdk_parser, sdk_arguments
+from agentbench.cli.terminal_ui import LLMActivity
+from agentbench.cli.trace_runtime import build_trace_suite_runner
+from agentbench.cli.viewer import RunningViewer, start_viewer_server
+from agentbench.harness import SDK, ProviderSelectionError, SuiteRunner
 from agentbench.harness.registry import load_registry
 from agentbench.runtime.interception import DEFAULT_TRACE_MAX_BYTES
-
-from agentbench.cli.constants import ANSI_GREEN, LOGO_PAUSE_SECONDS
-from agentbench.cli.execution import run_benchmark_once, stop_viewer
-from agentbench.cli.environment import load_project_environment
-from agentbench.cli.logo import print_logo
-from agentbench.cli.TerminalUI import LLMActivity
-from agentbench.cli.presentation import (
-    confirm_agents,
-    panel_line,
-    panel_rule,
-    print_agents,
-    request_viewer_action,
-)
-from agentbench.cli.viewer import RunningViewer, start_viewer_server
-from agentbench.cli.trace_runtime import build_trace_suite_runner
+from agentbench.sdk.plugins import SDKSelection
 
 from .base import CommandFeature
 
@@ -34,6 +32,8 @@ DEFAULT_REGISTRY_PATH = (
 
 
 def configure_parser(parser: ArgumentParser) -> None:
+    parser.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY_PATH, help="Agent registry path")
+    configure_sdk_parser(parser)
     parser.add_argument(
         "--env-file",
         metavar="PATH",
@@ -42,11 +42,14 @@ def configure_parser(parser: ArgumentParser) -> None:
     parser.add_argument(
         "--output",
         metavar="PATH",
+        default="results/result.json",
         help=(
-            "Write a unique append-only JSONL result artifact, including "
-            "trace-like step data."
+            "Write a unique JSON result snapshot, including "
+            "trace-like step data (default: results/result.json)."
         ),
     )
+    parser.add_argument('--no-view', action='store_true',
+                        help='Save results without starting the local live viewer.')
     parser.add_argument(
         "--model",
         metavar="OPENROUTER_MODEL",
@@ -63,15 +66,23 @@ def configure_parser(parser: ArgumentParser) -> None:
         type=int,
         default=DEFAULT_TRACE_MAX_BYTES,
         metavar="BYTES",
-        help="Maximum intercepted payload bytes displayed per direction.",
+        help="Legacy option: streaming memory spool threshold; payloads are never truncated.",
     )
 
 
 def execute(args: Namespace) -> int:
     load_project_environment(args.env_file)
-    kwargs: dict[str, object] = {"output_path": args.output}
+    try:
+        kwargs: dict[str, object] = {"output_path": args.output, **sdk_arguments(args)}
+        if args.registry != DEFAULT_REGISTRY_PATH:
+            kwargs["registry_path"] = args.registry
+    except ProviderSelectionError as exc:
+        print(f"SDK configuration error: {exc}")
+        return 2
     if args.model is not None:
         kwargs["model"] = args.model
+    if args.no_view:
+        kwargs['viewer_starter'] = None
     if args.llm_trace != "off":
         kwargs["llm_trace"] = args.llm_trace
     if args.llm_trace_max_bytes != DEFAULT_TRACE_MAX_BYTES:
@@ -85,15 +96,26 @@ def run(
     input_fn: Callable[[str], str] = input,
     output_fn: Callable[[str], None] = print,
     suite_runner: SuiteRunner | None = None,
+    sdk: SDK | None = None,
+    sdk_selection: SDKSelection | None = None,
+    sdk_options: Mapping[str, object] | None = None,
     sleep_fn: Callable[[float], None] = time.sleep,
     output_path: str | Path | None = None,
-    viewer_starter: Callable[[Path], RunningViewer] = start_viewer_server,
+    viewer_starter: Callable[[Path], RunningViewer] | None = start_viewer_server,
     post_run_input_fn: Callable[[str], str] = input,
     llm_trace: str = "off",
     llm_trace_max_bytes: int = DEFAULT_TRACE_MAX_BYTES,
     model: str | None = None,
 ) -> int:
     """Confirm ready Agents, run the suite, and return a shell exit code."""
+    if sdk is not None and sdk_selection is not None:
+        raise ValueError("Pass sdk or sdk_selection, not both")
+    if suite_runner is not None and (
+        sdk is not None or sdk_selection is not None or sdk_options is not None
+    ):
+        raise ValueError(
+            "Configure sdk on the supplied suite_runner, or omit suite_runner"
+        )
 
     print_logo(output_fn)
     sleep_fn(LOGO_PAUSE_SECONDS)
@@ -128,33 +150,14 @@ def run(
         output_fn=output_fn,
         model=model,
         activity_sink=llm_activity,
+        sdk=sdk,
+        sdk_selection=sdk_selection,
+        sdk_options=sdk_options,
     )
-    while True:
-        execution = run_benchmark_once(
-            agents,
-            runner=runner,
-            output_path=output_path,
-            output_fn=output_fn,
-            viewer_starter=viewer_starter,
-            llm_activity=llm_activity,
-        )
-        if execution.result_log is None or execution.viewer is None:
-            return execution.exit_code
-
-        action = request_viewer_action(
-            execution.result_log.path,
-            execution.viewer.url,
-            input_fn=post_run_input_fn,
-            output_fn=output_fn,
-        )
-        stop_viewer(execution.viewer)
-        if action == "rerun":
-            output_fn("")
-            output_fn(panel_rule("RERUN QUEUED", ANSI_GREEN))
-            output_fn(panel_line("Starting a fresh benchmark run"))
-            output_fn(panel_rule("", ANSI_GREEN))
-            continue
-        return execution.exit_code
+    execution = run_benchmark_session(agents, runner=runner, output_path=output_path,
+        output_fn=output_fn, viewer_starter=viewer_starter, llm_activity=llm_activity,
+        input_fn=post_run_input_fn)
+    return execution.exit_code
 
 
 FEATURE = CommandFeature(

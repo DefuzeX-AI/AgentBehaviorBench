@@ -13,7 +13,7 @@ def test_runner_starts_invokes_and_stops_langgraph_agent(
 ) -> None:
     running = AgentRunner().start(starter_agent)
 
-    assert running.agent_id == "langgraph-new-project"
+    assert running.agent_id == "test-echo"
     assert running.adapter_name == "LangGraphAdapter"
     assert running.is_running
     assert running.invoke("DEFUZEX_AGENT_READY").output == "DEFUZEX_AGENT_READY"

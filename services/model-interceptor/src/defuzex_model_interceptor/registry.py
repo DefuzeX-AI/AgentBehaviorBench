@@ -44,6 +44,7 @@ def load_protocols() -> dict[str, ProtocolPlugin]:
         JSON_HTTP_PROTOCOL,
         OPENAI_CHAT_PROTOCOL,
         OPENAI_RESPONSES_PROTOCOL,
+        GEMINI_CONTENT_PROTOCOL,
     )
 
     plugins: dict[str, ProtocolPlugin] = {
@@ -51,16 +52,21 @@ def load_protocols() -> dict[str, ProtocolPlugin]:
         OPENAI_CHAT_PROTOCOL.name: OPENAI_CHAT_PROTOCOL,
         OPENAI_RESPONSES_PROTOCOL.name: OPENAI_RESPONSES_PROTOCOL,
         ANTHROPIC_MESSAGES_PROTOCOL.name: ANTHROPIC_MESSAGES_PROTOCOL,
+        GEMINI_CONTENT_PROTOCOL.name: GEMINI_CONTENT_PROTOCOL,
     }
+    for name in ("gemini-grpc", "ollama-chat", "ollama-generate", "openai-completions", "openai-embeddings"):
+        plugins[name] = JSON_HTTP_PROTOCOL
     return _load(PROTOCOL_GROUP, plugins)
 
 
 def load_authentication() -> dict[str, AuthenticationPlugin]:
-    from .auth import ANTHROPIC_API_KEY_AUTH, BEARER_TOKEN_AUTH
+    from .auth import ANTHROPIC_API_KEY_AUTH, BEARER_TOKEN_AUTH, GOOGLE_API_KEY_AUTH, NetworkIsolatedAuthentication
 
     plugins: dict[str, AuthenticationPlugin] = {
         BEARER_TOKEN_AUTH.name: BEARER_TOKEN_AUTH,
         ANTHROPIC_API_KEY_AUTH.name: ANTHROPIC_API_KEY_AUTH,
+        GOOGLE_API_KEY_AUTH.name: GOOGLE_API_KEY_AUTH,
+        "network-isolated": NetworkIsolatedAuthentication(),
     }
     return _load(AUTH_GROUP, plugins)
 

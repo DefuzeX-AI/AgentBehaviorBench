@@ -1,8 +1,11 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
-from agentbench.cli.result_export import start_result_log, unique_result_log_path
+import pytest
+
+from agentbench.cli.result_export import append_result_event, start_result_log, unique_result_log_path
 from agentbench.harness import BenchmarkStepFailure, SuiteAgentResult
 from tests.support.results import suite_result
 
@@ -10,16 +13,16 @@ FIXED_TIME = datetime(2026, 8, 19, 1, 1, 1)
 
 
 def read_events(path: Path) -> list[dict[str, object]]:
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
-def test_result_log_path_uses_jsonl_and_avoids_collisions(tmp_path) -> None:
+def test_result_log_path_uses_json_and_avoids_collisions(tmp_path) -> None:
     first = unique_result_log_path(tmp_path / "result.json", now=FIXED_TIME)
     first.write_text("", encoding="utf-8")
     second = unique_result_log_path(tmp_path / "result.json", now=FIXED_TIME)
 
-    assert first.name == "result-20260819-010101.jsonl"
-    assert second.name == "result-20260819-010101-2.jsonl"
+    assert first.name == "result-20260819-010101.json"
+    assert second.name == "result-20260819-010101-2.json"
 
 
 def test_result_log_appends_trace_events_without_losing_earlier_data(
@@ -91,7 +94,10 @@ def test_result_log_records_suite_failure(tmp_path) -> None:
 
     writer.append_suite_error(RuntimeError("service unavailable"))
 
-    assert read_events(writer.path)[-1] == {
+    event = read_events(writer.path)[-1]
+    assert datetime.fromisoformat(event.pop('timestamp')).tzinfo is not None
+    assert event == {
+        "source": "abb",
         "event": "suite_failed",
         "suite_id": "suite_failed",
         "error": {
@@ -99,3 +105,25 @@ def test_result_log_records_suite_failure(tmp_path) -> None:
             "message": "service unavailable",
         },
     }
+
+
+def test_failed_snapshot_replace_preserves_previous_document(tmp_path, monkeypatch):
+    path = tmp_path / "result.json"
+    append_result_event(path, {"event": "first"})
+    original = path.read_bytes()
+
+    def fail_replace(*args):
+        raise OSError("interrupted before replacement")
+
+    monkeypatch.setattr("agentbench.cli.result_export.os.replace", fail_replace)
+    with pytest.raises(OSError, match="interrupted"):
+        append_result_event(path, {"event": "second"})
+    assert path.read_bytes() == original
+    assert list(tmp_path.iterdir()) == [path]
+
+
+def test_concurrent_snapshot_updates_keep_all_events(tmp_path):
+    path = tmp_path / "result.json"
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        list(executor.map(lambda i: append_result_event(path, {"index": i}), range(20)))
+    assert {event["index"] for event in read_events(path)} == set(range(20))

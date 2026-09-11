@@ -7,6 +7,7 @@ from collections.abc import Callable
 from agentbench.adapter import AdapterFactory, AgentAdapter, AgentDescriptor
 
 from .agentcontainer import ContainerAgentAdapter, runtime_type
+from .agentcontainer.adapter import ContainerCaller
 from .contracts import AgentRuntime
 from .docker import DockerRuntime
 
@@ -19,8 +20,12 @@ class RuntimeFactoryError(RuntimeError):
 
 
 class RuntimeFactory:
-    def __init__(self, docker_builder: RuntimeBuilder | None = None) -> None:
+    def __init__(
+        self, docker_builder: RuntimeBuilder | None = None,
+        *, container_caller: ContainerCaller | None = None,
+    ) -> None:
         self._docker_builder = docker_builder or DockerRuntime
+        self._container_caller = container_caller
 
     def create_adapter(
         self,
@@ -32,7 +37,9 @@ class RuntimeFactory:
         if selected == "in_process":
             return adapter_factory.create(agent)
         if selected == "docker":
-            return ContainerAgentAdapter(agent, self._docker_builder())
+            return ContainerAgentAdapter(
+                agent, self._docker_builder(), caller=self._container_caller
+            )
         raise RuntimeFactoryError(f"Unsupported agent runtime: {selected!r}")
 
 

@@ -4,19 +4,23 @@ from __future__ import annotations
 
 from argparse import ArgumentParser, Namespace
 
-from agentbench.cli.viewer import DEFAULT_HOST, DEFAULT_PORT, serve_result_log
+from agentbench.cli.viewer import DEFAULT_HOST, DEFAULT_PORT, serve_result_log, ViewerUnavailable
 
 from .base import CommandFeature
 
 
 def configure_parser(parser: ArgumentParser) -> None:
-    parser.add_argument("result_log", help="Path to an AgentBench .jsonl result log.")
+    parser.add_argument("result_log", help="Path to an AgentBench JSON result snapshot.")
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
 
 
 def execute(args: Namespace) -> int:
-    serve_result_log(args.result_log, host=args.host, port=args.port)
+    try:
+        serve_result_log(args.result_log, host=args.host, port=args.port)
+    except ViewerUnavailable as exc:
+        print(str(exc))
+        return 1
     return 0
 
 

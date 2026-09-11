@@ -15,7 +15,7 @@ Current architecture paths:
 - [AgentFactory Flow](./Agents/Factory.md): use this when you have a downloaded
   Agent project and need to convert it into a deterministic AgentBench candidate.
 - [Runtime Contract](./Agents/Runtime.md): use this when Docker, package data,
-  JSONL worker behavior, Model Interceptor routing, or filesystem rules are involved.
+  native API communication, Model Interceptor routing, or filesystem rules are involved.
 - [Certification](./Agents/Certify.md): use this when you need to understand
   `certify`, `ready`, result artifacts, or Judge failure semantics.
 - [Troubleshooting](./Agents/Troubleshooting.md): use this when you already have
@@ -28,6 +28,9 @@ are supported.
 
 ## Add the Agent
 
+Use the [Agent unit layout](./Agents/Layout.md): outer ABB configuration and
+an inner `agent/` source checkout. Directory names are chosen by the user.
+
 After choosing the right architecture path, start from
 [AgentFactory Flow](./Agents/Factory.md). AgentFactory should work on a copied
 Agent project, not the original source checkout. Keep the adaptation small: an
@@ -39,16 +42,19 @@ Use this flow:
 1. Copy the original Agent project to a separate working directory.
 2. Identify its launch command, input/output contract, and actual model request
    host, path, protocol, and credential environment variable.
-3. Add a non-root Docker image and a persistent JSONL worker. Wrap the existing
-   Agent instead of rewriting its workflow.
-4. Copy the adapted Agent into `resources/agents/<order>-<agent-id>/`.
-5. Add `agent.toml`, declaring the native model traffic under
+3. Add a non-root Docker image that launches the original process. Document
+   its native API; container startup does not impose an input/output protocol.
+4. Put the original source into `resources/agents/<user-defined-name>/agent/`.
+   Put ABB's Dockerfile and any launch bridge in the outer directory. Build
+   with that outer directory as context and use `COPY agent/...` for source.
+5. Add outer `agent.toml`, declaring the native model traffic under
    `[llm_interception]` when the Agent calls a model.
-6. Add `resources/requirements/<agent-id>.md`.
+6. Add `requirement.md` beside `agent.toml`; upstream dependency files stay
+   inside `agent/`.
 7. Add an entry in `resources/registry.toml` with `enabled = true` and
    `status = "adapting"`.
 8. Run the focused tests for Registry discovery, Docker configuration,
-   interception routes, and the worker.
+   interception routes, and the native API caller.
 
 Do not change model code merely to point it at OpenRouter. The Agent should keep
 calling its original provider URL with the temporary token injected into the
@@ -99,13 +105,13 @@ An Agent is onboarded when:
 - The Agent is registered in `resources/registry.toml`.
 - Docker starts it under the AgentBench runtime policy when a Docker runtime is
   required.
-- The worker accepts SDK Inputs and returns serializable `output` and
-  `raw_output`.
+- For optional evaluation, an explicit caller maps SDK inputs and native API
+  results. The Agent itself has no required response envelope.
 - Model-backed Agents declare their native request route and the Interceptor
   captures a complete request/response pair without requiring a provider rewrite
   in Agent source.
 - Static fixtures and config files exist in the installed runtime image or
   package.
 - Runtime writes go to allowed paths.
-- `python -m agentbench certify <agent-id>` exits `0` and writes JSONL evidence.
+- `python -m agentbench certify <agent-id>` exits `0` and writes JSON evidence.
 - The Registry status for that Agent is `ready`.

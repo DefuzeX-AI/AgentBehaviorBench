@@ -53,12 +53,24 @@ class InterceptionTraceState:
         self._responses: set[str] = set()
         self._completed: list[str] = []
         self._condition = threading.Condition()
+        self._last_event = time.monotonic()
+        self._failed = False
+
+    def fail(self) -> None:
+        """A failed trace write must never count as a completed observation."""
+        with self._condition:
+            self._failed = True
+            self._condition.notify_all()
 
     def emit(self, event: TraceEvent) -> None:
         call_id = event.data.get("call_id")
         if not isinstance(call_id, str) or not call_id:
             return
         with self._condition:
+            if event.event == "llm_error" or event.data.get("truncated"):
+                self._failed = True
+                self._condition.notify_all()
+            self._last_event = time.monotonic()
             if event.event == "llm_request":
                 self._requests.add(call_id)
             elif event.event == "llm_response":
@@ -79,11 +91,26 @@ class InterceptionTraceState:
         deadline = time.monotonic() + timeout
         with self._condition:
             while len(self._completed) <= checkpoint:
+                if self._failed:
+                    return False
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     return False
                 self._condition.wait(remaining)
-            return True
+            return not self._failed
+
+    def wait_for_idle(self, *, timeout: float = 2, quiet: float = 0.3) -> bool:
+        """Drain final log events and reject requests with no corresponding response."""
+        deadline = time.monotonic() + timeout
+        with self._condition:
+            while time.monotonic() < deadline:
+                if self._failed:
+                    return False
+                idle_for = time.monotonic() - self._last_event
+                if idle_for >= quiet and self._requests <= self._responses:
+                    return True
+                self._condition.wait(timeout=min(0.05, max(0, deadline - time.monotonic())))
+        return False
 
 
 @dataclass(slots=True)

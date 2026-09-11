@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,13 @@ class LangGraphAdapterConfig:
     input_key: str | None
     output_key: str | None
     mode: str
+    binding: str | None = None
+    context: dict[str, object] | None = None
+
+    @property
+    def source_root(self) -> Path:
+        """Source checkout, separate from the outer ABB configuration directory."""
+        return (self.agent_root / "agent").resolve()
 
     @classmethod
     def from_agent_dir(cls, agent_root: str | Path) -> "LangGraphAdapterConfig":
@@ -45,8 +53,13 @@ class LangGraphAdapterConfig:
                 f"Unsupported LangGraph execution mode: {mode!r}"
             )
 
+        source_root = _resolve_inside(root, "agent")
+        if not source_root.is_dir():
+            raise LangGraphConfigurationError(
+                f"Agent source directory does not exist: {source_root}"
+            )
         config_name = _required_string(adapter, "config")
-        config_path = _resolve_inside(root, config_name)
+        config_path = _resolve_inside(source_root, config_name)
         langgraph_config = _read_json(config_path)
         graphs = _required_mapping(langgraph_config, "graphs")
         graph_id = _required_string(adapter, "graph_id")
@@ -66,6 +79,8 @@ class LangGraphAdapterConfig:
             input_key=_optional_string(adapter, "input_key"),
             output_key=_optional_string(adapter, "output_key"),
             mode=mode,
+            binding=_optional_string(adapter, "binding"),
+            context=_context(adapter),
         )
 
 
@@ -136,3 +151,16 @@ def _optional_string(data: dict[str, Any], key: str) -> str | None:
     if not isinstance(value, str) or not value.strip():
         raise LangGraphConfigurationError(f"Field must be a non-empty string: {key}")
     return value
+
+
+def _context(adapter):
+    if "context" not in adapter:
+        return None
+    value = adapter["context"]
+    if not isinstance(value, dict):
+        raise LangGraphConfigurationError("Manifest [adapter.context] must be a table")
+    try:
+        json.dumps(value, allow_nan=False)
+    except (TypeError, ValueError) as exc:
+        raise LangGraphConfigurationError("[adapter.context] must contain JSON-compatible data") from exc
+    return deepcopy(value)

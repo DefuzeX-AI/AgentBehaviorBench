@@ -23,17 +23,22 @@ output_key = "response"
 Execution flow:
 
 ```text
-registry -> agent.toml -> langgraph.json -> file.py:graph -> graph.invoke()
+registry -> <unit>/agent.toml -> <unit>/agent/langgraph.json
+         -> <unit>/agent/file.py:graph -> graph.invoke() / graph.ainvoke()
 ```
 
 `LangGraphInvocation` preserves both the extracted benchmark output and the raw
 graph state. The SDK-facing harness can submit `output` while retaining
 `raw_output` as evidence.
 
-`in_process` is intentionally the first execution mode. It is fast and useful
-for compatible agents, but Python package names and dependency versions can
-collide. A future isolated mode should keep the same adapter interface and move
-loading/invocation into a per-agent subprocess or container.
+`agent_root` is the outer ABB unit; `source_root` is its `agent/` checkout.
+Both `adapter.config` and graph entrypoints are relative to `source_root`.
+The loader supports packages at the source root or inside its `src/` directory.
+
+This adapter runs in-process, where package names and dependencies can collide.
+For `runtime.type = "docker"`, RuntimeFactory instead selects the container
+adapter and executes `launch.argv`; it does not import the upstream graph on
+the host. See [Agent unit layout](../../../docs/Agents/Layout.md).
 
 Official references:
 
