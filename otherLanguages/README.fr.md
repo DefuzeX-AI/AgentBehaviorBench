@@ -1,5 +1,24 @@
 # AgentBehaviorBench (ABB)
 
+<p align="center">
+  <img alt="AgentBehaviorBench — agents lamas qui évaluent des flux" src="../figures/title.png" width="720" style="border-radius: 24px;">
+</p>
+
+<p align="center">
+  <a href="../README.md">English</a> |
+  Français |
+  <a href="README.ja.md">日本語</a> |
+  <a href="README.zh-CN.md">中文简体</a> |
+  <a href="README.zh-TW.md">中文繁體</a> |
+  <a href="README.ko.md">한국어</a>
+</p>
+
+<p align="center">
+  <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-8a008a">
+  <img alt="Licence MIT" src="https://img.shields.io/badge/License-MIT-0086c9">
+  <img alt="Package 0.1.0" src="https://img.shields.io/badge/pypi%20package-0.1.0-2acb16">
+</p>
+
 > **Avant d'exécuter ABB :** installez Python 3.10+, Docker Desktop ou Docker
 > Engine (en cours d'exécution), ainsi que la dépendance optionnelle DefuzeX.
 > Le Company Research Agent prêt à l'emploi requiert `KUMA_API_KEY` (ou
@@ -10,6 +29,8 @@ AgentBehaviorBench exécute des agents IA enregistrés dans des environnements
 isolés, collecte les preuves d'exécution et évalue le résultat via un SDK
 sélectionnable. Le SDK par défaut est l'adaptateur KUMA intégré. Les résultats
 sont enregistrés localement et consultables dans le visualiseur ABB.
+
+![Architecture d'exécution AgentBehaviorBench](../figures/framework.png)
 
 ## Démarrage rapide
 

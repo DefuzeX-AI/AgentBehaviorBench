@@ -5,6 +5,30 @@
 > Company Research Agent needs `KUMA_API_KEY` (or `DEFUZEX_API_KEY`),
 > `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, and `TAVILY_API_KEY`.
 
+<p align="center">
+  <img
+    alt="AgentBehaviorBench — llama agents reviewing workflows"
+    src="figures/title.png"
+    width="720"
+    style="border-radius: 24px;"
+  >
+</p>
+
+<p align="center">
+  English |
+  <a href="otherLanguages/README.fr.md">Français</a> |
+  <a href="otherLanguages/README.ja.md">日本語</a> |
+  <a href="otherLanguages/README.zh-CN.md">中文简体</a> |
+  <a href="otherLanguages/README.zh-TW.md">中文繁體</a> |
+  <a href="otherLanguages/README.ko.md">한국어</a>
+</p>
+
+<p align="center">
+  <img alt="Python 3.10 or newer" src="https://img.shields.io/badge/Python-3.10%2B-8a008a">
+  <img alt="MIT License" src="https://img.shields.io/badge/License-MIT-0086c9">
+  <img alt="Package version 0.1.0" src="https://img.shields.io/badge/pypi%20package-0.1.0-2acb16">
+</p>
+
 AgentBehaviorBench runs registered AI agents in isolated runtimes, captures
 their execution evidence, and evaluates the result through a selectable SDK.
 The default SDK is the built-in KUMA adapter. Results are written locally and
@@ -110,7 +134,14 @@ See [the CLI reference](docs/CLI.md) for the complete command and option
 reference, and [the agent onboarding guide](docs/How%20To%20Add%20Agent.md) to
 add another Agent.
 
-## How ABB is organized
+## Overview
+
+ABB is designed to make Agent evaluation reproducible. An Agent is declared in
+the registry, adapted to ABB's runtime contract, evaluated with an SDK, and
+saved with inspectable execution evidence. Agents progress from `adapting` to
+`ready` only through the certification flow.
+
+The execution path is:
 
 ```text
 resources/registry.toml
@@ -119,6 +150,10 @@ resources/registry.toml
         -> Agent adapter and runtime
         -> result snapshot and local viewer
 ```
+
+![AgentBehaviorBench execution architecture](figures/framework.png)
+
+## Repository layout
 
 - `resources/registry.toml` declares each Agent, its status, and its runtime.
 - `resources/agents/` contains each Agent unit and its ABB configuration.
