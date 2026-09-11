@@ -1,5 +1,24 @@
 # AgentBehaviorBench (ABB)
 
+<p align="center">
+  <img alt="AgentBehaviorBench — ワークフローを評価するアルパカ Agent" src="../figures/title.png" width="720" style="border-radius: 24px;">
+</p>
+
+<p align="center">
+  <a href="../README.md">English</a> |
+  <a href="README.fr.md">Français</a> |
+  日本語 |
+  <a href="README.zh-CN.md">中文简体</a> |
+  <a href="README.zh-TW.md">中文繁體</a> |
+  <a href="README.ko.md">한국어</a>
+</p>
+
+<p align="center">
+  <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-8a008a">
+  <img alt="MIT License" src="https://img.shields.io/badge/License-MIT-0086c9">
+  <img alt="Package 0.1.0" src="https://img.shields.io/badge/pypi%20package-0.1.0-2acb16">
+</p>
+
 > **ABB を実行する前に：**Python 3.10 以上、起動済みの Docker Desktop または
 > Docker Engine、およびオプションの DefuzeX 依存関係を用意してください。付属の
 > 実行可能な Company Research Agent には `KUMA_API_KEY`（または
@@ -9,6 +28,8 @@
 AgentBehaviorBench は登録済み AI Agent を分離ランタイムで実行し、実行証跡を収集
 して、選択可能な SDK で結果を評価します。既定 SDK は組み込み KUMA adapter です。
 結果はローカルに保存され、ABB のブラウザビューアで確認できます。
+
+![AgentBehaviorBench 実行アーキテクチャ](../figures/framework.png)
 
 ## クイックスタート
 

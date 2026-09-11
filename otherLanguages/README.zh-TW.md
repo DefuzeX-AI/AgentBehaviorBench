@@ -1,5 +1,24 @@
 # AgentBehaviorBench (ABB)
 
+<p align="center">
+  <img alt="AgentBehaviorBench — 羊駝 Agent 工作流程審查" src="../figures/title.png" width="720" style="border-radius: 24px;">
+</p>
+
+<p align="center">
+  <a href="../README.md">English</a> |
+  <a href="README.fr.md">Français</a> |
+  <a href="README.ja.md">日本語</a> |
+  <a href="README.zh-CN.md">中文简体</a> |
+  中文繁體 |
+  <a href="README.ko.md">한국어</a>
+</p>
+
+<p align="center">
+  <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-8a008a">
+  <img alt="MIT License" src="https://img.shields.io/badge/License-MIT-0086c9">
+  <img alt="Package 0.1.0" src="https://img.shields.io/badge/pypi%20package-0.1.0-2acb16">
+</p>
+
 > **執行 ABB 前請先準備：**Python 3.10+、已啟動的 Docker Desktop 或 Docker
 > Engine，以及 DefuzeX 選用相依套件。內建且可執行的 Company Research Agent 需要
 > `KUMA_API_KEY`（或 `DEFUZEX_API_KEY`）、`OPENROUTER_API_KEY`、
@@ -8,6 +27,8 @@
 AgentBehaviorBench 會在隔離執行環境中執行已註冊的 AI Agent、收集執行證據，並以
 可選 SDK 評測結果。預設 SDK 是內建 KUMA adapter；結果儲存在本機，可用 ABB 瀏覽器
 檢視器查看。
+
+![AgentBehaviorBench 執行架構](../figures/framework.png)
 
 ## 快速開始
 
