@@ -113,8 +113,7 @@ use `DISTRIBUTION::NAME` to disambiguate them. `kuma` is reserved for the
 built-in adapter, so an external plugin with that name also needs a distribution
 qualifier. An entry point exposing the plain
 `create_run()` interface executes host-side. A formal container plugin implements
-`EvaluationSDKPlugin` and returns its `EvaluationRunner` Strategy. See
-[Evaluation SDK plugin architecture](architecture/evaluation-sdk-plugins.md).
+`EvaluationSDKPlugin` and returns its `EvaluationRunner` Strategy.
 
 ## Legacy DefuzeX API
 
@@ -181,5 +180,5 @@ The equivalent explicit development CLI selection is:
 agentbench run --sdk python:examples.local_sdk
 ```
 
-For a replaceable JSON Case with multiple Inputs, see the Chinese
-[SDK replacement guide](SDK替换.md) and `examples/case_file_sdk.py`.
+For a replaceable JSON Case with multiple Inputs, see
+`examples/case_file_sdk.py`.

@@ -282,13 +282,12 @@ Custom SDKs always get suite progress; detailed tabs require ABB-compatible
 artifacts registered through `BenchmarkProgress.artifact_directory`.
 Completed-step callbacks still represent accepted results, not live timing.
 
-The **交互时间线** tab groups network requests, streaming chunks and responses
+The **Interactions** tab groups network requests, streaming chunks and responses
 by `call_id`, and framework tool executions by `span_id`. Ant Design controls
 provide type/Input/status/time filters, full-payload search, page sizes and page
 jumps. New records show an update notice without moving the current page.
 Details show parsed chat/tool messages, JSON, Case/Input value matches, callbacks
-and independently paginated original records. See [交互时间线](交互时间线.md)
-for the evidence rules and instructions for adapting new Agents or SDKs.
+and independently paginated original records.
 Append `#view=raw` to a viewer URL to open this tab directly.
 
 After the run finishes, the CLI keeps the viewer alive and asks:
@@ -664,8 +663,7 @@ root), `timeout` (per preparation/Case container), `max_steps`, and `case_collec
 are rejected instead of silently selecting the old execution path.
 A selected plain `create_run()` SDK executes through the generic host-side
 adapter. A plugin implementing `EvaluationSDKPlugin` can provide a formal
-container runner. See [SDK.md](SDK.md) and the
-[plugin architecture](architecture/evaluation-sdk-plugins.md).
+container runner. See [SDK.md](SDK.md).
 
 
 ### Host evidence and fresh-checkout viewer requirements

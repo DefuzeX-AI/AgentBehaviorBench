@@ -28,8 +28,8 @@ For the current internal beta's built-in KUMA evaluator, users must download the
 [`Defuze-SDK` dev branch](https://github.com/DefuzeX-AI/Defuze-SDK/tree/dev)
 into a sibling `Defuze-SDK` checkout, or supply its path through `sdk_source`.
 The KUMA container adapter installs that source in its image. Other evaluation
-SDKs have their own requirements and do not require KUMA. See `SDK.md` and
-`SDK替换.md` when adapting another evaluator or Case source.
+SDKs have their own requirements and do not require KUMA. See `SDK.md` when
+adapting another evaluator or Case source.
 
 Continue reading based on the task scope:
 
