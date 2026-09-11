@@ -32,7 +32,7 @@ async def execute(root, output, settings=None):
         binding = InputBinding.from_file(root / 'evaluation/input-contract.json')
         configure_trust()
         files.save('process.json', {'pid': os.getpid(), 'container': platform.node(), 'mode': 'official',
-                   'sdk_version': version('kuma-defuzex'), 'agent_id': manifest['agent_id'],
+                   'sdk': 'kuma', 'sdk_version': version('kuma-defuzex'), 'agent_id': manifest['agent_id'],
                    'source': manifest.get('source'), 'repo': str(root / 'agent')})
         files.save('manifest.json', {'phase': 'case_generation', 'judge': 'pending'})
         options = dict(repo_path=root / 'agent', agent_profile_path=root / 'evaluation/profile.md',

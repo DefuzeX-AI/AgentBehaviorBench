@@ -11,15 +11,31 @@ function JsonButton({ label, value, onOpen }) {
   return <button className="json-button" disabled={value == null} onClick={() => onOpen(label, value)}>查看 JSON</button>;
 }
 
-function MarkdownContent({ value, empty = '尚未产生内容。' }) {
+function MarkdownContent({ value, empty = '尚未产生内容。', collapse = false }) {
   const text = textValue(value);
   if (text == null) return <p className="content-empty">{value == null ? empty : '此内容为结构化数据，请查看 JSON。'}</p>;
-  return <div className="markdown-content"><ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown></div>;
+  return <CollapsibleMarkdown text={text} collapse={collapse} />;
+}
+
+function CollapsibleMarkdown({ text, collapse }) {
+  const [expanded, setExpanded] = useState(false);
+  const canCollapse = collapse && (text.length > 360 || text.split('\n').length > 5);
+  return <>
+    <div className={`markdown-content ${canCollapse && !expanded ? 'is-collapsed' : ''}`}><ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown></div>
+    {canCollapse && <button className="content-toggle" onClick={() => setExpanded(value => !value)} aria-expanded={expanded}>{expanded ? '收起 Prompt' : '展开完整 Prompt'}</button>}
+  </>;
 }
 
 function Status({ value }) {
   const tone = /succeed|complete|pass/i.test(String(value)) ? 'success' : /fail|error|issue/i.test(String(value)) ? 'issue' : 'neutral';
   return <span className={`status status-${tone}`}>{value || '未提供'}</span>;
+}
+
+function SdkIdentity({ process }) {
+  const sdk = process?.sdk || process?.sdk_name || process?.evaluator || (process?.mode === 'official' ? 'kuma' : '未记录');
+  const version = process?.sdk_version ? `v${process.sdk_version}` : '版本未记录';
+  const mode = process?.mode === 'official' ? '官方运行' : process?.mode || '运行模式未记录';
+  return <span className="sdk-identity"><strong>{sdk} SDK</strong><span>{version}</span><span>{mode}</span></span>;
 }
 
 function JudgeSummary({ report, onOpen }) {
@@ -51,8 +67,8 @@ export default function EvaluationView({ run, revision }) {
       <div><span>执行</span><Status value={manifest.execution || data.execution_status} /></div><div><span>OTel</span><Status value={manifest.otel} /></div><div><span>提交</span><Status value={manifest.submission} /></div><div><span>Judge</span><Status value={manifest.judge || publicReport?.status} /></div>
     </div>
     {data.inputs.map(step => <section className="input-step" key={step.step}>
-      <div className="input-step-title"><p className="eyebrow">Input {step.step}</p><div className="step-identifiers"><code>{step.input?.input_id || '未关联 Input'}</code>{step.result?.status && <Status value={step.result.status} />}</div></div>
-      <div className="content-panel input-panel"><div className="section-heading"><div><h3>输入</h3><p>SDK Input 的 <code>payload</code></p></div><JsonButton label={`Input ${step.step}`} value={step.input} onOpen={openJson} /></div><MarkdownContent value={step.input?.payload} empty="尚未产生 SDK Input。" /></div>
+      <div className="input-step-title"><div><p className="eyebrow">Input {step.step}</p><SdkIdentity process={data.process} /></div><div className="step-identifiers"><code>{step.input?.input_id || '未关联 Input'}</code>{step.result?.status && <Status value={step.result.status} />}</div></div>
+      <div className="content-panel input-panel"><div className="section-heading"><div><h3>输入</h3><p>SDK Input 的 <code>payload</code>，默认只显示前 5 行</p></div><JsonButton label={`Input ${step.step}`} value={step.input} onOpen={openJson} /></div><MarkdownContent value={step.input?.payload} empty="尚未产生 SDK Input。" collapse /></div>
       <div className="content-panel output-panel"><div className="section-heading"><div><h3>Agent 结果</h3><p>Agent Result 的 <code>output</code></p></div><JsonButton label={`Agent 结果 ${step.step}`} value={step.result} onOpen={openJson} /></div><MarkdownContent value={step.result?.output} empty="尚未产生 Agent 输出。" /></div>
       <div className="supporting-json"><JsonButton label={`SDK Submission ${step.step}`} value={step.submission} onOpen={openJson} /><JsonButton label={`KUMA Evidence ${step.step}`} value={step.evidence} onOpen={openJson} /></div>
     </section>)}
