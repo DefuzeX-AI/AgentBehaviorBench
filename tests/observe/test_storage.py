@@ -65,3 +65,23 @@ def test_partial_tool_failure_preserves_result_and_marks_trace(tmp_path):
     result = asyncio.run(RunnableLambda(run).ainvoke("x", config={"callbacks": [TraceCallback(store)]}))
     assert result is original
     assert summarize(tmp_path)["framework:tool_incomplete"] == 1
+
+
+def test_langgraph_routing_signal_is_not_a_span_error(tmp_path):
+    import pytest
+    from langchain_core.runnables import RunnableLambda
+    from langgraph.errors import ParentCommand
+    from langgraph.types import Command
+    from agentbench.observe.langchain import TraceCallback
+    from agentbench.observe.store import summarize
+    store = TraceStore(tmp_path / "framework.jsonl", "run", source="framework")
+    signal = ParentCommand(Command(graph=Command.PARENT, goto="answer"))
+    def route(value):
+        raise signal
+    with pytest.raises(ParentCommand):
+        RunnableLambda(route).invoke("x", config={"callbacks": [TraceCallback(store)]})
+    counts = summarize(tmp_path)
+    assert "framework:span_error" not in counts
+    assert counts["framework:span_end"] == 1
+    recorded = json.loads((tmp_path / "framework.jsonl").read_text().splitlines()[-1])
+    assert recorded["data"]["control_flow"] == "ParentCommand"

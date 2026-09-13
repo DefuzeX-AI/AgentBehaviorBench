@@ -2,6 +2,13 @@
 from langchain_core.callbacks import BaseCallbackHandler
 from .correlation import current_span
 
+try:
+    # LangGraph routes between graphs by raising; GraphBubbleUp is its own base
+    # class for those signals. Plain LangChain Agents do not install LangGraph.
+    from langgraph.errors import GraphBubbleUp as _CONTROL_FLOW
+except ImportError:
+    _CONTROL_FLOW = ()
+
 
 class TraceCallback(BaseCallbackHandler):
     raise_error = True
@@ -25,6 +32,10 @@ class TraceCallback(BaseCallbackHandler):
 
     def _error(self, error, run_id, **kwargs):
         current_span.set(str(kwargs["parent_run_id"]) if kwargs.get("parent_run_id") else None)
+        if isinstance(error, _CONTROL_FLOW):
+            self.store.record("span_end", span_id=str(run_id), output=None,
+                              control_flow=type(error).__name__)
+            return
         self.store.record("span_error", span_id=str(run_id), error=str(error))
 
     def on_chain_start(self, serialized, inputs, *, run_id, parent_run_id=None, **kwargs):
