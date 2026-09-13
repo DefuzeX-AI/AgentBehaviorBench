@@ -218,6 +218,7 @@ class ModelInterceptorAddon:
 
     def _emit_error(self, flow, message, *, code, local_status=None):
         '''According to issue 19, we need more bug report'''
+        # A blocked request is only actionable if the event names what was blocked.
 
         metadata = flow.metadata
         tool = metadata.get("abb_tool", False)

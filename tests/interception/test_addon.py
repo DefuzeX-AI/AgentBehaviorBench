@@ -198,3 +198,18 @@ def test_transport_failure_does_not_invent_an_http_status(build):
     assert fields["local_status"] is None
     assert fields["upstream_status"] is None
     assert fields["error"] == "Client disconnected. [REDACTED]"
+
+
+def test_blocked_request_event_names_the_undeclared_host(build):
+    addon, flow = build()
+    flow.request = http.Request.make("GET", "https://api.github.com/repos/owner/name/releases/latest?page=1")
+    with patch("defuzex_model_interceptor.proxy.addon.emit") as emit:
+        addon.request(flow)
+        assert flow.response.status_code == 403
+        assert emit.call_args.args[0] == "llm_error"
+        event = emit.call_args.kwargs
+        assert event["error"] == "Undeclared network request blocked"
+        assert event["source_host"] == "api.github.com"
+        # The query string may carry credentials and is never part of the event.
+        assert event["source_path"] == "/repos/owner/name/releases/latest"
+        assert event["method"] == "GET"
