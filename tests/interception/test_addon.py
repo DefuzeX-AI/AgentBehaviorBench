@@ -112,3 +112,18 @@ def test_grpc_stream_error_keeps_nonzero_trailers_at_eof(build):
     assert flow.response.trailers["grpc-status"] == "13"
     assert flow.response.stream(b"") == b""
     assert flow.response.trailers["grpc-status"] == "13"
+
+
+def test_blocked_request_event_names_the_undeclared_host(build):
+    addon, flow = build()
+    flow.request = http.Request.make("GET", "https://api.github.com/repos/owner/name/releases/latest?page=1")
+    with patch("defuzex_model_interceptor.addon.emit") as emit:
+        addon.request(flow)
+        assert flow.response.status_code == 403
+        assert emit.call_args.args[0] == "llm_error"
+        event = emit.call_args.kwargs
+        assert event["error"] == "Undeclared network request blocked"
+        assert event["source_host"] == "api.github.com"
+        # The query string may carry credentials and is never part of the event.
+        assert event["source_path"] == "/repos/owner/name/releases/latest"
+        assert event["method"] == "GET"
