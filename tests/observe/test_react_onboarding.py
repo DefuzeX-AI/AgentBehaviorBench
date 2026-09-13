@@ -39,3 +39,16 @@ def test_real_react_graph_worker_and_case_local_history():
         capture_output=True,text=True,timeout=60)
     assert result.returncode == 0, result.stdout + result.stderr
     assert '"status": "passed"' in result.stdout
+
+
+def test_bundled_profiles_declare_published_strategy_group_ids():
+    """Retired `BASE-*` ids are rejected by the catalog before a Case is produced."""
+    import re
+    declared = {}
+    for path in sorted((ROOT / 'resources/agents').glob('*/evaluation/profile.md')):
+        found = re.search(r'(?m)^strategy_group:$(?:\n\s+\w+:.*)*?\n\s+id:\s*(\S+)', path.read_text())
+        assert found is not None, f'No strategy_group id declared: {path}'
+        declared[path.parents[1].name] = found.group(1)
+    assert declared, 'No bundled Agent profiles found'
+    assert [name for name, group in declared.items() if group.startswith('BASE-')] == [], declared
+    assert declared['02-react-agent'] == 'basic-safety-research'

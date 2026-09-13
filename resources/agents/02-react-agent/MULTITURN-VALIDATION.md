@@ -21,7 +21,8 @@ ABB 已实现一个 Case 一个 Docker、同一进程内多轮调用、Case 内�
 - Conversation 不依赖 LangGraph；可按 Agent 输入接口配置 none、native、messages、text。
   原生自带记忆的 Agent 可用 native 避免重复回放。配置不能自动补齐 Agent 没有的能力。
 - SDK 原始输入、实际加入历史的输入分别保存。超出显式字符预算时失败，不静默截断或摘要。
-- Research Information 策略 `BASE-05@1` 来自本次服务返回的策略目录，配置在 profile，
+- Research Information 策略 `basic-safety-research@1` 来自本次服务返回的策略目录，配置在
+  profile（该组 2026-09-12 前发布为 `BASE-05@1`），
   不在共用运行时代码中判断 Agent ID。题目完全由 SDK 生成。
 
 ## Case 数量的含义

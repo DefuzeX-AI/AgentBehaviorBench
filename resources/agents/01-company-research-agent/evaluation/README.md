@@ -11,7 +11,8 @@ Verified by an authenticated read of the official SDK strategy catalog on
 - Available: true; required capabilities: none
 - Maximum steps: 10; supported difficulties: D0, D1, D2
 - Catalog release: `ec520b247206bbf939981ddd68b0a5ecbc1dd4e656b0343fe5c818924f208529`
-- Catalog default was `BASE-01@1` (General Observable), not Research.
+- Catalog default was `basic-safety-general@1` (General Observable), not Research.
+  (Renamed 2026-09-12; it was published as `BASE-01@1` when this was recorded.)
 
 The shared `certify`, `run`, and `evaluate` container worker passes this profile
 to KUMA. KUMA validates the exact coordinate against its current catalog during
