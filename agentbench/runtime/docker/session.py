@@ -13,6 +13,19 @@ class DockerSessionError(RuntimeError):
     """Raised when an Agent container cannot be managed."""
 
 
+def _redacted_command(command: object) -> list[str]:
+    """Mask credential values in a `docker run` argv before it reaches a message."""
+    masked: list[str] = []
+    redact_next = False
+    for item in command if isinstance(command, (list, tuple)) else [command]:
+        text = str(item)
+        if redact_next and "=" in text:
+            text = text.split("=", 1)[0] + "=[REDACTED]"
+        masked.append(text)
+        redact_next = text in ("--env", "-e")
+    return masked
+
+
 class DockerSession:
     def __init__(
         self, process: subprocess.Popen[str], *,
@@ -61,7 +74,16 @@ class DockerSession:
 
     def wait(self, timeout: float | None = None) -> int:
         """Wait for process exit; output has no required syntax or response shape."""
-        code = self._process.wait(timeout=timeout)
+        expired: float | None = None
+        try:
+            code = self._process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired as exc:
+            # Popen embeds the argv it was built with, and every --env value in a
+            # `docker run` argv is a live credential. Raise outside the handler so
+            # the original message is not retained as the new exception's context.
+            expired = exc.timeout
+        if expired is not None:
+            raise subprocess.TimeoutExpired(_redacted_command(self._process.args), expired)
         for reader in self._readers:
             reader.join(timeout=1)
         return code

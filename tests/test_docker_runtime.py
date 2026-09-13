@@ -55,3 +55,23 @@ def test_session_closes_a_persistent_process():
         assert session.is_running
     assert not session.is_running
     assert session.returncode is not None
+
+
+def test_session_timeout_never_reports_container_credentials():
+    import pytest
+    process = subprocess.Popen(
+        [sys.executable, "-u", "-c", "import time; time.sleep(30)",
+         "--env", "DEFUZEX_API_KEY=dfx_live_value", "--env", "TAVILY_API_KEY=tvly_live_value",
+         "--name", "defuzex-test-agent"],
+        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        text=True,
+    )
+    with DockerSession(process, close_callback=lambda: None) as session:
+        with pytest.raises(subprocess.TimeoutExpired) as raised:
+            session.wait(timeout=0.1)
+    message = str(raised.value)
+    assert "dfx_live_value" not in message and "tvly_live_value" not in message
+    assert "DEFUZEX_API_KEY=[REDACTED]" in message and "TAVILY_API_KEY=[REDACTED]" in message
+    # Non-credential arguments stay readable, so the message still identifies the container.
+    assert "defuzex-test-agent" in message
+    assert raised.value.__context__ is None and raised.value.__cause__ is None
