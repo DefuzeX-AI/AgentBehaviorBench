@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "agentbench/services/model-interceptor/src"))
-from defuzex_model_interceptor.gemini import GeminiStream, request_to_chat, response_from_chat
+from model.google.gemini import GeminiStream, request_to_chat, response_from_chat
 
 
 def test_request_mapping_and_rejection():

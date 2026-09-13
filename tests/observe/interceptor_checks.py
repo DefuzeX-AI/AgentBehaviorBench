@@ -4,17 +4,17 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 from mitmproxy import http
-from defuzex_model_interceptor.addon import ModelInterceptorAddon
+from defuzex_model_interceptor.proxy.addon import ModelInterceptorAddon
 from defuzex_model_interceptor.config import ServiceConfig, Credential, Route, Target
 
 
 class InterceptorChecks(unittest.TestCase):
     def test_large_event_transport(self):
-        from defuzex_model_interceptor.events import emit
+        from defuzex_model_interceptor.observation.events import emit
         emit("large_transport_test", raw_body="完整输出" * 100000 + "[DONE]")
 
     def test_large_stream_is_fully_recorded_and_forwarded(self):
-        with patch("defuzex_model_interceptor.addon.emit") as emit:
+        with patch("defuzex_model_interceptor.proxy.addon.emit") as emit:
             addon, flow = self.make("openai-chat", True)
             flow.response = http.Response.make(200, b"", {"content-type": "text/event-stream"})
             addon.responseheaders(flow)
@@ -31,7 +31,7 @@ class InterceptorChecks(unittest.TestCase):
             self.assertEqual(response["raw_body"], data.decode())
 
     def test_large_json_request_and_response_are_complete(self):
-        with patch("defuzex_model_interceptor.addon.emit") as emit:
+        with patch("defuzex_model_interceptor.proxy.addon.emit") as emit:
             addon, flow = self.make()
             text = "完整输入输出" * 50000
             # Restore a source request and send it through the real routing code.
@@ -90,7 +90,7 @@ class InterceptorChecks(unittest.TestCase):
         addon.response(flow)
 
     def test_google_fragmented_stream_and_events(self):
-        with patch("defuzex_model_interceptor.addon.emit") as emit:
+        with patch("defuzex_model_interceptor.proxy.addon.emit") as emit:
             addon, flow = self.make(stream=True)
             flow.response = http.Response.make(200, b"", {"content-type": "text/event-stream"})
             addon.responseheaders(flow)

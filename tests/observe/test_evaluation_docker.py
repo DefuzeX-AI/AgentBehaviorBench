@@ -29,6 +29,7 @@ def test_company_sdk_execute_in_same_container(tmp_path):
         shutil.copy(repo / 'tests/acceptance/company_sdk/verify_execution.py', fixtures / 'check.py')
         shutil.copy(repo / 'tests/observe/company_upstream.py', fixtures)
         shutil.copytree(repo / 'agentbench/services/model-interceptor/src/defuzex_model_interceptor', fixtures / 'defuzex_model_interceptor')
+        shutil.copytree(repo / 'agentbench/services/model-interceptor/src/model', fixtures / 'model')
         output = tmp_path / 'output'; output.mkdir(); output.chmod(0o777)
         result = subprocess.run(['docker', 'run', '--rm', '--network', 'none',
             *EvaluationPolicy(state).run_arguments(),

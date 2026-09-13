@@ -1,20 +1,7 @@
-"""Trace event formatting and unconditional secret redaction."""
-
-from __future__ import annotations
-
-import json
+"""Recursive sanitization of known credentials and credential fields."""
 from collections.abc import Mapping
 
-
-TRACE_PREFIX = "DEFUZEX_TRACE "
 SECRET_KEYS = {"authorization", "api_key", "apikey", "token", "secret", "password"}
-
-
-def emit(event: str, **data: object) -> None:
-    print(
-        TRACE_PREFIX + json.dumps({"event": event, **data}, ensure_ascii=False),
-        flush=True,
-    )
 
 
 def redact(value: object, secrets: tuple[str, ...]) -> object:

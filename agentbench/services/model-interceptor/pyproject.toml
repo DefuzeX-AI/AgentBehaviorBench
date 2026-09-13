@@ -13,20 +13,20 @@ dependencies = ["mitmproxy==12.2.3", "google-ai-generativelanguage==0.12.0"]
 defuzex-model-interceptor = "defuzex_model_interceptor.entrypoint:main"
 
 [project.entry-points."defuzex.model_interceptor.protocols"]
-json-http = "defuzex_model_interceptor.protocols:JSON_HTTP_PROTOCOL"
-openai-chat = "defuzex_model_interceptor.protocols:OPENAI_CHAT_PROTOCOL"
-openai-responses = "defuzex_model_interceptor.protocols:OPENAI_RESPONSES_PROTOCOL"
-anthropic-messages = "defuzex_model_interceptor.protocols:ANTHROPIC_MESSAGES_PROTOCOL"
-gemini-content = "defuzex_model_interceptor.protocols:GEMINI_CONTENT_PROTOCOL"
+json-http = "defuzex_model_interceptor.observation.decoders:JSON_HTTP_PROTOCOL"
+openai-chat = "defuzex_model_interceptor.observation.decoders:OPENAI_CHAT_PROTOCOL"
+openai-responses = "defuzex_model_interceptor.observation.decoders:OPENAI_RESPONSES_PROTOCOL"
+anthropic-messages = "defuzex_model_interceptor.observation.decoders:ANTHROPIC_MESSAGES_PROTOCOL"
+gemini-content = "defuzex_model_interceptor.observation.decoders:GEMINI_CONTENT_PROTOCOL"
 
 [project.entry-points."defuzex.model_interceptor.auth"]
-bearer-token = "defuzex_model_interceptor.auth:BEARER_TOKEN_AUTH"
-anthropic-api-key = "defuzex_model_interceptor.auth:ANTHROPIC_API_KEY_AUTH"
-google-api-key = "defuzex_model_interceptor.auth:GOOGLE_API_KEY_AUTH"
+bearer-token = "defuzex_model_interceptor.security.auth:BEARER_TOKEN_AUTH"
+anthropic-api-key = "model.anthropic.auth:ANTHROPIC_API_KEY_AUTH"
+google-api-key = "model.google.auth:GOOGLE_API_KEY_AUTH"
 
 [project.entry-points."defuzex.model_interceptor.targets"]
-openrouter = "defuzex_model_interceptor.targets:OPENROUTER_TARGET"
+openrouter = "defuzex_model_interceptor.registry:create_openrouter_target"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["defuzex_model_interceptor*"]
+include = ["defuzex_model_interceptor*", "model", "model.*"]

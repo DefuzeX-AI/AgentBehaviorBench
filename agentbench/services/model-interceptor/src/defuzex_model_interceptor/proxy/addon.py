@@ -4,13 +4,13 @@ import json
 from urllib.parse import quote
 from uuid import uuid4
 from mitmproxy import http
-from .auth import InterceptorAuthenticationError
-from .events import emit, redact
-from .registry import load_authentication, load_protocols, load_targets
-from .targets import TargetRoutingError
-from .capture import ResponseCapture
-from .wire import json_bytes
-from .policy import EgressPolicy
+from ..observation.events import emit, failure_fields
+from ..security.redaction import redact
+from ..error import ErrorCode, InterceptionFailure, InterceptorAuthenticationError, RequestKind
+from ..registry import load_authentication, load_protocols, load_targets
+from ..observation.capture import ResponseCapture
+from ..transport.json import json_bytes
+from ..routing.policy import EgressPolicy
 
 
 class ModelInterceptorAddon:
@@ -37,17 +37,19 @@ class ModelInterceptorAddon:
                 defuzex_call_id=f"call_{uuid4().hex}", defuzex_started=time.monotonic(),
                 framework_span_id=span if span and len(span) <= 64 else None,
                 defuzex_source_host=flow.request.pretty_host,
+                defuzex_source_port=flow.request.port,
                 defuzex_source_path=flow.request.path.split('?', 1)[0])
             emit('tool_request', **self._tool_fields(flow), **self._body(flow.request))
             return
         span = flow.request.headers.pop("x-abb-framework-span", None)
         flow.metadata.update(defuzex_call_id=f"call_{uuid4().hex}", defuzex_started=time.monotonic(),
                              defuzex_source_host=flow.request.pretty_host,
+                             defuzex_source_port=flow.request.port,
                              defuzex_source_path=flow.request.path.split("?", 1)[0],
                              source_grpc=flow.request.headers.get("content-type", "").startswith("application/grpc"),
                              framework_span_id=span if span and len(span) <= 64 else None)
         if route is None:
-            self._error(flow, "Undeclared network request blocked", 403)
+            self._error(flow, "Undeclared network request blocked", 403, code=ErrorCode.EGRESS_DENIED)
             return
         flow.metadata["defuzex_route"] = route.route_id
         credential = self.credentials[route.credential_id]
@@ -64,10 +66,10 @@ class ModelInterceptorAddon:
             prepared = self.targets[self.config.target.target_plugin].prepare_request(
                 outbound, route=route, target=self.config.target)
         except InterceptorAuthenticationError as exc:
-            self._error(flow, str(exc), 401)
+            self._error(flow, str(exc), 401, code=ErrorCode.AUTHENTICATION_FAILED)
             return
         except Exception as exc:
-            self._error(flow, str(exc), 422)
+            self._error(flow, str(exc), 422, code=ErrorCode.REQUEST_PREPARATION_FAILED)
             return
         flow.request = outbound
         flow.metadata.update(wire=prepared.wire, defuzex_provider=prepared.provider_id,
@@ -122,9 +124,9 @@ class ModelInterceptorAddon:
                 capture.close()
                 flow.metadata["defuzex_stream_emitted"] = True
                 flow.metadata["defuzex_stream_failed"] = True
-                self._emit_error(flow, str(exc))
+                self._emit_error(flow, str(exc), code=ErrorCode.STREAM_PROCESSING_FAILED)
                 if getattr(wire, "grpc", False):
-                    flow.response.trailers = http.Headers([(b"grpc-status", b"13"), (b"grpc-message", quote(str(exc)).encode("ascii"))])
+                    flow.response.trailers = http.Headers([(b"grpc-status", b"13"), (b"grpc-message", quote(str(redact(str(exc), self.secrets))).encode("ascii"))])
                     return [] if chunk else b""
                 raise
         flow.response.stream = stream
@@ -148,11 +150,11 @@ class ModelInterceptorAddon:
             translated = wire.response(payload, status)
             if status >= 400 or payload.get("error") or translated.get("error"):
                 self._emit_response(flow, content, streaming=False)
-                self._error(flow, str(translated.get("error", "Upstream error")), status if status >= 400 else 502)
+                self._error(flow, str(translated.get("error", "Upstream error")), status if status >= 400 else 502,
+                            code=ErrorCode.UPSTREAM_ERROR)
                 return
             if getattr(wire, "grpc", False):
-                from .wire.grpc import pack_response
-                flow.response.content = pack_response(translated)
+                flow.response.content = wire.encode_response(translated)
                 flow.response.headers["content-type"] = "application/grpc"
                 flow.response.trailers = http.Headers([(b"grpc-status", b"0")])
                 flow.response.headers.pop("content-length", None)
@@ -162,7 +164,8 @@ class ModelInterceptorAddon:
             flow.metadata["client_payload"] = translated
             self._emit_response(flow, content, streaming=False)
         except Exception as exc:
-            self._error(flow, "Response conversion failed: " + str(exc), 502)
+            self._error(flow, "Response conversion failed: " + str(exc), 502,
+                        code=ErrorCode.RESPONSE_CONVERSION_FAILED)
 
     def _fields(self, flow):
         return dict(agent_id=self.config.agent_id, call_id=flow.metadata["defuzex_call_id"],
@@ -213,15 +216,37 @@ class ModelInterceptorAddon:
              client_payload=redact(flow.metadata.get("client_payload"), self.secrets),
              raw_body=redact(content.decode("utf-8", errors="replace"), self.secrets), truncated=False)
 
-    def _emit_error(self, flow, message):
-        emit("llm_error", agent_id=self.config.agent_id, call_id=flow.metadata["defuzex_call_id"],
-             error=redact(message, self.secrets), framework_span_id=flow.metadata.get("framework_span_id"))
+    def _emit_error(self, flow, message, *, code, local_status=None):
+        '''According to issue 19, we need more bug report'''
 
-    def _error(self, flow, message, status):
-        self._emit_error(flow, message)
+        metadata = flow.metadata
+        tool = metadata.get("abb_tool", False)
+        routed = metadata.get("defuzex_provider") is not None
+        failure = InterceptionFailure(
+            code=code, message=message, call_id=metadata["defuzex_call_id"],
+            request_kind=RequestKind.TOOL if tool else (
+                RequestKind.MODEL if metadata.get("defuzex_route") else RequestKind.UNKNOWN),
+            source_host=metadata.get("defuzex_source_host"),
+            source_port=metadata.get("defuzex_source_port"),
+            source_path=metadata.get("defuzex_source_path"), method=flow.request.method,
+            route_id=metadata.get("defuzex_route"), provider=metadata.get("defuzex_provider"),
+            target_host=flow.request.pretty_host if routed or tool else None,
+            target_port=flow.request.port if routed or tool else None,
+            target_path=flow.request.path if routed or tool else None,
+            local_status=local_status, upstream_status=metadata.get("upstream_status"),
+        )
+        # Preserve event names and tool fields consumed by existing trace readers.
+        fields = self._tool_fields(flow) if tool else {}
+        fields.update(failure_fields(failure, self.secrets))
+        fields.update(agent_id=self.config.agent_id,
+                      framework_span_id=metadata.get("framework_span_id"))
+        emit("tool_error" if tool else "llm_error", **redact(fields, self.secrets))
+
+    def _error(self, flow, message, status, *, code):
+        self._emit_error(flow, message, code=code, local_status=status)
         flow.metadata.pop("wire", None)
         if flow.metadata.get("source_grpc"):
-            from .wire.grpc import status_code
+            from ..transport.grpc import status_code
             flow.response = http.Response.make(200, b"", {"content-type": "application/grpc",
                 "grpc-status": str(status_code(status)), "grpc-message": quote(str(redact(message, self.secrets)))})
         else:
@@ -232,10 +257,8 @@ class ModelInterceptorAddon:
         capture = flow.metadata.pop("defuzex_capture", None)
         if capture:
             capture.close()
-        if flow.metadata.get('abb_tool'):
-            emit('tool_error', **self._tool_fields(flow), error=redact(str(flow.error), self.secrets))
-        elif "defuzex_call_id" in flow.metadata:
-            self._emit_error(flow, str(flow.error))
+        if "defuzex_call_id" in flow.metadata:
+            self._emit_error(flow, str(flow.error), code=ErrorCode.TRANSPORT_ERROR)
 
     def _route(self, flow):
         return next((r for r in self.config.routes if self.policy.matches(r, flow.request)), None)

@@ -46,7 +46,7 @@ def install():
     def requests_send(self, request, *args, **kwargs):
         if not request.url.startswith("https://generativelanguage.googleapis.com/"):
             raise AssertionError("Offline test attempted unexpected requests HTTP")
-        from defuzex_model_interceptor.gemini import request_to_chat, response_from_chat
+        from model.google.gemini import request_to_chat, response_from_chat
         request_to_chat(json.loads(request.body), streaming=False)
         response = requests.Response()
         response.status_code = 200

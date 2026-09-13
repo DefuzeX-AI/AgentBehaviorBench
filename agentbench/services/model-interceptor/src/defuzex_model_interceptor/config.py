@@ -9,6 +9,10 @@ from types import MappingProxyType
 from typing import Mapping
 
 
+CONFIG_ENV = "DEFUZEX_INTERCEPTOR_CONFIG"
+DEFAULT_CONFIG = "/run/secrets/interceptor_config"
+
+
 class ServiceConfigurationError(ValueError):
     pass
 

@@ -1,0 +1,1 @@
+"""Declared network egress policy."""

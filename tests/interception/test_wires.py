@@ -8,10 +8,12 @@ from types import SimpleNamespace
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "agentbench/services/model-interceptor/src"))
-from defuzex_model_interceptor.wire import GeminiWire, load_wires, json_bytes
-from defuzex_model_interceptor.wire.sse import SSEDecoder
-from defuzex_model_interceptor.wire.ollama import OllamaWire
-from defuzex_model_interceptor.policy import EgressPolicy
+from model.google.gemini import GeminiWire
+from defuzex_model_interceptor.registry import load_wires
+from defuzex_model_interceptor.transport.json import json_bytes
+from defuzex_model_interceptor.transport.sse import SSEDecoder
+from model.ollama import OllamaWire
+from defuzex_model_interceptor.routing.policy import EgressPolicy
 from defuzex_model_interceptor.config import ToolRoute, Route
 
 def source(data, path="/v1beta/models/gemini:generateContent", headers=None):
@@ -61,7 +63,7 @@ def test_sse_event_size_is_bounded():
 def test_grpc_protobuf_unary_and_stream_roundtrip(compression):
     pytest.importorskip("google.ai.generativelanguage_v1beta")
     from google.ai.generativelanguage_v1beta import GenerateContentRequest, GenerateContentResponse
-    from defuzex_model_interceptor.wire.grpc import unpack_request, pack_response
+    from model.google.grpc import unpack_request, pack_response
     request = GenerateContentRequest(model="models/gemini", contents=[{"role": "user", "parts": [{"text": "你好"}]}])
     body = GenerateContentRequest.serialize(request)
     if compression:
@@ -83,13 +85,13 @@ def test_grpc_protobuf_unary_and_stream_roundtrip(compression):
     (b"\x01\x00\x00\x00\x00", "snappy"), (b"\x00\x00\x00\x00\x00extra", "identity")])
 def test_grpc_bad_frames_fail(raw, encoding):
     pytest.importorskip("google.ai.generativelanguage_v1beta")
-    from defuzex_model_interceptor.wire.grpc import unpack_request
+    from model.google.grpc import unpack_request
     with pytest.raises(ValueError):
         unpack_request(raw, encoding)
 
 def test_grpc_unknown_proto_fields_are_not_dropped():
     pytest.importorskip("google.ai.generativelanguage_v1beta")
-    from defuzex_model_interceptor.wire.grpc import unpack_request
+    from model.google.grpc import unpack_request
     # Unknown field 1000, varint 1.
     body = b"\xc0\x3e\x01"
     with pytest.raises(ValueError, match="Unknown"):

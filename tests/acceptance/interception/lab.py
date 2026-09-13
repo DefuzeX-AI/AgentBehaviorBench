@@ -13,7 +13,7 @@ import tempfile
 import time
 import tomllib
 from upstream import start, TEXT
-from defuzex_model_interceptor.entrypoint import _configure_netfilter
+from defuzex_model_interceptor.proxy.netfilter import configure_netfilter
 import defuzex_model_interceptor
 
 def main():
@@ -39,7 +39,7 @@ def main():
         "base_url": "https://127.0.0.1:8443/api/v1", "model": "lab/target"}}))
     config.chmod(0o600)
     os.environ["DEFUZEX_INTERCEPTOR_CONFIG"] = str(config)
-    _configure_netfilter()
+    configure_netfilter()
     log_path = directory / "proxy.log"
     proxy = None
     try:
@@ -48,7 +48,7 @@ def main():
                 "--listen-host", "0.0.0.0", "--listen-port", "8080", "--set", f"confdir={directory}/ca",
                 "--set", "connection_strategy=lazy", "--set", "upstream_cert=false", "--set", "rawtcp=false",
                 "--set", f"ssl_verify_upstream_trusted_ca={ca}", "--scripts",
-                str(Path(defuzex_model_interceptor.__file__).with_name("loader.py"))], stdout=log, stderr=subprocess.STDOUT)
+                str(Path(defuzex_model_interceptor.__file__).parent / "proxy" / "loader.py")], stdout=log, stderr=subprocess.STDOUT)
             for _ in range(100):
                 if proxy.poll() is not None:
                     raise RuntimeError(log_path.read_text())

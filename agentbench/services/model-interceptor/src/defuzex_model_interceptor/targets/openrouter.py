@@ -1,36 +1,19 @@
-"""Built-in upstream target provider adapters."""
-
+"""Prepare model requests for the configured OpenRouter endpoint."""
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
 from urllib.parse import urlsplit
-
-from .config import Route, Target
-from .wire import load_wires
-
-
-class TargetRoutingError(ValueError):
-    pass
-
-
-@dataclass(frozen=True, slots=True)
-class PreparedTargetRequest:
-    provider_id: str
-    source_model: object
-    target_model: str
-    host: str
-    path: str
-    payload: object
-    source_payload: object = None
-    wire: object = None
+from ..config import Route, Target
+from ..contracts import PreparedTargetRequest, WireStrategy
+from ..error import TargetRoutingError
 
 
 class OpenRouterTarget:
     name = "openrouter"
 
-    def __init__(self, wires=None):
-        self.wires = load_wires() if wires is None else wires
+    def __init__(self, wires: Mapping[str, Callable[[], WireStrategy]]):
+        self.wires = wires
 
     def prepare_request(
         self,
@@ -90,6 +73,3 @@ class OpenRouterTarget:
             source_payload=source,
             wire=wire,
         )
-
-
-OPENROUTER_TARGET = OpenRouterTarget()

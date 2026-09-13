@@ -57,6 +57,7 @@ def test_company_image_executes_original_graph_offline(tmp_path):
     fixtures.mkdir()
     shutil.copy(Path(__file__).with_name("company_upstream.py"), fixtures)
     shutil.copytree(repo / "agentbench/services/model-interceptor/src/defuzex_model_interceptor", fixtures / "defuzex_model_interceptor")
+    shutil.copytree(repo / "agentbench/services/model-interceptor/src/model", fixtures / "model")
     (fixtures / "entry.py").write_text('''import asyncio
 import sys
 from pathlib import Path

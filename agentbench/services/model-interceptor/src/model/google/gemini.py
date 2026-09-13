@@ -5,6 +5,10 @@ Google GAPIC REST streaming expects a JSON array; alt=sse clients expect SSE.
 """
 
 
+from defuzex_model_interceptor.transport.json import json_bytes, json_request
+from defuzex_model_interceptor.transport.sse import SSEDecoder
+
+
 def _text(parts):
     if not isinstance(parts, list) or any(not isinstance(p, dict) or set(p) != {"text"}
                                           or not isinstance(p["text"], str) for p in parts):
@@ -83,7 +87,6 @@ def response_from_chat(payload, *, status=200):
 class GeminiStream:
     """Backward-compatible facade over the shared framing/translation engine."""
     def __init__(self, *, sse=False, max_event_bytes=1048576):
-        from .wire import GeminiWire, GeminiWireStream
         wire = GeminiWire()
         wire.sse = sse
         self._stream = GeminiWireStream(wire)
@@ -91,3 +94,69 @@ class GeminiStream:
 
     def feed(self, chunk):
         return self._stream.feed(chunk)
+
+
+class GeminiWire:
+    endpoint = "/chat/completions"
+    response_type = "application/json"
+    passthrough = False
+
+    def __init__(self, grpc=False):
+        self.grpc, self.sse = grpc, False
+
+    @property
+    def stream_type(self):
+        return "text/event-stream" if self.sse else "application/json"
+
+    def decode(self, request):
+        if self.grpc:
+            from .grpc import unpack_request
+            if not request.headers.get("content-type", "").startswith("application/grpc"):
+                raise ValueError("Expected gRPC content type")
+            source = unpack_request(request.content, request.headers.get("grpc-encoding", "identity"))
+            method = request.path.rsplit("/", 1)[-1]
+            if method not in {"GenerateContent", "StreamGenerateContent"}:
+                raise ValueError("Unsupported Gemini RPC")
+            self.streaming = method == "StreamGenerateContent"
+            self.source_model = source.get("model")
+        else:
+            source = json_request(request)
+            self.streaming = ":streamGenerateContent" in request.path
+            self.sse = "alt=sse" in request.path
+            self.source_model = request.path.split("/models/", 1)[-1].split(":", 1)[0]
+        return source, request_to_chat(source, streaming=self.streaming)
+
+    def response(self, payload, status):
+        return response_from_chat(payload, status=status)
+
+    def encode_response(self, payload):
+        if self.grpc:
+            from .grpc import pack_response
+            return pack_response(payload)
+        return json_bytes(payload)
+
+    def stream(self):
+        return GeminiWireStream(self)
+
+
+class GeminiWireStream:
+    def __init__(self, wire):
+        self.wire = wire
+        self.parser = SSEDecoder()
+        self.first = True
+
+    def feed(self, chunk):
+        output = bytearray()
+        for event in self.parser.feed(chunk):
+            payload = response_from_chat(event)
+            if self.wire.grpc:
+                from .grpc import pack_response
+                output.extend(pack_response(payload))
+            elif self.wire.sse:
+                output.extend(b"data: " + json_bytes(payload) + b"\n\n")
+            else:
+                output.extend((b"[" if self.first else b",") + json_bytes(payload))
+            self.first = False
+        if not chunk and not self.wire.grpc and not self.wire.sse:
+            output.extend(b"[]" if self.first else b"]")
+        return bytes(output)

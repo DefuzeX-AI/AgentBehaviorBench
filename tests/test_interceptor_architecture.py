@@ -16,18 +16,18 @@ INTERCEPTOR_CONTEXT = REPO_ROOT / "agentbench" / "services" / "model-interceptor
 INTERCEPTOR_SRC = INTERCEPTOR_CONTEXT / "src"
 sys.path.insert(0, str(INTERCEPTOR_SRC))
 
-from defuzex_model_interceptor.auth import (  # noqa: E402
-    AnthropicApiKeyAuthentication,
+from defuzex_model_interceptor.security.auth import (  # noqa: E402
     BearerTokenAuthentication,
-    InterceptorAuthenticationError,
 )
-from defuzex_model_interceptor.events import redact  # noqa: E402
-from defuzex_model_interceptor.entrypoint import _configure_netfilter  # noqa: E402
+from defuzex_model_interceptor.error import InterceptorAuthenticationError  # noqa: E402
+from defuzex_model_interceptor.security.redaction import redact  # noqa: E402
+from defuzex_model_interceptor.proxy.netfilter import configure_netfilter  # noqa: E402
 from defuzex_model_interceptor.config import Route, ServiceConfig, Target  # noqa: E402
-from defuzex_model_interceptor.protocols import (  # noqa: E402
+from defuzex_model_interceptor.observation.decoders import (  # noqa: E402
     OPENAI_CHAT_PROTOCOL,
 )
-from defuzex_model_interceptor.targets import OPENROUTER_TARGET  # noqa: E402
+from model.anthropic.auth import AnthropicApiKeyAuthentication
+from defuzex_model_interceptor.registry import create_openrouter_target
 
 from agentbench.runtime.docker.interceptor_image import (  # noqa: E402
     LocalInterceptorImageProvider,
@@ -96,7 +96,9 @@ def test_interceptor_build_context_is_declared_as_package_data() -> None:
         "model-interceptor/Dockerfile",
         "model-interceptor/pyproject.toml",
         "model-interceptor/src/defuzex_model_interceptor/*.py",
-        "model-interceptor/src/defuzex_model_interceptor/wire/*.py",
+        "model-interceptor/src/defuzex_model_interceptor/**/*.py",
+        "model-interceptor/src/model/*.py",
+        "model-interceptor/src/model/**/*.py",
     } <= bundled
 
 
@@ -210,7 +212,7 @@ def test_openrouter_target_rewrites_endpoint_model_and_optional_headers(
         headers={"X-OpenRouter-Title": "AgentBench"},
     )
 
-    prepared = OPENROUTER_TARGET.prepare_request(
+    prepared = create_openrouter_target().prepare_request(
         request,
         route=route,
         target=target,
@@ -241,8 +243,8 @@ def test_trace_redaction_covers_headers_fields_and_literal_secrets() -> None:
 
 def test_netfilter_covers_all_non_root_tcp_and_blocks_untranslated_egress(monkeypatch) -> None:
     commands = []
-    monkeypatch.setattr("defuzex_model_interceptor.entrypoint.subprocess.run", lambda command, **kwargs: commands.append(command))
-    _configure_netfilter()
+    monkeypatch.setattr("defuzex_model_interceptor.proxy.netfilter.subprocess.run", lambda command, **kwargs: commands.append(command))
+    configure_netfilter()
     redirects = [c for c in commands if "REDIRECT" in c]
     assert len(redirects) == 1 and "--dport" not in redirects[0]
     assert "--uid-owner" in redirects[0] and "!" in redirects[0]

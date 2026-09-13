@@ -1,6 +1,7 @@
 """Ollama text chat/generate semantics over OpenRouter chat completions."""
 from datetime import datetime, timezone
-from .sse import SSEDecoder
+from defuzex_model_interceptor.transport.sse import SSEDecoder
+from defuzex_model_interceptor.transport.json import json_request, json_bytes
 
 
 class OllamaWire:
@@ -14,7 +15,6 @@ class OllamaWire:
     stream_type = "application/x-ndjson"
 
     def decode(self, request):
-        from . import json_request
         source = json_request(request)
         allowed = {"model", "prompt", "system", "messages", "stream", "options", "keep_alive", "tools"}
         if source.get("tools"):
@@ -85,7 +85,6 @@ class OllamaStream:
         self.emitted_done = False
 
     def feed(self, chunk):
-        from . import json_bytes
         output = bytearray()
         for event in self.parser.feed(chunk):
             self.last.update({k:v for k,v in event.items() if k != "choices"})

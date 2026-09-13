@@ -1,45 +1,23 @@
-"""Plugin discovery for service-side protocol and authentication behavior."""
+"""Composition root for built-in adapters and installed plugins.
 
-from __future__ import annotations
-
+Plugins may export an instance, a class, or a zero-argument factory.
+Wire plugins remain per-call factories, so stream state is never shared.
+"""
 from importlib.metadata import entry_points
-from typing import Protocol, runtime_checkable
-
+from .contracts import AuthenticationPlugin, ProtocolPlugin, TargetProviderPlugin
 
 PROTOCOL_GROUP = "defuzex.model_interceptor.protocols"
 AUTH_GROUP = "defuzex.model_interceptor.auth"
 TARGET_GROUP = "defuzex.model_interceptor.targets"
 
 
-@runtime_checkable
-class ProtocolPlugin(Protocol):
-    name: str
-
-    def decode_request(self, content: bytes, content_type: str) -> object:
-        ...
-
-    def decode_response(self, content: bytes, content_type: str) -> object:
-        ...
-
-
-@runtime_checkable
-class AuthenticationPlugin(Protocol):
-    name: str
-
-    def authorize(self, headers: object, *, temporary_token: str, upstream_secret: str) -> None:
-        ...
-
-
-@runtime_checkable
-class TargetProviderPlugin(Protocol):
-    name: str
-
-    def prepare_request(self, request: object, *, route: object, target: object) -> object:
-        ...
+def create_openrouter_target():
+    from .targets.openrouter import OpenRouterTarget
+    return OpenRouterTarget(load_wires())
 
 
 def load_protocols() -> dict[str, ProtocolPlugin]:
-    from .protocols import (
+    from .observation.decoders import (
         ANTHROPIC_MESSAGES_PROTOCOL,
         JSON_HTTP_PROTOCOL,
         OPENAI_CHAT_PROTOCOL,
@@ -60,7 +38,9 @@ def load_protocols() -> dict[str, ProtocolPlugin]:
 
 
 def load_authentication() -> dict[str, AuthenticationPlugin]:
-    from .auth import ANTHROPIC_API_KEY_AUTH, BEARER_TOKEN_AUTH, GOOGLE_API_KEY_AUTH, NetworkIsolatedAuthentication
+    from .security.auth import BEARER_TOKEN_AUTH, NetworkIsolatedAuthentication
+    from model.anthropic.auth import ANTHROPIC_API_KEY_AUTH
+    from model.google.auth import GOOGLE_API_KEY_AUTH
 
     plugins: dict[str, AuthenticationPlugin] = {
         BEARER_TOKEN_AUTH.name: BEARER_TOKEN_AUTH,
@@ -72,10 +52,10 @@ def load_authentication() -> dict[str, AuthenticationPlugin]:
 
 
 def load_targets() -> dict[str, TargetProviderPlugin]:
-    from .targets import OPENROUTER_TARGET
+    target = create_openrouter_target()
 
     plugins: dict[str, TargetProviderPlugin] = {
-        OPENROUTER_TARGET.name: OPENROUTER_TARGET,
+        target.name: target,
     }
     return _load(TARGET_GROUP, plugins)
 
@@ -83,8 +63,33 @@ def load_targets() -> dict[str, TargetProviderPlugin]:
 def _load(group: str, plugins: dict[str, object]) -> dict:  # type: ignore[type-arg]
     for entry_point in entry_points(group=group):
         loaded = entry_point.load()
-        plugin = loaded() if isinstance(loaded, type) else loaded
+        is_factory = isinstance(loaded, type) or (
+            callable(loaded) and not getattr(loaded, "name", None)
+        )
+        plugin = loaded() if is_factory else loaded
         name = getattr(plugin, "name", "").strip().lower()
         if name:
             plugins[name] = plugin
     return plugins
+
+
+def load_wires():
+    from model.ollama import OllamaWire
+    from model.google.gemini import GeminiWire
+    from model.native import NativeJsonWire
+    registry = {
+        "openai-chat": lambda: NativeJsonWire("/chat/completions"),
+        "openai-responses": lambda: NativeJsonWire("/responses", "response.completed"),
+        "anthropic-messages": lambda: NativeJsonWire("/messages", "message_stop"),
+        "openai-completions": lambda: NativeJsonWire("/completions"),
+        "openai-embeddings": lambda: NativeJsonWire("/embeddings"),
+        "gemini-content": GeminiWire,
+        "gemini-grpc": lambda: GeminiWire(grpc=True),
+        "ollama-chat": OllamaWire,
+        "ollama-generate": lambda: OllamaWire(generate=True),
+    }
+    for entry in entry_points(group="defuzex.model_interceptor.wires"):
+        if entry.name in registry:
+            raise ValueError("Duplicate wire strategy: " + entry.name)
+        registry[entry.name] = entry.load()
+    return registry
