@@ -133,10 +133,16 @@ agentbench certify react-agent --no-view
 agentbench certify react-agent --yes --no-view    # unattended
 ```
 
+`run` and `certify` report a missing or malformed `--registry` or
+`--env-file` on one line and exit `1`, as `observe` and `evaluate` do. An
+unusable SDK selection exits `2`.
+
 ## Result and maintenance commands
 
 ```bash
 # Serve a saved result in the browser viewer.
+# A path that is missing or is not a file, or a --port outside 0-65535,
+# is reported on one line; the command exits non-zero without a traceback.
 agentbench view results/benchmark.json [--host HOST] [--port PORT]
 
 # List SDK integrations without importing third-party plugin code.

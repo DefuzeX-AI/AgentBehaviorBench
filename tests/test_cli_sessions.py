@@ -98,3 +98,36 @@ def test_evaluate_stops_at_its_own_charge_warning_without_consent(
     assert started == []
     output = capsys.readouterr().out
     assert 'may incur charges' in output and 'cancelled' in output
+
+
+# `observe --list` answers from the registry alone and never loads an env file.
+@pytest.mark.parametrize('command,label,fault', [
+    (command, label, fault)
+    for command, label in [('run', 'Run failed'), ('certify', 'Certification failed'),
+                           ('observe', 'Observe failed'), ('evaluate', 'Evaluation failed')]
+    for fault in ['registry', 'env_file']
+    if not (command == 'observe' and fault == 'env_file')
+])
+def test_a_missing_input_file_is_a_diagnostic_line_on_every_command(
+        command, label, fault, tmp_path, capsys, monkeypatch):
+    from agentbench.cli.main import cli
+    from agentbench.cli.terminal_ui import constants
+    monkeypatch.setattr(constants, 'LOGO_PAUSE_SECONDS', 0)
+    monkeypatch.setattr('agentbench.cli.features.run.LOGO_PAUSE_SECONDS', 0)
+    absent = tmp_path / 'absent'
+    arguments = [command]
+    if command in ('certify', 'evaluate'):
+        arguments.append('react-agent')
+    if command == 'observe':
+        arguments.append('--list')
+    if fault == 'registry':
+        arguments += ['--registry', str(absent / 'registry.toml')]
+    else:
+        arguments += ['--env-file', str(absent / '.env')]
+    if command in ('run', 'certify', 'evaluate'):
+        arguments.append('--no-view')
+
+    assert cli(arguments) == 1
+    output = capsys.readouterr().out
+    assert label in output and str(absent) in output
+    assert 'Traceback' not in output

@@ -152,3 +152,27 @@ def test_viewer_explains_missing_frontend_build(tmp_path, monkeypatch):
     result.write_text('[]')
     with pytest.raises(viewer_module.ViewerUnavailable, match="npm ci.*npm run build"):
         start_viewer_server(result, port=0)
+
+
+@pytest.mark.parametrize('target,expected', [
+    ('missing', 'Result log not found'),
+    ('directory', 'Result log is not a file'),
+])
+def test_view_reports_an_unusable_result_path_on_one_line(tmp_path, capsys, target, expected):
+    from agentbench.cli.main import cli
+    path = tmp_path / 'absent.json' if target == 'missing' else tmp_path
+    assert cli(['view', str(path)]) == 1
+    output = capsys.readouterr().out
+    assert expected in output
+    assert 'Traceback' not in output and output.count('\n') == 1
+
+
+@pytest.mark.parametrize('port', ['99999', '-1'])
+def test_view_rejects_a_port_the_socket_layer_cannot_bind(tmp_path, capsys, port):
+    from agentbench.cli.main import cli
+    log = tmp_path / 'result.json'
+    log.write_text('[]', encoding='utf-8')
+    with pytest.raises(SystemExit) as raised:
+        cli(['view', str(log), '--port', port])
+    assert raised.value.code == 2
+    assert 'port must be between 0 and 65535' in capsys.readouterr().err

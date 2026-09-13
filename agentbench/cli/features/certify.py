@@ -66,25 +66,29 @@ def configure_parser(parser: ArgumentParser) -> None:
 
 
 def execute(args: Namespace) -> int:
-    load_project_environment(args.env_file)
     try:
+        load_project_environment(args.env_file)
         kwargs: dict[str, object] = {"output_path": args.output, **sdk_arguments(args)}
         if args.registry != DEFAULT_REGISTRY_PATH:
             kwargs["registry_path"] = args.registry
+        if args.model is not None:
+            kwargs["model"] = args.model
+        if args.no_view:
+            kwargs['viewer_starter'] = None
+        if args.yes:
+            kwargs['assume_yes'] = True
+        if args.llm_trace != "off":
+            kwargs["llm_trace"] = args.llm_trace
+        if args.llm_trace_max_bytes != DEFAULT_TRACE_MAX_BYTES:
+            kwargs["llm_trace_max_bytes"] = args.llm_trace_max_bytes
+        return certify(args.agent_id, **kwargs)
     except ProviderSelectionError as exc:
         print(f"SDK configuration error: {exc}")
         return 2
-    if args.model is not None:
-        kwargs["model"] = args.model
-    if args.no_view:
-        kwargs['viewer_starter'] = None
-    if args.yes:
-        kwargs['assume_yes'] = True
-    if args.llm_trace != "off":
-        kwargs["llm_trace"] = args.llm_trace
-    if args.llm_trace_max_bytes != DEFAULT_TRACE_MAX_BYTES:
-        kwargs["llm_trace_max_bytes"] = args.llm_trace_max_bytes
-    return certify(args.agent_id, **kwargs)
+    except (OSError, ValueError) as exc:
+        # A missing registry or environment file is the caller's input, not a bug.
+        print(f"Certification failed: {exc}")
+        return 1
 
 
 def certify(

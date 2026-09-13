@@ -61,8 +61,9 @@ def serve_result_log(
     """Serve the static viewer and result-log API until interrupted."""
 
     path = Path(result_log).resolve()
-    if not path.exists():
-        raise FileNotFoundError(f"Result log not found: {path}")
+    if not path.is_file():
+        raise FileNotFoundError(f"Result log is not a file: {path}" if path.exists()
+                                else f"Result log not found: {path}")
 
     require_viewer_assets()
     server = create_viewer_server(path, host=host, port=port)
