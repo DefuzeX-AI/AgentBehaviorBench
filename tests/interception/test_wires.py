@@ -7,7 +7,7 @@ import sys
 from types import SimpleNamespace
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "services/model-interceptor/src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "agentbench/services/model-interceptor/src"))
 from defuzex_model_interceptor.wire import GeminiWire, load_wires, json_bytes
 from defuzex_model_interceptor.wire.sse import SSEDecoder
 from defuzex_model_interceptor.wire.ollama import OllamaWire

@@ -26,7 +26,7 @@ def test_original_company_graph_with_controlled_http(tmp_path):
                   "framework": "langgraph", "input": {"company": "测试公司", "company_url": "https://example.test",
                                                          "hq_location": "Toronto", "industry": "Software"}}))
     environ = dict(os.environ, OPENAI_API_KEY="offline", GEMINI_API_KEY="offline", TAVILY_API_KEY="offline",
-                   PYTHONPATH=os.pathsep.join([str(repo), str(repo / "services/model-interceptor/src")]))
+                   PYTHONPATH=os.pathsep.join([str(repo), str(repo / "agentbench/services/model-interceptor/src")]))
     result = subprocess.run([sys.executable, "-m", "agentbench.runtime.agentcontainer.worker", "--agent-root", str(root),
                              "--request", str(request), "--output", str(output)], env=environ, capture_output=True, text=True, timeout=60)
     saved = json.loads((output / "result.json").read_text())
@@ -56,7 +56,7 @@ def test_company_image_executes_original_graph_offline(tmp_path):
     fixtures = tmp_path / "fixtures"
     fixtures.mkdir()
     shutil.copy(Path(__file__).with_name("company_upstream.py"), fixtures)
-    shutil.copytree(repo / "services/model-interceptor/src/defuzex_model_interceptor", fixtures / "defuzex_model_interceptor")
+    shutil.copytree(repo / "agentbench/services/model-interceptor/src/defuzex_model_interceptor", fixtures / "defuzex_model_interceptor")
     (fixtures / "entry.py").write_text('''import asyncio
 import sys
 from pathlib import Path

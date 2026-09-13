@@ -8,7 +8,7 @@
 <p align="center">
   <img
     alt="AgentBehaviorBench — llama agents reviewing workflows"
-    src="figures/title.png"
+    src="docs/figures/title.png"
     width="720"
     style="border-radius: 24px;"
   >
@@ -16,11 +16,11 @@
 
 <p align="center">
   English |
-  <a href="otherLanguages/README.fr.md">Français</a> |
-  <a href="otherLanguages/README.ja.md">日本語</a> |
-  <a href="otherLanguages/README.zh-CN.md">中文简体</a> |
-  <a href="otherLanguages/README.zh-TW.md">中文繁體</a> |
-  <a href="otherLanguages/README.ko.md">한국어</a>
+  <a href="docs/otherLanguages/README.fr.md">Français</a> |
+  <a href="docs/otherLanguages/README.ja.md">日本語</a> |
+  <a href="docs/otherLanguages/README.zh-CN.md">中文简体</a> |
+  <a href="docs/otherLanguages/README.zh-TW.md">中文繁體</a> |
+  <a href="docs/otherLanguages/README.ko.md">한국어</a>
 </p>
 
 <p align="center">
@@ -151,7 +151,7 @@ resources/registry.toml
         -> result snapshot and local viewer
 ```
 
-![AgentBehaviorBench execution architecture](figures/framework.png)
+![AgentBehaviorBench execution architecture](docs/figures/framework.png)
 
 ## Repository layout
 
@@ -161,6 +161,8 @@ resources/registry.toml
 - `agentbench/harness/` owns suite execution, results, and registry loading.
 - `agentbench/runtime/` runs Agents locally or in Docker and intercepts model
   traffic for Docker runtimes.
+- `agentbench/services/` contains runtime services shipped with AgentBench,
+  including the Model Interceptor Docker build context.
 - `agentbench/sdk/` contains built-in SDK adapters and plugin discovery.
 
 ## Development

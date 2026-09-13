@@ -17,7 +17,7 @@ def command(*args):
 def controlled(output, settings, skip_build):
     if not skip_build:
         print("Building interceptor and original-client lab images...", flush=True)
-        command("build", "-t", "abb-interceptor:protocol-validation", REPO / "services/model-interceptor")
+        command("build", "-t", "abb-interceptor:protocol-validation", REPO / "agentbench/services/model-interceptor")
         command("build", "-t", "abb-protocol-lab:validation", "-f", REPO / "tests/acceptance/interception/Dockerfile", FIXTURE)
     network = "abb-protocol-lab-" + uuid4().hex[:12]
     name = network + "-clients"
@@ -27,12 +27,12 @@ def controlled(output, settings, skip_build):
                 "--cap-drop=ALL", "--cap-add=NET_ADMIN", "--cap-add=NET_RAW",
                 "--cap-add=SETUID", "--cap-add=SETGID", "--security-opt=no-new-privileges",
                 "--tmpfs=/tmp:rw,nosuid,size=128m", "--memory=1g", "--pids-limit=256",
-                "--env", "PYTHONPATH=/workspace:/workspace/services/model-interceptor/src"]
+                "--env", "PYTHONPATH=/workspace:/workspace/agentbench/services/model-interceptor/src"]
         for host in ("api.openai.com", "api.anthropic.com", "generativelanguage.googleapis.com",
                      "api.deepseek.com", "dashscope.aliyuncs.com"):
             args += ["--add-host", f"{host}:127.0.0.2"]
         # Never mount the workspace root or .env into an Agent.
-        for relative in ("agentbench", "services/model-interceptor/src", "tests/acceptance/interception", "tests/fixtures/llm-probe"):
+        for relative in ("agentbench", "tests/acceptance/interception", "tests/fixtures/llm-probe"):
             args += ["--mount", f"type=bind,source={REPO / relative},target=/workspace/{relative},readonly"]
         args += ["--mount", f"type=bind,source={output},target=/artifacts",
                  "abb-protocol-lab:validation", json.dumps(settings)]

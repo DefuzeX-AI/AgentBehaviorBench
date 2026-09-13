@@ -8,7 +8,7 @@ import pytest
 def test_interceptor_image_protocol_pipeline(tmp_path):
     from agentbench.runtime.docker.image_builder import DockerImageBuilder
     repo = Path(__file__).resolve().parents[2]
-    context = repo / "services/model-interceptor"
+    context = repo / "agentbench/services/model-interceptor"
     image = DockerImageBuilder().build(context=context, dockerfile=context / "Dockerfile", repository="model-interceptor")
     checks = Path(__file__).with_name("interceptor_checks.py")
     result = subprocess.run(["docker", "run", "--rm", "--network", "none", "--read-only", "--tmpfs=/tmp:rw,noexec,nosuid,size=64m",

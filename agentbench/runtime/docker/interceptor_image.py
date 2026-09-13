@@ -37,5 +37,5 @@ def default_interceptor_image_provider(
     configured = environ.get(INTERCEPTOR_IMAGE_ENV, "").strip()
     if configured:
         return StaticInterceptorImageProvider(configured)
-    context = Path(__file__).resolve().parents[3] / "services" / "model-interceptor"
+    context = Path(__file__).resolve().parents[2] / "services" / "model-interceptor"
     return LocalInterceptorImageProvider(builder, context)

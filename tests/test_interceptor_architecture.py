@@ -12,7 +12,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 compatibility
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-INTERCEPTOR_CONTEXT = REPO_ROOT / "services" / "model-interceptor"
+INTERCEPTOR_CONTEXT = REPO_ROOT / "agentbench" / "services" / "model-interceptor"
 INTERCEPTOR_SRC = INTERCEPTOR_CONTEXT / "src"
 sys.path.insert(0, str(INTERCEPTOR_SRC))
 
@@ -70,6 +70,34 @@ def test_interceptor_image_build_is_scoped_to_service_context() -> None:
             "repository": "model-interceptor",
         }
     ]
+
+
+def test_interceptor_build_context_is_bundled_inside_agentbench() -> None:
+    from agentbench import __file__ as agentbench_file
+
+    package_root = Path(agentbench_file).resolve().parent
+    assert INTERCEPTOR_CONTEXT == package_root / "services" / "model-interceptor"
+    assert INTERCEPTOR_CONTEXT.joinpath("Dockerfile").is_file()
+    assert INTERCEPTOR_CONTEXT.joinpath("pyproject.toml").is_file()
+    assert INTERCEPTOR_CONTEXT.joinpath(
+        "src", "defuzex_model_interceptor", "entrypoint.py"
+    ).is_file()
+
+
+def test_interceptor_build_context_is_declared_as_package_data() -> None:
+    metadata = tomllib.loads(
+        REPO_ROOT.joinpath("pyproject.toml").read_text(encoding="utf-8")
+    )
+    bundled = set(
+        metadata["tool"]["setuptools"]["package-data"]["agentbench.services"]
+    )
+
+    assert {
+        "model-interceptor/Dockerfile",
+        "model-interceptor/pyproject.toml",
+        "model-interceptor/src/defuzex_model_interceptor/*.py",
+        "model-interceptor/src/defuzex_model_interceptor/wire/*.py",
+    } <= bundled
 
 
 def test_deployment_can_supply_an_interceptor_image() -> None:
