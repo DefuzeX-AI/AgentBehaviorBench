@@ -13,6 +13,7 @@ from agentbench.cli.viewer import start_viewer_server
 from agentbench.cli.registry_status import RegistryStatusError, update_agent_status
 from agentbench.cli.sdk import configure_sdk_parser, sdk_arguments
 from agentbench.cli.terminal_ui import LLMActivity
+from agentbench.cli.terminal_ui.presentation import confirm_agents
 from agentbench.cli.trace_runtime import build_trace_suite_runner
 from agentbench.harness import (
     SDK,
@@ -32,6 +33,7 @@ def configure_parser(parser: ArgumentParser) -> None:
     parser.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY_PATH, help="Agent registry path")
     configure_sdk_parser(parser)
     parser.add_argument('--no-view', action='store_true', help='Save results without starting the live viewer.')
+    parser.add_argument('--yes', action='store_true', help='Accept the charge and skip the confirmation prompt.')
     parser.add_argument("agent_id", help="Registered adapting Agent to certify.")
     parser.add_argument(
         "--env-file",
@@ -76,6 +78,8 @@ def execute(args: Namespace) -> int:
         kwargs["model"] = args.model
     if args.no_view:
         kwargs['viewer_starter'] = None
+    if args.yes:
+        kwargs['assume_yes'] = True
     if args.llm_trace != "off":
         kwargs["llm_trace"] = args.llm_trace
     if args.llm_trace_max_bytes != DEFAULT_TRACE_MAX_BYTES:
@@ -98,6 +102,8 @@ def certify(
     model: str | None = None,
     viewer_starter=start_viewer_server,
     post_run_input_fn=input,
+    input_fn: Callable[[str], str] = input,
+    assume_yes: bool = False,
 ) -> int:
     """Run one adapting Agent and promote it after adapter execution succeeds."""
     if sdk is not None and sdk_selection is not None:
@@ -132,6 +138,11 @@ def certify(
         "The registry will change to ready if the Agent completes its Cases "
         "without invocation errors."
     )
+    # Certification runs the full benchmark flow and rewrites the registry, so it
+    # asks before spending, exactly as run does.
+    if not confirm_agents((agent,), input_fn=input_fn, output_fn=output_fn,
+                          assume_yes=assume_yes):
+        return 0
     llm_activity = LLMActivity(output_fn)
     execution = run_benchmark_session(
         (agent,),

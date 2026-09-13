@@ -50,6 +50,8 @@ def configure_parser(parser: ArgumentParser) -> None:
     )
     parser.add_argument('--no-view', action='store_true',
                         help='Save results without starting the local live viewer.')
+    parser.add_argument('--yes', action='store_true',
+                        help='Accept the charge and skip the confirmation prompt.')
     parser.add_argument(
         "--model",
         metavar="OPENROUTER_MODEL",
@@ -83,6 +85,8 @@ def execute(args: Namespace) -> int:
         kwargs["model"] = args.model
     if args.no_view:
         kwargs['viewer_starter'] = None
+    if args.yes:
+        kwargs['assume_yes'] = True
     if args.llm_trace != "off":
         kwargs["llm_trace"] = args.llm_trace
     if args.llm_trace_max_bytes != DEFAULT_TRACE_MAX_BYTES:
@@ -106,6 +110,7 @@ def run(
     llm_trace: str = "off",
     llm_trace_max_bytes: int = DEFAULT_TRACE_MAX_BYTES,
     model: str | None = None,
+    assume_yes: bool = False,
 ) -> int:
     """Confirm ready Agents, run the suite, and return a shell exit code."""
     if sdk is not None and sdk_selection is not None:
@@ -140,6 +145,7 @@ def run(
         input_fn=input_fn,
         output_fn=output_fn,
         sleep_fn=sleep_fn,
+        assume_yes=assume_yes,
     ):
         return 0
 

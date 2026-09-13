@@ -34,8 +34,9 @@ agentbench run [OPTIONS]
 
 Runs every Agent that is both `enabled = true` and `status = "ready"` in the
 registry. The command lists the selection and asks for confirmation before
-execution. Calling `agentbench` with no command is equivalent to
-`agentbench run`.
+execution; `--yes` accepts up front, and a session with no usable console
+declines rather than blocking. Calling `agentbench` with no command is
+equivalent to `agentbench run`.
 
 | Option | Meaning |
 | --- | --- |
@@ -46,6 +47,7 @@ execution. Calling `agentbench` with no command is equivalent to
 | `--env-file PATH` | Load variables from this dotenv file instead of `.env`. |
 | `--output PATH` | Base path for the ABB JSON result snapshot; defaults to `results/result.json`. ABB creates a unique snapshot. |
 | `--no-view` | Save the result without starting the browser viewer. |
+| `--yes` | Accept the charge and skip the confirmation prompt. |
 | `--model MODEL` | Override `OPENROUTER_MODEL` for this run. |
 | `--llm-trace terminal` | Print sanitized intercepted model activity. |
 | `--llm-trace-max-bytes BYTES` | Legacy streaming spool threshold; payloads are not truncated. |
@@ -67,11 +69,14 @@ agentbench evaluate [AGENT] [OPTIONS]
 
 Evaluates one enabled Agent. Supply its ID or its displayed enabled-Agent
 number; omit it to select interactively. The command creates independent SDK
-Cases and requires a Judge report to succeed.
+Cases and requires a Judge report to succeed. Creating Cases and calling the
+Judge consumes Credits, so it lists the Agent and asks for confirmation first;
+pass `--yes` to accept up front.
 
 ```bash
 agentbench evaluate company-research-agent --cases 1
 agentbench evaluate 1 --model openai/gpt-4.1-mini --no-view
+agentbench evaluate 1 --yes --no-view             # unattended
 ```
 
 In addition to the shared `--registry`, `--env-file`, `--model`, `--sdk`,
@@ -117,12 +122,15 @@ agentbench certify AGENT_ID [OPTIONS]
 
 Runs one registered `adapting` Agent through the certification flow. A
 successful run promotes its registry status to `ready`; failed or interrupted
-runs retain the existing status. It supports the same `--registry`, `--sdk`,
+runs retain the existing status. It runs the full benchmark flow and rewrites
+the registry, so it asks for confirmation first; pass `--yes` to accept up
+front. It supports the same `--registry`, `--sdk`,
 `--sdk-options`, `--sdk-source`, `--env-file`, `--output`, `--no-view`,
 `--model`, and LLM-tracing options as `run`.
 
 ```bash
 agentbench certify react-agent --no-view
+agentbench certify react-agent --yes --no-view    # unattended
 ```
 
 ## Result and maintenance commands

@@ -72,7 +72,7 @@ def test_evaluate_cli_executes_ten_cases_without_clamping(starter_agent, repo_ro
     monkeypatch.setattr(evaluate, 'resolve_agent', lambda *_: replace(starter_agent, case_count=1 if explicit else 10))
     monkeypatch.setattr(evaluate, 'load_project_environment', lambda _: None)
     monkeypatch.chdir(repo_root)
-    args = ['evaluate', '1', '--sdk', 'python:examples.case_file_sdk',
+    args = ['evaluate', '1', '--yes', '--sdk', 'python:examples.case_file_sdk',
             '--sdk-options', 'examples/case_file_options.json', '--result-output', str(tmp_path / 'results.json')]
     if explicit:
         args += ['--cases', '10']

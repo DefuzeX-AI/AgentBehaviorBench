@@ -70,7 +70,7 @@ def test_evaluate_cli_runs_replacement_without_kuma(starter_agent, repo_root, mo
     monkeypatch.setattr(evaluate, 'resolve_agent', lambda *_: starter_agent)
     monkeypatch.setattr(evaluate, 'load_project_environment', lambda _: None)
     monkeypatch.chdir(repo_root)
-    assert cli(['evaluate', '1', '--sdk', 'python:examples.case_file_sdk',
+    assert cli(['evaluate', '1', '--yes', '--sdk', 'python:examples.case_file_sdk',
                 '--sdk-options', 'examples/case_file_options.json']) == 0
     assert 'Judge: pass' in capsys.readouterr().out
 
@@ -101,7 +101,7 @@ from agentbench.cli.main import cli
 raise SystemExit(cli(sys.argv[1:]))
 '''
     result = subprocess.run([
-        sys.executable, '-c', script, 'evaluate', 'test-echo', '--registry', str(registry),
+        sys.executable, '-c', script, 'evaluate', 'test-echo', '--yes', '--registry', str(registry),
         '--env-file', str(env_file), '--sdk', 'python:examples.case_file_sdk',
         '--sdk-options', 'examples/case_file_options.json',
     ], cwd=repo_root, capture_output=True, text=True, timeout=30,
@@ -129,7 +129,7 @@ def test_evaluate_defaults_and_explicit_options_use_selected_factory(starter_age
     monkeypatch.setattr(KumaContainerRunner, 'validate_sdk', lambda *_: 'official-container')
     options = tmp_path / 'options.json'
     options.write_text(json.dumps({'output': str(tmp_path / 'from-json'), 'timeout': 11}))
-    assert cli(['evaluate', '1', '--model', 'vendor/model', '--sdk-options', str(options),
+    assert cli(['evaluate', '1', '--yes', '--model', 'vendor/model', '--sdk-options', str(options),
                 '--sdk-source', str(tmp_path / 'sdk'), '--output', str(tmp_path / 'override'),
                 '--timeout', '12']) == 0
     assert received == [(tmp_path / 'sdk', tmp_path / 'override', 12, 'vendor/model')]
@@ -171,7 +171,7 @@ def test_evaluate_plugin_validates_before_execution(starter_agent, monkeypatch, 
     monkeypatch.setattr(evaluate, 'enabled_agents', lambda _: [{'agent_id': starter_agent.agent_id}])
     monkeypatch.setattr(evaluate, 'resolve_agent', lambda *_: starter_agent)
     monkeypatch.setattr(evaluate, 'load_project_environment', lambda _: None)
-    assert cli(['evaluate', '1', '--sdk', 'python:replacement_sdk_fixture:plugin',
+    assert cli(['evaluate', '1', '--yes', '--sdk', 'python:replacement_sdk_fixture:plugin',
                 '--model', 'vendor/model']) == (1 if preflight_fails else 0)
     assert calls == (['validate'] if preflight_fails else ['validate', 'run'])
 

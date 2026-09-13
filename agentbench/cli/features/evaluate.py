@@ -4,6 +4,7 @@ from dataclasses import replace
 from agentbench.cli.execution import run_benchmark_session
 from agentbench.cli.trace_runtime import build_trace_suite_runner
 from agentbench.cli.terminal_ui import LLMActivity
+from agentbench.cli.terminal_ui.presentation import confirm_agents
 from agentbench.cli.viewer import start_viewer_server
 from agentbench.cli.features.certify import _default_output_path
 from pathlib import Path
@@ -24,6 +25,7 @@ def configure_parser(parser):
     parser.add_argument('--model', type=model_name)
     configure_sdk_parser(parser)
     parser.add_argument('--no-view', action='store_true', help='Save results without starting the live viewer.')
+    parser.add_argument('--yes', action='store_true', help='Accept the charge and skip the confirmation prompt.')
     parser.add_argument('--llm-trace', choices=('off', 'terminal'), default='off')
     parser.add_argument('--llm-trace-max-bytes', type=int, default=DEFAULT_TRACE_MAX_BYTES)
     parser.add_argument('--result-output', type=Path, help='ABB result JSON naming base (independent of SDK output)')
@@ -64,6 +66,9 @@ def execute(args):
             agent = replace(agent, case_count=args.cases)
         print(f'Evaluation: {agent.case_count} independent Case(s) using {plan.selection.reference.name}; '
               'selected services may incur charges.', flush=True)
+        # The warning above is only useful with an opportunity to stop.
+        if not confirm_agents((agent,), input_fn=input, output_fn=print, assume_yes=args.yes):
+            return 0
         output = args.result_output or _default_output_path(args.registry, agent.agent_id, command="evaluate")
         if args.output is not None:
             print('--output configures the SDK only; --result-output selects the ABB result JSON.')

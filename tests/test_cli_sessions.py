@@ -72,3 +72,29 @@ def test_missing_kuma_source_reports_the_path_it_tried(tmp_path):
     with pytest.raises(ProviderSelectionError) as raised:
         runner.validate_sdk(SimpleNamespace(path=agent))
     assert str(absent) in str(raised.value)
+
+
+@pytest.mark.parametrize('command', ['run', 'certify', 'evaluate'])
+def test_every_spending_command_offers_the_same_confirmation_opt_out(command):
+    arguments = [command] + (['agent'] if command == 'certify' else [])
+    parser = build_parser()
+    assert parser.parse_args(arguments).yes is False
+    assert parser.parse_args(arguments + ['--yes']).yes is True
+
+
+def test_evaluate_stops_at_its_own_charge_warning_without_consent(
+        starter_agent, repo_root, monkeypatch, capsys):
+    from agentbench.cli.main import cli
+    from agentbench.cli.features import evaluate
+    started = []
+    monkeypatch.setattr(evaluate, 'enabled_agents', lambda _: [{'agent_id': starter_agent.agent_id}])
+    monkeypatch.setattr(evaluate, 'resolve_agent', lambda *_: starter_agent)
+    monkeypatch.setattr(evaluate, 'load_project_environment', lambda _: None)
+    monkeypatch.setattr(evaluate, 'run_benchmark_session',
+                        lambda *a, **kw: started.append(a))
+    monkeypatch.chdir(repo_root)
+    assert cli(['evaluate', '1', '--sdk', 'python:examples.case_file_sdk',
+                '--sdk-options', 'examples/case_file_options.json']) == 0
+    assert started == []
+    output = capsys.readouterr().out
+    assert 'may incur charges' in output and 'cancelled' in output

@@ -66,6 +66,7 @@ def test_certify_promotes_passing_adapting_agent(tmp_path: Path) -> None:
         "test-agent",
         registry_path=registry_path,
         output_fn=output.append,
+        input_fn=lambda _: "yes",
         suite_runner=FakeSuiteRunner(),  # type: ignore[arg-type]
     )
 
@@ -88,6 +89,7 @@ def test_certify_promotes_agent_that_completes_with_benchmark_failure(
         "test-agent",
         registry_path=registry_path,
         output_fn=output.append,
+        input_fn=lambda _: "yes",
         suite_runner=FakeSuiteRunner(result_status="issue"),  # type: ignore[arg-type]
     )
 
@@ -106,6 +108,7 @@ def test_certify_keeps_invocation_error_agent_adapting(tmp_path: Path) -> None:
         "test-agent",
         registry_path=registry_path,
         output_fn=output.append,
+        input_fn=lambda _: "yes",
         suite_runner=InvocationErrorSuiteRunner(),  # type: ignore[arg-type]
     )
 
@@ -123,6 +126,7 @@ def test_certify_is_idempotent_for_ready_agent(tmp_path: Path) -> None:
         "test-agent",
         registry_path=registry_path,
         output_fn=output.append,
+        input_fn=lambda _: "yes",
         suite_runner=runner,  # type: ignore[arg-type]
     )
 
@@ -138,6 +142,7 @@ def test_certify_rejects_non_adapting_status(tmp_path: Path) -> None:
         "test-agent",
         registry_path=registry_path,
         output_fn=lambda _: None,
+        input_fn=lambda _: "yes",
         suite_runner=FakeSuiteRunner(),  # type: ignore[arg-type]
     )
 
@@ -194,3 +199,21 @@ class InvocationErrorSuiteRunner:
                 ),
             ),
         )
+
+
+def test_certify_without_consent_neither_runs_nor_promotes(tmp_path: Path) -> None:
+    registry_path = _write_registry(tmp_path, status="adapting")
+    output: list[str] = []
+
+    exit_code = certify(
+        "test-agent",
+        registry_path=registry_path,
+        output_fn=output.append,
+        input_fn=lambda _: "no",
+        suite_runner=FakeSuiteRunner(),  # type: ignore[arg-type]
+    )
+
+    assert exit_code == 0
+    assert load_registry(registry_path).find("test-agent").status == "adapting"
+    assert output[-1] == "Cancelled."
+    assert not list(tmp_path.glob("results/certify-test-agent-*.json"))

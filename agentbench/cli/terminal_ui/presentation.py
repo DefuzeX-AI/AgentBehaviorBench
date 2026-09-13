@@ -36,8 +36,13 @@ def confirm_agents(
     output_fn: Callable[[str], None] = print,
     sleep_fn: Callable[[float], None] = time.sleep,
     reveal_delay: float = AGENT_REVEAL_DELAY_SECONDS,
+    assume_yes: bool = False,
 ) -> bool:
-    """Print detected agents and return whether execution was confirmed."""
+    """Print detected agents and return whether execution was confirmed.
+
+    `assume_yes` is a caller stating up front that it accepts the charge, so
+    unattended use stays a deliberate choice rather than a silent default.
+    """
 
     print_agents(
         agents,
@@ -45,15 +50,17 @@ def confirm_agents(
         sleep_fn=sleep_fn,
         reveal_delay=reveal_delay,
     )
-    try:
-        confirmed = request_confirmation(input_fn, output_fn)
-    except (EOFError, KeyboardInterrupt):
-        output_fn("\nCancelled.")
-        return False
+    if not assume_yes:
+        try:
+            confirmed = request_confirmation(input_fn, output_fn)
+        except (EOFError, KeyboardInterrupt, OSError):
+            # No console to answer on: decline rather than block or abort.
+            output_fn("\nNo interactive input available; cancelled.")
+            return False
 
-    if not confirmed:
-        output_fn("Cancelled.")
-        return False
+        if not confirmed:
+            output_fn("Cancelled.")
+            return False
 
     output_fn("")
     output_fn(panel_rule("RUN QUEUED", ANSI_GREEN))
