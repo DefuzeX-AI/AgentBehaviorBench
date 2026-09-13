@@ -53,5 +53,8 @@ def evaluation_agent(agent, sdk):
             raise ValueError('Evaluation requires an explicit non-root image USER')
         dockerfile.write_text(original + '\nUSER root\nCOPY .abb-sdk/ /opt/abb-sdk/\n'
                              'RUN python -m pip install --no-cache-dir "/opt/abb-sdk[otel]"\n'
+                             # The SDK asks GitHub for a newer release on import. That host is not
+                             # a declared route, so the block fails the whole invocation trace.
+                             'ENV KUMA_DISABLE_UPDATE_CHECK=1\n'
                              'COPY evaluation/ /opt/agent/evaluation/\nUSER ' + users[-1] + '\n')
         yield SimpleNamespace(path=root, agent_id=agent.agent_id, framework=agent.framework)

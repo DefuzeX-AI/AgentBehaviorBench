@@ -34,6 +34,20 @@ def test_build_overlay_preserves_original_and_sdk_only_egress():
     assert (root / 'agent.toml').read_bytes() == original
 
 
+def test_evaluation_overlay_disables_the_sdk_release_check(tmp_path, offline_agent):
+    from agentbench.sdk.kuma.image import evaluation_agent
+    sdk = tmp_path / 'KUMA-DefuzeX'
+    (sdk / 'src/kuma').mkdir(parents=True)
+    (sdk / 'pyproject.toml').write_text('[project]\nname = "kuma"\n')
+    (sdk / 'README.md').write_text('kuma\n')
+    (sdk / 'src/kuma/__init__.py').write_text('')
+    with evaluation_agent(offline_agent, sdk) as staged:
+        dockerfile = (staged.path / 'Dockerfile').read_text()
+    # The release check runs on import, so it must be off for every process in the image.
+    assert '\nENV KUMA_DISABLE_UPDATE_CHECK=1\n' in dockerfile
+    assert dockerfile.index('KUMA_DISABLE_UPDATE_CHECK') < dockerfile.rindex('USER agent')
+
+
 def test_evaluate_cli_selects_number_without_native_input():
     from agentbench.cli.main import build_parser
     args = build_parser().parse_args(['evaluate', '1'])
