@@ -140,7 +140,9 @@ unusable SDK selection exits `2`.
 ## Result and maintenance commands
 
 ```bash
-# Serve a saved result in the browser viewer.
+# Serve a saved result in the browser viewer. The URL is printed as soon as the
+# server is listening, so a pipe, a log file or a wrapper script sees it while
+# the viewer is still running.
 # A path that is missing or is not a file, or a --port outside 0-65535,
 # is reported on one line; the command exits non-zero without a traceback.
 agentbench view results/benchmark.json [--host HOST] [--port PORT]

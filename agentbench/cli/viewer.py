@@ -69,8 +69,10 @@ def serve_result_log(
     server = create_viewer_server(path, host=host, port=port)
     base_url = f"http://{host}:{server.server_port}"
     url = _locked_viewer_url(base_url, _result_log_suite_id(path))
-    print(f"View: {url}")
-    print(f"Result log: {path}")
+    # serve_forever() never returns on its own, so a block-buffered stdout — any
+    # pipe or file — would hold both lines until the viewer is stopped.
+    print(f"View: {url}", flush=True)
+    print(f"Result log: {path}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

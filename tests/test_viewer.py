@@ -1,4 +1,5 @@
 import json
+import sys
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
@@ -176,3 +177,53 @@ def test_view_rejects_a_port_the_socket_layer_cannot_bind(tmp_path, capsys, port
         cli(['view', str(log), '--port', port])
     assert raised.value.code == 2
     assert 'port must be between 0 and 65535' in capsys.readouterr().err
+
+
+def test_view_makes_the_url_visible_before_it_blocks(tmp_path, monkeypatch) -> None:
+    """A pipe or a file is block-buffered, and serve_forever() never returns on its own."""
+    from agentbench.cli import viewer as viewer_module
+    assets = tmp_path / "dist"
+    assets.mkdir()
+    (assets / "index.html").write_text("<html><head></head><body></body></html>")
+    monkeypatch.setattr(viewer_module, "WEB_ROOT", assets)
+    result_log = tmp_path / "result.json"
+    result_log.write_text(json.dumps([
+        {"event": "run_started", "suite_id": "suite_test", "selected_agent_ids": ["agent-a"]},
+    ]), encoding="utf-8")
+
+    class BlockBufferedStream:
+        """Only a flush makes written text visible, as for a real non-TTY stdout."""
+
+        def __init__(self) -> None:
+            self.written: list[str] = []
+            self.visible: list[str] = []
+
+        def write(self, text: str) -> int:
+            self.written.append(text)
+            return len(text)
+
+        def flush(self) -> None:
+            self.visible.extend(self.written)
+            self.written.clear()
+
+    stream = BlockBufferedStream()
+    visible_while_serving = []
+
+    class ServerStub:
+        server_port = 8765
+
+        def serve_forever(self) -> None:
+            visible_while_serving.append("".join(stream.visible))
+            raise KeyboardInterrupt
+
+        def server_close(self) -> None:
+            return None
+
+    monkeypatch.setattr(viewer_module, "create_viewer_server", lambda *args, **kwargs: ServerStub())
+    monkeypatch.setattr(sys, "stdout", stream)
+
+    viewer_module.serve_result_log(result_log)
+
+    assert visible_while_serving == [
+        f"View: http://127.0.0.1:8765/suite/suite_test/\nResult log: {result_log.resolve()}\n"
+    ]
