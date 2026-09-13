@@ -129,9 +129,10 @@ def test_evaluate_defaults_and_explicit_options_use_selected_factory(starter_age
     monkeypatch.setattr(KumaContainerRunner, 'validate_sdk', lambda *_: 'official-container')
     options = tmp_path / 'options.json'
     options.write_text(json.dumps({'output': str(tmp_path / 'from-json'), 'timeout': 11}))
+    # The stub Judge returns 'issue', so the command reports failure.
     assert cli(['evaluate', '1', '--yes', '--model', 'vendor/model', '--sdk-options', str(options),
                 '--sdk-source', str(tmp_path / 'sdk'), '--output', str(tmp_path / 'override'),
-                '--timeout', '12']) == 0
+                '--timeout', '12']) == 1
     assert received == [(tmp_path / 'sdk', tmp_path / 'override', 12, 'vendor/model')]
 
 

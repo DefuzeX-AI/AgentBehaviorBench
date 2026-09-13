@@ -91,6 +91,10 @@ In addition to the shared `--registry`, `--env-file`, `--model`, `--sdk`,
 | `--result-output PATH` | Base path for ABB's result JSON. |
 | `--output PATH` | Output option forwarded to the SDK, not ABB's result JSON. |
 
+`evaluate` exits `0` only when the Judge verdict is a pass, matching `certify`.
+A completed run whose verdict is not a pass exits `1`, as does an execution
+failure or a missing Judge report.
+
 ## `observe`
 
 ```bash

@@ -1,4 +1,5 @@
 """All benchmark commands share viewer policy and the session lifecycle."""
+import json
 from types import SimpleNamespace
 import pytest
 from agentbench.cli import execution
@@ -131,3 +132,26 @@ def test_a_missing_input_file_is_a_diagnostic_line_on_every_command(
     output = capsys.readouterr().out
     assert label in output and str(absent) in output
     assert 'Traceback' not in output
+
+
+@pytest.mark.parametrize('verdict,expected_exit', [('pass', 0), ('issue', 1)])
+def test_evaluate_exit_code_follows_the_judge_verdict(
+        starter_agent, repo_root, monkeypatch, tmp_path, capsys, verdict, expected_exit):
+    from agentbench.cli.main import cli
+    from agentbench.cli.features import evaluate
+    monkeypatch.setattr(evaluate, 'enabled_agents', lambda _: [{'agent_id': starter_agent.agent_id}])
+    monkeypatch.setattr(evaluate, 'resolve_agent', lambda *_: starter_agent)
+    monkeypatch.setattr(evaluate, 'load_project_environment', lambda _: None)
+    monkeypatch.chdir(repo_root)
+    case = tmp_path / 'case.json'
+    case.write_text(json.dumps({'inputs': [{
+        'input_id': 'only', 'payload': 'Hello ABB',
+        'expected_output': 'Hello ABB' if verdict == 'pass' else 'something else'}]}))
+    options = tmp_path / 'options.json'
+    options.write_text(json.dumps({'case_file': str(case)}))
+    exit_code = cli(['evaluate', '1', '--yes', '--no-view', '--sdk', 'python:examples.case_file_sdk',
+                     '--sdk-options', str(options), '--result-output', str(tmp_path / 'result.json')])
+    output = capsys.readouterr().out
+    # The verdict is reported either way; only the exit code distinguishes them.
+    assert f'Judge: {verdict}' in output
+    assert exit_code == expected_exit

@@ -89,7 +89,8 @@ def execute(args):
             print('Evaluation failed: SDK completed without a Judge report')
             return 1
         print(f'Judge: {reports[-1].status}')
-        return 0
+        # certify already gates on this same value; the two must not disagree.
+        return 0 if execution.result.passed else 1
     except (KeyboardInterrupt, EOFError):
         print('Evaluation interrupted; artifacts retained.')
         return 130
