@@ -19,7 +19,10 @@ def test_build_overlay_preserves_original_and_sdk_only_egress():
     original = (root / 'agent.toml').read_bytes()
     repo = Path(__file__).resolve().parents[2]
     agent = SimpleNamespace(path=root, agent_id='company-research-agent', framework='langgraph')
-    with evaluation_agent(agent, repo.parent / 'Defuze-SDK') as staged:
+    sdk = repo.parent / 'KUMA-DefuzeX'
+    if not (sdk / 'src/kuma/__init__.py').is_file():
+        pytest.skip(f'No local KUMA SDK checkout at {sdk}')
+    with evaluation_agent(agent, sdk) as staged:
         from kuma.repository.agent_profiles import parse_agent_profile
         profile = parse_agent_profile(staged.path / 'evaluation/profile.md')
         assert profile.strategy_group.id == 'CAND-009'

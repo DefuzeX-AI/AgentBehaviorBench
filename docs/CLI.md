@@ -42,6 +42,7 @@ execution. Calling `agentbench` with no command is equivalent to
 | `--registry PATH` | Registry file; defaults to `resources/registry.toml`. |
 | `--sdk NAME` | Evaluation SDK: `kuma`, `panda`, an installed entry-point name, `DISTRIBUTION::NAME`, or `python:MODULE[:OBJECT]`. The default is `kuma`. |
 | `--sdk-options PATH` | JSON object passed to the selected SDK. |
+| `--sdk-source PATH` | Override the selected SDK's `sdk_source` option; wins over the same key in `--sdk-options`. For `kuma` this is the local SDK checkout, which defaults to a sibling `KUMA-DefuzeX` directory. |
 | `--env-file PATH` | Load variables from this dotenv file instead of `.env`. |
 | `--output PATH` | Base path for the ABB JSON result snapshot; defaults to `results/result.json`. ABB creates a unique snapshot. |
 | `--no-view` | Save the result without starting the browser viewer. |
@@ -74,7 +75,8 @@ agentbench evaluate 1 --model openai/gpt-4.1-mini --no-view
 ```
 
 In addition to the shared `--registry`, `--env-file`, `--model`, `--sdk`,
-`--sdk-options`, `--no-view`, and LLM-tracing options, `evaluate` accepts:
+`--sdk-options`, `--sdk-source`, `--no-view`, and LLM-tracing options,
+`evaluate` accepts:
 
 | Option | Meaning |
 | --- | --- |
@@ -83,7 +85,6 @@ In addition to the shared `--registry`, `--env-file`, `--model`, `--sdk`,
 | `--timeout SECONDS` | Override the SDK timeout. |
 | `--result-output PATH` | Base path for ABB's result JSON. |
 | `--output PATH` | Output option forwarded to the SDK, not ABB's result JSON. |
-| `--sdk-source PATH` | Override the selected SDK's `sdk_source` option. |
 
 ## `observe`
 
@@ -117,8 +118,8 @@ agentbench certify AGENT_ID [OPTIONS]
 Runs one registered `adapting` Agent through the certification flow. A
 successful run promotes its registry status to `ready`; failed or interrupted
 runs retain the existing status. It supports the same `--registry`, `--sdk`,
-`--sdk-options`, `--env-file`, `--output`, `--no-view`, `--model`, and
-LLM-tracing options as `run`.
+`--sdk-options`, `--sdk-source`, `--env-file`, `--output`, `--no-view`,
+`--model`, and LLM-tracing options as `run`.
 
 ```bash
 agentbench certify react-agent --no-view

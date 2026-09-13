@@ -49,3 +49,26 @@ def test_session_closes_viewer_when_prompt_fails(monkeypatch):
         execution.run_benchmark_session((), runner=object(), output_path=None,
             output_fn=lambda _: None, viewer_starter=object(), input_fn=fail)
     assert stopped == [True]
+
+
+@pytest.mark.parametrize('command', ['run', 'certify', 'evaluate'])
+def test_sdk_source_is_selectable_on_every_command_that_drives_an_sdk(command, tmp_path):
+    from agentbench.cli.sdk import sdk_arguments
+    arguments = [command] + (['agent'] if command == 'certify' else [])
+    parser = build_parser()
+    assert 'sdk_options' not in sdk_arguments(parser.parse_args(arguments))
+    args = parser.parse_args(arguments + ['--sdk-source', str(tmp_path)])
+    assert sdk_arguments(args)['sdk_options'] == {'sdk_source': tmp_path}
+
+
+def test_missing_kuma_source_reports_the_path_it_tried(tmp_path):
+    from agentbench.harness.errors import ProviderSelectionError
+    from agentbench.sdk.kuma.benchmark import KumaContainerRunner
+    agent = tmp_path / 'agent'; (agent / 'evaluation').mkdir(parents=True)
+    (agent / 'evaluation/profile.md').write_text('---\n---\n')
+    (agent / 'evaluation/input-contract.json').write_text('{}')
+    absent = tmp_path / 'nowhere'
+    runner = KumaContainerRunner(environ={'KUMA_API_KEY': 'fixture'}, options={'sdk_source': absent})
+    with pytest.raises(ProviderSelectionError) as raised:
+        runner.validate_sdk(SimpleNamespace(path=agent))
+    assert str(absent) in str(raised.value)

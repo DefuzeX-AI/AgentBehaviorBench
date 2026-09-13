@@ -94,7 +94,8 @@ def test_run_and_certify_factory_use_same_core_and_model():
 
 def test_default_kuma_source_is_sibling_checkout(repo_root):
     # Moving the adapter must not shift the default to inside AgentBehaviorBench.
-    assert ContainerBenchmarkRunner().sdk == repo_root.parent / 'Defuze-SDK'
+    # The name is the one DefuzeX-AI/KUMA-DefuzeX checks out as.
+    assert ContainerBenchmarkRunner().sdk == repo_root.parent / 'KUMA-DefuzeX'
 
 
 def test_custom_sdk_remains_explicit_injection():

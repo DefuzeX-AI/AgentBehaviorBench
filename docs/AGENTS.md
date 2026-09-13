@@ -25,8 +25,9 @@ If you need to add, port, or validate an Agent, read
 point for the onboarding flow and reading path.
 
 For the current internal beta's built-in KUMA evaluator, users must download the SDK from
-[`Defuze-SDK` dev branch](https://github.com/DefuzeX-AI/Defuze-SDK/tree/dev)
-into a sibling `Defuze-SDK` checkout, or supply its path through `sdk_source`.
+[`KUMA-DefuzeX`](https://github.com/DefuzeX-AI/KUMA-DefuzeX) into a sibling
+`KUMA-DefuzeX` checkout, or supply its path through `--sdk-source` (or the
+`sdk_source` key of `--sdk-options`).
 The KUMA container adapter installs that source in its image. Other evaluation
 SDKs have their own requirements and do not require KUMA. See `SDK.md` when
 adapting another evaluator or Case source.

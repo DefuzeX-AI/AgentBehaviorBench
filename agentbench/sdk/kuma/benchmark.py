@@ -35,7 +35,7 @@ class KumaContainerRunner:
         unknown = set(options) - {'sdk_source', 'output', 'timeout', 'max_steps', 'case_collection'}
         if unknown:
             raise ProviderSelectionError(f'Unsupported container evaluation options: {sorted(unknown)}')
-        self.sdk = Path(options.get('sdk_source', Path(__file__).resolve().parents[4] / 'Defuze-SDK'))
+        self.sdk = Path(options.get('sdk_source', Path(__file__).resolve().parents[4] / 'KUMA-DefuzeX'))
         self.output = Path(options.get('output', 'results/observe'))
         self.timeout = options.get('timeout', 2400)
         self.case_collection = Path(options['case_collection']) if options.get('case_collection') is not None else None
@@ -110,7 +110,7 @@ class KumaContainerRunner:
             if not (registration.path / relative).is_file():
                 raise ProviderSelectionError(f'Missing Agent evaluation file: {relative}')
         if not (self.sdk / 'src/kuma/__init__.py').is_file():
-            raise ProviderSelectionError('Local KUMA SDK source unavailable')
+            raise ProviderSelectionError(f'Local KUMA SDK source unavailable: {self.sdk}')
         return 'official-container'
 
     def run_defuzex(self, *args, **kwargs):

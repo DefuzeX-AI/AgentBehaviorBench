@@ -24,6 +24,12 @@ def configure_sdk_parser(parser: ArgumentParser) -> None:
         metavar="PATH",
         help="JSON object of options passed to the selected SDK.",
     )
+    parser.add_argument(
+        "--sdk-source",
+        metavar="PATH",
+        type=Path,
+        help="Override the selected SDK's sdk_source option.",
+    )
 
 
 def sdk_arguments(args: Namespace) -> dict[str, object]:
@@ -41,4 +47,8 @@ def sdk_arguments(args: Namespace) -> dict[str, object]:
         if not isinstance(options, dict):
             raise ProviderSelectionError("SDK options must be a JSON object")
         result["sdk_options"] = options
+    if getattr(args, "sdk_source", None) is not None:
+        # A command-line value wins over the same key in --sdk-options.
+        result["sdk_options"] = {**result.get("sdk_options", {}),
+                                 "sdk_source": args.sdk_source}
     return result
