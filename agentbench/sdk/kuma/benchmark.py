@@ -1,5 +1,6 @@
 """Shared container Case executor for run, certify and the evaluate alias."""
 import json
+import shutil
 import math
 import os
 from dataclasses import dataclass
@@ -58,11 +59,19 @@ class KumaContainerRunner:
         """Collect the Registry count completely, before any Agent execution."""
         count = getattr(registration, 'case_count', 1)
         if self.case_collection is not None:
-            # Explicit reuse preserves the original collection and never generates.
+            # Explicit reuse preserves the original collection and never generates. The
+            # saved Case artifacts are read from a `cases` folder beside the collection.
             collection = json.loads(self.case_collection.read_text())
             directory = self.output.resolve() / uuid4().hex
             files = Artifacts(directory)
             files.save('evaluation/case-collection.json', collection)
+            source_cases = self.case_collection.resolve().parent / 'cases'
+            target_cases = directory / 'evaluation/cases'; target_cases.mkdir(parents=True, exist_ok=True)
+            for entry in collection.get('cases', ()):
+                name = Path(entry.get('artifact', '')).name
+                if not name or not (source_cases / name).is_file():
+                    raise RuntimeError(f'Case collection is missing its saved Case artifact: {name or entry}')
+                shutil.copyfile(source_cases / name, target_cases / name)
             files.save('run.json', {'schema': 'abb.case_collection.import.v1',
                                    'status': 'succeeded', 'source': str(self.case_collection.resolve())})
         else:
@@ -88,7 +97,8 @@ class KumaContainerRunner:
             status = json.loads((directory / 'run.json').read_text())
             files.save('run.json', {**status, 'status': 'failed', 'validation': 'failed'})
             raise RuntimeError(str(exc)) from exc
-        self._case_batches[registration.agent_id] = {'collection': collection, 'next_index': 0}
+        self._case_batches[registration.agent_id] = {
+            'collection': collection, 'next_index': 0, 'cases': directory / 'evaluation/cases'}
         Artifacts(directory).save('evaluation/batch-selection.json', {
             'requested_count': count, 'accepted_count': count, 'status': 'accepted'})
         return self._case_batches[registration.agent_id]
@@ -115,15 +125,16 @@ class KumaContainerRunner:
         if prepared is None:
             prepared = self._prepare_batch(registration, on_progress)
         index = prepared['next_index']
-        if index >= len(prepared['collection']['entries']):
+        if index >= len(prepared['collection']['cases']):
             raise RuntimeError('Generated Case batch is exhausted; start a new suite explicitly')
         prepared['next_index'] += 1
-        entry = prepared['collection']['entries'][index]
-        batch = prepared['collection']['batches'][entry['batch_index']]
-        case_index = entry['case_index']
+        entry = prepared['collection']['cases'][index]
+        case_artifact = prepared['cases'] / Path(entry['artifact']).name
+        if not case_artifact.is_file():
+            raise RuntimeError(f'Prepared Case artifact is missing: {case_artifact}')
         directory = evaluate(registration, output=self.output, sdk=self.sdk,
                              environ=self.environ, timeout=self.timeout, max_steps=self.max_steps,
-                             case_batch=batch, case_index=case_index,
+                             case_artifact=case_artifact,
                              excluded_cases=self._case_fingerprints.get(registration.agent_id, ()), trace_sink=self.trace_sink,
                              trace_max_bytes=self.trace_max_bytes,
                              on_artifacts_ready=lambda path: emit_progress(
@@ -134,8 +145,8 @@ class KumaContainerRunner:
             result = read_result(directory, registration.agent_id, on_step_start, on_step_complete)
             from agentbench.sdk.common.case_identity import case_content_sha256
             case = json.loads((directory / 'evaluation/case.json').read_text())
-            if case['case_id'] != batch['cases'][case_index]['case_id']:
-                raise RuntimeError('Executed Case does not match the selected batch entry')
+            if case['case_id'] != entry['case_id']:
+                raise RuntimeError('Executed Case does not match the prepared collection entry')
             fingerprint = case_content_sha256(case)
             seen = self._case_fingerprints.setdefault(registration.agent_id, [])
             if fingerprint in seen:

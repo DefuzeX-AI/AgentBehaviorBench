@@ -14,7 +14,7 @@ from agentbench.runtime.agentcontainer.session import AgentSession
 
 
 async def execute(root, output, settings=None):
-    from kuma import create_run, generate_cases
+    from kuma import create_run
     from kuma.otel import configure_trace_evidence
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.resources import Resource
@@ -35,19 +35,24 @@ async def execute(root, output, settings=None):
                    'sdk': 'kuma', 'sdk_version': version('kuma-defuzex'), 'agent_id': manifest['agent_id'],
                    'source': manifest.get('source'), 'repo': str(root / 'agent')})
         files.save('manifest.json', {'phase': 'case_generation', 'judge': 'pending'})
-        options = dict(repo_path=root / 'agent', agent_profile_path=root / 'evaluation/profile.md',
+        options = dict(repo_path=root / 'agent',
                        max_steps=settings.get('max_steps'), allow_local=False, track_files=False, save_local=True,
                        api_key=os.environ.get('KUMA_API_KEY') or os.environ.get('DEFUZEX_API_KEY'),
                        trace_evidence=capture, max_retries=0, operation_wait_timeout=600)
         if settings.get('mode') == 'generate':
             from .generation import generate_collection
-            collection = generate_collection(generate_cases, count=settings['count'], options=options, files=files)
-            files.save('manifest.json', {'phase': 'batch_generated', 'count': len(collection['entries']),
-                                        'mode': collection['mode']})
+            # Generation reads the Agent profile; reuse rejects it, so the profile
+            # belongs only to this branch.
+            collection = generate_collection(
+                create_run, count=settings['count'], files=files, repo=root / 'agent',
+                options=dict(options, agent_profile_path=root / 'evaluation/profile.md'))
+            files.save('manifest.json', {'phase': 'batch_generated', 'count': len(collection['cases'])})
             return 0
-        if settings.get('case_batch') is None:
-            raise ValueError('Evaluation requires a generated Case batch; generation belongs to batch preparation')
-        run = create_run(case_batch=settings['case_batch'], case_index=settings.get('case_index', 0), **options)
+        if settings.get('case_artifact') is None:
+            raise ValueError('Evaluation requires a prepared Case artifact; generation belongs to batch preparation')
+        # The SDK reuses a Case only from a saved artifact file inside the Run repository,
+        # and rejects a Profile or strategy alongside it: the Case is already decided.
+        run = create_run(case_path=settings['case_artifact'], **options)
         # Current SDK has no public Case accessor. Keep this version-sensitive
         # snapshot in the KUMA boundary; never manufacture an official Case ID.
         from kuma.serialization import to_json

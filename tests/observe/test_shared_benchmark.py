@@ -71,7 +71,12 @@ def test_host_rejection_marks_run_failed(completed_run, monkeypatch):
     save('evaluation/inputs/0001/evidence.json', {'spans': []})
     runner = ContainerBenchmarkRunner()
     monkeypatch.setattr(runner, 'validate_sdk', lambda _: 'official-container')
-    runner._case_batches['a'] = {'collection': {'batches': [{'cases': [{'case_id': 'case-1'}]}], 'entries': [{'batch_index': 0, 'case_index': 0}]}, 'next_index': 0}
+    prepared = folder / 'prepared'; prepared.mkdir(parents=True, exist_ok=True)
+    (prepared / 'abb-case-0001.json').write_text(json.dumps({'schema_version': 'kuma.case_artifact.v1'}))
+    runner._case_batches['a'] = {
+        'collection': {'schema': 'abb.case_collection.v2', 'requested_count': 1,
+                       'cases': [{'case_id': 'case-1', 'artifact': '.kuma/abb-case-0001.json'}]},
+        'next_index': 0, 'cases': prepared}
     monkeypatch.setattr(benchmark, 'evaluate', lambda *a, **kw: folder)
     notifications = []
     with pytest.raises(RuntimeError, match='evidence'):

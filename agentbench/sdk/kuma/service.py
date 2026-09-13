@@ -23,17 +23,20 @@ class EvaluationPolicy:
 
 def evaluate(agent, *, output, sdk, environ, timeout=2400, trace_sink=None, trace_max_bytes=262144,
              on_artifacts_ready=None, max_steps=None, excluded_cases=(),
-             generation_count=None, case_batch=None, case_index=0):
+             generation_count=None, case_artifact=None):
     if not (environ.get('KUMA_API_KEY') or environ.get('DEFUZEX_API_KEY')):
         raise ValueError('KUMA_API_KEY or DEFUZEX_API_KEY is required')
     directory = output.resolve() / uuid4().hex
     directory.mkdir(parents=True, mode=0o700)
     files = Artifacts(directory)
     inputs = directory / 'request'; inputs.mkdir()
+    # The Case artifact is addressed inside the Run repository; the host copies the
+    # prepared file into the repository ledger below, before the container starts.
+    reused = f'.kuma/{Path(case_artifact).name}' if case_artifact is not None else None
     files.save('request/evaluation.json', {
         'max_steps': max_steps, 'excluded_cases': list(excluded_cases),
         'mode': 'generate' if generation_count is not None else 'execute',
-        'count': generation_count, 'case_batch': case_batch, 'case_index': case_index})
+        'count': generation_count, 'case_artifact': reused})
     destination = directory / 'evaluation'; destination.mkdir(mode=0o777); destination.chmod(0o777)
     status = {'schema': 'abb.evaluate.run.v1', 'run_id': directory.name,
               'agent_id': agent.agent_id, 'status': 'running'}
@@ -49,6 +52,8 @@ def evaluate(agent, *, output, sdk, environ, timeout=2400, trace_sink=None, trac
             repository = directory / 'sdk-repo'
             shutil.copytree(descriptor.path / 'agent', repository, ignore=_ignore)
             state = repository / '.kuma'; state.mkdir(mode=0o777); state.chmod(0o777)
+            if case_artifact is not None:
+                shutil.copyfile(case_artifact, state / Path(case_artifact).name)
             store = TraceStore(directory / 'network.jsonl', directory.name, source='interceptor')
             class Sink:
                 def emit(self, event):
