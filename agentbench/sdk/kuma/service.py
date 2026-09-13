@@ -21,6 +21,17 @@ class EvaluationPolicy:
                 f'type=bind,source={self.state},target=/opt/agent/agent/.kuma')
 
 
+def received_verdict(directory):
+    """A rejected Run may still hold a paid-for Judge report; name it rather than lose it."""
+    report = directory / 'evaluation/judge/report.json'
+    try:
+        document = json.loads(report.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return None
+    return {'status': document.get('status'), 'report_id': document.get('report_id'),
+            'report': str(report)}
+
+
 def evaluate(agent, *, output, sdk, environ, timeout=2400, trace_sink=None, trace_max_bytes=262144,
              on_artifacts_ready=None, max_steps=None, excluded_cases=(),
              generation_count=None, case_artifact=None):
@@ -72,6 +83,13 @@ def evaluate(agent, *, output, sdk, environ, timeout=2400, trace_sink=None, trac
             status['status'] = 'succeeded' if code == 0 else 'failed'
     except BaseException as exc:
         status.update(status='failed', error_type=type(exc).__name__, error=str(exc))
+        # The host may reject a Run the Backend already charged for. Say so, and say
+        # where the verdict is: rejecting it is correct, discarding it silently is not.
+        verdict = received_verdict(directory)
+        if verdict is not None:
+            status['judge'] = verdict
+            print(f'Judge verdict already received and retained: {verdict["status"]} '
+                  f'({verdict["report"]})', flush=True)
         raise
     finally:
         if session is not None:

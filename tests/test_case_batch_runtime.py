@@ -218,3 +218,62 @@ def test_invalid_saved_selection_rejected_before_execution(batch_runtime, starte
     count = 2 if fault in ('duplicate', 'wrong_count') else 1
     result = SuiteRunner(benchmark_runner=runner).run([replace(starter_agent, case_count=count)])
     assert not result.passed and not calls
+
+
+def test_host_rejection_keeps_the_judge_verdict_it_already_paid_for(monkeypatch, tmp_path):
+    from contextlib import contextmanager
+    from agentbench.sdk.kuma import service
+    root = tmp_path / 'unit'; (root / 'agent').mkdir(parents=True)
+    agent = SimpleNamespace(path=root, agent_id='a')
+
+    @contextmanager
+    def overlay(*args):
+        yield agent
+
+    def reject(checkpoint):
+        raise RuntimeError('Agent invocation completed without a matched LLM request/response trace')
+
+    def container_wrote_a_verdict(directory):
+        judge = directory / 'evaluation/judge'; judge.mkdir(parents=True)
+        (judge / 'report.json').write_text(json.dumps(
+            {'status': 'fail', 'report_id': 'report_fixture', 'run_id': 'run_fixture'}))
+
+    session = SimpleNamespace(trace_checkpoint=lambda: None, wait=lambda **kw: 0,
+                              validate_trace=reject, close=lambda: None, stdout='', stderr='')
+    monkeypatch.setattr(service, 'evaluation_agent', overlay)
+    monkeypatch.setattr(service, 'DockerRuntime', lambda **kw: SimpleNamespace(start=lambda *a, **kw: session))
+    with pytest.raises(RuntimeError):
+        service.evaluate(agent, output=tmp_path / 'out', sdk=tmp_path,
+                         environ={'DEFUZEX_API_KEY': 'fixture'},
+                         on_artifacts_ready=container_wrote_a_verdict)
+    directory = next((tmp_path / 'out').iterdir())
+    status = json.loads((directory / 'run.json').read_text())
+    # The guard still rejects the Run; it just no longer hides what was bought.
+    assert status['status'] == 'failed' and status['exit_code'] == 0
+    assert status['judge']['status'] == 'fail'
+    assert status['judge']['report_id'] == 'report_fixture'
+    assert Path(status['judge']['report']).is_file()
+
+
+def test_a_run_without_a_verdict_reports_no_judge_field(monkeypatch, tmp_path):
+    from contextlib import contextmanager
+    from agentbench.sdk.kuma import service
+    root = tmp_path / 'unit'; (root / 'agent').mkdir(parents=True)
+    agent = SimpleNamespace(path=root, agent_id='a')
+
+    @contextmanager
+    def overlay(*args):
+        yield agent
+
+    def reject(checkpoint):
+        raise RuntimeError('no trace')
+
+    session = SimpleNamespace(trace_checkpoint=lambda: None, wait=lambda **kw: 0,
+                              validate_trace=reject, close=lambda: None, stdout='', stderr='')
+    monkeypatch.setattr(service, 'evaluation_agent', overlay)
+    monkeypatch.setattr(service, 'DockerRuntime', lambda **kw: SimpleNamespace(start=lambda *a, **kw: session))
+    with pytest.raises(RuntimeError):
+        service.evaluate(agent, output=tmp_path / 'out', sdk=tmp_path,
+                         environ={'DEFUZEX_API_KEY': 'fixture'})
+    status = json.loads((next((tmp_path / 'out').iterdir()) / 'run.json').read_text())
+    assert status['status'] == 'failed' and 'judge' not in status
