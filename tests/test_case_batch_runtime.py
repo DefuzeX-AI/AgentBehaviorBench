@@ -277,3 +277,61 @@ def test_a_run_without_a_verdict_reports_no_judge_field(monkeypatch, tmp_path):
                          environ={'DEFUZEX_API_KEY': 'fixture'})
     status = json.loads((next((tmp_path / 'out').iterdir()) / 'run.json').read_text())
     assert status['status'] == 'failed' and 'judge' not in status
+
+
+def _failed_run(directory, *, error, network_events=()):
+    """Write the artifacts a container leaves behind when a phase fails."""
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / 'run.json').write_text(json.dumps(
+        {'agent_id': 'a1', 'run_id': directory.name, 'status': 'failed'}))
+    (directory / 'evaluation').mkdir(exist_ok=True)
+    (directory / 'evaluation' / 'manifest.json').write_text(json.dumps({'error': error}))
+    if network_events:
+        (directory / 'network.jsonl').write_text(
+            '\n'.join(json.dumps(event) for event in network_events))
+
+
+def test_container_failure_names_the_sdk_error_and_the_blocked_upstream(tmp_path):
+    directory = tmp_path / 'run1'
+    _failed_run(
+        directory,
+        error={'type': 'ServiceError', 'message': 'The KUMA service request failed.',
+               'code': 'invalid_response'},
+        network_events=[
+            {'event': 'llm_request', 'data': {'host': 'example.test'}},
+            {'event': 'tool_error', 'data': {'method': 'GET', 'host': 'defuzex.ai',
+                                             'path': '/sdk/v2/operations/abc/',
+                                             'error': "[Errno 110] Connect call failed"}},
+        ],
+    )
+    with pytest.raises(RuntimeError) as failure:
+        benchmark.read_result(directory, 'a1')
+    message = str(failure.value)
+    # The SDK's own classification, which alone does not say the connection never opened.
+    assert 'ServiceError: The KUMA service request failed. [invalid_response]' in message
+    # The Interceptor names the upstream, which is what makes the cause attributable.
+    assert 'GET defuzex.ai/sdk/v2/operations/abc/' in message
+    assert '[Errno 110] Connect call failed' in message
+
+
+def test_container_failure_without_interceptor_errors_still_names_the_cause(tmp_path):
+    directory = tmp_path / 'run2'
+    _failed_run(directory, error={'type': 'CaseIntegrityError',
+                                  'message': 'The Case integrity metadata does not match.',
+                                  'code': 'invalid_case_integrity'})
+    with pytest.raises(RuntimeError) as failure:
+        benchmark.read_result(directory, 'a1')
+    message = str(failure.value)
+    assert 'CaseIntegrityError: The Case integrity metadata does not match.' in message
+    assert 'invalid_case_integrity' in message
+    # Nothing to attribute to the Interceptor, so it is not mentioned at all.
+    assert 'interceptor' not in message
+
+
+def test_container_failure_falls_back_to_the_path_when_nothing_is_recorded(tmp_path):
+    directory = tmp_path / 'run3'
+    directory.mkdir()
+    (directory / 'run.json').write_text(json.dumps(
+        {'agent_id': 'a1', 'run_id': 'run3', 'status': 'failed'}))
+    with pytest.raises(RuntimeError, match='Container evaluation did not complete'):
+        benchmark.read_result(directory, 'a1')

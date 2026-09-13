@@ -163,6 +163,55 @@ class KumaContainerRunner:
             raise
 
 
+def _container_failure(directory, read):
+    """Name why the container stopped, so the host does not report only a path.
+
+    Two sources answer different halves. ``manifest.json`` carries the SDK's own
+    classification and is present whichever phase failed. The Interceptor's event
+    log names the upstream it could not reach, which is what separates a genuine
+    malformed reply from a connection that never opened.
+    """
+    parts = []
+    try:
+        error = read('evaluation/manifest.json').get('error')
+    except (OSError, ValueError, KeyError):
+        error = None
+    if isinstance(error, dict) and error.get('message'):
+        code = error.get('code')
+        parts.append(f"{error.get('type') or 'error'}: {error['message']}"
+                     + (f" [{code}]" if code else ''))
+    blocked = _interceptor_failure(directory)
+    if blocked:
+        parts.append(f'interceptor: {blocked}')
+    return '; '.join(parts)
+
+
+def _interceptor_failure(directory):
+    """Return the Interceptor's last failed call, or None when it recorded none."""
+    log = directory / 'network.jsonl'
+    if not log.is_file():
+        return None
+    latest = None
+    try:
+        with log.open(encoding='utf-8', errors='replace') as stream:
+            for line in stream:
+                if '"tool_error"' not in line and '"llm_error"' not in line:
+                    continue
+                try:
+                    event = json.loads(line)
+                except ValueError:
+                    continue
+                if event.get('event') in ('tool_error', 'llm_error'):
+                    latest = event.get('data') or {}
+    except OSError:
+        return None
+    if not latest:
+        return None
+    target = f"{latest.get('method') or ''} {latest.get('host') or ''}{latest.get('path') or ''}".strip()
+    detail = latest.get('error')
+    return f'{target}: {detail}' if target else (str(detail) if detail else None)
+
+
 def read_result(directory, agent_id, on_step_start=None, on_step_complete=None):
     """Validate the completed artifact contract on the trusted host."""
     def read(relative):
@@ -173,7 +222,9 @@ def read_result(directory, agent_id, on_step_start=None, on_step_complete=None):
         return json.loads(path.read_text(encoding='utf-8'))
     host = read('run.json')
     if host.get('agent_id') != agent_id or host.get('run_id') != directory.name or host.get('status') != 'succeeded':
-        raise RuntimeError(f'Container evaluation did not complete: {directory}')
+        cause = _container_failure(directory, read)
+        raise RuntimeError(f'Container evaluation did not complete: {directory}'
+                           + (f' -- {cause}' if cause else ''))
     summary = read('evaluation/manifest.json')
     for key, expected in {'execution':'succeeded', 'otel':'complete', 'submission':'committed',
                            'evidence':'captured', 'judge':'received', 'phase':'finished'}.items():
