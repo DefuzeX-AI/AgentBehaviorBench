@@ -21,7 +21,7 @@
 | #20 | 失败 Case 保留匹配身份的 Judge/artifact；修复官方不可变 Submission 被误判无证据 | test_issue20、test_issue20_evidence：PyPI 1/2/3/5 轮修前 4 失败、修后通过。真实复用 Case 宿主接受；三 Agent 12 个 Case 中两个远端 Judge 失败时其余十份结果仍保留。 |
 | #31 | Docker 边界不注入宿主 callback 对象 | test_issue31、真实目录插件容器验收。 |
 | #32 | 关闭 stdin 不抹掉已完成 execution，viewer 仍清理 | test_issue32。 |
-| #34 | 原 SDK code/request ID 与相关网络错误分别展示；保留公开请求恢复入口 | test_issue34、test_issue34_recovery；真实中断恢复仍未做收费验收。 |
+| #34 | 原 SDK code/request ID 与相关网络错误分别展示；保留公开请求恢复入口 | test_issue34、test_issue34_recovery；真实 PyPI 终态失败账本回放覆盖三类远端错误（含 retryable=true），证明不新建网络客户端、原记录不变；真实中断成功恢复仍未做收费验收。 |
 | #36 | 已记录的连接/上游终态与采集/策略等致命错误分开 | test_issue36、Docker 并发/取消验收；未从字符串猜测用户主动取消。 |
 | #37 | viewer 启动信息立即 flush | test_issue37。 |
 | #38 | 补评测目标、结果含义和可运行结果示例 | README、Troubleshooting、真实执行的 offline_demo。 |
@@ -44,3 +44,5 @@
 当前主机回归为 253 passed / 8 opt-in skipped；需要 Docker 的检查已分别显式运行，最近新增的两个 Agent 容器兼容性回归也实际通过。真实历史传递已覆盖 ReAct / GPT Researcher 的 1/2/3/5 轮与 TradingAgents 的 1/2 轮；后者的 3/5 轮仍在计划中。
 
 仍需区分两类上游限制：CaseGen 偶尔输出超出 profile 能力的任务；Judge 偶尔返回 model_invalid_result、request_failed 或 service_busy，而 Agent 和证据提交已成功。原始 code/request/operation 身份已记录；没有自动重复计费请求，没有把这些失败计为成功额度。
+
+补充 Issue34 定向验证：11 passed。新增的 3 个真实 PyPI 账本回归只验证已失败记录的恢复行为；不宣称修复服务端错误。SDK 公共 request summary 不暴露 error_code/error_retryable，原错误保留在 SDK 磁盘记录及 ABB manifest 中，测试遵循这个实际合同。

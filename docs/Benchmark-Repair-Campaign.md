@@ -144,3 +144,5 @@ Issue #39：主机边界与当前镜像真实断网验收通过；后续新增�
 - 官方文档分别定义为服务端内部错误与模型供应方超时/不可用/繁忙；没有公开更具体原因。retryable=true 也不允许 SDK 自动重复付费请求。不能据此改写用户输入、伪造 Judge 或归咎 OpenRouter key。
 - 对全部 12 个 Case 的 24 次输入做离线逐字历史核验：首轮只有自身输入，第二轮包含完整前序结果历史。ReAct 使用原生 messages，两个研究 binding 使用 prior user/final answer。保留原始 partial 和工具内容大小限制；验收文件 Three-Agent-Two-Turn-Acceptance-2026-09-14.json。
 - 下一批仅将 worker 从 3 改为 2，保持三 Agent × 各 4 Cases × 最多两轮。使用新生成 Case，因此只作负载相关性的观察，不宣称是因果证明；完成后检查再进入三轮/五轮。
+
+两轮 Case 适配性人工复核：12 个基线任务中 10 个可由声明工具尝试，GPT Researcher 另两个基线要求冻结/版本化索引及 lineage introspection，当前 binding 未暴露这些操作。该不匹配与刻意加入的 follow-up 注入分开记录，详见 Three-Agent-Two-Turn-Case-Scope-2026-09-14.json；不把链路成功当作场景质量通过。
