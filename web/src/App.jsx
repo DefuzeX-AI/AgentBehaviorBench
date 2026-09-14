@@ -6,6 +6,8 @@ import EvaluationView from './evaluation/EvaluationView.jsx';
 const RawRunView = lazy(() => import('./RawRunView.jsx'));
 const FlowPrototype = lazy(() => import('./flow-prototype/FlowPrototype.jsx'));
 import useLiveJson from './useLiveJson.js';
+import useSuiteLive from './suite/useSuiteLive.js';
+import SuiteOverview from './suite/SuiteOverview.jsx';
 
 const PAGE_SIZE = 100;
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -34,7 +36,7 @@ export default function App() {
   const [listError, setListError] = useState('');
   const [revision, setRevision] = useState(0);
   const catalog = useLiveJson('/api/observe/runs', revision);
-  const suite = useLiveJson(suiteEndpoint, revision);
+  const suite = useSuiteLive(suiteEndpoint, revision);
   const runMetadata = useLiveJson(selected ? `/api/observe/runs/${selected}/metadata` : null, revision);
   useEffect(() => {
     if (catalog.data?.runs) {
@@ -119,7 +121,7 @@ export default function App() {
 
   return (
     <div className="workspace">
-    <RunSidebar runs={runs} jobs={catalog.data?.jobs || []} selected={selected} busy={listBusy} error={listError}
+    <RunSidebar runs={runs} jobs={suite.data?.jobs || catalog.data?.jobs || []} selected={selected} busy={listBusy} error={listError}
       onSelect={id => { setImported(false); setView(current => current === 'flow' ? 'flow' : 'otel'); if (id === selected) setRevision(value => value + 1); else setSelected(id); }}
       onRefresh={() => setRevision(value => value + 1)} />
     <main>
@@ -131,25 +133,18 @@ export default function App() {
         <input ref={input} type="file" multiple accept=".jsonl,.json" hidden
           onChange={event => { loadFiles(Array.from(event.target.files)); event.target.value = ''; }} />
       </header>
-      <p className="description">{bound ? `Suite ${suite.data?.suite_id || '加载中'} · 每秒自动同步。选择左侧运行查看详细执行过程。` : selected ? `Run ${selected}：选择下方视图查看运行记录。` : '从左侧选择运行记录自动加载，也可以手动打开 trace 文件。'}</p>
-      {bound && <div className="summary" role="status">
-        <span>{suite.data?.state === 'complete' ? '评测已结束' : suite.data?.state === 'failed' ? '执行失败或已中断' : '评测进行中'}</span>
-        {suite.data?.effective_workers != null && <span>Case 并发 {suite.data.effective_workers}（配置上限 {suite.data.configured_workers}）· 共 {suite.data.total_case_count} 个 Case</span>}
-        {suite.data?.summary && <span>通过 {suite.data.summary.passed} · 未通过 {suite.data.summary.failed} · 跳过 {suite.data.summary.skipped}</span>}
-        {suite.data?.jobs && <span>Case 运行中 {suite.data.jobs.reduce((count, job) => count + (job.counts?.running || 0), 0)} · 排队 {suite.data.jobs.reduce((count, job) => count + (job.counts?.queued || 0), 0)}</span>}
-        <span>{suite.updated ? `同步于 ${suite.updated}` : '连接中…'}</span>
-      </div>}
+      <p className="description">{bound ? `Suite ${suite.data?.suite_id || '加载中'} · 每秒自动同步。展开多个 Case，对照每次执行及 Judge 结果。` : selected ? `Run ${selected}：选择下方视图查看运行记录。` : '从左侧选择运行记录自动加载，也可以手动打开 trace 文件。'}</p>
       {suite.error && <p role="alert">{suite.error}；已显示的数据保留，连接恢复后继续同步。</p>}
       {suite.data?.suite_error && <p role="alert">{suite.data.suite_error.message}</p>}
 
       <nav className="trace-tabs" aria-label="Trace 视图">{bound && <button aria-pressed={view === 'suite'} onClick={() => { setImported(false); setView('suite'); }}>Suite 进度</button>}<button aria-pressed={view === 'otel'} onClick={() => setView('otel')}>OTel 调用树</button><button aria-pressed={view === 'evaluation'} onClick={() => setView('evaluation')}>Case / SDK / Judge</button><button aria-pressed={view === 'raw'} onClick={() => setView('raw')}>交互时间线</button><button aria-pressed={view === 'flow'} onClick={() => { setView('flow'); const url = new URL(location.href); const hash = new URLSearchParams(url.hash.slice(1)); hash.set('view', 'flow'); url.hash = hash.toString(); history.replaceState(null, '', url); }}>执行流程 · 原型</button></nav>
       {view !== 'suite' && !selected && !imported && <p role="status">{listBusy ? '正在读取运行目录…' : listError ? `运行目录不可用：${listError}` : '此结果没有登记可查看的证据目录。可能尚未产出，或来源未提供；请在 Suite 进度查看已保存的输入和判决。'}</p>}
       {view !== 'suite' && Object.entries(runMetadata.data?.evidence_availability || {}).filter(([, value]) => value.status !== 'available').map(([kind, value]) => <p role="status" key={kind}>{kind}: {value.status}{value.reason ? ` — ${value.reason}` : ''}</p>)}
-      {runMetadata.data?.artifacts?.received_report?.host_accepted === false && <p role="alert">
+      {view !== 'suite' && runMetadata.data?.artifacts?.received_report?.host_accepted === false && <p role="alert">
         Judge 报告已保留（{runMetadata.data.artifacts.received_report.status}），宿主未接受该次执行。
         请在「Case / SDK / Judge」查看原报告；拒绝原因：{runMetadata.data.error || '请查看运行诊断'}。
       </p>}
-      {view === 'flow' ? <Suspense fallback={<p>正在加载执行流程…</p>}><FlowPrototype key={selected} run={selected} revision={revision} /></Suspense> : view === 'otel' ? <TraceView run={selected} revision={revision} /> : view === 'evaluation' ? <EvaluationView run={selected} revision={revision} /> : view === 'raw' && selected ? <Suspense fallback={<p>正在加载交互时间线…</p>}><RawRunView key={selected} run={selected} revision={revision} /></Suspense> : <>
+      {view === 'suite' ? <SuiteOverview /> : view === 'flow' ? <Suspense fallback={<p>正在加载执行流程…</p>}><FlowPrototype key={selected} run={selected} revision={revision} /></Suspense> : view === 'otel' ? <TraceView run={selected} revision={revision} /> : view === 'evaluation' ? <EvaluationView run={selected} revision={revision} /> : view === 'raw' && selected ? <Suspense fallback={<p>正在加载交互时间线…</p>}><RawRunView key={selected} run={selected} revision={revision} /></Suspense> : <>
       <section className="toolbar" aria-label="筛选 trace">
         <label className="search"><span className="sr-only">搜索 trace</span>
           <input type="search" placeholder="搜索事件、节点、run ID 或内容…" value={query}
@@ -197,7 +192,7 @@ export default function App() {
           {filtered.length > limit && <button className="more" onClick={() => setLimit(value => value + PAGE_SIZE)}>再显示 {Math.min(PAGE_SIZE, filtered.length - limit)} 条</button>}
         </section>}
       </>}
-      <footer>ABB / OBSERVE <span>本地只读 · 运行记录每秒自动同步</span></footer>
+      <footer>ABB / OBSERVE <span>{suite.data?.capabilities?.can_control ? '本地 Suite · 运行与恢复进度自动同步' : '本地只读 · 运行记录每秒自动同步'}</span></footer>
     </main>
     </div>
   );

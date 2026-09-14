@@ -52,13 +52,14 @@ export default function EvaluationView({ run, revision }) {
   const { data, error } = useLiveJson(run ? `/api/observe/runs/${run}/evaluation` : null, revision);
   const [json, setJson] = useState(null);
   if (!run) return <p>请先选择运行。</p>;
-  if (error) return <p>{error}</p>;
+  if (error && !data) return <p role="alert">{error}（自动重试中）</p>;
   if (!data) return <p>正在读取评测产物…</p>;
 
   const openJson = (title, value) => setJson({ title, value });
   const manifest = data.manifest || {};
   const publicReport = data.public_result?.report;
   return <section className="evaluation-view">
+    {error && <p role="alert">{error}；保留上次数据，连接恢复后继续同步。</p>}
     <div className="evaluation-header">
       <div><p className="eyebrow">Case / SDK / Judge</p><h2>SDK 评测</h2><p>优先显示可读内容。需要排查字段或完整上下文时，再打开原始 JSON。</p></div>
       <div className="header-actions"><JsonButton label="当前阶段 / 错误" value={data.error || data.manifest} onOpen={openJson} /><JsonButton label="同容器进程与 SDK 版本" value={data.process} onOpen={openJson} /><JsonButton label="Case 原始记录" value={data.case} onOpen={openJson} /></div>
