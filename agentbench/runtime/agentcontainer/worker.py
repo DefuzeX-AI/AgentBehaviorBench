@@ -61,7 +61,9 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None, ses
         result.update(status="succeeded", output=invocation.output, raw_output=invocation.raw_output)
         store.record("execution_end", output=invocation.output)
     except BaseException as exc:
-        result.update(status="failed", error_type=type(exc).__name__, error=str(exc))
+        status = ('cancelled' if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt)) else
+                  'timeout' if isinstance(exc, TimeoutError) else 'failed')
+        result.update(status=status, error_type=type(exc).__name__, error=str(exc))
         store.record("execution_error", error_type=type(exc).__name__, error=str(exc))
     finally:
         if owned_session:

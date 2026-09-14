@@ -19,6 +19,7 @@ from agentbench.sdk.common.case_identity import case_content_sha256
 
 from .service import evaluate
 from .diagnostics import evaluation_failure, collect_artifacts
+from .configuration import request_options, api_key
 
 
 @dataclass(frozen=True)
@@ -40,10 +41,14 @@ class KumaContainerRunner:
                  runtime_services=None):
         self.environ = dict(os.environ if environ is None else environ)
         options = dict(options or {})
-        unknown = set(options) - {'output', 'timeout', 'max_steps', 'case_collection'}
+        unknown = set(options) - {'output', 'timeout', 'max_steps', 'case_collection', 'sdk_request_options'}
         if unknown:
             raise ProviderSelectionError(f'Unsupported container evaluation options: {sorted(unknown)}')
         self.output = Path(options.get('output', 'results/observe'))
+        try:
+            self.sdk_request_options = request_options(options.get('sdk_request_options'))
+        except ValueError as exc:
+            raise ProviderSelectionError(str(exc)) from exc
         self.timeout = options.get('timeout', 2400)
         if (isinstance(self.timeout, bool) or not isinstance(self.timeout, (int, float))
                 or not math.isfinite(self.timeout) or self.timeout <= 0):
@@ -64,7 +69,8 @@ class KumaContainerRunner:
 
     def _runtime_options(self, identity):
         return dict(control=self.control, build_coordinator=self.build_coordinator,
-                    runtime_services=self.runtime_services, identity=identity)
+                    runtime_services=self.runtime_services, identity=identity,
+                    sdk_request_options=self.sdk_request_options)
 
     def _artifacts_ready(self, registration, on_progress, path, identity, detail):
         emit_progress(
@@ -74,8 +80,10 @@ class KumaContainerRunner:
         )
 
     def validate_sdk(self, registration):
-        if not (self.environ.get('KUMA_API_KEY') or self.environ.get('DEFUZEX_API_KEY')):
-            raise ProviderSelectionError('KUMA_API_KEY or DEFUZEX_API_KEY is required')
+        try:
+            api_key(self.environ)
+        except ValueError as exc:
+            raise ProviderSelectionError(str(exc)) from exc
         for relative in ('evaluation/profile.md', 'evaluation/input-contract.json'):
             if not (registration.path / relative).is_file():
                 raise ProviderSelectionError(f'Missing Agent evaluation file: {relative}')
@@ -292,8 +300,9 @@ def read_result(directory, agent_id):
             raise RuntimeError('Input / output / submission identity mismatch')
         if read(f'{prefix}/otel-status.json').get('status') != 'complete':
             raise RuntimeError('Incomplete OTel artifacts')
-        if not read(f'{prefix}/evidence.json').get('spans'):
-            raise RuntimeError('Missing SDK span evidence')
+        capture = submission.get('capture_status', {}).get('traces', {})
+        if capture.get('status') not in ('complete', 'partial') or not isinstance(read(f'{prefix}/evidence.json'), dict):
+            raise RuntimeError('SDK trace capture was not recorded; inspect capture-status.json')
         value = BenchmarkStepResult(item['input_id'], item['payload'],
                                    AdapterInvocation(result['output'], result.get('raw_output')))
         steps.append(value)

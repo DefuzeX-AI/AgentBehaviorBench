@@ -23,5 +23,7 @@
 - 第二批：test_issue12/15/17/18/19/37，统一显式 --yes，拒绝确认不调用服务；evaluate 按全部 Judge 报告返回状态；viewer 路径/端口诊断与启动 flush。CLI 捕获配置异常，公开 Python run 的原异常契约保持。全套离线回归 194 通过 / 6 跳过。
 - `8116e23`：第二批 CLI 修复已 push。
 - 第三批：test_issue20/34 覆盖 SDK 具体错误、生成早期错误、诊断损坏、外部链接、凭据脱敏、同 Case / Run 报告校验和失败 Case 导出。报告留在 failed Case 的 artifacts 字段，不伪造成功 BenchmarkResult；终端与 viewer 提示已收报告和宿主拒绝。Python 203 通过 / 6 跳过，Web 20 通过，生产构建成功。
+- `5d2eca7`：第三批已 push。
+- 第四批：真实 PyPI SDK + 真实 LangChain tool 验证结构化参数、原生 ToolMessage 内容与 tool_call_id 进入官方 trace；每 Input 保存原始 capture_status。1/2/3/5 轮各跑两个独立离线 Case，验证历史延续与 Case 隔离。显式 timeout/cancelled 映射官方 timeout/aborted；SDK HTTP 选项不再硬设 max_retries=0。保留公开请求查询/恢复入口，不创建替代付费请求，不自动将恢复报告判为宿主通过。全套离线测试 223 通过 / 6 跳过。
 
 本地原有未提交修改保留。公共 observer/runtime/CLI 的必要修复按其职责落地，Kuma 专属协议继续放 sdk/plugin/kuma。

@@ -2,7 +2,7 @@
 
 These history/state/extension semantics belong to KUMA, not the SDK contract.
 """
-from agentbench.sdk.common.artifacts import Artifacts
+from agentbench.sdk.common.artifacts import Artifacts, plain
 from agentbench.observe.store import TraceStore
 
 
@@ -62,7 +62,8 @@ async def drive_run(run, binding, invoke, directory, *, provider):
                 if succeeded:
                     run.submit(output=result['output'], status='completed')
                 else:
-                    run.submit(status='failed', error='Agent execution failed; see local diagnostics')
+                    terminal = {'timeout': 'timeout', 'cancelled': 'aborted', 'aborted': 'aborted'}.get(result['status'], 'failed')
+                    run.submit(status=terminal, error=f'Agent execution {terminal}; see local diagnostics')
             except Exception:
                 if len(run.history) > before:
                     summary['phase'] = 'judge'
@@ -73,13 +74,25 @@ async def drive_run(run, binding, invoke, directory, *, provider):
                     step['committed'] = True
                     summary['submission'] = 'committed'
                     files.save(f'{relative}/submission.json', committed[0].submission)
+                    submission = plain(committed[0].submission)
+                    step['submission_status'] = submission['status']
+                    step['capture_status'] = submission.get('capture_status', {})
                     trace.record('submission_committed', input_id=item.input_id, case_id=run.case_id,
                                  artifact=f'{relative}/submission.json')
                     files.save(f'{relative}/evidence.json',
                                committed[0].submission.extensions.get('trace_evidence'))
                     evidence = committed[0].submission.extensions.get('trace_evidence')
-                    summary['evidence'] = ('missing' if not evidence or not evidence.get('spans')
-                                           or summary['evidence'] == 'missing' else 'captured')
+                    capture_status = submission.get('capture_status', {})
+                    traces = capture_status.get('traces', {})
+                    summary['evidence'] = ('captured' if isinstance(evidence, dict)
+                        and traces.get('status') in ('complete', 'partial') and summary['evidence'] != 'missing' else 'missing')
+                    tool_status = [{'span_id': span.get('span_id'), 'tool_content_status': span['tool_content_status']}
+                                   for span in (evidence or {}).get('spans', ()) if 'tool_content_status' in span]
+                    files.save(f'{relative}/capture-status.json', {
+                        'input_id': item.input_id, 'capture_status': capture_status,
+                        'tool_content_status': tool_status,
+                        'trace_summary': {key: evidence.get(key) for key in ('reasons', 'missing', 'dropped_count')}
+                                         if isinstance(evidence, dict) else None})
                     conversation.commit(result)
                 files.save('manifest.json', summary)
         summary['phase'] = 'judge'
@@ -93,6 +106,8 @@ async def drive_run(run, binding, invoke, directory, *, provider):
     except Exception as exc:
         summary['error'] = {'type': type(exc).__name__, 'message': str(exc),
                             'code': getattr(exc, 'code', None),
+                            'retryable': getattr(exc, 'retryable', None),
+                            'client_request_id': getattr(exc, 'client_request_id', None),
                             'request_id': getattr(exc, 'request_id', None)}
         if summary['phase'] == 'judge':
             summary['judge'] = 'failed'

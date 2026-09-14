@@ -28,3 +28,31 @@ def test_live_callback_distinguishes_control_flow(tmp_path, control_flow):
     events = [json.loads(line)['event'] for line in (tmp_path / 'framework.jsonl').read_text().splitlines()]
     assert ('span_error' in events) is not control_flow
     assert json.loads((tmp_path / 'otel-status.json').read_text())['unfinished_spans'] == 0
+
+
+def test_real_tool_arguments_result_and_call_id_reach_kuma(tmp_path):
+    from langchain_core.tools import tool
+    from kuma import to_json
+    from tests.sdk_fixtures.issue_run import sdk_run
+
+    @tool
+    def add(left: int, right: int) -> int:
+        """Add two integers locally."""
+        return left + right
+
+    with sdk_run(tmp_path/'repo', ['Add 2 and 3']) as (run, provider):
+        run.get_input(full=True)
+        observed = InvocationObservation(tmp_path/'observe', 'invoke', run.run_id, 'langgraph', provider=provider)
+        observed.store.record('execution_start', input='Add 2 and 3')
+        actual = add.invoke({'type': 'tool_call', 'name': 'add', 'id': 'actual-tool-call', 'args': {'left': 2, 'right': 3}},
+                            config=observed.config())
+        observed.store.record('execution_end', output=actual.content)
+        observed.close()
+        run.submit(output=actual.content)
+        submission = to_json(run.history[0].submission)
+        tool_span, = [s for s in submission['extensions']['trace_evidence']['spans']
+                      if s['attributes'].get('gen_ai.operation.name') == 'execute_tool']
+        assert tool_span['tool_content_status'] == {'arguments': 'present', 'result': 'present'}
+        assert tool_span['attributes']['gen_ai.tool.call.arguments'] == {'left': 2, 'right': 3}
+        assert tool_span['attributes']['gen_ai.tool.call.result'] == actual.content
+        assert tool_span['attributes']['gen_ai.tool.call.id'] == 'actual-tool-call'

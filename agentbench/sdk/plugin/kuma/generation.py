@@ -10,24 +10,10 @@ import json
 from pathlib import Path, PurePosixPath
 
 from agentbench.sdk.common.case_identity import case_content_sha256
+from .compatibility import artifact_case
 
 SCHEMA = 'abb.case_collection.v2'
 LEDGER = '.kuma'
-
-
-def artifact_case(artifact):
-    """Return the normalized Case mapping inside a validated Case artifact.
-
-    An official artifact stores the original signed wire content, whose steps are not
-    the normalized inputs; the SDK's own converter is the only correct way to read it.
-    """
-    from kuma.repository.case_artifacts import artifact_case_mapping
-
-    if not isinstance(artifact, dict) or artifact.get('schema_version') is None:
-        raise ValueError('Invalid Case artifact')
-    if not isinstance(artifact.get('case'), dict):
-        raise ValueError('Case artifact carries no Case content')
-    return artifact_case_mapping(artifact)
 
 
 def generate_collection(create_run, *, count, options, files, repo):

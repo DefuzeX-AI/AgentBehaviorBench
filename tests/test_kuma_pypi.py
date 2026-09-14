@@ -246,7 +246,8 @@ def write_completed_case(directory, agent_id, case):
     files.save(prefix + 'result.json', {'schema': 'abb.result.v1', 'status': 'succeeded',
         'agent_id': agent_id, 'run_id': 'invocation', 'output': item['payload']})
     files.save(prefix + 'request.json', {'agent_id': agent_id, 'run_id': 'invocation', 'session_id': run_id})
-    files.save(prefix + 'submission.json', {'status': 'completed', 'output': item['payload']})
+    files.save(prefix + 'submission.json', {'status': 'completed', 'output': item['payload'],
+                                          'capture_status': {'traces': {'status': 'complete'}}})
     files.save(prefix + 'otel-status.json', {'status': 'complete'})
     files.save(prefix + 'evidence.json', {'spans': ['span']})
 

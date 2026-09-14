@@ -10,6 +10,8 @@ from importlib.metadata import version
 from agentbench.sdk.common.artifacts import Artifacts
 from agentbench.sdk.common.input_binding import InputBinding
 from .runner import drive_run
+from .configuration import request_options, api_key
+from .compatibility import run_case
 from agentbench.runtime.agentcontainer.session import AgentSession
 
 
@@ -43,8 +45,10 @@ async def execute(root, output, settings=None):
         binding = InputBinding.from_file(root / 'evaluation/input-contract.json')
         configure_trust()
         # 先保存当前进程、SDK 版本和初始任务状态，方便我们查看进度
+        credential, credential_source = api_key(os.environ)
         files.save('process.json', {'pid': os.getpid(), 'container': platform.node(), 'mode': 'official',
                    'sdk': 'kuma', 'sdk_version': version('kuma-defuzex'), 'agent_id': manifest['agent_id'],
+                   'api_key_source': credential_source,
                    'source': manifest.get('source'), 'repo': str(root / 'agent')})
         files.save('manifest.json', {'phase': 'case_generation', 'judge': 'pending'})
 
@@ -54,10 +58,8 @@ async def execute(root, output, settings=None):
                        allow_local=False, track_files=False, 
                        save_local=True,
 
-                       api_key=os.environ.get('KUMA_API_KEY') or os.environ.get('DEFUZEX_API_KEY'),
-                       trace_evidence=capture, 
-                       max_retries=0, 
-                       operation_wait_timeout=600)
+                       api_key=credential, trace_evidence=capture,
+                       **request_options(settings.get('sdk_request_options')))
 
         
         if settings.get('mode') == 'generate':
@@ -84,11 +86,11 @@ async def execute(root, output, settings=None):
         # Current SDK has no public Case accessor. Keep this version-sensitive
         # snapshot in the KUMA boundary; never manufacture an official Case ID.
         # 保存 SDK 实际加载的 Case，供宿主检查
-        from kuma.serialization import to_json
-        files.save('case.json', to_json(run._case))
+        case = run_case(run)
+        files.save('case.json', case)
         from agentbench.sdk.common.case_identity import case_content_sha256
         # 对照宿主指定的 Case ID 和内容摘要，确认没有执行错 Case
-        fingerprint = case_content_sha256(run._case)
+        fingerprint = case_content_sha256(case)
         expected = settings['expected_case']
         matched = run.case_id == expected['case_id'] and fingerprint == expected['content_sha256']
         files.save('case-selection.json', {'case_id': run.case_id, 'content_sha256': fingerprint,
@@ -128,6 +130,7 @@ async def execute(root, output, settings=None):
         # 出错时保存错误信息，并用退出码 1 通知宿主
         files.save('error.json', {'phase': 'case_generation' if run is None else 'evaluation',
                    'type': type(exc).__name__, 'message': str(exc), 'code': getattr(exc, 'code', None),
+                   'retryable': getattr(exc, 'retryable', None), 'client_request_id': getattr(exc, 'client_request_id', None),
                    'request_id': getattr(exc, 'request_id', None)})
         return 1
     finally:

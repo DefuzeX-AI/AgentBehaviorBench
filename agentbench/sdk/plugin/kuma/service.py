@@ -30,7 +30,8 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
              on_artifacts_ready=None, max_steps=None,
              generation_count=None, case_artifact=None, control=None,
              build_coordinator=None, job_context=None, identity=None,
-             runtime_services=None, expected_case_id=None, expected_content_sha256=None):
+             runtime_services=None, expected_case_id=None, expected_content_sha256=None,
+             sdk_request_options=None):
     """
     
     Run the Kuma worker in Docker and return its host artifact directory.
@@ -57,6 +58,8 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
             network trace. None disables this forwarding, not local tracing.
         trace_max_bytes: Interceptor memory-spooling threshold (default 262144).
             Larger responses spill to disk; this never truncates trace content.
+        sdk_request_options: Explicit public SDK HTTP/retry/wait options. Omitted
+            values retain the pinned SDK defaults, separately from timeout.
         on_artifacts_ready: Optional callback(directory: Path), invoked after
             initial request/status files exist and before container preparation.
             Used to advertise the live artifact location to the caller.
@@ -126,6 +129,7 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
     # prepared file into the repository ledger below, before the container starts.
     reused = f'.kuma/{Path(case_artifact).name}' if case_artifact is not None else None
     files.save('request/evaluation.json', {
+        'sdk_request_options': sdk_request_options or {},
         'max_steps': max_steps,
         'mode': 'generate' if generation_count is not None else 'execute',
         'count': generation_count, 'case_artifact': reused,
@@ -149,7 +153,7 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
             on_artifacts_ready(directory)
         control.check()
 
-        # 这里同时启动了一个线程 worker.py，里面会调用 SDK 的 create_cases 方法生成 Case
+        # The container worker calls create_run/save_case for Case preparation.
         with evaluation_agent(agent, control=control, deadline=preparation) as descriptor:
             # SDK requires repo and its ledger on the same filesystem. Mount the
             # actual staged Agent source read-only, with only its .kuma writable.
@@ -190,7 +194,7 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
                 runtime = DockerRuntime(build_coordinator=build_coordinator, **runtime_options)
             control.check()
 
-            # 启动docker,启动时候，我们同时得看worker.py里面的create_cases方法是否执行完毕，执行完毕后，才会返回session.wait()，然后才会返回结果
+            # Start the container process, then wait for its generation/execution mode.
             session = runtime.start(descriptor, 
                                     invocation=(inputs, destination),
                                     preparation_deadline=preparation)
