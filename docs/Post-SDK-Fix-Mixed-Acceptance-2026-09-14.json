@@ -24,7 +24,7 @@
     "process_exit_code": 1,
     "exit_code_reason": "Normal completed evaluation returned issue verdicts; no execution or report-delivery failure."
   },
-  "concurrency_interpretation": "Three Case lifecycles overlap across both Agents. Native Input intervals peaked at one in this workload; do not infer three simultaneous native model invocations from configured workers or lifecycle concurrency. Judge/setup/cleanup wait is included in Case lifecycles.",
+  "concurrency_interpretation": "Case lifecycle peak 3 across 2 Agent labels. Native Input peak 3, with native Agent-label peak 1. Native concurrency comes from framework execution_start/execution_end timestamps, not artifact-replayed step events; model concurrency is not inferred.",
   "checks": {
     "six_distinct_case_ids": true,
     "six_distinct_attempts_and_sdk_runs": true,
@@ -345,5 +345,12 @@
     "kuma_generation_and_judge_cost": "Not exposed here; consult provider billing. Not assumed free.",
     "notes": "This sums usage returned by OpenRouter, not an account balance or billing reconciliation."
   },
-  "cost_limit": "Returned OpenRouter response usage is a subtotal; missing response cost and opaque KUMA/tool fees are not assumed zero."
+  "cost_limit": "Returned OpenRouter response usage is a subtotal; missing response cost and opaque KUMA/tool fees are not assumed zero.",
+  "native_input_concurrency": {
+    "peak_inputs": 3,
+    "peak_agent_labels": 1,
+    "peak_suites": 1,
+    "basis": "Native framework.jsonl execution_start/execution_end timestamps, correlated by invocation_id and Case ID; excludes artifact replay events."
+  },
+  "audit_correction": "The previous native peak of 1 incorrectly used artifact-replayed step event times. The native framework timestamps establish peak 3."
 }
