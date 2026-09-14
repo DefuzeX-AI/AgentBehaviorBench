@@ -9,7 +9,7 @@ import pytest
 
 from agentbench.adapter.langgraph.config import LangGraphAdapterConfig
 from agentbench.runtime.interception.config import InterceptionConfig
-from agentbench.sdk.common.input_binding import InputBinding
+from agentbench.sdk.common.input_binding import validate_input_contract
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -23,7 +23,7 @@ def binding(unit, filename):
 
 
 @pytest.mark.parametrize('unit', ['03-trading-agents', '04-gpt-researcher'])
-def test_new_agents_load_with_explicit_routes_and_case_conversation(unit):
+def test_new_agents_load_with_explicit_routes_and_current_input_contract(unit):
     import ast
     path = ROOT/'resources/agents'/unit
     config = LangGraphAdapterConfig.from_agent_dir(path)
@@ -35,12 +35,8 @@ def test_new_agents_load_with_explicit_routes_and_case_conversation(unit):
     network = InterceptionConfig.from_agent_dir(path)
     assert network.required
     assert network.tool_routes
-    input_binding = InputBinding.from_file(path/'evaluation/input-contract.json')
-    first, second = input_binding.new_conversation(), input_binding.new_conversation()
-    first.prepare('Remember the constraint ONLY ALPHA')
-    first.commit({'status': 'succeeded', 'output': 'Acknowledged ONLY ALPHA'})
-    assert 'ONLY ALPHA' in json.dumps(first.prepare('Continue'))
-    assert 'ONLY ALPHA' not in json.dumps(second.prepare('Start another Case'))
+    validate_input_contract(path/'evaluation/input-contract.json')
+    assert json.loads((path/'evaluation/input-contract.json').read_text()) == {'encoding': 'identity'}
 
 
 @pytest.mark.parametrize('unit', ['02-react-agent', '03-trading-agents', '04-gpt-researcher'])
@@ -64,7 +60,67 @@ def test_registered_profile_passes_real_pypi_create_run_before_paid_generation(t
         run.cancel()
 
 
-def test_trading_native_graph_receives_history_callbacks_and_explicit_date(monkeypatch):
+def test_react_native_checkpoint_remembers_without_replaying_inputs_and_isolates_instances(monkeypatch):
+    """Run the pinned native graph with offline model/tool transports only."""
+    import asyncio
+    import importlib
+    import sys
+    from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+    from langchain_core.tools import tool
+
+    @tool
+    def search(query: str) -> str:
+        """Return the offline search observation."""
+        return 'Observed fixture for ' + query
+
+    class Model:
+        def bind_tools(self, tools):
+            assert tools == [search]
+            return self
+
+        async def ainvoke(self, messages):
+            humans = [message.content for message in messages if isinstance(message, HumanMessage)]
+            if humans[-1] == 'Remember ONLY ALPHA' and not isinstance(messages[-1], ToolMessage):
+                return AIMessage(content='', tool_calls=[{'name': 'search',
+                    'args': {'query': 'ALPHA'}, 'id': 'search-1', 'type': 'tool_call'}])
+            return AIMessage(content='ONLY ALPHA' if 'Remember ONLY ALPHA' in humans else 'No prior constraint')
+
+    original_modules = {name: value for name, value in sys.modules.items()
+                        if name == 'react_agent' or name.startswith('react_agent.')}
+    for name in original_modules:
+        monkeypatch.delitem(sys.modules, name)
+    monkeypatch.syspath_prepend(str(ROOT/'resources/agents/02-react-agent/agent/src'))
+    monkeypatch.setitem(sys.modules, 'react_agent.tools', SimpleNamespace(TOOLS=[search]))
+    monkeypatch.setitem(sys.modules, 'react_agent.utils', SimpleNamespace(
+        load_chat_model=lambda _: Model(), get_message_text=lambda message: message.content))
+    try:
+        importlib.import_module('react_agent.graph')
+        module = binding('02-react-agent', 'react.py')
+        first, other = module.create_graph(), module.create_graph()
+        config = {'configurable': {'thread_id': 'case-session'}}
+        async def execute():
+            await first.ainvoke('Remember ONLY ALPHA', config)
+            answer = await first.ainvoke('What constraint?', config)
+            isolated = await other.ainvoke('What constraint?', config)
+            return answer, isolated
+        try:
+            answer, isolated = asyncio.run(execute())
+            assert answer['answer'] == 'ONLY ALPHA'
+            assert isolated['answer'] == 'No prior constraint'
+            humans = [m.content for m in answer['messages'] if isinstance(m, HumanMessage)]
+            assert humans == ['Remember ONLY ALPHA', 'What constraint?']
+            assert len([m for m in answer['messages'] if isinstance(m, ToolMessage)]) == 1
+        finally:
+            first.close()
+            other.close()
+    finally:
+        for name in list(sys.modules):
+            if name == 'react_agent' or name.startswith('react_agent.'):
+                sys.modules.pop(name, None)
+        sys.modules.update(original_modules)
+
+
+def test_trading_native_graph_receives_only_current_input_and_keeps_its_files(monkeypatch):
     module = binding('03-trading-agents', 'trading.py')
     seen = []
     class Graph:
@@ -72,78 +128,93 @@ def test_trading_native_graph_receives_history_callbacks_and_explicit_date(monke
             seen.append(kwargs)
             self.propagator = SimpleNamespace(create_initial_state=lambda *args, **kw: kw)
             self.graph = self
+            self.cache = Path(kwargs['config']['data_cache_dir'])
+            self.cache.mkdir()
         def resolve_instrument_context(self, ticker, asset):
             return ticker + ':' + asset
         def invoke(self, state, config):
             seen.append((state, config))
+            (self.cache/'native-agent-state').write_text('Created by the native agent')
             return {'final_trade_decision': 'Native result for this invocation'}
     monkeypatch.setitem(__import__('sys').modules, 'tradingagents.default_config',
                         SimpleNamespace(DEFAULT_CONFIG={'data_vendors': {}}))
     monkeypatch.setitem(__import__('sys').modules, 'tradingagents.graph.trading_graph',
                         SimpleNamespace(TradingAgentsGraph=Graph))
     callbacks = [object()]
-    history = [{'role': 'user', 'content': '{"ticker":"AAPL","date":"2026-09-11"}'},
-               {'role': 'assistant', 'content': 'Consider uncertainty'},
-               {'role': 'user', 'content': 'Now require ONLY ALPHA evidence'}]
-    assert module.TradingGraph().invoke({'messages': history}, {'callbacks': callbacks})['answer'].startswith('Native result')
-    state, config = seen[1]
-    assert state['messages'] == history
-    assert 'ONLY ALPHA' in state['past_context']
-    assert config['callbacks'] is callbacks
-    assert seen[0]['selected_analysts'] == ['market']
-    assert not Path(seen[0]['config']['data_cache_dir']).parent.exists()
+    current = {'ticker': 'MSFT', 'date': '2026-09-10', 'request': 'Require ONLY ALPHA evidence'}
+    session = module.TradingGraph()
+    try:
+        assert session.invoke(current, {'callbacks': callbacks})['answer'].startswith('Native result')
+        state, config = seen[1]
+        assert state['messages'] == [{'role': 'user', 'content': current['request']}]
+        assert state['past_context'] == current['request']
+        assert config['callbacks'] is callbacks
+        assert seen[0]['selected_analysts'] == ['market']
+        cache = Path(seen[0]['config']['data_cache_dir'])
+        assert (cache/'native-agent-state').read_text() == 'Created by the native agent'
+        second = session.invoke('Discuss uncertainty', context={
+            'research_defaults': {'ticker': 'AAPL', 'date': '2026-09-11'}})
+        assert len(seen) == 3  # Native instance constructed once for both inputs.
+        assert seen[2][0]['past_context'] == 'Discuss uncertainty'
+        assert seen[2][0]['messages'] == [{'role': 'user', 'content': 'Discuss uncertainty'}]
+        assert second['research_request'] == {'ticker': 'AAPL', 'date': '2026-09-11'}
+        assert (cache/'native-agent-state').is_file()
+    finally:
+        session.close()
+    assert not cache.parent.exists()
 
 
-def test_trading_never_takes_identity_from_assistant_or_another_case():
+def test_trading_requires_current_parameters_and_rejects_history_envelopes():
     module = binding('03-trading-agents', 'trading.py')
-    first = [{'role':'user', 'content':'{"ticker":"AAPL","date":"2026-09-11"}'},
-             {'role':'assistant', 'content':'{"ticker":"MSFT","date":"2020-01-01"}'},
-             {'role':'user', 'content':'Continue'}]
-    assert module.request_from_messages(first)[:2] == ('AAPL', '2026-09-11')
+    current = {'ticker': 'AAPL', 'date': '2026-09-11', 'request': 'Current question'}
+    assert module.request_from_input(current) == ('AAPL', '2026-09-11', 'Current question')
     with pytest.raises(ValueError, match='ticker'):
-        module.request_from_messages([{'role':'user', 'content':'Continue'}])
+        module.request_from_input('Continue')
     with pytest.raises(ValueError, match='path'):
-        module.request_from_messages([{'role':'user', 'content':'{"ticker":"../bad","date":"2026-09-11"}'}])
+        module.request_from_input({'ticker': '../bad', 'date': '2026-09-11'})
+    with pytest.raises(ValueError, match='history'):
+        module.request_from_input({'messages': [{'role': 'user', 'content': 'Old input'}]})
 
 
 def test_trading_explicit_deployment_defaults_are_not_cross_case_memory():
     module = binding('03-trading-agents', 'trading.py')
     defaults = {'ticker': 'AAPL', 'date': '2026-09-11'}
-    first = [{'role': 'user', 'content': '{"ticker":"MSFT","date":"2026-09-10"}'},
-             {'role': 'assistant', 'content': '{"ticker":"NVDA"}'},
-             {'role': 'user', 'content': 'Now discuss uncertainty'}]
-    assert module.request_from_messages(first, defaults=defaults)[:2] == ('MSFT', '2026-09-10')
-    fresh = [{'role': 'user', 'content': 'Assess the configured stock'}]
-    assert module.request_from_messages(fresh, defaults=defaults)[:2] == ('AAPL', '2026-09-11')
+    first = '{"ticker":"MSFT","date":"2026-09-10","request":"Current question"}'
+    assert module.request_from_input(first, defaults=defaults) == ('MSFT', '2026-09-10', 'Current question')
+    assert module.request_from_input({'request': first}, defaults=defaults) == ('MSFT', '2026-09-10', 'Current question')
+    assert module.request_from_input('Assess the configured stock', defaults=defaults) == (
+        'AAPL', '2026-09-11', 'Assess the configured stock')
     assert defaults == {'ticker': 'AAPL', 'date': '2026-09-11'}
     with pytest.raises(ValueError, match='ticker'):
-        module.request_from_messages([{'role': 'user', 'content': '{"ticker":null}'}], defaults=defaults)
+        module.request_from_input('{"ticker":null}', defaults=defaults)
 
 
-def test_research_query_keeps_user_corrections_and_labels_prior_reports():
+def test_research_query_preserves_current_text_and_rejects_synthetic_history():
     module = binding('04-gpt-researcher', 'research.py')
     history = [{'role':'user', 'content':'Compare alpha and beta'},
                {'role':'assistant', 'content':'A prior report'},
                {'role':'user', 'content':'Correction: use only beta'}]
-    query = module.query_from_messages({'messages':history})
-    assert all(m['content'] in query for m in history)
-    assert 'not verified new sources' in query
-    assert module.query_from_messages({'messages':[{'role':'user','content':'Fresh'}]}) == 'Fresh'
+    with pytest.raises(ValueError, match='history'):
+        module.query_from_input({'messages': history})
+    current = 'Correction: use only beta'
+    assert module.query_from_input(current) == current
+    assert module.query_from_input({'query': current}) == current
+    with pytest.raises(ValueError, match='non-empty'):
+        module.query_from_input({'query': '  '})
 
 
-def test_research_langgraph_boundary_delivers_history_and_returns_native_report(monkeypatch):
+def test_research_langgraph_boundary_delivers_current_query_and_returns_native_report(monkeypatch):
     import asyncio
     module = binding('04-gpt-researcher', 'research.py')
     delivered = []
     async def research(self, value, config=None, **kwargs):
-        delivered.append(value['messages'])
+        delivered.append(value['query'])
         return {'answer': 'Native report', 'sources': ['https://arxiv.org/abs/example']}
     monkeypatch.setattr(module.ResearchGraph, 'ainvoke', research)
-    history = [{'role': 'user', 'content': 'Remember ONLY ALPHA'},
-               {'role': 'assistant', 'content': 'Understood'},
-               {'role': 'user', 'content': 'Continue'}]
-    output = asyncio.run(module.create_graph().ainvoke({'messages': history}))
-    assert delivered == [history]
+    graph = module.create_graph()
+    asyncio.run(graph.ainvoke({'query': 'Remember ONLY ALPHA'}))
+    output = asyncio.run(graph.ainvoke({'query': 'Continue'}))
+    assert delivered == ['Remember ONLY ALPHA', 'Continue']
     assert output['answer'] == 'Native report'
     assert output['sources'] == ['https://arxiv.org/abs/example']
 
@@ -210,13 +281,13 @@ def test_pubmed_parallel_requests_share_cooldown_even_after_failure():
     assert all(b - a >= 0.03 for a, b in zip(starts, starts[1:]))
 
 
-@pytest.mark.parametrize('scenario', ['single', 'conversation', 'long_query'])
-def test_native_pubmed_transport_preserves_context_without_raw_history_search(monkeypatch, scenario):
+@pytest.mark.parametrize('scenario', ['single', 'unicode', 'long_query'])
+def test_native_pubmed_transport_preserves_current_query_and_native_parser(monkeypatch, scenario):
     """Exercise the real upstream retriever through ABB's observed binding.
 
     A bounded HTTP double reproduces NCBI's 414 response for long GET URLs.
-    Conversation history belongs in LLM planning/writing prompts, not the raw
-    search term. A long standalone search uses form POST without truncation.
+    The current query passes unchanged to the native researcher and retriever.
+    A long standalone search uses form POST without truncation.
     """
     import asyncio
     import sys
@@ -228,14 +299,11 @@ def test_native_pubmed_transport_preserves_context_without_raw_history_search(mo
     spec = importlib.util.spec_from_file_location('native_pubmed', source)
     native = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(native)
-    messages = [{'role': 'user', 'content': 'Find clinical evidence for cancer therapy'}]
-    if scenario == 'conversation':
-        messages += [{'role': 'assistant', 'content': 'Prior discussion 癌症证据 ' * 300},
-                     {'role': 'user', 'content': 'Continue with the same article'}]
+    expected_query = 'Find clinical evidence for cancer therapy'
+    if scenario == 'unicode':
+        expected_query = 'Find clinical evidence 癌症证据'
     elif scenario == 'long_query':
-        messages[0]['content'] = 'cancer therapy ' * 500
-    expected_context = module.query_from_messages({'messages': messages})
-    expected_query = messages[-1]['content']
+        expected_query = 'cancer therapy ' * 500
     calls = []
 
     def respond(method, url, *, params=None, data=None, **kwargs):
@@ -261,11 +329,11 @@ def test_native_pubmed_transport_preserves_context_without_raw_history_search(mo
             self.cfg = SimpleNamespace(llm_kwargs={})
             self.sources = []
         async def conduct_research(self):
-            assert self.query == expected_context
+            assert self.query == expected_query
             self.sources = self.retrievers[0](self.query).search(max_results=1)
             self.sources += self.retrievers[0]('Model-planned clinical search').search(max_results=1)
         async def write_report(self):
-            assert self.query == expected_context
+            assert self.query == expected_query
             return 'Native report fixture'
         def get_source_urls(self):
             return []
@@ -274,7 +342,7 @@ def test_native_pubmed_transport_preserves_context_without_raw_history_search(mo
 
     monkeypatch.setitem(sys.modules, 'gpt_researcher', SimpleNamespace(GPTResearcher=NativeResearcher))
     monkeypatch.setitem(sys.modules, 'gpt_researcher.retrievers.pubmed_central.pubmed_central', native)
-    result = asyncio.run(module.ResearchGraph().ainvoke({'messages': messages}))
+    result = asyncio.run(module.ResearchGraph().ainvoke({'query': expected_query}))
     assert result['sources'] == ['https://www.ncbi.nlm.nih.gov/pmc/articles/123/']
     assert len(calls) == 4  # Two distinct searches/fetches, no retry of either.
     assert calls[0][0] == ('POST' if scenario == 'long_query' else 'GET')

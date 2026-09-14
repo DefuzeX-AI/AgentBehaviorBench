@@ -1,4 +1,4 @@
-# 02 ReAct Agent — 初始接入
+# 02 ReAct Agent
 
 原仓库：https://github.com/langchain-ai/react-agent
 
@@ -11,7 +11,7 @@
 - `agent/`：完整上游源码、依赖和许可证。
 - `agent.toml`：Docker、入口、Context、模型和工具流量配置。
 - `Dockerfile`：Python 3.11、上游依赖、ABB worker、OTel，非 root 运行。
-- `bindings/react.py`：只处理输入输出和 Context，直接调用原版图。
+- `bindings/react.py`：处理输入输出和 Context；原版图使用 LangGraph 原生 checkpointer。
 - `requirement.md`：能力与接入边界。
 - `evaluation/`：SDK profile 和会话输入契约；选择服务目录中的 `basic-safety-research` (Research Information) 策略，题目仍由 SDK 生成。
 - `smoke-input.json`：真实模型/搜索 smoke 的示例请求。
@@ -33,13 +33,18 @@
 ## 输入与输出
 
 接受 SDK 文本、`{"message":"..."}`，或原生 `{"messages":[...]}`。
-互斥输入避免同时提交新消息与另一份历史。绑定返回最终回答 `answer` 和完整
+互斥输入避免同时提交新消息与另一份历史。`messages` 是调用方当前请求的原生输入格式，
+评测器不会自动回填旧消息。绑定返回最终回答 `answer` 和完整
 `messages`；SDK 接收回答文本，raw output/trace 保留完整消息。
 
-`evaluate` 在一个 Case 的容器中复用 adapter，并由共用 Conversation 组件自动
-传入完整原生 messages（包含工具调用及结果）。策略声明在
-`evaluation/input-contract.json`，没有在 ReAct binding 内添加记忆代码。
-不同 Case 完全隔离，不使用数据库或跨 Case 记忆。独立 `observe` 仍为单次调用。
+`evaluate` 在一个 Case 的容器中复用 adapter，每轮只传入当前 SDK Input。
+该部署将上游原版 `builder` 编译一次，并配置 LangGraph 自带的 `InMemorySaver`；
+运行时提供稳定的 `configurable.thread_id`。历史消息、工具调用与工具结果由原生
+graph/checkpointer 保存，BBA 不拼接历史、不生成摘要、不实现额外记忆逻辑。
+原版导出的 `graph` 本身未启用 checkpointer，这是明确的部署配置差异。
+
+不同 Case 使用独立实例；同一 Case 结束时释放状态。不保证进程重启后的恢复，
+也不自动压缩长上下文。独立 `observe` 仍为单次会话调用。
 
 ## 运行
 
@@ -60,17 +65,17 @@ python -m agentbench evaluate 02 --cases 2 --max-steps 4 --env-file /path/to/hos
 
 ## 初始验收
 
-状态为 `adapting`，不自动参加默认批量 run。
+历史初始接入状态为 `adapting`；当前参与状态以 `resources/registry.toml` 为准。
 镜像依赖构建已完成。离线 Docker 测试使用 `--network none`，只在测试脚本中
 提供假模型/搜索客户端，运行原版 ReAct 图与真实 ABB worker，检查工具循环、
-自动历史传递、单 Case adapter 复用和 framework/OTel 产物。测试不构成真实模型/Tavily 认证。
+原生 checkpoint、单 Case adapter 复用和 framework/OTel 产物。测试不构成真实模型/Tavily 认证。
 
 ```bash
-ABB_DOCKER_TEST=1 .venv/bin/python -m pytest -q tests/observe/test_react_onboarding.py
+.venv/bin/python -m pytest -q tests/test_issue39.py
 ```
 
-完整 KUMA certify 与跨重启恢复不属于本次会话接入；Registry 保持 adapting。
-真实多轮验收及 Judge 阻塞详情见 [MULTITURN-VALIDATION.md](./MULTITURN-VALIDATION.md)。
+历史真实多轮验收及 Judge 阻塞详情见 [MULTITURN-VALIDATION.md](./MULTITURN-VALIDATION.md)。
+这些历史结果使用旧的历史回填方式，不能作为当前 checkpointer 配置的验收。
 
 Case 数量、临时循环兼容、保存后导入及 wangyi 实现核对见 [BATCH-VALIDATION.md](./BATCH-VALIDATION.md)。
 

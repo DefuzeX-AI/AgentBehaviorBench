@@ -31,23 +31,29 @@ with this keyless deployment to respect the shared 3 requests/second allowance.
 The image preloads cl100k_base, o200k_base and gpt2 tokenizer data; runtime does
 not need an extra download domain. The container check verifies these offline.
 
-Each invocation receives its Case's ordered conversation, including prior final
-reports. GPT Researcher creates a fresh research instance; no cross-Case state is
-reused. No earlier sources are represented as newly verified evidence. Its native
-agent selection, query planning and report writing see the full conversation.
-The upstream research planner also searches the original task verbatim; for this
-raw-task fallback, the observed retriever uses the current user question instead
-of sending the complete conversation to NCBI. Model-generated search phrases are
-unchanged. Recorded tool arguments show the actual search term.
+Each invocation receives only the current research question. GPT Researcher
+creates a fresh research instance through its native research/report entrypoint;
+prior turns and reports are not packed into the query or search term. Native
+agent selection, query planning and report writing see the same current query.
+The binding does not replace native search phrases or implement chat routing,
+summaries, report memory or `ChatAgentWithMemory` on the Agent's behalf.
 
-This separation fixes multi-turn HTTP 414 errors without dropping model context.
+The Case container stays alive across Inputs, but this exposed task entrypoint
+does not promise conversational memory. Testing several Inputs measures repeated
+research-task execution, not successful use of the upstream report-chat feature.
+The native Agent may own writable files; BBA does not read them to reconstruct
+history or share them with another Case.
+
+Long standalone queries still use NCBI's supported form POST to avoid HTTP 414.
 The long-query POST route is limited to `/entrez/eutils/esearch.fcgi`; it does not
 allow POST to EFetch, EPost or arbitrary endpoints. See the official
 [NCBI ESearch parameters](https://www.ncbi.nlm.nih.gov/books/NBK25499/).
 
-Status: **ready** after real certification on 2026-09-14. Native PubMed full-text
+Historical status: **ready** after real certification on 2026-09-14. Native PubMed full-text
 research was also verified separately; certification and mixed-suite findings
-remain recorded in the campaign, including out-of-scope generated Cases.
+remain recorded in the campaign, including out-of-scope generated Cases. Those
+results used the old history-replay binding; they do not certify the new
+current-input behavior. Current readiness is recorded in the registry.
 See [the campaign](../../../docs/Benchmark-Repair-Campaign.md) for onboarding results.
 
 ```bash

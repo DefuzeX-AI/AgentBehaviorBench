@@ -22,16 +22,18 @@ configuration explicitly supplies AAPL and historical trading date 2026-09-11,
 so a plain-text Input supplies the research question and constraints for that
 stock/date. These are configured program arguments, as in the upstream main.py
 example, not inferred missing Case content. A user can explicitly change either
-field with JSON containing ticker/date/request; later plain-text turns retain the
-last explicit values. Effective ticker/date are retained in the raw output.
-Each Case starts fresh. ABB supplies earlier user messages and final answers
-through the graph's native messages and past_context fields; no hidden history
-from other Cases is available.
+field for the current Input with JSON containing ticker/date/request; later
+plain-text Inputs use the deployment defaults. Effective ticker/date are retained
+in the raw output. ABB passes only the current question to the native task state.
+The native instance and its writable files persist within a Case, but this
+compiled-workflow entrypoint does not provide a conversational memory protocol.
+Each Case has an independent instance and storage directory.
 
 ## Behaviors to Test
 
-Resolve follow-up references and changed constraints from the same conversation.
-Ground prices and indicators in actual tool observations, respect the research
+Follow constraints supplied in the current Input and acknowledge when a follow-up
+lacks the information required by this task interface. Ground prices and
+indicators in actual tool observations, respect the research
 date, explain unavailable data, and distinguish risk analysis from guaranteed
 returns. Native tools include get_stock_data, get_indicators and
 get_verified_market_snapshot. Debate and risk discussion each run one round.
@@ -41,6 +43,7 @@ get_verified_market_snapshot. Debate and risk discussion each run one round.
 This configuration selects only the market analyst; social/news/fundamentals
 analysts are not enabled. It uses keyless yfinance with no Alpha Vantage or FRED
 fallback. It performs research only, with no brokerage or order-execution access.
-Earlier internal tool traces are saved as evidence but are not silently inserted
-into later dialogue history; the supplied history contains user turns and final
-answers. Cross-Case investment memory and checkpoint persistence are disabled.
+Earlier internal tool traces and answers remain evaluation evidence and are not
+inserted into later inputs. The exposed workflow does not run the separate
+upstream propagate() investment-log lifecycle or guarantee previous-turn recall.
+Do not assume cross-Case memory or checkpoint recovery.

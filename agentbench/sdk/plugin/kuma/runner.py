@@ -6,14 +6,24 @@ from agentbench.sdk.common.artifacts import Artifacts, plain
 from agentbench.observe.store import TraceStore
 
 
-async def drive_run(run, binding, invoke, directory, *, provider, repo_path=None):
-    """invoke(payload, step_directory, provider) returns the native result envelope.
+async def drive_run(run, invoke, directory, *, provider, repo_path=None):
+    """Deliver current Inputs sequentially; leave context entirely to the Agent.
+
+    Args:
+        run: Initialized KUMA Run owning the Case and submission history.
+        invoke: Async (payload, step_directory, provider) callable returning the
+            native result envelope. Its caller owns the Agent session lifetime.
+        directory: Destination for this Run's step artifacts and summary.
+        provider: Shared trace provider flushed before each submission.
+        repo_path: Optional SDK repository for Judge recovery diagnostics.
+    Returns:
+        Persisted summary of execution, evidence, submissions and Judge state.
 
     SDK creation and provider attachment happen before this loop, in its caller.
     Input folders use local ordinal IDs, never untrusted SDK identifiers as paths.
+    Each payload is delivered unchanged, without history, summaries or old outputs.
     """
     files = Artifacts(directory)
-    conversation = binding.new_conversation()
     directory.mkdir(parents=True, exist_ok=True)
     trace = TraceStore(directory / 'sdk.jsonl', run.run_id, source='sdk')
     summary = {'run_id': run.run_id, 'case_id': run.case_id, 'phase': 'input',
@@ -30,10 +40,9 @@ async def drive_run(run, binding, invoke, directory, *, provider, repo_path=None
             files.save(f'{relative}/input.json', item)
             trace.record('input_delivered', input_id=item.input_id, case_id=run.case_id,
                          artifact=f'{relative}/input.json')
-            summary['phase'] = 'input_contract'
-            payload = conversation.prepare(binding.map(item.payload))
+            payload = item.payload
             files.save(f'{relative}/context.json', {
-                'mode': conversation.mode, 'history_messages': len(conversation.messages),
+                'input_delivery': 'current_input', 'context_owner': 'agent',
                 'session_id': run.run_id, 'input_id': item.input_id})
             files.save(f'{relative}/mapped-input.json', payload)
             trace.record('input_mapped', input_id=item.input_id, case_id=run.case_id,
@@ -95,7 +104,6 @@ async def drive_run(run, binding, invoke, directory, *, provider, repo_path=None
                         'tool_content_status': tool_status,
                         'trace_summary': {key: evidence.get(key) for key in ('reasons', 'missing', 'dropped_count')}
                                          if isinstance(evidence, dict) else None})
-                    conversation.commit(result)
                 files.save('manifest.json', summary)
         summary['phase'] = 'judge'
         if run.report is not None:

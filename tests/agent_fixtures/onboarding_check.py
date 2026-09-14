@@ -35,8 +35,8 @@ if agent_id == 'trading-agents':
         native = TradingAgentsGraph(selected_analysts=['market'], config=cfg)
         assert native.graph is not None
         assert native.quick_thinking_llm.use_responses_api is not True, 'Manifest routes require Chat Completions'
-        state = native.propagator.create_initial_state('AAPL', '2026-09-11', past_context='Remember ONLY ALPHA')
-        assert state['past_context'] == 'Remember ONLY ALPHA'
+        state = native.propagator.create_initial_state('AAPL', '2026-09-11', past_context='Current market question')
+        assert state['past_context'] == 'Current market question'
         details = {'native_graph_nodes': list(native.graph.nodes)}
 elif agent_id == 'gpt-researcher':
     import asyncio
@@ -44,14 +44,11 @@ elif agent_id == 'gpt-researcher':
     import tiktoken
     from unittest.mock import patch
     from gpt_researcher import GPTResearcher
-    from research import query_from_messages
-    current = 'Continue the article comparison'
-    conversation = query_from_messages({'messages': [
-        {'role': 'user', 'content': 'Remember ONLY ALPHA for this Case'},
-        {'role': 'assistant', 'content': 'Previous unverified research discussion'},
-        {'role': 'user', 'content': current},
-    ]})
-    native = GPTResearcher(conversation,
+    from research import query_from_input
+    current = 'Compare the clinical evidence for ALPHA'
+    query = query_from_input({'query': current})
+    assert query == current
+    native = GPTResearcher(query,
                            config_path='/opt/agent/bindings/research.json',
                            verbose=False, mcp_strategy='disabled')
     assert native.cfg.retrievers == ['pubmed_central']
@@ -94,14 +91,14 @@ elif agent_id == 'gpt-researcher':
         with patch('gpt_researcher.actions.report_generation.create_chat_completion', report_completion):
             assert await native.write_report() == 'Offline native report'
     asyncio.run(verify_native_context_hooks())
-    assert searched == [conversation]
-    assert conversation in selected[0][-1]['content']
-    assert conversation in planned[0][-1]['content']
-    assert conversation in written[0][-1]['content']
-    assert native.query == conversation and 'prompt_family' not in native.kwargs
+    assert searched == [current]
+    assert current in selected[0][-1]['content']
+    assert current in planned[0][-1]['content']
+    assert current in written[0][-1]['content']
+    assert native.query == current and 'prompt_family' not in native.kwargs
     details = {'native_retrievers': native.cfg.retrievers, 'embedding_dimensions':384,
                'torch':torch.__version__, 'offline_tokenizers':encodings,
-               'native_context_paths':['agent_selection','planning','writing'],
+               'native_current_input_paths':['agent_selection','planning','writing'],
                'native_entrypoint_checked':True}
 else:
     raise ValueError(agent_id)

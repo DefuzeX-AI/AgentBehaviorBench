@@ -12,6 +12,7 @@ from agentbench.runtime.contracts.execution import RunControl
 from agentbench.sdk.common.artifacts import Artifacts
 from agentbench.sdk.contracts import PreparedCase, PreparedCaseBatch, RunnerRecoveryCapabilities
 from agentbench.sdk.common.case_identity import case_content_sha256
+from agentbench.sdk.common.input_binding import validate_input_contract
 
 from .service import evaluate
 from .diagnostics import evaluation_failure, collect_artifacts
@@ -85,6 +86,10 @@ class KumaContainerRunner:
         for relative in ('evaluation/profile.md', 'evaluation/input-contract.json'):
             if not (registration.path / relative).is_file():
                 raise ProviderSelectionError(f'Missing Agent evaluation file: {relative}')
+        try:
+            validate_input_contract(registration.path / 'evaluation/input-contract.json')
+        except ValueError as exc:
+            raise ProviderSelectionError(str(exc)) from exc
         return 'official-container'
 
     def recovery_capabilities(self, registration) -> RunnerRecoveryCapabilities:

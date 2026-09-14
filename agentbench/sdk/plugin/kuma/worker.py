@@ -8,7 +8,7 @@ from pathlib import Path
 from uuid import uuid4
 from importlib.metadata import version
 from agentbench.sdk.common.artifacts import Artifacts
-from agentbench.sdk.common.input_binding import InputBinding
+from agentbench.sdk.common.input_binding import validate_input_contract
 from .runner import drive_run
 from .configuration import request_options, api_key
 from .compatibility import run_case
@@ -41,8 +41,8 @@ async def execute(root, output, settings=None):
     agent_session = AgentSession()
     settings = dict(settings or {})
     try:
-        # 读取输入映射规则，并配置容器内的证书信任
-        binding = InputBinding.from_file(root / 'evaluation/input-contract.json')
+        # 仅校验逐轮原样输入契约；历史与记忆由 Agent 自己维护
+        validate_input_contract(root / 'evaluation/input-contract.json')
         configure_trust()
         # 先保存当前进程、SDK 版本和初始任务状态，方便我们查看进度
         credential, credential_source = api_key(os.environ)
@@ -111,7 +111,7 @@ async def execute(root, output, settings=None):
 
         
         async def invoke(payload, folder, shared_provider):
-            # 每轮对话由这里调用 Agent，payload 是映射后的输入，folder 是本轮目录
+            # 每轮调用同一个 Agent 会话，payload 仅包含当前 Input
             # shared_provider 是同一套 trace 采集对象
             request = folder / 'request.json'
             invocation_id = uuid4().hex
@@ -126,8 +126,7 @@ async def execute(root, output, settings=None):
             # 读取 Agent 写出的结果，交回上层对话流程
             return json.loads((folder / 'result.json').read_text())
         # 这里开始驱动整个 Case：取输入、调用上面的 invoke、提交输出并接收 Judge 报告
-        summary = await drive_run(run, binding,
-                                  invoke, output, provider=provider, repo_path=root / 'agent')
+        summary = await drive_run(run, invoke, output, provider=provider, repo_path=root / 'agent')
         # 判断执行和证据是否完整，这里的退出码不判断 Judge 是否给出 pass
         return 0 if (summary['judge'] == 'received' and summary['otel'] == 'complete'
                      and summary['evidence'] == 'captured'

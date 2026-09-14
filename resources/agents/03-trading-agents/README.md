@@ -6,7 +6,7 @@ Matches Wangyi's recorded source revision. Apache-2.0 license retained in `agent
 Upstream code is unchanged; the added `agent/abb-langgraph.json` is ABB loader
 metadata. Translation and deployment settings live outside `agent/`.
 
-`bindings/trading.py` maps configured ticker/date and the Case's conversation
+`bindings/trading.py` maps configured ticker/date and only the current Case Input
 to the native graph. It invokes the compiled graph with process-local callbacks,
 so actual model and tool activity reaches ABB/Kuma. There are no fake responses.
 The market analyst, bull/bear researchers, trader and risk workflow remain native.
@@ -30,14 +30,27 @@ Use `smoke-input.json` for native observe. The deployment declares AAPL and
 Profile. This follows the upstream main.py pattern of configured program
 arguments; plain-text Inputs supply the research question. Explicit user JSON
 can override ticker/date; invalid explicit fields are rejected. Effective values
-are retained as `raw_output.research_request`. Memory is explicit Case
-conversation; temporary native cache/report/memory directories are cleared after
-each invocation. A new Case never inherits another Case's state.
+are retained as `raw_output.research_request`. Explicit ticker/date overrides
+apply to the current Input only; a later plain-text Input uses the deployment
+defaults. BBA does not recover fields from older turns or insert prior answers.
 
-Status: **ready** after actual certification on 2026-09-14. Native execution,
+One native graph instance and its private writable cache/report/memory directory
+remain available throughout the Case, and are released when the Case closes.
+The native agent owns any files it writes; BBA does not read them to construct
+conversation context. Different Cases use independent directories and instances.
+
+The exposed compiled workflow is a stock-research task entrypoint. It starts a
+new graph state for each current request; it does not call the separate native
+`propagate()` investment-log lifecycle or promise conversational recall. In
+particular, persistent files and repeated Input delivery alone do not establish
+multi-turn memory. No bespoke chat, summarization or reflection logic is added.
+
+Historical status: **ready** after actual certification on 2026-09-14. Native execution,
 interception, SDK evidence and Judge were accepted. The Finance Case asked for
 accounting work outside this deployment, so its behavior score is not evidence
 of stock-research quality; that Case-scope limitation is retained in the ledger.
+That certification used the former history-replay binding and does not certify
+the current-input behavior. Current readiness is recorded in the registry.
 Onboarding findings and validation are recorded in
 [the campaign](../../../docs/Benchmark-Repair-Campaign.md).
 

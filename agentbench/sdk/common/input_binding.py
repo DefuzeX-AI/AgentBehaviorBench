@@ -1,25 +1,24 @@
-"""Forward SDK payloads unchanged to the existing framework Adapter."""
+"""Validate current-input delivery without managing Agent context."""
 import json
 from pathlib import Path
-from .conversation import Conversation
 
 
-class InputBinding:
-    def __init__(self, contract):
-        if contract.get('encoding') != 'identity' or set(contract) - {'encoding', 'conversation'}:
-            raise ValueError('Evaluation currently supports only unchanged SDK payloads')
-        settings = contract.get('conversation', {})
-        if not isinstance(settings, dict):
-            raise ValueError('conversation must be an object')
-        Conversation(settings)
-        self.conversation_settings = settings
+def validate_input_contract(path: Path) -> None:
+    """Require identity encoding; the Agent owns all conversation state.
 
-    @classmethod
-    def from_file(cls, path: Path):
-        return cls(json.loads(path.read_text(encoding='utf-8')))
+    Args:
+        path: Agent evaluation/input-contract.json file.
+    Returns:
+        None when the contract declares identity encoding only.
+    Raises:
+        ValueError: Invalid JSON or an obsolete history-augmentation contract.
 
-    def map(self, payload):
-        return payload
-
-    def new_conversation(self):
-        return Conversation(self.conversation_settings)
+    Validation performs no Agent execution or SDK service calls. Old conversation
+    settings fail explicitly instead of silently changing an evaluation's inputs.
+    Native field mapping remains in the existing framework adapter.
+    """
+    contract = json.loads(path.read_text(encoding='utf-8'))
+    if not isinstance(contract, dict) or contract != {'encoding': 'identity'}:
+        raise ValueError(
+            'Evaluation requires {"encoding": "identity"}; remove conversation '
+            'settings and use the Agent\'s native session/context management')

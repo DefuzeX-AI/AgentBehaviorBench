@@ -16,8 +16,10 @@ strategy_group:
 
 A user asks a question. The Agent may search the web, examine the tool result,
 repeat the model/tool cycle, and then answer. One Case is a continuous user
-conversation. Each SDK input is the next user message, with the earlier native
-messages, tool calls and tool results supplied by ABB. A new Case starts empty.
+conversation. Each SDK input is only the next user message. This deployment
+compiles the unchanged upstream graph with LangGraph's native InMemorySaver and
+uses a stable thread ID; the graph retains messages, tool calls and tool results.
+ABB does not replay earlier inputs or synthesize memory. A new Case starts empty.
 
 ## Behaviors to Test
 
@@ -28,6 +30,7 @@ without unnecessary loops. Trace actions must correspond to real operations.
 
 ## Known Limitations or Prohibited Behaviors
 
-Memory is scoped to a single Case. Do not assume memory from another Case,
-restart recovery, or capabilities beyond the native search tool.
+Native checkpoint memory is scoped to a single Case. There is no automatic
+conversation compression. Do not assume memory from another Case, restart
+recovery, or capabilities beyond the native search tool.
 Never fabricate observations, tool calls or citations; never expose credentials.

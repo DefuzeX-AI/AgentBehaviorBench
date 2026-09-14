@@ -1,6 +1,5 @@
 """Run the original GPT Researcher with native keyless search/local embeddings."""
 import asyncio
-import json
 import time
 from threading import Lock
 from pathlib import Path
@@ -66,38 +65,22 @@ def search_pubmed_ids(retriever, max_results):
         return None
 
 
-def query_from_messages(value):
-    """Return LLM task context containing only this Case's supplied conversation.
+def query_from_input(value):
+    """Extract the current research question without adding conversation history.
 
     Args:
-        value: {query: text} for observe or {messages: user/assistant list} for Kuma.
+        value: Current text Input or the native {query: text} request object.
     Returns:
-        Task context for native model prompt builders, retaining previous turns.
-        Multi-turn output must not be passed directly to a search retriever.
+        The original query text, unchanged, for native research and search.
     Raises:
-        ValueError: Empty query, invalid roles or non-text conversation content.
+        ValueError: Empty/non-text query or a synthetic conversation envelope.
     """
-    if not isinstance(value, dict):
-        raise ValueError('Expected query or messages object')
-    if 'messages' not in value:
-        query = value.get('query')
-        if not isinstance(query, str) or not query.strip():
-            raise ValueError('query must be non-empty text')
-        return query
-    messages = value['messages']
-    if not isinstance(messages, list) or not messages:
-        raise ValueError('messages must be non-empty')
-    for message in messages:
-        if (not isinstance(message, dict) or message.get('role') not in ('user', 'assistant')
-                or not isinstance(message.get('content'), str)):
-            raise ValueError('Expected text user/assistant conversation messages')
-    if messages[-1]['role'] != 'user':
-        raise ValueError('Current message must be from the user')
-    if len(messages) == 1:
-        return messages[0]['content']
-    return ('Research the current user request in the context of this conversation. '
-            'Previous assistant reports are prior discussion, not verified new sources.\n'
-            + json.dumps(messages, ensure_ascii=False))
+    if isinstance(value, dict) and 'messages' in value:
+        raise ValueError('Supply the current query, not a messages history')
+    query = value.get('query') if isinstance(value, dict) else value
+    if not isinstance(query, str) or not query.strip():
+        raise ValueError('query must be non-empty text')
+    return query
 
 
 class ResearchGraph:
@@ -108,7 +91,7 @@ class ResearchGraph:
         """Return the native Markdown report after real research and report writing.
 
         Args:
-            value: Current Case conversation or a native query object.
+            value: Current research question as text or a native query object.
             config: Process-local RunnableConfig used by model/search callbacks.
             context: Reserved deployment context; settings live in research.json.
         Returns:
@@ -119,21 +102,10 @@ class ResearchGraph:
         from langchain_core.tools import StructuredTool
 
         run_config = config or {}
-        conversation = query_from_messages(value)
-        messages = value.get('messages', [])
-        multi_turn = len(messages) > 1
-        current_query = messages[-1]['content'] if messages else value['query']
+        query = query_from_input(value)
 
         class ObservedPubMed(PubMedCentralSearch):
-            """Observe actual search terms; keep raw conversation in the LLM only."""
-            def __init__(self, query, *args, **kwargs):
-                # Upstream searches its original task before/after planning. A
-                # conversation is model context, so that raw-task fallback uses
-                # the current question. Model-generated search phrases pass
-                # through unchanged and are observed with their actual values.
-                if multi_turn and query == conversation:
-                    query = current_query
-                super().__init__(query, *args, **kwargs)
+            """Observe native search terms without rewriting the input query."""
 
             def _search_articles(self, max_results):
                 return _PUBMED_REQUESTS.call(search_pubmed_ids, self, max_results)
@@ -148,7 +120,7 @@ class ResearchGraph:
                         description='Search PubMed Central and retrieve native article full text.')
                 return call.invoke({'query': self.query, 'max_results': max_results}, config=run_config)
 
-        researcher = GPTResearcher(query=conversation, report_type='research_report',
+        researcher = GPTResearcher(query=query, report_type='research_report',
                 config_path=str(Path(__file__).with_name('research.json')), verbose=False,
                 mcp_strategy='disabled')
         researcher.retrievers = [ObservedPubMed]
@@ -177,7 +149,6 @@ def create_graph():
 
     class State(TypedDict, total=False):
         query: str
-        messages: list
         answer: str
         sources: list
 

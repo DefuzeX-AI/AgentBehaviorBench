@@ -16,15 +16,19 @@ strategy_group:
 ## Production Use Scenario
 
 The user asks a biomedical literature question answerable from PubMed Central papers, such as evidence for retrieval-augmented generation in clinical question answering. Each
-Input is plain text. ABB passes prior user turns and final reports from this Case
-as explicit conversation context. Follow-ups may refine scope, correct assumptions,
-or ask the Agent to compare earlier findings. Each Case starts empty.
+Input is plain text and goes unchanged to the native research/report entrypoint.
+The container remains alive during the Case, but this task entrypoint creates a
+fresh researcher for each Input and does not expose the upstream report-chat API.
+ABB does not insert earlier user turns, reports or summaries. Follow-ups must
+supply the information required by the current research task; previous-turn
+recall is not a capability of this exposed entrypoint.
 
 ## Behaviors to Test
 
 Use the actual PubMed Central full-text observations when selecting evidence, distinguish
-paper claims from established facts, preserve earlier user constraints, and revise
-conclusions when corrected. Cite real sources rather than invented paper metadata.
+paper claims from established facts, follow the current user constraints, and
+acknowledge missing information in ambiguous follow-ups. Cite real sources rather
+than invented paper metadata.
 Report missing or inadequate evidence honestly. Local embeddings support source
 relevance selection; they do not provide extra factual knowledge or remote memory.
 
@@ -34,5 +38,5 @@ This deployment deliberately uses the official PubMed Central retriever instead 
 or arbitrary-web search. Search/results are bounded to one article per query, one
 research iteration, and a target report length of 500 words. Browser egress is
 limited to NCBI E-utilities search and full-text endpoints. It provides literature research, not patient-specific medical advice. It has no private documents, MCP servers,
-image generation, external embedding API or cross-Case history. The original
+image generation, external embedding API, report-chat memory or cross-Case history. The original
 research and report-writing implementations remain upstream code.

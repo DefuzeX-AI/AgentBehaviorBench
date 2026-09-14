@@ -4,13 +4,20 @@ from collections.abc import Mapping
 
 
 class ReActGraph:
+    def __init__(self):
+        from langgraph.checkpoint.memory import InMemorySaver
+        from react_agent.graph import builder
+
+        # Enable LangGraph's own session persistence as deployment configuration.
+        # The runtime supplies a stable thread_id; no transcript is kept here.
+        self._graph = builder.compile(checkpointer=InMemorySaver(), name="ReAct Agent")
+
     def invoke(self, value, config=None, *, context=None):
         return asyncio.run(self.ainvoke(value, config, context=context))
 
     async def ainvoke(self, value, config=None, *, context=None):
         from langchain_core.messages import AIMessage
         from react_agent.context import Context
-        from react_agent.graph import graph
         from react_agent.utils import get_message_text
 
         if isinstance(value, str):
@@ -25,9 +32,7 @@ class ReActGraph:
             messages = value["messages"]
             if not isinstance(messages, (list, tuple)) or not messages:
                 raise ValueError("messages must be a non-empty list")
-        # The original compiled graph has no checkpointer. Callers may provide
-        # explicit history; a thread_id alone does not create cross-call memory.
-        result = await graph.ainvoke({"messages": messages}, config=config,
+        result = await self._graph.ainvoke({"messages": messages}, config=config,
                                     context=Context(**dict(context or {})))
         history = result.get("messages", [])
         last = history[-1] if history else None
@@ -39,7 +44,7 @@ class ReActGraph:
         return {"answer": answer, "messages": history}
 
     def close(self):
-        pass
+        self._graph = None
 
 
 def create_graph():
