@@ -1,6 +1,7 @@
 """Issue #20: preserve actual per-Input SDK evidence status through multi-turn runs."""
 import asyncio
 import json
+from collections.abc import Mapping
 
 import pytest
 
@@ -31,6 +32,11 @@ def test_sdk_multi_turn_history_and_capture_status(tmp_path, turns):
             output = tmp_path/f'output-{case_index}'
             summary = asyncio.run(drive_run(run, binding, invoke, output, provider=provider))
             assert summary['judge'] == 'received'
+            # PyPI KUMA freezes Submission JSON into read-only mappings. A real
+            # committed trace must still pass the worker's evidence gate.
+            evidence = run.history[0].submission.extensions['trace_evidence']
+            assert isinstance(evidence, Mapping) and not isinstance(evidence, dict)
+            assert summary['evidence'] == 'captured'
             assert len(run.history) == turns
             assert [len(p['messages']) for p in delivered] == list(range(1, 2*turns, 2))
             assert len(delivered[0]['messages']) == 1  # No preceding Case memory.
@@ -40,6 +46,9 @@ def test_sdk_multi_turn_history_and_capture_status(tmp_path, turns):
                 assert stored['capture_status'] == submission['capture_status']
                 assert stored['capture_status']['traces']['status'] in ('complete', 'partial')
                 assert stored['tool_content_status'] == []  # Root span is not invented tool evidence.
+                assert stored['trace_summary'] == {
+                    key: submission['extensions']['trace_evidence'].get(key)
+                    for key in ('reasons', 'missing', 'dropped_count')}
                 assert summary['steps'][i-1]['submission_status'] == 'completed'
 
 

@@ -76,3 +76,13 @@ Issue #39：主机边界与当前镜像真实断网验收通过；后续新增�
 最终主机回归：237 通过 / 8 opt-in 跳过；8 个 opt-in 容器检查已分别启用运行通过（Docker suite / PyPI / 目录插件 / 两个新增 Agent）。最终实际付费运行仍为 0 成功 / 1 失败，不满足真实验收完成条件。
 
 完整 Issue 追踪表见 `Issue-Fix-Status-2026-09-14.md`；补充 test_issue8/9 证明既有 whitelist 与 endpoint 诊断边界。
+
+## 09:07 恢复：OpenRouter 与 Issue #20 真实验收
+
+新 Key 已从 `.env` 读取，官方鉴权与一次 gpt-4.1-mini 调用均 HTTP 200；14 tokens，OpenRouter 返回 cost $0.000008。未记录密钥。
+
+第一次恢复揭示适配错误：Kuma 的 Submission 会递归冻结 JSON 为 MappingProxyType；drive_run 对原始 trace_evidence 使用 isinstance(dict)，把确有 5 个 span 的证据误判为 missing。原始 Judge 已收到且保留，但容器返回失败。此前多轮回归检查了 capture_status，漏掉 worker 所依赖的 summary.evidence；现已补齐此断言，真实 PyPI 1/2/3/5 轮修前 4 失败，修后全部通过。适配器改为使用已转换的独立 JSON 快照，未修改 SDK 或放宽证据状态要求。
+
+修后重跑保存的官方 Case：Agent succeeded、OTel complete、submission committed、evidence captured、Judge issue（无 evidence_gaps），宿主正常构建 BenchmarkResult。CLI 退出 1 是行为判定 issue 的正常表现，Case 无执行 error。真实累计 1 个完成 / 3 次执行尝试。验证路径及 SHA256 见 Issue20-Real-Acceptance-2026-09-14.json。全套主机 237 passed / 8 opt-in skipped；本次真实容器验收已单独实际执行。
+
+该旧 Case 要求媒体文件处理，与 ReAct 搜索能力不符。已核对原始 CaseGen POST：agent_description、behavior_spec 与 research 策略组按 profile 正确发送；当前只将它计为链路完成，不宣称该行为评分有效衡量搜索能力。后续检查新 Case 的适配性。arXiv 新的单次无模型查询 30 秒超时，暂未恢复其联网验收。

@@ -79,9 +79,11 @@ async def drive_run(run, binding, invoke, directory, *, provider):
                     step['capture_status'] = submission.get('capture_status', {})
                     trace.record('submission_committed', input_id=item.input_id, case_id=run.case_id,
                                  artifact=f'{relative}/submission.json')
-                    files.save(f'{relative}/evidence.json',
-                               committed[0].submission.extensions.get('trace_evidence'))
-                    evidence = committed[0].submission.extensions.get('trace_evidence')
+                    # KUMA Submission recursively freezes JSON as MappingProxyType.
+                    # Inspect the detached JSON snapshot already used for persistence,
+                    # so a valid immutable trace is not mistaken for missing evidence.
+                    evidence = submission['extensions'].get('trace_evidence')
+                    files.save(f'{relative}/evidence.json', evidence)
                     capture_status = submission.get('capture_status', {})
                     traces = capture_status.get('traces', {})
                     summary['evidence'] = ('captured' if isinstance(evidence, dict)
