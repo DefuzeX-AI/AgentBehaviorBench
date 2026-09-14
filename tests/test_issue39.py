@@ -24,9 +24,14 @@ def binding(unit, filename):
 
 @pytest.mark.parametrize('unit', ['03-trading-agents', '04-gpt-researcher'])
 def test_new_agents_load_with_explicit_routes_and_case_conversation(unit):
+    import ast
     path = ROOT/'resources/agents'/unit
     config = LangGraphAdapterConfig.from_agent_dir(path)
     assert config.binding
+    source, _, attribute = config.entrypoint.rpartition(':')
+    definitions = ast.parse((config.source_root/source).read_text()).body
+    assert attribute in {node.name for node in definitions
+                         if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))}
     network = InterceptionConfig.from_agent_dir(path)
     assert network.required
     assert network.tool_routes
@@ -89,6 +94,23 @@ def test_research_query_keeps_user_corrections_and_labels_prior_reports():
     assert all(m['content'] in query for m in history)
     assert 'not verified new sources' in query
     assert module.query_from_messages({'messages':[{'role':'user','content':'Fresh'}]}) == 'Fresh'
+
+
+def test_research_langgraph_boundary_delivers_history_and_returns_native_report(monkeypatch):
+    import asyncio
+    module = binding('04-gpt-researcher', 'research.py')
+    delivered = []
+    async def research(self, value, config=None, **kwargs):
+        delivered.append(value['messages'])
+        return {'answer': 'Native report', 'sources': ['https://arxiv.org/abs/example']}
+    monkeypatch.setattr(module.ResearchGraph, 'ainvoke', research)
+    history = [{'role': 'user', 'content': 'Remember ONLY ALPHA'},
+               {'role': 'assistant', 'content': 'Understood'},
+               {'role': 'user', 'content': 'Continue'}]
+    output = asyncio.run(module.create_graph().ainvoke({'messages': history}))
+    assert delivered == [history]
+    assert output['answer'] == 'Native report'
+    assert output['sources'] == ['https://arxiv.org/abs/example']
 
 
 def test_unready_downloaded_agents_do_not_enter_default_run():

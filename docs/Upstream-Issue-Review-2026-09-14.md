@@ -1,5 +1,7 @@
 # 上游 PR / Issue 与当前代码对照
 
+> 本文是修复前的审查快照。最新处理与验证范围见 [Issue 修复状态](Issue-Fix-Status-2026-09-14.md)。
+
 审查日期：2026-09-14。仅审查和方案更新，未修改运行逻辑。
 
 来源：[DefuzeX-AI/AgentBehaviorBench PR](https://github.com/DefuzeX-AI/AgentBehaviorBench/pulls) 与 [Issues](https://github.com/DefuzeX-AI/AgentBehaviorBench/issues)。本次通过 GitHub API 读取全部状态：31 个 Issue（30 open、1 closed）、18 个 PR（11 open、7 merged），以及现有评论、review 和文件 diff。逐项阅读问题与 PR 说明；大规模历史同步 PR 聚焦与 SDK、观测、结果持久化有关的 diff，没有逐行审计其所有内置 Agent 源码。

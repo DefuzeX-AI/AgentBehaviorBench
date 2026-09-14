@@ -14,7 +14,7 @@
 
 ## 状态
 
-阶段一：离线回归与真实离线容器验收通过；准备真实服务测试。首批 test_issue10/14/31/32/36 共 17 项通过：修前 7 失败 / 10 通过，修后全部通过。现有全套离线测试 178 通过 / 6 个明确选择性验收跳过。
+已完成离线回归和真实离线容器验收；真实服务验收未完成，当前因模型凭据 401 暂停。首批 test_issue10/14/31/32/36 共 17 项通过：修前 7 失败 / 10 通过，修后全部通过。现有全套离线测试 178 通过 / 6 个明确选择性验收跳过。
 真实完成 Case：0；真实评测尝试：1；满足终止条件的连续轮数：0。
 
 里程碑：`ac1b659` 保存此前并发重构和审查基线。首批修复包含控制流 span 关闭、host callback 边界、关闭 stdin、Docker 二次清理超时，以及按已记录终态验收 trace；策略、认证、转换、采集故障仍拒绝。
@@ -56,7 +56,7 @@
 | 可选 MCP | 上游 import 打印缺 langchain_mcp_adapters 的提示 | 此配置明确 disabled，非启用能力；未伪造 MCP 工具。 |
 | Registry 生命周期 | 下载源码不足以 ready；还要求 requirement.md | 补齐必需描述文件，按真实 load_registry 校验；两个新 Agent 均 adapting。 |
 
-Issue #39：主机边界与当前镜像真实断网验收共 8 项通过。两个镜像均使用 PyPI Kuma 0.2.4。
+Issue #39：主机边界与当前镜像真实断网验收通过；后续新增真实 LangGraph 节点边界回归。两个镜像均使用 PyPI Kuma 0.2.4。
 完整 artifact 目录与源文件校验数见 `Onboarding-Acceptance-2026-09-14.json`。
 这些检查未创建付费 Case、未调用真实模型/Judge，也未运行 certify。
 
@@ -70,3 +70,9 @@ Issue #39：主机边界与当前镜像真实断网验收共 8 项通过。两�
 6. 任一新故障先查 SDK 官方协议、保存请求/原始报告、回归修复并 push，再继续。达成五次连续合格多 Agent suite 且实际多轮得到验证，或累计 200 成功 Case 后停止。
 
 仍未完成：ReAct 成功 1 Case / 4 Cases、三个 Agent 真实认证、真实多轮与五次连续并发验收。当前阻塞是模型凭据 401；arXiv 429 是新 Agent 的额外联网阻塞。
+
+- `6437f4c`：两个新 Agent 的官方源码接入、断网依赖验收和首次真实失败记录已 push。随后复核修正新增入口 metadata，指向确实存在的上游类；GPT Researcher 通过显式单节点 LangGraph binding 接入，未将其原生 Python 类冒称为 LangGraph。增加入口定义校验和真实 LangGraph 边界回归。
+
+最终主机回归：237 通过 / 8 opt-in 跳过；8 个 opt-in 容器检查已分别启用运行通过（Docker suite / PyPI / 目录插件 / 两个新增 Agent）。最终实际付费运行仍为 0 成功 / 1 失败，不满足真实验收完成条件。
+
+完整 Issue 追踪表见 `Issue-Fix-Status-2026-09-14.md`；补充 test_issue8/9 证明既有 whitelist 与 endpoint 诊断边界。

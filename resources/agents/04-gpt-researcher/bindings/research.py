@@ -83,4 +83,21 @@ class ResearchGraph:
 
 
 def create_graph():
-    return ResearchGraph()
+    """Expose the native Python researcher through one explicit LangGraph node."""
+    from typing_extensions import TypedDict
+    from langgraph.graph import StateGraph, START, END
+
+    class State(TypedDict, total=False):
+        query: str
+        messages: list
+        answer: str
+        sources: list
+
+    async def research(state, config):
+        return await ResearchGraph().ainvoke(state, config=config)
+
+    graph = StateGraph(State)
+    graph.add_node('research', research)
+    graph.add_edge(START, 'research')
+    graph.add_edge('research', END)
+    return graph.compile()

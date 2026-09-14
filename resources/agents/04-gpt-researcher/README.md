@@ -3,7 +3,10 @@
 Official source: https://github.com/assafelovic/gpt-researcher
 Revision: `6f998577d547b1e54ec662dac63583aa11e3b84b` (downloaded 2026-09-14).
 Matches Wangyi's recorded source revision. MIT license retained in `agent/`.
-Upstream code is unchanged; `agent/abb-langgraph.json` is added loader metadata.
+Upstream code is unchanged; `agent/abb-langgraph.json` identifies the real native
+class. The required ABB binding wraps the Python researcher in one LangGraph node,
+so the registry's framework describes the ABB execution boundary, not an upstream
+claim that GPT Researcher itself is a compiled LangGraph.
 
 The native `GPTResearcher.conduct_research()` and `write_report()` perform research
 and report generation. This deployment uses its official arXiv retriever and a
