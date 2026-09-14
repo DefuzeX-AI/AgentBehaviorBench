@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="../README.md">English</a> |
+  <a href="../../README.md">English</a> |
   <a href="README.fr.md">Français</a> |
   <a href="README.ja.md">日本語</a> |
   <a href="README.zh-CN.md">中文简体</a> |
@@ -64,7 +64,7 @@ ABB 會要求確認選取的 Agent，在 `results/` 下儲存結果快照並啟�
 或自動化執行請使用：
 
 ```bash
-agentbench run --no-view --output results/benchmark.json
+agentbench run --yes --no-view --output results/benchmark.json
 ```
 
 ## 相依條件與環境變數
@@ -110,8 +110,8 @@ agentbench run --model openai/gpt-4.1-mini
 agentbench run --sdk kuma --sdk-options sdk-options.json
 ```
 
-完整參數請見英文 [CLI reference](../docs/CLI.md)，新增 Agent 請見
-[agent onboarding guide](../docs/How%20To%20Add%20Agent.md)。
+完整參數請見英文 [CLI reference](../CLI.md)，新增 Agent 請見
+[agent onboarding guide](../How%20To%20Add%20Agent.md)。
 
 ## 目錄結構
 
@@ -136,8 +136,8 @@ resources/registry.toml
 python -m pytest
 ```
 
-儲存庫規範見 [AGENTS.md](../AGENTS.md) 與 [docs/AGENTS.md](../docs/AGENTS.md)。
+儲存庫規範見 [AGENTS.md](../../AGENTS.md) 與 [docs/AGENTS.md](../../AGENTS.md)。
 
 ## 授權
 
-MIT，見 [LICENSE](../LICENSE)。
+MIT，見 [LICENSE](../../LICENSE)。

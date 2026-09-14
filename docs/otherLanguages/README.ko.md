@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="../README.md">English</a> |
+  <a href="../../README.md">English</a> |
   <a href="README.fr.md">Français</a> |
   <a href="README.ja.md">日本語</a> |
   <a href="README.zh-CN.md">中文简体</a> |
@@ -65,7 +65,7 @@ ABB는 선택된 Agent의 확인을 요청하고, `results/`에 결과 스냅샷
 뷰어를 시작합니다. 헤드리스 또는 자동 실행에는 다음을 사용하세요.
 
 ```bash
-agentbench run --no-view --output results/benchmark.json
+agentbench run --yes --no-view --output results/benchmark.json
 ```
 
 ## 요구 사항 및 환경 변수
@@ -113,8 +113,8 @@ agentbench run --model openai/gpt-4.1-mini
 agentbench run --sdk kuma --sdk-options sdk-options.json
 ```
 
-전체 인수는 영어 [CLI reference](../docs/CLI.md)를, Agent 추가는
-[agent onboarding guide](../docs/How%20To%20Add%20Agent.md)를 참조하세요.
+전체 인수는 영어 [CLI reference](../CLI.md)를, Agent 추가는
+[agent onboarding guide](../How%20To%20Add%20Agent.md)를 참조하세요.
 
 ## 저장소 구성
 
@@ -139,9 +139,9 @@ resources/registry.toml
 python -m pytest
 ```
 
-저장소 규칙은 [AGENTS.md](../AGENTS.md) 및 [docs/AGENTS.md](../docs/AGENTS.md)를
+저장소 규칙은 [AGENTS.md](../../AGENTS.md) 및 [docs/AGENTS.md](../../AGENTS.md)를
 참조하세요.
 
 ## 라이선스
 
-MIT. 자세한 내용은 [LICENSE](../LICENSE)를 참조하세요.
+MIT. 자세한 내용은 [LICENSE](../../LICENSE)를 참조하세요.

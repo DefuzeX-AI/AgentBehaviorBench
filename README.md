@@ -2,7 +2,7 @@
 
 > **Before you run ABB:** install Python 3.10+, Docker Desktop or Docker
 > Engine (running). The KUMA evaluation image installs its SDK from PyPI. The bundled
-> Company Research Agent needs `KUMA_API_KEY` (or `DEFUZEX_API_KEY`),
+> ReAct research Agent needs `KUMA_API_KEY` (or `DEFUZEX_API_KEY`),
 > `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, and `TAVILY_API_KEY`.
 
 <p align="center">
@@ -36,6 +36,12 @@ one adapter it is selected automatically; with several, choose `--sdk NAME`.
 This checkout currently includes KUMA. Results are written locally and can be
 inspected in ABB's browser viewer.
 
+ABB owns Agent selection, containers, concurrency, observation and local results.
+Kuma owns the Case/Input/Submission/Report contract and calls the DefuzeX service
+for official scenario generation and judging. A Case tests behavior in a scenario;
+its Judge report is not a general intelligence score. A behavioral `issue` is a
+completed evaluation finding. An invocation or evidence failure is recorded separately.
+
 ## Quick start
 
 From the repository root, create a virtual environment and install ABB:
@@ -45,7 +51,18 @@ python3 -m venv .venv
 source .venv/bin/activate              # Windows PowerShell: .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -e "."
+agentbench sdk list                   # Should list kuma without requiring credentials.
 ```
+
+Try the complete local flow before configuring accounts:
+
+```bash
+python -m examples.offline_demo --output results/offline-demo.json
+```
+
+This runs an echo Agent and deterministic local Judge without Docker, credentials,
+or network. The `OFFLINE_RESULT=` line identifies the saved file. It demonstrates
+the harness and viewer format; it does not test the official Kuma service.
 
 KUMA's adapter lives in `agentbench/sdk/plugin/kuma/`. Its evaluation image
 installs `kuma-defuzex[otel]==0.2.4` from PyPI, as declared in the adapter's
@@ -66,22 +83,34 @@ KUMA_API_KEY=
 OPENROUTER_API_KEY=
 OPENROUTER_MODEL=openai/gpt-4.1-mini
 
-# Required by the bundled Company Research Agent for web research.
+# Required by the ReAct and Company Research Agents for web research.
 TAVILY_API_KEY=
 ```
 
-Start Docker, then run every enabled Agent whose registry status is `ready`:
+Install [Docker for your platform](https://docs.docker.com/get-started/get-docker/)
+and start it. Check `docker info` before running an Agent. The registry initially
+has ReAct enabled as `adapting` and Company Research disabled. Evaluate and then
+certify the enabled Agent:
+
+```bash
+agentbench evaluate react-agent --cases 1 --max-steps 1
+agentbench certify react-agent
+```
+
+Certification requires successful execution and accepted evidence for every Case;
+a Judge finding does not prevent readiness. Once certification makes it `ready`,
+run every enabled ready Agent:
 
 ```bash
 agentbench run
 ```
 
 ABB asks you to confirm the selected Agents, saves a result snapshot under
-`results/`, and starts the local viewer. Use `--no-view` for a non-interactive
+`results/`, and starts the local viewer. Use `--yes --no-view` for a non-interactive
 or headless run:
 
 ```bash
-agentbench run --no-view --output results/benchmark.json
+agentbench run --yes --no-view --output results/benchmark.json
 ```
 
 To execute up to four Cases at once, set this single value in `.env`:
@@ -116,15 +145,23 @@ changed files, worker/image/container counts, result shape, and validation.
 | Requirement | Why it is needed |
 | --- | --- |
 | Python 3.10 or newer | ABB host CLI and harness. |
-| Docker Desktop / Docker Engine | The bundled ready Agent runs in a Docker container. Docker must be running before `run`, `evaluate`, `certify`, or `observe`. |
+| Docker Desktop / Docker Engine | Docker Agents need a running engine before `run`, `evaluate`, `certify`, or `observe`. The offline demo does not. |
 | `KUMA_API_KEY` or `DEFUZEX_API_KEY` | Case and Judge access when using the KUMA SDK. |
 | `OPENROUTER_API_KEY` | Model traffic from Docker Agents is routed through ABB's interceptor to OpenRouter. |
-| `OPENROUTER_MODEL` | Model slug for the run; a default is provided in `.env.example`, but choose a model your account can use. |
-| `TAVILY_API_KEY` | Web-search credential required by the bundled Company Research Agent. |
+| `OPENROUTER_MODEL` | Required model slug. `.env.example` contains an example value, not an implicit runtime default. Choose one your account can use. |
+| `TAVILY_API_KEY` | Web-search credential for ReAct and Company Research. |
 
 `.env` is ignored by Git. Environment variables already exported by the shell
 override values in `.env`; `--env-file PATH` selects another dotenv file; and
 `--model MODEL` overrides `OPENROUTER_MODEL` for one command.
+
+Get model credentials from [OpenRouter keys](https://openrouter.ai/settings/keys),
+and search credentials from the [Tavily dashboard](https://app.tavily.com/).
+For Kuma credentials, follow the [official API key guide](https://github.com/DefuzeX-AI/KUMA-DefuzeX/blob/main/docs/sdk-guide.md#api-key)
+and obtain an account key from your DefuzeX service administrator if none was issued.
+ABB selects non-empty `KUMA_API_KEY` first, then `DEFUZEX_API_KEY` (an ABB alias),
+and passes it explicitly to Kuma. A host SDK credential file is not mounted into
+the container. Never put keys in CLI arguments, committed profiles, or reports.
 
 The optional variables below are only needed when you want to identify
 OpenRouter requests or use a compatible endpoint:
@@ -143,8 +180,8 @@ The most useful commands are:
 | Command | Use |
 | --- | --- |
 | `agentbench run` | Evaluate every enabled `ready` Agent with the selected SDK. This is the default command. |
-| `agentbench evaluate company-research-agent --cases 1` | Evaluate one enabled Agent on a chosen number of independent Cases. |
-| `agentbench observe company-research-agent` | Run one enabled Agent with native input and save traces, without creating Cases or calling a Judge. |
+| `agentbench evaluate react-agent --cases 1` | Evaluate one enabled Agent on a chosen number of independent Cases. |
+| `agentbench observe react-agent` | Run one enabled Agent with native input and save traces, without creating Cases or calling a Judge. |
 | `agentbench certify react-agent` | Run an `adapting` Agent and promote it to `ready` only after certification succeeds. |
 | `agentbench view results/benchmark.json` | Reopen a saved benchmark result in the local viewer. |
 | `agentbench sdk list` | List adapter directories without importing SDK implementations. |
@@ -169,6 +206,10 @@ interface, dependency rules, Python usage, and verification commands.
 See [the CLI reference](docs/CLI.md) for the complete command and option
 reference, and [the agent onboarding guide](docs/How%20To%20Add%20Agent.md) to
 add another Agent.
+
+See [troubleshooting and result interpretation](docs/Troubleshooting.md) for
+configuration, network, trace, Judge and exit-code failures, or the
+[中文操作指南](docs/Guide.zh-CN.md).
 
 ## Overview
 
@@ -209,8 +250,7 @@ Run the test suite after installing development dependencies:
 python -m pytest
 ```
 
-For repository conventions, see [AGENTS.md](AGENTS.md) and
-[docs/AGENTS.md](docs/AGENTS.md).
+For repository conventions, see [AGENTS.md](AGENTS.md).
 
 ## License
 

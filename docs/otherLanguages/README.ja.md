@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="../README.md">English</a> |
+  <a href="../../README.md">English</a> |
   <a href="README.fr.md">Français</a> |
   日本語 |
   <a href="README.zh-CN.md">中文简体</a> |
@@ -67,7 +67,7 @@ ABB は選択された Agent の確認を求め、`results/` に結果スナッ�
 ローカルビューアを起動します。ヘッドレスまたは自動実行では次を使います。
 
 ```bash
-agentbench run --no-view --output results/benchmark.json
+agentbench run --yes --no-view --output results/benchmark.json
 ```
 
 ## 要件と環境変数
@@ -115,8 +115,8 @@ agentbench run --model openai/gpt-4.1-mini
 agentbench run --sdk kuma --sdk-options sdk-options.json
 ```
 
-すべての引数は英語版の [CLI reference](../docs/CLI.md) を、Agent の追加は
-[agent onboarding guide](../docs/How%20To%20Add%20Agent.md) を参照してください。
+すべての引数は英語版の [CLI reference](../CLI.md) を、Agent の追加は
+[agent onboarding guide](../How%20To%20Add%20Agent.md) を参照してください。
 
 ## リポジトリ構成
 
@@ -141,9 +141,9 @@ resources/registry.toml
 python -m pytest
 ```
 
-リポジトリの規約は [AGENTS.md](../AGENTS.md) と [docs/AGENTS.md](../docs/AGENTS.md) を
+リポジトリの規約は [AGENTS.md](../../AGENTS.md) と [docs/AGENTS.md](../../AGENTS.md) を
 参照してください。
 
 ## ライセンス
 
-MIT。詳細は [LICENSE](../LICENSE)。
+MIT。詳細は [LICENSE](../../LICENSE)。

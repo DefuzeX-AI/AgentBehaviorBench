@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="../README.md">English</a> |
+  <a href="../../README.md">English</a> |
   <a href="README.fr.md">Français</a> |
   <a href="README.ja.md">日本語</a> |
   中文简体 |
@@ -20,7 +20,7 @@
 </p>
 
 > **运行 ABB 前请先准备：**Python 3.10+、已启动的 Docker Desktop 或 Docker
-> Engine。KUMA 会在构建评测容器时自动从 PyPI 安装。Company Research Agent 需要
+> Engine。KUMA 会在构建评测容器时自动从 PyPI 安装。ReAct Agent 需要
 > `KUMA_API_KEY`（或 `DEFUZEX_API_KEY`）、`OPENROUTER_API_KEY`、
 > `OPENROUTER_MODEL` 和 `TAVILY_API_KEY`。
 
@@ -30,6 +30,8 @@ AgentBehaviorBench 在隔离运行时中执行已注册的 AI Agent，收集执�
 并可在 ABB 浏览器查看器中检查。
 
 ![AgentBehaviorBench 执行架构](../figures/framework.png)
+
+操作、结果判断和故障处理见[中文操作指南](../Guide.zh-CN.md)。
 
 ## 快速开始
 
@@ -65,7 +67,7 @@ ABB 会要求确认选中的 Agent，在 `results/` 下保存结果快照并启�
 界面或自动化运行请使用：
 
 ```bash
-agentbench run --no-view --output results/benchmark.json
+agentbench run --yes --no-view --output results/benchmark.json
 ```
 
 ## 依赖与环境变量
@@ -77,7 +79,7 @@ agentbench run --no-view --output results/benchmark.json
 | `KUMA_API_KEY` 或 `DEFUZEX_API_KEY` | 使用 KUMA SDK 时所需的 Case 与 Judge 访问凭据。 |
 | `OPENROUTER_API_KEY` | Docker Agent 的模型流量经 ABB interceptor 转发到 OpenRouter。 |
 | `OPENROUTER_MODEL` | 本次运行使用的模型名称。 |
-| `TAVILY_API_KEY` | 内置 Company Research Agent 的网页搜索凭据。 |
+| `TAVILY_API_KEY` | ReAct Agent 的网页搜索凭据。 |
 
 `.env` 被 Git 忽略。Shell 中已导出的变量会覆盖 `.env`；`--env-file PATH` 可选择
 其他 dotenv 文件；`--model MODEL` 可只覆盖单次命令的模型。
@@ -97,8 +99,8 @@ OPENROUTER_APP_TITLE=AgentBehaviorBench
 | 命令 | 用途 |
 | --- | --- |
 | `agentbench run` | 评测所有启用且 `ready` 的 Agent；这是默认命令。 |
-| `agentbench evaluate company-research-agent --cases 1` | 用指定数量的独立 Case 评测一个 Agent。 |
-| `agentbench observe company-research-agent` | 用原生输入运行一个 Agent 并保存 trace，不创建 Case，也不调用 Judge。 |
+| `agentbench evaluate react-agent --cases 1` | 用指定数量的独立 Case 评测一个 Agent。 |
+| `agentbench observe react-agent` | 用原生输入运行一个 Agent 并保存 trace，不创建 Case，也不调用 Judge。 |
 | `agentbench certify react-agent` | 认证 `adapting` Agent；成功后将其提升为 `ready`。 |
 | `agentbench view results/benchmark.json` | 在本地查看器中重新打开结果。 |
 | `agentbench sdk list` | 列出 SDK 适配器目录，不导入 SDK 实现。 |
@@ -111,17 +113,20 @@ agentbench run --model openai/gpt-4.1-mini
 agentbench run --sdk kuma --sdk-options sdk-options.json
 ```
 
-完整参数请见英文 [CLI reference](../docs/CLI.md)，添加 Agent 请见
-[agent onboarding guide](../docs/How%20To%20Add%20Agent.md)。
+完整参数请见英文 [CLI reference](../CLI.md)，添加 Agent 请见
+[agent onboarding guide](../How%20To%20Add%20Agent.md)。
 
 ## 目录结构
 
 ```text
-resources/registry.toml
-        -> CLI selection
-        -> SuiteRunner / evaluation SDK
-        -> Agent adapter and runtime
-        -> result snapshot and local viewer
+AgentBehaviorBench/
+├── resources/registry.toml
+├── resources/agents/
+├── agentbench/cli/
+├── agentbench/harness/
+├── agentbench/runtime/
+├── agentbench/sdk/plugin/kuma/
+└── results/
 ```
 
 - `resources/registry.toml` 声明 Agent、状态和运行时。
@@ -140,8 +145,8 @@ resources/registry.toml
 python -m pytest
 ```
 
-仓库约定见 [AGENTS.md](../AGENTS.md) 和 [docs/AGENTS.md](../docs/AGENTS.md)。
+仓库约定见 [AGENTS.md](../../AGENTS.md) 和 [docs/AGENTS.md](../../AGENTS.md)。
 
 ## 许可证
 
-MIT，见 [LICENSE](../LICENSE)。
+MIT，见 [LICENSE](../../LICENSE)。

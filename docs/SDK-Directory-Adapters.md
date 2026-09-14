@@ -66,7 +66,7 @@ plugin = Adapter()
 ```
 
 `context` provides an immutable environment snapshot, optional model, trace sink,
-trace size limit, cooperative cancellation control, task identity, and shared
+in-memory trace spool threshold, cooperative cancellation control, task identity, and shared
 runtime/build services. `options` is a shallow defensive copy exposed as a
 read-only mapping. Each adapter owns its defaults and rejects unsupported
 options. Do not initialize clients, read credentials, contact services, or start

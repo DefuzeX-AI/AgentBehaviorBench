@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="../README.md">English</a> |
+  <a href="../../README.md">English</a> |
   Français |
   <a href="README.ja.md">日本語</a> |
   <a href="README.zh-CN.md">中文简体</a> |
@@ -68,7 +68,7 @@ ABB demande une confirmation, enregistre un instantané dans `results/` et lance
 le visualiseur local. Pour une exécution sans interface :
 
 ```bash
-agentbench run --no-view --output results/benchmark.json
+agentbench run --yes --no-view --output results/benchmark.json
 ```
 
 ## Prérequis et variables d'environnement
@@ -116,8 +116,8 @@ agentbench run --model openai/gpt-4.1-mini
 agentbench run --sdk kuma --sdk-options sdk-options.json
 ```
 
-La référence complète est en anglais : [CLI reference](../docs/CLI.md). Pour
-ajouter un agent, consultez le [guide d'intégration](../docs/How%20To%20Add%20Agent.md).
+La référence complète est en anglais : [CLI reference](../CLI.md). Pour
+ajouter un agent, consultez le [guide d'intégration](../How%20To%20Add%20Agent.md).
 
 ## Organisation du dépôt
 
@@ -142,9 +142,9 @@ resources/registry.toml
 python -m pytest
 ```
 
-Consultez [AGENTS.md](../AGENTS.md) et [docs/AGENTS.md](../docs/AGENTS.md) pour
+Consultez [AGENTS.md](../../AGENTS.md) et [docs/AGENTS.md](../../AGENTS.md) pour
 les conventions du dépôt.
 
 ## Licence
 
-MIT. Voir [LICENSE](../LICENSE).
+MIT. Voir [LICENSE](../../LICENSE).

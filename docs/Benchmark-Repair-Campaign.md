@@ -14,7 +14,7 @@
 
 ## 状态
 
-阶段一进行中。首批 test_issue10/14/31/32/36 共 17 项通过：修前 7 失败 / 10 通过，修后全部通过。现有全套离线测试 178 通过 / 6 个明确选择性验收跳过。
+阶段一：离线回归与真实离线容器验收通过；准备真实服务测试。首批 test_issue10/14/31/32/36 共 17 项通过：修前 7 失败 / 10 通过，修后全部通过。现有全套离线测试 178 通过 / 6 个明确选择性验收跳过。
 真实完成 Case：0；真实评测尝试：0；满足终止条件的连续轮数：0。
 
 里程碑：`ac1b659` 保存此前并发重构和审查基线。首批修复包含控制流 span 关闭、host callback 边界、关闭 stdin、Docker 二次清理超时，以及按已记录终态验收 trace；策略、认证、转换、采集故障仍拒绝。
@@ -27,3 +27,7 @@
 - 第四批：真实 PyPI SDK + 真实 LangChain tool 验证结构化参数、原生 ToolMessage 内容与 tool_call_id 进入官方 trace；每 Input 保存原始 capture_status。1/2/3/5 轮各跑两个独立离线 Case，验证历史延续与 Case 隔离。显式 timeout/cancelled 映射官方 timeout/aborted；SDK HTTP 选项不再硬设 max_retries=0。保留公开请求查询/恢复入口，不创建替代付费请求，不自动将恢复报告判为宿主通过。全套离线测试 223 通过 / 6 跳过。
 
 本地原有未提交修改保留。公共 observer/runtime/CLI 的必要修复按其职责落地，Kuma 专属协议继续放 sdk/plugin/kuma。
+
+- `36fca31`：第四批 SDK 协议修复已 push。
+- 第五批：无凭据离线示例（test_issue44）、CLI / onboarding / 中英排错文档和 README 链接修正。真实 Docker 并发/取消与 PyPI SDK 验收 21 项通过；目录插件真实容器验收 1 项通过。全部是离线 Provider，不计入真实服务额度。
+- 容器证据：`results/verification/kuma-pypi-5a1ff7c6735941469548901559944f32/`（Case、Agent 输出、Judge、verification.json）；同目录下 docker-concurrency-* 与 sdk-directory-* 保留其他验收。
