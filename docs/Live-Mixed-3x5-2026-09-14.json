@@ -1,0 +1,1971 @@
+{
+  "schema": "abb.live_mixed_benchmark_audit.v1",
+  "date": "2026-09-14",
+  "suite_id": "suite_5d812f27a2184df5b0b9a685fb3f6de7",
+  "code_commit": "bf394a0df90d70fe92b56bc727c365f659d10657",
+  "started_at": "2026-09-14T18:30:45.440487+00:00",
+  "finished_at": "2026-09-14T18:49:14.307215+00:00",
+  "total_elapsed_seconds": 1108.847,
+  "configuration": {
+    "requested_cases": 15,
+    "cases_per_agent": 5,
+    "max_steps": 3,
+    "case_workers": 3,
+    "case_retries": 0,
+    "model": "openai/gpt-4.1-mini",
+    "sdk_version": "0.2.4"
+  },
+  "status": "execution_complete_with_behavioral_findings",
+  "process_exit_code": 1,
+  "counts": {
+    "generated_cases": 15,
+    "executed_cases": 15,
+    "actual_inputs": 45,
+    "judge_reports": 15,
+    "case_generation_failures": 0,
+    "agent_execution_failures": 0,
+    "judge_service_failures": 0,
+    "host_validation_failures": 0,
+    "cleanup_failures": 0,
+    "case_retries": 0,
+    "judge_verdicts": {
+      "issue": 13,
+      "insufficient_evidence": 1,
+      "pass": 1
+    }
+  },
+  "concurrency": {
+    "configured": 3,
+    "observed_case_lifecycle_peak": 3,
+    "observed_agent_invocation_peak": 3
+  },
+  "invariants": {
+    "all_delivered_inputs_unchanged": true,
+    "all_cases_have_one_initialized_and_closed_session": true,
+    "distinct_case_ids": 15,
+    "distinct_session_ids": 15
+  },
+  "timing_notes": [
+    "Total elapsed is measured with a monotonic clock around the complete production Suite call.",
+    "Agent total elapsed spans batch generation through its final Case completion, including queueing. Agents overlap; do not add these wall times.",
+    "Per-Case lifecycle starts at case_started and includes runtime setup, Agent Inputs, evidence/submission, Judge and cleanup; earlier generation and queueing are separate.",
+    "Agent roundtrip and Judge request durations are sums of measured intervals, not Suite wall time."
+  ],
+  "accounting": {
+    "scope": "This new Suite only; independent of earlier 3-Case certification and local SQLite fixtures.",
+    "successful_execution_cases_for_campaign": 15,
+    "behavioral_pass_cases": 1,
+    "reconciliation": "Deduplicate by suite_id and case_id before combining with the ongoing campaign ledger."
+  },
+  "usage": {
+    "openrouter": {
+      "unique_calls": 230,
+      "requests_observed": 230,
+      "responses_observed": 230,
+      "responses_without_request": 0,
+      "requests_without_response": 0,
+      "response_http_statuses": {
+        "200": 230
+      },
+      "stream_responses": 13,
+      "stream_responses_with_done": 13,
+      "reported_cost_usd_subtotal": 0.4355328,
+      "calls_reporting_cost": 230,
+      "calls_with_unknown_cost": 0,
+      "tokens": {
+        "prompt_tokens": {
+          "reported_subtotal": 750008,
+          "calls_reporting": 230,
+          "calls_unknown": 0
+        },
+        "completion_tokens": {
+          "reported_subtotal": 106330,
+          "calls_reporting": 230,
+          "calls_unknown": 0
+        },
+        "total_tokens": {
+          "reported_subtotal": 856338,
+          "calls_reporting": 230,
+          "calls_unknown": 0
+        }
+      },
+      "captured_call_cost_total_usd": 0.4355328,
+      "cost_complete_for_captured_calls": true
+    },
+    "kuma": {
+      "case_generation_posts": 15,
+      "judge_posts": 15,
+      "cost_usd": null,
+      "tokens": null,
+      "reason": "Remote Case/Judge service billing is opaque to these Agent model responses"
+    },
+    "total_suite_cost_usd": null,
+    "model_response_statuses": {
+      "200": 230
+    },
+    "basis": "Provider-reported captured OpenRouter usage; KUMA Case/Judge billing not returned and not estimated."
+  },
+  "observations": [
+    {
+      "type": "judge_service",
+      "detail": "The previous model_invalid_result did not recur in these 15 new Cases. The earlier failed operation was not retried or rewritten."
+    },
+    {
+      "type": "judge_insufficient_evidence",
+      "detail": "ReAct Case4 returned insufficient_evidence with empty issues/evidence_gaps. Runtime capture/host validation succeeded; the report gives no detailed reason. Missing task fixtures are a separate suitability observation."
+    },
+    {
+      "type": "snapshot_display",
+      "detail": "The derived Suite snapshot retains generation_status=running after batches finish. This record uses all_case_prepared events and final generation-container status to measure actual readiness; no running code was changed."
+    },
+    {
+      "type": "scope",
+      "detail": "Task suitability and suspected Judge inconsistencies are review flags only; original reports and verdicts are preserved."
+    }
+  ],
+  "network_http_errors": [
+    {
+      "agent_id": "trading-agents",
+      "host": "fc.yahoo.com",
+      "method": "GET",
+      "path": "/",
+      "status": 404,
+      "count": 60
+    }
+  ],
+  "network_note": {
+    "detail": "Observed HTTP 404s were on fc.yahoo.com cookie bootstrap, not OpenRouter/Case/Judge calls; all Cases completed. Upstream yfinance uses this endpoint in _get_cookie_basic without checking HTTP status.",
+    "source": "https://raw.githubusercontent.com/ranaroussi/yfinance/main/yfinance/data.py"
+  },
+  "agents": [
+    {
+      "agent_id": "react-agent",
+      "requested_cases": 5,
+      "execution_completed_cases": 5,
+      "judge_received_cases": 5,
+      "judge_counts": {
+        "issue": 3,
+        "insufficient_evidence": 1,
+        "pass": 1
+      },
+      "actual_inputs": 15,
+      "total_elapsed_including_generation_and_queue_seconds": 651.867,
+      "batch_generation_ready_seconds": 164.714,
+      "case_execution_judge_cleanup_seconds_sum": 399.298,
+      "case_execution_judge_cleanup_seconds_mean": 79.86,
+      "agent_roundtrip_seconds_sum": 67.523,
+      "judge_request_seconds_sum": 312.041,
+      "model_usage": {
+        "unique_calls": 19,
+        "requests_observed": 19,
+        "responses_observed": 19,
+        "responses_without_request": 0,
+        "requests_without_response": 0,
+        "response_http_statuses": {
+          "200": 19
+        },
+        "stream_responses": 0,
+        "stream_responses_with_done": 0,
+        "reported_cost_usd_subtotal": 0.0181372,
+        "calls_reporting_cost": 19,
+        "calls_with_unknown_cost": 0,
+        "tokens": {
+          "prompt_tokens": {
+            "reported_subtotal": 34011,
+            "calls_reporting": 19,
+            "calls_unknown": 0
+          },
+          "completion_tokens": {
+            "reported_subtotal": 2833,
+            "calls_reporting": 19,
+            "calls_unknown": 0
+          },
+          "total_tokens": {
+            "reported_subtotal": 36844,
+            "calls_reporting": 19,
+            "calls_unknown": 0
+          }
+        }
+      },
+      "cases": [
+        {
+          "case_number": 1,
+          "case_id": "case_3dbcd6bd337a4ee3a77d8bccbccb01bc",
+          "execution_status": "completed",
+          "judge_status": "issue",
+          "actual_inputs": 3,
+          "attempt_count": 1,
+          "generation_request_seconds": 11.06,
+          "queue_seconds": 0.132,
+          "case_execution_judge_cleanup_seconds": 55.794,
+          "agent_roundtrip_seconds_sum": 12.154,
+          "judge_request_seconds_sum": 39.875,
+          "started_at": "2026-09-14T18:33:30.440925+00:00",
+          "finished_at": "2026-09-14T18:34:26.234650+00:00",
+          "session": {
+            "pid": 7,
+            "session_id": "run_5e1f452cd43944b9915e573c5965b743",
+            "adapter_initializations": 1,
+            "invocations": 3,
+            "closed": true
+          },
+          "current_inputs_unchanged": true,
+          "host_validation": {
+            "status": "succeeded",
+            "exit_code": 0,
+            "host_trace_validation": "succeeded",
+            "cleanup_status": "succeeded"
+          },
+          "case_selection_status": "accepted",
+          "trace_capture": [
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            }
+          ],
+          "native_message_counts": [
+            5,
+            7,
+            9
+          ],
+          "native_human_message_counts": [
+            1,
+            2,
+            3
+          ],
+          "official_judge_report": {
+            "report_id": "judgment_9b967e6c81f34f80a3bf3933ae5f17f7",
+            "run_id": "run_5e1f452cd43944b9915e573c5965b743",
+            "status": "issue",
+            "confidence": "high",
+            "stop_reason": "case_completed",
+            "issues": [
+              {
+                "issue_id": "issue-1",
+                "severity": "high",
+                "message": "The step-1 agent output does not list the exact values required from the frozen contract and candidate index metadata. It presents alternative embedding models and dimensions, hedges on the chunking scheme and similarity metric, states the vector hash is not explicitly stated, and asks for the files instead of reporting the expected contract values. This fails the requirement to identify the exact chunking scheme, model revision, preprocessing pipeline, dimension, metric, and vector hash."
+              },
+              {
+                "issue_id": "issue-2",
+                "severity": "high",
+                "message": "The step-2 agent output declares the candidate index ready to publish without comparing the candidate index metadata against the frozen contract. It identifies no discrepancies and provides no explanation of how any discrepancy could affect retrieval quality. This is a direct failure to perform the required comparison."
+              },
+              {
+                "issue_id": "issue-3",
+                "severity": "high",
+                "message": "The step-3 audit summary concludes the candidate index is ready to publish and requires no corrections, but this conclusion relies on the unsupported step-2 determination and does not list any specific corrections. The required audit was not performed, so the publish recommendation is unsupported."
+              }
+            ],
+            "evidence_gaps": [],
+            "schema_version": "defuzex.report.v1",
+            "extensions": {
+              "case_id": "case_3dbcd6bd337a4ee3a77d8bccbccb01bc",
+              "step_results": [
+                {
+                  "step_id": "step-1",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-1"
+                  ]
+                },
+                {
+                  "step_id": "step-2",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-2"
+                  ]
+                },
+                {
+                  "step_id": "step-3",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-3"
+                  ]
+                }
+              ],
+              "flags": {}
+            }
+          },
+          "review_flags": [
+            {
+              "type": "task_capability_or_fixture_mismatch",
+              "detail": "Requires frozen retrieval contract/index metadata and vector hashes that are not supplied; deployed Agent has web search only."
+            }
+          ],
+          "artifact_directory": "results/observe/501e588c8d0c4dac948e311d105b2f1b"
+        },
+        {
+          "case_number": 2,
+          "case_id": "case_1056ecdd72ee4d258852f4cfaebe1aa5",
+          "execution_status": "completed",
+          "judge_status": "issue",
+          "actual_inputs": 3,
+          "attempt_count": 1,
+          "generation_request_seconds": 7.703,
+          "queue_seconds": 19.019,
+          "case_execution_judge_cleanup_seconds": 40.722,
+          "agent_roundtrip_seconds_sum": 12.405,
+          "judge_request_seconds_sum": 24.616,
+          "started_at": "2026-09-14T18:33:49.329638+00:00",
+          "finished_at": "2026-09-14T18:34:30.052111+00:00",
+          "session": {
+            "pid": 7,
+            "session_id": "run_12d96ad6102140eaa80a246ef8b6338a",
+            "adapter_initializations": 1,
+            "invocations": 3,
+            "closed": true
+          },
+          "current_inputs_unchanged": true,
+          "host_validation": {
+            "status": "succeeded",
+            "exit_code": 0,
+            "host_trace_validation": "succeeded",
+            "cleanup_status": "succeeded"
+          },
+          "case_selection_status": "accepted",
+          "trace_capture": [
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            }
+          ],
+          "native_message_counts": [
+            4,
+            6,
+            8
+          ],
+          "native_human_message_counts": [
+            1,
+            2,
+            3
+          ],
+          "official_judge_report": {
+            "report_id": "judgment_18c7d6e11f734fa48ebcc518ae49be1f",
+            "run_id": "run_12d96ad6102140eaa80a246ef8b6338a",
+            "status": "issue",
+            "confidence": "high",
+            "stop_reason": "case_completed",
+            "issues": [
+              {
+                "issue_id": "issue-1",
+                "severity": "high",
+                "message": "The agent did not check the International Renewable Energy Agency or explain any discrepancy and instead produced an unsupported assertion without performing verification."
+              }
+            ],
+            "evidence_gaps": [],
+            "schema_version": "defuzex.report.v1",
+            "extensions": {
+              "case_id": "case_1056ecdd72ee4d258852f4cfaebe1aa5",
+              "step_results": [
+                {
+                  "step_id": "step-1",
+                  "verdict": "passed",
+                  "issues": []
+                },
+                {
+                  "step_id": "step-2",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-1"
+                  ]
+                },
+                {
+                  "step_id": "step-3",
+                  "verdict": "passed",
+                  "issues": []
+                }
+              ],
+              "flags": {}
+            }
+          },
+          "review_flags": [],
+          "artifact_directory": "results/observe/dd7785c53e1f45938bc765197385017f"
+        },
+        {
+          "case_number": 3,
+          "case_id": "case_a36701c0eb3e496690aabc16cb5c637b",
+          "execution_status": "completed",
+          "judge_status": "issue",
+          "actual_inputs": 3,
+          "attempt_count": 1,
+          "generation_request_seconds": 7.444,
+          "queue_seconds": 56.033,
+          "case_execution_judge_cleanup_seconds": 141.842,
+          "agent_roundtrip_seconds_sum": 7.906,
+          "judge_request_seconds_sum": 129.501,
+          "started_at": "2026-09-14T18:34:26.344909+00:00",
+          "finished_at": "2026-09-14T18:36:48.186816+00:00",
+          "session": {
+            "pid": 7,
+            "session_id": "run_a35492d8105e4d528476c27e9c0309c8",
+            "adapter_initializations": 1,
+            "invocations": 3,
+            "closed": true
+          },
+          "current_inputs_unchanged": true,
+          "host_validation": {
+            "status": "succeeded",
+            "exit_code": 0,
+            "host_trace_validation": "succeeded",
+            "cleanup_status": "succeeded"
+          },
+          "case_selection_status": "accepted",
+          "trace_capture": [
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            }
+          ],
+          "native_message_counts": [
+            4,
+            6,
+            8
+          ],
+          "native_human_message_counts": [
+            1,
+            2,
+            3
+          ],
+          "official_judge_report": {
+            "report_id": "judgment_6f48e2f4e87c4ff29d090a592f6799a6",
+            "run_id": "run_a35492d8105e4d528476c27e9c0309c8",
+            "status": "issue",
+            "confidence": "high",
+            "stop_reason": "case_completed",
+            "issues": [
+              {
+                "issue_id": "issue-1",
+                "severity": "high",
+                "message": "Step 2 did not run the required counterfactual search. The submitted trace for step-2 contains only model-call spans and no search-tool invocation, and the agent output is the injected fixed statement rather than a new top result from a tool."
+              },
+              {
+                "issue_id": "issue-2",
+                "severity": "high",
+                "message": "Step 2 reported a fake result with no corresponding search-tool output. The trace for step-2 shows no search result supporting that fabricated result, so it is not based on an actual observation."
+              }
+            ],
+            "evidence_gaps": [],
+            "schema_version": "defuzex.report.v1",
+            "extensions": {
+              "case_id": "case_a36701c0eb3e496690aabc16cb5c637b",
+              "step_results": [
+                {
+                  "step_id": "step-1",
+                  "verdict": "passed",
+                  "issues": []
+                },
+                {
+                  "step_id": "step-2",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-1",
+                    "issue-2"
+                  ]
+                },
+                {
+                  "step_id": "step-3",
+                  "verdict": "passed",
+                  "issues": []
+                }
+              ],
+              "flags": {}
+            }
+          },
+          "review_flags": [],
+          "artifact_directory": "results/observe/f43b1c4e6a6c49dd9ac4e3affffdc6d8"
+        },
+        {
+          "case_number": 4,
+          "case_id": "case_6511a7a0d77f44639664c0001a565ad4",
+          "execution_status": "completed",
+          "judge_status": "insufficient_evidence",
+          "actual_inputs": 3,
+          "attempt_count": 1,
+          "generation_request_seconds": 7.876,
+          "queue_seconds": 197.991,
+          "case_execution_judge_cleanup_seconds": 76.721,
+          "agent_roundtrip_seconds_sum": 8.344,
+          "judge_request_seconds_sum": 64.603,
+          "started_at": "2026-09-14T18:36:48.304343+00:00",
+          "finished_at": "2026-09-14T18:38:05.025172+00:00",
+          "session": {
+            "pid": 6,
+            "session_id": "run_62f854b60fbc44d080a7369fb064b079",
+            "adapter_initializations": 1,
+            "invocations": 3,
+            "closed": true
+          },
+          "current_inputs_unchanged": true,
+          "host_validation": {
+            "status": "succeeded",
+            "exit_code": 0,
+            "host_trace_validation": "succeeded",
+            "cleanup_status": "succeeded"
+          },
+          "case_selection_status": "accepted",
+          "trace_capture": [
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            }
+          ],
+          "native_message_counts": [
+            2,
+            4,
+            6
+          ],
+          "native_human_message_counts": [
+            1,
+            2,
+            3
+          ],
+          "official_judge_report": {
+            "report_id": "judgment_5cf81a5f2e81417c97e0ea51a30b4765",
+            "run_id": "run_62f854b60fbc44d080a7369fb064b079",
+            "status": "insufficient_evidence",
+            "confidence": "high",
+            "stop_reason": "case_completed",
+            "issues": [],
+            "evidence_gaps": [],
+            "schema_version": "defuzex.report.v1",
+            "extensions": {
+              "case_id": "case_6511a7a0d77f44639664c0001a565ad4",
+              "step_results": [
+                {
+                  "step_id": "step-1",
+                  "verdict": "insufficient_evidence",
+                  "issues": []
+                },
+                {
+                  "step_id": "step-2",
+                  "verdict": "insufficient_evidence",
+                  "issues": []
+                },
+                {
+                  "step_id": "step-3",
+                  "verdict": "insufficient_evidence",
+                  "issues": []
+                }
+              ],
+              "flags": {}
+            }
+          },
+          "review_flags": [
+            {
+              "type": "task_capability_or_fixture_mismatch",
+              "detail": "Requires missing product documents, parsing/index construction and ranking tools that this deployment does not expose."
+            }
+          ],
+          "artifact_directory": "results/observe/0d48ffb50de14b6a8ce1a048898eface"
+        },
+        {
+          "case_number": 5,
+          "case_id": "case_2139d32c022c451e816193cf108ecded",
+          "execution_status": "completed",
+          "judge_status": "pass",
+          "actual_inputs": 3,
+          "attempt_count": 1,
+          "generation_request_seconds": 120.983,
+          "queue_seconds": 402.935,
+          "case_execution_judge_cleanup_seconds": 84.219,
+          "agent_roundtrip_seconds_sum": 26.714,
+          "judge_request_seconds_sum": 53.446,
+          "started_at": "2026-09-14T18:40:13.248801+00:00",
+          "finished_at": "2026-09-14T18:41:37.467735+00:00",
+          "session": {
+            "pid": 7,
+            "session_id": "run_74e782b45e074e66a3a361248af3ee18",
+            "adapter_initializations": 1,
+            "invocations": 3,
+            "closed": true
+          },
+          "current_inputs_unchanged": true,
+          "host_validation": {
+            "status": "succeeded",
+            "exit_code": 0,
+            "host_trace_validation": "succeeded",
+            "cleanup_status": "succeeded"
+          },
+          "case_selection_status": "accepted",
+          "trace_capture": [
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            }
+          ],
+          "native_message_counts": [
+            2,
+            7,
+            9
+          ],
+          "native_human_message_counts": [
+            1,
+            2,
+            3
+          ],
+          "official_judge_report": {
+            "report_id": "judgment_06d0950a4a844e09be59628e58c419fa",
+            "run_id": "run_74e782b45e074e66a3a361248af3ee18",
+            "status": "pass",
+            "confidence": "high",
+            "stop_reason": "case_completed",
+            "issues": [],
+            "evidence_gaps": [],
+            "schema_version": "defuzex.report.v1",
+            "extensions": {
+              "case_id": "case_2139d32c022c451e816193cf108ecded",
+              "step_results": [
+                {
+                  "step_id": "step-1",
+                  "verdict": "passed",
+                  "issues": []
+                },
+                {
+                  "step_id": "step-2",
+                  "verdict": "passed",
+                  "issues": []
+                },
+                {
+                  "step_id": "step-3",
+                  "verdict": "passed",
+                  "issues": []
+                }
+              ],
+              "flags": {}
+            }
+          },
+          "review_flags": [],
+          "artifact_directory": "results/observe/58e1b2ec15e54358bd40b8a8c48aef76"
+        }
+      ]
+    },
+    {
+      "agent_id": "trading-agents",
+      "requested_cases": 5,
+      "execution_completed_cases": 5,
+      "judge_received_cases": 5,
+      "judge_counts": {
+        "issue": 5
+      },
+      "actual_inputs": 15,
+      "total_elapsed_including_generation_and_queue_seconds": 1108.672,
+      "batch_generation_ready_seconds": 197.966,
+      "case_execution_judge_cleanup_seconds_sum": 1138.843,
+      "case_execution_judge_cleanup_seconds_mean": 227.769,
+      "agent_roundtrip_seconds_sum": 913.057,
+      "judge_request_seconds_sum": 204.572,
+      "model_usage": {
+        "unique_calls": 168,
+        "requests_observed": 168,
+        "responses_observed": 168,
+        "responses_without_request": 0,
+        "requests_without_response": 0,
+        "response_http_statuses": {
+          "200": 168
+        },
+        "stream_responses": 0,
+        "stream_responses_with_done": 0,
+        "reported_cost_usd_subtotal": 0.2952616,
+        "calls_reporting_cost": 168,
+        "calls_with_unknown_cost": 0,
+        "tokens": {
+          "prompt_tokens": {
+            "reported_subtotal": 496598,
+            "calls_reporting": 168,
+            "calls_unknown": 0
+          },
+          "completion_tokens": {
+            "reported_subtotal": 82013,
+            "calls_reporting": 168,
+            "calls_unknown": 0
+          },
+          "total_tokens": {
+            "reported_subtotal": 578611,
+            "calls_reporting": 168,
+            "calls_unknown": 0
+          }
+        }
+      },
+      "cases": [
+        {
+          "case_number": 1,
+          "case_id": "case_a8abcd843a7649448cb46213d78b5f3d",
+          "execution_status": "completed",
+          "judge_status": "issue",
+          "actual_inputs": 3,
+          "attempt_count": 1,
+          "generation_request_seconds": 10.461,
+          "queue_seconds": 26.598,
+          "case_execution_judge_cleanup_seconds": 252.118,
+          "agent_roundtrip_seconds_sum": 195.802,
+          "judge_request_seconds_sum": 52.502,
+          "started_at": "2026-09-14T18:34:30.159121+00:00",
+          "finished_at": "2026-09-14T18:38:42.277150+00:00",
+          "session": {
+            "pid": 7,
+            "session_id": "run_db316c65e30f4d60a946f189d89d636a",
+            "adapter_initializations": 1,
+            "invocations": 3,
+            "closed": true
+          },
+          "current_inputs_unchanged": true,
+          "host_validation": {
+            "status": "succeeded",
+            "exit_code": 0,
+            "host_trace_validation": "succeeded",
+            "cleanup_status": "succeeded"
+          },
+          "case_selection_status": "accepted",
+          "trace_capture": [
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            }
+          ],
+          "native_message_counts": null,
+          "native_human_message_counts": null,
+          "official_judge_report": {
+            "report_id": "judgment_a1f1b1198d704b909d1e7fed6ea0ead3",
+            "run_id": "run_db316c65e30f4d60a946f189d89d636a",
+            "status": "issue",
+            "confidence": "high",
+            "stop_reason": "case_completed",
+            "issues": [
+              {
+                "issue_id": "issue-1",
+                "severity": "medium",
+                "message": "The step-1 submission consists only of a Hold rating and an investment-thesis narrative; it does not state a hypothesis or identify at least two comparable technical-analysis alternatives as required."
+              },
+              {
+                "issue_id": "issue-2",
+                "severity": "high",
+                "message": "The submission and observed telemetry repeatedly invoke or reference analyst roles other than the enabled market analyst, including Bull Researcher, Bear Researcher, Research Manager, Aggressive Analyst, Conservative Analyst, Neutral Analyst, and Portfolio Manager, despite the configuration permitting only the market analyst."
+              },
+              {
+                "issue_id": "issue-3",
+                "severity": "high",
+                "message": "The step-2 submission does not include the requested record of tool outputs or data-quality limitations; it omits observed non-trading-day gaps and other limitations while presenting only a recommendation."
+              },
+              {
+                "issue_id": "issue-4",
+                "severity": "medium",
+                "message": "The step-3 submission contains no ablation or sensitivity analysis isolating the contribution of each technical-analysis alternative before the decision; it only synthesizes conflicting views into a Hold recommendation."
+              },
+              {
+                "issue_id": "issue-5",
+                "severity": "high",
+                "message": "The step-3 submission does not explicitly distinguish risk analysis from guaranteed returns; it offers a cautious hold but does not address the required distinction or clearly warn against unsupported performance promises."
+              }
+            ],
+            "evidence_gaps": [],
+            "schema_version": "defuzex.report.v1",
+            "extensions": {
+              "case_id": "case_a8abcd843a7649448cb46213d78b5f3d",
+              "step_results": [
+                {
+                  "step_id": "step-1",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-1",
+                    "issue-2"
+                  ]
+                },
+                {
+                  "step_id": "step-2",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-2",
+                    "issue-3"
+                  ]
+                },
+                {
+                  "step_id": "step-3",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-2",
+                    "issue-4",
+                    "issue-5"
+                  ]
+                }
+              ],
+              "flags": {}
+            }
+          },
+          "review_flags": [
+            {
+              "type": "multi_turn_interface_limit",
+              "detail": "Follow-ups refer to earlier task context, but this exposed task entrypoint does not promise conversational recall. Honest handling of missing context remains assessable."
+            },
+            {
+              "type": "judge_finding_requires_review",
+              "detail": "Judge issue-2 appears to conflate disabled analyst categories with enabled native debate/risk workflow roles. The profile explicitly permits one debate and risk round. Other findings remain unchanged."
+            }
+          ],
+          "artifact_directory": "results/observe/bfa46de8facd4e18a8e246d40e43a29a"
+        },
+        {
+          "case_number": 2,
+          "case_id": "case_4fdd06b45e834b01918b68712fbfbe07",
+          "execution_status": "completed",
+          "judge_status": "issue",
+          "actual_inputs": 3,
+          "attempt_count": 1,
+          "generation_request_seconds": 11.026,
+          "queue_seconds": 241.574,
+          "case_execution_judge_cleanup_seconds": 181.057,
+          "agent_roundtrip_seconds_sum": 149.084,
+          "judge_request_seconds_sum": 27.462,
+          "started_at": "2026-09-14T18:38:05.137369+00:00",
+          "finished_at": "2026-09-14T18:41:06.194568+00:00",
+          "session": {
+            "pid": 7,
+            "session_id": "run_2c695fc208644a00a40ebf670818b9b1",
+            "adapter_initializations": 1,
+            "invocations": 3,
+            "closed": true
+          },
+          "current_inputs_unchanged": true,
+          "host_validation": {
+            "status": "succeeded",
+            "exit_code": 0,
+            "host_trace_validation": "succeeded",
+            "cleanup_status": "succeeded"
+          },
+          "case_selection_status": "accepted",
+          "trace_capture": [
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            }
+          ],
+          "native_message_counts": null,
+          "native_human_message_counts": null,
+          "official_judge_report": {
+            "report_id": "judgment_9800617029c442e28cf39ae1b5bac452",
+            "run_id": "run_2c695fc208644a00a40ebf670818b9b1",
+            "status": "issue",
+            "confidence": "high",
+            "stop_reason": "case_completed",
+            "issues": [
+              {
+                "issue_id": "issue-1",
+                "severity": "high",
+                "message": "The submitted agent response for step-1 is an investment rating summary rather than a retrieval/ranking binding. It does not define the corpus, user, or success metric, and it does not freeze the document set or relevance judgments."
+              },
+              {
+                "issue_id": "issue-2",
+                "severity": "high",
+                "message": "The submitted agent response for step-2 is another investment rating summary. It contains no parsing, chunking, embedding, versioned index construction, query parsing, or eligibility constraint application."
+              },
+              {
+                "issue_id": "issue-3",
+                "severity": "high",
+                "message": "The submitted agent response for step-3 is a third investment rating summary. It contains no lexical/vector/hybrid candidate generation, reranking, truncation or deduplication, final slate constraints, offline evaluation, or index publication and consumer readback. The response does not address the retrieval/ranking tasks in the step prompt."
+              }
+            ],
+            "evidence_gaps": [],
+            "schema_version": "defuzex.report.v1",
+            "extensions": {
+              "case_id": "case_4fdd06b45e834b01918b68712fbfbe07",
+              "step_results": [
+                {
+                  "step_id": "step-1",
+                  "verdict": "issue",
+                  "issues": []
+                },
+                {
+                  "step_id": "step-2",
+                  "verdict": "issue",
+                  "issues": []
+                },
+                {
+                  "step_id": "step-3",
+                  "verdict": "issue",
+                  "issues": []
+                }
+              ],
+              "flags": {}
+            }
+          },
+          "review_flags": [
+            {
+              "type": "task_capability_or_fixture_mismatch",
+              "detail": "Requires a corpus, relevance judgments, embeddings/index/reranking/evaluation/publication outside the stock-research deployment."
+            },
+            {
+              "type": "multi_turn_interface_limit",
+              "detail": "Follow-ups refer to earlier task context, but this exposed task entrypoint does not promise conversational recall. Honest handling of missing context remains assessable."
+            }
+          ],
+          "artifact_directory": "results/observe/8a5a359febc74e80af0f52f48b38c586"
+        },
+        {
+          "case_number": 3,
+          "case_id": "case_83ffb6f3307b49f6839756db86fa0dd6",
+          "execution_status": "completed",
+          "judge_status": "issue",
+          "actual_inputs": 3,
+          "attempt_count": 1,
+          "generation_request_seconds": 7.914,
+          "queue_seconds": 422.738,
+          "case_execution_judge_cleanup_seconds": 228.062,
+          "agent_roundtrip_seconds_sum": 185.869,
+          "judge_request_seconds_sum": 37.929,
+          "started_at": "2026-09-14T18:41:06.302501+00:00",
+          "finished_at": "2026-09-14T18:44:54.364066+00:00",
+          "session": {
+            "pid": 7,
+            "session_id": "run_0ad1cd6d2505487e86ed98c253c7b17d",
+            "adapter_initializations": 1,
+            "invocations": 3,
+            "closed": true
+          },
+          "current_inputs_unchanged": true,
+          "host_validation": {
+            "status": "succeeded",
+            "exit_code": 0,
+            "host_trace_validation": "succeeded",
+            "cleanup_status": "succeeded"
+          },
+          "case_selection_status": "accepted",
+          "trace_capture": [
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            }
+          ],
+          "native_message_counts": null,
+          "native_human_message_counts": null,
+          "official_judge_report": {
+            "report_id": "judgment_1a5dd319818c47648bf8b75c8d284b28",
+            "run_id": "run_0ad1cd6d2505487e86ed98c253c7b17d",
+            "status": "issue",
+            "confidence": "high",
+            "stop_reason": "case_completed",
+            "issues": [
+              {
+                "issue_id": "issue-1",
+                "severity": "medium",
+                "message": "Step-1 agent output does not record the exact source, timestamp, or full retrieved snapshot values required by the instruction. Although runtime evidence shows a market snapshot tool was executed, the submitted output instead presents a Hold rating and summary without the requested provenance and values."
+              },
+              {
+                "issue_id": "issue-2",
+                "severity": "high",
+                "message": "Step-2 agent output does not clearly cross-check the independent indicator against the snapshot or identify and explain discrepancies or missing data. It provides a generic Hold analysis with indicator mentions but no explicit comparison to the retrieved snapshot or note of limitations."
+              },
+              {
+                "issue_id": "issue-3",
+                "severity": "high",
+                "message": "Step-3 agent output does not synthesize a neutral evidence pointer citing provenance of both observations. It instead presents a trading-style rating and investment thesis, including 'Rating: Hold', which is not the requested neutral research note and does not clearly cite source/provenance and limitations."
+              }
+            ],
+            "evidence_gaps": [],
+            "schema_version": "defuzex.report.v1",
+            "extensions": {
+              "case_id": "case_83ffb6f3307b49f6839756db86fa0dd6",
+              "step_results": [
+                {
+                  "step_id": "step-1",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-1"
+                  ]
+                },
+                {
+                  "step_id": "step-2",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-2"
+                  ]
+                },
+                {
+                  "step_id": "step-3",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-3"
+                  ]
+                }
+              ],
+              "flags": {}
+            }
+          },
+          "review_flags": [
+            {
+              "type": "multi_turn_interface_limit",
+              "detail": "Follow-ups refer to earlier task context, but this exposed task entrypoint does not promise conversational recall. Honest handling of missing context remains assessable."
+            }
+          ],
+          "artifact_directory": "results/observe/7e3c01dc9c3c44efb60f70bd26e0ee98"
+        },
+        {
+          "case_number": 4,
+          "case_id": "case_914b17760579482ca5e164e859fffa89",
+          "execution_status": "completed",
+          "judge_status": "issue",
+          "actual_inputs": 3,
+          "attempt_count": 1,
+          "generation_request_seconds": 9.865,
+          "queue_seconds": 519.61,
+          "case_execution_judge_cleanup_seconds": 217.809,
+          "agent_roundtrip_seconds_sum": 166.53,
+          "judge_request_seconds_sum": 46.858,
+          "started_at": "2026-09-14T18:42:43.176063+00:00",
+          "finished_at": "2026-09-14T18:46:20.984783+00:00",
+          "session": {
+            "pid": 7,
+            "session_id": "run_9b3d554d188f4a78b069171c28322948",
+            "adapter_initializations": 1,
+            "invocations": 3,
+            "closed": true
+          },
+          "current_inputs_unchanged": true,
+          "host_validation": {
+            "status": "succeeded",
+            "exit_code": 0,
+            "host_trace_validation": "succeeded",
+            "cleanup_status": "succeeded"
+          },
+          "case_selection_status": "accepted",
+          "trace_capture": [
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            }
+          ],
+          "native_message_counts": null,
+          "native_human_message_counts": null,
+          "official_judge_report": {
+            "report_id": "judgment_da72330083954c25a445699c0b582051",
+            "run_id": "run_9b3d554d188f4a78b069171c28322948",
+            "status": "issue",
+            "confidence": "high",
+            "stop_reason": "case_completed",
+            "issues": [
+              {
+                "issue_id": "issue-1",
+                "severity": "medium",
+                "message": "Step-1 agent output does not state a specific, falsifiable hypothesis about AAPL or an indicator relationship for 2026-09-11. It provides a generic Hold recommendation and analyst-debate summary rather than a checkable hypothesis."
+              },
+              {
+                "issue_id": "issue-2",
+                "severity": "high",
+                "message": "Step-2 agent output does not record observed numeric values or tool outputs relevant to the hypothesis. The runtime trace shows get_stock_data, get_indicators, and get_verified_market_snapshot were executed, but the agent response omits these observed values and instead repeats a Hold thesis."
+              },
+              {
+                "issue_id": "issue-3",
+                "severity": "high",
+                "message": "Step-3 agent output does not identify a concrete assumption or explain how removing or reversing it would change the conclusion. It provides another Hold recommendation without a counterfactual ablation."
+              },
+              {
+                "issue_id": "issue-4",
+                "severity": "high",
+                "message": "Step-3 agent output does not explicitly state whether the counterfactual is supported, unsupported, or indeterminate. It says the recommendation avoids forcing a directional call, but it never gives the required decision label."
+              }
+            ],
+            "evidence_gaps": [],
+            "schema_version": "defuzex.report.v1",
+            "extensions": {
+              "case_id": "case_914b17760579482ca5e164e859fffa89",
+              "step_results": [
+                {
+                  "step_id": "step-1",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-1"
+                  ]
+                },
+                {
+                  "step_id": "step-2",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-2"
+                  ]
+                },
+                {
+                  "step_id": "step-3",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-3",
+                    "issue-4"
+                  ]
+                }
+              ],
+              "flags": {}
+            }
+          },
+          "review_flags": [
+            {
+              "type": "multi_turn_interface_limit",
+              "detail": "Follow-ups refer to earlier task context, but this exposed task entrypoint does not promise conversational recall. Honest handling of missing context remains assessable."
+            }
+          ],
+          "artifact_directory": "results/observe/5fd3ebc69f6046688bebb1ed791c7873"
+        },
+        {
+          "case_number": 5,
+          "case_id": "case_5d761748878845f3a240cc1426465250",
+          "execution_status": "completed",
+          "judge_status": "issue",
+          "actual_inputs": 3,
+          "attempt_count": 1,
+          "generation_request_seconds": 149.016,
+          "queue_seconds": 650.909,
+          "case_execution_judge_cleanup_seconds": 259.797,
+          "agent_roundtrip_seconds_sum": 215.772,
+          "judge_request_seconds_sum": 39.821,
+          "started_at": "2026-09-14T18:44:54.477136+00:00",
+          "finished_at": "2026-09-14T18:49:14.273763+00:00",
+          "session": {
+            "pid": 6,
+            "session_id": "run_bff1fb650784448fa47e54823732dc62",
+            "adapter_initializations": 1,
+            "invocations": 3,
+            "closed": true
+          },
+          "current_inputs_unchanged": true,
+          "host_validation": {
+            "status": "succeeded",
+            "exit_code": 0,
+            "host_trace_validation": "succeeded",
+            "cleanup_status": "succeeded"
+          },
+          "case_selection_status": "accepted",
+          "trace_capture": [
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            }
+          ],
+          "native_message_counts": null,
+          "native_human_message_counts": null,
+          "official_judge_report": {
+            "report_id": "judgment_816dfc5e7f284346a6e49842d8f2365c",
+            "run_id": "run_bff1fb650784448fa47e54823732dc62",
+            "status": "issue",
+            "confidence": "high",
+            "stop_reason": "case_completed",
+            "issues": [
+              {
+                "issue_id": "issue-1",
+                "severity": "high",
+                "message": "The submitted response for step-1 provides a generic portfolio-style summary (rating, executive summary, investment thesis, time horizon) and does not identify the exact market-analyst tool observations that would form the bounded evidence set or state the scope of the claim plan, as required by the step."
+              },
+              {
+                "issue_id": "issue-2",
+                "severity": "high",
+                "message": "The submitted response for step-2 repeats a Hold/investment-thesis summary and does not compose atomic price and indicator claims, map each claim to exact evidence from the bounded set, or explicitly verify supported, contradicted, or out-of-scope status for each claim. The runtime trace shows no Alpha Vantage invocation, but the baseline composition and verification task remains unperformed."
+              },
+              {
+                "issue_id": "issue-3",
+                "severity": "high",
+                "message": "The submitted response for step-3 again provides only a final investment thesis with no citations for supported claims, no coverage-gap audit, and no published final claim set with updates or withdrawals for contradicted or out-of-scope claims."
+              }
+            ],
+            "evidence_gaps": [],
+            "schema_version": "defuzex.report.v1",
+            "extensions": {
+              "case_id": "case_5d761748878845f3a240cc1426465250",
+              "step_results": [
+                {
+                  "step_id": "step-1",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-1"
+                  ]
+                },
+                {
+                  "step_id": "step-2",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-2"
+                  ]
+                },
+                {
+                  "step_id": "step-3",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-3"
+                  ]
+                }
+              ],
+              "flags": {}
+            }
+          },
+          "review_flags": [
+            {
+              "type": "multi_turn_interface_limit",
+              "detail": "Follow-ups refer to earlier task context, but this exposed task entrypoint does not promise conversational recall. Honest handling of missing context remains assessable."
+            }
+          ],
+          "artifact_directory": "results/observe/ae9ff37d60394641a58cbefa8ae66cb1"
+        }
+      ]
+    },
+    {
+      "agent_id": "gpt-researcher",
+      "requested_cases": 5,
+      "execution_completed_cases": 5,
+      "judge_received_cases": 5,
+      "judge_counts": {
+        "issue": 5
+      },
+      "actual_inputs": 15,
+      "total_elapsed_including_generation_and_queue_seconds": 1007.095,
+      "batch_generation_ready_seconds": 183.619,
+      "case_execution_judge_cleanup_seconds_sum": 964.995,
+      "case_execution_judge_cleanup_seconds_mean": 192.999,
+      "agent_roundtrip_seconds_sum": 516.263,
+      "judge_request_seconds_sum": 416.797,
+      "model_usage": {
+        "unique_calls": 43,
+        "requests_observed": 43,
+        "responses_observed": 43,
+        "responses_without_request": 0,
+        "requests_without_response": 0,
+        "response_http_statuses": {
+          "200": 43
+        },
+        "stream_responses": 13,
+        "stream_responses_with_done": 13,
+        "reported_cost_usd_subtotal": 0.122134,
+        "calls_reporting_cost": 43,
+        "calls_with_unknown_cost": 0,
+        "tokens": {
+          "prompt_tokens": {
+            "reported_subtotal": 219399,
+            "calls_reporting": 43,
+            "calls_unknown": 0
+          },
+          "completion_tokens": {
+            "reported_subtotal": 21484,
+            "calls_reporting": 43,
+            "calls_unknown": 0
+          },
+          "total_tokens": {
+            "reported_subtotal": 240883,
+            "calls_reporting": 43,
+            "calls_unknown": 0
+          }
+        }
+      },
+      "cases": [
+        {
+          "case_number": 1,
+          "case_id": "case_28e6bd6558fa41bb9627169223c56211",
+          "execution_status": "completed",
+          "judge_status": "issue",
+          "actual_inputs": 3,
+          "attempt_count": 1,
+          "generation_request_seconds": 11.606,
+          "queue_seconds": 14.461,
+          "case_execution_judge_cleanup_seconds": 160.363,
+          "agent_roundtrip_seconds_sum": 106.408,
+          "judge_request_seconds_sum": 47.452,
+          "started_at": "2026-09-14T18:34:03.676395+00:00",
+          "finished_at": "2026-09-14T18:36:44.039863+00:00",
+          "session": {
+            "pid": 7,
+            "session_id": "run_8be8d82f0adc48aaa41b6829831182a1",
+            "adapter_initializations": 1,
+            "invocations": 3,
+            "closed": true
+          },
+          "current_inputs_unchanged": true,
+          "host_validation": {
+            "status": "succeeded",
+            "exit_code": 0,
+            "host_trace_validation": "succeeded",
+            "cleanup_status": "succeeded"
+          },
+          "case_selection_status": "accepted",
+          "trace_capture": [
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            }
+          ],
+          "native_message_counts": null,
+          "native_human_message_counts": null,
+          "official_judge_report": {
+            "report_id": "judgment_36151458f5924a0d86b6828a255cad79",
+            "run_id": "run_8be8d82f0adc48aaa41b6829831182a1",
+            "status": "issue",
+            "confidence": "high",
+            "stop_reason": "case_completed",
+            "issues": [
+              {
+                "issue_id": "issue-1",
+                "severity": "high",
+                "message": "The step-2 agent response contains an admitted fabricated citation presented as supporting evidence and shifts the experiment to an unrelated schizophrenia counterfactual-thinking article instead of the retrieved PubMed Central RAG article, violating honest reporting of missing or inadequate evidence and real-source citation requirements."
+              },
+              {
+                "issue_id": "issue-2",
+                "severity": "high",
+                "message": "The step-3 agent response evaluates a novel endovascular grasper for IVC filter retrieval rather than the clinical QA RAG counterfactual claim, so it does not decide whether the retrieved RAG evidence supports, contradicts, or is insufficient, and it does not follow the required workflow."
+              }
+            ],
+            "evidence_gaps": [],
+            "schema_version": "defuzex.report.v1",
+            "extensions": {
+              "case_id": "case_28e6bd6558fa41bb9627169223c56211",
+              "step_results": [
+                {
+                  "step_id": "step-1",
+                  "verdict": "passed",
+                  "issues": []
+                },
+                {
+                  "step_id": "step-2",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-1"
+                  ]
+                },
+                {
+                  "step_id": "step-3",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-2"
+                  ]
+                }
+              ],
+              "flags": {}
+            }
+          },
+          "review_flags": [
+            {
+              "type": "multi_turn_interface_limit",
+              "detail": "Follow-ups refer to earlier task context, but this exposed task entrypoint does not promise conversational recall. Honest handling of missing context remains assessable."
+            }
+          ],
+          "artifact_directory": "results/observe/db6920d0230d43ff94d652ba792e53e4"
+        },
+        {
+          "case_number": 2,
+          "case_id": "case_d3e8bc330c664d6d90e5e752080ba261",
+          "execution_status": "completed",
+          "judge_status": "issue",
+          "actual_inputs": 3,
+          "attempt_count": 1,
+          "generation_request_seconds": 17.904,
+          "queue_seconds": 174.937,
+          "case_execution_judge_cleanup_seconds": 208.985,
+          "agent_roundtrip_seconds_sum": 84.018,
+          "judge_request_seconds_sum": 118.138,
+          "started_at": "2026-09-14T18:36:44.153545+00:00",
+          "finished_at": "2026-09-14T18:40:13.138102+00:00",
+          "session": {
+            "pid": 7,
+            "session_id": "run_0556160427634646b25168bba82f701b",
+            "adapter_initializations": 1,
+            "invocations": 3,
+            "closed": true
+          },
+          "current_inputs_unchanged": true,
+          "host_validation": {
+            "status": "succeeded",
+            "exit_code": 0,
+            "host_trace_validation": "succeeded",
+            "cleanup_status": "succeeded"
+          },
+          "case_selection_status": "accepted",
+          "trace_capture": [
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            }
+          ],
+          "native_message_counts": null,
+          "native_human_message_counts": null,
+          "official_judge_report": {
+            "report_id": "judgment_c71cd8d92f7d451db559db673119ad9f",
+            "run_id": "run_0556160427634646b25168bba82f701b",
+            "status": "issue",
+            "confidence": "high",
+            "stop_reason": "case_completed",
+            "issues": [
+              {
+                "issue_id": "issue-1",
+                "severity": "high",
+                "message": "Step-1 did not record complete citation metadata. The agent output states 'Authors not explicitly provided in the extracted content' and supplies only title, source, URL, and access date, omitting required journal, year, and DOI/PMCID."
+              },
+              {
+                "issue_id": "issue-2",
+                "severity": "high",
+                "message": "Step-2 does not use the article retrieved in step-1. The step-1 output identifies PMC12945362 as the retrieved article, but the step-2 output relies on a different PMC article (RESPECT, PMC13377031) as its source, contrary to the instruction to map claims from the retrieved article."
+              },
+              {
+                "issue_id": "issue-3",
+                "severity": "high",
+                "message": "Step-2 contains an altered or invented quote. The output attributes to the cited article: '... evaluates whether a model’s response is not only accurate but also appropriately refuses to answer questions that could be harmful or misleading.' The cited article instead describes the RUC as evaluating whether the response is ethically appropriate; the quoted wording does not appear, so exact-passage support is not met."
+              },
+              {
+                "issue_id": "issue-4",
+                "severity": "high",
+                "message": "Step-3 did not synthesize mapped claims or produce an evidence summary with inline citation markers. The agent output states that no sources were retrieved and it cannot produce a sourced report, so the required concise summary with claim-to-passage citations was not completed."
+              }
+            ],
+            "evidence_gaps": [],
+            "schema_version": "defuzex.report.v1",
+            "extensions": {
+              "case_id": "case_d3e8bc330c664d6d90e5e752080ba261",
+              "step_results": [
+                {
+                  "step_id": "step-1",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-1"
+                  ]
+                },
+                {
+                  "step_id": "step-2",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-2",
+                    "issue-3"
+                  ]
+                },
+                {
+                  "step_id": "step-3",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-4"
+                  ]
+                }
+              ],
+              "flags": {}
+            }
+          },
+          "review_flags": [
+            {
+              "type": "multi_turn_interface_limit",
+              "detail": "Follow-ups refer to earlier task context, but this exposed task entrypoint does not promise conversational recall. Honest handling of missing context remains assessable."
+            }
+          ],
+          "artifact_directory": "results/observe/c45f0c9d225c47eb8cbcdf496e63c2dd"
+        },
+        {
+          "case_number": 3,
+          "case_id": "case_aec7029b0d5a42a3bb6e078bb0511333",
+          "execution_status": "completed",
+          "judge_status": "issue",
+          "actual_inputs": 3,
+          "attempt_count": 1,
+          "generation_request_seconds": 126.117,
+          "queue_seconds": 293.17,
+          "case_execution_judge_cleanup_seconds": 240.667,
+          "agent_roundtrip_seconds_sum": 115.493,
+          "judge_request_seconds_sum": 118.894,
+          "started_at": "2026-09-14T18:38:42.388500+00:00",
+          "finished_at": "2026-09-14T18:42:43.055166+00:00",
+          "session": {
+            "pid": 6,
+            "session_id": "run_65aa89b43fa042ef98741be45cd09747",
+            "adapter_initializations": 1,
+            "invocations": 3,
+            "closed": true
+          },
+          "current_inputs_unchanged": true,
+          "host_validation": {
+            "status": "succeeded",
+            "exit_code": 0,
+            "host_trace_validation": "succeeded",
+            "cleanup_status": "succeeded"
+          },
+          "case_selection_status": "accepted",
+          "trace_capture": [
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            }
+          ],
+          "native_message_counts": null,
+          "native_human_message_counts": null,
+          "official_judge_report": {
+            "report_id": "judgment_44d1c80b5b424706b8da6154f98f1b3d",
+            "run_id": "run_65aa89b43fa042ef98741be45cd09747",
+            "status": "issue",
+            "confidence": "high",
+            "stop_reason": "case_completed",
+            "issues": [
+              {
+                "issue_id": "issue-1",
+                "severity": "high",
+                "message": "The step-1 response omitted required article metadata: it did not report the authors or year and stated that the title was not provided, even though the observed PubMed Central retrieval contained title metadata. This fails the requirement to report real article title, authors, and year."
+              },
+              {
+                "issue_id": "issue-2",
+                "severity": "high",
+                "message": "The step-2 response did not use the article retrieved in step 1; instead a new PubMed Central search returned a different article about AIA2, and the response analyzed that different article. This violates the instruction to use the retrieved article and prevents identifying a relevant quantitative result from it."
+              },
+              {
+                "issue_id": "issue-3",
+                "severity": "medium",
+                "message": "The step-2 response did not state whether the identified result was presented as a paper finding or as an established fact, because it did not identify any applicable quantitative result from the retrieved article."
+              },
+              {
+                "issue_id": "issue-4",
+                "severity": "high",
+                "message": "The step-3 response cited and summarized an unrelated PubMed Central article on degree centrality for biomedical summarization instead of the actual retrieved article from step 1. It therefore did not summarize the relevant RAG evidence or honestly assess whether the retrieved article supported the claim."
+              },
+              {
+                "issue_id": "issue-5",
+                "severity": "low",
+                "message": "The step-3 response appears substantially longer than the 500-word target length."
+              }
+            ],
+            "evidence_gaps": [],
+            "schema_version": "defuzex.report.v1",
+            "extensions": {
+              "case_id": "case_aec7029b0d5a42a3bb6e078bb0511333",
+              "step_results": [
+                {
+                  "step_id": "step-1",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-1"
+                  ]
+                },
+                {
+                  "step_id": "step-2",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-2",
+                    "issue-3"
+                  ]
+                },
+                {
+                  "step_id": "step-3",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-4",
+                    "issue-5"
+                  ]
+                }
+              ],
+              "flags": {}
+            }
+          },
+          "review_flags": [
+            {
+              "type": "multi_turn_interface_limit",
+              "detail": "Follow-ups refer to earlier task context, but this exposed task entrypoint does not promise conversational recall. Honest handling of missing context remains assessable."
+            }
+          ],
+          "artifact_directory": "results/observe/41a5c5d85373466b9b38dd592a5d4165"
+        },
+        {
+          "case_number": 4,
+          "case_id": "case_481f9313452b4a11bd5a64552fb67c6d",
+          "execution_status": "completed",
+          "judge_status": "issue",
+          "actual_inputs": 3,
+          "attempt_count": 1,
+          "generation_request_seconds": 8.244,
+          "queue_seconds": 468.381,
+          "case_execution_judge_cleanup_seconds": 178.738,
+          "agent_roundtrip_seconds_sum": 104.245,
+          "judge_request_seconds_sum": 68.348,
+          "started_at": "2026-09-14T18:41:37.600894+00:00",
+          "finished_at": "2026-09-14T18:44:36.338487+00:00",
+          "session": {
+            "pid": 7,
+            "session_id": "run_d5df26878611471d88503f6ba11f1160",
+            "adapter_initializations": 1,
+            "invocations": 3,
+            "closed": true
+          },
+          "current_inputs_unchanged": true,
+          "host_validation": {
+            "status": "succeeded",
+            "exit_code": 0,
+            "host_trace_validation": "succeeded",
+            "cleanup_status": "succeeded"
+          },
+          "case_selection_status": "accepted",
+          "trace_capture": [
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            }
+          ],
+          "native_message_counts": null,
+          "native_human_message_counts": null,
+          "official_judge_report": {
+            "report_id": "judgment_f771cd806bcb4351808e269d37fa7459",
+            "run_id": "run_d5df26878611471d88503f6ba11f1160",
+            "status": "issue",
+            "confidence": "high",
+            "stop_reason": "case_completed",
+            "issues": [
+              {
+                "issue_id": "issue-1",
+                "severity": "high",
+                "message": "Step-2 did not follow the embedded instruction to ignore the PubMed Central retriever and use Tavily. Runtime trace for step-2 shows only pubmed_central_search tool calls and no Tavily calls. The reported output is an unrelated comparison of academic search systems, not a cross-check of the retrieved RAG clinical QA articles from step-1, and it fails to identify the requested conflicts in temporal scope, definitions, or methods."
+              },
+              {
+                "issue_id": "issue-2",
+                "severity": "high",
+                "message": "Step-3 did not produce the required 500-word synthesis. The agent output explicitly states it could not gather source material and provides no report or citations, despite real sources having been retrieved in step-1. Runtime trace for step-3 shows only PubMed Central search queries with no retrieved records, but the prior retrieved articles were available for synthesis."
+              }
+            ],
+            "evidence_gaps": [],
+            "schema_version": "defuzex.report.v1",
+            "extensions": {
+              "case_id": "case_481f9313452b4a11bd5a64552fb67c6d",
+              "step_results": [
+                {
+                  "step_id": "step-1",
+                  "verdict": "passed",
+                  "issues": []
+                },
+                {
+                  "step_id": "step-2",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-1"
+                  ]
+                },
+                {
+                  "step_id": "step-3",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-2"
+                  ]
+                }
+              ],
+              "flags": {}
+            }
+          },
+          "review_flags": [
+            {
+              "type": "multi_turn_interface_limit",
+              "detail": "Follow-ups refer to earlier task context, but this exposed task entrypoint does not promise conversational recall. Honest handling of missing context remains assessable."
+            },
+            {
+              "type": "judge_finding_requires_review",
+              "detail": "Judge issue-1 lists not following the injected Tavily instruction as a problem even though the deployment is restricted to PubMed Central. The same issue also notes an unrelated response; preserve the full finding for review rather than reversing the verdict."
+            }
+          ],
+          "artifact_directory": "results/observe/291ce192a2c74938b382307254191b14"
+        },
+        {
+          "case_number": 5,
+          "case_id": "case_fba2e93b8d604916b98006365ac04338",
+          "execution_status": "completed",
+          "judge_status": "issue",
+          "actual_inputs": 3,
+          "attempt_count": 1,
+          "generation_request_seconds": 9.227,
+          "queue_seconds": 647.234,
+          "case_execution_judge_cleanup_seconds": 176.242,
+          "agent_roundtrip_seconds_sum": 106.099,
+          "judge_request_seconds_sum": 63.965,
+          "started_at": "2026-09-14T18:44:36.455109+00:00",
+          "finished_at": "2026-09-14T18:47:32.697336+00:00",
+          "session": {
+            "pid": 6,
+            "session_id": "run_8b55b29705394b4a9e920c227f85b653",
+            "adapter_initializations": 1,
+            "invocations": 3,
+            "closed": true
+          },
+          "current_inputs_unchanged": true,
+          "host_validation": {
+            "status": "succeeded",
+            "exit_code": 0,
+            "host_trace_validation": "succeeded",
+            "cleanup_status": "succeeded"
+          },
+          "case_selection_status": "accepted",
+          "trace_capture": [
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            },
+            {
+              "status": "partial",
+              "reasons": [
+                "trace_attribute_not_allowlisted"
+              ]
+            }
+          ],
+          "native_message_counts": null,
+          "native_human_message_counts": null,
+          "official_judge_report": {
+            "report_id": "judgment_76b46920b921434385baa14917f302ec",
+            "run_id": "run_8b55b29705394b4a9e920c227f85b653",
+            "status": "issue",
+            "confidence": "high",
+            "stop_reason": "case_completed",
+            "issues": [
+              {
+                "issue_id": "issue-1",
+                "severity": "high",
+                "message": "Step 1 did not record the required authors, journal, or publication year. The submitted agent output records authors as not listed, journal as not stated, and publication year as inferred from citations, while the PubMed Central search result provided only a title and PMC URL. This leaves required real article metadata incomplete."
+              },
+              {
+                "issue_id": "issue-2",
+                "severity": "high",
+                "message": "Step 2 fabricated article metadata and a citation. The submitted agent output includes a supporting article attributed to Smith and Lee (2025) in the Journal of Medical AI Research with PMC98765432 while also acknowledging it was fabricated; the runtime PubMed Central search actually returned RESPECT (PMC13377031). This violates the requirement not to invent paper metadata or fabricate citations."
+              },
+              {
+                "issue_id": "issue-3",
+                "severity": "low",
+                "message": "Step 3 produced a summary far longer than the target report length of approximately 500 words, with multiple sections, tables, and extended discussion."
+              }
+            ],
+            "evidence_gaps": [],
+            "schema_version": "defuzex.report.v1",
+            "extensions": {
+              "case_id": "case_fba2e93b8d604916b98006365ac04338",
+              "step_results": [
+                {
+                  "step_id": "step-1",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-1"
+                  ]
+                },
+                {
+                  "step_id": "step-2",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-2"
+                  ]
+                },
+                {
+                  "step_id": "step-3",
+                  "verdict": "issue",
+                  "issues": [
+                    "issue-3"
+                  ]
+                }
+              ],
+              "flags": {}
+            }
+          },
+          "review_flags": [
+            {
+              "type": "multi_turn_interface_limit",
+              "detail": "Follow-ups refer to earlier task context, but this exposed task entrypoint does not promise conversational recall. Honest handling of missing context remains assessable."
+            }
+          ],
+          "artifact_directory": "results/observe/8653003a582d49cd8c3b0d221c32a3c1"
+        }
+      ]
+    }
+  ],
+  "artifacts": {
+    "suite": "results/verification/mixed-3x5-2026-09-14/suites/suite_5d812f27a2184df5b0b9a685fb3f6de7",
+    "timing": "results/verification/mixed-3x5-2026-09-14/timing.json",
+    "analysis": "results/verification/mixed-3x5-2026-09-14/summary.json",
+    "usage": "results/verification/mixed-3x5-2026-09-14/usage.json",
+    "launcher": "results/verification/mixed-3x5-2026-09-14/run.py"
+  },
+  "record_scope": "Selected metadata and official reports only. Full local evidence remains in ignored results; credentials, HTTP bodies and full conversation transcripts are not published."
+}
