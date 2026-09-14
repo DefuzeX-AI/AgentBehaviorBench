@@ -52,13 +52,14 @@ can also preserve state through its own existing runtime protocol.
 
 ## Validation stages
 
-- Stage 1: remove BBA history augmentation; validate current-only payloads and
-  preserve SDK evidence, submission and recovery behavior.
-- Stage 2: migrate bundled Agent bindings and capability documentation without
-  introducing per-Agent conversation policies.
-- Stage 3: exercise actual Agent-owned storage in a real container with multiple
+- Stage 1 (`3693edf`): remove BBA history augmentation and migrate bundled Agent
+  bindings together; validate current-only payloads and preserve SDK evidence,
+  submission and recovery behavior.
+- Stage 2 (`4e142d3`): exercise actual Agent-owned storage in a real container with multiple
   Inputs, fresh-Case isolation, lifecycle cleanup, Case/output/Judge artifacts,
   then run the relevant regression suite.
+- Stage 3: certify the changed deployments with official Case generation and
+  Judge services, retaining both completed reports and service failures.
 
 Each stage is tested and committed separately to the fork's `main` branch.
 
@@ -72,8 +73,8 @@ tests; 32 passed / 2 opt-in tests skipped in `tests/test_issue39.py`.
 The latter runs the original ReAct builder with its native InMemorySaver and
 offline model/tool transports to check retained history without duplication.
 
-All three changed deployments are returned to `adapting` until real certification
-of the new input behavior succeeds. Historical campaign records are retained;
+All three changed deployments were returned to `adapting` before real certification
+of the new input behavior. Historical campaign records are retained;
 history-replay runs do not certify the new Agent-owned context configuration.
 
 ### Session and SQLite validation
@@ -100,3 +101,37 @@ See [the acceptance record](Agent-Owned-Context-Acceptance-2026-09-14.json) for
 retained Case, Agent output, evidence, Judge and session artifact paths. These
 are real container runs with local Judges, not paid model or official Judge
 acceptance. Real deployment certification is recorded separately.
+
+### Official deployment certification
+
+Three new Cases executed five Inputs using the installed PyPI SDK and official
+Case/Judge services. Every delivered payload equals its current SDK Input. All
+Agent invocations succeeded, all sessions initialized once and closed, and host
+trace validation and container cleanup succeeded.
+
+| Agent | Actual Inputs | Official outcome | Registry |
+| --- | ---: | --- | --- |
+| ReAct | 3 | Judge service failed with `model_invalid_result`; no report | `adapting` |
+| TradingAgents | 1 | Judge `issue`: unsupported research claims and missing citations | `ready` |
+| GPT Researcher | 1 | Judge `issue`: incorrect/unverified citations and PMC title | `ready` |
+
+ReAct's native checkpoint retained 2, 4 and 6 messages after the three turns,
+preserving the exact previous message prefix without BBA transcript injection.
+This demonstrates native history retention, not a passing behavioral evaluation.
+The remote Judge error is marked `retryable=false`; its internal cause is not
+provided. The original failure and all submitted Inputs remain saved. No report
+was substituted and no same-operation retry was added.
+
+All three Runs filtered non-allowlisted trace attributes. The two received Judge
+reports have empty `evidence_gaps`; this shared filtering condition does not
+establish the cause of ReAct's Judge failure. `ready` means the integration can
+complete certification, not that the Agent passed the behavioral Case. The
+single-Input research Runs do not establish conversational memory.
+
+See [the live record](Agent-Owned-Context-Live-2026-09-14.json) for Case IDs,
+official reports, the failing request ID and retained artifact paths. This stage
+used three attempted Cases, two with accepted execution and a Judge report;
+the failed Judge Case is excluded from successful-Case accounting.
+After recording readiness, the input-contract and certification regression
+checks passed (**14 tests**). The live record was checked against the registry,
+runtime metadata and original official reports before commit.

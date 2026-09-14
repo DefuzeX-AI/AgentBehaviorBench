@@ -56,6 +56,13 @@ results used the old history-replay binding; they do not certify the new
 current-input behavior. Current readiness is recorded in the registry.
 See [the campaign](../../../docs/Benchmark-Repair-Campaign.md) for onboarding results.
 
+Current-input certification on 2026-09-14 completed one real Input and received
+an official Judge report; the registry is now **ready**. The Judge verdict was
+`issue` for incorrect/unverified citations and a mismatched PMC article title,
+with no evidence gaps. This certifies execution, not citation accuracy or
+conversational recall. See
+[the live record](../../../docs/Agent-Owned-Context-Live-2026-09-14.json).
+
 ```bash
 agentbench evaluate gpt-researcher --cases 1 --max-steps 1 --yes --no-view
 agentbench certify gpt-researcher --yes --no-view

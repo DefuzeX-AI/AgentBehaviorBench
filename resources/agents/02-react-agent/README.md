@@ -77,6 +77,12 @@ python -m agentbench evaluate 02 --cases 2 --max-steps 4 --env-file /path/to/hos
 历史真实多轮验收及 Judge 阻塞详情见 [MULTITURN-VALIDATION.md](./MULTITURN-VALIDATION.md)。
 这些历史结果使用旧的历史回填方式，不能作为当前 checkpointer 配置的验收。
 
+2026-09-14 当前配置的真实认证完成了三轮 Agent 调用：输入均为当前 SDK Input，
+原生 checkpoint 消息数依次为 2、4、6；单次初始化、会话关闭和宿主 trace 校验正常。
+官方 Judge 返回 `model_invalid_result`（`retryable=false`），未生成报告，因此仍为
+`adapting`。这证明原生历史保留路径正常，不代表行为评测通过。详情及失败请求 ID
+见[当前配置真实验收记录](../../../docs/Agent-Owned-Context-Live-2026-09-14.json)。
+
 Case 数量、临时循环兼容、保存后导入及 wangyi 实现核对见 [BATCH-VALIDATION.md](./BATCH-VALIDATION.md)。
 
 逐项需求完成状态和最后一次完整 CLI 结果见 [REQUIREMENTS-CHECK.md](./REQUIREMENTS-CHECK.md)。

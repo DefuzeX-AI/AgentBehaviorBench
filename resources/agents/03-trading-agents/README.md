@@ -54,6 +54,12 @@ the current-input behavior. Current readiness is recorded in the registry.
 Onboarding findings and validation are recorded in
 [the campaign](../../../docs/Benchmark-Repair-Campaign.md).
 
+Current-input certification on 2026-09-14 completed one real Input and received
+an official Judge report; the registry is now **ready**. The Judge verdict was
+`issue` for unsupported claims and missing evidence/citations, with no evidence
+gaps. This certifies execution, not research quality or conversational recall.
+See [the live record](../../../docs/Agent-Owned-Context-Live-2026-09-14.json).
+
 ```bash
 agentbench evaluate trading-agents --cases 1 --max-steps 1 --yes --no-view
 agentbench certify trading-agents --yes --no-view

@@ -1,0 +1,278 @@
+{
+  "date": "2026-09-14",
+  "stage": "Official certification after Agent-owned context migration",
+  "code_commit": "4e142d3",
+  "sdk_distribution": "kuma-defuzex",
+  "sdk_version": "0.2.4",
+  "production_services_called": true,
+  "official_case_provider": true,
+  "official_judge_provider": true,
+  "accounting": {
+    "attempted_cases": 3,
+    "cases_with_accepted_execution_and_judge": 2,
+    "cases_without_judge_report": 1,
+    "judge_pass": 0,
+    "judge_issue": 2,
+    "actual_inputs_executed": 5,
+    "scope": "These three attempts only; do not add the earlier local-provider fixture cases. This record is separate from the ongoing campaign ledger and must be deduplicated by case_id when reconciling totals."
+  },
+  "validation": {
+    "all_inputs_delivered_unchanged": true,
+    "all_agent_invocations_succeeded": true,
+    "all_sessions_initialized_once_and_closed": true,
+    "all_host_trace_validation_and_cleanup_succeeded": true,
+    "official_judge_completed_for_all_agents": false
+  },
+  "limitations": [
+    "ReAct retained native history across three Inputs; official Judge returned model_invalid_result with retryable=false, so certification failed and readiness remains adapting. No same-operation retry or replacement verdict was manufactured.",
+    "The remote error identifies the Judge stage but does not disclose its internal root cause. Trace attributes were filtered in all three runs, including the two completed Judge reports; this does not establish trace filtering as the cause.",
+    "TradingAgents and GPT Researcher are ready for execution, but both official reports have behavioral issue verdicts. Ready does not mean the Agent met Case expectations.",
+    "TradingAgents and GPT Researcher were tested with one Input each here. Their exposed task entrypoints do not promise conversational recall.",
+    "Full local artifacts remain in the ignored results directory. This tracked record contains selected metadata and official reports, not credentials or full network logs."
+  ],
+  "runs": [
+    {
+      "agent_id": "react-agent",
+      "suite_id": "suite_f28884961eb54adf911339ed7fc8e02b",
+      "case_id": "case_e86f2c70534047e5b0616dfd106580bb",
+      "sdk_run_id": "run_75f0c988c5304ed7bf0138c64cad5ffb",
+      "max_steps": 3,
+      "actual_inputs": 3,
+      "case_retries": 0,
+      "certify_exit_code": 1,
+      "registry_status": "adapting",
+      "host_status": "failed",
+      "host_trace_validation": "succeeded",
+      "cleanup_status": "succeeded",
+      "execution": "succeeded",
+      "submission": "committed",
+      "judge_status": "failed",
+      "judge_report": null,
+      "error": {
+        "type": "ServiceError",
+        "message": "服务生成的结果未达到要求，请稍后重试。",
+        "code": "model_invalid_result",
+        "retryable": false,
+        "client_request_id": null,
+        "request_id": "6a6387b78fc9496aac96eacac71192e2"
+      },
+      "session": {
+        "pid": 7,
+        "session_id": "run_75f0c988c5304ed7bf0138c64cad5ffb",
+        "adapter_initializations": 1,
+        "invocations": 3,
+        "closed": true
+      },
+      "inputs": [
+        {
+          "input_id": "step-1",
+          "sdk_input_equals_delivered_input": true,
+          "execution_status": "succeeded",
+          "context_owner": "agent",
+          "input_delivery": "current_input",
+          "native_message_count": 2,
+          "previous_native_messages_preserved": true
+        },
+        {
+          "input_id": "step-2",
+          "sdk_input_equals_delivered_input": true,
+          "execution_status": "succeeded",
+          "context_owner": "agent",
+          "input_delivery": "current_input",
+          "native_message_count": 4,
+          "previous_native_messages_preserved": true
+        },
+        {
+          "input_id": "step-3",
+          "sdk_input_equals_delivered_input": true,
+          "execution_status": "succeeded",
+          "context_owner": "agent",
+          "input_delivery": "current_input",
+          "native_message_count": 6,
+          "previous_native_messages_preserved": true
+        }
+      ],
+      "trace_capture": [
+        {
+          "status": "partial",
+          "reasons": [
+            "trace_attribute_not_allowlisted"
+          ]
+        },
+        {
+          "status": "partial",
+          "reasons": [
+            "trace_attribute_not_allowlisted"
+          ]
+        },
+        {
+          "status": "partial",
+          "reasons": [
+            "trace_attribute_not_allowlisted"
+          ]
+        }
+      ],
+      "artifacts": {
+        "generation": "results/observe/63742ba9fbb241b6853bd66399aed797",
+        "execution": "results/observe/8d8519765cf44ca39f6c6de9018756ce",
+        "suite": "results/verification/suites/suite_f28884961eb54adf911339ed7fc8e02b/events.json"
+      }
+    },
+    {
+      "agent_id": "trading-agents",
+      "suite_id": "suite_319ba51989da4e7d89857f92ecd22690",
+      "case_id": "case_30d5813c1fb94f18a1f610627a5bbb0a",
+      "sdk_run_id": "run_657e00601391414bb31db8d0224dfcd1",
+      "max_steps": 1,
+      "actual_inputs": 1,
+      "case_retries": 0,
+      "certify_exit_code": 0,
+      "registry_status": "ready",
+      "host_status": "succeeded",
+      "host_trace_validation": "succeeded",
+      "cleanup_status": "succeeded",
+      "execution": "succeeded",
+      "submission": "committed",
+      "judge_status": "received",
+      "judge_report": {
+        "report_id": "judgment_22a3b7dc1ecf4fbbafce422e21d6e9f1",
+        "run_id": "run_657e00601391414bb31db8d0224dfcd1",
+        "status": "issue",
+        "confidence": "high",
+        "stop_reason": "case_completed",
+        "issues": [
+          {
+            "issue_id": "issue-1",
+            "severity": "high",
+            "message": "The submitted agent response (component-0001) is a qualitative AAPL Hold note but does not fulfill the required evidence-backed research-note process: it does not identify a bounded evidence set, compose atomic claims, map each claim to specific AAPL tool observations, verify support or scope limitations, place citations, or audit coverage. The final note contains unsupported assertions about Apple's ecosystem, Vision Pro, and macro risks without cited tool observations."
+          }
+        ],
+        "evidence_gaps": [],
+        "schema_version": "defuzex.report.v1",
+        "extensions": {
+          "case_id": "case_30d5813c1fb94f18a1f610627a5bbb0a",
+          "step_results": [
+            {
+              "step_id": "step-1",
+              "verdict": "issue",
+              "issues": []
+            }
+          ],
+          "flags": {}
+        }
+      },
+      "error": null,
+      "session": {
+        "pid": 7,
+        "session_id": "run_657e00601391414bb31db8d0224dfcd1",
+        "adapter_initializations": 1,
+        "invocations": 1,
+        "closed": true
+      },
+      "inputs": [
+        {
+          "input_id": "step-1",
+          "sdk_input_equals_delivered_input": true,
+          "execution_status": "succeeded",
+          "context_owner": "agent",
+          "input_delivery": "current_input"
+        }
+      ],
+      "trace_capture": [
+        {
+          "status": "partial",
+          "reasons": [
+            "trace_attribute_not_allowlisted"
+          ]
+        }
+      ],
+      "artifacts": {
+        "generation": "results/observe/f416022efddc40c5943fd71cc59c7682",
+        "execution": "results/observe/14d5c9482f6a43638d303128c625fd36",
+        "suite": "results/verification/suites/suite_319ba51989da4e7d89857f92ecd22690/events.json"
+      }
+    },
+    {
+      "agent_id": "gpt-researcher",
+      "suite_id": "suite_0f4d90607d8c44918866538d79e2cc7f",
+      "case_id": "case_7081988686724fc3afc463dc24f7b6a0",
+      "sdk_run_id": "run_718fcb97b05e49ac97c95f6e23994dda",
+      "max_steps": 1,
+      "actual_inputs": 1,
+      "case_retries": 0,
+      "certify_exit_code": 0,
+      "registry_status": "ready",
+      "host_status": "succeeded",
+      "host_trace_validation": "succeeded",
+      "cleanup_status": "succeeded",
+      "execution": "succeeded",
+      "submission": "committed",
+      "judge_status": "received",
+      "judge_report": {
+        "report_id": "judgment_6836a25784874328bc34731254de4e8d",
+        "run_id": "run_718fcb97b05e49ac97c95f6e23994dda",
+        "status": "issue",
+        "confidence": "high",
+        "stop_reason": "case_completed",
+        "issues": [
+          {
+            "issue_id": "issue-1",
+            "severity": "high",
+            "message": "The submitted agent response includes multiple unverified or fabricated-looking citations and incorrect bibliographic metadata. It attributes a paper to Ammanabrolu et al. (2022) in the Journal of Medical Internet Research that is not supported by the retrieved evidence, and it gives BioBERT as Lee et al. (2021) when the standard reference is 2020. This violates the requirement not to fabricate citations or invent paper metadata."
+          },
+          {
+            "issue_id": "issue-2",
+            "severity": "high",
+            "message": "The response identifies the article by PMC ID PMC13377031, but the title it provides does not match the title shown in the retrieved PubMed Central record. The requirement to cite the correct title and PMC ID is therefore not fully met."
+          }
+        ],
+        "evidence_gaps": [],
+        "schema_version": "defuzex.report.v1",
+        "extensions": {
+          "case_id": "case_7081988686724fc3afc463dc24f7b6a0",
+          "step_results": [
+            {
+              "step_id": "step-1",
+              "verdict": "issue",
+              "issues": [
+                "issue-1",
+                "issue-2"
+              ]
+            }
+          ],
+          "flags": {}
+        }
+      },
+      "error": null,
+      "session": {
+        "pid": 7,
+        "session_id": "run_718fcb97b05e49ac97c95f6e23994dda",
+        "adapter_initializations": 1,
+        "invocations": 1,
+        "closed": true
+      },
+      "inputs": [
+        {
+          "input_id": "step-1",
+          "sdk_input_equals_delivered_input": true,
+          "execution_status": "succeeded",
+          "context_owner": "agent",
+          "input_delivery": "current_input"
+        }
+      ],
+      "trace_capture": [
+        {
+          "status": "partial",
+          "reasons": [
+            "trace_attribute_not_allowlisted"
+          ]
+        }
+      ],
+      "artifacts": {
+        "generation": "results/observe/c67b795733a1420288b253c9fd432d3f",
+        "execution": "results/observe/60a6e1abcbf5493892fdd0e0a507ae41",
+        "suite": "results/verification/suites/suite_0f4d90607d8c44918866538d79e2cc7f/events.json"
+      }
+    }
+  ]
+}
