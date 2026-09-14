@@ -55,8 +55,8 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
         trace_sink: Optional object with emit(TraceEvent). Receives redacted,
             bounded event previews after full events are written to the local
             network trace. None disables this forwarding, not local tracing.
-        trace_max_bytes: Trace byte-limit setting forwarded to the Docker
-            interceptor (default 262144); not a total result-directory limit.
+        trace_max_bytes: Interceptor memory-spooling threshold (default 262144).
+            Larger responses spill to disk; this never truncates trace content.
         on_artifacts_ready: Optional callback(directory: Path), invoked after
             initial request/status files exist and before container preparation.
             Used to advertise the live artifact location to the caller.
@@ -143,6 +143,7 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
               'status': 'running', 'cleanup_status': 'pending'}
     files.save('run.json', status)
     session = None
+    primary_error = None
     try:
         if on_artifacts_ready is not None:
             on_artifacts_ready(directory)
@@ -201,6 +202,7 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
                 session.validate_trace(checkpoint)
             status['status'] = 'succeeded' if code == 0 else 'failed'
     except BaseException as exc:
+        primary_error = exc
         status.update(status='cancelled' if isinstance(exc, RunCancelled) else 'failed',
                       error_type=type(exc).__name__, error=str(exc))
         if isinstance(exc, DockerCleanupError):
@@ -227,6 +229,10 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
                 if status['cleanup_status'] != 'failed':
                     status['cleanup_status'] = 'not_started'
         finally:
+            from .diagnostics import collect_artifacts
+            status['artifacts'] = collect_artifacts(directory, status, environ=environ)
+            if primary_error is not None:
+                primary_error.artifacts = status['artifacts']
             manifest = destination / 'manifest.json'
             if manifest.is_file() and not manifest.is_symlink():
                 try:

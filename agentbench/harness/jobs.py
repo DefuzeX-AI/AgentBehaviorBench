@@ -122,7 +122,7 @@ def run_preparation_job(job: PreparationJob, *, control: RunControl,
             raise ValueError("Prepared Cases contain duplicate IDs")
         return PreparationOutcome(cases=cases)
     except BaseException as exc:
-        return PreparationOutcome(error=EvaluationFailure(type(exc).__name__, str(exc)),
+        return PreparationOutcome(error=EvaluationFailure(type(exc).__name__, str(exc), getattr(exc, 'artifacts', None)),
                                   fatal=fatal_error(exc, control))
 
 
@@ -144,5 +144,6 @@ def run_case_job(job: CaseJob, *, control: RunControl,
     except BaseException as exc:
         result = CaseResult(job.registration.agent_id, job.case.case_index, str(job.identity["job_id"]),
                             "cancelled" if isinstance(exc, RunCancelled) else "failed",
-                            case_id=job.case.case_id, error_type=type(exc).__name__, error_message=str(exc))
+                            case_id=job.case.case_id, error_type=type(exc).__name__, error_message=str(exc),
+                            artifacts=getattr(exc, 'artifacts', None))
         return CaseOutcome(result, fatal_error(exc, control))

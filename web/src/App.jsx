@@ -145,6 +145,10 @@ export default function App() {
       <nav className="trace-tabs" aria-label="Trace 视图">{bound && <button aria-pressed={view === 'suite'} onClick={() => { setImported(false); setView('suite'); }}>Suite 进度</button>}<button aria-pressed={view === 'otel'} onClick={() => setView('otel')}>OTel 调用树</button><button aria-pressed={view === 'evaluation'} onClick={() => setView('evaluation')}>Case / SDK / Judge</button><button aria-pressed={view === 'raw'} onClick={() => setView('raw')}>交互时间线</button><button aria-pressed={view === 'flow'} onClick={() => { setView('flow'); const url = new URL(location.href); const hash = new URLSearchParams(url.hash.slice(1)); hash.set('view', 'flow'); url.hash = hash.toString(); history.replaceState(null, '', url); }}>执行流程 · 原型</button></nav>
       {view !== 'suite' && !selected && !imported && <p role="status">{listBusy ? '正在读取运行目录…' : listError ? `运行目录不可用：${listError}` : '此结果没有登记可查看的证据目录。可能尚未产出，或来源未提供；请在 Suite 进度查看已保存的输入和判决。'}</p>}
       {view !== 'suite' && Object.entries(runMetadata.data?.evidence_availability || {}).filter(([, value]) => value.status !== 'available').map(([kind, value]) => <p role="status" key={kind}>{kind}: {value.status}{value.reason ? ` — ${value.reason}` : ''}</p>)}
+      {runMetadata.data?.artifacts?.received_report?.host_accepted === false && <p role="alert">
+        Judge 报告已保留（{runMetadata.data.artifacts.received_report.status}），宿主未接受该次执行。
+        请在「Case / SDK / Judge」查看原报告；拒绝原因：{runMetadata.data.error || '请查看运行诊断'}。
+      </p>}
       {view === 'flow' ? <Suspense fallback={<p>正在加载执行流程…</p>}><FlowPrototype key={selected} run={selected} revision={revision} /></Suspense> : view === 'otel' ? <TraceView run={selected} revision={revision} /> : view === 'evaluation' ? <EvaluationView run={selected} revision={revision} /> : view === 'raw' && selected ? <Suspense fallback={<p>正在加载交互时间线…</p>}><RawRunView key={selected} run={selected} revision={revision} /></Suspense> : <>
       <section className="toolbar" aria-label="筛选 trace">
         <label className="search"><span className="sr-only">搜索 trace</span>

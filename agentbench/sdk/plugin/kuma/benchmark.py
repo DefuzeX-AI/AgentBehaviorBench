@@ -18,6 +18,7 @@ from agentbench.sdk.contracts import PreparedCase
 from agentbench.sdk.common.case_identity import case_content_sha256
 
 from .service import evaluate
+from .diagnostics import evaluation_failure, collect_artifacts
 
 
 @dataclass(frozen=True)
@@ -115,7 +116,7 @@ class KumaContainerRunner:
             if self.case_collection is None:
                 status = json.loads((directory / 'run.json').read_text())
                 if status.get('status') != 'succeeded':
-                    raise RuntimeError(f'Case batch generation failed: {directory}')
+                    raise evaluation_failure(directory, 'Case batch generation failed', environ=self.environ)
                 collection = json.loads((directory / 'evaluation/case-collection.json').read_text())
             else:
                 collection = json.loads(self.case_collection.read_text())
@@ -207,9 +208,12 @@ class KumaContainerRunner:
             return result
         except Exception as exc:
             status = json.loads((directory / 'run.json').read_text())
+            status['status'] = 'failed'
+            exc.artifacts = collect_artifacts(directory, status, environ=self.environ)
             Artifacts(directory, environ=self.environ).save('run.json', {
                 **status, 'status': 'cancelled' if self.control.cancelled else 'failed',
                 'validation': 'failed', 'error_type': type(exc).__name__, 'error': str(exc),
+                'artifacts': exc.artifacts,
             })
             raise
 
@@ -260,7 +264,7 @@ def read_result(directory, agent_id):
         return json.loads(path.read_text(encoding='utf-8'))
     host = read('run.json')
     if host.get('agent_id') != agent_id or host.get('run_id') != directory.name or host.get('status') != 'succeeded':
-        raise RuntimeError(f'Container evaluation did not complete: {directory}')
+        raise evaluation_failure(directory, 'Container evaluation did not complete')
     summary = read('evaluation/manifest.json')
     for key, expected in {'execution':'succeeded', 'otel':'complete', 'submission':'committed',
                            'evidence':'captured', 'judge':'received', 'phase':'finished'}.items():

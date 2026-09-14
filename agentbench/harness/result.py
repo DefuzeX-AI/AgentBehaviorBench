@@ -56,6 +56,7 @@ CaseStatus = Literal["succeeded", "failed", "cancelled", "skipped"]
 class EvaluationFailure:
     error_type: str
     error_message: str
+    artifacts: dict | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +71,7 @@ class CaseResult:
     benchmark: BenchmarkResult | None = None
     error_type: str | None = None
     error_message: str | None = None
+    artifacts: dict | None = None
 
     def __post_init__(self) -> None:
         if type(self.case_index) is not int or self.case_index < 0:

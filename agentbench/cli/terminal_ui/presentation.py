@@ -127,6 +127,12 @@ def print_agent_start(
 def print_agent_complete(
     item: SuiteAgentResult, output_fn: Callable[[str], None]
 ) -> None:
+    for case in item.case_results:
+        artifacts = case.artifacts or {}
+        report = artifacts.get('received_report')
+        if report and not report.get('host_accepted'):
+            output_fn(f"Judge retained | Case {case.case_index + 1}: {report['status']} | "
+                      f"Host rejected | {artifacts.get('directory', '')}/{report['path']}")
     color = ANSI_GREEN if item.passed else ANSI_YELLOW if item.status in {"cancelled", "skipped"} else ANSI_RED
     status = f"{color}{'PASS' if item.passed else item.status.upper()}{ANSI_RESET}"
     if item.error_type is not None and item.completed_case_count == 0:

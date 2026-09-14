@@ -292,6 +292,7 @@ def _suite_agent_to_json(item: SuiteAgentResult) -> dict[str, object]:
 def _case_to_json(case: CaseResult) -> dict[str, object]:
     return {"agent_id": case.agent_id, "case_index": case.case_index,
             "job_id": case.job_id, "case_id": case.case_id, "status": case.status,
+            "artifacts": _json_value(case.artifacts),
             "benchmark": None if case.benchmark is None else _benchmark_to_json(case.benchmark),
             "error": None if case.error_type is None else {"type": case.error_type, "message": case.error_message}}
 
