@@ -50,6 +50,27 @@ conversation continuity in custom SDK loops. KUMA's whole-Case worker is the
 supported persistent evaluation path in this deployment. A native service caller
 can also preserve state through its own existing runtime protocol.
 
+## Bundled native entrypoints after the issue audit
+
+| Agent | Current Input | Native owner of state |
+| --- | --- | --- |
+| ReAct | Current user message | Native LangGraph checkpoint and message reducer |
+| TradingAgents | Explicit ticker/date JSON text | Public `propagate()` investment log and resolved-outcome reflections |
+| GPT Researcher | Initial research question, then report-chat messages | Original report API, ReportStore and ChatAgentWithMemory |
+
+The GPT binding follows the original frontend workflow: research once, save the
+actual question/report through its native API, then send only the current message
+to that report's chat endpoint. It holds an opaque report ID, not a history list.
+Each Case has its own original app instance and native store. This changes the
+evaluated application from repeated research tasks to native report chat; it does
+not add a BBA memory implementation. The original first research question is
+stored separately and is not automatically included in subsequent chat history.
+Native report RAG and any limitations on compression remain Agent behavior.
+
+Trading's investment memory is not chat recall: its own five-trading-day outcome
+window and historical-date filter determine when a prior decision becomes an
+eligible lesson. See [the repair and acceptance record](Native-Entrypoint-Repair-2026-09-14.md).
+
 ## Validation stages
 
 - Stage 1 (`3693edf`): remove BBA history augmentation and migrate bundled Agent

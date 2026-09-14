@@ -1,9 +1,14 @@
 """Run the original GPT Researcher with native keyless search/local embeddings."""
 import asyncio
+import importlib.util
 import json
+import os
+import sys
 import time
 from threading import Lock
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from uuid import uuid4
 
 
 class PubMedRequestGate:
@@ -28,6 +33,7 @@ class PubMedRequestGate:
 
 
 _PUBMED_REQUESTS = PubMedRequestGate()
+_APP_IMPORT_LOCK = Lock()
 
 
 def search_pubmed_ids(retriever, max_results):
@@ -167,21 +173,132 @@ class ResearchGraph:
         pass
 
 
+class NativeReportAPI:
+    """Transport to one unchanged native app with a private native ReportStore.
+
+    The original app owns persistence and chat history. Its supported
+    REPORT_STORE_PATH environment setting is read only during app construction;
+    the temporary override is restored before any asynchronous work starts.
+    """
+    def __init__(self):
+        self.directory = TemporaryDirectory(prefix='gpt-native-report-')
+        self.module_name = '_gpt_report_' + uuid4().hex
+        self.module = None
+        source = Path(__file__).resolve().parents[1] / 'agent/backend/server/app.py'
+        try:
+            spec = importlib.util.spec_from_file_location(self.module_name, source)
+            module = importlib.util.module_from_spec(spec)
+            # FastAPI/Pydantic resolve route annotations through sys.modules.
+            sys.modules[self.module_name] = module
+            with _APP_IMPORT_LOCK:
+                previous = os.environ.get('REPORT_STORE_PATH')
+                os.environ['REPORT_STORE_PATH'] = str(Path(self.directory.name) / 'reports.json')
+                try:
+                    spec.loader.exec_module(module)
+                finally:
+                    if previous is None:
+                        os.environ.pop('REPORT_STORE_PATH', None)
+                    else:
+                        os.environ['REPORT_STORE_PATH'] = previous
+            self.module = module
+        except BaseException:
+            self.close()
+            raise
+
+    async def post(self, path, payload):
+        """Send one native API request; preserve native errors as failures."""
+        import httpx
+        if self.module is None:
+            raise RuntimeError('Native report API is closed')
+        # In-process ASGI transport opens no listening socket or remote endpoint.
+        # These routes initialize at import; the web-server lifespan only mounts
+        # output/static directories, which research/report chat does not require.
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=self.module.app),
+                                     base_url='http://native-report', trust_env=False) as client:
+            response = await client.post(path, json=payload)
+            response.raise_for_status()
+            data = response.json()
+        if not isinstance(data, dict) or data.get('success') is not True:
+            raise RuntimeError('Native report API did not complete the request')
+        return data
+
+    def close(self):
+        self.module = None
+        sys.modules.pop(self.module_name, None)
+        self.directory.cleanup()
+
+
+class ResearchSession:
+    """Follow the native UI's research, save-report, report-chat workflow.
+
+    One instance belongs to one Case. It holds only a native app transport and
+    opaque report ID. Native ReportStore and ChatAgentWithMemory own the report,
+    chat history and report retrieval; this binding never reads or builds them.
+    """
+    def __init__(self):
+        from typing_extensions import TypedDict
+        from langgraph.graph import StateGraph, START, END
+
+        self._api = None
+        self._report_id = None
+        self._closed = False
+
+        class State(TypedDict, total=False):
+            query: str
+            answer: str
+            sources: list
+            metadata: dict | None
+            report_id: str
+
+        async def research(state, config):
+            return await self._run_current(query_from_input(state), config)
+
+        graph = StateGraph(State)
+        graph.add_node('research', research)
+        graph.add_edge(START, 'research')
+        graph.add_edge('research', END)
+        # The real node supplies native LangChain callback context through ASGI.
+        self._graph = graph.compile()
+
+    async def _run_current(self, query, config):
+        if self._closed:
+            raise RuntimeError('Research session is closed')
+        if self._api is None:
+            self._api = NativeReportAPI()
+        if self._report_id is None:
+            result = await ResearchGraph().ainvoke({'query': query}, config=config)
+            report_id = uuid4().hex
+            saved = await self._api.post('/api/reports',
+                {'id': report_id, 'question': query, 'answer': result['answer']})
+            if saved.get('id') != report_id:
+                raise RuntimeError('Native report API returned a different report ID')
+            self._report_id = report_id
+            return {**result, 'report_id': report_id}
+
+        data = await self._api.post(f'/api/reports/{self._report_id}/chat',
+                                    {'role': 'user', 'content': query})
+        response = data.get('response')
+        answer = response.get('content') if isinstance(response, dict) else None
+        if not isinstance(answer, str) or not answer.strip():
+            raise RuntimeError('Native report chat returned an empty response')
+        return {'answer': answer, 'metadata': response.get('metadata'),
+                'report_id': self._report_id}
+
+    def invoke(self, value, config=None):
+        return asyncio.run(self.ainvoke(value, config))
+
+    async def ainvoke(self, value, config=None):
+        """Deliver only the current question; native APIs handle session state."""
+        return await self._graph.ainvoke({'query': query_from_input(value)}, config=config)
+
+    def close(self):
+        self._closed = True
+        self._report_id = None
+        if self._api is not None:
+            self._api.close()
+            self._api = None
+
+
 def create_graph():
-    """Expose the native Python researcher through one explicit LangGraph node."""
-    from typing_extensions import TypedDict
-    from langgraph.graph import StateGraph, START, END
-
-    class State(TypedDict, total=False):
-        query: str
-        answer: str
-        sources: list
-
-    async def research(state, config):
-        return await ResearchGraph().ainvoke(state, config=config)
-
-    graph = StateGraph(State)
-    graph.add_node('research', research)
-    graph.add_edge(START, 'research')
-    graph.add_edge('research', END)
-    return graph.compile()
+    """Create one native research/report-chat session for the Case lifetime."""
+    return ResearchSession()

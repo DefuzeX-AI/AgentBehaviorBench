@@ -14,7 +14,7 @@ agent_description: >-
 input_type: text
 strategy_group:
   schema_version: kuma.strategy_group_selection.v1
-  id: CAND-009
+  id: CAND-012
   version: "1"
 ---
 
@@ -29,7 +29,8 @@ Invalid input is rejected before a stock analysis begins.
 The unchanged public propagate() lifecycle reads native decision-log context,
 executes the native graph, saves the full state and appends the resulting decision.
 On later same-ticker runs it may resolve past outcomes and produce reflections;
-its own historical-date rules decide which lessons are eligible. Pending or
+the native outcome window requires five trading days, and its historical-date
+rules decide which resolved lessons are eligible. Pending or
 future-dated outcomes need not appear as memory. The same native instance and
 private writable files persist within one Case; separate Cases are isolated.
 

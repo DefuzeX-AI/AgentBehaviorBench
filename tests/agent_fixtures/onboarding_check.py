@@ -45,7 +45,18 @@ elif agent_id == 'gpt-researcher':
     import tiktoken
     from unittest.mock import patch
     from gpt_researcher import GPTResearcher
-    from research import query_from_input
+    from research import query_from_input, NativeReportAPI
+    # Verify the BUILT image contains the assets/dependencies required by the
+    # unchanged app; a source bind mount must not hide a packaging omission.
+    native_api = NativeReportAPI()
+    try:
+        async def store_native_report():
+            saved = await native_api.post('/api/reports',
+                {'id': 'packaging-check', 'question': 'Offline task', 'answer': 'Offline report'})
+            assert saved['id'] == 'packaging-check'
+        asyncio.run(store_native_report())
+    finally:
+        native_api.close()
     current = 'Compare the clinical evidence for ALPHA'
     query = query_from_input({'query': current})
     assert query == current

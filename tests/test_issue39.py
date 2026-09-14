@@ -186,20 +186,35 @@ def test_research_query_preserves_current_text_and_rejects_synthetic_history():
         module.query_from_input({'query': '  '})
 
 
-def test_research_langgraph_boundary_delivers_current_query_and_returns_native_report(monkeypatch):
+def test_research_langgraph_boundary_researches_once_then_delivers_current_chat(monkeypatch):
     import asyncio
     module = binding('04-gpt-researcher', 'research.py')
-    delivered = []
+    delivered, requests = [], []
     async def research(self, value, config=None, **kwargs):
         delivered.append(value['query'])
         return {'answer': 'Native report', 'sources': ['https://arxiv.org/abs/example']}
     monkeypatch.setattr(module.ResearchGraph, 'ainvoke', research)
+    class ReportAPI:
+        async def post(self, path, payload):
+            requests.append((path, payload))
+            if path == '/api/reports':
+                return {'success': True, 'id': payload['id']}
+            return {'success': True, 'response': {'role': 'assistant', 'content': 'Native report follow-up'}}
+        def close(self):
+            pass
+    monkeypatch.setattr(module, 'NativeReportAPI', ReportAPI)
     graph = module.create_graph()
-    asyncio.run(graph.ainvoke({'query': 'Remember ONLY ALPHA'}))
-    output = asyncio.run(graph.ainvoke({'query': 'Continue'}))
-    assert delivered == ['Remember ONLY ALPHA', 'Continue']
-    assert output['answer'] == 'Native report'
-    assert output['sources'] == ['https://arxiv.org/abs/example']
+    try:
+        first = asyncio.run(graph.ainvoke({'query': 'Remember ONLY ALPHA'}))
+        output = asyncio.run(graph.ainvoke({'query': 'Continue'}))
+        assert delivered == ['Remember ONLY ALPHA']
+        assert first['answer'] == 'Native report'
+        assert first['sources'] == ['https://arxiv.org/abs/example']
+        assert output['answer'] == 'Native report follow-up'
+        assert requests[0][1]['answer'] == 'Native report'
+        assert requests[1][1] == {'role': 'user', 'content': 'Continue'}
+    finally:
+        graph.close()
 
 
 @pytest.mark.parametrize('visited,prefetched', [(True, False), (False, True), (True, True), (False, False)])

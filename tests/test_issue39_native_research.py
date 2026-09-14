@@ -124,7 +124,9 @@ def test_current_task_report_uses_public_custom_prompt_without_replaying_history
     monkeypatch.setitem(sys.modules, 'gpt_researcher', SimpleNamespace(GPTResearcher=Researcher))
     monkeypatch.setitem(sys.modules, 'gpt_researcher.retrievers.pubmed_central.pubmed_central',
                         SimpleNamespace(PubMedCentralSearch=type('Search', (), {})))
-    graph = binding.create_graph()
+    # The task helper still receives only its current question. The session
+    # binding separately routes later Inputs to the native report-chat API.
+    graph = binding.ResearchGraph()
     first = asyncio.run(graph.ainvoke({'query': 'Remember ONLY ALPHA'}))
     second = asyncio.run(graph.ainvoke({'query': 'What paper did we discuss?'}))
     assert len(tasks) == 2 and tasks[0] is not tasks[1]
@@ -136,10 +138,10 @@ def test_current_task_report_uses_public_custom_prompt_without_replaying_history
     assert second['sources'] == ['https://example.org/paper']
 
 
-def test_deployed_profile_and_configuration_do_not_claim_native_chat_or_minimum_as_cap():
+def test_deployed_profile_and_configuration_separate_report_limit_from_native_chat():
     config = json.loads((UNIT / 'bindings/research.json').read_text())
     profile = (UNIT / 'evaluation/profile.md').read_text()
     assert 'TOTAL_WORDS' not in config
-    assert 'does not expose the upstream report-chat API' in profile
-    assert 'previous-turn\nrecall is not a capability' in profile
+    assert 'native chat endpoint' in profile
+    assert 'Later responses use the original chat prompt' in profile
     assert 'not an output truncation or a guaranteed word-count limit' in profile

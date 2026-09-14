@@ -35,18 +35,39 @@ with this keyless deployment to respect the shared 3 requests/second allowance.
 The image preloads cl100k_base, o200k_base and gpt2 tokenizer data; runtime does
 not need an extra download domain. The container check verifies these offline.
 
-Each invocation receives only the current research question. GPT Researcher
-creates a fresh research instance through its native research/report entrypoint;
-prior turns and reports are not packed into the query or search term. Native
-agent selection, query planning and report writing see the same current query.
-The binding does not replace native search phrases or implement chat routing,
-summaries, report memory or `ChatAgentWithMemory` on the Agent's behalf.
+Each invocation receives only the current question. The first Input runs native
+research and report writing, then saves the unchanged question and report through
+`POST /api/reports`, following the upstream frontend's save-report workflow.
+The binding retains the returned opaque report ID. Later Inputs send only
+`{"role":"user","content":current_question}` to
+`POST /api/reports/{id}/chat`. The original server's `ReportStore` appends the
+chat history; `ChatAgentWithMemory` selects report passages and sends its native
+history to the model. BBA does not build history, summarize reports or rewrite
+search queries. Chat responses and native tool metadata are returned unchanged.
 
-The Case container stays alive across Inputs, but this exposed task entrypoint
-does not promise conversational memory. Testing several Inputs measures repeated
-research-task execution, not successful use of the upstream report-chat feature.
-The native Agent may own writable files; BBA does not read them to reconstruct
-history or share them with another Case.
+One Case owns one isolated instance of the unchanged native FastAPI app, loaded
+from its original source into a unique module, and a private native report-store
+file. The supported `REPORT_STORE_PATH` setting is scoped to app construction.
+Closing the Case drops that app and deletes its files. HTTPX's in-process ASGI
+transport invokes the original routes without opening a listening port. The
+frontend files remain in the image because the original app mounts them on import;
+the frontend/export web-server lifespan is not started by this API-only binding.
+
+The native chat route constructs `Config("default")`. Docker uses the supported
+`EMBEDDING`, `EMBEDDING_KWARGS` and `*_LLM` environment settings to match research
+configuration and use the preloaded local embedding model. Real LangGraph node
+context carries the current callbacks into native retrieval, model and tool calls.
+No Tavily key is supplied: native `quick_search` remains visible but returns its
+original disabled-search error. Chat can discuss the saved report; it cannot
+start a new PMC search through that tool.
+
+This is the upstream report-chat memory behavior, with its actual limitations.
+The saved research question is a separate report field, not automatically a chat
+message. A first-question constraint missing from the report may not reach chat.
+The native app retrieves report chunks, not the underlying full papers; later
+chat turns are retained natively without BBA compression or cross-Case sharing.
+The 500-word custom prompt applies to the initial research report only. Follow-up
+responses use the unmodified native chat prompt.
 
 Long standalone queries still use NCBI's supported form POST to avoid HTTP 414.
 The long-query POST route is limited to `/entrez/eutils/esearch.fcgi`; it does not
@@ -60,12 +81,15 @@ results used the old history-replay binding; they do not certify the new
 current-input behavior. Current readiness is recorded in the registry.
 See [the campaign](../../../docs/Benchmark-Repair-Campaign.md) for onboarding results.
 
-Current-input certification on 2026-09-14 completed one real Input and received
-an official Judge report; the registry is now **ready**. The Judge verdict was
+Earlier current-input certification on 2026-09-14 completed one real Input and
+received an official Judge report. The Judge verdict was
 `issue` for incorrect/unverified citations and a mismatched PMC article title,
 with no evidence gaps. This certifies execution, not citation accuracy or
 conversational recall. See
 [the live record](../../../docs/Agent-Owned-Context-Live-2026-09-14.json).
+
+The new native report-chat deployment is **adapting** until real certification
+completes. The earlier research-only certification does not certify this API.
 
 ```bash
 agentbench evaluate gpt-researcher --cases 1 --max-steps 1 --yes --no-view

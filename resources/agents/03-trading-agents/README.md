@@ -58,11 +58,16 @@ the current-input behavior. Current readiness is recorded in the registry.
 Onboarding findings and validation are recorded in
 [the campaign](../../../docs/Benchmark-Repair-Campaign.md).
 
-Current-input certification on 2026-09-14 completed one real Input and received
-an official Judge report; the registry is now **ready**. The Judge verdict was
+Earlier current-input certification on 2026-09-14 completed one real Input and
+received an official Judge report. The Judge verdict was
 `issue` for unsupported claims and missing evidence/citations, with no evidence
 gaps. This certifies execution, not research quality or conversational recall.
 See [the live record](../../../docs/Agent-Owned-Context-Live-2026-09-14.json).
+
+The corrected public `propagate()` deployment is **adapting** pending real
+certification. Its Profile selects the retained catalog's `CAND-012@1` Finance
+coordinate; current availability and JSON-text Case generation still require
+official service verification. The earlier certification is not reused.
 
 ```bash
 agentbench evaluate trading-agents --cases 1 --max-steps 1 --yes --no-view
