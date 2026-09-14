@@ -1,7 +1,33 @@
 """Run the original GPT Researcher with native keyless search/local embeddings."""
 import asyncio
 import json
+import time
+from threading import Lock
 from pathlib import Path
+
+
+class PubMedRequestGate:
+    """Serialize native NCBI requests in this Case process, including failures.
+
+    Each request finishes before the next 1.1-second cooldown starts. With at
+    most three active Case workers this stays within the keyless 3 requests/s
+    NCBI allowance. This gate does not retry or alter native responses.
+    """
+    def __init__(self, interval=1.1):
+        self.interval = interval
+        self.lock = Lock()
+        self.next_request = 0.0
+
+    def call(self, operation, *args, **kwargs):
+        with self.lock:
+            time.sleep(max(0.0, self.next_request - time.monotonic()))
+            try:
+                return operation(*args, **kwargs)
+            finally:
+                self.next_request = time.monotonic() + self.interval
+
+
+_PUBMED_REQUESTS = PubMedRequestGate()
 
 
 def query_from_messages(value):
@@ -52,24 +78,30 @@ class ResearchGraph:
             {answer: Markdown, sources: native source URLs}. Failures propagate.
         """
         from gpt_researcher import GPTResearcher
-        from gpt_researcher.retrievers.arxiv.arxiv import ArxivSearch
+        from gpt_researcher.retrievers.pubmed_central.pubmed_central import PubMedCentralSearch
         from langchain_core.tools import StructuredTool
 
         run_config = config or {}
 
-        class ObservedArxiv(ArxivSearch):
+        class ObservedPubMed(PubMedCentralSearch):
             """Observe the actual native call; preserve its parameters and result."""
+            def _search_articles(self, max_results):
+                return _PUBMED_REQUESTS.call(super()._search_articles, max_results)
+
+            def _fetch_full_text(self, article_id):
+                return _PUBMED_REQUESTS.call(super()._fetch_full_text, article_id)
+
             def search(self, max_results=5):
                 def search(query: str, max_results: int):
-                    return ArxivSearch.search(self, max_results=max_results)
-                call = StructuredTool.from_function(search, name='arxiv_search',
-                        description='Search arXiv using the native academic retriever.')
+                    return PubMedCentralSearch.search(self, max_results=max_results)
+                call = StructuredTool.from_function(search, name='pubmed_central_search',
+                        description='Search PubMed Central and retrieve native article full text.')
                 return call.invoke({'query': self.query, 'max_results': max_results}, config=run_config)
 
         researcher = GPTResearcher(query=query_from_messages(value), report_type='research_report',
                 config_path=str(Path(__file__).with_name('research.json')), verbose=False,
                 mcp_strategy='disabled')
-        researcher.retrievers = [ObservedArxiv]
+        researcher.retrievers = [ObservedPubMed]
         researcher.cfg.llm_kwargs = dict(researcher.cfg.llm_kwargs,
                                         callbacks=run_config.get('callbacks'))
         await researcher.conduct_research()

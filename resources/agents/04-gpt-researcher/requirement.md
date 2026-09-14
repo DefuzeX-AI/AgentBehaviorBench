@@ -1,7 +1,7 @@
 # GPT Researcher requirements
 
-Use the official research planning, arXiv retrieval, local embedding and report
-writing implementations. Accept a plain-language academic research question and
+Use the official research planning, PubMed Central retrieval, local embedding and report
+writing implementations. Accept a plain-language biomedical literature question and
 return a Markdown report with evidence from actual retrieved papers. Preserve
 the user's constraints and corrections across this Case's conversation. Do not
 invent citations or portray previous assistant reports as new observations.

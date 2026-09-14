@@ -1,5 +1,10 @@
 ---
-agent_description: A LangGraph ReAct agent that answers user requests through iterative model calls and a native Tavily search tool, returning a final assistant answer.
+agent_description: >-
+  LangGraph ReAct Agent Template. It has exactly ONE tool, search(query) -> web
+  search results, backed by Tavily. It alternates model reasoning and web search
+  until it can answer in text. It has no other tools, no local documents, no file
+  processing, no command execution and no ability to sign or publish anything.
+  Inputs are plain-text research questions and follow-ups within one conversation.
 input_type: text
 strategy_group:
   schema_version: kuma.strategy_group_selection.v1

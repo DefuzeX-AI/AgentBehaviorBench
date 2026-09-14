@@ -86,3 +86,15 @@ Issue #39：主机边界与当前镜像真实断网验收通过；后续新增�
 修后重跑保存的官方 Case：Agent succeeded、OTel complete、submission committed、evidence captured、Judge issue（无 evidence_gaps），宿主正常构建 BenchmarkResult。CLI 退出 1 是行为判定 issue 的正常表现，Case 无执行 error。真实累计 1 个完成 / 3 次执行尝试。验证路径及 SHA256 见 Issue20-Real-Acceptance-2026-09-14.json。全套主机 237 passed / 8 opt-in skipped；本次真实容器验收已单独实际执行。
 
 该旧 Case 要求媒体文件处理，与 ReAct 搜索能力不符。已核对原始 CaseGen POST：agent_description、behavior_spec 与 research 策略组按 profile 正确发送；当前只将它计为链路完成，不宣称该行为评分有效衡量搜索能力。后续检查新 Case 的适配性。arXiv 新的单次无模型查询 30 秒超时，暂未恢复其联网验收。
+
+## 09:38：并发、多轮和新增 Agent 的进一步结果
+
+- 四个一轮 Case 真实并发（最大同时在途 4）：3 个有效完成；1 个 Judge operation 终态 model_invalid_result / retryable=false，未自动重试。前三个报告和宿主结果独立保留。
+- 四个两轮 Case 真实并发：全部实际执行 2 个 Inputs，2 个有效完成、1 个 insufficient_evidence 不计验收成功、1 个 Judge model_invalid_result。跨 Case 首轮 history_messages=0；同 Case 第二轮包含此前用户/回答及原生工具历史。累计有效完成 6 / 12 次 Case 执行尝试。
+- TradingAgents 第一轮 certify 在 CaseGen 前失败：新增 profile 的 Known Limitations 缺完整官方标题。两个新 Agent 都受影响。test_issue39.py 使用真实 PyPI create_run 与本地 Provider 校验生产 profile，修前 2 失败，修后全部通过。没有调用付费 CaseGen。
+- 修正 profile 后 TradingAgents 收到的官方 Case 要求创建承包商管理员账户，没有 ticker/date JSON；真实 binding 拒绝，Judge insufficient_evidence 留存，仍 adapting。这是 Case 与 Agent 输入协议不符，不能用伪造 ticker/date 或改写官方 Case 隐藏。
+- 原生 arXiv 检索在 HTTP / HTTPS 仍不稳定，换用上游已有 PubMed Central 检索器，真实取回 102288 字符文章全文。配置明确限定医学文献研究，源代码未修改。
+- GPT Researcher 的实际 observe 揭示首次 tokenizer 下载被 egress 拦截，且同时子查询导致 NCBI 429。预装三种 tiktoken 数据；原镜像断网回归失败，新镜像断网通过（含真实 embedding）。为原生 NCBI 请求添加按 Case 共享的锁和 1.1 秒冷却，混合测试使用最多 3 workers，仍需真实重验。原始拒绝结果和工具 429 均保留。
+- 全套主机现为 243 passed / 8 opt-in skipped；新增 GPT 镜像验收单独实际通过，包含 native PMC、384 维 CPU embeddings 与三个离线 tokenizer。
+
+上游依据：KUMA [#15](https://github.com/DefuzeX-AI/KUMA-DefuzeX/issues/15)、[#63](https://github.com/DefuzeX-AI/KUMA-DefuzeX/issues/63) 报告 Case 与行为/工具能力不符；#63 给出在 agent_description 明确写实际工具的缓解方法，现已用于三个 profile，实际效果仍需测试。上游 [#68](https://github.com/DefuzeX-AI/KUMA-DefuzeX/issues/68) 记录 CaseGen 的 model_invalid_result；本次观察在 Judge 阶段，不能断言是相同内部原因。公共 API 返回无更具体 reason。PyPI 最新仍为 0.2.4。

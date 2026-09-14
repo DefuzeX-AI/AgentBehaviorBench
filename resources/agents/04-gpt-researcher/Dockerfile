@@ -7,6 +7,9 @@ RUN python -m pip install --no-cache-dir ./agent 'opentelemetry-sdk>=1.30,<2' 'l
     && useradd --create-home --uid 10001 agent
 RUN python -c "from huggingface_hub import snapshot_download; snapshot_download('sentence-transformers/all-MiniLM-L6-v2', revision='1110a243fdf4706b3f48f1d95db1a4f5529b4d41', local_dir='/opt/models/all-MiniLM-L6-v2', ignore_patterns=['onnx/*','openvino/*','*.h5','*.ot','*.bin'])"
 ENV HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
+ENV TIKTOKEN_CACHE_DIR=/opt/models/tiktoken
+RUN python -c "import tiktoken; [tiktoken.get_encoding(name) for name in ('cl100k_base', 'o200k_base', 'gpt2')]" \
+    && chmod -R a+rX /opt/models/tiktoken
 COPY .abb-runtime/ /opt/abb-runtime/
 COPY bindings/ ./bindings/
 COPY agent.toml ./agent.toml

@@ -43,6 +43,27 @@ def test_new_agents_load_with_explicit_routes_and_case_conversation(unit):
     assert 'ONLY ALPHA' not in json.dumps(second.prepare('Start another Case'))
 
 
+@pytest.mark.parametrize('unit', ['02-react-agent', '03-trading-agents', '04-gpt-researcher'])
+def test_registered_profile_passes_real_pypi_create_run_before_paid_generation(tmp_path, unit):
+    """Validate actual profile prose via the public SDK with a local Case Provider."""
+    from kuma import create_run
+    seen = []
+    def case_provider(context):
+        seen.append(context)
+        return {'case_id': 'profile-acceptance', 'input_type': 'text',
+                'inputs': [{'input_id': 'step-1', 'payload_type': 'text', 'payload': 'Local contract check'}]}
+    repo = tmp_path/'repo'
+    repo.mkdir()
+    run = create_run(repo_path=repo, agent_profile_path=ROOT/'resources/agents'/unit/'evaluation/profile.md',
+                     case_provider=case_provider, judge=False, allow_local=True,
+                     track_files=False, max_steps=1)
+    try:
+        assert run.case_id == 'profile-acceptance'
+        assert seen[0].agent_profile_sections['prohibited_behaviors'].strip()
+    finally:
+        run.cancel()
+
+
 def test_trading_native_graph_receives_history_callbacks_and_explicit_date(monkeypatch):
     module = binding('03-trading-agents', 'trading.py')
     seen = []
@@ -111,6 +132,66 @@ def test_research_langgraph_boundary_delivers_history_and_returns_native_report(
     assert delivered == [history]
     assert output['answer'] == 'Native report'
     assert output['sources'] == ['https://arxiv.org/abs/example']
+
+
+@pytest.mark.parametrize('has_sources', [True, False])
+def test_research_observes_native_full_text_and_preserves_sources_for_judge(monkeypatch, has_sources):
+    import asyncio
+    import sys
+    module = binding('04-gpt-researcher', 'research.py')
+    source = 'https://www.ncbi.nlm.nih.gov/pmc/articles/PMC123/'
+    native_result = [{'href': source, 'raw_content': 'Observed article full text'}]
+    seen = []
+
+    class NativeSearch:
+        requires_scraping = False
+        def __init__(self, query):
+            self.query = query
+        def search(self, max_results=5):
+            seen.append((self.query, max_results))
+            return native_result
+
+    class NativeResearcher:
+        def __init__(self, **kwargs):
+            self.query = kwargs['query']
+            self.cfg = SimpleNamespace(llm_kwargs={})
+        async def conduct_research(self):
+            retriever = self.retrievers[0](self.query)
+            assert retriever.requires_scraping is False
+            assert retriever.search(max_results=1) is native_result
+        async def write_report(self):
+            return 'Original native report'
+        def get_source_urls(self):
+            return [source] if has_sources else []
+
+    monkeypatch.setitem(sys.modules, 'gpt_researcher', SimpleNamespace(GPTResearcher=NativeResearcher))
+    monkeypatch.setitem(sys.modules, 'gpt_researcher.retrievers.pubmed_central.pubmed_central',
+                        SimpleNamespace(PubMedCentralSearch=NativeSearch))
+    invocation = module.ResearchGraph().ainvoke({'query': 'Biomedical evidence'}, {'callbacks': []})
+    assert asyncio.run(invocation) == {'answer': 'Original native report',
+                                      'sources': [source] if has_sources else []}
+    assert seen == [('Biomedical evidence', 1)]
+
+
+def test_pubmed_parallel_requests_share_cooldown_even_after_failure():
+    from concurrent.futures import ThreadPoolExecutor
+    import time
+    module = binding('04-gpt-researcher', 'research.py')
+    gate = module.PubMedRequestGate(interval=0.03)
+    starts = []
+    def request(number):
+        starts.append(time.monotonic())
+        if number == 1:
+            raise RuntimeError('Native request failed')
+        return number
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        futures = [executor.submit(gate.call, request, number) for number in range(3)]
+        assert futures[0].result() == 0
+        with pytest.raises(RuntimeError, match='Native request failed'):
+            futures[1].result()
+        assert futures[2].result() == 2
+    assert len(starts) == 3
+    assert all(b - a >= 0.03 for a, b in zip(starts, starts[1:]))
 
 
 def test_unready_downloaded_agents_do_not_enter_default_run():

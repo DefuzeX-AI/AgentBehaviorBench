@@ -31,16 +31,22 @@ if agent_id == 'trading-agents':
         details = {'native_graph_nodes': list(native.graph.nodes)}
 elif agent_id == 'gpt-researcher':
     import torch
+    import tiktoken
     from gpt_researcher import GPTResearcher
     native = GPTResearcher('Academic research', config_path='/opt/agent/bindings/research.json',
                            verbose=False, mcp_strategy='disabled')
-    assert native.cfg.retrievers == ['arxiv']
+    assert native.cfg.retrievers == ['pubmed_central']
     assert native.cfg.embedding_provider == 'huggingface'
     vectors = native.memory.get_embeddings().embed_documents(['red apples', 'quantum mechanics'])
     assert len(vectors) == 2 and len(vectors[0]) == 384
     assert vectors[0] != vectors[1]
     assert torch.version.cuda is None
-    details = {'native_retrievers': native.cfg.retrievers, 'embedding_dimensions':384, 'torch':torch.__version__}
+    encodings = ['cl100k_base', 'o200k_base', 'gpt2']
+    for name in encodings:
+        encoding = tiktoken.get_encoding(name)
+        assert encoding.decode(encoding.encode('Biomedical evidence')) == 'Biomedical evidence'
+    details = {'native_retrievers': native.cfg.retrievers, 'embedding_dimensions':384,
+               'torch':torch.__version__, 'offline_tokenizers':encodings}
 else:
     raise ValueError(agent_id)
 adapter.close()

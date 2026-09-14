@@ -32,7 +32,7 @@ output_key = "answer"
 binding = "research.py:create_graph"
 
 [observe]
-input_fields = [{ name = "query", label = "Academic research question", required = true }]
+input_fields = [{ name = "query", label = "Biomedical literature research question", required = true }]
 
 [llm_interception]
 required = true
@@ -53,7 +53,7 @@ protocol_plugin = "openai-chat"
 credential = "openai"
 
 [[llm_interception.tool_routes]]
-host_patterns = ["export.arxiv.org", "arxiv.org", "www.arxiv.org"]
-ports = [80, 443]
+host_patterns = ["eutils.ncbi.nlm.nih.gov"]
+ports = [443]
 methods = ["GET", "HEAD"]
-path_patterns = ["/api/*", "/pdf/*", "/abs/*", "/html/*"]
+path_patterns = ["/entrez/eutils/esearch.fcgi", "/entrez/eutils/efetch.fcgi"]
