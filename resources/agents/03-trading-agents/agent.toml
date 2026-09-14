@@ -31,8 +31,7 @@ type = "langgraph"
 mode = "in_process"
 config = "abb-langgraph.json"
 graph_id = "agent"
-input_key = "request"
-output_key = "answer"
+# The native task takes explicit ticker/date JSON and returns its complete result.
 binding = "trading.py:create_graph"
 
 [adapter.context]
@@ -42,12 +41,8 @@ debate_rounds = 1
 risk_rounds = 1
 max_tokens = 2500
 
-[adapter.context.research_defaults]
-ticker = "AAPL"
-date = "2026-09-11"
-
 [observe]
-input_fields = [{ name = "ticker", label = "Ticker", required = true }, { name = "date", label = "Date YYYY-MM-DD", required = true }, { name = "request", label = "Research request", required = true }]
+input_fields = [{ name = "ticker", label = "Ticker", required = true }, { name = "date", label = "Date YYYY-MM-DD", required = true }]
 
 [llm_interception]
 required = true

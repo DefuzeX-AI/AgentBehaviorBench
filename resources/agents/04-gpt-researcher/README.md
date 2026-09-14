@@ -15,7 +15,11 @@ CPU-local `sentence-transformers/all-MiniLM-L6-v2` model, pinned to revision
 embedding API key. Kuma and the shared model provider still require credentials.
 
 This is an explicitly limited biomedical-literature configuration: PubMed Central full text,
-one article per query, one research iteration, target 500 words. The native
+one article per query and one research iteration. The supported
+`write_report(custom_prompt=...)` option requests at most 500 words including
+references (or a shorter user limit). Native `TOTAL_WORDS` means a minimum,
+so it is not used as a maximum. The returned report is never truncated; actual
+length and citation quality remain visible to the Judge. The native
 search operation is observed with its actual query/result. The binding uses NCBI's
 equivalent form POST for search URLs above 2000 encoded bytes, retaining the native
 parameters, article IDs, full-text fetching and parsing. Report writing remains

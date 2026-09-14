@@ -35,8 +35,9 @@ if agent_id == 'trading-agents':
         native = TradingAgentsGraph(selected_analysts=['market'], config=cfg)
         assert native.graph is not None
         assert native.quick_thinking_llm.use_responses_api is not True, 'Manifest routes require Chat Completions'
-        state = native.propagator.create_initial_state('AAPL', '2026-09-11', past_context='Current market question')
-        assert state['past_context'] == 'Current market question'
+        assert callable(native.propagate)
+        state = native.propagator.create_initial_state('AAPL', '2026-09-11')
+        assert not state.get('past_context')
         details = {'native_graph_nodes': list(native.graph.nodes)}
 elif agent_id == 'gpt-researcher':
     import asyncio

@@ -6,6 +6,10 @@
 2. Inspect its real entry point, native input/output, state, model calls, tools and
    dependencies. Use `02-react-agent` as a structural example. Keep upstream logic
    intact; place ABB translation in the unit's binding, not in Kuma.
+   Invoke the public application API, including its lifecycle, rather than
+   reconstructing its internal graph state. A field such as `past_context` may
+   mean resolved investment outcomes, not a current user question. Reject inputs
+   the chosen API cannot represent; never silently discard their constraints.
 3. Add `requirement.md`, a reproducible Dockerfile, `agent.toml` runtime/launch/adapter settings and
    native input fields. BBA delivers only the current Input and keeps the Case's
    Agent session alive. Use the Agent's native context/storage configuration;
@@ -22,6 +26,12 @@
    The input contract is `{"encoding":"identity"}`. An Agent may manage its own
    SQLite database or files in the container's private writable `/tmp`; BBA does
    not manage their contents. Use a new storage namespace for each Case attempt.
+   Preserve the native public output contract: KUMA accepts JSON objects as well
+   as text. Label reports, final decisions and other returned fields accurately.
+   `raw_output` stays local; only the selected `output` reaches KUMA. Do not
+   replace a full native result with a rating or upload all debug traces to
+   compensate for an output mapping error. Verify the meaning of native settings
+   such as minimum report length before describing them as maximums in a Profile.
 6. Register the unit in `resources/registry.toml` with `enabled = true`,
    `status = "adapting"`, a unique ID and a small initial `case` count.
 7. Check native execution using `observe`, then run `evaluate ID --cases 1

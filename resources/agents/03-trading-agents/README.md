@@ -6,8 +6,9 @@ Matches Wangyi's recorded source revision. Apache-2.0 license retained in `agent
 Upstream code is unchanged; the added `agent/abb-langgraph.json` is ABB loader
 metadata. Translation and deployment settings live outside `agent/`.
 
-`bindings/trading.py` maps configured ticker/date and only the current Case Input
-to the native graph. It invokes the compiled graph with process-local callbacks,
+`bindings/trading.py` accepts explicit ticker/date and calls the unchanged public
+`TradingAgentsGraph.propagate()` lifecycle. A LangChain child-config context
+forwards process-local callbacks to native graph, tool and reflection calls,
 so actual model and tool activity reaches ABB/Kuma. There are no fake responses.
 The market analyst, bull/bear researchers, trader and risk workflow remain native.
 The selected market-only configuration uses yfinance; it does not need FRED or
@@ -25,25 +26,28 @@ intercepted deployment. Native curl impersonation returned Yahoo 429 through the
 proxy; the native requests backend returned real bars through that same proxy.
 No market responses, upstream source code or interception policy are replaced.
 
-Use `smoke-input.json` for native observe. The deployment declares AAPL and
-2026-09-11 in `[adapter.context.research_defaults]`, also disclosed in the Agent
-Profile. This follows the upstream main.py pattern of configured program
-arguments; plain-text Inputs supply the research question. Explicit user JSON
-can override ticker/date; invalid explicit fields are rejected. Effective values
-are retained as `raw_output.research_request`. Explicit ticker/date overrides
-apply to the current Input only; a later plain-text Input uses the deployment
-defaults. BBA does not recover fields from older turns or insert prior answers.
+Use `smoke-input.json` for native observe. The native task accepts an explicit
+object such as `{"ticker":"AAPL","date":"2026-09-11"}`. Official Kuma currently
+generates text Inputs, so the Profile requires that text to be a JSON-encoded
+ticker/date object. Both fields are required on every turn. There is no implicit
+stock/date default, freeform request field, chat-message envelope or automatic
+field recovery. Unsupported fields/questions fail validation before native work.
 
 One native graph instance and its private writable cache/report/memory directory
 remain available throughout the Case, and are released when the Case closes.
 The native agent owns any files it writes; BBA does not read them to construct
-conversation context. Different Cases use independent directories and instances.
+conversation context. Public `propagate()` now runs the original pending-outcome
+resolution, memory retrieval, state logging and decision storage. The original
+historical-date rules determine eligible lessons. Pending decisions and future
+outcomes are not forced into memory by BBA. Native decision memory is not an
+arbitrary chat transcript. Different Cases use independent directories and
+instances; no cross-Case memory or process-restart recovery is promised.
 
-The exposed compiled workflow is a stock-research task entrypoint. It starts a
-new graph state for each current request; it does not call the separate native
-`propagate()` investment-log lifecycle or promise conversational recall. In
-particular, persistent files and repeated Input delivery alone do not establish
-multi-turn memory. No bespoke chat, summarization or reflection logic is added.
+The complete public return is exposed as `{"final_state": ..., "decision": ...}`.
+`final_state` contains native analyst reports, debate/risk state and the final
+portfolio report; `decision` is the native rating signal. BBA neither relabels a
+market report as the final answer nor selects only a Hold/Buy/Sell summary.
+The native portfolio manager still produces its original investment decision.
 
 Historical status: **ready** after actual certification on 2026-09-14. Native execution,
 interception, SDK evidence and Judge were accepted. The Finance Case asked for

@@ -1,4 +1,4 @@
-"""Map the current research request to the official TradingAgents graph state."""
+"""Call TradingAgents' public task API; native code owns decisions and memory."""
 import json
 from copy import deepcopy
 from datetime import date
@@ -6,53 +6,37 @@ from tempfile import TemporaryDirectory
 from pathlib import Path
 
 
-def request_from_input(value, *, defaults=None):
-    """Resolve deployment parameters using only the current Input.
+def request_from_input(value):
+    """Validate the explicit arguments supported by the native stock task API.
 
     Args:
-        value: Current text or {ticker, date, request} request. JSON text may
-            provide the same fields. Plain text uses the deployment defaults.
-        defaults: Optional deployment ticker/date declared in adapter.context and
-            the Agent Profile. Without defaults, user JSON must supply both.
+        value: A {ticker, date} object or its JSON text representation. Both
+            fields are required on every Input; no prior values are inferred.
     Returns:
-        A (ticker, ISO date, current request text) tuple for native graph state.
+        A (ticker, ISO date) tuple for native propagate(company_name, trade_date).
     Raises:
-        ValueError: Missing/invalid ticker, date, request or a history envelope.
+        ValueError: Freeform questions, missing/extra fields, or invalid values.
+            Rejected input is not silently dropped or presented as past memory.
     """
     if isinstance(value, str):
         try:
-            decoded = json.loads(value)
-        except json.JSONDecodeError:
-            decoded = None
-        value = decoded if isinstance(decoded, dict) else {'request': value}
-    if not isinstance(value, dict) or 'messages' in value:
-        raise ValueError('Supply the current research request, not a messages history')
-    # The generic adapter wraps text in {request: text}. Decode explicit JSON
-    # from that field too; this is field mapping, never conversation recovery.
-    if set(value) == {'request'} and isinstance(value['request'], str):
-        try:
-            decoded = json.loads(value['request'])
-        except json.JSONDecodeError:
-            decoded = None
-        if isinstance(decoded, dict):
-            value = decoded
-    if 'messages' in value:
-        raise ValueError('Supply the current research request, not a messages history')
-    request = {key: value for key, value in (defaults or {}).items() if key in ('ticker', 'date')}
-    request.update({key: value[key] for key in ('ticker', 'date') if key in value})
-    ticker = request.get('ticker')
-    if not isinstance(ticker, str) or not ticker.strip() or len(ticker) > 32:
-        raise ValueError('Specify a ticker through deployment defaults or user JSON')
+            value = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise ValueError('TradingAgents requires a JSON object with ticker and date; freeform chat is unsupported') from exc
+    if not isinstance(value, dict) or set(value) != {'ticker', 'date'}:
+        raise ValueError('TradingAgents requires exactly ticker and date; request/messages and other extra fields are unsupported')
+    ticker = value['ticker']
+    if not isinstance(ticker, str) or not ticker or ticker.strip() != ticker or len(ticker) > 32:
+        raise ValueError('ticker must be a non-empty symbol without surrounding whitespace')
     if any(char in ticker for char in ('/', '\\', '\x00')) or '..' in ticker:
         raise ValueError('Ticker must be a symbol, not a path')
     try:
-        trade_date = date.fromisoformat(request.get('date', '')).isoformat()
+        trade_date = date.fromisoformat(value['date']).isoformat()
+        if trade_date != value['date']:
+            raise ValueError('Non-canonical date')
     except (TypeError, ValueError) as exc:
         raise ValueError('Specify an explicit date as YYYY-MM-DD') from exc
-    question = value.get('request', '')
-    if not isinstance(question, str):
-        raise ValueError('request must be text')
-    return ticker.strip(), trade_date, question
+    return ticker, trade_date
 
 
 class TradingGraph:
@@ -92,33 +76,31 @@ class TradingGraph:
         return self._native
 
     def invoke(self, value, config=None, *, context=None):
-        """Run the upstream market/debate/risk workflow and return its final answer.
+        """Run the public native lifecycle and preserve both public return values.
 
         Args:
-            value: Current text or native {ticker, date, request} object.
-            config: Process-local LangChain RunnableConfig, including callbacks.
+            value: Explicit {ticker, date} object or JSON-encoded text.
+            config: Process-local LangChain RunnableConfig, including callbacks
+                inherited by native graph, tool and reflection invocations.
             context: Deployment settings for model, debate rounds and token cap.
         Returns:
-            {answer: original final_trade_decision}; no order is executed.
+            {final_state: native complete state, decision: native rating signal}.
+            Intermediate reports retain their original names in final_state;
+            they are never relabeled as the final decision. No order is executed.
         """
         settings = dict(context or {})
-        ticker, trade_date, question = request_from_input(value,
-                                        defaults=settings.get('research_defaults'))
+        ticker, trade_date = request_from_input(value)
         graph = self._load_native(settings)
-        identity = graph.resolve_instrument_context(ticker, 'stock')
-        state = graph.propagator.create_initial_state(ticker, trade_date,
-                     past_context=question, instrument_context=identity)
-        state['messages'] = [{'role': 'user', 'content': question or ticker}]
+        from langchain_core.runnables.config import set_config_context
+
         run_config = dict(config or {})
-        run_config.setdefault('recursion_limit', 100)
-        # Drive the compiled native workflow with process-local callbacks. This
-        # task entrypoint does not implement native propagate()'s investment-log
-        # lifecycle or claim that old decisions become conversational memory.
-        final = graph.graph.invoke(state, config=run_config)
-        answer = final.get('final_trade_decision')
-        if not isinstance(answer, str) or not answer.strip():
-            raise RuntimeError('TradingAgents returned no final trade decision')
-        return {'answer': answer, 'research_request': {'ticker': ticker, 'date': trade_date}}
+        # propagate() owns pending-outcome reflection, native memory retrieval,
+        # graph execution, logging and checkpoint cleanup. LangChain's child
+        # config context observes that entire call without replacing its methods.
+        with set_config_context(run_config) as invocation_context:
+            final_state, decision = invocation_context.run(
+                graph.propagate, ticker, trade_date, asset_type='stock')
+        return {'final_state': final_state, 'decision': decision}
 
     def close(self):
         """Release this binding and its private native cache/report files."""

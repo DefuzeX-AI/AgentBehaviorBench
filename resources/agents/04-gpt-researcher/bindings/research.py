@@ -1,5 +1,6 @@
 """Run the original GPT Researcher with native keyless search/local embeddings."""
 import asyncio
+import json
 import time
 from threading import Lock
 from pathlib import Path
@@ -83,6 +84,28 @@ def query_from_input(value):
     return query
 
 
+def report_prompt(query):
+    """Build the deployment's instructions for the native report writer.
+
+    Args:
+        query: Original current research question; no previous turns or reports.
+    Returns:
+        A custom_prompt accepted by GPTResearcher.write_report(). The upstream
+        writer adds its research context. This replaces its default minimum-word
+        prompt; it requests a maximum without truncating the generated report.
+    """
+    return (
+        'Write a biomedical literature research answer in Markdown to the current '
+        'request below. Use at most 500 words in total, including references, and '
+        'respect a shorter limit if requested. There is no minimum word count.\n'
+        'Base factual claims on the supplied PubMed Central research context. '
+        'Use a clear structure and cite substantive claims, figures and quotes '
+        'with inline hyperlinks to sources in that context. Include a reference '
+        'list of the sources used.\n'
+        'Current request (JSON string):\n' + json.dumps(query, ensure_ascii=False)
+    )
+
+
 class ResearchGraph:
     def invoke(self, value, config=None, *, context=None):
         return asyncio.run(self.ainvoke(value, config, context=context))
@@ -127,7 +150,9 @@ class ResearchGraph:
         researcher.cfg.llm_kwargs = dict(researcher.cfg.llm_kwargs,
                                         callbacks=run_config.get('callbacks'))
         await researcher.conduct_research()
-        report = await researcher.write_report()
+        # Public upstream customization API; TOTAL_WORDS in the default prompt
+        # is a minimum, so it cannot implement this deployment's maximum.
+        report = await researcher.write_report(custom_prompt=report_prompt(query))
         if not isinstance(report, str) or not report.strip():
             raise RuntimeError('GPT Researcher returned an empty report')
         # get_source_urls() contains scraped pages only. Native full-text

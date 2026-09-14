@@ -120,73 +120,56 @@ def test_react_native_checkpoint_remembers_without_replaying_inputs_and_isolates
         sys.modules.update(original_modules)
 
 
-def test_trading_native_graph_receives_only_current_input_and_keeps_its_files(monkeypatch):
+def test_trading_public_entrypoint_receives_explicit_parameters_and_keeps_native_files(monkeypatch):
+    from langchain_core.runnables.config import ensure_config
     module = binding('03-trading-agents', 'trading.py')
     seen = []
     class Graph:
         def __init__(self, **kwargs):
             seen.append(kwargs)
-            self.propagator = SimpleNamespace(create_initial_state=lambda *args, **kw: kw)
-            self.graph = self
             self.cache = Path(kwargs['config']['data_cache_dir'])
             self.cache.mkdir()
-        def resolve_instrument_context(self, ticker, asset):
-            return ticker + ':' + asset
-        def invoke(self, state, config):
-            seen.append((state, config))
+        def propagate(self, ticker, trade_date, *, asset_type):
+            seen.append((ticker, trade_date, asset_type, ensure_config()))
             (self.cache/'native-agent-state').write_text('Created by the native agent')
-            return {'final_trade_decision': 'Native result for this invocation'}
+            return {'market_report': 'Native detailed report', 'final_trade_decision': 'Hold'}, 'Hold'
     monkeypatch.setitem(__import__('sys').modules, 'tradingagents.default_config',
                         SimpleNamespace(DEFAULT_CONFIG={'data_vendors': {}}))
     monkeypatch.setitem(__import__('sys').modules, 'tradingagents.graph.trading_graph',
                         SimpleNamespace(TradingAgentsGraph=Graph))
     callbacks = [object()]
-    current = {'ticker': 'MSFT', 'date': '2026-09-10', 'request': 'Require ONLY ALPHA evidence'}
     session = module.TradingGraph()
     try:
-        assert session.invoke(current, {'callbacks': callbacks})['answer'].startswith('Native result')
-        state, config = seen[1]
-        assert state['messages'] == [{'role': 'user', 'content': current['request']}]
-        assert state['past_context'] == current['request']
-        assert config['callbacks'] is callbacks
+        output = session.invoke({'ticker': 'MSFT', 'date': '2026-09-10'}, {'callbacks': callbacks})
+        assert output == {'final_state': {'market_report': 'Native detailed report',
+                                         'final_trade_decision': 'Hold'}, 'decision': 'Hold'}
+        assert seen[1][:3] == ('MSFT', '2026-09-10', 'stock')
+        assert seen[1][3]['callbacks'] == callbacks
         assert seen[0]['selected_analysts'] == ['market']
         cache = Path(seen[0]['config']['data_cache_dir'])
         assert (cache/'native-agent-state').read_text() == 'Created by the native agent'
-        second = session.invoke('Discuss uncertainty', context={
-            'research_defaults': {'ticker': 'AAPL', 'date': '2026-09-11'}})
-        assert len(seen) == 3  # Native instance constructed once for both inputs.
-        assert seen[2][0]['past_context'] == 'Discuss uncertainty'
-        assert seen[2][0]['messages'] == [{'role': 'user', 'content': 'Discuss uncertainty'}]
-        assert second['research_request'] == {'ticker': 'AAPL', 'date': '2026-09-11'}
+        session.invoke('{"ticker":"AAPL","date":"2026-09-11"}')
+        assert len(seen) == 3  # One native instance, two public task calls.
+        assert seen[2][:3] == ('AAPL', '2026-09-11', 'stock')
         assert (cache/'native-agent-state').is_file()
     finally:
         session.close()
     assert not cache.parent.exists()
 
 
-def test_trading_requires_current_parameters_and_rejects_history_envelopes():
+def test_trading_requires_current_native_parameters_without_implicit_defaults():
     module = binding('03-trading-agents', 'trading.py')
-    current = {'ticker': 'AAPL', 'date': '2026-09-11', 'request': 'Current question'}
-    assert module.request_from_input(current) == ('AAPL', '2026-09-11', 'Current question')
+    current = {'ticker': 'AAPL', 'date': '2026-09-11'}
+    assert module.request_from_input(current) == ('AAPL', '2026-09-11')
+    assert module.request_from_input(json.dumps(current)) == ('AAPL', '2026-09-11')
     with pytest.raises(ValueError, match='ticker'):
         module.request_from_input('Continue')
     with pytest.raises(ValueError, match='path'):
         module.request_from_input({'ticker': '../bad', 'date': '2026-09-11'})
-    with pytest.raises(ValueError, match='history'):
-        module.request_from_input({'messages': [{'role': 'user', 'content': 'Old input'}]})
-
-
-def test_trading_explicit_deployment_defaults_are_not_cross_case_memory():
-    module = binding('03-trading-agents', 'trading.py')
-    defaults = {'ticker': 'AAPL', 'date': '2026-09-11'}
-    first = '{"ticker":"MSFT","date":"2026-09-10","request":"Current question"}'
-    assert module.request_from_input(first, defaults=defaults) == ('MSFT', '2026-09-10', 'Current question')
-    assert module.request_from_input({'request': first}, defaults=defaults) == ('MSFT', '2026-09-10', 'Current question')
-    assert module.request_from_input('Assess the configured stock', defaults=defaults) == (
-        'AAPL', '2026-09-11', 'Assess the configured stock')
-    assert defaults == {'ticker': 'AAPL', 'date': '2026-09-11'}
-    with pytest.raises(ValueError, match='ticker'):
-        module.request_from_input('{"ticker":null}', defaults=defaults)
+    for unsupported in ({'messages': []}, {**current, 'request': 'Old research question'},
+                        {'date': '2026-09-11'}, {'ticker': 'MSFT'}):
+        with pytest.raises(ValueError, match='exactly ticker and date'):
+            module.request_from_input(unsupported)
 
 
 def test_research_query_preserves_current_text_and_rejects_synthetic_history():
@@ -244,7 +227,8 @@ def test_research_observes_native_full_text_and_preserves_sources_for_judge(monk
             retriever = self.retrievers[0](self.query)
             assert retriever.requires_scraping is False
             assert retriever.search(max_results=1) is native_result
-        async def write_report(self):
+        async def write_report(self, *, custom_prompt):
+            assert self.query in custom_prompt
             return 'Original native report'
         def get_source_urls(self):
             return [source] if visited else []
@@ -332,8 +316,9 @@ def test_native_pubmed_transport_preserves_current_query_and_native_parser(monke
             assert self.query == expected_query
             self.sources = self.retrievers[0](self.query).search(max_results=1)
             self.sources += self.retrievers[0]('Model-planned clinical search').search(max_results=1)
-        async def write_report(self):
+        async def write_report(self, *, custom_prompt):
             assert self.query == expected_query
+            assert expected_query in custom_prompt
             return 'Native report fixture'
         def get_source_urls(self):
             return []
