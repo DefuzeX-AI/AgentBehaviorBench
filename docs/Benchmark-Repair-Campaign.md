@@ -14,7 +14,7 @@
 
 ## 状态
 
-当前：三个 Agent 均已真实 certify 为 ready。累计有效完成 52 / 75 次 Case 执行尝试，连续合格混合 suite 为 0。修复后 GPT 的两个保存 Case 已完整执行三轮，历史实际进入模型且 PMC 请求全部 HTTP 200；现继续三 Agent 五轮矩阵。以下保留历史，最新计数以 Benchmark-Campaign-Ledger.json 为准。
+当前：三个 Agent 均已真实 certify 为 ready。累计有效完成 60 / 84 次 Case 执行尝试，连续合格混合 suite 为 0。修复后 GPT 的两个保存 Case 已完整执行三轮，历史实际进入模型且 PMC 请求全部 HTTP 200；三 Agent 五轮矩阵已完成但有一个远端 Judge 终态错误，下一批需先审查后再开始。以下保留历史，最新计数以 Benchmark-Campaign-Ledger.json 为准。
 
 里程碑：`ac1b659` 保存此前并发重构和审查基线。首批修复包含控制流 span 关闭、host callback 边界、关闭 stdin、Docker 二次清理超时，以及按已记录终态验收 trace；策略、认证、转换、采集故障仍拒绝。
 
@@ -177,3 +177,10 @@ Issue #39：主机边界与当前镜像真实断网验收通过；后续新增�
 - suite_37fa5957e4fc421fa2d57ffe7171189f 复用两个官方 Case，0 CaseGen / 18 模型 POST / 2 Judge。六个 Inputs 全部完成，两份原始 Judge issue 无 evidence_gaps，宿主均接受。
 - 每轮完整上下文实际进入原生模型选择、规划和写作请求，逐字历史与首轮隔离通过；实际检索词没有完整对话原文，全部 NCBI 响应 HTTP 200。
 - Judge 指出第三轮编造检索数量、引入未检索的博客证据等真实 Agent 行为问题，保留原判，不把输入传递正确等同于记忆/抗注入行为通过。详见 Post-PMC-Saved-Pair-Three-Turn-2026-09-14.json。
+
+## 三 Agent 五轮矩阵
+
+- `suite_a8d700371e53446196445e0d3646c023` 选择 ReAct、TradingAgents、GPT Researcher，各 3 个 Case，配置 3 个 worker；9 个 Case 共实际执行 43 次 Input，最大并发 3 个 Case、3 种 Agent，CaseGen 9 次、模型 212 次、Judge 9 次。
+- 8 个 Case 的 execution / OTel / submission / evidence / Judge / host 链路完整，Judge 返回 `pass` 或 `issue`；GPT Researcher 的一个 Case 在 5 次 Input 后收到远端 `model_invalid_result`，没有 Judge report，原始 5 轮 artifact 仍完整保存。该错误是官方服务终态，未自动重发付费请求，因此本 suite 不合格，连续合格次数保持 0。
+- 43 次输入的历史顺序审计通过；所有 Case 的实际 Input 目录和中途结果保留。记账脚本同时修正为按 LF 解析 JSON Lines，避免上游结果文本中的 U+2028/U+2029 被 Python `splitlines()` 误当成记录分隔符。
+- 累计有效完成由 52 增至 60，累计尝试由 75 增至 84；OpenRouter 已记录 883 个响应、3,477,718 个 token、报告成本 `$1.6288876`（KUMA CaseGen/Judge 费用未在本地暴露，需以服务账单为准）。详见 `post-pmc-stage2-3-agents-3-cases-5-steps.audit.json` 与 `post-pmc-stage2-3-agents-3-cases-5-steps.history.json`。
