@@ -7,6 +7,7 @@ import tempfile
 from types import SimpleNamespace
 from agentbench.runtime.docker.worker_build import _ignore
 from agentbench.sdk.common.whitelist import whitelist_toml
+from .manifest import extend_runtime_environment
 
 
 @contextmanager
@@ -58,7 +59,7 @@ def evaluation_agent(agent, *, control=None, deadline=None):
                                f'argv = ["python", "-m", "{__package__}.worker"]', source)
         if count != 1:
             raise ValueError('Expected one explicit launch.argv')
-        source = source.replace('[runtime]\n', '[runtime]\nenv_keys = ["KUMA_API_KEY", "DEFUZEX_API_KEY"]\n', 1)
+        source = extend_runtime_environment(source, ('KUMA_API_KEY', 'DEFUZEX_API_KEY'))
         source += whitelist_toml(Path(__file__).with_name('whitelist.json'))
         (root / 'agent.toml').write_text(source)
         dockerfile = root / 'Dockerfile'

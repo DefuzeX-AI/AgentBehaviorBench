@@ -377,6 +377,9 @@ def test_service_retains_identity_trace_and_diagnostics_on_cleanup_failure(
 def test_real_pypi_overlay_and_offline_case_judge(echo_agent):
     """Build the actual overlay, then run the real PyPI SDK without network."""
     base = os.environ['ABB_KUMA_PYPI_BASE_IMAGE']
+    manifest = echo_agent.path / 'agent.toml'
+    manifest.write_text(manifest.read_text().replace(
+        '[runtime]\n', '[runtime]\nenv_keys = ["ABB_ACCEPTANCE_NATIVE_SETTING"]\n'))
     # Use an existing image with Python and an unprivileged agent user. A fresh
     # runtime path prevents old code in that image from hiding migration errors.
     (echo_agent.path / 'Dockerfile').write_text(
@@ -389,9 +392,10 @@ def test_real_pypi_overlay_and_offline_case_judge(echo_agent):
     output.mkdir(parents=True)
     with evaluation_agent(echo_agent) as staged:
         config = AgentContainerConfig.from_agent_dir(
-            staged.path, secret_resolver=EnvironmentSecretResolver({}), environ={})
+            staged.path, secret_resolver=EnvironmentSecretResolver({}),
+            environ={'ABB_ACCEPTANCE_NATIVE_SETTING': 'preserved'})
         assert config.argv[-1] == 'agentbench.sdk.plugin.kuma.worker'
-        assert config.environment == {}
+        assert config.environment == {'ABB_ACCEPTANCE_NATIVE_SETTING': 'preserved'}
         (output / 'Dockerfile').write_text((staged.path / 'Dockerfile').read_text())
         requirements = (staged.path / '.abb-sdk/requirements.txt').read_text()
         (output / 'requirements.txt').write_text(requirements)
@@ -406,6 +410,7 @@ def test_real_pypi_overlay_and_offline_case_judge(echo_agent):
         'docker', 'run', '--rm', '--network', 'none', '--user', '10001:10001',
         *DockerPolicy().run_arguments(), '--env', 'PYTHONDONTWRITEBYTECODE=1',
         '--env', 'KUMA_API_KEY=', '--env', 'DEFUZEX_API_KEY=',
+        '--env', 'ABB_ACCEPTANCE_NATIVE_SETTING=' + config.environment['ABB_ACCEPTANCE_NATIVE_SETTING'],
         '--mount', f'type=bind,source={fixtures},target=/checks,readonly',
         '--mount', f'type=bind,source={output},target=/artifacts',
         '--entrypoint', 'python', image, '/checks/pypi_check.py',

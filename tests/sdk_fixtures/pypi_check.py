@@ -2,6 +2,7 @@
 
 import importlib.metadata
 import json
+import os
 from pathlib import Path
 
 import agentbench
@@ -14,6 +15,7 @@ from container_run import main
 
 
 assert callable(execute)
+assert os.environ['ABB_ACCEPTANCE_NATIVE_SETTING'] == 'preserved'
 selection = resolve_sdk('kuma')
 runner = selection.value.create_benchmark_runner(
     context=SDKRunnerContext(environ={}, model=None, trace_sink=None, trace_max_bytes=1024),
@@ -29,6 +31,7 @@ output = Path('/artifacts')
     'adapter': selection.reference.object_ref,
     'runtime': agentbench.__file__,
     'runner_contract': ['prepare_cases', 'run_case'],
+    'native_environment_setting': os.environ['ABB_ACCEPTANCE_NATIVE_SETTING'],
 }, indent=2))
 main()
 case = artifact_case(json.loads((output / 'case.json').read_text()))
