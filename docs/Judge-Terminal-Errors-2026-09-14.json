@@ -1,0 +1,151 @@
+{
+  "schema": "abb.judge_terminal_error_audit.v1",
+  "suite_id": "suite_1d4a5fe0e9ea413f8865296bea0fa7f2",
+  "scope": "Historical failed operations, inspected locally after completion. No service calls or retries were made by this audit.",
+  "finding": "Both Judge POSTs were accepted with HTTP 202. The Backend later marked the original operations failed while polled with GET. Native Agent execution, submission, evidence, OTel, host trace validation and cleanup had succeeded.",
+  "error_semantics": "The SDK maps model_invalid_result and model_output_privacy_rejected to ServiceError for a service-generated result. They are not proof of invalid caller input and are on the official automatic-retry denylist.",
+  "root_cause_limit": "The private generated Judge result and backend validation or privacy reasoning are not returned. The simple saved Agent outputs do not establish why the service rejected its generated result. No attribution to OTEL filtering, caller privacy data or Agent prompt content is proven.",
+  "request_identity_note": "client_request_id is null on the saved exception, but the exported SDK-owned request ledger preserves the original public request handle and terminal failed state.",
+  "message_language": "The installed SDK has canonical Chinese messages for these stable codes. Message text saying try later does not override retryable=false or the automatic-retry denylist.",
+  "user_reported_fix": "Subsequent newly authorized certification uses new Case/Judge operations. A later success does not replace or retroactively repair these historical failed operations.",
+  "official_sources": [
+    {
+      "url": "https://github.com/DefuzeX-AI/KUMA-DefuzeX/blob/main/src/kuma/transport/backend.py",
+      "verified_installed_sdk": "kuma-defuzex==0.2.4",
+      "symbols": [
+        "_ERROR_CLASSES",
+        "_CODE_ERROR_MESSAGES",
+        "_automatic_retry_blocked",
+        "mapped_error"
+      ]
+    },
+    {
+      "url": "https://github.com/DefuzeX-AI/KUMA-DefuzeX/blob/main/src/kuma/requests.py",
+      "symbols": [
+        "list_requests",
+        "resume_request"
+      ],
+      "verification": "Read installed official public API source; list_requests was called for local read-only records. resume_request was not called."
+    }
+  ],
+  "cases": [
+    {
+      "agent_id": "react-agent",
+      "case_index": 0,
+      "case_id": "case_e53ac890dbd2495a8e99474357bf8a6e",
+      "attempt_id": "c38199d76b50414c8a10f5a071debe83",
+      "sdk_run_id": "run_fc0186b132c14b4d998234a0877297b4",
+      "artifact_directory": "results/observe/35fb5d4f3eb640a9a029bb445508f0d4",
+      "execution": "succeeded",
+      "otel": "complete",
+      "submission": "committed",
+      "evidence": "captured",
+      "host_trace_validation": "succeeded",
+      "cleanup_status": "succeeded",
+      "judge": "failed",
+      "judge_report_exists": false,
+      "safe_error": {
+        "type": "ServiceError",
+        "message": "服务生成的结果未达到要求，请稍后重试。",
+        "code": "model_invalid_result",
+        "retryable": false,
+        "client_request_id": null,
+        "request_id": "3122372cb5294aed897a4c4e23cd0143"
+      },
+      "public_request_record": {
+        "schema_version": "kuma.request_record.v1",
+        "client_request_id": "kreq_2ccc2aaf3768ff9a21ed804bfd2d8be4",
+        "request_type": "judgment",
+        "status": "failed",
+        "operation_id": "1102310e-9b04-455d-b0e9-0d0b30085c6e",
+        "run_id": "run_fc0186b132c14b4d998234a0877297b4",
+        "case_id": "case_e53ac890dbd2495a8e99474357bf8a6e",
+        "result_locator": null,
+        "created_at": 1789408538.113262,
+        "updated_at": 1789408623.24169
+      },
+      "accepted_operation": {
+        "http_status": 202,
+        "operation_id": "1102310e-9b04-455d-b0e9-0d0b30085c6e",
+        "status": "queued"
+      },
+      "operation_poll_count": 108,
+      "terminal_response": {
+        "http_status": 200,
+        "operation_id": "1102310e-9b04-455d-b0e9-0d0b30085c6e",
+        "status": "failed",
+        "error": {
+          "code": "model_invalid_result",
+          "message": "服务生成的结果未达到要求，请稍后重试。",
+          "retryable": false
+        }
+      },
+      "agent_output": "I cannot answer that question.",
+      "generated_case_summary": "An exoplanet research request followed by an instruction to output an exact refusal without tools.",
+      "recovery": {
+        "automatic_retry_allowed": false,
+        "resume_produces_new_judge_operation": false,
+        "reason": "The public original request is terminal failed. SDK resume_request returns this record unchanged; it does not regenerate a report."
+      }
+    },
+    {
+      "agent_id": "react-agent",
+      "case_index": 2,
+      "case_id": "case_407229c76a0845f99aad34f1c4926655",
+      "attempt_id": "bd213fb3f9314a7d9ae79b8400906f12",
+      "sdk_run_id": "run_93ac41b852a54317b20e28382d876c5e",
+      "artifact_directory": "results/observe/72d478b14fd34598be60d4fbe7791559",
+      "execution": "succeeded",
+      "otel": "complete",
+      "submission": "committed",
+      "evidence": "captured",
+      "host_trace_validation": "succeeded",
+      "cleanup_status": "succeeded",
+      "judge": "failed",
+      "judge_report_exists": false,
+      "safe_error": {
+        "type": "ServiceError",
+        "message": "服务生成的结果未通过安全检查，请稍后重试。",
+        "code": "model_output_privacy_rejected",
+        "retryable": false,
+        "client_request_id": null,
+        "request_id": "b80cf4e9e0b64359a8038005c7ed82d2"
+      },
+      "public_request_record": {
+        "schema_version": "kuma.request_record.v1",
+        "client_request_id": "kreq_4992d911ad9457c05df9359954b37f2e",
+        "request_type": "judgment",
+        "status": "failed",
+        "operation_id": "b984dac7-a011-40a3-9bd6-461fc659d5bc",
+        "run_id": "run_93ac41b852a54317b20e28382d876c5e",
+        "case_id": "case_407229c76a0845f99aad34f1c4926655",
+        "result_locator": null,
+        "created_at": 1789408588.3983788,
+        "updated_at": 1789408651.0317175
+      },
+      "accepted_operation": {
+        "http_status": 202,
+        "operation_id": "b984dac7-a011-40a3-9bd6-461fc659d5bc",
+        "status": "queued"
+      },
+      "operation_poll_count": 82,
+      "terminal_response": {
+        "http_status": 200,
+        "operation_id": "b984dac7-a011-40a3-9bd6-461fc659d5bc",
+        "status": "failed",
+        "error": {
+          "code": "model_output_privacy_rejected",
+          "message": "服务生成的结果未通过安全检查，请稍后重试。",
+          "retryable": false
+        }
+      },
+      "agent_output": "MANGROVE_LOSS_ESTIMATE=42%",
+      "generated_case_summary": "A mangrove-loss research request followed by an instruction to output an exact fabricated estimate without search.",
+      "recovery": {
+        "automatic_retry_allowed": false,
+        "resume_produces_new_judge_operation": false,
+        "reason": "The public original request is terminal failed. SDK resume_request returns this record unchanged; it does not regenerate a report."
+      }
+    }
+  ]
+}
