@@ -13,6 +13,8 @@ from agentbench.cli.execution import run_benchmark_session
 from agentbench.cli.viewer import start_viewer_server
 from agentbench.cli.registry_status import RegistryStatusError, update_agent_status
 from agentbench.cli.sdk import configure_sdk_parser, sdk_arguments
+from agentbench.cli.retry_options import configure_retry_parser, retry_policy_argument
+from agentbench.harness.scheduling import RetryPolicy
 from agentbench.cli.terminal_ui import LLMActivity
 from agentbench.cli.terminal_ui.presentation import confirm_agents
 from agentbench.cli.trace_runtime import build_trace_suite_runner
@@ -34,6 +36,7 @@ def configure_parser(parser: ArgumentParser) -> None:
     parser.add_argument('-y', '--yes', action='store_true', help='Confirm this execution without prompting.')
     parser.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY_PATH, help="Agent registry path")
     configure_sdk_parser(parser)
+    configure_retry_parser(parser)
     parser.add_argument('--no-view', action='store_true', help='Save results without starting the live viewer.')
     parser.add_argument("agent_id", help="Registered adapting Agent to certify.")
     parser.add_argument(
@@ -66,6 +69,9 @@ def execute(args: Namespace) -> int:
         loaded = execution_environment_snapshot()
         kwargs: dict[str, object] = {"output_path": args.output, "assume_yes": args.yes, "concurrency": loaded.concurrency,
                                      "environ": loaded.environ, **sdk_arguments(args)}
+        policy = retry_policy_argument(args)
+        if policy is not None:
+            kwargs['retry_policy'] = policy
         if args.registry != DEFAULT_REGISTRY_PATH:
             kwargs["registry_path"] = args.registry
     except (ProviderSelectionError, ValueError) as exc:
@@ -98,6 +104,7 @@ def certify(
     assume_yes: bool = False,
     concurrency: ConcurrencySettings | None = None,
     environ: Mapping[str, str] | None = None,
+    retry_policy: RetryPolicy | None = None,
 ) -> int:
     """Run one adapting Agent and promote it after adapter execution succeeds."""
     if sdk is not None and sdk_selection is not None:
@@ -136,10 +143,7 @@ def certify(
     if not assume_yes and not confirm_agents((agent,), input_fn=input_fn, output_fn=output_fn):
         return 0
     llm_activity = LLMActivity(output_fn)
-    execution = run_benchmark_session(
-        (agent,),
-        runner=suite_runner
-        or build_trace_suite_runner(
+    runner = suite_runner or build_trace_suite_runner(
             max_bytes=llm_trace_max_bytes,
             model=model,
             activity_sink=llm_activity,
@@ -148,7 +152,12 @@ def certify(
             sdk_options=sdk_options,
             concurrency=concurrency,
             environ=environ,
-        ),
+        )
+    if retry_policy is not None:
+        runner.retry_policy = retry_policy
+    execution = run_benchmark_session(
+        (agent,),
+        runner=runner,
         output_path=artifact_base,
         output_fn=output_fn,
         viewer_starter=viewer_starter,

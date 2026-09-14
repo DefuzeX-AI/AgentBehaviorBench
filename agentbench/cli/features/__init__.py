@@ -8,6 +8,8 @@ from .observe import FEATURE as OBSERVE_FEATURE
 from .evaluate import FEATURE as EVALUATE_FEATURE
 from .clean import FEATURE as CLEAN_FEATURE
 from .sdk import FEATURE as SDK_FEATURE
+from .resume import FEATURE as RESUME_FEATURE, RETRY_FEATURE
+from .reuse import FEATURE as REUSE_FEATURE
 
 FEATURES: tuple[CommandFeature, ...] = (
     RUN_FEATURE,
@@ -17,6 +19,9 @@ FEATURES: tuple[CommandFeature, ...] = (
     EVALUATE_FEATURE,
     CLEAN_FEATURE,
     SDK_FEATURE,
+    RESUME_FEATURE,
+    RETRY_FEATURE,
+    REUSE_FEATURE,
 )
 
 __all__ = ["FEATURES", "CommandFeature"]

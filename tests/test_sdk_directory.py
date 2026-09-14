@@ -413,6 +413,8 @@ for reference in discover_sdks():
 def test_discovered_adapter_runs_real_agent_and_exports_case_output_judge(
     adapter_directory, tmp_path, monkeypatch
 ):
+    from agentbench.cli.sessions import fresh
+    monkeypatch.setattr(fresh, 'PROJECT_ROOT', tmp_path)
     from agentbench.cli.execution import run_benchmark_session
     from agentbench.cli.trace_runtime import build_trace_suite_runner
     from agentbench.harness import AgentRegistration

@@ -16,6 +16,7 @@ from agentbench.cli.terminal_ui.presentation import (
     print_agents,
 )
 from agentbench.cli.sdk import configure_sdk_parser, sdk_arguments
+from agentbench.cli.retry_options import configure_retry_parser, retry_policy_argument
 from agentbench.cli.terminal_ui import LLMActivity
 from agentbench.cli.trace_runtime import build_trace_suite_runner
 from agentbench.harness import ProviderSelectionError
@@ -30,6 +31,7 @@ DEFAULT_REGISTRY_PATH = (
 
 def configure_parser(parser: ArgumentParser) -> None:
     configure_sdk_parser(parser)
+    configure_retry_parser(parser)
     parser.add_argument('-y', '--yes', action='store_true', help='Confirm this execution without prompting.')
     parser.add_argument(
         "--env-file",
@@ -67,6 +69,9 @@ def execute(args: Namespace) -> int:
         loaded = execution_environment_snapshot()
         kwargs: dict[str, object] = {"output_path": args.output, "assume_yes": args.yes, "concurrency": loaded.concurrency,
                                      "environ": loaded.environ, **sdk_arguments(args)}
+        policy = retry_policy_argument(args)
+        if policy is not None:
+            kwargs['retry_policy'] = policy
     except (ProviderSelectionError, ValueError) as exc:
         print(f"SDK configuration error: {exc}")
         return 2
@@ -149,6 +154,8 @@ def run(configuration: RunConfiguration | None = None) -> int:
         concurrency=config.concurrency,
         environ=config.environ,
     )
+    if config.retry_policy is not None:
+        suite_runner.retry_policy = config.retry_policy
 
     execution = run_benchmark_session(
         agents,

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from argparse import ArgumentParser, ArgumentTypeError, Namespace
+import os
+from pathlib import Path
 
 from agentbench.cli.viewer import DEFAULT_HOST, DEFAULT_PORT, serve_result_log, ViewerUnavailable
 
@@ -24,7 +26,15 @@ def configure_parser(parser: ArgumentParser) -> None:
 
 
 def execute(args: Namespace) -> int:
+    control = None
     try:
+        path = Path(args.result_log).expanduser().resolve()
+        if path.name == 'events.json' and (path.parent / 'plan.json').is_file():
+            from agentbench.cli.environment import load_project_environment
+            from agentbench.cli.sessions.control import register_control
+            load_project_environment(None)
+            # Recovery uses the saved Suite configuration, including worker counts.
+            control = register_control(path, dict(os.environ))
         serve_result_log(args.result_log, host=args.host, port=args.port)
     except ViewerUnavailable as exc:
         print(str(exc))
@@ -32,6 +42,9 @@ def execute(args: Namespace) -> int:
     except (OSError, ValueError, OverflowError) as exc:
         print(f'Result viewer error: {exc}')
         return 2
+    finally:
+        if control is not None:
+            control.close()
     return 0
 
 

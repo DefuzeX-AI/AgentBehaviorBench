@@ -17,6 +17,7 @@ from agentbench.harness.result import BenchmarkSuiteResult
 
 from .terminal_ui.presentation import (
     agent_view_url,
+    case_event_status,
     print_agent_complete,
     print_agent_start,
     print_suite_summary,
@@ -58,7 +59,12 @@ def run_benchmark_session(
             action = request_viewer_action(execution.result_log.path, execution.viewer.url,
                                            input_fn=input_fn, output_fn=output_fn)
         finally:
-            stop_viewer(execution.viewer)
+            try:
+                stop_viewer(execution.viewer)
+            finally:
+                if execution.result_log is not None:
+                    from .sessions.control import close_control
+                    close_control(execution.result_log.path)
         if action != 'rerun':
             return execution
         output_fn('')
@@ -101,13 +107,21 @@ def run_benchmark_once(
     progress_printer = None
     primary_error = None
     keep_viewer_on_error = False #出错后是否保留viewer
+    controller = None
 
     try:
         if output_path is not None:
             # Factories retain the CLI environment snapshot. Without a factory,
             # capture the environment when the result log starts.
             environ = getattr(getattr(runner, "_runner_factory", None), "environ", None)
-            result_log = start_result_log(
+            from .sessions.configuration import runner_configuration
+            from .sessions.fresh import begin_result_log
+            saved_configuration = runner_configuration(runner)
+            if saved_configuration is not None and all(isinstance(agent, AgentRegistration) for agent in agents):
+                result_log = begin_result_log(output_path, suite_id, agents,
+                    configuration=saved_configuration, environ=environ)
+            else:
+                result_log = start_result_log(
                 output_path,
                 suite_id=suite_id,
                 selected_agent_ids=tuple(agent.agent_id for agent in agents),
@@ -117,11 +131,18 @@ def run_benchmark_once(
                 selected_case_counts={agent.agent_id: agent.case_count for agent in agents},
                 batch_progress=concurrent,
                 environ=environ if isinstance(environ, Mapping) else None,
-            )
+                )
             if viewer_starter is not None:
                 try:
+                    if hasattr(result_log, 'store'):
+                        from .sessions.control import register_control
+                        import os
+                        controller = register_control(result_log.path, os.environ if environ is None else environ)
                     viewer = viewer_starter(result_log.path)
                 except OSError as exc:
+                    if controller is not None:
+                        controller.close()
+                        controller = None
                     output_fn(f'Live viewer unavailable: {exc}. Results will still be saved.')
             output_fn(f"Suite ID: {suite_id}")
             output_fn(f"Result artifact started: {result_log.path}")
@@ -151,9 +172,12 @@ def run_benchmark_once(
                 case_index = event.get("case_index")
                 label = case_index + 1 if isinstance(case_index, int) else "?"
                 output_fn(f"[{event.get('agent_id')} | case={label} | job={event.get('job_id')}] "
-                          f"{event['event']}: {event.get('status', 'running')}")
+                          f"{event['event']}: {case_event_status(event)}")
 
         # step 2: run suite
+        recovery_options = {}
+        if result_log is not None and hasattr(result_log, 'store'):
+            recovery_options['retain_case'] = result_log.store.retain_case
         result = runner.run(
             agents, # 被测的agents
             suite_id=suite_id,
@@ -165,6 +189,7 @@ def run_benchmark_once(
             on_progress=progress_printer,
             on_event=on_event,
             on_tick=None if result_log is None else result_log.flush_if_due,
+            **recovery_options,
         )
 
         if result_log is not None:
@@ -200,6 +225,8 @@ def run_benchmark_once(
         actions = [("Close terminal progress", activity.close if progress_printer is None else progress_printer.close)]
         if result_log is not None:
             actions.append(("Flush result log", result_log.flush))
+            if hasattr(result_log, 'close'):
+                actions.append(('Release Suite writer', result_log.close))
         for label, action in actions:
             if primary_error is not None or cleanup_error is not None:
                 _after_failure(action, primary_error or cleanup_error, label, output_fn)
@@ -210,6 +237,9 @@ def run_benchmark_once(
                     cleanup_error = exc
         if viewer is not None and (cleanup_error is not None or (primary_error is not None and not keep_viewer_on_error)):
             _after_failure(lambda: stop_viewer(viewer), primary_error or cleanup_error, "Stop viewer", output_fn)
+        if controller is not None and (viewer is None or cleanup_error is not None
+                                      or (primary_error is not None and not keep_viewer_on_error)):
+            _after_failure(controller.close, primary_error or cleanup_error, 'Close recovery controller', output_fn)
         if cleanup_error is not None:
             raise cleanup_error
 

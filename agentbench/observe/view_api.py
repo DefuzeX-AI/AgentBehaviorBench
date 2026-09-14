@@ -296,14 +296,19 @@ class SuiteRunCatalogAPI:
     def __init__(self, result_log):
         self.result_log = Path(result_log).resolve()
 
-    def entries(self, events=None):
+    def entries(self, events=None, *, snapshot=None):
+        from .suite_reader import persisted_snapshot, attempt_references
+        if events is None and snapshot is None:
+            snapshot = persisted_snapshot(self.result_log)
+        if snapshot is not None:
+            events = snapshot['events']
         if events is None:
             events = json.loads(self.result_log.read_text(encoding='utf-8'))
         if not isinstance(events, list):
             raise ValueError('Expected suite events')
         selected = next((e.get('selected_agent_ids', []) for e in events
                          if isinstance(e, dict) and e.get('event') == 'run_started'), [])
-        references = []
+        references = list(attempt_references(snapshot)) if snapshot is not None else []
         for event in events:
             if not isinstance(event, dict):
                 continue
@@ -344,11 +349,16 @@ class SuiteRunCatalogAPI:
                     or metadata.get('schema') not in ('abb.observe.run.v1', 'abb.evaluate.run.v1')
                     or not re.fullmatch(r'[a-zA-Z0-9_-]+', directory.name)):
                     continue
+                if (identity.get('artifact_run_id') not in (None, directory.name)
+                    or any(metadata.get(key) is not None and identity.get(key) is not None
+                           and metadata[key] != identity[key]
+                           for key in ('suite_id', 'case_index', 'attempt_id'))):
+                    continue
                 updated = datetime.fromtimestamp(api.file('run.json').stat().st_mtime, timezone.utc).isoformat()
                 details = dict(entries.get(directory.name, (None, {}))[1])
                 details.update({'id': directory.name, 'agent': agent_id,
                                 'status': metadata.get('status'), 'updated': updated})
-                for key in ('suite_id', 'job_id', 'agent_job_id', 'registration_index', 'case_index', 'case_id', 'artifact_run_id'):
+                for key in ('suite_id', 'job_id', 'agent_job_id', 'registration_index', 'case_index', 'case_id', 'artifact_run_id', 'attempt_id', 'attempt_number'):
                     candidate = metadata.get(key)
                     if candidate is None:
                         candidate = identity.get(key)
@@ -360,10 +370,12 @@ class SuiteRunCatalogAPI:
         return entries
 
     def route(self, path, query):
-        events = json.loads(self.result_log.read_text(encoding='utf-8'))
-        entries = self.entries(events)
+        from .suite_reader import persisted_snapshot
+        snapshot = persisted_snapshot(self.result_log)
+        events = snapshot['events'] if snapshot is not None else json.loads(self.result_log.read_text(encoding='utf-8'))
+        entries = self.entries(events, snapshot=snapshot)
         if path == '/api/observe/runs':
-            jobs = suite_jobs(events)
+            jobs = snapshot['jobs'] if snapshot is not None else suite_jobs(events)
             order = {job['agent_id']: index for index, job in enumerate(jobs)}
             runs = sorted((entry[1] for entry in entries.values()),
                           key=lambda run: (order.get(run['agent'], len(order)),

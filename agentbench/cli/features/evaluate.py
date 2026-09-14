@@ -2,6 +2,7 @@
 import math
 from dataclasses import replace
 from agentbench.cli.execution import run_benchmark_session
+from agentbench.cli.retry_options import configure_retry_parser, retry_policy_argument
 from agentbench.cli.trace_runtime import build_trace_suite_runner
 from agentbench.cli.terminal_ui import LLMActivity
 from agentbench.cli.terminal_ui.presentation import confirm_agents
@@ -26,6 +27,7 @@ def configure_parser(parser):
     parser.add_argument('--env-file', type=Path)
     parser.add_argument('--model', type=model_name)
     configure_sdk_parser(parser)
+    configure_retry_parser(parser)
     parser.add_argument('--no-view', action='store_true', help='Save results without starting the live viewer.')
     parser.add_argument('--llm-trace-max-bytes', type=int, default=DEFAULT_TRACE_MAX_BYTES)
     parser.add_argument('--result-output', type=Path, help='ABB result JSON naming base (independent of SDK output)')
@@ -37,6 +39,7 @@ def configure_parser(parser):
 
 def execute(args):
     try:
+        policy = retry_policy_argument(args)
         if args.timeout is not None and (not math.isfinite(args.timeout) or args.timeout <= 0):
             raise ValueError('Timeout must be finite and positive')
         for name in ('cases', 'max_steps'):
@@ -79,6 +82,8 @@ def execute(args):
             model=args.model, activity_sink=activity,
             sdk_selection=plan.selection, sdk_options=plan.options,
             concurrency=loaded.concurrency, environ=loaded.environ)
+        if policy is not None:
+            runner.retry_policy = policy
         execution = run_benchmark_session((agent,), runner=runner, output_path=output,
             output_fn=print, viewer_starter=None if args.no_view else start_viewer_server,
             llm_activity=activity, input_fn=input)

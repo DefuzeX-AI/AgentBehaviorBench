@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from html import escape
 import threading
 from dataclasses import dataclass
@@ -45,11 +46,18 @@ class RunningViewer:
     thread: threading.Thread
     base_url: str
     url: str
+    on_stop: Callable[[], None] | None = None
 
     def stop(self) -> None:
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(timeout=2)
+        try:
+            if self.on_stop is not None:
+                self.on_stop()
+        finally:
+            try:
+                self.server.shutdown()
+            finally:
+                self.server.server_close()
+                self.thread.join(timeout=2)
 
 
 def serve_result_log(
@@ -77,7 +85,11 @@ def serve_result_log(
     except KeyboardInterrupt:
         print("\nViewer stopped.")
     finally:
-        server.server_close()
+        from .sessions.control import close_control
+        try:
+            close_control(path)
+        finally:
+            server.server_close()
 
 
 def start_viewer_server(
@@ -95,11 +107,13 @@ def start_viewer_server(
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     base_url = f"http://{host}:{server.server_port}"
+    from .sessions.control import close_control
     return RunningViewer(
         server=server,
         thread=thread,
         base_url=base_url,
         url=_locked_viewer_url(base_url, suite_id),
+        on_stop=lambda: close_control(path),
     )
 
 
@@ -149,13 +163,11 @@ def build_viewer_handler(
 
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
+            from .viewer_control import controlled_snapshot, local_origin
+            if parsed.path.startswith('/api/') and not local_origin(self.headers):
+                self._send_json({'error': 'Same-origin reads only'}, status=HTTPStatus.FORBIDDEN)
+                return
             if run_api is not None and parsed.path.startswith('/api/observe/'):
-                origin = self.headers.get('Origin')
-                host = self.headers.get('Host', '')
-                if (urlparse(f'http://{host}').hostname not in ('localhost', '127.0.0.1', '::1')
-                    or (origin and origin != f'http://{host}') or self.headers.get('Sec-Fetch-Site') == 'cross-site'):
-                    self._send_json({'error': 'Same-origin reads only'}, status=HTTPStatus.FORBIDDEN)
-                    return
                 try:
                     self._send_json(run_api.route(parsed.path, parse_qs(parsed.query)))
                 except (OSError, ValueError, KeyError, StopIteration):
@@ -163,7 +175,10 @@ def build_viewer_handler(
                 return
             result_api_path = _suite_result_api_path(expected_suite_id)
             if parsed.path == result_api_path:
-                self._send_json(parse_result_log(result_log))
+                try:
+                    self._send_json(controlled_snapshot(parse_result_log(result_log), result_log))
+                except (OSError, ValueError, KeyError):
+                    self._send_json({'error': 'Suite snapshot unavailable'}, status=HTTPStatus.SERVICE_UNAVAILABLE)
                 return
             if parsed.path == "/api/result" or parsed.path.startswith(
                 "/api/suites/"
@@ -198,6 +213,33 @@ def build_viewer_handler(
 
             self.path = _static_path(parsed.path)
             super().do_GET()
+
+        def do_POST(self) -> None:
+            from .viewer_control import bound_controller, local_origin, read_command, valid_token
+            if not local_origin(self.headers, require_origin=True):
+                self._send_json({'error': 'Same-origin commands only'}, status=HTTPStatus.FORBIDDEN)
+                return
+            controller = bound_controller(result_log)
+            if controller is None:
+                self._send_json({'error': 'This viewer is read-only'}, status=HTTPStatus.FORBIDDEN)
+                return
+            if urlparse(self.path).path != controller.capabilities.get('control_url'):
+                self._send_suite_mismatch()
+                return
+            try:
+                token = self.headers.get('X-ABB-Control-Token', '')
+                if not valid_token(controller, token):
+                    raise PermissionError('Invalid control credential')
+                payload = read_command(self.headers, self.rfile)
+                reply = controller.submit(payload, token, origin_valid=True)
+            except PermissionError:
+                self._send_json({'error': 'Invalid control credential'}, status=HTTPStatus.FORBIDDEN)
+            except ValueError as exc:
+                self._send_json({'error': str(exc)}, status=HTTPStatus.BAD_REQUEST)
+            except RuntimeError as exc:
+                self._send_json({'error': str(exc)}, status=HTTPStatus.CONFLICT)
+            else:
+                self._send_json(reply, status=HTTPStatus.ACCEPTED)
 
         def _send_suite_mismatch(self) -> None:
             self._send_json(
@@ -306,7 +348,7 @@ def parse_result_log(path: str | Path) -> dict[str, object]:
             case["step_events"] = [event for event in item.get("step_events", [])
                                    if event.get("case_index") == case["case_index"]]
 
-    return {
+    payload = {
         "path": str(result_path),
         "suite_id": suite_id,
         "configured_workers": configured_workers,
@@ -322,6 +364,14 @@ def parse_result_log(path: str | Path) -> dict[str, object]:
         "event_count": len(events),
         "events": events,
     }
+    from agentbench.observe.suite_reader import persisted_snapshot
+    canonical = persisted_snapshot(result_path)
+    if canonical is not None:
+        payload.update(canonical)
+        payload['agents'] = [dict(job, case_results=[case['result'] for case in job['cases']
+                                                    if case['result'] is not None])
+                             for job in canonical['jobs']]
+    return payload
 
 
 def _result_log_suite_id(path: Path) -> str | None:

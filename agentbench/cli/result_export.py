@@ -290,25 +290,13 @@ def _suite_agent_to_json(item: SuiteAgentResult) -> dict[str, object]:
 
 
 def _case_to_json(case: CaseResult) -> dict[str, object]:
-    return {"agent_id": case.agent_id, "case_index": case.case_index,
-            "job_id": case.job_id, "case_id": case.case_id, "status": case.status,
-            "artifacts": _json_value(case.artifacts),
-            "benchmark": None if case.benchmark is None else _benchmark_to_json(case.benchmark),
-            "error": None if case.error_type is None else {"type": case.error_type, "message": case.error_message}}
+    from agentbench.harness.session.codec import case_to_json
+    return case_to_json(case)
 
 
 def _benchmark_to_json(benchmark: BenchmarkResult) -> dict[str, object]:
-    return {
-        "agent_id": benchmark.agent_id,
-        "adapter_name": benchmark.adapter_name,
-        "run_id": benchmark.run_id,
-        "run_state": benchmark.run_state,
-        "provider_mode": benchmark.provider_mode,
-        "passed": benchmark.passed,
-        "history_count": benchmark.history_count,
-        "report": _json_value(benchmark.report),
-        "steps": [_step_to_json(step) for step in benchmark.steps],
-    }
+    from agentbench.harness.session.codec import benchmark_to_json
+    return benchmark_to_json(benchmark)
 
 
 def _step_to_json(step: BenchmarkStepResult) -> dict[str, object]:

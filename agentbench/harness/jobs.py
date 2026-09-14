@@ -6,7 +6,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, replace
 
 from agentbench.runtime.contracts.execution import RunCancelled, RunControl, RuntimeInfrastructureError
-from agentbench.sdk.contracts import EvaluationRunner, PreparedCase
+from agentbench.sdk.contracts import EvaluationRunner, PreparedCase, PreparedCaseBatch, PreparationFailure
 
 from .errors import ProviderSelectionError, SuiteConfigurationError
 from .events import EventBus, EventDeliveryError
@@ -31,6 +31,7 @@ class PreparationJob:
     registration: AgentRegistration
     runner: EvaluationRunner
     identity: Mapping[str, object]
+    case_indices: tuple[int, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -39,6 +40,7 @@ class CaseJob:
     runner: EvaluationRunner
     case: PreparedCase
     identity: Mapping[str, object]
+    previous_result: CaseResult | None = None
 
 
 @dataclass(frozen=True)
@@ -46,6 +48,8 @@ class PreparationOutcome:
     cases: tuple[PreparedCase, ...] = ()
     error: EvaluationFailure | None = None
     fatal: BaseException | None = None
+    failures: tuple[PreparationFailure, ...] = ()
+    unattempted_indices: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -107,20 +111,37 @@ def run_preparation_job(job: PreparationJob, *, control: RunControl,
 
 
         # 在这里 我们真正的开始调用 createcases 来创建 case（可以去看kuma 的 create_cases 方法）
-        cases = tuple(job.runner.prepare_cases(job.registration, on_progress=events.progress))
+        partial = getattr(job.runner, 'prepare_case_batch', None)
+        requested = tuple(range(job.registration.case_count)) if job.case_indices is None else job.case_indices
+        if callable(partial):
+            batch = partial(job.registration, case_indices=requested, on_progress=events.progress)
+            if not isinstance(batch, PreparedCaseBatch):
+                raise TypeError('prepare_case_batch must return PreparedCaseBatch')
+            cases = batch.cases
+        else:
+            if requested != tuple(range(job.registration.case_count)):
+                raise ValueError('This SDK cannot prepare a partial Case selection')
+            cases = tuple(job.runner.prepare_cases(job.registration, on_progress=events.progress))
+            batch = None
 
 
         
-        if len(cases) != job.registration.case_count:
+        if batch is None and len(cases) != job.registration.case_count:
             raise ValueError("Prepared Case count does not match the requested count")
         if not all(isinstance(case, PreparedCase) for case in cases):
             raise TypeError("prepare_cases must return PreparedCase descriptors")
-        if tuple(case.case_index for case in cases) != tuple(range(len(cases))):
-            raise ValueError("Prepared Cases must have consecutive ordered indices")
+        indices = tuple(case.case_index for case in cases)
+        if indices != tuple(sorted(set(indices))) or not set(indices).issubset(requested):
+            raise ValueError("Prepared Cases must retain distinct requested indices")
         identifiers = [case.case_id for case in cases if case.case_id is not None]
         if len(set(identifiers)) != len(identifiers):
             raise ValueError("Prepared Cases contain duplicate IDs")
-        return PreparationOutcome(cases=cases)
+        if batch is not None:
+            covered = set(indices) | {failure.case_index for failure in batch.failures} | set(batch.unattempted_indices)
+            if covered != set(requested):
+                raise ValueError('Partial preparation must account for every requested Case')
+        return PreparationOutcome(cases=cases, failures=() if batch is None else batch.failures,
+                                  unattempted_indices=() if batch is None else batch.unattempted_indices)
     except BaseException as exc:
         return PreparationOutcome(error=EvaluationFailure(type(exc).__name__, str(exc), getattr(exc, 'artifacts', None)),
                                   fatal=fatal_error(exc, control))
@@ -131,19 +152,29 @@ def run_case_job(job: CaseJob, *, control: RunControl,
     events = JobEvents(bus, job.identity, callbacks)
     try:
         control.check()
-        bus.publish({**job.identity, "event": "case_started", "status": "running"})
-        benchmark = job.runner.run_case(
-            job.registration, job.case, on_progress=events.progress,
+        status = 'retrying' if job.identity.get('attempt_number', 1) > 1 or job.previous_result else 'running'
+        bus.publish({**job.identity, "event": "case_started", "status": status})
+        execute = job.runner.run_case if job.previous_result is None else getattr(job.runner, 'recover_case')
+        recovery = {} if job.previous_result is None else {'previous_result': job.previous_result}
+        benchmark = execute(
+            job.registration, job.case, **recovery, on_progress=events.progress,
             on_step_start=events.step_started, on_step_complete=events.step_completed,
             on_step_failure=events.step_failed,
         )
         result = CaseResult(job.registration.agent_id, job.case.case_index, str(job.identity["job_id"]),
                             "succeeded" if benchmark.passed else "failed",
                             case_id=job.case.case_id, benchmark=benchmark)
-        return CaseOutcome(result)
+        return CaseOutcome(replace(result, attempt_id=job.identity.get('attempt_id'),
+                                   attempt_number=job.identity.get('attempt_number', 1)))
     except BaseException as exc:
         result = CaseResult(job.registration.agent_id, job.case.case_index, str(job.identity["job_id"]),
                             "cancelled" if isinstance(exc, RunCancelled) else "failed",
                             case_id=job.case.case_id, error_type=type(exc).__name__, error_message=str(exc),
                             artifacts=getattr(exc, 'artifacts', None))
-        return CaseOutcome(result, fatal_error(exc, control))
+        artifacts = dict(job.previous_result.artifacts or {}) if job.previous_result is not None else {}
+        artifacts.update(result.artifacts or {})
+        if isinstance(getattr(exc, 'recovery', None), Mapping):
+            artifacts['recovery'] = dict(exc.recovery)
+        return CaseOutcome(replace(result, artifacts=artifacts or None,
+                                   attempt_id=job.identity.get('attempt_id'),
+                                   attempt_number=job.identity.get('attempt_number', 1)), fatal_error(exc, control))

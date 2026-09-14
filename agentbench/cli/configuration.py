@@ -9,6 +9,7 @@ from pathlib import Path
 from agentbench.cli.viewer import RunningViewer, start_viewer_server
 from agentbench.harness import SDK, SuiteRunner
 from agentbench.harness.concurrency import ConcurrencySettings
+from agentbench.harness.scheduling import RetryPolicy
 from agentbench.runtime.interception import DEFAULT_TRACE_MAX_BYTES
 from agentbench.sdk.plugins import SDKSelection
 
@@ -31,3 +32,4 @@ class RunConfiguration:
     model: str | None = None
     concurrency: ConcurrencySettings | None = None
     environ: Mapping[str, str] | None = None
+    retry_policy: RetryPolicy | None = None

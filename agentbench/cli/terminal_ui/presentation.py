@@ -154,6 +154,13 @@ def print_agent_complete(
 def print_suite_summary(
     result: BenchmarkSuiteResult, output_fn: Callable[[str], None]
 ) -> None:
+    from collections import Counter
+    cases = [case for item in result.items for case in item.case_results]
+    completed = sum(case.execution_status == 'completed' for case in cases)
+    planned = sum(item.requested_case_count for item in result.items)
+    verdicts = Counter(case.judge_status for case in cases if case.judge_status is not None)
+    output_fn(f"\nCase execution: {completed}/{planned} completed | Judge: "
+              + (', '.join(f'{status}={count}' for status, count in sorted(verdicts.items())) or 'no report'))
     output_fn(
         "\nSuite complete: "
         f"{result.passed_count} passed, "
@@ -161,6 +168,14 @@ def print_suite_summary(
         f"{result.skipped_count} skipped, "
         f"{result.selected_count} selected."
     )
+
+
+def case_event_status(event):
+    """Describe execution and Judge separately while retaining legacy exit policy."""
+    case = event.get('case_result')
+    status = getattr(case, 'execution_status', None) or event.get('status', 'running')
+    verdict = getattr(case, 'judge_status', None)
+    return f'{status} | judge={verdict}' if verdict is not None else status
 
 
 def print_viewer_footer(

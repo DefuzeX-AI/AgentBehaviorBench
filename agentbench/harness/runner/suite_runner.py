@@ -18,6 +18,7 @@ from ..progress import BenchmarkProgress
 from ..registry import AgentRegistration
 from ..result import BenchmarkSuiteResult
 from ..scheduler import CaseScheduler
+from ..scheduling import RetryPolicy
 
 
 class SuiteRunner:
@@ -27,7 +28,7 @@ class SuiteRunner:
                  sdk_options: Mapping[str, object] | None = None,
                  benchmark_runner: EvaluationRunner | None = None,
                  runner_factory=None, concurrency: ConcurrencySettings | None = None,
-                 trace_sink=None) -> None:
+                 trace_sink=None, retry_policy: RetryPolicy | None = None) -> None:
         if (benchmark_runner is not None or runner_factory is not None) and (
             sdk is not None or sdk_options is not None
         ):
@@ -42,6 +43,7 @@ class SuiteRunner:
         self._trace_sink = trace_sink
         self._run_lock = threading.Lock()
         self._active_control = None
+        self.retry_policy = retry_policy or RetryPolicy()
 
         
         if benchmark_runner is None and runner_factory is None:
@@ -68,7 +70,8 @@ class SuiteRunner:
     def run(self, registrations: Iterable[AgentRegistration], *, suite_id=None,
             continue_on_error=True, on_agent_start=None, on_agent_complete=None,
             on_progress=None, on_step_start=None, on_step_complete=None,
-            on_step_failure=None, on_event=None, on_tick=None) -> BenchmarkSuiteResult:
+            on_step_failure=None, on_event=None, on_tick=None, resume_state=None,
+            retain_case=None, retry_policy=None, run_control=None) -> BenchmarkSuiteResult:
         """Run one Suite: validate Agents, prepare Cases, schedule jobs, and collect results.
 
         This method waits for the Suite to finish. CaseScheduler creates the
@@ -106,6 +109,13 @@ class SuiteRunner:
             on_tick: Callback() invoked during event-bus draining, including
                 while waiting for jobs. Used to flush buffered logs when due;
                 this is not a separate timer thread or an exact-time guarantee.
+            resume_state: Validated AgentSeed values keyed by Agent ID. Completed
+                Cases are retained and prepared Cases skip generation.
+            retain_case: Optional Callback(agent_id, PreparedCase) returning a
+                durable descriptor before its prepared event is published.
+            retry_policy: Optional RetryPolicy override for this invocation.
+            run_control: Optional external RunControl preserving cancellation
+                requested before this method initializes its runtime resources.
 
         Returns:
             BenchmarkSuiteResult containing the Suite ID, selected Agent IDs,
@@ -122,6 +132,9 @@ class SuiteRunner:
             on exceptions and closes the Suite session before releasing its lock.
         """
         from agentbench.runtime.contracts.execution import RunControl
+
+        if run_control is not None and not isinstance(run_control, RunControl):
+            raise TypeError('run_control must be a RunControl')
 
         # Freeze the iterable so validation and scheduling use the same selection.
         selected = tuple(registrations)
@@ -148,7 +161,7 @@ class SuiteRunner:
         
         # Share one cancellation signal and route worker notifications back to
         # the coordinator instead of calling terminal/log handlers from workers.
-        control = RunControl()
+        control = run_control if run_control is not None else RunControl()
         self._active_control = control
         bus = EventBus(on_event=on_event, on_tick=on_tick)
         callbacks = SuiteCallbacks(len(selected), on_agent_start, on_agent_complete, on_progress,
@@ -160,6 +173,7 @@ class SuiteRunner:
         runners: dict[int, EvaluationRunner] = {}
 
         try:
+            control.check()
             if self._runner_factory is not None:
                 # Open resources owned by this Suite, using its ID and control.
                 session = self._runner_factory.open_suite(suite_id, control)
@@ -232,6 +246,7 @@ class SuiteRunner:
                 create_case_job=create_case_job, 
                 workers=workers,
                 control=control, bus=bus, callbacks=callbacks, continue_on_error=continue_on_error,
+                retry_policy=retry_policy or self.retry_policy, seeds=resume_state, retain_case=retain_case,
             ).run()
             
             return BenchmarkSuiteResult(suite_id, tuple(agent.agent_id for agent in selected), items)

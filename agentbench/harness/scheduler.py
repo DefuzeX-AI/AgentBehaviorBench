@@ -5,11 +5,13 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
-from dataclasses import dataclass, field
+from dataclasses import replace
 import signal
 import threading
+import time
+import heapq
+from itertools import count
 from types import MappingProxyType
-from uuid import uuid4
 
 from agentbench.runtime.contracts.execution import RunCancelled, RunControl
 from agentbench.sdk.contracts import PreparedCase
@@ -19,35 +21,10 @@ from .events import EventBus
 from .jobs import (CaseJob, CaseOutcome, PreparationJob, PreparationOutcome,
                    SuiteCallbacks, run_case_job, run_preparation_job)
 from .result import CaseResult, EvaluationFailure, SuiteAgentResult
+from .scheduling import AgentState, AgentSeed, RetryPolicy
+from .scheduling.preparation import accept_preparation
 
 CaseJobFactory = Callable[[PreparationJob, PreparedCase, Mapping[str, object]], CaseJob]
-
-
-@dataclass
-class _AgentState:
-    preparation: PreparationJob
-    started: bool = False
-    completed: bool = False
-    preparation_error: EvaluationFailure | None = None
-    pending: deque[PreparedCase] = field(default_factory=deque)
-    results: dict[int, CaseResult] = field(default_factory=dict)
-    identities: dict[int, Mapping[str, object]] = field(default_factory=dict)
-
-    def __post_init__(self):
-        parent = self.preparation.identity
-        self.identities = {
-            index: MappingProxyType({**parent, "job_id": f"case_{uuid4().hex}",
-                                     "agent_job_id": parent["job_id"], "phase": "execute",
-                                     "case_index": index, "case_id": None})
-            for index in range(self.preparation.registration.case_count)
-        }
-
-    def snapshot(self) -> SuiteAgentResult:
-        return SuiteAgentResult(
-            self.preparation.registration.agent_id,
-            tuple(self.results[index] for index in sorted(self.results)),
-            self.preparation.registration.case_count, self.preparation_error,
-        )
 
 
 class CaseScheduler:
@@ -55,11 +32,11 @@ class CaseScheduler:
 
     def __init__(self, preparations: Sequence[PreparationJob], *, create_case_job: CaseJobFactory,
                  workers: int, control: RunControl, bus: EventBus,
-                 callbacks: SuiteCallbacks, continue_on_error: bool):
-        self.states = [_AgentState(job) for job in preparations]
-        self.unprepared = deque(self.states)
-        self.ready: deque[_AgentState] = deque()
-        self.inflight: dict[Future, tuple[_AgentState, PreparationJob | CaseJob]] = {}
+                 callbacks: SuiteCallbacks, continue_on_error: bool,
+                 retry_policy=None, seeds=None, retain_case=None):
+        self.states = [AgentState(job) for job in preparations]
+        self.unprepared, self.ready = deque(), deque()
+        self.inflight: dict[Future, tuple[AgentState, PreparationJob | CaseJob]] = {}
         self.create_case_job = create_case_job
         self.workers = workers
         self.control, self.bus, self.callbacks = control, bus, callbacks
@@ -68,6 +45,26 @@ class CaseScheduler:
         self.failure: BaseException | None = None
         self.consumer_failed = False
         self.interrupted = False
+        self.retry_policy = retry_policy or RetryPolicy()
+        self.retain_case = retain_case or (lambda _agent, case: case)
+        self.delayed = []
+        self._retry_order = count()
+        for state in self.states:
+            seed = (seeds or {}).get(state.preparation.registration.agent_id, AgentSeed())
+            state.initialize(seed)
+            now, monotonic_now = time.time(), time.monotonic()
+            for case in tuple(state.pending):
+                due = seed.retry_at.get(case.case_index)
+                if due is not None and due > now:
+                    state.pending.remove(case)
+                    heapq.heappush(self.delayed, (monotonic_now + due - now, next(self._retry_order),
+                                                  state, case.case_index))
+            if state.pending:
+                self.ready.append(state)
+            missing = tuple(i for i in state.identities if i not in state.prepared and i not in state.results)
+            if missing:
+                state.preparation = replace(state.preparation, case_indices=missing)
+                self.unprepared.append(state)
 
     def run(self) -> tuple[SuiteAgentResult, ...]:
         # 开线程池
@@ -78,12 +75,19 @@ class CaseScheduler:
             # Record cancellation without throwing between submit and tracking.
             signal.signal(signal.SIGINT, self._interrupt)
         try:
+            for state in self.states:
+                self._finish_agent(state)
             while self.inflight or (self.admission and not self.control.cancelled
-                                    and (self.ready or self.unprepared)):
+                                    and (self.ready or self.unprepared or self.delayed)):
                 try:
+                    self._release_retries()
                     self._fill_slots(pool)
                     if not self.inflight:
-                        break
+                        if not self.delayed:
+                            break
+                        self.bus.drain(discard=self.consumer_failed)
+                        self.control.wait(min(0.1, max(0, self.delayed[0][0] - time.monotonic())))
+                        continue
                     self.bus.drain(discard=self.consumer_failed)
                     done, _ = wait(self.inflight, timeout=0.1, return_when=FIRST_COMPLETED)
                     if done:
@@ -155,21 +159,28 @@ class CaseScheduler:
                 case = state.pending.popleft()
                 if state.pending:
                     self.ready.append(state)
-                identity = state.identities[case.case_index]
+                identity = state.begin_attempt(case)
                 try:
                     job = self.create_case_job(state.preparation, case, identity)
+                    if case.case_index in state.recoveries:
+                        job = replace(job, previous_result=state.recoveries.pop(case.case_index))
+                    self._publish({**identity, 'event': 'attempt_dispatched'})
                 except BaseException as exc:
                     failure = exc if isinstance(exc, (RunCancelled, KeyboardInterrupt)) else SuiteConfigurationError(str(exc))
-                    result = CaseResult(state.preparation.registration.agent_id, case.case_index,
+                    previous = state.waiting_results.get(case.case_index)
+                    result = previous or CaseResult(state.preparation.registration.agent_id, case.case_index,
                                         str(identity["job_id"]),
                                         "cancelled" if isinstance(exc, RunCancelled) else "failed",
-                                        case_id=case.case_id, error_type=type(exc).__name__, error_message=str(exc))
+                                        case_id=case.case_id, error_type=type(exc).__name__, error_message=str(exc),
+                                        attempt_id=identity['attempt_id'], attempt_number=identity['attempt_number'])
                     state.results[case.case_index] = result
                     if isinstance(exc, RunCancelled) and self.control.cancelled:
                         self.admission = False
                     else:
                         self._stop(failure)
                     self._publish_case(state, result)
+                    if previous is not None:
+                        self._publish({**identity, 'event': 'case_retry_cancelled', 'status': 'cancelled'})
                     continue
                 function = run_case_job
 
@@ -187,47 +198,65 @@ class CaseScheduler:
                 future = pool.submit(function, job, control=self.control, bus=self.bus, callbacks=self.callbacks)
             except BaseException as exc:
                 state.started = True
-                self._accept(state, job, self._unexpected_outcome(job, exc))
+                previous = state.waiting_results.get(job.case.case_index) if isinstance(job, CaseJob) else None
+                self._accept(state, job, CaseOutcome(previous, fatal=exc) if previous
+                             else self._unexpected_outcome(job, exc))
                 if isinstance(exc, KeyboardInterrupt):
                     self.interrupted = True
                 continue
+            if isinstance(job, CaseJob):
+                state.waiting_results.pop(job.case.case_index, None)
             state.started = True
             self.inflight[future] = (state, job)
 
-    def _accept(self, state: _AgentState, job: PreparationJob | CaseJob,
+    def _accept(self, state: AgentState, job: PreparationJob | CaseJob,
                 outcome: PreparationOutcome | CaseOutcome):
         if outcome.fatal is not None:
             self._stop(outcome.fatal)
         if isinstance(outcome, PreparationOutcome):
-            if outcome.error is not None:
-                state.preparation_error = outcome.error
-                if not self.continue_on_error:
-                    self.admission = False
-                self._skip_remaining(state, "Case batch preparation failed")
-            else:
-                state.pending.extend(outcome.cases)
-                if state.pending:
-                    self.ready.append(state)
-                for case in outcome.cases:
-                    identity = MappingProxyType({**state.identities[case.case_index], "case_id": case.case_id})
-                    state.identities[case.case_index] = identity
-                # Preserve every prepared identity before a consumer can fail.
-                for case in outcome.cases:
-                    identity = state.identities[case.case_index]
-                    self._publish({**identity, "event": "case_queued", "status": "queued"})
+            accept_preparation(self, state, job, outcome)
         else:
             result = outcome.result
+            retries = state.retries.get(result.case_index, 0)
+            if (outcome.fatal is None and self.admission and self.continue_on_error
+                    and self.retry_policy.permits(result, retries)):
+                recovery = (result.artifacts or {})['recovery']
+                if recovery['action'] != 'resume_request' or callable(getattr(job.runner, 'recover_case', None)):
+                    self._queue_retry(state, result)
+                    return
             state.results[result.case_index] = result
             if result.status != "succeeded" and not self.continue_on_error:
                 self.admission = False
             self._publish_case(state, result)
         self._finish_agent(state)
 
-    def _publish_case(self, state: _AgentState, result: CaseResult):
-        self._publish({**state.identities[result.case_index], "event": "case_completed",
-                       "status": result.status, "case_result": result})
+    def _queue_retry(self, state, result):
+        index = result.case_index
+        state.waiting_results[index] = result
+        state.retries[index] = state.retries.get(index, 0) + 1
+        delay = self.retry_policy.delay(state.retries[index])
+        if (result.artifacts or {})['recovery']['action'] == 'resume_request':
+            state.recoveries[index] = result
+        self._publish({**state.identities[index], 'event': 'case_attempt_failed',
+                       'status': 'failed', 'case_result': result})
+        self._publish({**state.identities[index], 'event': 'retry_scheduled', 'status': 'retry_wait',
+                       'retry_count': state.retries[index], 'retry_at': time.time() + delay,
+                       'recovery_action': (result.artifacts or {})['recovery']['action']})
+        heapq.heappush(self.delayed, (time.monotonic() + delay, next(self._retry_order), state, index))
 
-    def _finish_agent(self, state: _AgentState):
+    def _release_retries(self):
+        while self.delayed and self.delayed[0][0] <= time.monotonic() and self.admission and not self.control.cancelled:
+            _, _, state, index = heapq.heappop(self.delayed)
+            state.pending.append(state.prepared[index])
+            if state not in self.ready:
+                self.ready.append(state)
+
+    def _publish_case(self, state: AgentState, result: CaseResult):
+        phase = 'generate' if (result.artifacts or {}).get('phase') == 'case_generation' else 'execute'
+        self._publish({**state.identities[result.case_index], "event": "case_completed",
+                       "status": result.status, 'phase': phase, "case_result": result})
+
+    def _finish_agent(self, state: AgentState):
         if state.completed or len(state.results) != state.preparation.registration.case_count:
             return
         state.completed = True
@@ -236,16 +265,19 @@ class CaseScheduler:
         self._publish({**identity, "phase": None, "event": "agent_completed", "status": item.status, "item": item},
                       self.callbacks.on_agent_complete, (item,))
 
-    def _skip_remaining(self, state: _AgentState, reason: str, *, emit=True):
+    def _skip_remaining(self, state: AgentState, reason: str, *, emit=True):
         for index, identity in state.identities.items():
             if index in state.results:
                 continue
-            result = CaseResult(state.preparation.registration.agent_id, index, str(identity["job_id"]),
-                                "skipped", case_id=identity["case_id"],
-                                error_type="CaseSkipped", error_message=reason)
+            previous = state.waiting_results.get(index)
+            result = previous or CaseResult(state.preparation.registration.agent_id, index, str(identity["job_id"]),
+                                           "skipped", case_id=identity["case_id"],
+                                           error_type="CaseSkipped", error_message=reason)
             state.results[index] = result
             if emit:
                 self._publish_case(state, result)
+                if previous is not None:
+                    self._publish({**identity, 'event': 'case_retry_cancelled', 'status': 'cancelled'})
         state.pending.clear()
 
     @staticmethod

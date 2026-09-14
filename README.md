@@ -131,6 +131,25 @@ internal. Each Case keeps its own status, and final results are ordered by
 Agent registration then Case index. Ctrl+C cancels active work, retains finished
 Case results, and records cancelled or skipped Cases explicitly.
 
+Directory SDK runs also retain a fixed plan and immutable Case files under
+`results/suites/<suite-id>/` (or `suites/` beside a custom output base). Reopen the
+printed `events.json` path to view all Cases and their attempt histories together.
+The viewer can continue unfinished work or retry an eligible Case; its partial
+report includes completed results even while other Cases are blocked.
+
+```bash
+agentbench resume results/suites/<suite-id>/events.json
+agentbench retry results/suites/<suite-id>/events.json --agent react-agent --case 3
+```
+
+Completed Judge findings are retained, including `issue`; they are not retried
+until a passing verdict appears. Safe transient execution failures have at most
+two automatic retries by default. `--case-retries 0` disables these, and
+`--retry-delay` sets the initial backoff for run/evaluate/certify. Unknown accepted
+requests and unconfirmed cleanup remain blocked instead of duplicating work.
+See [recovery behavior and module boundaries](docs/Suite-Recovery-Implementation.md)
+and [reusing Cases after changing code or model](docs/Case-Reuse-Commands.md).
+
 Concurrent execution requires an SDK adapter supporting independent Case
 execution and cancellation. Python callers pass
 `ConcurrencySettings(max_parallel_cases=4)` to `SuiteRunner`; the library does
@@ -176,14 +195,15 @@ OPENROUTER_APP_TITLE=AgentBehaviorBench
 
 | Agent | Configured scope | Readiness |
 | --- | --- | --- |
-| ReAct | Native Tavily search and iterative reasoning | Adapting; real certification pending. |
-| TradingAgents | Native market analyst, debate and risk workflow; Yahoo Finance | Adapting; image and offline graph load verified. |
-| GPT Researcher | Native academic research with arXiv and local CPU embeddings | Adapting; image and offline embeddings verified; public arXiv probe rate-limited. |
+| ReAct | Native Tavily search and iterative reasoning | Ready in the checked-in registry; real execution artifacts retained. |
+| TradingAgents | Market analysis with Yahoo Finance; no order execution | Ready in the checked-in registry; real execution artifacts retained. |
+| GPT Researcher | Academic research with NCBI retrieval and local CPU embeddings | Ready in the checked-in registry; real execution artifacts retained. |
 | Company Research | Existing company research unit | Disabled; retained status is not current acceptance evidence. |
 
-Check `resources/registry.toml` for the current status. The repair campaign's
-real model run is currently blocked by the configured OpenRouter credential
-returning 401; the new Agents have not been certified or declared production-ready.
+Check `resources/registry.toml` for the current status and the
+[campaign ledger](docs/Benchmark-Campaign-Ledger.json) for measured execution
+coverage. Readiness validates the configured binding; it does not guarantee a
+passing Judge verdict for every generated Case.
 
 ## CLI
 
@@ -197,6 +217,9 @@ The most useful commands are:
 | `agentbench observe react-agent` | Run one enabled Agent with native input and save traces, without creating Cases or calling a Judge. |
 | `agentbench certify react-agent` | Run an `adapting` Agent and promote it to `ready` only after certification succeeds. |
 | `agentbench view results/benchmark.json` | Reopen a saved benchmark result in the local viewer. |
+| `agentbench resume SUITE` | Continue unfinished slots using saved Cases and original request state. |
+| `agentbench retry SUITE --agent ID --case N` | Explicitly recover one unfinished Case; numbers start at 1. |
+| `agentbench reuse SUITE` | Start a linked new evaluation using the same Cases under the current code. |
 | `agentbench sdk list` | List adapter directories without importing SDK implementations. |
 | `agentbench clean --dry-run` | Show the local result history that would be moved to a recoverable archive. |
 
