@@ -88,13 +88,15 @@ TAVILY_API_KEY=
 ```
 
 Install [Docker for your platform](https://docs.docker.com/get-started/get-docker/)
-and start it. Check `docker info` before running an Agent. The registry initially
-has ReAct, TradingAgents and GPT Researcher enabled as `adapting`, with Company Research disabled. Evaluate and then
-certify the enabled Agent:
+and start it. Check `docker info` before running an Agent. The checked-in registry
+currently enables five Agents. ReAct and GPT Researcher are `ready`;
+TradingAgents, Waku Agent and Article Explainer are `adapting`. Company Research
+remains disabled. Evaluate an adapting Agent and certify it only after its native
+deployment requirements are satisfied:
 
 ```bash
-agentbench evaluate react-agent --cases 1 --max-steps 1
-agentbench certify react-agent
+agentbench evaluate trading-agents --cases 1 --max-steps 1
+agentbench certify trading-agents
 ```
 
 Certification requires successful execution and accepted evidence for every Case;
@@ -196,14 +198,18 @@ OPENROUTER_APP_TITLE=AgentBehaviorBench
 | Agent | Configured scope | Readiness |
 | --- | --- | --- |
 | ReAct | Native Tavily search and iterative reasoning | Ready in the checked-in registry; real execution artifacts retained. |
-| TradingAgents | Market analysis with Yahoo Finance; no order execution | Ready in the checked-in registry; real execution artifacts retained. |
+| TradingAgents | Market analysis with Yahoo Finance; no order execution | Enabled and adapting; the current native entrypoint and input contract require certification. |
 | GPT Researcher | Academic research with NCBI retrieval and local CPU embeddings | Ready in the checked-in registry; real execution artifacts retained. |
 | Company Research | Existing company research unit | Disabled; retained status is not current acceptance evidence. |
+| Waku Agent | Native personal-assistant loop, Case-local memory and constrained local tools | Enabled and adapting; source and offline boundary verified, live model/tool evidence pending. |
+| Article Explainer | Native five-specialist compiled swarm | Enabled and adapting; live model/handoff evidence pending. |
 
 Check `resources/registry.toml` for the current status and the
 [campaign ledger](docs/Benchmark-Campaign-Ledger.json) for measured execution
 coverage. Readiness validates the configured binding; it does not guarantee a
-passing Judge verdict for every generated Case.
+passing Judge verdict for every generated Case. The Waku and Article onboarding evidence,
+source pins and remaining blockers are recorded in
+[the 2026-09-14 onboarding report](docs/New-Agent-Onboarding-2026-09-14.md).
 
 ## CLI
 

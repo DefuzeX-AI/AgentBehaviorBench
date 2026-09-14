@@ -1,0 +1,67 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "waku-agent"
+display_name = "05 Waku Agent"
+# Waku is native Python; ABB's invoke-compatible adapter provides the boundary.
+framework = "langgraph"
+
+[evaluation]
+# Writes are confined to a fresh private native Waku home; no external sending.
+replay_safe = true
+
+[source]
+repository = "https://github.com/ShenSeanChen/waku-agent"
+revision = "a2fb2563ebeacf65596a34e6a73cfedb040f8a1b"
+downloaded_on = "2026-09-14"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 600
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+config = "abb-langgraph.json"
+graph_id = "agent"
+input_key = "message"
+binding = "waku_binding.py:create_graph"
+
+[adapter.context]
+model = "gpt-4.1-mini"
+small_model = "gpt-4.1-mini"
+
+[observe]
+input_fields = [{name = "message", label = "Current assistant request", required = true}]
+
+[llm_interception]
+required = true
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
+
+[[llm_interception.tool_routes]]
+host_patterns = ["html.duckduckgo.com"]
+ports = [443]
+methods = ["GET"]
+path_patterns = ["/html/"]
