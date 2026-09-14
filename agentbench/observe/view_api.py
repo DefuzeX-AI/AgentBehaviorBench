@@ -5,6 +5,118 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
+def suite_jobs(events):
+    """Build stable Agent aggregates with independent, concurrent Case state."""
+    start = next((e for e in events if isinstance(e, dict) and e.get('event') == 'run_started'), {})
+    selected = start.get('selected_agent_ids', [])
+    selected = selected if isinstance(selected, list) else []
+    counts = start.get('selected_case_counts') or {}
+    counts = counts if isinstance(counts, dict) else {}
+    terminal = {'succeeded', 'failed', 'cancelled', 'skipped'}
+    jobs = {agent: {'agent_id': agent, 'job_id': None, 'registration_index': index,
+                    'status': 'queued', 'generation_status': 'queued', 'cases': []}
+            for index, agent in enumerate(selected) if isinstance(agent, str)}
+
+    def ensure_cases(job, count):
+        if type(count) is not int or count < 0:
+            return
+        while len(job['cases']) < count:
+            job['cases'].append({'agent_id': job['agent_id'], 'agent_job_id': job['job_id'],
+                                 'job_id': None, 'case_index': len(job['cases']), 'case_id': None,
+                                 'status': 'queued', 'phase': 'execute', 'stage': None,
+                                 'artifact_run_id': None, 'result': None})
+
+    def update_case(job, data, *, status=None, result=None):
+        index = data.get('case_index')
+        if type(index) is not int or index < 0:
+            return
+        ensure_cases(job, index + 1)
+        case = job['cases'][index]
+        for key in ('job_id', 'agent_job_id', 'case_id', 'artifact_run_id', 'stage'):
+            if data.get(key) is not None:
+                case[key] = data[key]
+        case['agent_job_id'] = case['agent_job_id'] or job['job_id']
+        if status is not None:
+            case['status'] = status
+        if result is not None:
+            case['result'] = result
+
+    for job in jobs.values():
+        ensure_cases(job, counts.get(job['agent_id'], 1))
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        kind = event.get('event')
+        if kind in {'suite_failed', 'suite_completed'}:
+            status = 'cancelled' if kind == 'suite_failed' else 'skipped'
+            for job in jobs.values():
+                if job['status'] not in terminal:
+                    job['status'] = status
+                for case in job['cases']:
+                    if case['status'] not in terminal:
+                        case['status'] = status
+            continue
+        job = jobs.get(event.get('agent_id'))
+        if job is None:
+            continue
+        if kind in {'agent_queued', 'agent_started', 'agent_completed'} or event.get('phase') == 'generate':
+            if event.get('job_id') is not None:
+                job['job_id'] = event['job_id']
+        elif event.get('agent_job_id') is not None:
+            job['job_id'] = event['agent_job_id']
+        if event.get('registration_index') is not None:
+            job['registration_index'] = event['registration_index']
+        ensure_cases(job, event.get('requested_case_count', 0))
+        if kind == 'agent_queued':
+            job['status'] = 'queued'
+        elif kind == 'agent_started':
+            job['status'] = 'running'
+        elif kind == 'progress' and (event.get('phase') == 'generate' or event.get('stage') == 'case_generation'):
+            job['generation_status'] = {'started': 'running', 'succeeded': 'succeeded', 'failed': 'failed'}.get(event.get('status'), 'running')
+            job['status'] = 'running'
+        elif kind == 'case_queued':
+            update_case(job, event, status='queued')
+        elif kind == 'case_started':
+            update_case(job, event, status='running')
+            job['status'] = 'running'
+        elif kind == 'case_completed':
+            result = event.get('case_result') or {}
+            if isinstance(result, dict):
+                update_case(job, {**event, **result}, status=event.get('status') or result.get('status', 'failed'), result=result)
+        elif kind in {'progress', 'step_started', 'step_completed', 'step_failed'}:
+            index = event.get('case_index')
+            if type(index) is int and index >= 0:
+                ensure_cases(job, index + 1)
+                current = job['cases'][index]['status']
+                update_case(job, event, status=current if current in terminal else 'running')
+            if job['status'] not in terminal:
+                job['status'] = 'running'
+        elif kind == 'agent_completed':
+            item = event.get('item') or {}
+            if not isinstance(item, dict):
+                continue
+            ensure_cases(job, item.get('requested_case_count', 0))
+            for case_result in item.get('case_results', []):
+                if isinstance(case_result, dict):
+                    update_case(job, case_result, status=case_result.get('status', 'failed'), result=case_result)
+            error = item.get('error') or item.get('preparation_error') or {}
+            error_type = error.get('type', error.get('error_type')) if isinstance(error, dict) else None
+            status = event.get('status') or item.get('status')
+            if status not in terminal:
+                status = ('cancelled' if error_type in {'RunCancelled', 'KeyboardInterrupt'} else
+                          'failed' if error or any(case['status'] == 'failed' for case in job['cases']) else 'succeeded')
+            job['status'] = status
+            for case in job['cases']:
+                if case['status'] not in terminal:
+                    case['status'] = 'cancelled' if status == 'cancelled' else 'skipped'
+    for job in jobs.values():
+        for case in job['cases']:
+            case['agent_job_id'] = case['agent_job_id'] or job['job_id']
+        job['counts'] = {status: sum(case['status'] == status for case in job['cases'])
+                         for status in ('queued', 'running', 'succeeded', 'failed', 'cancelled', 'skipped')}
+    return list(jobs.values())
+
+
 class RunCatalogAPI:
     """Browse sibling runs, confined to the selected artifact root."""
 
@@ -184,8 +296,9 @@ class SuiteRunCatalogAPI:
     def __init__(self, result_log):
         self.result_log = Path(result_log).resolve()
 
-    def entries(self):
-        events = json.loads(self.result_log.read_text(encoding='utf-8'))
+    def entries(self, events=None):
+        if events is None:
+            events = json.loads(self.result_log.read_text(encoding='utf-8'))
         if not isinstance(events, list):
             raise ValueError('Expected suite events')
         selected = next((e.get('selected_agent_ids', []) for e in events
@@ -195,9 +308,12 @@ class SuiteRunCatalogAPI:
             if not isinstance(event, dict):
                 continue
             if event.get('event') == 'progress':
-                references.append((event.get('agent_id'), event.get('artifact_directory')))
-            elif event.get('event') == 'agent_completed':
+                references.append((event.get('agent_id'), event.get('artifact_directory'), event))
+            elif event.get('event') in {'agent_completed', 'case_completed'}:
                 item = event.get('item') or {}
+                if event.get('event') == 'case_completed':
+                    case = event.get('case_result') or {}
+                    item = {'benchmarks': [case.get('benchmark')]} if isinstance(case, dict) else {}
                 if not isinstance(item, dict) or not isinstance(item.get('benchmarks', []), list):
                     continue
                 for result in item.get('benchmarks', []):
@@ -210,9 +326,11 @@ class SuiteRunCatalogAPI:
                     if not isinstance(extensions, dict):
                         continue
                     references.append((event.get('agent_id'),
-                                       extensions.get('abb_artifact_directory')))
+                                       extensions.get('abb_artifact_directory'),
+                                       {**event, **{key: extensions[key] for key in
+                                        ('case_id', 'case_index', 'artifact_run_id') if key in extensions}}))
         entries = {}
-        for agent_id, value in references:
+        for agent_id, value, identity in references:
             if agent_id not in selected or not isinstance(value, str):
                 continue
             directory = Path(value)
@@ -227,17 +345,30 @@ class SuiteRunCatalogAPI:
                     or not re.fullmatch(r'[a-zA-Z0-9_-]+', directory.name)):
                     continue
                 updated = datetime.fromtimestamp(api.file('run.json').stat().st_mtime, timezone.utc).isoformat()
-                entries[directory.name] = (api, {'id': directory.name, 'agent': agent_id,
-                    'status': metadata.get('status'), 'updated': updated})
+                details = dict(entries.get(directory.name, (None, {}))[1])
+                details.update({'id': directory.name, 'agent': agent_id,
+                                'status': metadata.get('status'), 'updated': updated})
+                for key in ('suite_id', 'job_id', 'agent_job_id', 'registration_index', 'case_index', 'case_id', 'artifact_run_id'):
+                    candidate = metadata.get(key)
+                    if candidate is None:
+                        candidate = identity.get(key)
+                    if candidate is not None:
+                        details[key] = candidate
+                entries[directory.name] = (api, details)
             except (OSError, ValueError):
                 continue
         return entries
 
     def route(self, path, query):
-        entries = self.entries()
+        events = json.loads(self.result_log.read_text(encoding='utf-8'))
+        entries = self.entries(events)
         if path == '/api/observe/runs':
-            runs = [entry[1] for entry in entries.values()][::-1]
-            return {'runs': runs, 'default_run': runs[0]['id'] if runs else None}
+            jobs = suite_jobs(events)
+            order = {job['agent_id']: index for index, job in enumerate(jobs)}
+            runs = sorted((entry[1] for entry in entries.values()),
+                          key=lambda run: (order.get(run['agent'], len(order)),
+                                           run.get('case_index') or 0, run['id']))
+            return {'runs': runs, 'jobs': jobs, 'default_run': runs[0]['id'] if runs else None}
         match = re.fullmatch(r'/api/observe/runs/([a-zA-Z0-9_-]+)/(.+)', path)
         if not match or match[1] not in entries:
             raise ValueError('Run not registered in this suite')

@@ -17,7 +17,11 @@ export function parseTrace(text, filename) {
       event: value.event,
       source: typeof value.source === 'string' ? value.source : 'unknown',
       timestamp: typeof value.timestamp === 'string' ? value.timestamp : '',
-      runId: typeof value.run_id === 'string' ? value.run_id : '',
+      runId: typeof value.artifact_run_id === 'string' ? value.artifact_run_id : typeof value.run_id === 'string' ? value.run_id : '',
+      agentId: typeof value.agent_id === 'string' ? value.agent_id : '',
+      jobId: typeof value.job_id === 'string' ? value.job_id : '',
+      caseIndex: value.case_index ?? null,
+      caseId: typeof value.case_id === 'string' ? value.case_id : '',
       raw: value,
       search: JSON.stringify(value).toLowerCase(),
     });
@@ -35,6 +39,12 @@ export function parseTrace(text, filename) {
     });
   }
   return { events, warnings };
+}
+
+export function eventIdentity(event) {
+  return [event.agentId, event.jobId && `Job ${event.jobId}`,
+    event.caseIndex != null && `Case ${typeof event.caseIndex === 'number' ? event.caseIndex + 1 : event.caseIndex}`, event.caseId,
+    event.runId && `Run ${event.runId}`].filter(Boolean).join(' · ');
 }
 
 export function sortEvents(events) {

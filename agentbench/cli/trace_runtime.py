@@ -5,12 +5,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from agentbench.harness import SDK, SuiteRunner
+from agentbench.harness.concurrency import ConcurrencySettings
 from agentbench.runtime.interception import (
     NullTraceSink,
     TraceSink,
 )
 from agentbench.sdk.plugins import SDKSelection, evaluation_plan
-from agentbench.sdk.runtime import build_evaluation_runner
+from agentbench.sdk.runtime import build_evaluation_runner_factory
 
 
 def build_trace_suite_runner(
@@ -21,6 +22,8 @@ def build_trace_suite_runner(
     sdk: SDK | None = None,
     sdk_selection: SDKSelection | None = None,
     sdk_options: Mapping[str, object] | None = None,
+    concurrency: ConcurrencySettings | None = None,
+    environ: Mapping[str, str] | None = None,
 ) -> SuiteRunner:
     sink: TraceSink = activity_sink or NullTraceSink()
 
@@ -44,11 +47,12 @@ def build_trace_suite_runner(
     )
 
     # Runner instance
-    benchmark_runner = build_evaluation_runner(
+    runner_factory = build_evaluation_runner_factory(
         plan,
         model=model,
         trace_sink=sink,
         trace_max_bytes=max_bytes,
+        environ=environ,
     )
 
-    return SuiteRunner(benchmark_runner=benchmark_runner)
+    return SuiteRunner(runner_factory=runner_factory, concurrency=concurrency, trace_sink=sink)

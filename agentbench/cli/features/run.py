@@ -8,7 +8,7 @@ from pathlib import Path
 
 from agentbench.cli.configuration import RunConfiguration
 from agentbench.cli.terminal_ui.constants import LOGO_PAUSE_SECONDS
-from agentbench.cli.environment import load_project_environment
+from agentbench.cli.environment import load_project_environment, execution_environment_snapshot
 from agentbench.cli.execution import run_benchmark_session
 from agentbench.cli.terminal_ui.logo import print_logo
 from agentbench.cli.terminal_ui.presentation import (
@@ -61,10 +61,12 @@ def configure_parser(parser: ArgumentParser) -> None:
 
 
 def execute(args: Namespace) -> int:
-    load_project_environment(args.env_file)
     try:
-        kwargs: dict[str, object] = {"output_path": args.output, **sdk_arguments(args)}
-    except ProviderSelectionError as exc:
+        load_project_environment(args.env_file)
+        loaded = execution_environment_snapshot()
+        kwargs: dict[str, object] = {"output_path": args.output, "concurrency": loaded.concurrency,
+                                     "environ": loaded.environ, **sdk_arguments(args)}
+    except (ProviderSelectionError, ValueError) as exc:
         print(f"SDK configuration error: {exc}")
         return 2
     if args.model is not None:
@@ -88,6 +90,8 @@ def run(configuration: RunConfiguration | None = None) -> int:
         config.sdk is not None
         or config.sdk_selection is not None
         or config.sdk_options is not None
+        or config.concurrency is not None
+        or config.environ is not None
     ):
         raise ValueError(
             "Configure sdk on the supplied suite_runner, or omit suite_runner"
@@ -125,7 +129,7 @@ def run(configuration: RunConfiguration | None = None) -> int:
     ):
         return 0
 
-    # starting bench
+    # Starting bench
 
     # output LLM data
     llm_activity = LLMActivity(config.output_fn)
@@ -138,6 +142,8 @@ def run(configuration: RunConfiguration | None = None) -> int:
         sdk=config.sdk,
         sdk_selection=config.sdk_selection,
         sdk_options=config.sdk_options,
+        concurrency=config.concurrency,
+        environ=config.environ,
     )
 
     execution = run_benchmark_session(

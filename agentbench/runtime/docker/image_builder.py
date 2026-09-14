@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import re
-import subprocess
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
+
+from agentbench.runtime.contracts.execution import Deadline, RunCancelled, RunControl, RuntimeInfrastructureError
+from .build_coordinator import BuildCoordinator
+from .command import DockerCommandRunner, DockerCommandTimeout
 
 
 class DockerBuildError(RuntimeError):
@@ -25,6 +28,11 @@ IGNORED_PARTS = {
 @dataclass(frozen=True, slots=True)
 class DockerImageBuilder:
     executable: str = "docker"
+    coordinator: BuildCoordinator = field(default_factory=BuildCoordinator)
+    control: RunControl | None = None
+    command_runner: DockerCommandRunner | None = None
+    build_timeout: float = 1800
+    environ: Mapping[str, str] | None = None
 
     def build(
         self,
@@ -33,45 +41,61 @@ class DockerImageBuilder:
         dockerfile: Path,
         repository: str,
         fingerprint_paths: Sequence[Path] | None = None,
+        control: RunControl | None = None,
+        deadline: Deadline | None = None,
+        log_directory: Path | None = None,
     ) -> str:
-        digest = _content_digest(context, fingerprint_paths=fingerprint_paths)
-        tag = f"defuzex-agentbench/{_safe_name(repository)}:{digest[:12]}"
-        inspected = subprocess.run(
-            [self.executable, "image", "inspect", tag],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-        )
-        if inspected.returncode == 0:
+        control = control or self.control
+        deadline = deadline or Deadline.after(self.build_timeout)
+        context = context.resolve()
+        dockerfile = dockerfile.resolve()
+        selected = None if fingerprint_paths is None else (*fingerprint_paths, dockerfile)
+        content_digest = _content_digest(context, fingerprint_paths=selected,
+                                         control=control, deadline=deadline)
+        # Selecting another Dockerfile from the same context changes the build.
+        digest = hashlib.sha256((content_digest + "\0" + str(dockerfile.relative_to(context))).encode()).hexdigest()
+        tag = f"defuzex-agentbench/{_safe_name(repository)}:{digest}"
+        commands = self.command_runner or DockerCommandRunner(self.executable, environ=self.environ)
+
+        def inspect_cached() -> str | None:
+            inspected = commands.run(
+                ["image", "inspect", "--format", '{{index .Config.Labels "abb.build_fingerprint"}}', tag],
+                control=control, deadline=deadline,
+            )
+            if inspected.returncode != 0:
+                return None
+            if inspected.stdout.strip() != digest:
+                raise DockerBuildError(f"Docker image fingerprint does not match: {tag}")
             return tag
 
-        built = subprocess.run(
-            [
-                self.executable,
-                "build",
-                "--tag",
-                tag,
-                "--file",
-                str(dockerfile),
-                str(context),
-            ],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
+        def build_once() -> str:
+            try:
+                built = commands.run(
+                    ["build", "--tag", tag, "--label", f"abb.build_fingerprint={digest}",
+                     "--file", str(dockerfile), str(context)],
+                    control=control, deadline=deadline, timeout=self.build_timeout,
+                    log_directory=log_directory,
+                )
+            except (RunCancelled, DockerCommandTimeout) as exc:
+                raise RuntimeInfrastructureError(
+                    f"Docker build client interrupted for {tag}; daemon build state is unknown"
+                ) from exc
+            if built.returncode != 0:
+                detail = (built.stderr or built.stdout).strip()
+                raise DockerBuildError(f"Docker image build failed: {detail}")
+            return tag
+
+        return self.coordinator.resolve(
+            (self.executable, tag), inspect_cached=inspect_cached, build_once=build_once,
+            control=control, deadline=deadline,
         )
-        if built.returncode != 0:
-            detail = (built.stderr or built.stdout).strip()
-            raise DockerBuildError(f"Docker image build failed: {detail}")
-        return tag
 
 
 def _content_digest(
-    root: Path, *, fingerprint_paths: Sequence[Path] | None = None
+    root: Path, *, fingerprint_paths: Sequence[Path] | None = None,
+    control: RunControl | None = None, deadline: Deadline | None = None,
 ) -> str:
+    root = root.resolve()
     digest = hashlib.sha256()
     candidates: set[Path] = set()
     for selected in fingerprint_paths or (root,):
@@ -81,7 +105,10 @@ def _content_digest(
         if selected.is_file():
             candidates.add(selected)
         elif selected.is_dir():
-            candidates.update(path for path in selected.rglob("*") if path.is_file())
+            for path in selected.rglob("*"):
+                _check(control, deadline)
+                if path.is_file():
+                    candidates.add(path)
 
     files = sorted(
         path
@@ -91,11 +118,25 @@ def _content_digest(
         and path.name != ".env"
     )
     for path in files:
+        _check(control, deadline)
+        if not path.resolve().is_relative_to(root):
+            raise DockerBuildError(f"Fingerprint path escapes build context: {path}")
         relative = path.relative_to(root).as_posix().encode("utf-8")
         digest.update(len(relative).to_bytes(4, "big"))
         digest.update(relative)
-        digest.update(path.read_bytes())
+        digest.update(path.stat().st_size.to_bytes(8, "big"))
+        with path.open("rb") as stream:
+            while block := stream.read(1024 * 1024):
+                _check(control, deadline)
+                digest.update(block)
     return digest.hexdigest()
+
+
+def _check(control: RunControl | None, deadline: Deadline | None) -> None:
+    if control is not None:
+        control.check()
+    if deadline is not None:
+        deadline.check()
 
 
 def _safe_name(value: str) -> str:

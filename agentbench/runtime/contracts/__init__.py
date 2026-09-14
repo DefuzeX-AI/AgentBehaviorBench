@@ -2,6 +2,7 @@
 
 from .runtime import AgentRuntime, RuntimeSession
 from .secrets import EnvironmentSecretResolver, MissingSecretError, SecretResolver
+from .execution import Deadline, DockerCleanupError, RunCancelled, RunControl, RuntimeInfrastructureError, RuntimeLimits
 
 __all__ = [
     "AgentRuntime",
@@ -9,4 +10,10 @@ __all__ = [
     "MissingSecretError",
     "RuntimeSession",
     "SecretResolver",
+    "Deadline",
+    "DockerCleanupError",
+    "RunCancelled",
+    "RunControl",
+    "RuntimeInfrastructureError",
+    "RuntimeLimits",
 ]

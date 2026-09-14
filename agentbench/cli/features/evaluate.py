@@ -10,7 +10,8 @@ from pathlib import Path
 from .base import CommandFeature
 from .run import DEFAULT_REGISTRY_PATH
 from .observe import model_name
-from ..environment import load_project_environment
+from ..environment import load_project_environment, execution_environment_snapshot
+from agentbench.harness.concurrency import ConcurrencyConfigurationError
 from ..sdk import configure_sdk_parser, sdk_arguments
 from agentbench.observe.catalog import enabled_agents, select_agent, resolve_agent
 from agentbench.runtime.interception import DEFAULT_TRACE_MAX_BYTES
@@ -49,6 +50,7 @@ def execute(args):
                 options[name] = value
         plan = evaluation_plan(selection=selected.get('sdk_selection'), options=options)
         load_project_environment(args.env_file)
+        loaded = execution_environment_snapshot()
         records = enabled_agents(args.registry)
         selection = args.selection
         if selection is None:
@@ -69,7 +71,8 @@ def execute(args):
         activity = LLMActivity(print)
         runner = build_trace_suite_runner(max_bytes=args.llm_trace_max_bytes,
             model=args.model, activity_sink=activity,
-            sdk_selection=plan.selection, sdk_options=plan.options)
+            sdk_selection=plan.selection, sdk_options=plan.options,
+            concurrency=loaded.concurrency, environ=loaded.environ)
         execution = run_benchmark_session((agent,), runner=runner, output_path=output,
             output_fn=print, viewer_starter=None if args.no_view else start_viewer_server,
             llm_activity=activity, input_fn=input)
@@ -84,6 +87,9 @@ def execute(args):
             return 1
         print(f'Judge: {reports[-1].status}')
         return 0
+    except ConcurrencyConfigurationError as exc:
+        print(f"Configuration error: {exc}")
+        return 2
     except (KeyboardInterrupt, EOFError):
         print('Evaluation interrupted; artifacts retained.')
         return 130

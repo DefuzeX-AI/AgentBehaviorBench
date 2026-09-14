@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import tempfile
 from collections.abc import Mapping
 from dataclasses import fields, is_dataclass
 from datetime import datetime, timezone
@@ -39,18 +40,29 @@ def redact(value, secrets=()):
 
 
 def atomic_json(path: Path, value):
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(json_value(value), ensure_ascii=False, indent=2), encoding="utf-8")
-    temporary.replace(path)
+    # Independent writers must never share the same intermediate pathname.
+    stream = tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", dir=path.parent,
+        prefix=path.name + ".", suffix=".tmp", delete=False,
+    )
+    temporary = Path(stream.name)
+    try:
+        with stream:
+            json.dump(json_value(value), stream, ensure_ascii=False, indent=2)
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 class TraceStore:
-    def __init__(self, path: Path, run_id: str, *, source="runtime", context=None):
+    def __init__(self, path: Path, run_id: str, *, source="runtime", context=None,
+                 environ=None):
         self.path, self.run_id, self.source = path, run_id, source
         # Authoritative invocation identity, shared by every event in this store.
         self.context = dict(context or {})
         self._lock = threading.Lock()
-        self._secrets = tuple(v for k, v in os.environ.items()
+        environment = os.environ if environ is None else environ
+        self._secrets = tuple(v for k, v in environment.items()
                               if any(x in k.upper() for x in ("KEY", "TOKEN", "SECRET", "PASSWORD")))
 
     def record(self, event: str, **data):

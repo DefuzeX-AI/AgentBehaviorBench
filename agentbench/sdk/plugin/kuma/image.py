@@ -10,7 +10,7 @@ from agentbench.sdk.common.whitelist import whitelist_toml
 
 
 @contextmanager
-def evaluation_agent(agent):
+def evaluation_agent(agent, *, control=None, deadline=None):
     """Stage an Agent and install the adapter's pinned PyPI SDK in its image.
 
     The host does not need an SDK checkout or installation. Dependencies belong
@@ -18,11 +18,26 @@ def evaluation_agent(agent):
     The Agent source and its original Dockerfile remain unchanged.
     """
     requirements = Path(__file__).with_name('requirements.txt')
+    def check():
+        if control is not None:
+            control.check()
+        if deadline is not None:
+            deadline.check()
+    def checked_copy(source, target):
+        check()
+        with open(source, 'rb') as incoming, open(target, 'wb') as outgoing:
+            while chunk := incoming.read(1024 * 1024):
+                check()
+                outgoing.write(chunk)
+        shutil.copystat(source, target)
+        return target
+    check()
     if not requirements.is_file() or requirements.is_symlink():
         raise ValueError('KUMA adapter requirements.txt is missing or linked')
     with tempfile.TemporaryDirectory(prefix='abb-evaluation-') as temporary:
         root = Path(temporary) / 'agent-unit'
-        shutil.copytree(agent.path, root, ignore=_ignore, symlinks=True)
+        shutil.copytree(agent.path, root, ignore=_ignore, symlinks=True,
+                        copy_function=checked_copy)
         if any(p.is_symlink() for p in root.rglob('*')):
             raise ValueError('Agent source must not contain symlinks')
         # SDK atomically updates .gitignore unless this rule already exists.
@@ -56,4 +71,5 @@ def evaluation_agent(agent):
                              '--index-url https://pypi.org/simple '
                              '-r /opt/abb-sdk/requirements.txt\n'
                              'COPY evaluation/ /opt/agent/evaluation/\nUSER ' + users[-1] + '\n')
+        check()
         yield SimpleNamespace(path=root, agent_id=agent.agent_id, framework=agent.framework)

@@ -8,11 +8,15 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from agentbench.harness.registry import AgentRegistration
     from agentbench.harness.result import BenchmarkResult
+    from agentbench.runtime.contracts.execution import RunControl
+    from agentbench.runtime.docker.build_coordinator import BuildCoordinator
+    from agentbench.runtime.services import RuntimeServices
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,14 +75,55 @@ class SDK(Protocol):
     def create_run(self, **kwargs: object) -> SDKRun: ...
 
 
+@dataclass(frozen=True, slots=True)
+class PreparedCase:
+    """Immutable work description passed from preparation to one Case runner."""
+
+    case_index: int
+    case_id: str | None = None
+    artifact_path: Path | None = None
+    content_sha256: str | None = None
+    artifact_sha256: str | None = None
+
+    def __post_init__(self) -> None:
+        if type(self.case_index) is not int or self.case_index < 0:
+            raise ValueError('case_index must be a non-negative integer')
+        if self.case_id is not None and (not isinstance(self.case_id, str) or not self.case_id.strip()):
+            raise ValueError('case_id must be a non-empty string when provided')
+        if self.artifact_path is not None and not isinstance(self.artifact_path, Path):
+            raise TypeError('artifact_path must be a pathlib.Path when provided')
+        if self.artifact_path is not None and not self.artifact_path.is_absolute():
+            raise ValueError('artifact_path must be absolute when provided')
+        for name in ('content_sha256', 'artifact_sha256'):
+            digest = getattr(self, name)
+            if digest is not None and (
+                not isinstance(digest, str) or len(digest) != 64
+                or any(character not in '0123456789abcdef' for character in digest)
+            ):
+                raise ValueError(f'{name} must be a lowercase SHA-256 digest')
+
+
 class EvaluationRunner(Protocol):
-    """Strategy that validates and evaluates one registered Agent."""
+    """Prepare explicit Cases, then execute one Case in an isolated runner."""
 
     def validate_sdk(self, registration: AgentRegistration) -> str: ...
 
-    def run(
-        self, registration: AgentRegistration, **kwargs: object,
+    def prepare_cases(
+        self, registration: AgentRegistration, *, on_progress=None,
+    ) -> tuple[PreparedCase, ...]: ...
+
+    def run_case(
+        self, registration: AgentRegistration, case: PreparedCase, *,
+        on_progress=None, on_step_start=None, on_step_complete=None, on_step_failure=None,
     ) -> BenchmarkResult: ...
+
+
+@dataclass(frozen=True, slots=True)
+class RunnerConcurrencyCapabilities:
+    """Optional plugin promise for isolated Case execution and cancellation."""
+
+    isolated_cases: bool = False
+    cooperative_cancel: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +134,10 @@ class SDKRunnerContext:
     model: str | None
     trace_sink: object
     trace_max_bytes: int
+    control: RunControl | None = None
+    build_coordinator: BuildCoordinator | None = None
+    job_context: Mapping[str, object] | None = None
+    runtime_services: RuntimeServices | None = None
 
 
 @runtime_checkable

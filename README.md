@@ -84,6 +84,33 @@ or headless run:
 agentbench run --no-view --output results/benchmark.json
 ```
 
+To execute up to four Cases at once, set this single value in `.env`:
+
+```dotenv
+ABB_MAX_PARALLEL_CASES=4
+```
+
+The default is `1`. Cases from the same Agent can run together: one Agent with
+four Cases can use all four workers. Across several Agents, the shared pool
+never exceeds the configured Case limit. Inputs within one Case remain ordered.
+ABB prepares each Agent's Case collection once, then gives each Case its own
+runner, container session, working files, trace identity, and result.
+
+The startup line shows the actual pool size, for example
+`Case workers: 4 (configured: 4)`. Image caching and build coordination are
+internal. Each Case keeps its own status, and final results are ordered by
+Agent registration then Case index. Ctrl+C cancels active work, retains finished
+Case results, and records cancelled or skipped Cases explicitly.
+
+Concurrent execution requires an SDK adapter supporting independent Case
+execution and cancellation. Python callers pass
+`ConcurrencySettings(max_parallel_cases=4)` to `SuiteRunner`; the library does
+not implicitly load a dotenv file.
+
+See the [Case concurrency design](docs/Case-Concurrency-Design.md) and
+[implementation guide](docs/Case-Concurrency-Implementation.md) for interfaces,
+changed files, worker/image/container counts, result shape, and validation.
+
 ## Requirements and environment
 
 | Requirement | Why it is needed |

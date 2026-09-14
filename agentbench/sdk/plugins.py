@@ -16,14 +16,12 @@ from .contracts import (
 from .contracts import SDKRunnerContext as SDKRunnerContext
 from .discovery import discover_sdks, load_sdk
 
-
 @dataclass(frozen=True, slots=True)
 class SDKSelection:
     """A resolved SDK value plus its identity for diagnostics."""
 
     reference: SDKReference
     value: object
-
 
 @dataclass(frozen=True, slots=True)
 class EvaluationPlan:
@@ -34,7 +32,6 @@ class EvaluationPlan:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "options", MappingProxyType(dict(self.options)))
-
 
 def resolve_sdk(spec: str | None = None) -> SDKSelection:
     """Select and load one adapter from the SDK directory.
@@ -52,26 +49,10 @@ def resolve_sdk(spec: str | None = None) -> SDKSelection:
             or the selected adapter cannot be loaded or violates the interface.
     """
 
-
-    # checking plugin folder
     requested = None if spec is None else spec.strip()
     if requested == "":
         raise ProviderSelectionError("SDK selection cannot be empty")
 
-    #
-    #(
-    #   SDKReference = (
-    #       name="kuma",
-    #       source="directory",
-    #       object_ref="agentbench.sdk.plugin.kuma.plugin:plugin",
-    #   ),
-    #   SDKReference = (
-    #       name="xxxx2",
-    #       source="directory",
-    #       object_ref="agentbench.sdk.plugin.xxxx2.plugin:plugin",
-    #   ),
-    # )
-    # 因为 Python 标准库没有 JavaScript/Java 那种通用的 Array 类型, 所以选择tuple
     references = discover_sdks()
     if not references:
         raise ProviderSelectionError(
@@ -79,8 +60,6 @@ def resolve_sdk(spec: str | None = None) -> SDKSelection:
             "and plugin.py under agentbench/sdk/plugin/."
         )
 
-
-    # kuma, xxx
     choices = ", ".join(reference.name for reference in references)
     if requested is None:
         if len(references) != 1:
@@ -90,9 +69,6 @@ def resolve_sdk(spec: str | None = None) -> SDKSelection:
             )
         reference = references[0]
     else:
-        # if only 1 sdk, like kuma, auto select kuma
-        # if mutiply agent, and user execute `agentbench evaluate react-agent --sdk xxx2`
-        # then BBA will select xxx2
         reference = next(
             (
                 item
@@ -114,10 +90,8 @@ def resolve_sdk(spec: str | None = None) -> SDKSelection:
             "execution and create_benchmark_runner()."
         )
 
-
     plugin_execution(value)
     return SDKSelection(reference=reference, value=value)
-
 
 def python_sdk_selection(sdk: object) -> SDKSelection:
     """Validate an SDK object explicitly supplied by a Python caller.
@@ -141,7 +115,6 @@ def python_sdk_selection(sdk: object) -> SDKSelection:
         reference=SDKReference(name=reference, source="python", object_ref=reference),
         value=sdk,
     )
-
 
 def evaluation_plan(
     *,
@@ -176,26 +149,17 @@ def evaluation_plan(
     if sdk is not None and selection is not None:
         raise ValueError("Pass sdk or selection, not both")
 
-    # Nomarlly go this way
     if selection is None:
         selection = resolve_sdk() if sdk is None else python_sdk_selection(sdk)
     else:
-        # kuma
         plugin_execution(selection.value)
     return EvaluationPlan(
         selection=selection,
         options={} if options is None else options
     )
 
-
 def plugin_execution(value: object) -> Literal["container", "local"]:
-    """
-    ### 1. 验证：是不是合法 SDK plugin
-    ### 2. 返回：它应该在 container 还是 local 执行（evaluation plan 暂时不需要)
-
-    Validate an SDK's interface and return its execution location.
-
-    Kuma requires container,but local is created for other case gen agent.
+    """Validate an SDK's interface and return its execution location.
 
     Adapter-shaped objects are checked strictly: an invalid adapter must not
     silently fall back to the plain create_run() interface.
@@ -209,14 +173,11 @@ def plugin_execution(value: object) -> Literal["container", "local"]:
             "execution",
         )
     ):
-        # we need obj rather than class
-        # we requires create benchmark runner
         if not callable(getattr(value, "create_benchmark_runner", None)):
             raise ProviderSelectionError(
                 "SDK plugin must expose create_benchmark_runner()"
             )
 
-        # Normally requires container
         execution = getattr(value, "execution", None)
         if execution not in ("container", "local"):
             raise ProviderSelectionError(

@@ -3,6 +3,8 @@ import json
 import shutil
 import math
 import os
+import hashlib
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
@@ -10,7 +12,10 @@ from agentbench.adapter import AdapterInvocation
 from agentbench.harness.errors import ProviderSelectionError
 from agentbench.harness.progress import emit_progress
 from agentbench.harness.result import BenchmarkResult, BenchmarkStepResult
+from agentbench.runtime.contracts.execution import RunControl
 from agentbench.sdk.common.artifacts import Artifacts
+from agentbench.sdk.contracts import PreparedCase
+from agentbench.sdk.common.case_identity import case_content_sha256
 
 from .service import evaluate
 
@@ -27,95 +32,45 @@ class Report:
 
 
 class KumaContainerRunner:
-    """Formal KUMA runner retained behind the KUMA evaluation plugin."""
+    """Prepare a complete Case batch or execute one explicitly selected Case."""
 
-    def __init__(self, *, environ=None, options=None, trace_sink=None, trace_max_bytes=262144):
+    def __init__(self, *, environ=None, options=None, trace_sink=None, trace_max_bytes=262144,
+                 control=None, build_coordinator=None, job_context=None,
+                 runtime_services=None):
         self.environ = dict(os.environ if environ is None else environ)
         options = dict(options or {})
-
-        # 目前支持 'output', 'timeout', 'max_steps', 'case_collection'
         unknown = set(options) - {'output', 'timeout', 'max_steps', 'case_collection'}
         if unknown:
             raise ProviderSelectionError(f'Unsupported container evaluation options: {sorted(unknown)}')
-
-
         self.output = Path(options.get('output', 'results/observe'))
-        # timeout
         self.timeout = options.get('timeout', 2400)
-        if (
-            isinstance(self.timeout, bool)
-            or not isinstance(self.timeout, (int, float))
-            or not math.isfinite(self.timeout)
-            or self.timeout <= 0
-        ):
+        if (isinstance(self.timeout, bool) or not isinstance(self.timeout, (int, float))
+                or not math.isfinite(self.timeout) or self.timeout <= 0):
             raise ProviderSelectionError('Container timeout must be a positive finite number')
-
-
-        # Default None
         self.case_collection = Path(options['case_collection']) if options.get('case_collection') is not None else None
-
-        # Max step
         self.max_steps = options.get('max_steps')
         if self.max_steps is not None and (type(self.max_steps) is not int or self.max_steps < 1):
             raise ProviderSelectionError('max_steps must be a positive integer')
-
         self.trace_sink = trace_sink
         self.trace_max_bytes = trace_max_bytes
-        self._case_fingerprints = {}
-        self._case_batches = {}
+        self.control = control or RunControl()
+        self.build_coordinator = build_coordinator
+        self.job_context = dict(job_context or {})
+        self.runtime_services = runtime_services
 
-    def begin_suite(self, suite_id):
-        """Scope generated-content deduplication to this requested test suite."""
-        self._case_fingerprints = {}
-        self._case_batches = {}
+    def _identity(self, registration, **fields):
+        return {**self.job_context, 'agent_id': registration.agent_id, **fields}
 
-    def _prepare_batch(self, registration, on_progress):
-        """Collect the Registry count completely, before any Agent execution."""
-        count = getattr(registration, 'case_count', 1)
-        if self.case_collection is not None:
-            # Explicit reuse preserves the original collection and never generates. The
-            # saved Case artifacts are read from a `cases` folder beside the collection.
-            collection = json.loads(self.case_collection.read_text())
-            directory = self.output.resolve() / uuid4().hex
-            files = Artifacts(directory)
-            files.save('evaluation/case-collection.json', collection)
-            source_cases = self.case_collection.resolve().parent / 'cases'
-            target_cases = directory / 'evaluation/cases'; target_cases.mkdir(parents=True, exist_ok=True)
-            for entry in collection.get('cases', ()):
-                name = Path(entry.get('artifact', '')).name
-                if not name or not (source_cases / name).is_file():
-                    raise RuntimeError(f'Case collection is missing its saved Case artifact: {name or entry}')
-                shutil.copyfile(source_cases / name, target_cases / name)
-            files.save('run.json', {'schema': 'abb.case_collection.import.v1',
-                                   'status': 'succeeded', 'source': str(self.case_collection.resolve())})
-        else:
-            directory = evaluate(
-                registration, output=self.output, environ=self.environ,
-                timeout=self.timeout, max_steps=self.max_steps, generation_count=count,
-                trace_sink=self.trace_sink, trace_max_bytes=self.trace_max_bytes,
-                on_artifacts_ready=lambda path: emit_progress(
-                    on_progress, stage='benchmark_execution', status='started',
-                    agent_id=registration.agent_id, detail=f'Preparing {count} distinct Cases',
-                    artifact_directory=str(path)))
-            status = json.loads((directory / 'run.json').read_text())
-            if status.get('status') != 'succeeded':
-                raise RuntimeError(f'Case batch generation failed: {directory}')
-        collection = json.loads((directory / 'evaluation/case-collection.json').read_text())
-        from .generation import validate_collection
-        files = Artifacts(directory)
-        try:
-            validate_collection(collection, count=count)
-        except ValueError as exc:
-            files.save('evaluation/batch-selection.json', {
-                'requested_count': count, 'accepted_count': 0, 'status': 'rejected', 'error': str(exc)})
-            status = json.loads((directory / 'run.json').read_text())
-            files.save('run.json', {**status, 'status': 'failed', 'validation': 'failed'})
-            raise RuntimeError(str(exc)) from exc
-        self._case_batches[registration.agent_id] = {
-            'collection': collection, 'next_index': 0, 'cases': directory / 'evaluation/cases'}
-        Artifacts(directory).save('evaluation/batch-selection.json', {
-            'requested_count': count, 'accepted_count': count, 'status': 'accepted'})
-        return self._case_batches[registration.agent_id]
+    def _runtime_options(self, identity):
+        return dict(control=self.control, build_coordinator=self.build_coordinator,
+                    runtime_services=self.runtime_services, identity=identity)
+
+    def _artifacts_ready(self, registration, on_progress, path, identity, detail):
+        emit_progress(
+            on_progress, stage='case_generation' if identity['phase'] == 'generate' else 'benchmark_execution',
+            status='started', detail=detail, artifact_directory=str(path), artifact_run_id=path.name,
+            case_count=registration.case_count, **identity,
+        )
 
     def validate_sdk(self, registration):
         if not (self.environ.get('KUMA_API_KEY') or self.environ.get('DEFUZEX_API_KEY')):
@@ -125,57 +80,177 @@ class KumaContainerRunner:
                 raise ProviderSelectionError(f'Missing Agent evaluation file: {relative}')
         return 'official-container'
 
-    def run_defuzex(self, *args, **kwargs):
-        raise ProviderSelectionError('Legacy run_defuzex options are not supported by the default container core; use run()')
+    # generate cases
+    def prepare_cases(self, registration, *, on_progress=None) -> tuple[PreparedCase, ...]:
+        """Generate/import and validate the entire immutable selection once."""
+        from .generation import validate_collection
 
-    validate_defuzex = run_defuzex
-
-    def run(self, registration, *, on_progress=None, on_step_start=None,
-            on_step_complete=None, on_step_failure=None):
+        self.control.check()
         self.validate_sdk(registration)
-        prepared = self._case_batches.get(registration.agent_id)
-        if prepared is None:
-            prepared = self._prepare_batch(registration, on_progress)
-        index = prepared['next_index']
-        if index >= len(prepared['collection']['cases']):
-            raise RuntimeError('Generated Case batch is exhausted; start a new suite explicitly')
-        prepared['next_index'] += 1
-        entry = prepared['collection']['cases'][index]
-        case_artifact = prepared['cases'] / Path(entry['artifact']).name
-        if not case_artifact.is_file():
-            raise RuntimeError(f'Prepared Case artifact is missing: {case_artifact}')
-        directory = evaluate(registration, output=self.output,
-                             environ=self.environ, timeout=self.timeout, max_steps=self.max_steps,
-                             case_artifact=case_artifact,
-                             excluded_cases=self._case_fingerprints.get(registration.agent_id, ()), trace_sink=self.trace_sink,
-                             trace_max_bytes=self.trace_max_bytes,
-                             on_artifacts_ready=lambda path: emit_progress(
-                                 on_progress, stage='benchmark_execution', status='started',
-                                 agent_id=registration.agent_id, detail='Live artifacts available',
-                                 artifact_directory=str(path)))
+
+        # 生成n个case
+        count = registration.case_count
+        identity = self._identity(registration, phase='generate', case_index=None, case_id=None)
+
+        # 并没有提前拿着生成好的case的情况下，我们走生成case
+        if self.case_collection is None:
+            directory = evaluate(
+                registration, output=self.output, environ=self.environ,
+                timeout=self.timeout, max_steps=self.max_steps, generation_count=count,
+                trace_sink=self.trace_sink, trace_max_bytes=self.trace_max_bytes,
+                **self._runtime_options(identity),
+                on_artifacts_ready=lambda path: self._artifacts_ready(
+                    registration, on_progress, path, identity, f'Preparing {count} distinct Cases'))
+        else:
+            # 如果提前拿着生成好的case的情况下，我们走导入case
+            directory = self.output.resolve() / uuid4().hex
+            files = Artifacts(directory, environ=self.environ)
+            files.save('run.json', {**identity, 'schema': 'abb.case_collection.import.v1',
+                                   'run_id': directory.name, 'artifact_run_id': directory.name,
+                                   'status': 'running', 'source': str(self.case_collection.resolve())})
+        
+        files = Artifacts(directory, environ=self.environ)
         try:
-            result = read_result(directory, registration.agent_id, on_step_start, on_step_complete)
-            from agentbench.sdk.common.case_identity import case_content_sha256
-            case = json.loads((directory / 'evaluation/case.json').read_text())
-            if case['case_id'] != entry['case_id']:
-                raise RuntimeError('Executed Case does not match the prepared collection entry')
-            fingerprint = case_content_sha256(case)
-            seen = self._case_fingerprints.setdefault(registration.agent_id, [])
-            if fingerprint in seen:
-                raise RuntimeError('SDK returned duplicate Case content; requested distinct Cases were not completed')
-            seen.append(fingerprint)
+            self.control.check()
+            if self.case_collection is None:
+                status = json.loads((directory / 'run.json').read_text())
+                if status.get('status') != 'succeeded':
+                    raise RuntimeError(f'Case batch generation failed: {directory}')
+                collection = json.loads((directory / 'evaluation/case-collection.json').read_text())
+            else:
+                collection = json.loads(self.case_collection.read_text())
+                validate_collection(collection, count=count)
+                source_cases = self.case_collection.resolve().parent / 'cases'
+                target_cases = directory / 'evaluation/cases'
+                target_cases.mkdir(parents=True)
+                for entry in collection['cases']:
+                    self.control.check()
+                    source = _collection_artifact(source_cases, entry['artifact'])
+                    shutil.copyfile(source, target_cases / source.name)
+                files.save('evaluation/case-collection.json', collection)
+            validate_collection(collection, count=count)
+            prepared = []
+            artifact_hashes = set()
+            for index, entry in enumerate(collection['cases']):
+                self.control.check()
+                source = _collection_artifact(directory / 'evaluation/cases', entry['artifact'])
+                artifact = json.loads(source.read_text(encoding='utf-8'))
+                if (not isinstance(artifact, dict) or not artifact.get('schema_version')
+                        or not isinstance(artifact.get('case'), dict)):
+                    raise ValueError('Invalid saved SDK Case artifact')
+                path, artifact_hash = _freeze_artifact(
+                    source, directory / 'evaluation/prepared-cases' / f'case-{index + 1:04d}.json',
+                    self.control)
+                if artifact_hash in artifact_hashes:
+                    raise ValueError('Case collection references duplicate saved artifact content')
+                artifact_hashes.add(artifact_hash)
+                prepared.append(PreparedCase(index, entry['case_id'], path,
+                                             entry['content_sha256'], artifact_hash))
+            files.save('evaluation/batch-selection.json', {
+                'requested_count': count, 'accepted_count': count, 'status': 'accepted'})
+            status = json.loads((directory / 'run.json').read_text())
+            files.save('run.json', {**status, 'status': 'succeeded', 'validation': 'succeeded'})
+            return tuple(prepared)
+        except Exception as exc:
+            files.save('evaluation/batch-selection.json', {
+                'requested_count': count, 'accepted_count': 0, 'status': 'rejected', 'error': str(exc)})
+            status = json.loads((directory / 'run.json').read_text())
+            files.save('run.json', {**status, 'status': 'cancelled' if self.control.cancelled else 'failed',
+                                   'validation': 'failed', 'error_type': type(exc).__name__, 'error': str(exc)})
+            raise
+
+    def run_case(self, registration, case: PreparedCase, *, on_progress=None,
+                 on_step_start=None, on_step_complete=None, on_step_failure=None) -> BenchmarkResult:
+        """Execute only the requested prepared Case, without a mutable cursor."""
+        self.control.check()
+        self.validate_sdk(registration)
+        if not isinstance(case, PreparedCase):
+            raise TypeError('run_case requires a PreparedCase')
+        if case.case_index >= registration.case_count:
+            raise ValueError('Prepared Case index exceeds the registered Case count')
+        if (case.case_id is None or case.content_sha256 is None or case.artifact_path is None
+                or case.artifact_sha256 is None):
+            raise ValueError('KUMA requires a prepared Case ID, content digest, artifact path and artifact digest')
+        if not case.artifact_path.is_file() or case.artifact_path.is_symlink():
+            raise ValueError(f'Prepared Case artifact is missing or linked: {case.artifact_path}')
+        if _artifact_digest(case.artifact_path, self.control) != case.artifact_sha256:
+            raise ValueError('Prepared SDK Case artifact was modified after preparation')
+        identity = self._identity(registration, phase='execute', case_index=case.case_index,
+                                  case_id=case.case_id)
+        directory = evaluate(
+            registration, output=self.output, environ=self.environ,
+            timeout=self.timeout, max_steps=self.max_steps, case_artifact=case.artifact_path,
+            expected_case_id=case.case_id, expected_content_sha256=case.content_sha256,
+            trace_sink=self.trace_sink, trace_max_bytes=self.trace_max_bytes,
+            **self._runtime_options(identity),
+            on_artifacts_ready=lambda path: self._artifacts_ready(
+                registration, on_progress, path, identity, 'Live artifacts available'))
+        try:
+            self.control.check()
+            result = read_result(directory, registration.agent_id)
+            executed = json.loads((directory / 'evaluation/case.json').read_text())
+            if executed['case_id'] != case.case_id:
+                raise RuntimeError('Executed Case does not match the prepared Case ID')
+            if case_content_sha256(executed) != case.content_sha256:
+                raise RuntimeError('Executed Case content does not match the prepared Case')
+            emit_progress(
+                on_progress, stage='benchmark_execution', status='succeeded',
+                detail='Validated Input artifacts', artifact_directory=str(directory),
+                artifact_run_id=directory.name, sdk_run_id=result.run_id,
+                event_timing='artifact_replay', case_count=registration.case_count, **identity,
+            )
+            for step in result.steps:
+                if on_step_start:
+                    on_step_start(registration.agent_id, step.input_id, step.payload)
+                if on_step_complete:
+                    on_step_complete(registration.agent_id, step)
             return result
         except Exception as exc:
-            # Container exit zero is not certification: the host must accept its artifacts.
-            Artifacts(directory).save('run.json', {
-                'schema': 'abb.evaluate.run.v1', 'run_id': directory.name,
-                'agent_id': registration.agent_id, 'status': 'failed',
-                'validation': 'failed', 'error_type': type(exc).__name__,
+            status = json.loads((directory / 'run.json').read_text())
+            Artifacts(directory, environ=self.environ).save('run.json', {
+                **status, 'status': 'cancelled' if self.control.cancelled else 'failed',
+                'validation': 'failed', 'error_type': type(exc).__name__, 'error': str(exc),
             })
             raise
 
 
-def read_result(directory, agent_id, on_step_start=None, on_step_complete=None):
+def _collection_artifact(directory: Path, reference: str) -> Path:
+    """Resolve an exported Case file without accepting links or path aliases."""
+    path = directory / Path(reference).name
+    if path.is_symlink() or not path.is_file() or path.resolve().parent != directory.resolve():
+        raise ValueError(f'Case collection is missing its saved Case artifact: {reference}')
+    return path.resolve()
+
+
+def _freeze_artifact(source: Path, target: Path, control: RunControl) -> tuple[Path, str]:
+    """Copy the SDK wire bytes and return their explicit integrity digest."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha256()
+    stream = tempfile.NamedTemporaryFile(dir=target.parent, suffix='.tmp', delete=False)
+    temporary = Path(stream.name)
+    try:
+        with source.open('rb') as incoming, stream:
+            while block := incoming.read(1024 * 1024):
+                control.check()
+                digest.update(block)
+                stream.write(block)
+        temporary.chmod(0o444)
+        temporary.replace(target)
+        return target.resolve(), digest.hexdigest()
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _artifact_digest(path: Path, control: RunControl) -> str:
+    digest = hashlib.sha256()
+    with path.open('rb') as stream:
+        while block := stream.read(1024 * 1024):
+            control.check()
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def read_result(directory, agent_id):
     """Validate the completed artifact contract on the trusted host."""
     def read(relative):
         candidate = directory / relative
@@ -218,19 +293,8 @@ def read_result(directory, agent_id, on_step_start=None, on_step_complete=None):
         value = BenchmarkStepResult(item['input_id'], item['payload'],
                                    AdapterInvocation(result['output'], result.get('raw_output')))
         steps.append(value)
-    # Notify only after every Input passes validation, not during partial validation.
-    for value in steps:
-        # These are persisted completion notifications, not live timing events.
-        if on_step_start:
-            on_step_start(agent_id, value.input_id, value.payload)
-        if on_step_complete:
-            on_step_complete(agent_id, value)
     normalized = Report(report['status'], report.get('confidence'), tuple(report.get('issues', [])),
                         tuple(report.get('evidence_gaps', [])), report['report_id'], report['run_id'],
                         {**report.get('extensions', {}), 'abb_artifact_directory': str(directory)})
     return BenchmarkResult(agent_id, 'container-' + 'sdk', summary['run_id'], 'report_ready',
                            normalized, tuple(steps), len(steps), 'official-container')
-
-
-# Compatibility for callers which imported the original implementation name.
-ContainerBenchmarkRunner = KumaContainerRunner

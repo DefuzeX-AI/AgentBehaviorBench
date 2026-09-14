@@ -7,7 +7,8 @@ from argparse import ArgumentParser, Namespace
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
-from agentbench.cli.environment import load_project_environment
+from agentbench.cli.environment import load_project_environment, execution_environment_snapshot
+from agentbench.harness.concurrency import ConcurrencySettings
 from agentbench.cli.execution import run_benchmark_session
 from agentbench.cli.viewer import start_viewer_server
 from agentbench.cli.registry_status import RegistryStatusError, update_agent_status
@@ -58,12 +59,14 @@ def configure_parser(parser: ArgumentParser) -> None:
 
 
 def execute(args: Namespace) -> int:
-    load_project_environment(args.env_file)
     try:
-        kwargs: dict[str, object] = {"output_path": args.output, **sdk_arguments(args)}
+        load_project_environment(args.env_file)
+        loaded = execution_environment_snapshot()
+        kwargs: dict[str, object] = {"output_path": args.output, "concurrency": loaded.concurrency,
+                                     "environ": loaded.environ, **sdk_arguments(args)}
         if args.registry != DEFAULT_REGISTRY_PATH:
             kwargs["registry_path"] = args.registry
-    except ProviderSelectionError as exc:
+    except (ProviderSelectionError, ValueError) as exc:
         print(f"SDK configuration error: {exc}")
         return 2
     if args.model is not None:
@@ -89,12 +92,15 @@ def certify(
     model: str | None = None,
     viewer_starter=start_viewer_server,
     post_run_input_fn=input,
+    concurrency: ConcurrencySettings | None = None,
+    environ: Mapping[str, str] | None = None,
 ) -> int:
     """Run one adapting Agent and promote it after adapter execution succeeds."""
     if sdk is not None and sdk_selection is not None:
         raise ValueError("Pass sdk or sdk_selection, not both")
     if suite_runner is not None and (
         sdk is not None or sdk_selection is not None or sdk_options is not None
+        or concurrency is not None or environ is not None
     ):
         raise ValueError(
             "Configure sdk on the supplied suite_runner, or omit suite_runner"
@@ -134,6 +140,8 @@ def certify(
             sdk=sdk,
             sdk_selection=sdk_selection,
             sdk_options=sdk_options,
+            concurrency=concurrency,
+            environ=environ,
         ),
         output_path=artifact_base,
         output_fn=output_fn,

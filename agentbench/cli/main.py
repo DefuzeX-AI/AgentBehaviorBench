@@ -8,6 +8,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 from agentbench.harness import SDK, SuiteRunner
+from agentbench.harness.concurrency import ConcurrencySettings
 
 from .configuration import RunConfiguration
 from .features import FEATURES
@@ -50,8 +51,10 @@ def main(
     output_path: str | Path | None = None,
     viewer_starter: Callable[[Path], RunningViewer] = start_viewer_server,
     post_run_input_fn: Callable[[str], str] = input,
+    concurrency: ConcurrencySettings | None = None,
+    environ: Mapping[str, str] | None = None,
 ) -> int:
-    """Run the default benchmark feature through the legacy Python API.
+    """Run the default benchmark feature through the public Python API.
 
     Args:
         input_fn: Function used to collect the initial confirmation.
@@ -70,6 +73,8 @@ def main(
     if (
         sdk is None
         and sdk_options is None
+        and concurrency is None
+        and environ is None
         and _is_stale_console_entry(
             output_path=output_path,
             input_fn=input_fn,
@@ -89,6 +94,8 @@ def main(
             output_path=output_path,
             viewer_starter=viewer_starter,
             post_run_input_fn=post_run_input_fn,
+            concurrency=concurrency,
+            environ=environ,
         )
     )
 

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { parseTrace, sortEvents } from './trace.js';
+import { eventIdentity, parseTrace, sortEvents } from './trace.js';
 import RunSidebar from './RunSidebar.jsx';
 import TraceView from './otel/TraceView.jsx';
 import EvaluationView from './evaluation/EvaluationView.jsx';
@@ -23,6 +23,7 @@ export default function App() {
   const [warnings, setWarnings] = useState([]);
   const [query, setQuery] = useState('');
   const [source, setSource] = useState('');
+  const [agentFilter, setAgentFilter] = useState('');
   const [limit, setLimit] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(false);
   const input = useRef(null);
@@ -61,8 +62,10 @@ export default function App() {
 
   const sources = useMemo(() => [...new Set(events.map(event => event.source))], [events]);
   const filtered = useMemo(() => events.filter(event =>
-    (!source || event.source === source) && event.search.includes(query.toLowerCase()),
-  ), [events, source, query]);
+    (!source || event.source === source) && (!agentFilter || event.agentId === agentFilter)
+      && event.search.includes(query.toLowerCase()),
+  ), [events, source, query, agentFilter]);
+  const eventAgents = useMemo(() => [...new Set(events.map(event => event.agentId).filter(Boolean))], [events]);
 
   async function loadFiles(selected) {
     if (!selected.length) return;
@@ -96,6 +99,7 @@ export default function App() {
     setFiles(names);
     setQuery('');
     setSource('');
+    setAgentFilter('');
     setLimit(PAGE_SIZE);
     setLoading(false);
   }
@@ -109,12 +113,13 @@ export default function App() {
     setWarnings([]);
     setQuery('');
     setSource('');
+    setAgentFilter('');
     setLoading(false);
   }
 
   return (
     <div className="workspace">
-    <RunSidebar runs={runs} selected={selected} busy={listBusy} error={listError}
+    <RunSidebar runs={runs} jobs={catalog.data?.jobs || []} selected={selected} busy={listBusy} error={listError}
       onSelect={id => { setImported(false); setView(current => current === 'flow' ? 'flow' : 'otel'); if (id === selected) setRevision(value => value + 1); else setSelected(id); }}
       onRefresh={() => setRevision(value => value + 1)} />
     <main>
@@ -129,7 +134,9 @@ export default function App() {
       <p className="description">{bound ? `Suite ${suite.data?.suite_id || '加载中'} · 每秒自动同步。选择左侧运行查看详细执行过程。` : selected ? `Run ${selected}：选择下方视图查看运行记录。` : '从左侧选择运行记录自动加载，也可以手动打开 trace 文件。'}</p>
       {bound && <div className="summary" role="status">
         <span>{suite.data?.state === 'complete' ? '评测已结束' : suite.data?.state === 'failed' ? '执行失败或已中断' : '评测进行中'}</span>
+        {suite.data?.effective_workers != null && <span>Case 并发 {suite.data.effective_workers}（配置上限 {suite.data.configured_workers}）· 共 {suite.data.total_case_count} 个 Case</span>}
         {suite.data?.summary && <span>通过 {suite.data.summary.passed} · 未通过 {suite.data.summary.failed} · 跳过 {suite.data.summary.skipped}</span>}
+        {suite.data?.jobs && <span>Case 运行中 {suite.data.jobs.reduce((count, job) => count + (job.counts?.running || 0), 0)} · 排队 {suite.data.jobs.reduce((count, job) => count + (job.counts?.queued || 0), 0)}</span>}
         <span>{suite.updated ? `同步于 ${suite.updated}` : '连接中…'}</span>
       </div>}
       {suite.error && <p role="alert">{suite.error}；已显示的数据保留，连接恢复后继续同步。</p>}
@@ -144,6 +151,10 @@ export default function App() {
           <input type="search" placeholder="搜索事件、节点、run ID 或内容…" value={query}
             onChange={event => { setQuery(event.target.value); setLimit(PAGE_SIZE); }} />
         </label>
+        {!!eventAgents.length && <label><span className="sr-only">Agent</span><select value={agentFilter}
+          onChange={event => { setAgentFilter(event.target.value); setLimit(PAGE_SIZE); }}>
+          <option value="">全部 Agent</option>{eventAgents.map(agent => <option key={agent} value={agent}>{agent}</option>)}
+        </select></label>}
         <label><span className="sr-only">来源</span><select value={source}
           onChange={event => { setSource(event.target.value); setLimit(PAGE_SIZE); }}>
           <option value="">全部来源</option>
@@ -176,7 +187,7 @@ export default function App() {
               <span className="source">{event.source}</span>
               <time dateTime={event.timestamp || undefined}>{event.timestamp || '无时间戳'}</time>
             </summary>
-            <div className="event-meta">{event.filename}{event.runId && ` · run ${event.runId}`}</div>
+            <div className="event-meta">{event.filename}{eventIdentity(event) && ` · ${eventIdentity(event)}`}</div>
             <pre>{JSON.stringify(event.raw, null, 2)}</pre>
           </details>)}
           {filtered.length > limit && <button className="more" onClick={() => setLimit(value => value + PAGE_SIZE)}>再显示 {Math.min(PAGE_SIZE, filtered.length - limit)} 条</button>}

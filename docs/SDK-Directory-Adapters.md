@@ -9,7 +9,7 @@ SDK availability is determined solely by adapter packages under the installed
 
 ```text
 agentbench/sdk/
-  contracts.py          # SDK interfaces and supported interface version
+  contracts.py          # SDK, PreparedCase, and Case execution interfaces
   discovery.py          # Filesystem discovery and selected-module import
   plugins.py            # Selection and execution plans
   runtime.py            # Runner construction
@@ -48,11 +48,13 @@ Export an instance, not a class. The directory supplies the name; the adapter
 does not need a duplicate `name` field.
 
 ```python
-from agentbench.sdk.contracts import SDK_PLUGIN_API_VERSION
+from agentbench.sdk.contracts import RunnerConcurrencyCapabilities
 
 
 class Adapter:
-    api_version = SDK_PLUGIN_API_VERSION
+    concurrency_capabilities = RunnerConcurrencyCapabilities(
+        isolated_cases=True, cooperative_cancel=True,
+    )
     execution = "local"  # Or "container"; the adapter owns actual deployment.
 
     def create_benchmark_runner(self, *, context, options):
@@ -63,22 +65,51 @@ class Adapter:
 plugin = Adapter()
 ```
 
-`context` provides the environment, optional model, trace sink, and trace size
-limit. `options` is a shallow defensive copy exposed as a read-only mapping.
-Each adapter owns its defaults and rejects unsupported options. Do not initialize
-clients, read credentials, contact services, or start Docker at module import.
+`context` provides an immutable environment snapshot, optional model, trace sink,
+trace size limit, cooperative cancellation control, task identity, and shared
+runtime/build services. `options` is a shallow defensive copy exposed as a
+read-only mapping. Each adapter owns its defaults and rejects unsupported
+options. Do not initialize clients, read credentials, contact services, or start
+Docker at module import.
 
-The returned runner implements the existing `EvaluationRunner` interface:
+Only declare `isolated_cases=True` and `cooperative_cancel=True` when every Case
+can execute in an independent runner and all blocking operations cooperate with
+the supplied cancellation control. The capability applies to Cases of the same
+Agent as well as Cases of different Agents.
 
-- `validate_sdk(registration) -> str`: check prerequisites without running the
+The returned runner implements `EvaluationRunner`:
+
+- `validate_sdk(registration) -> str`: check prerequisites without executing the
   Agent or creating a paid Case; return a descriptive execution mode.
-- `run(registration, **callbacks) -> BenchmarkResult`: perform one Case and
-  normalize SDK output to the shared result contract. Support the host progress
-  and step callbacks so live status and exported evidence remain complete.
+- `prepare_cases(registration, *, on_progress=None) -> tuple[PreparedCase, ...]`:
+  prepare the Agent's collection once and return exactly `registration.case_count`
+  immutable descriptors, in consecutive zero-based `case_index` order. Case IDs,
+  when present, must be distinct.
+- `run_case(registration, case, *, on_progress=None, on_step_start=None,
+  on_step_complete=None, on_step_failure=None) -> BenchmarkResult`: execute only
+  the supplied descriptor. Preserve ordered Inputs within the Case and normalize
+  its output and Judge into the shared result contract.
 
-`SuiteRunner` performs the initial preflight and calls `run` once per Case.
-Adapters needing per-Agent checks also validate each registration in `run`.
-An optional `begin_suite(suite_id)` resets suite-scoped state, such as Case batches.
+`PreparedCase` carries `case_index`, optional `case_id`, absolute `artifact_path`,
+and optional content/file SHA-256 digests. It describes prepared data; it must
+not carry a mutable SDK session or a shared next-Case cursor. A file-backed
+adapter verifies the prepared content and gives each execution its own writable
+workspace. Collection generation must not repeat for each Case.
+
+The host constructs a preparation runner and independent Case runners through
+the adapter factory. Preparation and execution share a bounded pool controlled
+by `ABB_MAX_PARALLEL_CASES`; a single Agent with four Cases can use four workers.
+Generation progress uses the parent Agent `job_id` with `phase=generate`. Case
+execution uses a distinct `job_id`, its `agent_job_id`, fixed `case_index` and
+`case_id`, and `phase=execute`. Use `context.job_context` to retain those identities.
+
+The standard `SuiteRunner.run` event callback receives `case_queued`,
+`case_started`, `case_completed`, step/progress events, and Agent lifecycle
+events. `case_completed.case_result` preserves each Case's terminal outcome;
+`agent_completed.item.case_results` aggregates the ordered outcomes after every
+Case is terminal. CLI persistence uses this event stream; display callbacks do
+not write a second copy. `on_tick` allows the coordinator to flush ordinary
+progress at the 200 ms threshold even while no new events arrive.
 
 Raw third-party SDKs need not resemble KUMA. The adapter translates their own
 interfaces into `EvaluationRunner`, including Case delivery, Agent invocation,
@@ -87,8 +118,7 @@ does not install it inside Docker: the container adapter owns that preparation.
 KUMA's evaluation image installs `kuma-defuzex[otel]==0.2.4` from the public PyPI
 index using `sdk/plugin/kuma/requirements.txt`. Its Python import is `kuma`.
 No sibling SDK checkout, copied `src/kuma`, or host SDK installation is needed.
-The old `sdk_source` option and `--sdk-source` flag have been removed. Discovery
-never installs dependencies; image construction owns that step and its cache.
+Discovery never installs dependencies; image construction owns that step and its cache.
 
 For optional host-side SDK development, install the same dependency declaration:
 
@@ -109,9 +139,8 @@ agentbench run --sdk kuma --sdk-options sdk-options.json
 ```
 
 Names are case-insensitive. `run`, `evaluate`, and `certify` use the same resolver.
-Installing an external distribution alone does not add an adapter. CLI package
-entry points, `DISTRIBUTION::NAME`, and `python:MODULE[:OBJECT]` are no longer SDK
-selection mechanisms. Put the import in an adapter package instead.
+Installing an external distribution alone does not add an adapter. Put the
+vendor import in a discovered adapter package.
 
 ```python
 from agentbench.cli.configuration import RunConfiguration
@@ -124,14 +153,14 @@ run(RunConfiguration(sdk_selection=resolve_sdk("kuma")))
 Python callers can still explicitly inject an already imported SDK object or
 adapter through `sdk=...`; this does not register it or affect directory discovery.
 `sdk` and `sdk_selection` are mutually exclusive. `SuiteRunner()` uses directory
-selection; the lower-level `BenchmarkRunner` needs an explicit raw SDK or an
-existing SDK Run. Explicit legacy `run_defuzex` calls are separate and do not
-participate in normal selection.
+selection. The lower-level `BenchmarkRunner` needs an explicit raw SDK or an
+existing SDK Run and implements the same prepare/execute Case contract.
 
 ## Adding another SDK
 
 1. Add `agentbench/sdk/plugin/<sdk_name>/__init__.py` and `plugin.py`.
-2. Implement its runner and normalize results to the shared contract.
+2. Implement `prepare_cases` and `run_case`, normalize each Case result, and
+   declare concurrency capabilities only after testing independent Case state.
 3. Keep vendor imports, dependency installation, credentials, and special options
    inside that directory. Keep generic Agent/Docker execution in `runtime/`.
 4. Check `agentbench sdk list` and `agentbench sdk show <sdk_name>`.

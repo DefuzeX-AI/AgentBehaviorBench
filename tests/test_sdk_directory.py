@@ -23,15 +23,63 @@ from agentbench.sdk.runtime import build_evaluation_runner
 
 MINIMAL_PLUGIN = """
 from types import SimpleNamespace
+from agentbench.sdk.contracts import PreparedCase
 class Adapter:
     execution = 'local'
     def create_benchmark_runner(self, *, context, options):
         return SimpleNamespace(
             validate_sdk=lambda registration: 'test',
-            run=lambda registration, **kwargs: None,
+            prepare_cases=lambda registration, **kwargs: tuple(PreparedCase(i) for i in range(registration.case_count)),
+            run_case=lambda registration, case, **kwargs: None,
             context=context, options=options)
 plugin = Adapter()
 """
+
+
+def test_plugin_needs_explicit_case_concurrency_capabilities(adapter_directory):
+    from agentbench.sdk.contracts import SDKRunnerContext
+    from agentbench.sdk.runtime import build_evaluation_runner_factory
+
+    add_adapter(adapter_directory)
+    factory = build_evaluation_runner_factory(
+        evaluation_plan(), model=None, trace_sink=None, trace_max_bytes=1024, environ={},
+    )
+    assert factory.supports_concurrency is False
+    # Optional concurrency fields do not change directory discovery's protocol.
+    context = SDKRunnerContext(environ={}, model=None, trace_sink=None, trace_max_bytes=1024)
+    assert context.control is None and context.runtime_services is None
+
+
+def test_factory_freezes_environment_and_renews_services_each_suite(adapter_directory, monkeypatch):
+    from agentbench.runtime.contracts.execution import RunControl
+    from agentbench.sdk.runtime import build_evaluation_runner_factory
+
+    add_adapter(adapter_directory)
+    environment = {'OPENROUTER_MODEL': 'snapshot', 'KUMA_API_KEY': 'captured-secret'}
+    factory = build_evaluation_runner_factory(
+        evaluation_plan(), model=None, trace_sink=None, trace_max_bytes=1024,
+        environ=environment,
+    )
+    environment['OPENROUTER_MODEL'] = 'changed'
+    monkeypatch.setenv('OPENROUTER_MODEL', 'process-change')
+    first = factory.open_suite('first-suite', RunControl())
+    second = factory.open_suite('second-suite', RunControl())
+    a = first.create(SimpleNamespace(agent_id='a'), {'job_id': 'job-a'})
+    b = first.create(SimpleNamespace(agent_id='b'), {'job_id': 'job-b'})
+    rerun = second.create(SimpleNamespace(agent_id='a'), {'job_id': 'rerun-a'})
+    assert a is not b
+    assert a.context.environ['OPENROUTER_MODEL'] == 'snapshot'
+    assert a.context.job_context == {'suite_id': 'first-suite', 'job_id': 'job-a', 'agent_id': 'a'}
+    assert a.context.build_coordinator is b.context.build_coordinator
+    assert a.context.build_coordinator is not rerun.context.build_coordinator
+    assert a.context.control is not rerun.context.control
+    with pytest.raises(TypeError):
+        a.context.environ['OPENROUTER_MODEL'] = 'cannot-mutate'
+    first.close()
+    first.close()
+    second.close()
+    with pytest.raises(RuntimeError, match='closed'):
+        first.create(SimpleNamespace(agent_id='c'), {'job_id': 'job-c'})
 
 CASE_FILE_PLUGIN = """
 class Adapter:
@@ -246,6 +294,41 @@ def test_invalid_runner_is_rejected(adapter_directory):
         )
 
 
+def test_agent_loop_only_runner_is_not_a_case_runner(adapter_directory):
+    add_adapter(adapter_directory, source=MINIMAL_PLUGIN + '''
+plugin.create_benchmark_runner = lambda **kw: SimpleNamespace(
+    validate_sdk=lambda registration: 'test', run=lambda registration, **kw: None)
+''')
+    with pytest.raises(ProviderSelectionError, match='invalid runner'):
+        build_evaluation_runner(evaluation_plan(), model=None, trace_sink=None, trace_max_bytes=1024)
+
+
+def test_prepared_case_is_immutable_and_validates_explicit_artifact_identity(tmp_path):
+    from dataclasses import FrozenInstanceError
+    from agentbench.sdk.contracts import PreparedCase
+
+    case = PreparedCase(0, 'case', tmp_path / 'case.json', 'a' * 64, 'b' * 64)
+    assert case.content_sha256 != case.artifact_sha256
+    with pytest.raises(FrozenInstanceError):
+        case.case_index = 1
+    for value in (-1, True, 1.5):
+        with pytest.raises(ValueError, match='case_index'):
+            PreparedCase(value)
+    with pytest.raises(ValueError, match='absolute'):
+        PreparedCase(0, artifact_path=Path('relative.json'))
+    with pytest.raises(ValueError, match='artifact_sha256'):
+        PreparedCase(0, artifact_sha256='not-a-hash')
+
+
+def test_generic_case_preparation_never_creates_sdk_runs():
+    from agentbench.harness import BenchmarkRunner
+
+    sdk = SimpleNamespace(create_run=lambda **kwargs: pytest.fail('Preparation must not create an SDK Run'))
+    cases = BenchmarkRunner(sdk=sdk).prepare_cases(SimpleNamespace(case_count=3))
+    assert tuple(case.case_index for case in cases) == (0, 1, 2)
+    assert all(case.artifact_path is None for case in cases)
+
+
 def test_lazy_sdk_dependency_error_identifies_selected_adapter(adapter_directory):
     add_adapter(
         adapter_directory,
@@ -442,7 +525,7 @@ def test_directory_adapter_retains_real_container_run(adapter_directory):
         },
     )
     agent = AgentRegistration(
-        "offline-echo", fixtures, True, "ready", "fixture", "acceptance"
+        "offline-echo", fixtures, True, "ready", "fixture", "acceptance", case_count=2,
     )
     execution = run_benchmark_session(
         (agent,),
@@ -452,11 +535,16 @@ def test_directory_adapter_retains_real_container_run(adapter_directory):
         viewer_starter=None,
     )
     assert execution.exit_code == 0, f"See {output}"
-    for name in ("case.json", "agent-output.json", "judge.json", "run.json"):
-        assert (output / name).is_file()
-    run = json.loads((output / "run.json").read_text())
-    assert run["report"]["status"] == "pass"
-    assert run["provider_mode"] == "offline-custom"
-    assert run["network"] == "none"
+    run_ids = []
+    for case_index in range(agent.case_count):
+        directory = output / f'case-{case_index:04d}'
+        for name in ("case.json", "agent-output.json", "judge.json", "run.json"):
+            assert (directory / name).is_file()
+        run = json.loads((directory / "run.json").read_text())
+        assert run["report"]["status"] == "pass"
+        assert run["provider_mode"] == "offline-custom"
+        assert run["network"] == "none"
+        run_ids.append(run['run_id'])
+    assert len(set(run_ids)) == agent.case_count
     assert execution.result_log.path.is_file()
     print(f"Acceptance artifacts retained: {output}")

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from agentbench.cli.viewer import RunningViewer, start_viewer_server
 from agentbench.harness import SDK, SuiteRunner
+from agentbench.harness.concurrency import ConcurrencySettings
 from agentbench.runtime.interception import DEFAULT_TRACE_MAX_BYTES
 from agentbench.sdk.plugins import SDKSelection
 
@@ -27,3 +28,5 @@ class RunConfiguration:
     post_run_input_fn: Callable[[str], str] = input
     llm_trace_max_bytes: int = DEFAULT_TRACE_MAX_BYTES
     model: str | None = None
+    concurrency: ConcurrencySettings | None = None
+    environ: Mapping[str, str] | None = None

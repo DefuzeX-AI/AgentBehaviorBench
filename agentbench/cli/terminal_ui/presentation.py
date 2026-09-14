@@ -22,6 +22,7 @@ from .constants import (
     ANSI_MAGENTA,
     ANSI_RED,
     ANSI_RESET,
+    ANSI_YELLOW,
 )
 
 PANEL_WIDTH = AGENT_SEPARATOR_WIDTH
@@ -126,24 +127,21 @@ def print_agent_start(
 def print_agent_complete(
     item: SuiteAgentResult, output_fn: Callable[[str], None]
 ) -> None:
+    color = ANSI_GREEN if item.passed else ANSI_YELLOW if item.status in {"cancelled", "skipped"} else ANSI_RED
+    status = f"{color}{'PASS' if item.passed else item.status.upper()}{ANSI_RESET}"
     if item.error_type is not None and item.completed_case_count == 0:
         output_fn(
-            f"Result: {ANSI_RED}FAILED{ANSI_RESET} | "
+            f"Result: {status} | "
             f"{item.error_type}: {item.error_message}"
         )
         return
 
-    status = (
-        f"{ANSI_GREEN}PASS{ANSI_RESET}"
-        if item.passed
-        else f"{ANSI_RED}FAIL{ANSI_RESET}"
-    )
     detail = (
         f"Result: {status} | "
         f"cases={item.completed_case_count}/{item.requested_case_count}"
     )
     if item.error_type is not None:
-        detail += f" | stopped={item.error_type}: {item.error_message}"
+        detail += f" | error={item.error_type}: {item.error_message}"
     output_fn(detail)
 
 

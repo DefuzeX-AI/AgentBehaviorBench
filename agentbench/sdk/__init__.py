@@ -3,6 +3,7 @@
 from .contracts import (
     EvaluationRunner, EvaluationSDKPlugin, SDK, SDKReport, SDKRun,
     SDKRunFactory, SDKRunnerContext, SDKTestInput, SDKReference,
+    PreparedCase, RunnerConcurrencyCapabilities,
 )
 
 _PLUGIN_EXPORTS = {
@@ -24,5 +25,6 @@ def __getattr__(name):
 __all__ = [
     "EvaluationRunner", "EvaluationSDKPlugin", "SDK", "SDKReport", "SDKRun",
     "SDKRunFactory", "SDKRunnerContext", "SDKTestInput", "SDKReference",
+    "PreparedCase", "RunnerConcurrencyCapabilities",
     "discover_sdks", *sorted(_PLUGIN_EXPORTS),
 ]

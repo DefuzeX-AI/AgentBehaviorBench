@@ -7,7 +7,7 @@ therefore creates one Run per requested Case, saves that Case as a
 executing the Agent. Execution later reuses those files.
 """
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from agentbench.sdk.common.case_identity import case_content_sha256
 
@@ -65,14 +65,14 @@ def validate_collection(collection, *, count):
     """Validate complete selection and content before any execution container starts."""
     if not isinstance(collection, dict):
         raise ValueError('Case collection must be an object')
-    if collection.get('schema', SCHEMA) != SCHEMA:
+    if collection.get('schema') != SCHEMA:
         raise ValueError('Unsupported Case collection schema')
-    if collection.get('requested_count', count) != count:
+    if collection.get('requested_count') != count:
         raise ValueError('Case collection requested count does not match this evaluation')
     cases = collection.get('cases')
     if not isinstance(cases, list) or len(cases) != count:
         raise ValueError(f'SDK returned an unexpected Case count; requested {count}')
-    seen, identifiers = set(), set()
+    seen, identifiers, artifacts = set(), set(), set()
     for entry in cases:
         if not isinstance(entry, dict):
             raise ValueError('Invalid Case collection entry')
@@ -80,12 +80,18 @@ def validate_collection(collection, *, count):
         fingerprint = entry.get('content_sha256')
         if not isinstance(case_id, str) or not case_id.strip():
             raise ValueError('Invalid Case identifier')
-        if not isinstance(artifact, str) or not artifact.startswith(f'{LEDGER}/'):
+        if not isinstance(artifact, str):
             raise ValueError('Invalid Case artifact reference')
-        if not isinstance(fingerprint, str) or len(fingerprint) != 64:
+        path = PurePosixPath(artifact)
+        if (len(path.parts) != 2 or path.parts[0] != LEDGER or path.parts[1] in ('.', '..')
+                or path.as_posix() != artifact or '\\' in artifact):
+            raise ValueError('Invalid Case artifact reference')
+        if (not isinstance(fingerprint, str) or len(fingerprint) != 64
+                or any(character not in '0123456789abcdef' for character in fingerprint)):
             raise ValueError('Invalid Case content fingerprint')
-        if fingerprint in seen or case_id in identifiers:
+        if fingerprint in seen or case_id in identifiers or artifact in artifacts:
             raise ValueError('SDK returned duplicate Case content or IDs; no Agent steps were executed')
         seen.add(fingerprint)
         identifiers.add(case_id)
+        artifacts.add(artifact)
     return collection

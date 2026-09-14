@@ -240,6 +240,9 @@ def parse_result_log(path: str | Path) -> dict[str, object]:
         parse_errors.append({"message": str(exc)})
 
     suite_id: str | None = None
+    configured_workers: int | None = None
+    effective_workers: int | None = None
+    total_case_count: int | None = None
     selected_agent_ids: list[str] = []
     agents: list[dict[str, object]] = []
     step_events_by_agent: dict[str, list[dict[str, object]]] = {}
@@ -249,6 +252,9 @@ def parse_result_log(path: str | Path) -> dict[str, object]:
     for event in events:
         event_type = event.get("event")
         if event_type == "run_started":
+            configured_workers = event.get("configured_workers")
+            effective_workers = event.get("effective_workers")
+            total_case_count = event.get("total_case_count")
             event_suite_id = event.get("suite_id")
             if isinstance(event_suite_id, str):
                 suite_id = event_suite_id
@@ -276,14 +282,38 @@ def parse_result_log(path: str | Path) -> dict[str, object]:
     if suite_error is not None:
         state = "failed"
 
+    from agentbench.observe.view_api import suite_jobs
+    jobs = suite_jobs(events)
+    final_agents = {item.get("agent_id"): item for item in agents}
+    agents = [{**{"agent_id": job["agent_id"], "status": job["status"],
+                  "case_results": [case["result"] for case in job["cases"] if case["result"] is not None]},
+               **final_agents.get(job["agent_id"], {}), "cases": job["cases"]} for job in jobs]
     agents = _merge_step_events(agents, step_events_by_agent)
+    selected_order = {agent_id: index for index, agent_id in enumerate(selected_agent_ids)}
+    agents.sort(key=lambda item: selected_order.get(item.get("agent_id"), len(selected_order)))
+    for item in agents:
+        groups = {}
+        for event in item.get("step_events", []):
+            key = (event.get("job_id"), event.get("case_index"), event.get("case_id"),
+                   event.get("artifact_run_id"))
+            group = groups.setdefault(key, {"job_id": key[0], "case_index": key[1],
+                                            "case_id": key[2], "artifact_run_id": key[3], "events": []})
+            group["events"].append(event)
+        item["case_step_events"] = list(groups.values())
+        for case in item.get("cases", []):
+            case["step_events"] = [event for event in item.get("step_events", [])
+                                   if event.get("case_index") == case["case_index"]]
 
     return {
         "path": str(result_path),
         "suite_id": suite_id,
+        "configured_workers": configured_workers,
+        "effective_workers": effective_workers,
+        "total_case_count": total_case_count,
         "state": state,
         "selected_agent_ids": selected_agent_ids,
         "agents": agents,
+        "jobs": jobs,
         "summary": summary,
         "suite_error": suite_error,
         "parse_errors": parse_errors,
@@ -338,7 +368,7 @@ def _merge_step_events(
         merged.append(
             {
                 "agent_id": agent_id,
-                "benchmark": None,
+                "case_results": [],
                 "error": {
                     "type": "Incomplete",
                     "message": "Agent did not produce a final suite result.",

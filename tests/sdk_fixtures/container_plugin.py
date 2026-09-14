@@ -7,6 +7,7 @@ from pathlib import Path
 
 from agentbench.adapter import AdapterInvocation
 from agentbench.harness.result import BenchmarkResult, BenchmarkStepResult
+from agentbench.sdk.contracts import PreparedCase
 from agentbench.runtime.docker.policy import DockerPolicy
 
 
@@ -22,7 +23,7 @@ class Runner:
     def __init__(self, options):
         self.image = options["image"]
         self.fixtures = Path(options["fixtures"]).resolve()
-        self.output = Path(options["output"]).resolve()
+        self.output_root = Path(options["output"]).resolve()
 
     def validate_sdk(self, registration):
         subprocess.run(
@@ -30,8 +31,12 @@ class Runner:
         )
         return "offline-custom-container"
 
-    def run(self, registration, **callbacks):
-        self.output.mkdir(parents=True, exist_ok=True)
+    def prepare_cases(self, registration, *, on_progress=None):
+        return tuple(PreparedCase(index) for index in range(registration.case_count))
+
+    def run_case(self, registration, case, **callbacks):
+        output = self.output_root / f'case-{case.case_index:04d}'
+        output.mkdir(parents=True, exist_ok=True)
         command = [
             "docker",
             "run",
@@ -50,21 +55,21 @@ class Runner:
             "--mount",
             f"type=bind,source={self.fixtures},target=/checks,readonly",
             "--mount",
-            f"type=bind,source={self.output},target=/artifacts",
+            f"type=bind,source={output},target=/artifacts",
             "--entrypoint",
             "python",
             self.image,
             "/checks/container_run.py",
         ]
         result = subprocess.run(command, capture_output=True, text=True, timeout=60)
-        (self.output / "container.log").write_text(
+        (output / "container.log").write_text(
             result.stdout + result.stderr, encoding="utf-8"
         )
         if result.returncode:
             raise RuntimeError(
-                f"Offline container failed; see {self.output / 'container.log'}"
+                f"Offline container failed; see {output / 'container.log'}"
             )
-        record = json.loads((self.output / "run.json").read_text())
+        record = json.loads((output / "run.json").read_text())
         step = BenchmarkStepResult(
             record["input_id"],
             record["payload"],
