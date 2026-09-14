@@ -7,6 +7,8 @@ from agentbench.harness.session import SuiteProvenanceError, case_from_json
 from agentbench.harness.session.capabilities import manual_recovery
 from .state import AgentSeed
 
+UNRESOLVED_ATTEMPT_STATES = frozenset({'dispatched', 'running', 'retrying', 'waiting_judge', 'reconciling'})
+
 
 def resume_seeds(store, *, selection=None, replay=False):
     """Return Agent seeds; completed verdicts never enter the recovery queue.
@@ -37,11 +39,18 @@ def resume_seeds(store, *, selection=None, replay=False):
                 seed.retry_at[index] = case['retry_at']
             prior = case_from_json(case['result']) if case.get('result') else None
             selected = selection is None or (agent, index) in selection
-            if prior is not None and (case['execution_status'] == 'completed' or not selected):
+            if prior is not None and case['execution_status'] == 'completed':
                 seed.results[index] = prior
                 continue
             if not selected:
-                seed.results[index] = _blocked(agent, case, 'Not selected for this recovery', 'skipped')
+                if attempts and case['execution_status'] in UNRESOLVED_ATTEMPT_STATES:
+                    # This placeholder is persisted with the aggregate result.
+                    # Skipping selection must not authorize replay of unknown work.
+                    saved = case.get('prepared_case') or {}
+                    seed.results[index] = _pending_reconciliation(
+                        agent, case, reusable=bool(saved.get('artifact_path') and saved.get('artifact_sha256')))
+                else:
+                    seed.results[index] = prior or _blocked(agent, case, 'Not selected for this recovery', 'skipped')
                 continue
             try:
                 saved = store.prepared_case(agent, index)
@@ -69,15 +78,12 @@ def resume_seeds(store, *, selection=None, replay=False):
                                     error_type=error.get('type'), error_message=error.get('message'))
                     from agentbench.harness.session import case_to_json
                     case['result'] = case_to_json(prior)
-            if attempts and case['execution_status'] in {'dispatched', 'running', 'retrying', 'waiting_judge', 'reconciling'}:
-                directory = case.get('artifact_directory')
-                if directory and index in prepared:
-                    pending = _blocked(agent, case, 'Reconcile the original Attempt before continuing')
-                    seed.recoveries[index] = replace(pending, artifacts={
-                        'directory': directory, 'recovery': {'action': 'inspect_attempt', 'automatic': False}})
+            if attempts and case['execution_status'] in UNRESOLVED_ATTEMPT_STATES:
+                pending = _pending_reconciliation(agent, case, reusable=index in prepared)
+                if pending.artifacts['recovery']['action'] == 'inspect_attempt':
+                    seed.recoveries[index] = pending
                 else:
-                    seed.results[index] = _blocked(agent, case, 'Interrupted Attempt lacks recoverable artifacts',
-                                                   prevent_replay=True)
+                    seed.results[index] = pending
                 continue
             if prior is not None:
                 recovery = (prior.artifacts or {}).get('recovery') or {}
@@ -101,6 +107,19 @@ def resume_seeds(store, *, selection=None, replay=False):
                     seed.waiting_results[index] = prior
         seeds[agent] = seed
     return seeds
+
+
+def _pending_reconciliation(agent, case, *, reusable):
+    """Keep an interrupted Attempt's identity and SDK evidence for later inspection."""
+    pending = _blocked(agent, case, 'Reconcile the original Attempt before continuing')
+    artifacts = dict(pending.artifacts or {})
+    directory = case.get('artifact_directory') or artifacts.get('directory')
+    if not directory or not reusable:
+        return _blocked(agent, case, 'Interrupted Attempt lacks recoverable artifacts', prevent_replay=True)
+    artifacts.update(directory=directory, recovery={
+        'action': 'inspect_attempt', 'automatic': False, 'allow_replay': False,
+        'reason': pending.error_message})
+    return replace(pending, artifacts=artifacts)
 
 
 def _blocked(agent, case, reason, status='failed', *, prevent_replay=False, artifact_block=False):

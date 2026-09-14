@@ -145,3 +145,9 @@ implementation does not reconstruct arbitrary Agent memory or pretend cleanup
 occurred. The public SDK cannot turn every terminal Judge failure into a new
 Judge-only evaluation, nor does a successful CaseGen request status necessarily
 provide an exportable Case file. Those cases retain evidence and a clear reason.
+
+Provenance covers source files, declared requirements, public settings and host
+SDK distribution versions. It does not yet pin the resolved Docker image ID,
+base image digest or every container dependency version. Rebuilding a mutable
+base image or dependency range can therefore change runtime bytes without a
+source change; this is not a guarantee of bit-identical execution environments.
