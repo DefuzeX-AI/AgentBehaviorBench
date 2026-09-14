@@ -219,6 +219,24 @@ def test_unready_downloaded_agents_do_not_enter_default_run():
     assert all(agent.status == 'ready' and agent.enabled for agent in selected)
 
 
+@pytest.mark.parametrize('host,path,method,allowed', [
+    ('query1.finance.yahoo.com', '/ws/fundamentals-timeseries/v1/finance/timeseries/AAPL', 'GET', True),
+    ('query1.finance.yahoo.com', '/ws/fundamentals-timeseries/v1/finance/timeseries/AAPL', 'POST', False),
+    ('query1.finance.yahoo.com', '/ws/unrelated', 'GET', False),
+    ('www.yahoo.com', '/', 'GET', True),
+    ('ca.yahoo.com', '/', 'GET', True),
+    ('ca.yahoo.com', '/account', 'GET', False),
+    ('api.openai.com', '/v1/responses', 'POST', False),
+])
+def test_native_yahoo_redirects_and_complementary_api_keep_precise_egress(monkeypatch, host, path, method, allowed):
+    monkeypatch.syspath_prepend(str(ROOT/'agentbench/services/model-interceptor/src'))
+    from defuzex_model_interceptor.routing.policy import EgressPolicy
+    config = InterceptionConfig.from_agent_dir(ROOT/'resources/agents/03-trading-agents')
+    policy = EgressPolicy(config)
+    request = SimpleNamespace(pretty_host=host, path=path, method=method, port=443)
+    assert policy.permits_tool(request) is allowed
+
+
 @pytest.mark.skipif(not os.getenv('ABB_AGENT_IMAGE_ACCEPTANCE'), reason='Opt-in real downloaded Agent images')
 @pytest.mark.parametrize('unit,agent_id', [('03-trading-agents', 'trading-agents'),
                                          ('04-gpt-researcher', 'gpt-researcher')])

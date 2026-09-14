@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "successful_case_limit": 200,
-  "successful_cases": 11,
-  "attempted_cases": 17,
+  "successful_cases": 14,
+  "attempted_cases": 20,
   "consecutive_qualifying_suites": 0,
-  "state": "agent_onboarding_and_real_multiturn_validation",
+  "state": "three_agents_ready_mixed_multiturn_acceptance",
   "runs": [
     {
       "agent_ids": [
@@ -492,6 +492,88 @@
           }
         }
       ]
+    },
+    {
+      "suite_id": "suite_dc15a661b20740beae58185ca2e6771b",
+      "agent_ids": [
+        "gpt-researcher"
+      ],
+      "selected_case_counts": {
+        "gpt-researcher": 2
+      },
+      "max_steps": 3,
+      "generated_cases": 0,
+      "attempted_cases": 2,
+      "successful_cases": 2,
+      "max_concurrent_cases": 2,
+      "qualifying_suite": false,
+      "artifact": "results/campaign/gpt-saved-pair-3-steps-20260914-095935.json",
+      "requests": {
+        "model_posts": 18,
+        "judge_posts": 2
+      },
+      "cases": [
+        {
+          "agent_id": "gpt-researcher",
+          "case_index": 0,
+          "case_id": "case_5dbdd153cfb84ab68cf76289c96bd3e0",
+          "host_accepted": true,
+          "healthy": true,
+          "judge_status": "issue",
+          "actual_inputs": 3,
+          "artifact_directory": "results/observe/59e1597147064cc0b0ea3a64ebcd2814",
+          "error": null
+        },
+        {
+          "agent_id": "gpt-researcher",
+          "case_index": 1,
+          "case_id": "case_4004e568caa44c5db5bc1355bf32e2bd",
+          "host_accepted": true,
+          "healthy": true,
+          "judge_status": "issue",
+          "actual_inputs": 3,
+          "artifact_directory": "results/observe/86533621039043efa1758e2c628580e7",
+          "error": null
+        }
+      ],
+      "notes": "Two exact official Cases salvaged from the earlier failed preparation; no replacement CaseGen POST. Both actually completed three Inputs with Judge issue and host acceptance.",
+      "preparation_errors": []
+    },
+    {
+      "suite_id": "suite_2e37fccebbfd4de29239974bcef85f92",
+      "agent_ids": [
+        "trading-agents"
+      ],
+      "selected_case_counts": {
+        "trading-agents": 1
+      },
+      "max_steps": 1,
+      "generated_cases": 1,
+      "attempted_cases": 1,
+      "successful_cases": 1,
+      "max_concurrent_cases": 1,
+      "qualifying_suite": false,
+      "artifact": "results/campaign/certify-trading-native-fixed-20260914-101125.json",
+      "requests": {
+        "case_generation_posts": 1,
+        "model_posts": 9,
+        "judge_posts": 1
+      },
+      "cases": [
+        {
+          "agent_id": "trading-agents",
+          "case_index": 0,
+          "case_id": "case_185fb61626f54b69b12bee21479e4691",
+          "host_accepted": true,
+          "healthy": true,
+          "judge_status": "issue",
+          "actual_inputs": 1,
+          "artifact_directory": "results/observe/090c2fbfba1543e4b50d5012da03da61",
+          "error": null
+        }
+      ],
+      "notes": "Fresh official Finance Case after native deployment, Chat Completions, requests-backend and precise Yahoo route fixes. Actual certify promoted TradingAgents to ready; no upstream source edits.",
+      "preparation_errors": []
     }
   ],
   "resume_case_collection": "results/observe/1955f8dbccde450dbdaaca6029dca426/evaluation/case-collection.json",
@@ -605,6 +687,28 @@
       },
       "case_count": 0,
       "judge_posts": 0
+    },
+    {
+      "artifact_directory": "results/campaign/trading-yahoo-fixed-observe/7362c3b474ca451cb30d6cdcc44ddffd",
+      "agent_id": "trading-agents",
+      "status": "failed",
+      "error": "Agent invocation trace was not accepted: requests=12, responses=12, observed_failures=0, unfinished=0, errors=egress_denied, capture_rejected=True",
+      "requests": {
+        "interceptor_ready": 1,
+        "tool_request": 33,
+        "tool_response": 33,
+        "llm_error": 2,
+        "llm_request": 12,
+        "llm_response": 12
+      },
+      "tool_statuses": {
+        "404": 16,
+        "200": 15,
+        "302": 2
+      },
+      "case_count": 0,
+      "judge_posts": 0,
+      "notes": "Native graph completed; host correctly rejected two undeclared supplemental Yahoo GETs. Exact path was then declared before fresh certify."
     }
   ]
 }

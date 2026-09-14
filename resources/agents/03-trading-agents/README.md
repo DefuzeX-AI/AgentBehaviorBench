@@ -20,6 +20,11 @@ into `/v1/responses`, which is not this adapter's protocol. Yahoo consent redire
 allow only the observed homepage GETs on `www.yahoo.com` and `ca.yahoo.com` in
 addition to finance APIs.
 
+`YF_DISABLE_CURL_CFFI=1` selects yfinance's upstream requests backend inside this
+intercepted deployment. Native curl impersonation returned Yahoo 429 through the
+proxy; the native requests backend returned real bars through that same proxy.
+No market responses, upstream source code or interception policy are replaced.
+
 Use `smoke-input.json` for native observe. The deployment declares AAPL and
 2026-09-11 in `[adapter.context.research_defaults]`, also disclosed in the Agent
 Profile. This follows the upstream main.py pattern of configured program
@@ -29,8 +34,10 @@ are retained as `raw_output.research_request`. Memory is explicit Case
 conversation; temporary native cache/report/memory directories are cleared after
 each invocation. A new Case never inherits another Case's state.
 
-Status: **adapting**. Image and boundary validation do not establish certification.
-Actual certify is pending a compatible fresh Case and successful native execution.
+Status: **ready** after actual certification on 2026-09-14. Native execution,
+interception, SDK evidence and Judge were accepted. The Finance Case asked for
+accounting work outside this deployment, so its behavior score is not evidence
+of stock-research quality; that Case-scope limitation is retained in the ledger.
 Onboarding findings and validation are recorded in
 [the campaign](../../../docs/Benchmark-Repair-Campaign.md).
 

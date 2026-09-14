@@ -14,7 +14,7 @@
 
 ## 状态
 
-当前：OpenRouter 新 key 已验证可用；ReAct 与 GPT Researcher 已真实 certify 为 ready。累计有效完成 11 / 17 次 Case 执行尝试，连续合格混合 suite 为 0。TradingAgents 的配置输入与模型协议已修正，Yahoo 数据服务与地区跳转仍在验证；两个保存的 GPT Researcher 三轮 Case 正在复用执行。以下按时间保留修复历史，最新计数以 Benchmark-Campaign-Ledger.json 为准。
+当前：OpenRouter 新 key 可用；三个 Agent 均已真实 certify 为 ready。累计有效完成 14 / 20 次 Case 执行尝试，连续合格混合 suite 为 0。两 Agent × 3 Cases 的五轮 suite 正在执行，下一阶段为三 Agent 混合验收。以下保留修复历史，最新计数以 Benchmark-Campaign-Ledger.json 为准。
 
 里程碑：`ac1b659` 保存此前并发重构和审查基线。首批修复包含控制流 span 关闭、host callback 边界、关闭 stdin、Docker 二次清理超时，以及按已记录终态验收 trace；策略、认证、转换、采集故障仍拒绝。
 
@@ -108,3 +108,16 @@ Issue #39：主机边界与当前镜像真实断网验收通过；后续新增�
 - 主机回归 246 passed / 8 opt-in skipped；新增 Trading 协议断网容器验收单独通过。原生 observe、模型探针及仅生成请求分别记账，不算完成 Case。
 
 上游依据：[TradingAgents provider 配置](https://github.com/TauricResearch/TradingAgents/blob/be952b8eccb49720509af544c6675233bc1f10d0/tradingagents/llm_clients/openai_client.py)、[GPT Researcher source API](https://github.com/assafelovic/gpt-researcher/blob/6f998577d547b1e54ec662dac63583aa11e3b84b/gpt_researcher/agent.py)、[KUMA 错误诊断](https://github.com/DefuzeX-AI/KUMA-DefuzeX/blob/main/docs/public-error-diagnostics.zh-CN.md)。
+
+## 10:15：TradingAgents 真实认证完成
+
+- Yahoo 同容器对照：原生 curl 直连可取 5 行行情，经透明代理时 crumb/chart 为 429；相同代理中的 requests 客户端为 200。进一步交叉检查 UA：curl 使用精简 UA 后成功，requests 使用浏览器 UA 也成功。上游支持的 YF_DISABLE_CURL_CFFI=1 让原生 yfinance 在代理内实际取得 5 行数据；不用猜测为账户额度耗尽。
+- 在 manifest 声明该 native backend。Issue39 真实断网容器回归修前失败、修后通过。行情 Agent 全图已跑完，但 host 仍正确拒绝未声明的 /ws/fundamentals-timeseries/v1/finance/timeseries/AAPL；补齐精确 GET 路由。新增七个真实 EgressPolicy 边界测试，拒绝其他方法、路径与模型接口。
+- 最终 fresh certify：1 CaseGen、9 个真实模型请求、1 Judge；execution succeeded、OTel complete、evidence captured、submission committed、Judge issue 且无证据缺口。宿主接受后 certify 自动更新 TradingAgents 为 ready。原始 artifact：results/observe/090c2fbfba1543e4b50d5012da03da61。
+- Judge issue 的原因是官方 Finance Case 要求季度会计结账，与行情分析 Agent 不符。CaseGen wire 确认 agent_description / behavior_spec / CAND-012 坐标均正确，SDK 0.2.4 并未漏传。它的 evidence_capabilities=[artifact_snapshot, agent_response_claim] 也符合官方 derive_casegen_evidence_capabilities 的实现；不能虚构 tool_call wire 能力去修复服务端场景匹配。
+- GPT Researcher 保存的两个 Case 均实际执行三轮，所有 prior user/final-answer 按原文进入后续 messages；两 Case 首轮独立。工具参数与全文结果被 SDK 捕获，source URLs 使用两个 native API 合并后非空。Judge 正确识别了后轮换错文章、编造未执行的 Tavily 引用等真实 Agent 行为问题。证据：Research-Three-Turn-Acceptance-2026-09-14.json。
+- KUMA 会过滤不在允许列表的额外 span 属性并保留 partial 标记；本次工具 arguments/result 都是 present，Judge 无 evidence_gaps。没有把 partial 改成 complete。
+- 下一批 ReAct 从 basic-safety-research@1 改为官方可用 Research CAND-009@1，检验是否减少 Terraform/性能基准等超出搜索能力的 Case；旧 Case 和报告保留。这是显式场景选择实验，尚不宣称解决上游 Case 匹配。
+- 全套主机 253 passed / 8 opt-in skipped；新增真实容器回归另行通过。当前等待两 Agent 五轮 suite 完成，再运行三 Agent × 3～5 Cases。
+
+上游依据：[yfinance HTTP backend](https://github.com/ranaroussi/yfinance/blob/main/yfinance/_http.py)、[KUMA 策略组](https://github.com/DefuzeX-AI/KUMA-DefuzeX/blob/main/docs/strategy-groups.zh-CN.md)。

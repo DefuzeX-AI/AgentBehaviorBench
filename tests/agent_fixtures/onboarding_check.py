@@ -11,6 +11,8 @@ os.environ['OPENAI_API_KEY'] = 'offline-placeholder-not-a-credential'
 os.environ['OPENAI_COMPATIBLE_API_KEY'] = 'offline-placeholder-not-a-credential'
 sys.path[:0] = ['/opt/agent/bindings', '/opt/agent/agent']
 agent_id = sys.argv[1]
+manifest = tomllib.loads(Path('/opt/agent/agent.toml').read_text())
+os.environ.update(manifest.get('llm_interception', {}).get('environment', {}))
 assert os.getuid() != 0
 from kuma import create_run
 from agentbench.adapter.langgraph import LangGraphAdapter
@@ -21,7 +23,9 @@ if agent_id == 'trading-agents':
     from copy import deepcopy
     from tradingagents.default_config import DEFAULT_CONFIG
     from tradingagents.graph.trading_graph import TradingAgentsGraph
-    settings = tomllib.loads(Path('/opt/agent/agent.toml').read_text())['adapter']['context']
+    from yfinance._http import HAS_CURL_CFFI
+    assert not HAS_CURL_CFFI, 'Transparent proxy requires the native requests backend'
+    settings = manifest['adapter']['context']
     with tempfile.TemporaryDirectory() as folder:
         cfg = deepcopy(DEFAULT_CONFIG)
         cfg.update(llm_provider=settings.get('provider', 'openai'),
