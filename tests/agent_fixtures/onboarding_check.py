@@ -39,10 +39,20 @@ if agent_id == 'trading-agents':
         assert state['past_context'] == 'Remember ONLY ALPHA'
         details = {'native_graph_nodes': list(native.graph.nodes)}
 elif agent_id == 'gpt-researcher':
+    import asyncio
     import torch
     import tiktoken
+    from unittest.mock import patch
     from gpt_researcher import GPTResearcher
-    native = GPTResearcher('Academic research', config_path='/opt/agent/bindings/research.json',
+    from research import query_from_messages
+    current = 'Continue the article comparison'
+    conversation = query_from_messages({'messages': [
+        {'role': 'user', 'content': 'Remember ONLY ALPHA for this Case'},
+        {'role': 'assistant', 'content': 'Previous unverified research discussion'},
+        {'role': 'user', 'content': current},
+    ]})
+    native = GPTResearcher(conversation,
+                           config_path='/opt/agent/bindings/research.json',
                            verbose=False, mcp_strategy='disabled')
     assert native.cfg.retrievers == ['pubmed_central']
     assert native.cfg.embedding_provider == 'huggingface'
@@ -54,8 +64,45 @@ elif agent_id == 'gpt-researcher':
     for name in encodings:
         encoding = tiktoken.get_encoding(name)
         assert encoding.decode(encoding.encode('Biomedical evidence')) == 'Biomedical evidence'
+    searched, selected, planned, written = [], [], [], []
+    class OfflineSearch:
+        requires_scraping = False
+        def __init__(self, query, **kwargs):
+            searched.append(query)
+        def search(self, max_results=1):
+            return []
+    native.retrievers = [OfflineSearch]
+    async def plan_completion(*args, **kwargs):
+        planned.append(kwargs['messages'])
+        return '["Clinical evidence for ALPHA"]'
+    async def report_completion(*args, **kwargs):
+        written.append(kwargs['messages'])
+        return 'Offline native report'
+    async def select_completion(*args, **kwargs):
+        selected.append(kwargs['messages'])
+        return '{"server":"Researcher","agent_role_prompt":"Research public literature"}'
+    async def delegated_research():
+        return []
+    async def verify_native_context_hooks():
+        with patch('gpt_researcher.actions.agent_creator.create_chat_completion', select_completion), \
+             patch.object(native.research_conductor, 'conduct_research', delegated_research):
+            await native.conduct_research()
+        with patch('gpt_researcher.actions.query_processing.create_chat_completion', plan_completion):
+            queries = await native.research_conductor.plan_research(native.query)
+        assert queries == ['Clinical evidence for ALPHA']
+        native.context = 'Offline article fixture: https://example.org/article'
+        with patch('gpt_researcher.actions.report_generation.create_chat_completion', report_completion):
+            assert await native.write_report() == 'Offline native report'
+    asyncio.run(verify_native_context_hooks())
+    assert searched == [conversation]
+    assert conversation in selected[0][-1]['content']
+    assert conversation in planned[0][-1]['content']
+    assert conversation in written[0][-1]['content']
+    assert native.query == conversation and 'prompt_family' not in native.kwargs
     details = {'native_retrievers': native.cfg.retrievers, 'embedding_dimensions':384,
-               'torch':torch.__version__, 'offline_tokenizers':encodings}
+               'torch':torch.__version__, 'offline_tokenizers':encodings,
+               'native_context_paths':['agent_selection','planning','writing'],
+               'native_entrypoint_checked':True}
 else:
     raise ValueError(agent_id)
 adapter.close()

@@ -210,6 +210,80 @@ def test_pubmed_parallel_requests_share_cooldown_even_after_failure():
     assert all(b - a >= 0.03 for a, b in zip(starts, starts[1:]))
 
 
+@pytest.mark.parametrize('scenario', ['single', 'conversation', 'long_query'])
+def test_native_pubmed_transport_preserves_context_without_raw_history_search(monkeypatch, scenario):
+    """Exercise the real upstream retriever through ABB's observed binding.
+
+    A bounded HTTP double reproduces NCBI's 414 response for long GET URLs.
+    Conversation history belongs in LLM planning/writing prompts, not the raw
+    search term. A long standalone search uses form POST without truncation.
+    """
+    import asyncio
+    import sys
+    import requests
+
+    module = binding('04-gpt-researcher', 'research.py')
+    module._PUBMED_REQUESTS = module.PubMedRequestGate(interval=0)
+    source = ROOT/'resources/agents/04-gpt-researcher/agent/gpt_researcher/retrievers/pubmed_central/pubmed_central.py'
+    spec = importlib.util.spec_from_file_location('native_pubmed', source)
+    native = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(native)
+    messages = [{'role': 'user', 'content': 'Find clinical evidence for cancer therapy'}]
+    if scenario == 'conversation':
+        messages += [{'role': 'assistant', 'content': 'Prior discussion 癌症证据 ' * 300},
+                     {'role': 'user', 'content': 'Continue with the same article'}]
+    elif scenario == 'long_query':
+        messages[0]['content'] = 'cancer therapy ' * 500
+    expected_context = module.query_from_messages({'messages': messages})
+    expected_query = messages[-1]['content']
+    calls = []
+
+    def respond(method, url, *, params=None, data=None, **kwargs):
+        assert url.startswith('https://eutils.ncbi.nlm.nih.gov/entrez/eutils/')
+        request = requests.Request(method, url, params=params, data=data).prepare()
+        calls.append((method, url, params if params is not None else data))
+        response = requests.Response()
+        response.request, response.url = request, request.url
+        response.status_code = 414 if len(request.url.encode()) > 4096 else 200
+        if url.endswith('esearch.fcgi'):
+            response._content = b'{"esearchresult":{"idlist":["123"]}}'
+        else:
+            assert url.endswith('efetch.fcgi') and method == 'GET'
+            response._content = b'<article><article-title>Real parser fixture</article-title><abstract>Evidence</abstract><body>Full text</body></article>'
+        return response
+
+    monkeypatch.setattr(requests, 'get', lambda url, **kw: respond('GET', url, **kw))
+    monkeypatch.setattr(requests, 'post', lambda url, **kw: respond('POST', url, **kw))
+
+    class NativeResearcher:
+        def __init__(self, **kwargs):
+            self.query = kwargs['query']
+            self.cfg = SimpleNamespace(llm_kwargs={})
+            self.sources = []
+        async def conduct_research(self):
+            assert self.query == expected_context
+            self.sources = self.retrievers[0](self.query).search(max_results=1)
+            self.sources += self.retrievers[0]('Model-planned clinical search').search(max_results=1)
+        async def write_report(self):
+            assert self.query == expected_context
+            return 'Native report fixture'
+        def get_source_urls(self):
+            return []
+        def get_research_sources(self):
+            return self.sources
+
+    monkeypatch.setitem(sys.modules, 'gpt_researcher', SimpleNamespace(GPTResearcher=NativeResearcher))
+    monkeypatch.setitem(sys.modules, 'gpt_researcher.retrievers.pubmed_central.pubmed_central', native)
+    result = asyncio.run(module.ResearchGraph().ainvoke({'messages': messages}))
+    assert result['sources'] == ['https://www.ncbi.nlm.nih.gov/pmc/articles/123/']
+    assert len(calls) == 4  # Two distinct searches/fetches, no retry of either.
+    assert calls[0][0] == ('POST' if scenario == 'long_query' else 'GET')
+    assert calls[0][2]['term'] == expected_query
+    assert calls[0][2]['retmax'] == 1
+    assert calls[1][0] == 'GET'
+    assert calls[2][0] == 'GET' and calls[2][2]['term'] == 'Model-planned clinical search'
+
+
 def test_unready_downloaded_agents_do_not_enter_default_run():
     from agentbench.harness.registry import load_registry
     registry = load_registry(ROOT/'resources/registry.toml')
@@ -235,6 +309,21 @@ def test_native_yahoo_redirects_and_complementary_api_keep_precise_egress(monkey
     policy = EgressPolicy(config)
     request = SimpleNamespace(pretty_host=host, path=path, method=method, port=443)
     assert policy.permits_tool(request) is allowed
+
+
+@pytest.mark.parametrize('host,path,method,allowed', [
+    ('eutils.ncbi.nlm.nih.gov', '/entrez/eutils/esearch.fcgi', 'POST', True),
+    ('eutils.ncbi.nlm.nih.gov', '/entrez/eutils/esearch.fcgi', 'GET', True),
+    ('eutils.ncbi.nlm.nih.gov', '/entrez/eutils/efetch.fcgi', 'POST', False),
+    ('eutils.ncbi.nlm.nih.gov', '/entrez/eutils/epost.fcgi', 'POST', False),
+    ('api.openai.com', '/v1/chat/completions', 'POST', False),
+])
+def test_pubmed_form_search_has_an_exact_egress_route(monkeypatch, host, path, method, allowed):
+    monkeypatch.syspath_prepend(str(ROOT/'agentbench/services/model-interceptor/src'))
+    from defuzex_model_interceptor.routing.policy import EgressPolicy
+    config = InterceptionConfig.from_agent_dir(ROOT/'resources/agents/04-gpt-researcher')
+    request = SimpleNamespace(pretty_host=host, path=path, method=method, port=443)
+    assert EgressPolicy(config).permits_tool(request) is allowed
 
 
 @pytest.mark.skipif(not os.getenv('ABB_AGENT_IMAGE_ACCEPTANCE'), reason='Opt-in real downloaded Agent images')

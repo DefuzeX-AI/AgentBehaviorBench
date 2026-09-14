@@ -14,7 +14,7 @@
 
 ## 状态
 
-当前：三个 Agent 均已真实 certify 为 ready。累计有效完成 46 / 56 次 Case 执行尝试，当前连续合格混合 suite 为 0。三 Agent 两轮测试在 3 workers 时 10/12 完成，在 2 workers 时 7/8 完成（另 4 个因 CaseGen 失败跳过）。降低并发未消除远端服务错误，正在继续三 Agent 三轮测试。以下保留历史，最新计数以 Benchmark-Campaign-Ledger.json 为准。
+当前：三个 Agent 均已真实 certify 为 ready。累计有效完成 45 / 67 次 Case 执行尝试，连续合格混合 suite 为 0。多轮 PMC 414 已定位并修复，原始官方两轮 Case 真实复用通过；此前受影响的 8 个 Case 已扣除成功额度。正在准备修复后的三 Agent 三轮/五轮并发验收。以下保留历史，最新计数以 Benchmark-Campaign-Ledger.json 为准。
 
 里程碑：`ac1b659` 保存此前并发重构和审查基线。首批修复包含控制流 span 关闭、host callback 边界、关闭 stdin、Docker 二次清理超时，以及按已记录终态验收 trace；策略、认证、转换、采集故障仍拒绝。
 
@@ -153,3 +153,14 @@ Issue #39：主机边界与当前镜像真实断网验收通过；后续新增�
 - GPT Researcher 已保存第一个生成的 Case，第二个 CaseGen 返回 model_output_policy_conflict / retryable=false；该 Agent 四个 Case 被跳过，已保存文件仍在。总共 10 CaseGen POST / 9 个生成 Case、100 模型 POST、8 Judge POST。跳过不计执行尝试，失败不计成功额度。
 - 对 16 次真实输入逐字核对历史，均正确；两种 Agent 的 Case 在时间上重叠执行。失败 operation/request 身份及对照结果见 Two-Worker-Comparison-2026-09-14.json。官方同类错误含义与此前一致，未自动重发。
 - 2-worker 样本仍有 Judge / CaseGen 终态错误，不能声称并发已修复服务。下一批继续尚未覆盖的三 Agent × 3 Cases × 最多三轮，随后检查实际输入、证据与 Judge 再决定五轮测试。
+
+**11:15 验收更正：** 完整 HTTP 审查发现多轮 PubMed 查询触发 414；此前 8 个已收到 Judge 的 Case 不满足无出错验收，已从成功额度扣除，累计由 46 更正为 38。首次两 Agent 五轮批次只证明历史/证据/Judge 链路完成，不再计作完整无错混合验收。原始结果不变，完整更正见 PMC-URI-Acceptance-Correction-2026-09-14.json。修复检索传输并重新实测后才能恢复计数。
+
+## 11:40：多轮 PMC 查询修复与真实验收
+
+- 上游原生规划会搜索 original task；ABB 将多轮对话作为该 task，导致原生 GET URI 过长。修复在 ObservedPubMed 入口仅将完整对话的 raw-task fallback 映射为当前用户问题；模型生成的搜索短语保持原样，完整历史仍由原生模型选择/规划/写作使用。长搜索词在发送前选择 NCBI 官方等价 form POST，不截断、不重试已失败请求。上游源文件未修改。
+- 精确添加 ESearch POST 路由，EFetch/EPost/其他端点仍不允许 POST。真实 ABB 拦截器中公开合成查询 POST 200、原生全文 GET 200，取得 51636 字符文章；该诊断无模型、CaseGen 或 Judge 请求。
+- 中间实现向 researcher.kwargs 注入 prompt_family，顶层 conduct_research 重复传参，真实两轮复用在第二轮 TypeError；Judge issue 已保留、宿主正确拒绝。新增真实镜像完整顶层入口回归，修前复现、最终检索边界实现通过，不保留该重复参数。
+- 最终同一官方 Case case_0dc8f6679120466fb1325be335243345 复用：2 Inputs succeeded，6 模型 POST / 1 Judge / 0 CaseGen，OTel complete / evidence captured / submission committed / Judge received；Judge issue 无 evidence_gaps，宿主接受。10 次 NCBI HTTP 全为 200。第二轮 9353 字符完整上下文实际进入三次模型请求，而三个实际检索词为 529/89/529 字符，没有完整对话原文；两轮各取回 2/1 个原生来源。
+- 完整证据见 PMC-Transport-Repair-2026-09-14.json。主机 264 passed / 8 opt-in skipped；当前 GPT 镜像已单独启用断网检查通过。
+- 先前运行中的三 Agent × 3 Cases × 三轮批次已经结束，9 个 Case 均收到 Judge；ReAct / TradingAgents 六个无错完成，旧 GPT 三个因 414 排除。27 次 Input 历史均逐字核对，TradingAgents 的实际三轮已覆盖；见 Three-Agent-Three-Turn-Acceptance-2026-09-14.json。

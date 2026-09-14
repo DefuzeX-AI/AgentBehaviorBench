@@ -16,8 +16,10 @@ embedding API key. Kuma and the shared model provider still require credentials.
 
 This is an explicitly limited biomedical-literature configuration: PubMed Central full text,
 one article per query, one research iteration, target 500 words. The native
-search operation is wrapped only to observe its real query/result; report writing
-is unchanged. Callback configuration stays inside the container. Public HTTPS
+search operation is observed with its actual query/result. The binding uses NCBI's
+equivalent form POST for search URLs above 2000 encoded bytes, retaining the native
+parameters, article IDs, full-text fetching and parsing. Report writing remains
+in the native researcher. Callback configuration stays inside the container. Public HTTPS
 egress is restricted to NCBI E-utilities search/fetch paths, with model routes separate.
 The earlier arXiv setup failed native public searches with HTTP 429; switching
 between HTTP and HTTPS did not resolve the native query. PMC returned actual
@@ -31,7 +33,17 @@ not need an extra download domain. The container check verifies these offline.
 
 Each invocation receives its Case's ordered conversation, including prior final
 reports. GPT Researcher creates a fresh research instance; no cross-Case state is
-reused. No earlier sources are represented as newly verified evidence.
+reused. No earlier sources are represented as newly verified evidence. Its native
+agent selection, query planning and report writing see the full conversation.
+The upstream research planner also searches the original task verbatim; for this
+raw-task fallback, the observed retriever uses the current user question instead
+of sending the complete conversation to NCBI. Model-generated search phrases are
+unchanged. Recorded tool arguments show the actual search term.
+
+This separation fixes multi-turn HTTP 414 errors without dropping model context.
+The long-query POST route is limited to `/entrez/eutils/esearch.fcgi`; it does not
+allow POST to EFetch, EPost or arbitrary endpoints. See the official
+[NCBI ESearch parameters](https://www.ncbi.nlm.nih.gov/books/NBK25499/).
 
 Status: **ready** after real certification on 2026-09-14. Native PubMed full-text
 research was also verified separately; certification and mixed-suite findings

@@ -1,7 +1,7 @@
 # Issue 修复状态与验证范围
 
 对应 [31 个 Issue / 18 个 PR 的审查基线](Upstream-Issue-Review-2026-09-14.md)。
-代码回归通过不代表真实服务最终验收完成。OpenRouter 凭据已恢复，三个 Agent 均已通过真实 certify；当前有效完成 46 / 尝试 56，五次连续合格混合 suite 尚未达成。真实运行中发现的 SDK 适配错误已补回归修复；仍收到少量远端 CaseGen / Judge 终态错误，不能在 ABB 内伪造其修复。最新计数见 [运行记录](Benchmark-Repair-Campaign.md)和 [Ledger](Benchmark-Campaign-Ledger.json)。
+代码回归通过不代表真实服务最终验收完成。OpenRouter 凭据已恢复，三个 Agent 均已通过真实 certify；当前有效完成 45 / 尝试 67，五次连续合格混合 suite 尚未达成。真实运行中发现的 SDK 适配错误已补回归修复；仍收到少量远端 CaseGen / Judge 终态错误，不能在 ABB 内伪造其修复。最新计数见 [运行记录](Benchmark-Repair-Campaign.md)和 [Ledger](Benchmark-Campaign-Ledger.json)。
 
 | Issue | 当前处理 | 验证或限制 |
 | --- | --- | --- |
@@ -41,8 +41,12 @@
 关键运行错误分别放在 test_issue 编号文件。旧 PR 涉及已删除路径和旧 SDK 合同，
 采用当前架构实现与回归，不整批合入旧代码，也未向上游发送评论或合并 PR。
 
-当前主机回归为 253 passed / 8 opt-in skipped；需要 Docker 的检查已分别显式运行，最近新增的两个 Agent 容器兼容性回归也实际通过。真实历史传递已覆盖 ReAct / GPT Researcher 的 1/2/3/5 轮与 TradingAgents 的 1/2 轮；后者的 3/5 轮仍在计划中。
+当前主机回归为 264 passed / 8 opt-in skipped；需要 Docker 的检查已分别显式运行，最近新增的两个 Agent 容器兼容性回归也实际通过。真实历史传递已覆盖 ReAct / GPT Researcher 的 1/2/3/5 轮与 TradingAgents 的 1/2/3 轮；后者的 5 轮仍在计划中。
 
 仍需区分两类上游限制：CaseGen 偶尔输出超出 profile 能力的任务；Judge 偶尔返回 model_invalid_result、request_failed 或 service_busy，而 Agent 和证据提交已成功。原始 code/request/operation 身份已记录；没有自动重复计费请求，没有把这些失败计为成功额度。
 
 补充 Issue34 定向验证：11 passed。新增的 3 个真实 PyPI 账本回归只验证已失败记录的恢复行为；不宣称修复服务端错误。SDK 公共 request summary 不暴露 error_code/error_retryable，原错误保留在 SDK 磁盘记录及 ABB manifest 中，测试遵循这个实际合同。
+
+**11:15 验收更正：** 完整 HTTP 审查发现多轮 PubMed 查询触发 414；此前 8 个已收到 Judge 的 Case 不满足无出错验收，已从成功额度扣除，累计由 46 更正为 38。首次两 Agent 五轮批次只证明历史/证据/Judge 链路完成，不再计作完整无错混合验收。原始结果不变，完整更正见 PMC-URI-Acceptance-Correction-2026-09-14.json。修复检索传输并重新实测后才能恢复计数。
+
+Issue39 多轮补修：原生 PMC GET 搜索完整对话引发 414，已改为检索边界分离上下文/当前问题，并支持精确 ESearch form POST。主机、真实断网顶层入口、实际拦截器和原始官方两轮 Case 均通过；中间重复 prompt_family 错误及修复也保留真实回归记录。TradingAgents 真实三轮已通过，三 Agent 五轮与五次连续合格批次仍待完成。

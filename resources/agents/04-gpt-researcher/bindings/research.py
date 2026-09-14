@@ -30,13 +30,50 @@ class PubMedRequestGate:
 _PUBMED_REQUESTS = PubMedRequestGate()
 
 
+def search_pubmed_ids(retriever, max_results):
+    """Use NCBI's GET/form-POST equivalents with the native search parameters.
+
+    Args:
+        retriever: Native PubMedCentralSearch instance holding query/db/settings.
+        max_results: Requested article count, forwarded without modification.
+    Returns:
+        Native article-ID list, [] for an unexpected JSON envelope, or None on
+        HTTP failure. The caller retains native full-text fetching and parsing.
+
+    Select POST before sending URLs over 2000 encoded bytes; never retry a failed
+    GET, truncate the query, or patch the process-wide requests implementation.
+    """
+    import requests
+
+    term = (f'{retriever.query} AND (ffrft[filter] OR pmc[filter])'
+            if retriever.db_type == 'pubmed' else retriever.query)
+    params = {'db': retriever.db_type, 'term': term, 'retmax': max_results,
+              'api_key': retriever.api_key, **retriever.params}
+    url = retriever.base_search_url
+    prepared_url = requests.Request('GET', url, params=params).prepare().url
+    try:
+        response = (requests.post(url, data=params) if len(prepared_url.encode()) > 2000
+                    else requests.get(url, params=params))
+        response.raise_for_status()
+        data = response.json()
+        result = data.get('esearchresult') if isinstance(data, dict) else None
+        ids = result.get('idlist') if isinstance(result, dict) else None
+        return ids if isinstance(ids, list) else []
+    except requests.RequestException as exc:
+        # Avoid printing a long request URL or its query/API-key parameters.
+        status = exc.response.status_code if exc.response is not None else None
+        print(f'PubMed search failed: {type(exc).__name__}, HTTP {status}')
+        return None
+
+
 def query_from_messages(value):
-    """Return an explicit query containing only this Case's supplied conversation.
+    """Return LLM task context containing only this Case's supplied conversation.
 
     Args:
         value: {query: text} for observe or {messages: user/assistant list} for Kuma.
     Returns:
-        Query text supplied to GPTResearcher without dropping previous turns.
+        Task context for native model prompt builders, retaining previous turns.
+        Multi-turn output must not be passed directly to a search retriever.
     Raises:
         ValueError: Empty query, invalid roles or non-text conversation content.
     """
@@ -82,11 +119,24 @@ class ResearchGraph:
         from langchain_core.tools import StructuredTool
 
         run_config = config or {}
+        conversation = query_from_messages(value)
+        messages = value.get('messages', [])
+        multi_turn = len(messages) > 1
+        current_query = messages[-1]['content'] if messages else value['query']
 
         class ObservedPubMed(PubMedCentralSearch):
-            """Observe the actual native call; preserve its parameters and result."""
+            """Observe actual search terms; keep raw conversation in the LLM only."""
+            def __init__(self, query, *args, **kwargs):
+                # Upstream searches its original task before/after planning. A
+                # conversation is model context, so that raw-task fallback uses
+                # the current question. Model-generated search phrases pass
+                # through unchanged and are observed with their actual values.
+                if multi_turn and query == conversation:
+                    query = current_query
+                super().__init__(query, *args, **kwargs)
+
             def _search_articles(self, max_results):
-                return _PUBMED_REQUESTS.call(super()._search_articles, max_results)
+                return _PUBMED_REQUESTS.call(search_pubmed_ids, self, max_results)
 
             def _fetch_full_text(self, article_id):
                 return _PUBMED_REQUESTS.call(super()._fetch_full_text, article_id)
@@ -98,7 +148,7 @@ class ResearchGraph:
                         description='Search PubMed Central and retrieve native article full text.')
                 return call.invoke({'query': self.query, 'max_results': max_results}, config=run_config)
 
-        researcher = GPTResearcher(query=query_from_messages(value), report_type='research_report',
+        researcher = GPTResearcher(query=conversation, report_type='research_report',
                 config_path=str(Path(__file__).with_name('research.json')), verbose=False,
                 mcp_strategy='disabled')
         researcher.retrievers = [ObservedPubMed]
