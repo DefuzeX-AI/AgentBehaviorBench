@@ -130,8 +130,8 @@ def run(configuration: RunConfiguration | None = None) -> int:
     # output LLM data
     llm_activity = LLMActivity(config.output_fn)
 
-    
-    runner = config.suite_runner or build_trace_suite_runner(
+    # build benchmark_runner
+    suite_runner = config.suite_runner or build_trace_suite_runner(
         max_bytes=config.llm_trace_max_bytes,
         model=config.model,
         activity_sink=llm_activity,
@@ -139,14 +139,18 @@ def run(configuration: RunConfiguration | None = None) -> int:
         sdk_selection=config.sdk_selection,
         sdk_options=config.sdk_options,
     )
+
     execution = run_benchmark_session(
         agents,
-        runner=runner,
+        runner=suite_runner,
+
         output_path=config.output_path,
+        input_fn=config.post_run_input_fn,
         output_fn=config.output_fn,
+
         viewer_starter=config.viewer_starter,
         llm_activity=llm_activity,
-        input_fn=config.post_run_input_fn,
+
     )
     return execution.exit_code
 

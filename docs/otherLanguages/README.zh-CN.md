@@ -20,12 +20,12 @@
 </p>
 
 > **运行 ABB 前请先准备：**Python 3.10+、已启动的 Docker Desktop 或 Docker
-> Engine，以及 DefuzeX 可选依赖。内置且可运行的 Company Research Agent 需要
+> Engine。KUMA 会在构建评测容器时自动从 PyPI 安装。Company Research Agent 需要
 > `KUMA_API_KEY`（或 `DEFUZEX_API_KEY`）、`OPENROUTER_API_KEY`、
 > `OPENROUTER_MODEL` 和 `TAVILY_API_KEY`。
 
 AgentBehaviorBench 在隔离运行时中执行已注册的 AI Agent，收集执行证据，并通过
-可选 SDK 评测结果。SDK 从 `agentbench/sdk/` 的适配器目录自动发现：只有一个时
+可选 SDK 评测结果。SDK 从 `agentbench/sdk/plugin/` 的适配器目录自动发现：只有一个时
 自动选择，有多个时通过 `--sdk NAME` 指定。当前目录包含 KUMA；结果保存在本地，
 并可在 ABB 浏览器查看器中检查。
 
@@ -33,13 +33,13 @@ AgentBehaviorBench 在隔离运行时中执行已注册的 AI Agent，收集执�
 
 ## 快速开始
 
-在仓库根目录创建虚拟环境，并安装带 DefuzeX extra 的 ABB：
+在仓库根目录创建虚拟环境，并安装 ABB：
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate              # Windows PowerShell: .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -e ".[defuzex]"
+python -m pip install -e "."
 ```
 
 创建本地环境文件并填写凭据：
@@ -129,7 +129,7 @@ resources/registry.toml
 - `agentbench/cli/` 提供命令行入口。
 - `agentbench/harness/` 负责 suite 执行、结果和注册表加载。
 - `agentbench/runtime/` 在本地或 Docker 运行 Agent。
-- `agentbench/sdk/` 包含 SDK 适配器、公共接口和目录发现逻辑。
+- `agentbench/sdk/plugin/` 包含 SDK 适配器、公共接口和目录发现逻辑。
 
 添加 SDK 只需新增包含 `__init__.py` 和 `plugin.py` 的适配器目录，不需要修改
 核心名称名单或注册安装包 entry point。详见 [SDK 适配器指南](../SDK-Directory-Adapters.md)。

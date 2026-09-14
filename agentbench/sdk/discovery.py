@@ -11,13 +11,14 @@ from agentbench.harness.errors import ProviderSelectionError
 from .contracts import SDKReference
 
 
-SDK_ROOT = Path(__file__).resolve().parent
+SDK_ROOT = Path(__file__).resolve().parent / "plugin"
 
 
 def discover_sdks() -> tuple[SDKReference, ...]:
     """List direct child packages containing a ``plugin.py`` entry module.
 
-    Discovery is relative to this installed package, not the working directory.
+    Only sdk/plugin/ is scanned, relative to this installed package rather than
+    the working directory. Sibling packages under sdk/ are not candidates.
     Helper/private directories are ignored. Candidate packages must have a
     valid Python identifier, an ``__init__.py``, and no linked entry paths.
     Names are compared case-insensitively and returned in deterministic order.
@@ -56,7 +57,7 @@ def discover_sdks() -> tuple[SDKReference, ...]:
             references[key] = SDKReference(
                 name=name,
                 source="directory",
-                object_ref=f"{__package__}.{name}.plugin:plugin",
+                object_ref=f"{__package__}.plugin.{name}.plugin:plugin",
             )
     except OSError as exc:
         raise ProviderSelectionError(
@@ -74,8 +75,12 @@ def load_sdk(reference: SDKReference) -> object:
     """
     module_name, _, attribute = reference.object_ref.partition(":")
     try:
+        # import agentbench.sdk.plugin.kuma.plugin
         module = importlib.import_module(module_name)
         return getattr(module, attribute)
+
+
+
     except ModuleNotFoundError as exc:
         raise ProviderSelectionError(
             f"Could not load SDK {reference.name!r}: missing module {exc.name!r}. "

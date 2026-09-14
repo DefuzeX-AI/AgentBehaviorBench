@@ -8,7 +8,6 @@ from pathlib import Path
 from agentbench.adapter import AdapterInvocation
 from agentbench.harness.result import BenchmarkResult, BenchmarkStepResult
 from agentbench.runtime.docker.policy import DockerPolicy
-from agentbench.sdk.contracts import SDK_PLUGIN_API_VERSION
 
 
 @dataclass(frozen=True)
@@ -96,7 +95,6 @@ class Runner:
 
 
 class Adapter:
-    api_version = SDK_PLUGIN_API_VERSION
     execution = "container"
 
     def create_benchmark_runner(self, *, context, options):

@@ -6,13 +6,12 @@ from collections.abc import Mapping
 
 from agentbench.harness.protocols.evaluation import EvaluationRunner
 
-from ..contracts import SDK_PLUGIN_API_VERSION, SDKRunnerContext
+from ...contracts import SDKRunnerContext
 
 
 class KumaEvaluationSDK:
     """Strategy adapter for the existing formal KUMA container runner."""
 
-    api_version = SDK_PLUGIN_API_VERSION
     execution = "container"
 
     def create_benchmark_runner(
@@ -20,9 +19,12 @@ class KumaEvaluationSDK:
     ) -> EvaluationRunner:
         from .benchmark import KumaContainerRunner
 
+        # getting .env
         environment = dict(context.environ)
+
         if context.model is not None:
             environment["OPENROUTER_MODEL"] = context.model
+
         return KumaContainerRunner(
             environ=environment,
             options=options,

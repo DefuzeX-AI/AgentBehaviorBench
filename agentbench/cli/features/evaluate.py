@@ -25,7 +25,6 @@ def configure_parser(parser):
     configure_sdk_parser(parser)
     parser.add_argument('--no-view', action='store_true', help='Save results without starting the live viewer.')
     parser.add_argument('--llm-trace-max-bytes', type=int, default=DEFAULT_TRACE_MAX_BYTES)
-    parser.add_argument('--sdk-source', type=Path, help='Override the SDK sdk_source option')
     parser.add_argument('--result-output', type=Path, help='ABB result JSON naming base (independent of SDK output)')
     parser.add_argument('--output', type=Path, help='Override the SDK output option')
     parser.add_argument('--timeout', type=float, help='Override the SDK timeout option (seconds)')
@@ -44,7 +43,7 @@ def execute(args):
         selected = sdk_arguments(args)
         options = dict(selected.get('sdk_options', {}))
         # Only explicit aliases are forwarded. Each SDK owns its defaults.
-        for name in ('sdk_source', 'output', 'timeout', 'max_steps'):
+        for name in ('output', 'timeout', 'max_steps'):
             value = getattr(args, name, None)
             if value is not None:
                 options[name] = value

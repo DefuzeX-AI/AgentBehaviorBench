@@ -23,15 +23,32 @@ def build_trace_suite_runner(
     sdk_options: Mapping[str, object] | None = None,
 ) -> SuiteRunner:
     sink: TraceSink = activity_sink or NullTraceSink()
+
+    # 返回一个确定的sdk
+    # ex:
+    #   EvaluationPlan(
+    #       selection=SDKSelection(
+    #           reference=SDKReference(
+    #               name='kuma',
+    #               source='directory',
+    #               object_ref='agentbench.sdk.plugin.kuma.plugin:plugin'
+    #           ),
+    #           value=<agentbench.sdk.plugin.kuma.plugin.KumaEvaluationSDK object at 0x...>
+    #       ),
+    #       options=mappingproxy({})
+    #   )
     plan = evaluation_plan(
         sdk=sdk,
         selection=sdk_selection,
         options=sdk_options,
     )
+
+    # Runner instance
     benchmark_runner = build_evaluation_runner(
         plan,
         model=model,
         trace_sink=sink,
         trace_max_bytes=max_bytes,
     )
+
     return SuiteRunner(benchmark_runner=benchmark_runner)

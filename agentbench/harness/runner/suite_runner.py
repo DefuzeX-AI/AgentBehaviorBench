@@ -38,12 +38,16 @@ class SuiteRunner:
         sdk_options: Mapping[str, object] | None = None,
         benchmark_runner: EvaluationRunner | None = None,
     ) -> None:
+        # there is two way run the benchmark but we cant import two thing at the same
+        # so raise error if benchmark_runner and sdk is not None both.
         if benchmark_runner is not None and (
             sdk is not None or sdk_options is not None
         ):
             raise ValueError(
                 "Configure sdk on either SuiteRunner or benchmark_runner, not both"
             )
+
+        # CLI
         if benchmark_runner is None:
             from agentbench.runtime.interception import NullTraceSink
             from agentbench.sdk.plugins import evaluation_plan
@@ -55,6 +59,8 @@ class SuiteRunner:
                 trace_sink=NullTraceSink(),
                 trace_max_bytes=262144,
             )
+
+        # python
         self._benchmark_runner = benchmark_runner
 
     @staticmethod

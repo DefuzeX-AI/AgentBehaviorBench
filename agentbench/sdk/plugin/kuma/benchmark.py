@@ -32,19 +32,33 @@ class KumaContainerRunner:
     def __init__(self, *, environ=None, options=None, trace_sink=None, trace_max_bytes=262144):
         self.environ = dict(os.environ if environ is None else environ)
         options = dict(options or {})
-        unknown = set(options) - {'sdk_source', 'output', 'timeout', 'max_steps', 'case_collection'}
+
+        # 目前支持 'output', 'timeout', 'max_steps', 'case_collection'
+        unknown = set(options) - {'output', 'timeout', 'max_steps', 'case_collection'}
         if unknown:
             raise ProviderSelectionError(f'Unsupported container evaluation options: {sorted(unknown)}')
-        self.sdk = Path(options.get('sdk_source', Path(__file__).resolve().parents[4] / 'Defuze-SDK'))
+
+
         self.output = Path(options.get('output', 'results/observe'))
+        # timeout
         self.timeout = options.get('timeout', 2400)
+        if (
+            isinstance(self.timeout, bool)
+            or not isinstance(self.timeout, (int, float))
+            or not math.isfinite(self.timeout)
+            or self.timeout <= 0
+        ):
+            raise ProviderSelectionError('Container timeout must be a positive finite number')
+
+
+        # Default None
         self.case_collection = Path(options['case_collection']) if options.get('case_collection') is not None else None
+
+        # Max step
         self.max_steps = options.get('max_steps')
         if self.max_steps is not None and (type(self.max_steps) is not int or self.max_steps < 1):
             raise ProviderSelectionError('max_steps must be a positive integer')
-        if (isinstance(self.timeout, bool) or not isinstance(self.timeout, (int, float))
-            or not math.isfinite(self.timeout) or self.timeout <= 0):
-            raise ProviderSelectionError('Container timeout must be a positive finite number')
+
         self.trace_sink = trace_sink
         self.trace_max_bytes = trace_max_bytes
         self._case_fingerprints = {}
@@ -76,7 +90,7 @@ class KumaContainerRunner:
                                    'status': 'succeeded', 'source': str(self.case_collection.resolve())})
         else:
             directory = evaluate(
-                registration, output=self.output, sdk=self.sdk, environ=self.environ,
+                registration, output=self.output, environ=self.environ,
                 timeout=self.timeout, max_steps=self.max_steps, generation_count=count,
                 trace_sink=self.trace_sink, trace_max_bytes=self.trace_max_bytes,
                 on_artifacts_ready=lambda path: emit_progress(
@@ -109,8 +123,6 @@ class KumaContainerRunner:
         for relative in ('evaluation/profile.md', 'evaluation/input-contract.json'):
             if not (registration.path / relative).is_file():
                 raise ProviderSelectionError(f'Missing Agent evaluation file: {relative}')
-        if not (self.sdk / 'src/kuma/__init__.py').is_file():
-            raise ProviderSelectionError('Local KUMA SDK source unavailable')
         return 'official-container'
 
     def run_defuzex(self, *args, **kwargs):
@@ -132,7 +144,7 @@ class KumaContainerRunner:
         case_artifact = prepared['cases'] / Path(entry['artifact']).name
         if not case_artifact.is_file():
             raise RuntimeError(f'Prepared Case artifact is missing: {case_artifact}')
-        directory = evaluate(registration, output=self.output, sdk=self.sdk,
+        directory = evaluate(registration, output=self.output,
                              environ=self.environ, timeout=self.timeout, max_steps=self.max_steps,
                              case_artifact=case_artifact,
                              excluded_cases=self._case_fingerprints.get(registration.agent_id, ()), trace_sink=self.trace_sink,

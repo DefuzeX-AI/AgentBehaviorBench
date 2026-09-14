@@ -1,7 +1,7 @@
 # AgentBehaviorBench (ABB)
 
 > **Before you run ABB:** install Python 3.10+, Docker Desktop or Docker
-> Engine (running), and the optional DefuzeX dependency. The bundled ready
+> Engine (running). The KUMA evaluation image installs its SDK from PyPI. The bundled
 > Company Research Agent needs `KUMA_API_KEY` (or `DEFUZEX_API_KEY`),
 > `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, and `TAVILY_API_KEY`.
 
@@ -31,22 +31,26 @@
 
 AgentBehaviorBench runs registered AI agents in isolated runtimes, captures
 their execution evidence, and evaluates the result through a selectable SDK.
-SDK adapters are discovered from directories under `agentbench/sdk/`. With
+SDK adapters are discovered from directories under `agentbench/sdk/plugin/`. With
 one adapter it is selected automatically; with several, choose `--sdk NAME`.
 This checkout currently includes KUMA. Results are written locally and can be
 inspected in ABB's browser viewer.
 
 ## Quick start
 
-From the repository root, create a virtual environment and install ABB with
-the DefuzeX extra:
+From the repository root, create a virtual environment and install ABB:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate              # Windows PowerShell: .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -e ".[defuzex]"
+python -m pip install -e "."
 ```
+
+KUMA's adapter lives in `agentbench/sdk/plugin/kuma/`. Its evaluation image
+installs `kuma-defuzex[otel]==0.2.4` from PyPI, as declared in the adapter's
+`requirements.txt`; no local SDK source checkout is required. The distribution
+is named `kuma-defuzex`, while Python code imports `kuma`.
 
 Create the local environment file and add the required credentials:
 
@@ -131,7 +135,7 @@ agentbench run --sdk kuma --sdk-options sdk-options.json
 ```
 
 To add an SDK, create an adapter package with a `plugin.py` entry under
-`agentbench/sdk/`; no central name list or package entry-point registration is
+`agentbench/sdk/plugin/`; no central name list or package entry-point registration is
 needed. See [the SDK adapter guide](docs/SDK-Directory-Adapters.md) for the
 interface, dependency rules, Python usage, and verification commands.
 
@@ -168,7 +172,7 @@ resources/registry.toml
   traffic for Docker runtimes.
 - `agentbench/services/` contains runtime services shipped with AgentBench,
   including the Model Interceptor Docker build context.
-- `agentbench/sdk/` contains SDK adapter packages, shared contracts, and directory discovery.
+- `agentbench/sdk/plugin/` contains SDK adapter packages, shared contracts, and directory discovery.
 
 ## Development
 

@@ -13,7 +13,7 @@ from uuid import uuid4
 
 import pytest
 
-import agentbench.sdk as sdk_package
+import agentbench.sdk.plugin as sdk_package
 from agentbench.cli.main import cli
 from agentbench.harness.errors import ProviderSelectionError
 from agentbench.sdk import discovery
@@ -22,10 +22,8 @@ from agentbench.sdk.runtime import build_evaluation_runner
 
 
 MINIMAL_PLUGIN = """
-from agentbench.sdk.contracts import SDK_PLUGIN_API_VERSION
 from types import SimpleNamespace
 class Adapter:
-    api_version = SDK_PLUGIN_API_VERSION
     execution = 'local'
     def create_benchmark_runner(self, *, context, options):
         return SimpleNamespace(
@@ -36,9 +34,7 @@ plugin = Adapter()
 """
 
 CASE_FILE_PLUGIN = """
-from agentbench.sdk.contracts import SDK_PLUGIN_API_VERSION
 class Adapter:
-    api_version = SDK_PLUGIN_API_VERSION
     execution = 'local'
     def create_benchmark_runner(self, *, context, options):
         from agentbench.harness import BenchmarkRunner
@@ -51,15 +47,15 @@ plugin = Adapter()
 @pytest.fixture
 def adapter_directory(tmp_path, monkeypatch):
     """Isolate real package imports without adding SDKs to the production tree."""
-    root = tmp_path / "sdks"
-    root.mkdir()
+    root = tmp_path / "sdk" / "plugin"
+    root.mkdir(parents=True)
     original_modules = set(sys.modules)
     original_attributes = set(vars(sdk_package))
     monkeypatch.setattr(discovery, "SDK_ROOT", root)
     monkeypatch.setattr(sdk_package, "__path__", [str(root)])
     yield root
     for name in set(sys.modules) - original_modules:
-        if name.startswith("agentbench.sdk."):
+        if name.startswith("agentbench.sdk.plugin."):
             sys.modules.pop(name, None)
     for name in set(vars(sdk_package)) - original_attributes:
         delattr(sdk_package, name)
@@ -90,9 +86,9 @@ def test_listing_is_sorted_relative_to_package_and_does_not_import(
     monkeypatch.chdir(tmp_path.parent)
     references = discovery.discover_sdks()
     assert [item.name for item in references] == ["alpha", "zeta"]
-    assert references[0].object_ref == "agentbench.sdk.alpha.plugin:plugin"
+    assert references[0].object_ref == "agentbench.sdk.plugin.alpha.plugin:plugin"
     assert all(item.source == "directory" for item in references)
-    assert "agentbench.sdk.alpha" not in sys.modules
+    assert "agentbench.sdk.plugin.alpha" not in sys.modules
 
 
 def test_adding_directory_changes_availability_without_registration(adapter_directory):
@@ -107,6 +103,15 @@ def test_adding_directory_changes_availability_without_registration(adapter_dire
     assert resolve_sdk().reference.name == "beta"
     with pytest.raises(ProviderSelectionError, match="Unknown SDK"):
         resolve_sdk("alpha")  # Previously imported modules do not bypass discovery.
+
+
+def test_sdk_siblings_are_outside_the_scanned_plugin_directory(adapter_directory):
+    add_adapter(adapter_directory.parent, "outside")
+    add_adapter(adapter_directory, "inside")
+    assert [item.name for item in discovery.discover_sdks()] == ["inside"]
+    assert resolve_sdk().reference.object_ref == "agentbench.sdk.plugin.inside.plugin:plugin"
+    with pytest.raises(ProviderSelectionError, match="Unknown SDK"):
+        resolve_sdk("outside")
 
 
 def test_no_adapters_has_actionable_error_and_empty_cli_list(adapter_directory, capsys):
@@ -175,7 +180,6 @@ def test_missing_dependency_does_not_break_listing_or_other_adapter(
         ),
         ('raise RuntimeError("private-settings")', "RuntimeError"),
         ("other_export = None", "plugin export"),
-        (MINIMAL_PLUGIN + '\nplugin.api_version = "v999"', "API version"),
         (MINIMAL_PLUGIN + "\nplugin.execution = []", "execution mode"),
         (
             MINIMAL_PLUGIN + "\nplugin.create_benchmark_runner = 42",
@@ -291,7 +295,7 @@ def test_contracts_import_without_harness_discovery_or_evaluators():
             "-c",
             """
 import sys
-from agentbench.sdk import SDK, EvaluationSDKPlugin, SDKReference, SDK_PLUGIN_API_VERSION
+from agentbench.sdk import SDK, EvaluationSDKPlugin, SDKReference
 assert 'agentbench.sdk.discovery' not in sys.modules
 assert 'agentbench.sdk.plugins' not in sys.modules
 assert 'agentbench.harness' not in sys.modules
@@ -313,7 +317,7 @@ def test_production_discovery_does_not_import_adapter_modules():
 import sys
 from agentbench.sdk import discover_sdks
 for reference in discover_sdks():
-    assert 'agentbench.sdk.' + reference.name not in sys.modules
+    assert 'agentbench.sdk.plugin.' + reference.name not in sys.modules
     assert reference.object_ref.partition(':')[0] not in sys.modules
 """,
         ],

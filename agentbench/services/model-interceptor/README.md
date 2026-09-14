@@ -104,7 +104,7 @@ the query string); matching requests retain their destination and produce
 model interception through a tool rule. When adapting an Agent, declare only
 the external endpoints it needs instead of allowing an entire service.
 
-The KUMA evaluation build overlay reads `agentbench/sdk/kuma/whitelist.json`
+The KUMA evaluation build overlay reads `agentbench/sdk/plugin/kuma/whitelist.json`
 to add its backend routes and one release
 metadata route: `GET api.github.com:443/repos/DefuzeX-AI/KUMA-DefuzeX/releases/latest`,
 with purpose `evaluation`. This permits the SDK's background update check

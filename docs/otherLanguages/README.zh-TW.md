@@ -20,7 +20,7 @@
 </p>
 
 > **執行 ABB 前請先準備：**Python 3.10+、已啟動的 Docker Desktop 或 Docker
-> Engine，以及 DefuzeX 選用相依套件。內建且可執行的 Company Research Agent 需要
+> Engine。KUMA 會在建置評測容器時自動從 PyPI 安裝。Company Research Agent 需要
 > `KUMA_API_KEY`（或 `DEFUZEX_API_KEY`）、`OPENROUTER_API_KEY`、
 > `OPENROUTER_MODEL` 與 `TAVILY_API_KEY`。
 
@@ -32,13 +32,13 @@ AgentBehaviorBench 會在隔離執行環境中執行已註冊的 AI Agent、收�
 
 ## 快速開始
 
-在儲存庫根目錄建立虛擬環境，並安裝含 DefuzeX extra 的 ABB：
+在儲存庫根目錄建立虛擬環境，並安裝 ABB：
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate              # Windows PowerShell: .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -e ".[defuzex]"
+python -m pip install -e "."
 ```
 
 建立本機環境檔案並填入憑證：
@@ -128,7 +128,7 @@ resources/registry.toml
 - `agentbench/cli/` 提供命令列入口。
 - `agentbench/harness/` 負責 suite 執行、結果與 registry 載入。
 - `agentbench/runtime/` 在本機或 Docker 中執行 Agent。
-- `agentbench/sdk/` 包含內建 SDK adapter 與插件探索邏輯。
+- `agentbench/sdk/plugin/` 包含內建 SDK adapter 與插件探索邏輯。
 
 ## 開發
 

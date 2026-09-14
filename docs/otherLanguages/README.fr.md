@@ -20,7 +20,8 @@
 </p>
 
 > **Avant d'exécuter ABB :** installez Python 3.10+, Docker Desktop ou Docker
-> Engine (en cours d'exécution), ainsi que la dépendance optionnelle DefuzeX.
+> Engine (en cours d'exécution). KUMA est installé automatiquement depuis PyPI
+> lors de la construction du conteneur d'évaluation.
 > Le Company Research Agent prêt à l'emploi requiert `KUMA_API_KEY` (ou
 > `DEFUZEX_API_KEY`), `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` et
 > `TAVILY_API_KEY`.
@@ -34,14 +35,13 @@ sont enregistrés localement et consultables dans le visualiseur ABB.
 
 ## Démarrage rapide
 
-À la racine du dépôt, créez un environnement virtuel et installez ABB avec
-l'extra DefuzeX :
+À la racine du dépôt, créez un environnement virtuel et installez ABB :
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate              # Windows PowerShell: .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -e ".[defuzex]"
+python -m pip install -e "."
 ```
 
 Créez le fichier d'environnement local et renseignez les identifiants :
@@ -134,7 +134,7 @@ resources/registry.toml
 - `agentbench/cli/` fournit les commandes du terminal.
 - `agentbench/harness/` gère l'exécution, les résultats et le registre.
 - `agentbench/runtime/` exécute les agents localement ou dans Docker.
-- `agentbench/sdk/` contient les adaptateurs SDK intégrés et la découverte de plugins.
+- `agentbench/sdk/plugin/` contient les adaptateurs SDK intégrés et la découverte de plugins.
 
 ## Développement
 

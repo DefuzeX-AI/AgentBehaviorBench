@@ -15,7 +15,18 @@ from agentbench.runtime.interception import OpenRouterProvider
 from .contracts import EvaluationSDKPlugin, SDKRunnerContext
 from .plugins import EvaluationPlan, plugin_execution
 
-
+# ex:
+#   plan = EvaluationPlan(
+#       selection=SDKSelection(
+#           reference=SDKReference(
+#               name='kuma',
+#               source='directory',
+#               object_ref='agentbench.sdk.plugin.kuma.plugin:plugin'
+#           ),
+#           value=<agentbench.sdk.plugin.kuma.plugin.KumaEvaluationSDK object at 0x...>
+#       ),
+#       options=mappingproxy({})
+#   )
 def build_evaluation_runner(
     plan: EvaluationPlan,
     *,
@@ -32,9 +43,14 @@ def build_evaluation_runner(
         trace_sink=trace_sink,
         trace_max_bytes=trace_max_bytes,
     )
+
+
     execution = plugin_execution(selected)
+    # checking whether sdk is inherent by EvaluationSDKPlugin
     if isinstance(selected, EvaluationSDKPlugin):
         try:
+
+            # ex: runner = KumaEvaluationSDK().create_benchmark_runner(...)
             runner = selected.create_benchmark_runner(
                 context=context,
                 options=plan.options,
@@ -50,6 +66,8 @@ def build_evaluation_runner(
             raise ProviderSelectionError(
                 "SDK plugin create_benchmark_runner() returned an invalid runner"
             )
+
+
         return runner
 
     if execution != "local":

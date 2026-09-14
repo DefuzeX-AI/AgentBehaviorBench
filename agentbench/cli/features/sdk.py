@@ -42,7 +42,7 @@ def _list_sdks(args: Namespace) -> int:
     for reference in references:
         print(f"{reference.name}\t{reference.source}\t{reference.object_ref}")
     if not references:
-        print("No SDK adapters found under agentbench/sdk/.")
+        print("No SDK adapters found under agentbench/sdk/plugin/.")
     else:
         print("Discovered adapters only; SDK dependencies are checked before execution.")
     return 0
@@ -62,7 +62,7 @@ FEATURE = CommandFeature(
     name="sdk",
     help="List and inspect evaluation SDK plugins.",
     description=(
-        "Discover adapter packages under agentbench/sdk/, "
+        "Discover adapter packages under agentbench/sdk/plugin/, "
         "without importing them during listing."
     ),
     configure=configure_parser,

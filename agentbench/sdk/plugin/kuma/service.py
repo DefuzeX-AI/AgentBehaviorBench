@@ -21,7 +21,7 @@ class EvaluationPolicy:
                 f'type=bind,source={self.state},target=/opt/agent/agent/.kuma')
 
 
-def evaluate(agent, *, output, sdk, environ, timeout=2400, trace_sink=None, trace_max_bytes=262144,
+def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max_bytes=262144,
              on_artifacts_ready=None, max_steps=None, excluded_cases=(),
              generation_count=None, case_artifact=None):
     if not (environ.get('KUMA_API_KEY') or environ.get('DEFUZEX_API_KEY')):
@@ -46,7 +46,7 @@ def evaluate(agent, *, output, sdk, environ, timeout=2400, trace_sink=None, trac
     try:
         if on_artifacts_ready is not None:
             on_artifacts_ready(directory)
-        with evaluation_agent(agent, sdk) as descriptor:
+        with evaluation_agent(agent) as descriptor:
             # SDK requires repo and its ledger on the same filesystem. Mount the
             # actual staged Agent source read-only, with only its .kuma writable.
             repository = directory / 'sdk-repo'

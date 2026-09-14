@@ -66,6 +66,7 @@ def main(
         post_run_input_fn: Function used for prompts after the run completes.
     """
 
+    # sdk and sdk option is python only, cli will accept output and input path
     if (
         sdk is None
         and sdk_options is None

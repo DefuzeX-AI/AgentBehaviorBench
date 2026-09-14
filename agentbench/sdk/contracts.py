@@ -15,9 +15,6 @@ if TYPE_CHECKING:
     from agentbench.harness.result import BenchmarkResult
 
 
-SDK_PLUGIN_API_VERSION = "agentbench.evaluation_sdk.v1"
-
-
 @dataclass(frozen=True, slots=True)
 class SDKReference:
     """Identity of an SDK, without importing or initializing its implementation.
@@ -98,12 +95,11 @@ class SDKRunnerContext:
 class EvaluationSDKPlugin(Protocol):
     """Directory adapter owning an SDK's dependencies and execution loop.
 
-    Export an instance as ``plugin`` from ``sdk/<name>/plugin.py``. The directory
+    Export an instance as ``plugin`` from ``sdk/plugin/<name>/plugin.py``. The directory
     supplies its name; no duplicate registration or name field is required.
     Importing the entry module must not start work or require SDK dependencies.
     """
 
-    api_version: str
     execution: Literal["container", "local"]
 
     def create_benchmark_runner(

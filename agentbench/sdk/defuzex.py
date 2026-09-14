@@ -88,7 +88,7 @@ def create_run(**kwargs: object) -> SDKRun:
         from defuzex import create_run
     except ModuleNotFoundError as exc:
         raise ProviderSelectionError(
-            "DefuzeX SDK is not installed; install agentbench's [defuzex] extra "
+            "DefuzeX SDK is not installed; install defuzex for this legacy API "
             "or pass sdk=your_sdk"
         ) from exc
     return create_run(**kwargs)  # type: ignore[arg-type, return-value]
@@ -101,7 +101,7 @@ def validate_installation(provider_mode: str, run_kwargs: Mapping[str, object]) 
         from defuzex import DefuzeClient
     except ModuleNotFoundError as exc:
         raise ProviderSelectionError(
-            "DefuzeX SDK is not installed; install agentbench's [defuzex] extra "
+            "DefuzeX SDK is not installed; install defuzex for this legacy API "
             "or pass sdk=your_sdk"
         ) from exc
 
