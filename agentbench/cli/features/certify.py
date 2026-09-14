@@ -14,6 +14,7 @@ from agentbench.cli.viewer import start_viewer_server
 from agentbench.cli.registry_status import RegistryStatusError, update_agent_status
 from agentbench.cli.sdk import configure_sdk_parser, sdk_arguments
 from agentbench.cli.terminal_ui import LLMActivity
+from agentbench.cli.terminal_ui.presentation import confirm_agents
 from agentbench.cli.trace_runtime import build_trace_suite_runner
 from agentbench.harness import (
     SDK,
@@ -30,6 +31,7 @@ from .run import DEFAULT_REGISTRY_PATH
 
 
 def configure_parser(parser: ArgumentParser) -> None:
+    parser.add_argument('-y', '--yes', action='store_true', help='Confirm this execution without prompting.')
     parser.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY_PATH, help="Agent registry path")
     configure_sdk_parser(parser)
     parser.add_argument('--no-view', action='store_true', help='Save results without starting the live viewer.')
@@ -62,7 +64,7 @@ def execute(args: Namespace) -> int:
     try:
         load_project_environment(args.env_file)
         loaded = execution_environment_snapshot()
-        kwargs: dict[str, object] = {"output_path": args.output, "concurrency": loaded.concurrency,
+        kwargs: dict[str, object] = {"output_path": args.output, "assume_yes": args.yes, "concurrency": loaded.concurrency,
                                      "environ": loaded.environ, **sdk_arguments(args)}
         if args.registry != DEFAULT_REGISTRY_PATH:
             kwargs["registry_path"] = args.registry
@@ -92,6 +94,8 @@ def certify(
     model: str | None = None,
     viewer_starter=start_viewer_server,
     post_run_input_fn=input,
+    input_fn=input,
+    assume_yes: bool = False,
     concurrency: ConcurrencySettings | None = None,
     environ: Mapping[str, str] | None = None,
 ) -> int:
@@ -106,10 +110,10 @@ def certify(
             "Configure sdk on the supplied suite_runner, or omit suite_runner"
         )
 
-    registry = load_registry(registry_path)
     try:
+        registry = load_registry(registry_path)
         agent = registry.find(agent_id)
-    except (KeyError, ValueError) as exc:
+    except (OSError, KeyError, ValueError) as exc:
         output_fn(f"Certification error: {exc}")
         return 2
 
@@ -129,6 +133,8 @@ def certify(
         "The registry will change to ready if the Agent completes its Cases "
         "without invocation errors."
     )
+    if not assume_yes and not confirm_agents((agent,), input_fn=input_fn, output_fn=output_fn):
+        return 0
     llm_activity = LLMActivity(output_fn)
     execution = run_benchmark_session(
         (agent,),

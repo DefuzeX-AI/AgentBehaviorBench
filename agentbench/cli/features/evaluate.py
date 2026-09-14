@@ -4,6 +4,7 @@ from dataclasses import replace
 from agentbench.cli.execution import run_benchmark_session
 from agentbench.cli.trace_runtime import build_trace_suite_runner
 from agentbench.cli.terminal_ui import LLMActivity
+from agentbench.cli.terminal_ui.presentation import confirm_agents
 from agentbench.cli.viewer import start_viewer_server
 from agentbench.cli.features.certify import _default_output_path
 from pathlib import Path
@@ -19,6 +20,7 @@ from agentbench.sdk import evaluation_plan
 
 
 def configure_parser(parser):
+    parser.add_argument('-y', '--yes', action='store_true', help='Confirm this execution without prompting.')
     parser.add_argument('selection', nargs='?', help='Enabled Agent number or ID')
     parser.add_argument('--registry', type=Path, default=DEFAULT_REGISTRY_PATH)
     parser.add_argument('--env-file', type=Path)
@@ -54,6 +56,8 @@ def execute(args):
         records = enabled_agents(args.registry)
         selection = args.selection
         if selection is None:
+            if args.yes:
+                raise ValueError('Specify an Agent number or ID when using --yes')
             print('Enabled Agents:')
             for index, record in enumerate(records, 1):
                 print(f'{index}. {record["agent_id"]} status={record.get("status")}')
@@ -65,6 +69,8 @@ def execute(args):
             agent = replace(agent, case_count=args.cases)
         print(f'Evaluation: {agent.case_count} independent Case(s) using {plan.selection.reference.name}; '
               'selected services may incur charges.', flush=True)
+        if not args.yes and not confirm_agents((agent,), input_fn=input, output_fn=print):
+            return 0
         output = args.result_output or _default_output_path(args.registry, agent.agent_id, command="evaluate")
         if args.output is not None:
             print('--output configures the SDK only; --result-output selects the ABB result JSON.')
@@ -85,8 +91,9 @@ def execute(args):
         if not reports or any(report is None for report in reports):
             print('Evaluation failed: SDK completed without a Judge report')
             return 1
-        print(f'Judge: {reports[-1].status}')
-        return 0
+        for index, report in enumerate(reports, 1):
+            print(f'Judge Case {index}: {report.status}')
+        return execution.exit_code if execution.exit_code else (0 if all(r.status == 'pass' for r in reports) else 1)
     except ConcurrencyConfigurationError as exc:
         print(f"Configuration error: {exc}")
         return 2

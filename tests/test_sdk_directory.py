@@ -489,6 +489,7 @@ def test_discovered_adapter_runs_real_agent_and_exports_case_output_judge(
                 "--sdk-options",
                 str(options_file),
                 "--no-view",
+                "--yes",
                 "--result-output",
                 str(tmp_path / "cli-result.json"),
             ]

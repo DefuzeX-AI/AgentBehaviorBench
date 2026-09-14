@@ -18,6 +18,7 @@ class RunConfiguration:
     """Dependencies and options for one benchmark run."""
 
     input_fn: Callable[[str], str] = input
+    assume_yes: bool = False
     output_fn: Callable[[str], None] = print
     suite_runner: SuiteRunner | None = None
     sdk: SDK | None = None

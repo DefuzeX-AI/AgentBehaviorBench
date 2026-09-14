@@ -61,15 +61,17 @@ def serve_result_log(
     """Serve the static viewer and result-log API until interrupted."""
 
     path = Path(result_log).resolve()
-    if not path.exists():
-        raise FileNotFoundError(f"Result log not found: {path}")
+    if not path.is_file():
+        raise FileNotFoundError(f"Result log is not a file: {path}")
+    if not 0 <= port <= 65535:
+        raise ValueError('Port must be between 0 and 65535')
 
     require_viewer_assets()
     server = create_viewer_server(path, host=host, port=port)
     base_url = f"http://{host}:{server.server_port}"
     url = _locked_viewer_url(base_url, _result_log_suite_id(path))
-    print(f"View: {url}")
-    print(f"Result log: {path}")
+    print(f"View: {url}", flush=True)
+    print(f"Result log: {path}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

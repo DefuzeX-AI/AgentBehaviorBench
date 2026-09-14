@@ -30,6 +30,7 @@ DEFAULT_REGISTRY_PATH = (
 
 def configure_parser(parser: ArgumentParser) -> None:
     configure_sdk_parser(parser)
+    parser.add_argument('-y', '--yes', action='store_true', help='Confirm this execution without prompting.')
     parser.add_argument(
         "--env-file",
         metavar="PATH",
@@ -64,7 +65,7 @@ def execute(args: Namespace) -> int:
     try:
         load_project_environment(args.env_file)
         loaded = execution_environment_snapshot()
-        kwargs: dict[str, object] = {"output_path": args.output, "concurrency": loaded.concurrency,
+        kwargs: dict[str, object] = {"output_path": args.output, "assume_yes": args.yes, "concurrency": loaded.concurrency,
                                      "environ": loaded.environ, **sdk_arguments(args)}
     except (ProviderSelectionError, ValueError) as exc:
         print(f"SDK configuration error: {exc}")
@@ -75,7 +76,11 @@ def execute(args: Namespace) -> int:
         kwargs['viewer_starter'] = None
     if args.llm_trace_max_bytes != DEFAULT_TRACE_MAX_BYTES:
         kwargs["llm_trace_max_bytes"] = args.llm_trace_max_bytes
-    return run(RunConfiguration(**kwargs))
+    try:
+        return run(RunConfiguration(**kwargs))
+    except (OSError, ProviderSelectionError, ValueError, KeyError) as exc:
+        print(f'Configuration error: {exc}')
+        return 2
 
 
 def run(configuration: RunConfiguration | None = None) -> int:
@@ -104,7 +109,6 @@ def run(configuration: RunConfiguration | None = None) -> int:
 
     # regist agents
     registry = load_registry(DEFAULT_REGISTRY_PATH)
-    print(registry)
 
     # we only pick ready agent, for adpating agent, run verify command first
     agents = registry.ready()
@@ -122,7 +126,7 @@ def run(configuration: RunConfiguration | None = None) -> int:
             "Use 'agentbench certify <agent_id>' when an adapter is ready."
         )
 
-    if not confirm_agents(
+    if not config.assume_yes and not confirm_agents(
         agents,
         input_fn=config.input_fn,
         output_fn=config.output_fn,
