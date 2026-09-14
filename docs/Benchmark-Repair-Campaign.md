@@ -184,3 +184,10 @@ Issue #39：主机边界与当前镜像真实断网验收通过；后续新增�
 - 8 个 Case 的 execution / OTel / submission / evidence / Judge / host 链路完整，Judge 返回 `pass` 或 `issue`；GPT Researcher 的一个 Case 在 5 次 Input 后收到远端 `model_invalid_result`，没有 Judge report，原始 5 轮 artifact 仍完整保存。该错误是官方服务终态，未自动重发付费请求，因此本 suite 不合格，连续合格次数保持 0。
 - 43 次输入的历史顺序审计通过；所有 Case 的实际 Input 目录和中途结果保留。记账脚本同时修正为按 LF 解析 JSON Lines，避免上游结果文本中的 U+2028/U+2029 被 Python `splitlines()` 误当成记录分隔符。
 - 累计有效完成由 52 增至 60，累计尝试由 75 增至 84；OpenRouter 已记录 883 个响应、3,477,718 个 token、报告成本 `$1.6288876`（KUMA CaseGen/Judge 费用未在本地暴露，需以服务账单为准）。详见 `post-pmc-stage2-3-agents-3-cases-5-steps.audit.json` 与 `post-pmc-stage2-3-agents-3-cases-5-steps.history.json`。
+
+## Judge 缺少报告的诊断
+
+- GPT Researcher 的失败 Case `case_d26c24681a0646669c76daf7a17ea66d` 并非没有调用 Judge：5 次 Input 的 execution、OTel、submission、evidence 均完成，最后的 operation `8bb9472a-8ae0-4e39-96c1-7cdbba85dc1c` 经过多次 GET 轮询后以 HTTP 200 wrapper 返回 `status=failed`、`model_invalid_result`、`retryable=false`。
+- `.kuma/requests/kreq_5caa04b6112623b1ff721ae393a90f73.json` 的 `request_type=judgment`、`status=failed`、`result_locator=null` 与最终轮询一致。服务没有返回 Judgment payload，所以 SDK 没有 `evaluation/judge/report.json`；5 个 Input 的 result/submission/evidence 和 manifest 仍保留，宿主据此拒绝接受该 Case。
+- KUMA 官方流程是最后一次 `submit()` 完成后进入 `judging`，官方 Judge 通过 `POST /sdk/v2/judge/` 创建幂等 operation，再用 `GET /sdk/v2/operations/{operation_id}/` 轮询；只有成功并通过公开 schema 校验才进入 `report_ready` 并保存报告。失败时恢复 `completed`、保留 History 和 request identity，不伪造报告。`model_invalid_result` 的公开含义是服务生成结果不合格，`retryable=false`；官方没有提供更细内部原因，不能从这次记录推断是 OTel、Case 内容或 OpenRouter 账户问题。
+- 该 Case 从健康和 qualifying-suite 统计中排除，不自动重发付费请求。完整字段、请求身份和官方链接见 `Judge-Failure-Analysis-2026-09-14.json`。
