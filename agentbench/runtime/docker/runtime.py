@@ -549,10 +549,10 @@ class DockerRuntime:
             checkpoint = int(value)
             if not trace_state.wait_for_completion_after(checkpoint, timeout=2, control=self.control):
                 raise DockerRuntimeError(
-                    "Agent invocation completed without a matched LLM request/response trace"
+                    "Agent invocation trace was not accepted: " + trace_state.diagnostic()
                 )
             if not trace_state.wait_for_idle(control=self.control):
-                raise DockerRuntimeError("Model trace is incomplete: unfinished pair, capture error, truncation, or failed persistence")
+                raise DockerRuntimeError("Model trace is incomplete: " + trace_state.diagnostic())
 
         return require_trace
 

@@ -44,7 +44,7 @@ def confirm_agents(
     )
     try:
         confirmed = request_confirmation(input_fn, output_fn)
-    except (EOFError, KeyboardInterrupt):
+    except (EOFError, KeyboardInterrupt, OSError, RuntimeError):
         output_fn("\nCancelled.")
         return False
 
@@ -187,7 +187,7 @@ def request_viewer_action(
     while True:
         try:
             answer = input_fn("Viewer action? [r rerun/q quit]: ").strip().lower()
-        except (EOFError, KeyboardInterrupt):
+        except (EOFError, KeyboardInterrupt, OSError, RuntimeError):
             output_fn("\nViewer stopped.")
             return "quit"
         if answer in {"q", "quit", "exit", ""}:

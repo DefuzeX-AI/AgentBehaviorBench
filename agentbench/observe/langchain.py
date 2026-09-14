@@ -1,5 +1,6 @@
 """LangChain callbacks: real execution IDs and parent IDs, no fabricated spans."""
 from langchain_core.callbacks import BaseCallbackHandler
+from langgraph.errors import GraphBubbleUp
 from .correlation import current_span
 
 
@@ -25,6 +26,9 @@ class TraceCallback(BaseCallbackHandler):
 
     def _error(self, error, run_id, **kwargs):
         current_span.set(str(kwargs["parent_run_id"]) if kwargs.get("parent_run_id") else None)
+        if isinstance(error, GraphBubbleUp):
+            self.store.record("span_control", span_id=str(run_id), control=type(error).__name__)
+            return
         self.store.record("span_error", span_id=str(run_id), error=str(error))
 
     def on_chain_start(self, serialized, inputs, *, run_id, parent_run_id=None, **kwargs):

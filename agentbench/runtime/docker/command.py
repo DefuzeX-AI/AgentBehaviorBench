@@ -93,7 +93,12 @@ class DockerCommandRunner:
                 process.kill()
             except ProcessLookupError:
                 pass
-            process.wait(timeout=2)
+            try:
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                # Popen.args can contain docker create --env credentials. Hide
+                # both the raw exception and its implicit traceback context.
+                raise DockerCommandTimeout('Docker client did not stop after termination') from None
 
 
 def _tail(stream, maximum: int = 2 * 1024 * 1024) -> str:

@@ -70,4 +70,12 @@ class HostObservation:
 
 
 def host_observation_factory(root):
-    return lambda registration, sdk_run: HostObservation(root, registration, sdk_run)
+    """Observe only in-process Agents; Docker workers own their callbacks."""
+    from agentbench.runtime.agentcontainer.config import runtime_type
+
+    def create(registration, sdk_run):
+        if runtime_type(registration.path) != 'in_process':
+            return None
+        return HostObservation(root, registration, sdk_run)
+
+    return create

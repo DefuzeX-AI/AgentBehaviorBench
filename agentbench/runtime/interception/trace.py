@@ -48,11 +48,18 @@ class NullTraceSink:
 
 
 class InterceptionTraceState:
-    """Track completed request/response pairs for required interception."""
+    """Track recorded request terminal states, independently of Agent success.
+
+    An observed upstream/transport failure ends a call without inventing a
+    response. Policy, authentication, conversion and capture failures still
+    reject evidence. A transport error alone does not identify who cancelled.
+    """
 
     def __init__(self) -> None:
         self._requests: set[str] = set()
         self._responses: set[str] = set()
+        self._terminated: set[str] = set()
+        self._errors: dict[str, str] = {}
         self._completed: list[str] = []
         self._condition = threading.Condition()
         self._last_event = time.monotonic()
@@ -80,9 +87,15 @@ class InterceptionTraceState:
         if not isinstance(call_id, str) or not call_id:
             return
         with self._condition:
-            if event.event == "llm_error" or event.data.get("truncated"):
+            if event.event == "llm_error":
+                code = event.data.get('error_code')
+                self._errors[call_id] = code if isinstance(code, str) else 'unclassified'
+                if code in {'transport_error', 'upstream_error'}:
+                    self._terminated.add(call_id)
+                else:
+                    self._failed = True
+            if event.data.get("truncated"):
                 self._failed = True
-                self._condition.notify_all()
             self._last_event = time.monotonic()
             if event.event == "llm_request":
                 self._requests.add(call_id)
@@ -90,11 +103,23 @@ class InterceptionTraceState:
                 self._responses.add(call_id)
             if (
                 call_id in self._requests
-                and call_id in self._responses
+                and call_id in self._responses | self._terminated
                 and call_id not in self._completed
             ):
                 self._completed.append(call_id)
-                self._condition.notify_all()
+            self._condition.notify_all()
+
+    def diagnostic(self) -> str:
+        """Return bounded classifications/counts, never exception text or argv."""
+        with self._condition:
+            unfinished = self._requests - self._responses - self._terminated
+            known = {'egress_denied', 'authentication_failed', 'request_preparation_failed',
+                     'upstream_error', 'response_conversion_failed', 'stream_processing_failed',
+                     'transport_error'}
+            codes = sorted({code if code in known else 'unclassified' for code in self._errors.values()})
+            return (f'requests={len(self._requests)}, responses={len(self._responses)}, '
+                    f'observed_failures={len(self._terminated)}, unfinished={len(unfinished)}, '
+                    f'errors={",".join(codes) or "none"}, capture_rejected={self._failed}')
 
     def checkpoint(self) -> int:
         with self._condition:
@@ -121,7 +146,7 @@ class InterceptionTraceState:
 
     def wait_for_idle(self, *, timeout: float = 2, quiet: float = 0.3,
                       control: RunControl | None = None) -> bool:
-        """Drain final log events and reject requests with no corresponding response."""
+        """Drain events and reject requests with no observed terminal outcome."""
         deadline = time.monotonic() + timeout
         with self._condition:
             while time.monotonic() < deadline:
@@ -131,7 +156,7 @@ class InterceptionTraceState:
                 if self._failed:
                     return False
                 idle_for = time.monotonic() - self._last_event
-                if idle_for >= quiet and self._requests <= self._responses:
+                if idle_for >= quiet and self._requests <= self._responses | self._terminated:
                     return True
                 self._condition.wait(timeout=min(0.05, max(0, deadline - time.monotonic())))
         return False

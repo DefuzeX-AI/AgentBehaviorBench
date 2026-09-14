@@ -47,7 +47,7 @@ class OtelSession:
                 self.spans[data['span_id']] = span
                 self.exporter.payload(span, 'input', data.get('input'))
                 self.exporter.payload(span, 'metadata', data.get('metadata'))
-            elif event in ('span_end', 'span_error'):
+            elif event in ('span_end', 'span_error', 'span_control'):
                 span = self.spans.pop(data['span_id'], None)
                 if span is None:
                     self.error = 'Missing span start'
@@ -56,6 +56,8 @@ class OtelSession:
                 self.exporter.payload(span, label, data.get(label))
                 if event == 'span_error':
                     span.set_status(Status(StatusCode.ERROR, 'Agent step raised an exception'))
+                elif event == 'span_control':
+                    span.set_attribute('abb.control_flow', data['control'])
                 span.end()
             elif event in ('execution_end', 'execution_error') and self.root:
                 label = 'output' if event == 'execution_end' else 'error'
