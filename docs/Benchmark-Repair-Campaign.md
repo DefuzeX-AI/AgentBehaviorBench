@@ -15,7 +15,7 @@
 ## 状态
 
 阶段一：离线回归与真实离线容器验收通过；准备真实服务测试。首批 test_issue10/14/31/32/36 共 17 项通过：修前 7 失败 / 10 通过，修后全部通过。现有全套离线测试 178 通过 / 6 个明确选择性验收跳过。
-真实完成 Case：0；真实评测尝试：0；满足终止条件的连续轮数：0。
+真实完成 Case：0；真实评测尝试：1；满足终止条件的连续轮数：0。
 
 里程碑：`ac1b659` 保存此前并发重构和审查基线。首批修复包含控制流 span 关闭、host callback 边界、关闭 stdin、Docker 二次清理超时，以及按已记录终态验收 trace；策略、认证、转换、采集故障仍拒绝。
 
@@ -31,3 +31,42 @@
 - `36fca31`：第四批 SDK 协议修复已 push。
 - 第五批：无凭据离线示例（test_issue44）、CLI / onboarding / 中英排错文档和 README 链接修正。真实 Docker 并发/取消与 PyPI SDK 验收 21 项通过；目录插件真实容器验收 1 项通过。全部是离线 Provider，不计入真实服务额度。
 - 容器证据：`results/verification/kuma-pypi-5a1ff7c6735941469548901559944f32/`（Case、Agent 输出、Judge、verification.json）；同目录下 docker-concurrency-* 与 sdk-directory-* 保留其他验收。
+
+## 真实服务阶段：首个 ReAct Case
+
+`fe26496` 文档/离线示例里程碑已 push。全套 Python 225 通过 / 6 个 opt-in 跳过；上述容器验收均已另行实际运行。
+
+- Case 生成成功，提交失败执行的证据后 Judge 返回 `insufficient_evidence`，原始报告保留。
+- 模型请求返回 OpenRouter 401 `User not found`。使用同一 .env key 直接 GET 官方 `/api/v1/key`，仍为 401；shell 没有覆盖，未配置其他 base URL。该独立查询没有发送模型请求。
+- 这是凭据/账户鉴权阻塞，不能通过改 SDK、增加重试或禁用 ReAct 解决；三个 Agent 共享该模型凭据。已暂停额外真实 Case/Judge 调用，等待用户在本地更新 key。
+- Ledger 记录成功 0 / 尝试 1 / 已生成 1 / 已收 Judge 1；失败不计成功额度，但不宣称生成与 Judge 免费。实际费用由服务账单确认。
+- 继续进行 TradingAgents / GPT Researcher 官方源码接入和离线验证，真实 certify 前保留 adapting。
+
+## 新 Agent 接入记录
+
+官方源码均下载并逐文件核对，已有上游文件未改；只在 source 中新增 ABB loader metadata，binding 与配置在外层。
+
+| 项目 | 发现 | 处理 / 验证 |
+| --- | --- | --- |
+| TradingAgents callbacks | 官方 propagate 不转发工具 callbacks | binding 驱动同一 compiled graph 并显式传 RunnableConfig；边界回归检查 history / callbacks。 |
+| TradingAgents 数据服务 | 默认完整分析师涉及额外服务 | 明确配置 market analyst + 原生 debate/risk 工作流，yfinance；未接 brokerage。真实原生 Yahoo 查询成功。 |
+| GPT Researcher 外部依赖 | 默认 Tavily / OpenAI embeddings 需要其他凭据 | 使用官方 arXiv retriever 与固定 revision 的本地 HuggingFace embedding，范围在 profile 写明。 |
+| CPU 镜像 | 默认 PyTorch 包拉入 GPU 依赖 | 中断旧构建，改官方 CPU index；断网实际向量计算通过，torch 2.14.0+cpu、384 维。 |
+| arXiv 公开检索 | 原生检索和一次独立 HTTP 检查均收到 429 | 停止重试、保留未通过状态；不能把空来源报告当成功联网验证。 |
+| 可选 MCP | 上游 import 打印缺 langchain_mcp_adapters 的提示 | 此配置明确 disabled，非启用能力；未伪造 MCP 工具。 |
+| Registry 生命周期 | 下载源码不足以 ready；还要求 requirement.md | 补齐必需描述文件，按真实 load_registry 校验；两个新 Agent 均 adapting。 |
+
+Issue #39：主机边界与当前镜像真实断网验收共 8 项通过。两个镜像均使用 PyPI Kuma 0.2.4。
+完整 artifact 目录与源文件校验数见 `Onboarding-Acceptance-2026-09-14.json`。
+这些检查未创建付费 Case、未调用真实模型/Judge，也未运行 certify。
+
+## 恢复顺序
+
+1. 用户在本机更新 `.env` 的 OPENROUTER_API_KEY；先做官方 `/api/v1/key` 只读检查。
+2. 复用首个已生成 collection（路径见 Ledger），通过 sdk-options 的 `case_collection` 执行 ReAct 1 Case。Judge 是新请求，仍可能收费。
+3. 通过后生成并完整运行 ReAct 4 Cases，再实际 certify；不能把失败计成完成额度。
+4. 确认 arXiv 限流解除/合适的原生检索配置后，两个新 Agent 各 evaluate、certify，凭真实结果写 ready。
+5. 三个 Agent 每个 3～5 Cases，max_steps 从 1 → 2 → 3 → 5。记录生成与实际执行 Inputs 数量；上限增加不保证生成多轮，不能篡改官方 Case 补轮数。
+6. 任一新故障先查 SDK 官方协议、保存请求/原始报告、回归修复并 push，再继续。达成五次连续合格多 Agent suite 且实际多轮得到验证，或累计 200 成功 Case 后停止。
+
+仍未完成：ReAct 成功 1 Case / 4 Cases、三个 Agent 真实认证、真实多轮与五次连续并发验收。当前阻塞是模型凭据 401；arXiv 429 是新 Agent 的额外联网阻塞。

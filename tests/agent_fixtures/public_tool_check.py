@@ -1,0 +1,17 @@
+"""Probe one real public data lookup; never call Kuma or an LLM."""
+import json
+import sys
+sys.path.insert(0, '/opt/agent/agent')
+agent_id = sys.argv[1]
+if agent_id == 'trading-agents':
+    from tradingagents.dataflows.y_finance import get_YFin_data_online
+    result = get_YFin_data_online('AAPL', '2026-09-01', '2026-09-11')
+    assert isinstance(result, str) and '2026-09-' in result, str(result)[:500]
+    evidence = {'characters': len(result), 'has_requested_dates': True}
+else:
+    from gpt_researcher.retrievers.arxiv.arxiv import ArxivSearch
+    result = ArxivSearch('ti:"retrieval augmented generation"').search(max_results=1)
+    assert result, 'Native arXiv search returned no public sources'
+    evidence = {'results': len(result), 'source': result[0]['href']}
+print(json.dumps({'agent_id':agent_id, 'probe':'native-public-tool', 'status':'passed',
+                  'model_requests':0,'case_generation_requests':0,'judge_requests':0,**evidence}))

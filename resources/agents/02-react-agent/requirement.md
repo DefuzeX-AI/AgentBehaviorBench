@@ -12,9 +12,9 @@ ABB accepts text, {"message": "..."}, or {"messages": [...]} native conversation
 history. Only one input shape is accepted at a time. The final assistant text is
 submitted to the SDK; complete messages remain in raw output and framework trace.
 
-This initial Docker configuration is one-shot: separate SDK Inputs do not share
-memory automatically. Explicit history may be supplied through messages. Persistent
-multi-turn sessions and cross-turn trace identity require a subsequent runtime
-session design; do not claim that a stable thread_id alone provides memory.
+The input contract supplies the full native messages from earlier successful
+Inputs in the same Case. This includes tool calls and results. A new Case starts
+empty; a stable thread_id alone does not provide memory. Offline 1/2/3/5-turn
+boundary checks pass; successful real-service multi-turn verification is pending.
 
 Status: adapting. Real model/search certification has not been completed.

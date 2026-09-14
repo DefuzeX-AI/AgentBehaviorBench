@@ -6,7 +6,7 @@
 2. Inspect its real entry point, native input/output, state, model calls, tools and
    dependencies. Use `02-react-agent` as a structural example. Keep upstream logic
    intact; place ABB translation in the unit's binding, not in Kuma.
-3. Add a reproducible Dockerfile, `agent.toml` runtime/launch/adapter settings and
+3. Add `requirement.md`, a reproducible Dockerfile, `agent.toml` runtime/launch/adapter settings and
    native input fields. For multi-turn Cases, the binding must accept prior messages
    inside that Case without retaining another Case's state. Document any capability
    deliberately disabled for evaluation (for example order execution).

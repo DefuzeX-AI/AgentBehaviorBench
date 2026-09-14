@@ -89,7 +89,7 @@ TAVILY_API_KEY=
 
 Install [Docker for your platform](https://docs.docker.com/get-started/get-docker/)
 and start it. Check `docker info` before running an Agent. The registry initially
-has ReAct enabled as `adapting` and Company Research disabled. Evaluate and then
+has ReAct, TradingAgents and GPT Researcher enabled as `adapting`, with Company Research disabled. Evaluate and then
 certify the enabled Agent:
 
 ```bash
@@ -171,6 +171,19 @@ OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
 OPENROUTER_HTTP_REFERER=https://example.com
 OPENROUTER_APP_TITLE=AgentBehaviorBench
 ```
+
+## Included Agents
+
+| Agent | Configured scope | Readiness |
+| --- | --- | --- |
+| ReAct | Native Tavily search and iterative reasoning | Adapting; real certification pending. |
+| TradingAgents | Native market analyst, debate and risk workflow; Yahoo Finance | Adapting; image and offline graph load verified. |
+| GPT Researcher | Native academic research with arXiv and local CPU embeddings | Adapting; image and offline embeddings verified; public arXiv probe rate-limited. |
+| Company Research | Existing company research unit | Disabled; retained status is not current acceptance evidence. |
+
+Check `resources/registry.toml` for the current status. The repair campaign's
+real model run is currently blocked by the configured OpenRouter credential
+returning 401; the new Agents have not been certified or declared production-ready.
 
 ## CLI
 

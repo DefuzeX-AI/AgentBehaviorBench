@@ -1,0 +1,65 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "trading-agents"
+display_name = "03 TradingAgents"
+framework = "langgraph"
+
+[source]
+repository = "https://github.com/TauricResearch/TradingAgents"
+revision = "be952b8eccb49720509af544c6675233bc1f10d0"
+downloaded_on = "2026-09-14"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+config = "abb-langgraph.json"
+graph_id = "agent"
+input_key = "request"
+output_key = "answer"
+binding = "trading.py:create_graph"
+
+[adapter.context]
+model = "gpt-4.1-mini"
+debate_rounds = 1
+risk_rounds = 1
+max_tokens = 2500
+
+[observe]
+input_fields = [{ name = "ticker", label = "Ticker", required = true }, { name = "date", label = "Date YYYY-MM-DD", required = true }, { name = "request", label = "Research request", required = true }]
+
+[llm_interception]
+required = true
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
+
+[[llm_interception.tool_routes]]
+host_patterns = ["query1.finance.yahoo.com", "query2.finance.yahoo.com", "fc.yahoo.com", "guce.yahoo.com", "consent.yahoo.com"]
+ports = [443]
+methods = ["GET", "POST"]
+path_patterns = ["/", "/v1/*", "/v6/*", "/v7/*", "/v8/*", "/v10/*", "/v11/*", "/consent", "/collectConsent"]
