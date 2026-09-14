@@ -14,7 +14,7 @@
 
 ## 状态
 
-当前：三个 Agent 均已真实 certify 为 ready。累计有效完成 45 / 67 次 Case 执行尝试，连续合格混合 suite 为 0。多轮 PMC 414 已定位并修复，原始官方两轮 Case 真实复用通过；此前受影响的 8 个 Case 已扣除成功额度。正在准备修复后的三 Agent 三轮/五轮并发验收。以下保留历史，最新计数以 Benchmark-Campaign-Ledger.json 为准。
+当前：三个 Agent 均已真实 certify 为 ready。累计有效完成 50 / 73 次 Case 执行尝试，连续合格混合 suite 为 0。PMC 多轮修复已通过真实验收；新的三 Agent 三轮批次仍遇到远端 Judge / CaseGen 终态错误。已保存的两个 GPT Case 正在复用做三轮验收，随后继续五轮。以下保留历史，最新计数以 Benchmark-Campaign-Ledger.json 为准。
 
 里程碑：`ac1b659` 保存此前并发重构和审查基线。首批修复包含控制流 span 关闭、host callback 边界、关闭 stdin、Docker 二次清理超时，以及按已记录终态验收 trace；策略、认证、转换、采集故障仍拒绝。
 
@@ -164,3 +164,10 @@ Issue #39：主机边界与当前镜像真实断网验收通过；后续新增�
 - 最终同一官方 Case case_0dc8f6679120466fb1325be335243345 复用：2 Inputs succeeded，6 模型 POST / 1 Judge / 0 CaseGen，OTel complete / evidence captured / submission committed / Judge received；Judge issue 无 evidence_gaps，宿主接受。10 次 NCBI HTTP 全为 200。第二轮 9353 字符完整上下文实际进入三次模型请求，而三个实际检索词为 529/89/529 字符，没有完整对话原文；两轮各取回 2/1 个原生来源。
 - 完整证据见 PMC-Transport-Repair-2026-09-14.json。主机 264 passed / 8 opt-in skipped；当前 GPT 镜像已单独启用断网检查通过。
 - 先前运行中的三 Agent × 3 Cases × 三轮批次已经结束，9 个 Case 均收到 Judge；ReAct / TradingAgents 六个无错完成，旧 GPT 三个因 414 排除。27 次 Input 历史均逐字核对，TradingAgents 的实际三轮已覆盖；见 Three-Agent-Three-Turn-Acceptance-2026-09-14.json。
+
+## 11:51：修复后混合三轮与保存 Case 复用
+
+- suite_d6427c80c39d4266b0554265b6251d6d：3 workers、三个 Agent 各选 3 Cases。ReAct 两个、TradingAgents 三个 Case 无错完成，均实际三轮；ReAct 一个远端 Judge model_invalid_result / retryable=false，执行与证据提交已成功。
+- GPT Researcher 第三个 CaseGen 返回 model_output_policy_conflict / retryable=false；前两个原始 Case 均已保存，未重新生成。用新的两条选择清单复用这两个 Case 验证修复后的三轮，原 artifact/hash 保持不变。
+- 上游同类错误公开含义与前述一致，按原 request / operation 身份记录，没有伪造具体内部原因。完整本批摘要见 Post-PMC-Mixed-Three-Turn-2026-09-14.json。
+- 补充 TradingAgents 模型侧核验：上一批三个 Case 的第 1/2/3 轮，全部原序消息实际出现在至少一个模型请求中（第三轮为五条连续历史消息），证明不只停留在本地 mapped-input 文件。证据加入 Three-Agent-Three-Turn-Acceptance-2026-09-14.json。

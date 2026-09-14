@@ -1,7 +1,7 @@
 # Issue 修复状态与验证范围
 
 对应 [31 个 Issue / 18 个 PR 的审查基线](Upstream-Issue-Review-2026-09-14.md)。
-代码回归通过不代表真实服务最终验收完成。OpenRouter 凭据已恢复，三个 Agent 均已通过真实 certify；当前有效完成 45 / 尝试 67，五次连续合格混合 suite 尚未达成。真实运行中发现的 SDK 适配错误已补回归修复；仍收到少量远端 CaseGen / Judge 终态错误，不能在 ABB 内伪造其修复。最新计数见 [运行记录](Benchmark-Repair-Campaign.md)和 [Ledger](Benchmark-Campaign-Ledger.json)。
+代码回归通过不代表真实服务最终验收完成。OpenRouter 凭据已恢复，三个 Agent 均已通过真实 certify；当前有效完成 50 / 尝试 73，五次连续合格混合 suite 尚未达成。真实运行中发现的 SDK 适配错误已补回归修复；仍收到少量远端 CaseGen / Judge 终态错误，不能在 ABB 内伪造其修复。最新计数见 [运行记录](Benchmark-Repair-Campaign.md)和 [Ledger](Benchmark-Campaign-Ledger.json)。
 
 | Issue | 当前处理 | 验证或限制 |
 | --- | --- | --- |
