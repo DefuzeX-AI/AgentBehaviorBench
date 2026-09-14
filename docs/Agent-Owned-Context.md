@@ -75,3 +75,28 @@ offline model/tool transports to check retained history without duplication.
 All three changed deployments are returned to `adapting` until real certification
 of the new input behavior succeeds. Historical campaign records are retained;
 history-replay runs do not certify the new Agent-owned context configuration.
+
+### Session and SQLite validation
+
+The production KUMA worker, PyPI SDK 0.2.4, generic AgentSession, framework
+adapter and LangGraph execute normally in the acceptance tests. Only the remote
+Case/Judge providers are replaced with explicit deterministic local providers.
+The fixture Agent creates and queries SQLite itself; BBA does not access its
+database during execution. A shared Case rejects conflicting `thread_id` values.
+
+Validation: full Python suite **430 passed, 9 opt-in tests skipped**. The socket
+tests require local loopback permission; the sandbox-only attempt could not bind
+their HTTP server, and the complete suite passed with that permission. Explicit
+session acceptance **7 passed**, including three overlapping containers under
+the production Docker policy, non-root and with network disabled. Each container
+used `/tmp/session-work/case/agent-memory.sqlite3`; no state crossed containers.
+
+The five-turn Case recalled a value, updated it and recalled the correction.
+A fresh Case returned `unset` before learning its own value. Failure/cancellation
+tests preserved previous submissions and closed the Agent database once. All
+actual input artifacts contain only the corresponding SDK Input.
+
+See [the acceptance record](Agent-Owned-Context-Acceptance-2026-09-14.json) for
+retained Case, Agent output, evidence, Judge and session artifact paths. These
+are real container runs with local Judges, not paid model or official Judge
+acceptance. Real deployment certification is recorded separately.

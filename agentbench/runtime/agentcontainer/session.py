@@ -5,6 +5,11 @@ from agentbench.adapter.factory import DEFAULT_ADAPTER_FACTORY
 
 
 class AgentSession:
+    """Own one Agent instance and its resources for one Case attempt.
+
+    Context and storage contents belong to the Agent. This class only loads,
+    reuses and closes its adapter; it never reads or writes conversation memory.
+    """
     def __init__(self):
         self.adapter = None
         self.identity = None
@@ -12,6 +17,17 @@ class AgentSession:
         self.invocations = 0
 
     def load(self, root, envelope):
+        """Return the same adapter for this Agent/session, loading it once.
+
+        Args:
+            root: Agent unit directory.
+            envelope: Invocation identity with agent_id, framework, run_id and
+                an optional stable session_id (defaults to run_id).
+        Returns:
+            Loaded adapter whose native resources survive until aclose().
+        Raises:
+            ValueError: Closed session or a different Agent/Case identity.
+        """
         identity = (root.resolve(), envelope['agent_id'], envelope['framework'],
                     envelope.get('session_id', envelope['run_id']))
         if self.closed or (self.identity is not None and self.identity != identity):
