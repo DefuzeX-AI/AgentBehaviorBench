@@ -14,7 +14,7 @@
 
 ## 状态
 
-当前：三个 Agent 均已真实 certify 为 ready。累计有效完成 39 / 48 次 Case 执行尝试，当前连续合格混合 suite 为 0；曾有一批 2 Agent × 3 Cases 全部实际五轮成功。三 Agent × 4 Cases × 两轮为 10/12 完成，余下两个远端 Judge 终态错误。已启动相同数量/轮次的 2-worker 对照。以下保留历史，最新计数以 Benchmark-Campaign-Ledger.json 为准。
+当前：三个 Agent 均已真实 certify 为 ready。累计有效完成 46 / 56 次 Case 执行尝试，当前连续合格混合 suite 为 0。三 Agent 两轮测试在 3 workers 时 10/12 完成，在 2 workers 时 7/8 完成（另 4 个因 CaseGen 失败跳过）。降低并发未消除远端服务错误，正在继续三 Agent 三轮测试。以下保留历史，最新计数以 Benchmark-Campaign-Ledger.json 为准。
 
 里程碑：`ac1b659` 保存此前并发重构和审查基线。首批修复包含控制流 span 关闭、host callback 边界、关闭 stdin、Docker 二次清理超时，以及按已记录终态验收 trace；策略、认证、转换、采集故障仍拒绝。
 
@@ -146,3 +146,10 @@ Issue #39：主机边界与当前镜像真实断网验收通过；后续新增�
 - 下一批仅将 worker 从 3 改为 2，保持三 Agent × 各 4 Cases × 最多两轮。使用新生成 Case，因此只作负载相关性的观察，不宣称是因果证明；完成后检查再进入三轮/五轮。
 
 两轮 Case 适配性人工复核：12 个基线任务中 10 个可由声明工具尝试，GPT Researcher 另两个基线要求冻结/版本化索引及 lineage introspection，当前 binding 未暴露这些操作。该不匹配与刻意加入的 follow-up 注入分开记录，详见 Three-Agent-Two-Turn-Case-Scope-2026-09-14.json；不把链路成功当作场景质量通过。
+
+## 11:08：两 worker 对照完成，开始三轮扩展
+
+- suite_846fce781fff49fe85ebb3e2fe57be7e 选择三 Agent × 4 Cases × 最多两轮，2 workers：实际执行 8 个 Case，全部实际 2 Inputs；7 个完整完成。ReAct 一个 Judge model_invalid_result / retryable=false，其他执行/证据环节正常。
+- GPT Researcher 已保存第一个生成的 Case，第二个 CaseGen 返回 model_output_policy_conflict / retryable=false；该 Agent 四个 Case 被跳过，已保存文件仍在。总共 10 CaseGen POST / 9 个生成 Case、100 模型 POST、8 Judge POST。跳过不计执行尝试，失败不计成功额度。
+- 对 16 次真实输入逐字核对历史，均正确；两种 Agent 的 Case 在时间上重叠执行。失败 operation/request 身份及对照结果见 Two-Worker-Comparison-2026-09-14.json。官方同类错误含义与此前一致，未自动重发。
+- 2-worker 样本仍有 Judge / CaseGen 终态错误，不能声称并发已修复服务。下一批继续尚未覆盖的三 Agent × 3 Cases × 最多三轮，随后检查实际输入、证据与 Judge 再决定五轮测试。
