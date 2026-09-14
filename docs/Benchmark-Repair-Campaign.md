@@ -14,7 +14,7 @@
 
 ## 状态
 
-当前：三个 Agent 均已真实 certify 为 ready。累计有效完成 29 / 36 次 Case 执行尝试，当前连续合格混合 suite 为 0；曾有一批 2 Agent × 3 Cases 全部实际五轮成功。三 Agent × 3 Cases 首轮为 8/9 完成，余下一个 Judge 服务端终态错误。正在测试三 Agent × 4 Cases × 最多两轮。以下保留历史，最新计数以 Benchmark-Campaign-Ledger.json 为准。
+当前：三个 Agent 均已真实 certify 为 ready。累计有效完成 39 / 48 次 Case 执行尝试，当前连续合格混合 suite 为 0；曾有一批 2 Agent × 3 Cases 全部实际五轮成功。三 Agent × 4 Cases × 两轮为 10/12 完成，余下两个远端 Judge 终态错误。已启动相同数量/轮次的 2-worker 对照。以下保留历史，最新计数以 Benchmark-Campaign-Ledger.json 为准。
 
 里程碑：`ac1b659` 保存此前并发重构和审查基线。首批修复包含控制流 span 关闭、host callback 边界、关闭 stdin、Docker 二次清理超时，以及按已记录终态验收 trace；策略、认证、转换、采集故障仍拒绝。
 
@@ -136,3 +136,11 @@ Issue #39：主机边界与当前镜像真实断网验收通过；后续新增�
 - 失败的 Agent execution、OTel、submission 和 evidence 已成功；失败在远程 Judge。相邻成功 Case 的同构证据为 100679 / 1047321 bytes，失败的为 100485 bytes，均 9 spans 且工具参数/结果 present。不能据此声称了解服务端模型失败的具体原因；官方只暴露通用错误。请求/operation ID 与对照保存于 Remote-Judge-Failure-2026-09-14.json，未自动重发该请求。
 - Research 组本批 9 个任务中 8 个在任务层面匹配，1 个 TradingAgents Case 仍要求离线商品检索评估。Case-Scope-Review-2026-09-14.json 独立记录，不能把链路稳定等同于 Case 合理。
 - 后续最多四个已界定组合：(每 Agent 4 Cases, 2 Inputs 上限)、(3,3)、(3,5)、(5,5)，仍 3 workers。每批结束先检查全部 Case 的真实执行、证据与 Judge；任一异常即暂停下一批供排查。不会覆盖旧日志、重试已知失败请求或超出 200 有效完成 Case 上限；四批本身不能保证满足五次连续验收。
+
+## 10:54：三 Agent 两轮与低并发对照
+
+- suite_597ee659ca8d485b9ea0de390f30d13f：三 Agent × 各 4 Cases，每个实际 2 Inputs，最大同时 3 Cases / 3 种 Agent。12 CaseGen、123 模型 POST、12 Judge POST；10 个链路正常完成，2 个远端 Judge 终态错误。结果独立落盘，无整轮丢失。
+- GPT Researcher 的 request_failed / retryable=false 在 Judge 提交后约 13 秒返回；TradingAgents 的 service_busy / retryable=true 在约 311 秒后返回。两者 execution succeeded、OTel complete、submission committed、evidence captured。原始 operation 明确 failed，未自动重新提交。请求身份与原始时间见 Remote-Judge-Two-Turn-Failures-2026-09-14.json。
+- 官方文档分别定义为服务端内部错误与模型供应方超时/不可用/繁忙；没有公开更具体原因。retryable=true 也不允许 SDK 自动重复付费请求。不能据此改写用户输入、伪造 Judge 或归咎 OpenRouter key。
+- 对全部 12 个 Case 的 24 次输入做离线逐字历史核验：首轮只有自身输入，第二轮包含完整前序结果历史。ReAct 使用原生 messages，两个研究 binding 使用 prior user/final answer。保留原始 partial 和工具内容大小限制；验收文件 Three-Agent-Two-Turn-Acceptance-2026-09-14.json。
+- 下一批仅将 worker 从 3 改为 2，保持三 Agent × 各 4 Cases × 最多两轮。使用新生成 Case，因此只作负载相关性的观察，不宣称是因果证明；完成后检查再进入三轮/五轮。
