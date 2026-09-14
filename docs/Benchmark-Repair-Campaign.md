@@ -14,7 +14,7 @@
 
 ## 状态
 
-当前：OpenRouter 新 key 可用；三个 Agent 均已真实 certify 为 ready。累计有效完成 14 / 20 次 Case 执行尝试，连续合格混合 suite 为 0。两 Agent × 3 Cases 的五轮 suite 正在执行，下一阶段为三 Agent 混合验收。以下保留修复历史，最新计数以 Benchmark-Campaign-Ledger.json 为准。
+当前：三个 Agent 均已真实 certify 为 ready。累计有效完成 29 / 36 次 Case 执行尝试，当前连续合格混合 suite 为 0；曾有一批 2 Agent × 3 Cases 全部实际五轮成功。三 Agent × 3 Cases 首轮为 8/9 完成，余下一个 Judge 服务端终态错误。正在测试三 Agent × 4 Cases × 最多两轮。以下保留历史，最新计数以 Benchmark-Campaign-Ledger.json 为准。
 
 里程碑：`ac1b659` 保存此前并发重构和审查基线。首批修复包含控制流 span 关闭、host callback 边界、关闭 stdin、Docker 二次清理超时，以及按已记录终态验收 trace；策略、认证、转换、采集故障仍拒绝。
 
@@ -128,3 +128,11 @@ Issue #39：主机边界与当前镜像真实断网验收通过；后续新增�
 - 已逐轮比较六个 Case 的历史：原生 LangChain human/ai 与 user/assistant 仅规范角色表示，正文、tool_call_id、tool_calls 按原值比较；前序消息前缀全部保留，每个 Case 首轮仅一条自己的输入。完整摘要与文件摘要见 Mixed-Five-Turn-Acceptance-2026-09-14.json。
 - TradingAgents 对照改为 Research CAND-009@1 后，官方保存 case_b8b2476da32245fe864586e6eb440086明确要求 AAPL / 2026-09-11 研究，并在第二轮加入日期边界及伪造数据诱导，与声明能力匹配。正在复用这个原始两轮 Case；不重复生成、不改 prompt。
 - 尚未完成五次连续三 Agent 混合验收；本次成功代表链路与多轮传递正常，生成场景适配和 Agent 行为质量仍按原报告记录。
+
+## 10:33：三 Agent 首轮与后续矩阵
+
+- TradingAgents 的匹配 Research Case 复用完成两轮，21 模型 POST / 1 Judge / 0 CaseGen；宿主接受、Judge issue。逐字核对第二轮包含第一轮用户与最终回答，工具参数/结果 present。Judge 识别的是没有完成五交易日 high/low 的真实行为问题。
+- suite_8bc78ce3917047309eaf217a6f311234 选择三 Agent × 各 3 Cases × 1 Input：8 个完整完成，1 个 GPT Researcher Judge operation 终态 model_invalid_result、retryable=false。8 份结果独立保存，没有随失败 Case 丢失；本轮不计连续验收成功。
+- 失败的 Agent execution、OTel、submission 和 evidence 已成功；失败在远程 Judge。相邻成功 Case 的同构证据为 100679 / 1047321 bytes，失败的为 100485 bytes，均 9 spans 且工具参数/结果 present。不能据此声称了解服务端模型失败的具体原因；官方只暴露通用错误。请求/operation ID 与对照保存于 Remote-Judge-Failure-2026-09-14.json，未自动重发该请求。
+- Research 组本批 9 个任务中 8 个在任务层面匹配，1 个 TradingAgents Case 仍要求离线商品检索评估。Case-Scope-Review-2026-09-14.json 独立记录，不能把链路稳定等同于 Case 合理。
+- 后续最多四个已界定组合：(每 Agent 4 Cases, 2 Inputs 上限)、(3,3)、(3,5)、(5,5)，仍 3 workers。每批结束先检查全部 Case 的真实执行、证据与 Judge；任一异常即暂停下一批供排查。不会覆盖旧日志、重试已知失败请求或超出 200 有效完成 Case 上限；四批本身不能保证满足五次连续验收。
