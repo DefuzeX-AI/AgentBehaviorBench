@@ -72,10 +72,26 @@ class CaseResult:
     error_type: str | None = None
     error_message: str | None = None
     artifacts: dict | None = None
+    attempt_id: str | None = None
+    attempt_number: int = 1
+
+    @property
+    def execution_status(self) -> str:
+        """Separate a delivered verdict from infrastructure failure."""
+        if self.benchmark is not None and self.benchmark.report is not None and self.error_type is None:
+            return "completed"
+        return {"failed": "blocked", "succeeded": "completed"}.get(self.status, self.status)
+
+    @property
+    def judge_status(self) -> str | None:
+        report = self.benchmark.report if self.benchmark is not None else None
+        return getattr(report, "status", None)
 
     def __post_init__(self) -> None:
         if type(self.case_index) is not int or self.case_index < 0:
             raise ValueError("Case index must be a nonnegative integer")
+        if type(self.attempt_number) is not int or self.attempt_number < 1:
+            raise ValueError("Attempt number must be a positive integer")
         if self.status not in {"succeeded", "failed", "cancelled", "skipped"}:
             raise ValueError("Case result requires a terminal status")
         if self.benchmark is not None and self.benchmark.agent_id != self.agent_id:

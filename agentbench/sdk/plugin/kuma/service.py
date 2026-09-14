@@ -31,7 +31,8 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
              generation_count=None, case_artifact=None, control=None,
              build_coordinator=None, job_context=None, identity=None,
              runtime_services=None, expected_case_id=None, expected_content_sha256=None,
-             sdk_request_options=None):
+             sdk_request_options=None, generation_indices=None, partial_generation=False,
+             safe_case_replay=False):
     """
     
     Run the Kuma worker in Docker and return its host artifact directory.
@@ -69,6 +70,12 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
             number of Cases to prepare. The worker creates/saves Cases without
             invoking the Agent. None selects execution mode. The generation
             worker validates the count; callers should omit case_artifact here.
+        generation_indices: Optional original zero-based slots to generate from
+            the full generation_count selection. Other slots are not requested.
+        partial_generation: Record individual generation failures and continue
+            independent slots. Shared authentication/quota blocks stop the batch.
+        safe_case_replay: Explicit Agent promise that whole-Case replay has no
+            unsafe external side effects. Does not override SDK retry policy.
         case_artifact: Host path to a previously saved SDK Case artifact for
             execution mode. Copied into the staged repository's .kuma directory
             and passed to the worker as a repository-relative path. The worker
@@ -133,6 +140,7 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
         'max_steps': max_steps,
         'mode': 'generate' if generation_count is not None else 'execute',
         'count': generation_count, 'case_artifact': reused,
+        'case_indices': generation_indices, 'allow_partial': partial_generation,
         'expected_case': {'case_id': expected_case_id, 'content_sha256': expected_content_sha256}})
     destination = directory / 'evaluation'; destination.mkdir(mode=0o777); destination.chmod(0o777)
     identity = {**dict(job_context or {}), **dict(identity or {}),
@@ -144,7 +152,8 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
     if generation_count is not None:
         identity.update(case_index=None, case_id=None)
     status = {**identity, 'schema': 'abb.evaluate.run.v1', 'run_id': directory.name,
-              'status': 'running', 'cleanup_status': 'pending'}
+              'status': 'running', 'cleanup_status': 'pending', 'host_trace_validation': 'not_performed',
+              'safe_case_replay': safe_case_replay is True}
     files.save('run.json', status)
     session = None
     primary_error = None
@@ -202,8 +211,17 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
             code = session.wait(timeout=timeout)
             status['exit_code'] = code
             # Preparation calls the SDK only; no Agent/LLM invocation exists.
-            if code == 0 and generation_count is None:
-                session.validate_trace(checkpoint)
+            if generation_count is None:
+                from .diagnostics import read_diagnostic
+                summary = read_diagnostic(directory, 'evaluation/manifest.json')
+                judge_only_failure = (
+                    summary.get('phase') == 'judge' and summary.get('execution') == 'succeeded'
+                    and summary.get('otel') == 'complete' and summary.get('submission') == 'committed'
+                    and summary.get('evidence') == 'captured')
+                if code == 0 or judge_only_failure:
+                    status['host_trace_validation'] = 'failed'
+                    session.validate_trace(checkpoint)
+                    status['host_trace_validation'] = 'succeeded'
             status['status'] = 'succeeded' if code == 0 else 'failed'
     except BaseException as exc:
         primary_error = exc

@@ -103,6 +103,64 @@ class PreparedCase:
                 raise ValueError(f'{name} must be a lowercase SHA-256 digest')
 
 
+@dataclass(frozen=True, slots=True)
+class PreparationFailure:
+    """One logical Case slot that could not produce a reusable Case.
+
+    SDK error fields retain their original meaning: ``retryable`` alone is not
+    permission to start another paid request. Request identities and artifacts
+    allow the coordinator to choose recovery without interpreting error text.
+    """
+
+    case_index: int
+    error_type: str
+    error_message: str
+    phase: str = 'case_generation'
+    code: str | None = None
+    retryable: bool | None = None
+    client_request_id: str | None = None
+    request_id: str | None = None
+    artifacts: Mapping[str, object] | None = None
+
+    def __post_init__(self) -> None:
+        if type(self.case_index) is not int or self.case_index < 0:
+            raise ValueError('case_index must be a non-negative integer')
+        if self.retryable is not None and type(self.retryable) is not bool:
+            raise TypeError('retryable must be a boolean when provided')
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedCaseBatch:
+    """Partial preparation results retaining the original, disjoint slot IDs."""
+
+    cases: tuple[PreparedCase, ...]
+    failures: tuple[PreparationFailure, ...] = ()
+    unattempted_indices: tuple[int, ...] = ()
+
+    def __post_init__(self) -> None:
+        indices = [case.case_index for case in self.cases]
+        indices.extend(failure.case_index for failure in self.failures)
+        indices.extend(self.unattempted_indices)
+        if any(type(index) is not int or index < 0 for index in indices):
+            raise ValueError('Batch indices must be non-negative integers')
+        if len(indices) != len(set(indices)):
+            raise ValueError('Prepared, failed and unattempted Case indices must be disjoint')
+
+    @property
+    def failures_by_index(self) -> dict[int, PreparationFailure]:
+        return {failure.case_index: failure for failure in self.failures}
+
+
+@runtime_checkable
+class PartialCasePreparation(Protocol):
+    """Optional capability; legacy runners may keep all-or-nothing preparation."""
+
+    def prepare_case_batch(
+        self, registration: AgentRegistration, *,
+        case_indices: tuple[int, ...] | None = None, on_progress=None,
+    ) -> PreparedCaseBatch: ...
+
+
 class EvaluationRunner(Protocol):
     """Prepare explicit Cases, then execute one Case in an isolated runner."""
 
@@ -124,6 +182,18 @@ class RunnerConcurrencyCapabilities:
 
     isolated_cases: bool = False
     cooperative_cancel: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class RunnerRecoveryCapabilities:
+    """Recovery promises, independent of concurrent execution support.
+
+    ``safe_case_replay`` requires an audited Agent declaration: new isolated
+    sessions alone do not make external side effects safe to repeat.
+    """
+
+    safe_case_replay: bool = False
+    resume_judgment: bool = False
 
 
 @dataclass(frozen=True, slots=True)

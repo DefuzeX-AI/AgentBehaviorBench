@@ -63,14 +63,34 @@ def collect_artifacts(directory, host, *, environ=None):
     error = summary.get('error')
     if not isinstance(error, dict):
         error = early
-    result = {'directory': str(Path(directory).resolve()), 'phase': _text(summary.get('phase') or early.get('phase'))}
+    result = {'directory': str(Path(directory).resolve()), 'phase': _text(summary.get('phase') or early.get('phase')),
+              'cleanup_status': host.get('cleanup_status'),
+              'host_trace_validation': host.get('host_trace_validation'),
+              'safe_case_replay': host.get('safe_case_replay') is True,
+              'host_phase': host.get('phase'), 'host_error_type': host.get('error_type'),
+              'completion': {key: summary.get(key) for key in ('execution', 'otel', 'submission', 'evidence')}}
     if error:
         result['sdk_error'] = {key: (value if isinstance(value, bool) else _text(value))
                                for key in ('type', 'message', 'code', 'retryable', 'request_id', 'client_request_id')
                                if (value := error.get(key)) is not None}
+    steps = summary.get('steps')
+    for step in steps if isinstance(steps, list) else ():
+        if not isinstance(step, dict) or not isinstance(step.get('directory'), str):
+            continue
+        native = read_diagnostic(directory, f"evaluation/{step['directory']}/result.json")
+        if native.get('status') in ('failed', 'timeout'):
+            result['native_failure'] = {key: _text(native.get(key)) for key in ('status', 'error_type', 'error')}
+            break
     report = read_diagnostic(directory, 'evaluation/judge/report.json')
     case = read_diagnostic(directory, 'evaluation/case.json')
     case_id, run_id = summary.get('case_id'), summary.get('run_id')
+    request = summary.get('request')
+    if (isinstance(request, dict) and request.get('request_type') == 'judgment'
+            and isinstance(case_id, str) and case_id and isinstance(run_id, str) and run_id
+            and request.get('run_id') == run_id and request.get('case_id') == case_id
+            and case.get('case_id') == case_id and host.get('case_id') in (None, case_id)):
+        result['sdk_request'] = {key: request.get(key) for key in (
+            'client_request_id', 'request_type', 'status', 'operation_id', 'run_id', 'case_id')}
     extensions = report.get('extensions')
     if (summary.get('judge') == 'received' and isinstance(case_id, str) and case_id
             and isinstance(run_id, str) and run_id and case.get('case_id') == case_id
@@ -117,6 +137,8 @@ def collect_artifacts(directory, host, *, environ=None):
             result['related_network_errors'] = related[-3:]
     except (OSError, ValueError, RuntimeError):
         pass
+    from .recovery import classify_failure
+    result['recovery'] = classify_failure(result)
     return redact(result, files.secrets)
 
 

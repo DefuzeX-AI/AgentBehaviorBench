@@ -6,7 +6,7 @@ from agentbench.sdk.common.artifacts import Artifacts, plain
 from agentbench.observe.store import TraceStore
 
 
-async def drive_run(run, binding, invoke, directory, *, provider):
+async def drive_run(run, binding, invoke, directory, *, provider, repo_path=None):
     """invoke(payload, step_directory, provider) returns the native result envelope.
 
     SDK creation and provider attachment happen before this loop, in its caller.
@@ -113,6 +113,18 @@ async def drive_run(run, binding, invoke, directory, *, provider):
                             'request_id': getattr(exc, 'request_id', None)}
         if summary['phase'] == 'judge':
             summary['judge'] = 'failed'
+            request_id = getattr(exc, 'client_request_id', None)
+            if request_id and repo_path is not None:
+                # Persist only the SDK's public read-only request projection.
+                # A retryable flag is not evidence that an operation is pending.
+                from .request_recovery import inspect_requests
+                try:
+                    request = inspect_requests(repo_path, request_id)
+                    if (request.get('run_id') == run.run_id and request.get('case_id') == run.case_id
+                            and request.get('request_type') == 'judgment'):
+                        summary['request'] = request
+                except Exception:
+                    pass  # Never replace the primary error with failed inspection.
         elif summary['phase'] == 'execution':
             summary['execution'] = 'failed'
         elif summary['phase'] == 'submission':

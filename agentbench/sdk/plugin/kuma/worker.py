@@ -18,7 +18,7 @@ from agentbench.runtime.agentcontainer.session import AgentSession
 async def execute(root, output, settings=None):
     # 这里进入容器内的评测流程，root 是 Agent 根目录，output 是产物目录，settings 是任务配置
     # 导入官方 Kuma SDK、证据采集工具和实际调用 Agent 的函数
-    from kuma import create_run
+    from kuma import create_run, DEFAULT_BASE_URL
     from kuma.otel import configure_trace_evidence
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.resources import Resource
@@ -48,6 +48,7 @@ async def execute(root, output, settings=None):
         credential, credential_source = api_key(os.environ)
         files.save('process.json', {'pid': os.getpid(), 'container': platform.node(), 'mode': 'official',
                    'sdk': 'kuma', 'sdk_version': version('kuma-defuzex'), 'agent_id': manifest['agent_id'],
+                   'sdk_base_url': DEFAULT_BASE_URL,
                    'api_key_source': credential_source,
                    'source': manifest.get('source'), 'repo': str(root / 'agent')})
         files.save('manifest.json', {'phase': 'case_generation', 'judge': 'pending'})
@@ -69,10 +70,15 @@ async def execute(root, output, settings=None):
             # belongs only to this branch.
             collection = generate_collection(
                 create_run, count=settings['count'], files=files, repo=root / 'agent',
+                case_indices=settings.get('case_indices'), allow_partial=settings.get('allow_partial', False),
                 options=dict(options, agent_profile_path=root / 'evaluation/profile.md'))
-            files.save('manifest.json', {'phase': 'batch_generated', 'count': len(collection['cases'])})
+            complete = not collection['failures'] and not collection['unattempted_indices']
+            files.save('manifest.json', {'phase': 'batch_generated' if complete else 'batch_partial',
+                                        'count': len(collection['cases']),
+                                        'failed_count': len(collection['failures']),
+                                        'unattempted_indices': collection['unattempted_indices']})
             # Case 批量生成完成就结束，不进入下面的 Case 执行流程
-            return 0
+            return 0 if complete else 1
         
         # 执行模式必须提供已经保存的 Case 文件
         if settings.get('case_artifact') is None:
@@ -121,7 +127,7 @@ async def execute(root, output, settings=None):
             return json.loads((folder / 'result.json').read_text())
         # 这里开始驱动整个 Case：取输入、调用上面的 invoke、提交输出并接收 Judge 报告
         summary = await drive_run(run, binding,
-                                  invoke, output, provider=provider)
+                                  invoke, output, provider=provider, repo_path=root / 'agent')
         # 判断执行和证据是否完整，这里的退出码不判断 Judge 是否给出 pass
         return 0 if (summary['judge'] == 'received' and summary['otel'] == 'complete'
                      and summary['evidence'] == 'captured'
