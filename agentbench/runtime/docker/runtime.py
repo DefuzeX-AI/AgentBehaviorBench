@@ -442,15 +442,16 @@ class DockerRuntime:
         if "PRIVATE KEY" in pem or "-----BEGIN CERTIFICATE-----" not in pem:
             raise DockerRuntimeError("Invalid interceptor public CA export")
         ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT).load_verify_locations(cadata=pem)
-        with tempfile.NamedTemporaryFile(mode="w", encoding="ascii", dir=destination.parent, delete=False) as stream:
-            owned = Path(stream.name)
-            try:
+        stream = tempfile.NamedTemporaryFile(mode="w", encoding="ascii", dir=destination.parent, delete=False)
+        owned = Path(stream.name)
+        try:
+            with stream:
                 stream.write(pem)
-                stream.flush()
-                owned.chmod(0o644)
-                owned.replace(destination)
-            finally:
-                owned.unlink(missing_ok=True)
+            # Windows cannot replace or remove a file while this handle is open.
+            owned.chmod(0o644)
+            owned.replace(destination)
+        finally:
+            owned.unlink(missing_ok=True)
 
     def _require_non_root_image(self, image: str) -> None:
         result = self._run(

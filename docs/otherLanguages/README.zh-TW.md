@@ -108,7 +108,6 @@ OPENROUTER_APP_TITLE=AgentBehaviorBench
 ```bash
 agentbench run --model openai/gpt-4.1-mini
 agentbench run --sdk kuma --sdk-options sdk-options.json
-agentbench run --llm-trace terminal
 ```
 
 完整參數請見英文 [CLI reference](../docs/CLI.md)，新增 Agent 請見

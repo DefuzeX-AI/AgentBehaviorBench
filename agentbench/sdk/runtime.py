@@ -12,12 +12,8 @@ from agentbench.runtime import RuntimeFactory
 from agentbench.runtime.docker import DockerRuntime
 from agentbench.runtime.interception import OpenRouterProvider
 
-from .plugins import (
-    EvaluationPlan,
-    EvaluationSDKPlugin,
-    SDKRunnerContext,
-    plugin_execution,
-)
+from .contracts import EvaluationSDKPlugin, SDKRunnerContext
+from .plugins import EvaluationPlan, plugin_execution
 
 
 def build_evaluation_runner(
@@ -38,10 +34,16 @@ def build_evaluation_runner(
     )
     execution = plugin_execution(selected)
     if isinstance(selected, EvaluationSDKPlugin):
-        runner = selected.create_benchmark_runner(
-            context=context,
-            options=plan.options,
-        )
+        try:
+            runner = selected.create_benchmark_runner(
+                context=context,
+                options=plan.options,
+            )
+        except ModuleNotFoundError as exc:
+            raise ProviderSelectionError(
+                f"Could not create SDK {plan.selection.reference.name!r} runner: "
+                f"missing module {exc.name!r}. Check the adapter's dependencies."
+            ) from exc
         if not callable(getattr(runner, "validate_sdk", None)) or not callable(
             getattr(runner, "run", None)
         ):

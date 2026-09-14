@@ -6,7 +6,7 @@ import json
 import threading
 import time
 from dataclasses import dataclass
-from typing import Callable, Mapping, Protocol, runtime_checkable
+from typing import Mapping, Protocol, runtime_checkable
 
 
 TRACE_PREFIX = "DEFUZEX_TRACE "
@@ -112,46 +112,3 @@ class InterceptionTraceState:
                 self._condition.wait(timeout=min(0.05, max(0, deadline - time.monotonic())))
         return False
 
-
-@dataclass(slots=True)
-class TerminalTraceSink:
-    output_fn: Callable[[str], None] = print
-
-    def emit(self, event: TraceEvent) -> None:
-        if event.event == "interceptor_ready":
-            return
-        data = event.data
-        call_id = data.get("call_id", "-")
-        route = data.get("route_id", "-")
-        direction = "REQUEST" if event.event == "llm_request" else "RESPONSE"
-        source = ""
-        if data.get("source_host"):
-            source = (
-                f" source={data.get('source_host', '')}"
-                f"{data.get('source_path', '')}"
-            )
-        self.output_fn(
-            f"[LLM TRACE {direction}] call={call_id} route={route} "
-            f"provider={data.get('provider', '-')} "
-            f"{data.get('method', '')} {data.get('host', '')}{data.get('path', '')}"
-            f"{source}".rstrip()
-        )
-        metadata = {
-            key: data[key]
-            for key in (
-                "source_model",
-                "model",
-                "status",
-                "latency_ms",
-                "streaming",
-                "routing_error",
-                "truncated",
-            )
-            if key in data
-        }
-        if metadata:
-            self.output_fn(json.dumps(metadata, ensure_ascii=False, sort_keys=True))
-        if "payload" in data:
-            self.output_fn(
-                json.dumps(data["payload"], ensure_ascii=False, indent=2, sort_keys=True)
-            )

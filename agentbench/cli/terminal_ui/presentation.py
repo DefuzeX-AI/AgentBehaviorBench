@@ -34,16 +34,12 @@ def confirm_agents(
     *,
     input_fn: Callable[[str], str] = input,
     output_fn: Callable[[str], None] = print,
-    sleep_fn: Callable[[float], None] = time.sleep,
-    reveal_delay: float = AGENT_REVEAL_DELAY_SECONDS,
 ) -> bool:
     """Print detected agents and return whether execution was confirmed."""
 
     print_agents(
         agents,
         output_fn,
-        sleep_fn=sleep_fn,
-        reveal_delay=reveal_delay,
     )
     try:
         confirmed = request_confirmation(input_fn, output_fn)
@@ -70,9 +66,6 @@ def confirm_agents(
 def print_agents(
     agents: tuple[AgentRegistration, ...],
     output_fn: Callable[[str], None],
-    *,
-    sleep_fn: Callable[[float], None] = time.sleep,
-    reveal_delay: float = AGENT_REVEAL_DELAY_SECONDS,
 ) -> None:
     """Print the detected agent list."""
 
@@ -86,7 +79,7 @@ def print_agents(
     )
     output_fn(panel_line(""))
     for index, agent in enumerate(agents, start=1):
-        sleep_fn(reveal_delay)
+        time.sleep(AGENT_REVEAL_DELAY_SECONDS)
         marker = f"{ANSI_MAGENTA}{index:02d}{ANSI_RESET}"
         status = (
             f"{ANSI_GREEN}{agent.status.upper()}{ANSI_RESET}"
@@ -104,7 +97,7 @@ def print_agents(
         if index < len(agents):
             output_fn(panel_line("    " + "." * 64))
     if agents:
-        sleep_fn(reveal_delay)
+        time.sleep(AGENT_REVEAL_DELAY_SECONDS)
     output_fn(panel_rule("", ANSI_CYAN))
 
 

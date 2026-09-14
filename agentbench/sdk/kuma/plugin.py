@@ -6,13 +6,12 @@ from collections.abc import Mapping
 
 from agentbench.harness.protocols.evaluation import EvaluationRunner
 
-from ..plugins import SDK_PLUGIN_API_VERSION, SDKRunnerContext
+from ..contracts import SDK_PLUGIN_API_VERSION, SDKRunnerContext
 
 
 class KumaEvaluationSDK:
     """Strategy adapter for the existing formal KUMA container runner."""
 
-    name = "kuma"
     api_version = SDK_PLUGIN_API_VERSION
     execution = "container"
 

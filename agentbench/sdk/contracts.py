@@ -15,6 +15,23 @@ if TYPE_CHECKING:
     from agentbench.harness.result import BenchmarkResult
 
 
+SDK_PLUGIN_API_VERSION = "agentbench.evaluation_sdk.v1"
+
+
+@dataclass(frozen=True, slots=True)
+class SDKReference:
+    """Identity of an SDK, without importing or initializing its implementation.
+
+    For discovered adapters, ``name`` is the directory name and ``object_ref``
+    is the qualified ``plugin`` export. Python injection is an explicit caller
+    override, not an additional source of discoverable adapters.
+    """
+
+    name: str
+    source: Literal["directory", "python"]
+    object_ref: str
+
+
 class SDKReport(Protocol):
     status: str
     confidence: object
@@ -79,9 +96,13 @@ class SDKRunnerContext:
 
 @runtime_checkable
 class EvaluationSDKPlugin(Protocol):
-    """Adapter for SDKs which need their own deployment or execution loop."""
+    """Directory adapter owning an SDK's dependencies and execution loop.
 
-    name: str
+    Export an instance as ``plugin`` from ``sdk/<name>/plugin.py``. The directory
+    supplies its name; no duplicate registration or name field is required.
+    Importing the entry module must not start work or require SDK dependencies.
+    """
+
     api_version: str
     execution: Literal["container", "local"]
 

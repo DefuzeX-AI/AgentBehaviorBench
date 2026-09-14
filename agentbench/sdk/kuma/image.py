@@ -6,6 +6,7 @@ import shutil
 import tempfile
 from types import SimpleNamespace
 from agentbench.runtime.docker.worker_build import _ignore
+from agentbench.sdk.common.whitelist import whitelist_toml
 
 
 @contextmanager
@@ -42,9 +43,7 @@ def evaluation_agent(agent, sdk):
         if count != 1:
             raise ValueError('Expected one explicit launch.argv')
         source = source.replace('[runtime]\n', '[runtime]\nenv_keys = ["KUMA_API_KEY", "DEFUZEX_API_KEY"]\n', 1)
-        # User-authorized SDK-only egress, scoped to this evaluation overlay.
-        # No model routes/protocols are changed and no unrestricted network is used.
-        source += '\n[[llm_interception.tool_routes]]\npurpose = "evaluation"\nhost_patterns = ["defuzex.ai"]\nports = [443]\nmethods = ["GET", "POST"]\npath_patterns = ["/api/agentdefuze", "/api/agentdefuze/*"]\n'
+        source += whitelist_toml(Path(__file__).with_name('whitelist.json'))
         (root / 'agent.toml').write_text(source)
         dockerfile = root / 'Dockerfile'
         original = dockerfile.read_text()

@@ -114,7 +114,6 @@ Options `run` fréquentes :
 ```bash
 agentbench run --model openai/gpt-4.1-mini
 agentbench run --sdk kuma --sdk-options sdk-options.json
-agentbench run --llm-trace terminal
 ```
 
 La référence complète est en anglais : [CLI reference](../docs/CLI.md). Pour

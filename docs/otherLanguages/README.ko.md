@@ -111,7 +111,6 @@ OPENROUTER_APP_TITLE=AgentBehaviorBench
 ```bash
 agentbench run --model openai/gpt-4.1-mini
 agentbench run --sdk kuma --sdk-options sdk-options.json
-agentbench run --llm-trace terminal
 ```
 
 전체 인수는 영어 [CLI reference](../docs/CLI.md)를, Agent 추가는

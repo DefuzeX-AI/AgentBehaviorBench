@@ -5,12 +5,8 @@ from __future__ import annotations
 from argparse import ArgumentParser, Namespace
 
 from agentbench.harness.errors import ProviderSelectionError
-from agentbench.sdk.plugins import (
-    SDK_ENTRY_POINT_GROUP,
-    installed_sdk_references,
-    plugin_execution,
-    resolve_sdk,
-)
+from agentbench.sdk.discovery import discover_sdks
+from agentbench.sdk.plugins import plugin_execution, resolve_sdk
 
 from .base import CommandFeature
 
@@ -18,13 +14,13 @@ from .base import CommandFeature
 def configure_parser(parser: ArgumentParser) -> None:
     commands = parser.add_subparsers(dest="sdk_command", required=True)
     list_parser = commands.add_parser(
-        "list", help="List built-in and installed evaluation SDKs."
+        "list", help="List evaluation adapters found in the SDK directory."
     )
     list_parser.set_defaults(sdk_handler=_list_sdks)
     show_parser = commands.add_parser(
         "show", help="Load one SDK and show its execution interface."
     )
-    show_parser.add_argument("name", help="SDK NAME or DISTRIBUTION::NAME.")
+    show_parser.add_argument("name", help="SDK adapter directory name.")
     show_parser.set_defaults(sdk_handler=_show_sdk)
 
 
@@ -41,20 +37,14 @@ def execute(args: Namespace) -> int:
 
 def _list_sdks(args: Namespace) -> int:
     del args
-    print("NAME\tSOURCE\tDISTRIBUTION\tVERSION\tOBJECT")
-    for reference in installed_sdk_references():
-        print(
-            "\t".join(
-                (
-                    reference.name,
-                    reference.source,
-                    reference.distribution or "-",
-                    reference.version or "-",
-                    reference.object_ref,
-                )
-            )
-        )
-    print(f"Entry point group: {SDK_ENTRY_POINT_GROUP}")
+    references = discover_sdks()
+    print("NAME\tSOURCE\tOBJECT")
+    for reference in references:
+        print(f"{reference.name}\t{reference.source}\t{reference.object_ref}")
+    if not references:
+        print("No SDK adapters found under agentbench/sdk/.")
+    else:
+        print("Discovered adapters only; SDK dependencies are checked before execution.")
     return 0
 
 
@@ -63,8 +53,6 @@ def _show_sdk(args: Namespace) -> int:
     reference = selection.reference
     print(f"Name: {reference.name}")
     print(f"Source: {reference.source}")
-    print(f"Distribution: {reference.distribution or '-'}")
-    print(f"Version: {reference.version or '-'}")
     print(f"Object: {reference.object_ref}")
     print(f"Execution: {plugin_execution(selection.value)}")
     return 0
@@ -74,7 +62,7 @@ FEATURE = CommandFeature(
     name="sdk",
     help="List and inspect evaluation SDK plugins.",
     description=(
-        "Discover SDK plugins installed through Python package entry points, "
+        "Discover adapter packages under agentbench/sdk/, "
         "without importing them during listing."
     ),
     configure=configure_parser,

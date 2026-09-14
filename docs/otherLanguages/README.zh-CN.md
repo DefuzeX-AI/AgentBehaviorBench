@@ -25,8 +25,9 @@
 > `OPENROUTER_MODEL` 和 `TAVILY_API_KEY`。
 
 AgentBehaviorBench 在隔离运行时中执行已注册的 AI Agent，收集执行证据，并通过
-可选 SDK 评测结果。默认 SDK 是内置 KUMA adapter；结果保存在本地，并可在 ABB
-浏览器查看器中检查。
+可选 SDK 评测结果。SDK 从 `agentbench/sdk/` 的适配器目录自动发现：只有一个时
+自动选择，有多个时通过 `--sdk NAME` 指定。当前目录包含 KUMA；结果保存在本地，
+并可在 ABB 浏览器查看器中检查。
 
 ![AgentBehaviorBench 执行架构](../figures/framework.png)
 
@@ -73,7 +74,7 @@ agentbench run --no-view --output results/benchmark.json
 | --- | --- |
 | Python 3.10 或更高版本 | ABB 主机 CLI 与 harness。 |
 | Docker Desktop / Docker Engine | 当前可运行的内置 Agent 在 Docker 中执行；执行前 Docker 必须已启动。 |
-| `KUMA_API_KEY` 或 `DEFUZEX_API_KEY` | 默认 KUMA SDK 的 Case 与 Judge 访问凭据。 |
+| `KUMA_API_KEY` 或 `DEFUZEX_API_KEY` | 使用 KUMA SDK 时所需的 Case 与 Judge 访问凭据。 |
 | `OPENROUTER_API_KEY` | Docker Agent 的模型流量经 ABB interceptor 转发到 OpenRouter。 |
 | `OPENROUTER_MODEL` | 本次运行使用的模型名称。 |
 | `TAVILY_API_KEY` | 内置 Company Research Agent 的网页搜索凭据。 |
@@ -100,7 +101,7 @@ OPENROUTER_APP_TITLE=AgentBehaviorBench
 | `agentbench observe company-research-agent` | 用原生输入运行一个 Agent 并保存 trace，不创建 Case，也不调用 Judge。 |
 | `agentbench certify react-agent` | 认证 `adapting` Agent；成功后将其提升为 `ready`。 |
 | `agentbench view results/benchmark.json` | 在本地查看器中重新打开结果。 |
-| `agentbench sdk list` | 列出内置和已安装的评测 SDK。 |
+| `agentbench sdk list` | 列出 SDK 适配器目录，不导入 SDK 实现。 |
 | `agentbench clean --dry-run` | 预览将被移动到可恢复归档的本地结果历史。 |
 
 常用 `run` 选项：
@@ -108,7 +109,6 @@ OPENROUTER_APP_TITLE=AgentBehaviorBench
 ```bash
 agentbench run --model openai/gpt-4.1-mini
 agentbench run --sdk kuma --sdk-options sdk-options.json
-agentbench run --llm-trace terminal
 ```
 
 完整参数请见英文 [CLI reference](../docs/CLI.md)，添加 Agent 请见
@@ -129,7 +129,10 @@ resources/registry.toml
 - `agentbench/cli/` 提供命令行入口。
 - `agentbench/harness/` 负责 suite 执行、结果和注册表加载。
 - `agentbench/runtime/` 在本地或 Docker 运行 Agent。
-- `agentbench/sdk/` 包含内置 SDK adapter 和插件发现逻辑。
+- `agentbench/sdk/` 包含 SDK 适配器、公共接口和目录发现逻辑。
+
+添加 SDK 只需新增包含 `__init__.py` 和 `plugin.py` 的适配器目录，不需要修改
+核心名称名单或注册安装包 entry point。详见 [SDK 适配器指南](../SDK-Directory-Adapters.md)。
 
 ## 开发
 

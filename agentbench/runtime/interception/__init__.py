@@ -23,7 +23,6 @@ from .trace import (
     DEFAULT_TRACE_MAX_BYTES,
     InterceptionTraceState,
     NullTraceSink,
-    TerminalTraceSink,
     TraceEvent,
     TraceSink,
 )
@@ -47,7 +46,6 @@ __all__ = [
     "RunningModelInterceptor",
     "StaticInterceptorImageProvider",
     "StaticModelTargetProvider",
-    "TerminalTraceSink",
     "TraceEvent",
     "TraceSink",
     "TrustPlugin",

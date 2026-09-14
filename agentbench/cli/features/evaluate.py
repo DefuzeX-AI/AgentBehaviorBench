@@ -24,7 +24,6 @@ def configure_parser(parser):
     parser.add_argument('--model', type=model_name)
     configure_sdk_parser(parser)
     parser.add_argument('--no-view', action='store_true', help='Save results without starting the live viewer.')
-    parser.add_argument('--llm-trace', choices=('off', 'terminal'), default='off')
     parser.add_argument('--llm-trace-max-bytes', type=int, default=DEFAULT_TRACE_MAX_BYTES)
     parser.add_argument('--sdk-source', type=Path, help='Override the SDK sdk_source option')
     parser.add_argument('--result-output', type=Path, help='ABB result JSON naming base (independent of SDK output)')
@@ -69,8 +68,8 @@ def execute(args):
         if args.output is not None:
             print('--output configures the SDK only; --result-output selects the ABB result JSON.')
         activity = LLMActivity(print)
-        runner = build_trace_suite_runner(mode=args.llm_trace, max_bytes=args.llm_trace_max_bytes,
-            output_fn=print, model=args.model, activity_sink=activity,
+        runner = build_trace_suite_runner(max_bytes=args.llm_trace_max_bytes,
+            model=args.model, activity_sink=activity,
             sdk_selection=plan.selection, sdk_options=plan.options)
         execution = run_benchmark_session((agent,), runner=runner, output_path=output,
             output_fn=print, viewer_starter=None if args.no_view else start_viewer_server,

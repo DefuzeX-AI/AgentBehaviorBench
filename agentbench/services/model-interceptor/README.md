@@ -97,6 +97,27 @@ and non-DNS UDP are blocked. Google supports header or query API keys and
 rejects ambiguous credentials. `network-isolated` remains restricted to keyless
 local protocols inside a private Agent namespace.
 
+Non-model HTTP access is allowlisted through `llm_interception.tool_routes`
+in the Agent manifest. Rules match the host, port, method and path (excluding
+the query string); matching requests retain their destination and produce
+`tool_request` / `tool_response` events. Declared model hosts cannot bypass
+model interception through a tool rule. When adapting an Agent, declare only
+the external endpoints it needs instead of allowing an entire service.
+
+The KUMA evaluation build overlay reads `agentbench/sdk/kuma/whitelist.json`
+to add its backend routes and one release
+metadata route: `GET api.github.com:443/repos/DefuzeX-AI/KUMA-DefuzeX/releases/latest`,
+with purpose `evaluation`. This permits the SDK's background update check
+without disabling it or allowing other GitHub endpoints. These extra routes
+apply only to the staged evaluation manifest; the original Agent is unchanged.
+
+Each whitelist entry contains a full `url` and explicit `methods`, for example
+`{"url": "https://service.example/api/status", "methods": ["GET"]}`.
+Paths match exactly unless they end in `/*`; query strings are not matched.
+When integrating another SDK, keep its whitelist JSON in its own SDK directory
+and reuse `agentbench.sdk.common.whitelist.whitelist_toml` in its build overlay.
+Declare the JSON as package data so installed ABB builds can read it too.
+
 Authentication and target mutations are staged on a request copy. Failed
 preparation cannot forward a real key to the original provider. Empty
 intermediate stream output must not terminate HTTP/1 chunked responses, and

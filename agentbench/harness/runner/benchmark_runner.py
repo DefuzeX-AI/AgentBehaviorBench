@@ -217,7 +217,8 @@ class BenchmarkRunner:
 
         A supplied SDK receives repo_path plus sdk_options unchanged. It owns
         credentials, providers, validation and judging. No DefuzeX settings are
-        added to that path. Omitting sdk preserves the DefuzeX default.
+        added to that path. Use SuiteRunner for directory-discovered adapters;
+        this lower-level runner requires an SDK object or an existing SDKRun.
         """
         callbacks = dict(
             on_progress=on_progress,
@@ -240,8 +241,6 @@ class BenchmarkRunner:
                     on_step_complete=on_step_complete,
                     on_step_failure=on_step_failure,
                 )
-        if self._sdk is None:
-            return await self.arun_defuzex(registration, **self._sdk_options, **callbacks)
         mode = self.validate_sdk(registration)
         kwargs = {"repo_path": registration.path, **self._sdk_options}
         return await self._execute(
@@ -254,7 +253,10 @@ class BenchmarkRunner:
     def validate_sdk(self, registration: AgentRegistration) -> str:
         """Check the selected SDK interface without starting an Agent or Run."""
         if self._sdk is None:
-            return self.validate_defuzex(registration, **self._sdk_options)
+            raise ProviderSelectionError(
+                "BenchmarkRunner requires an explicit SDK object; use SuiteRunner "
+                "for directory-discovered adapters, or pass an existing SDKRun to run()."
+            )
         if isinstance(self._sdk, type) or not callable(
             getattr(self._sdk, "create_run", None)
         ):

@@ -49,12 +49,6 @@ def configure_parser(parser: ArgumentParser) -> None:
         help="OpenRouter model slug; defaults to OPENROUTER_MODEL.",
     )
     parser.add_argument(
-        "--llm-trace",
-        choices=("off", "terminal"),
-        default="off",
-        help="Print sanitized intercepted model requests and responses.",
-    )
-    parser.add_argument(
         "--llm-trace-max-bytes",
         type=int,
         default=DEFAULT_TRACE_MAX_BYTES,
@@ -76,8 +70,6 @@ def execute(args: Namespace) -> int:
         kwargs["model"] = args.model
     if args.no_view:
         kwargs['viewer_starter'] = None
-    if args.llm_trace != "off":
-        kwargs["llm_trace"] = args.llm_trace
     if args.llm_trace_max_bytes != DEFAULT_TRACE_MAX_BYTES:
         kwargs["llm_trace_max_bytes"] = args.llm_trace_max_bytes
     return certify(args.agent_id, **kwargs)
@@ -93,7 +85,6 @@ def certify(
     sdk: SDK | None = None,
     sdk_selection: SDKSelection | None = None,
     sdk_options: Mapping[str, object] | None = None,
-    llm_trace: str = "off",
     llm_trace_max_bytes: int = DEFAULT_TRACE_MAX_BYTES,
     model: str | None = None,
     viewer_starter=start_viewer_server,
@@ -137,9 +128,7 @@ def certify(
         (agent,),
         runner=suite_runner
         or build_trace_suite_runner(
-            mode=llm_trace,
             max_bytes=llm_trace_max_bytes,
-            output_fn=output_fn,
             model=model,
             activity_sink=llm_activity,
             sdk=sdk,

@@ -31,8 +31,10 @@
 
 AgentBehaviorBench runs registered AI agents in isolated runtimes, captures
 their execution evidence, and evaluates the result through a selectable SDK.
-The default SDK is the built-in KUMA adapter. Results are written locally and
-can be inspected in ABB's browser viewer.
+SDK adapters are discovered from directories under `agentbench/sdk/`. With
+one adapter it is selected automatically; with several, choose `--sdk NAME`.
+This checkout currently includes KUMA. Results are written locally and can be
+inspected in ABB's browser viewer.
 
 ## Quick start
 
@@ -53,7 +55,7 @@ cp .env.example .env                   # Windows PowerShell: Copy-Item .env.exam
 ```
 
 ```dotenv
-# Required by the default KUMA evaluation SDK. DEFUZEX_API_KEY is accepted too.
+# Required when using the KUMA evaluation SDK. DEFUZEX_API_KEY is accepted too.
 KUMA_API_KEY=
 
 # Required for model calls made by Docker-based Agents.
@@ -84,7 +86,7 @@ agentbench run --no-view --output results/benchmark.json
 | --- | --- |
 | Python 3.10 or newer | ABB host CLI and harness. |
 | Docker Desktop / Docker Engine | The bundled ready Agent runs in a Docker container. Docker must be running before `run`, `evaluate`, `certify`, or `observe`. |
-| `KUMA_API_KEY` or `DEFUZEX_API_KEY` | Case and Judge access for the default KUMA SDK. |
+| `KUMA_API_KEY` or `DEFUZEX_API_KEY` | Case and Judge access when using the KUMA SDK. |
 | `OPENROUTER_API_KEY` | Model traffic from Docker Agents is routed through ABB's interceptor to OpenRouter. |
 | `OPENROUTER_MODEL` | Model slug for the run; a default is provided in `.env.example`, but choose a model your account can use. |
 | `TAVILY_API_KEY` | Web-search credential required by the bundled Company Research Agent. |
@@ -114,7 +116,7 @@ The most useful commands are:
 | `agentbench observe company-research-agent` | Run one enabled Agent with native input and save traces, without creating Cases or calling a Judge. |
 | `agentbench certify react-agent` | Run an `adapting` Agent and promote it to `ready` only after certification succeeds. |
 | `agentbench view results/benchmark.json` | Reopen a saved benchmark result in the local viewer. |
-| `agentbench sdk list` | List built-in and installed evaluation SDK plugins. |
+| `agentbench sdk list` | List adapter directories without importing SDK implementations. |
 | `agentbench clean --dry-run` | Show the local result history that would be moved to a recoverable archive. |
 
 Useful `run` options:
@@ -123,12 +125,15 @@ Useful `run` options:
 # Use an explicit model for this run.
 agentbench run --model openai/gpt-4.1-mini
 
-# Select a built-in or installed SDK and pass it a JSON options file.
+# Select a discovered adapter directory and pass it a JSON options file.
 agentbench run --sdk kuma --sdk-options sdk-options.json
 
-# Print sanitized model activity while retaining the normal result artifact.
-agentbench run --llm-trace terminal
 ```
+
+To add an SDK, create an adapter package with a `plugin.py` entry under
+`agentbench/sdk/`; no central name list or package entry-point registration is
+needed. See [the SDK adapter guide](docs/SDK-Directory-Adapters.md) for the
+interface, dependency rules, Python usage, and verification commands.
 
 See [the CLI reference](docs/CLI.md) for the complete command and option
 reference, and [the agent onboarding guide](docs/How%20To%20Add%20Agent.md) to
@@ -163,7 +168,7 @@ resources/registry.toml
   traffic for Docker runtimes.
 - `agentbench/services/` contains runtime services shipped with AgentBench,
   including the Model Interceptor Docker build context.
-- `agentbench/sdk/` contains built-in SDK adapters and plugin discovery.
+- `agentbench/sdk/` contains SDK adapter packages, shared contracts, and directory discovery.
 
 ## Development
 

@@ -42,7 +42,10 @@ class _CallActivity:
 
 
 class LLMActivity:
-    """Render one short, self-erasing panel for the current LLM call."""
+    """
+        Render one short, self-erasing panel for the current LLM call.
+    
+    """
 
     def __init__(
         self,
@@ -116,6 +119,10 @@ class LLMActivity:
 
         if event.event == "interceptor_ready":
             return
+        if (event.event in {'tool_request', 'tool_response', 'tool_error'}
+                and event.data.get('purpose') == 'evaluation'):
+            self._write_evaluation_http(event)
+            return
         if event.event not in {"llm_request", "llm_response", "llm_error"}:
             return
         call_id = event.data.get("call_id")
@@ -171,6 +178,22 @@ class LLMActivity:
 
             if self._stage_label is not None:
                 self._render_live_block_locked()
+
+    def _write_evaluation_http(self, event: TraceEvent) -> None:
+        """Keep SDK egress visible without implying the whole Run succeeded."""
+        data = event.data
+        call_id = data.get('call_id')
+        if not isinstance(call_id, str) or not call_id:
+            return
+        address = str(data.get('host', '')) + str(data.get('path', '')).split('?', 1)[0]
+        if event.event == 'tool_request':
+            status = 'ALLOWED'
+        elif event.event == 'tool_response':
+            status = f"HTTP {data.get('status', '?')}"
+        else:
+            status = f"FAILED: {data.get('error', 'Network request failed')}"
+        line = f"[EVALUATION HTTP] {data.get('method', '')} {address} | {status} | call={call_id}"
+        self.write_static('    ' + _truncate_preview(line, 512))
 
     def write_static(self, text: str) -> None:
         """Print permanent output without corrupting the temporary panel."""
