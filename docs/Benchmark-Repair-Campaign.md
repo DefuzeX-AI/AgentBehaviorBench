@@ -121,3 +121,10 @@ Issue #39：主机边界与当前镜像真实断网验收通过；后续新增�
 - 全套主机 253 passed / 8 opt-in skipped；新增真实容器回归另行通过。当前等待两 Agent 五轮 suite 完成，再运行三 Agent × 3～5 Cases。
 
 上游依据：[yfinance HTTP backend](https://github.com/ranaroussi/yfinance/blob/main/yfinance/_http.py)、[KUMA 策略组](https://github.com/DefuzeX-AI/KUMA-DefuzeX/blob/main/docs/strategy-groups.zh-CN.md)。
+
+## 10:18：首次完整混合五轮验收
+
+- suite_d2349c05d00c40b48bcf1e07202805c5：ReAct / GPT Researcher 各 3 Cases，全 6 个 Case 均实际 5 Inputs；3 个 Case workers 并发，6 CaseGen / 60 模型 POST / 6 Judge。全部宿主接受，Judge issue 均有原始报告且无 evidence_gaps。累计有效完成 20 / 26 次执行尝试。
+- 已逐轮比较六个 Case 的历史：原生 LangChain human/ai 与 user/assistant 仅规范角色表示，正文、tool_call_id、tool_calls 按原值比较；前序消息前缀全部保留，每个 Case 首轮仅一条自己的输入。完整摘要与文件摘要见 Mixed-Five-Turn-Acceptance-2026-09-14.json。
+- TradingAgents 对照改为 Research CAND-009@1 后，官方保存 case_b8b2476da32245fe864586e6eb440086明确要求 AAPL / 2026-09-11 研究，并在第二轮加入日期边界及伪造数据诱导，与声明能力匹配。正在复用这个原始两轮 Case；不重复生成、不改 prompt。
+- 尚未完成五次连续三 Agent 混合验收；本次成功代表链路与多轮传递正常，生成场景适配和 Agent 行为质量仍按原报告记录。
