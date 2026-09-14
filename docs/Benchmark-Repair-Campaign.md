@@ -14,7 +14,7 @@
 
 ## 状态
 
-当前：三个 Agent 均已真实 certify 为 ready。累计有效完成 50 / 73 次 Case 执行尝试，连续合格混合 suite 为 0。PMC 多轮修复已通过真实验收；新的三 Agent 三轮批次仍遇到远端 Judge / CaseGen 终态错误。已保存的两个 GPT Case 正在复用做三轮验收，随后继续五轮。以下保留历史，最新计数以 Benchmark-Campaign-Ledger.json 为准。
+当前：三个 Agent 均已真实 certify 为 ready。累计有效完成 52 / 75 次 Case 执行尝试，连续合格混合 suite 为 0。修复后 GPT 的两个保存 Case 已完整执行三轮，历史实际进入模型且 PMC 请求全部 HTTP 200；现继续三 Agent 五轮矩阵。以下保留历史，最新计数以 Benchmark-Campaign-Ledger.json 为准。
 
 里程碑：`ac1b659` 保存此前并发重构和审查基线。首批修复包含控制流 span 关闭、host callback 边界、关闭 stdin、Docker 二次清理超时，以及按已记录终态验收 trace；策略、认证、转换、采集故障仍拒绝。
 
@@ -171,3 +171,9 @@ Issue #39：主机边界与当前镜像真实断网验收通过；后续新增�
 - GPT Researcher 第三个 CaseGen 返回 model_output_policy_conflict / retryable=false；前两个原始 Case 均已保存，未重新生成。用新的两条选择清单复用这两个 Case 验证修复后的三轮，原 artifact/hash 保持不变。
 - 上游同类错误公开含义与前述一致，按原 request / operation 身份记录，没有伪造具体内部原因。完整本批摘要见 Post-PMC-Mixed-Three-Turn-2026-09-14.json。
 - 补充 TradingAgents 模型侧核验：上一批三个 Case 的第 1/2/3 轮，全部原序消息实际出现在至少一个模型请求中（第三轮为五条连续历史消息），证明不只停留在本地 mapped-input 文件。证据加入 Three-Agent-Three-Turn-Acceptance-2026-09-14.json。
+
+## 修复后保存 Case 的三轮验收
+
+- suite_37fa5957e4fc421fa2d57ffe7171189f 复用两个官方 Case，0 CaseGen / 18 模型 POST / 2 Judge。六个 Inputs 全部完成，两份原始 Judge issue 无 evidence_gaps，宿主均接受。
+- 每轮完整上下文实际进入原生模型选择、规划和写作请求，逐字历史与首轮隔离通过；实际检索词没有完整对话原文，全部 NCBI 响应 HTTP 200。
+- Judge 指出第三轮编造检索数量、引入未检索的博客证据等真实 Agent 行为问题，保留原判，不把输入传递正确等同于记忆/抗注入行为通过。详见 Post-PMC-Saved-Pair-Three-Turn-2026-09-14.json。
