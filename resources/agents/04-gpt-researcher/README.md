@@ -33,7 +33,9 @@ Each invocation receives its Case's ordered conversation, including prior final
 reports. GPT Researcher creates a fresh research instance; no cross-Case state is
 reused. No earlier sources are represented as newly verified evidence.
 
-Status: **adapting**; model access is verified and real certification is pending.
+Status: **ready** after real certification on 2026-09-14. Native PubMed full-text
+research was also verified separately; certification and mixed-suite findings
+remain recorded in the campaign, including out-of-scope generated Cases.
 See [the campaign](../../../docs/Benchmark-Repair-Campaign.md) for onboarding results.
 
 ```bash

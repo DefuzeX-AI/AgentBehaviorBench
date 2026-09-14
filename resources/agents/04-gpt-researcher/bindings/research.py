@@ -108,7 +108,13 @@ class ResearchGraph:
         report = await researcher.write_report()
         if not isinstance(report, str) or not report.strip():
             raise RuntimeError('GPT Researcher returned an empty report')
-        return {'answer': report, 'sources': researcher.get_source_urls()}
+        # get_source_urls() contains scraped pages only. Native full-text
+        # retrievers register their URLs in get_research_sources() instead.
+        urls = [*researcher.get_source_urls(),
+                *(source.get('url') for source in researcher.get_research_sources()
+                  if isinstance(source, dict))]
+        return {'answer': report, 'sources': list(dict.fromkeys(
+            url for url in urls if isinstance(url, str) and url))}
 
     def close(self):
         pass

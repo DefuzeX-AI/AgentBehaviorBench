@@ -5,8 +5,10 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+import tomllib
 
 os.environ['OPENAI_API_KEY'] = 'offline-placeholder-not-a-credential'
+os.environ['OPENAI_COMPATIBLE_API_KEY'] = 'offline-placeholder-not-a-credential'
 sys.path[:0] = ['/opt/agent/bindings', '/opt/agent/agent']
 agent_id = sys.argv[1]
 assert os.getuid() != 0
@@ -19,13 +21,16 @@ if agent_id == 'trading-agents':
     from copy import deepcopy
     from tradingagents.default_config import DEFAULT_CONFIG
     from tradingagents.graph.trading_graph import TradingAgentsGraph
+    settings = tomllib.loads(Path('/opt/agent/agent.toml').read_text())['adapter']['context']
     with tempfile.TemporaryDirectory() as folder:
         cfg = deepcopy(DEFAULT_CONFIG)
-        cfg.update(llm_provider='openai', deep_think_llm='gpt-4.1-mini',
+        cfg.update(llm_provider=settings.get('provider', 'openai'),
+                   backend_url='https://api.openai.com/v1', deep_think_llm='gpt-4.1-mini',
                    quick_think_llm='gpt-4.1-mini', data_cache_dir=folder+'/cache',
                    results_dir=folder+'/reports', memory_log_path=folder+'/memory.md')
         native = TradingAgentsGraph(selected_analysts=['market'], config=cfg)
         assert native.graph is not None
+        assert native.quick_thinking_llm.use_responses_api is not True, 'Manifest routes require Chat Completions'
         state = native.propagator.create_initial_state('AAPL', '2026-09-11', past_context='Remember ONLY ALPHA')
         assert state['past_context'] == 'Remember ONLY ALPHA'
         details = {'native_graph_nodes': list(native.graph.nodes)}

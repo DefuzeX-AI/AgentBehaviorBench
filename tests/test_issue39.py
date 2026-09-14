@@ -106,6 +106,20 @@ def test_trading_never_takes_identity_from_assistant_or_another_case():
         module.request_from_messages([{'role':'user', 'content':'{"ticker":"../bad","date":"2026-09-11"}'}])
 
 
+def test_trading_explicit_deployment_defaults_are_not_cross_case_memory():
+    module = binding('03-trading-agents', 'trading.py')
+    defaults = {'ticker': 'AAPL', 'date': '2026-09-11'}
+    first = [{'role': 'user', 'content': '{"ticker":"MSFT","date":"2026-09-10"}'},
+             {'role': 'assistant', 'content': '{"ticker":"NVDA"}'},
+             {'role': 'user', 'content': 'Now discuss uncertainty'}]
+    assert module.request_from_messages(first, defaults=defaults)[:2] == ('MSFT', '2026-09-10')
+    fresh = [{'role': 'user', 'content': 'Assess the configured stock'}]
+    assert module.request_from_messages(fresh, defaults=defaults)[:2] == ('AAPL', '2026-09-11')
+    assert defaults == {'ticker': 'AAPL', 'date': '2026-09-11'}
+    with pytest.raises(ValueError, match='ticker'):
+        module.request_from_messages([{'role': 'user', 'content': '{"ticker":null}'}], defaults=defaults)
+
+
 def test_research_query_keeps_user_corrections_and_labels_prior_reports():
     module = binding('04-gpt-researcher', 'research.py')
     history = [{'role':'user', 'content':'Compare alpha and beta'},
@@ -134,8 +148,8 @@ def test_research_langgraph_boundary_delivers_history_and_returns_native_report(
     assert output['sources'] == ['https://arxiv.org/abs/example']
 
 
-@pytest.mark.parametrize('has_sources', [True, False])
-def test_research_observes_native_full_text_and_preserves_sources_for_judge(monkeypatch, has_sources):
+@pytest.mark.parametrize('visited,prefetched', [(True, False), (False, True), (True, True), (False, False)])
+def test_research_observes_native_full_text_and_preserves_sources_for_judge(monkeypatch, visited, prefetched):
     import asyncio
     import sys
     module = binding('04-gpt-researcher', 'research.py')
@@ -162,14 +176,16 @@ def test_research_observes_native_full_text_and_preserves_sources_for_judge(monk
         async def write_report(self):
             return 'Original native report'
         def get_source_urls(self):
-            return [source] if has_sources else []
+            return [source] if visited else []
+        def get_research_sources(self):
+            return [{'url': source}] if prefetched else []
 
     monkeypatch.setitem(sys.modules, 'gpt_researcher', SimpleNamespace(GPTResearcher=NativeResearcher))
     monkeypatch.setitem(sys.modules, 'gpt_researcher.retrievers.pubmed_central.pubmed_central',
                         SimpleNamespace(PubMedCentralSearch=NativeSearch))
     invocation = module.ResearchGraph().ainvoke({'query': 'Biomedical evidence'}, {'callbacks': []})
     assert asyncio.run(invocation) == {'answer': 'Original native report',
-                                      'sources': [source] if has_sources else []}
+                                      'sources': [source] if visited or prefetched else []}
     assert seen == [('Biomedical evidence', 1)]
 
 

@@ -6,13 +6,15 @@ from tempfile import TemporaryDirectory
 from pathlib import Path
 
 
-def request_from_messages(messages):
-    """Return ticker/date plus unchanged history from native user JSON messages.
+def request_from_messages(messages, *, defaults=None):
+    """Return configured ticker/date, explicit user overrides and unchanged history.
 
     Args:
-        messages: Current Case's ordered user/assistant dictionaries. The first
-            user turn supplies {ticker, date, request}; later turns may update
-            these fields. No field is inferred from an assistant's answer.
+        messages: Current Case's ordered user/assistant dictionaries. User JSON
+            can supply {ticker, date, request}; plain text uses configured values.
+            No field is inferred from an assistant's answer.
+        defaults: Optional deployment ticker/date declared in adapter.context and
+            the Agent Profile. Without defaults, user JSON must supply both.
     Returns:
         A (ticker, ISO date, serialized conversation) tuple for native graph state.
     Raises:
@@ -20,7 +22,7 @@ def request_from_messages(messages):
     """
     if not isinstance(messages, list) or not messages:
         raise ValueError('Supply a non-empty messages list')
-    request = {}
+    request = {key: value for key, value in (defaults or {}).items() if key in ('ticker', 'date')}
     for message in messages:
         if not isinstance(message, dict) or message.get('role') not in ('user', 'assistant'):
             raise ValueError('Expected user/assistant conversation messages')
@@ -32,12 +34,12 @@ def request_from_messages(messages):
         try:
             fields = json.loads(content)
         except json.JSONDecodeError:
-            continue  # A follow-up can be plain text; identity stays explicit.
+            continue  # Plain text keeps the configured or explicitly updated identity.
         if isinstance(fields, dict):
             request.update({key: fields[key] for key in ('ticker', 'date') if key in fields})
     ticker = request.get('ticker')
     if not isinstance(ticker, str) or not ticker.strip() or len(ticker) > 32:
-        raise ValueError('First user message must specify a ticker in a JSON object')
+        raise ValueError('Specify a ticker through deployment defaults or user JSON')
     if any(char in ticker for char in ('/', '\\', '\x00')) or '..' in ticker:
         raise ValueError('Ticker must be a symbol, not a path')
     try:
@@ -66,12 +68,16 @@ class TradingGraph:
         messages = value.get('messages')
         if messages is None:
             messages = [{'role': 'user', 'content': json.dumps(value)}]
-        ticker, trade_date, history = request_from_messages(messages)
         settings = dict(context or {})
+        ticker, trade_date, history = request_from_messages(messages,
+                                        defaults=settings.get('research_defaults'))
         with TemporaryDirectory(prefix='abb-trading-') as directory:
             root = Path(directory)
             options = deepcopy(DEFAULT_CONFIG)
-            options.update(llm_provider='openai', backend_url='https://api.openai.com/v1',
+            # The gateway speaks Chat Completions. Native 'openai' opts into
+            # Responses; use the upstream compatible-provider configuration.
+            options.update(llm_provider=settings.get('provider', 'openai_compatible'),
+                           backend_url='https://api.openai.com/v1',
                            deep_think_llm=settings.get('model', 'gpt-4.1-mini'),
                            quick_think_llm=settings.get('model', 'gpt-4.1-mini'),
                            results_dir=str(root/'reports'), data_cache_dir=str(root/'cache'),
@@ -95,7 +101,7 @@ class TradingGraph:
             answer = final.get('final_trade_decision')
             if not isinstance(answer, str) or not answer.strip():
                 raise RuntimeError('TradingAgents returned no final trade decision')
-            return {'answer': answer}
+            return {'answer': answer, 'research_request': {'ticker': ticker, 'date': trade_date}}
 
     def close(self):
         pass

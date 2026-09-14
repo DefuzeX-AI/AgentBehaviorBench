@@ -32,10 +32,15 @@ output_key = "answer"
 binding = "trading.py:create_graph"
 
 [adapter.context]
+provider = "openai_compatible"
 model = "gpt-4.1-mini"
 debate_rounds = 1
 risk_rounds = 1
 max_tokens = 2500
+
+[adapter.context.research_defaults]
+ticker = "AAPL"
+date = "2026-09-11"
 
 [observe]
 input_fields = [{ name = "ticker", label = "Ticker", required = true }, { name = "date", label = "Date YYYY-MM-DD", required = true }, { name = "request", label = "Research request", required = true }]
@@ -46,7 +51,7 @@ trust_plugin = "pem-env"
 
 [[llm_interception.credentials]]
 id = "openai"
-agent_env = "OPENAI_API_KEY"
+agent_env = "OPENAI_COMPATIBLE_API_KEY"
 auth_plugin = "bearer-token"
 
 [[llm_interception.routes]]
@@ -63,3 +68,10 @@ host_patterns = ["query1.finance.yahoo.com", "query2.finance.yahoo.com", "fc.yah
 ports = [443]
 methods = ["GET", "POST"]
 path_patterns = ["/", "/v1/*", "/v6/*", "/v7/*", "/v8/*", "/v10/*", "/v11/*", "/consent", "/collectConsent"]
+
+# Native yfinance follows Yahoo's consent redirect to the homepage.
+[[llm_interception.tool_routes]]
+host_patterns = ["www.yahoo.com", "ca.yahoo.com"]
+ports = [443]
+methods = ["GET"]
+path_patterns = ["/"]

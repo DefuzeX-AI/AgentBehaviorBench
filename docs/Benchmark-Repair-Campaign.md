@@ -14,8 +14,7 @@
 
 ## 状态
 
-已完成离线回归和真实离线容器验收；真实服务验收未完成，当前因模型凭据 401 暂停。首批 test_issue10/14/31/32/36 共 17 项通过：修前 7 失败 / 10 通过，修后全部通过。现有全套离线测试 178 通过 / 6 个明确选择性验收跳过。
-真实完成 Case：0；真实评测尝试：1；满足终止条件的连续轮数：0。
+当前：OpenRouter 新 key 已验证可用；ReAct 与 GPT Researcher 已真实 certify 为 ready。累计有效完成 11 / 17 次 Case 执行尝试，连续合格混合 suite 为 0。TradingAgents 的配置输入与模型协议已修正，Yahoo 数据服务与地区跳转仍在验证；两个保存的 GPT Researcher 三轮 Case 正在复用执行。以下按时间保留修复历史，最新计数以 Benchmark-Campaign-Ledger.json 为准。
 
 里程碑：`ac1b659` 保存此前并发重构和审查基线。首批修复包含控制流 span 关闭、host callback 边界、关闭 stdin、Docker 二次清理超时，以及按已记录终态验收 trace；策略、认证、转换、采集故障仍拒绝。
 
@@ -98,3 +97,14 @@ Issue #39：主机边界与当前镜像真实断网验收通过；后续新增�
 - 全套主机现为 243 passed / 8 opt-in skipped；新增 GPT 镜像验收单独实际通过，包含 native PMC、384 维 CPU embeddings 与三个离线 tokenizer。
 
 上游依据：KUMA [#15](https://github.com/DefuzeX-AI/KUMA-DefuzeX/issues/15)、[#63](https://github.com/DefuzeX-AI/KUMA-DefuzeX/issues/63) 报告 Case 与行为/工具能力不符；#63 给出在 agent_description 明确写实际工具的缓解方法，现已用于三个 profile，实际效果仍需测试。上游 [#68](https://github.com/DefuzeX-AI/KUMA-DefuzeX/issues/68) 记录 CaseGen 的 model_invalid_result；本次观察在 Judge 阶段，不能断言是相同内部原因。公共 API 返回无更具体 reason。PyPI 最新仍为 0.2.4。
+
+## 10:03：认证、三轮并发与外部服务诊断
+
+- ReAct 复用原始 World Bank 两轮 Case，真实 certify 成功；GPT Researcher 一轮 fresh Case 真实 certify 成功，均由认证流程更新 ready。正常 Judge issue 保留。GPT 的另一次原生 observe 取回全文并输出含真实 PMC 引用的报告；get_source_urls 仅包含已抓取网页，预取全文应从 get_research_sources 读取。binding 现在合并这两个官方来源集合，保留报告原文。test_issue39 覆盖预取/访问/重叠/空来源。
+- TradingAgents 上游 main.py 由程序配置 ticker/date；原 binding 强制首条 JSON 过严。adapter.context 显式声明 AAPL / 2026-09-11，profile 同步披露，用户 JSON 可覆盖，后续 Case 从默认值重新开始。旧不兼容 Case 原样保留，不把新增默认值伪称为旧 Case 内容。官方 CAND-012 Finance 单次准备仍缺具体 JSON 字段，已记录为 preparation_only，未执行。
+- TradingAgents 原生 openai provider 自动选择 Responses，ABB 当前模型线路为 Chat Completions。真实断网镜像回归修前失败，改为上游 openai_compatible provider 后通过，未修改上游源码。实际模型调用也已成功。Yahoo consent 重定向需要精确 GET www.yahoo.com/ 和 ca.yahoo.com/；限流另记，未放开任意网络。
+- 首个混合 suite 选择两 Agent × 3 Cases，上限 3 轮 / 3 workers。ReAct 三个 Case 全部实际 3 Inputs，Judge 为 pass / issue / issue，证据和宿主均正常。GPT 第三个 CaseGen 终态 model_output_policy_conflict，前两个 Case 已落盘；仅其 Agent 被跳过，ReAct 结果独立保留。已复制原始两个 Case 文件到新选择清单复用，无重复 CaseGen、无修改 SDK Case。
+- 官方错误文档将 model_output_policy_conflict 定义为服务输出未通过任务/安全检查；公开响应 retryable=false，没有私有字段或具体原因。请求 ID 9b337d260a0d4d649887f205be47cf65；原错误和保存的两个 Case 位于 results/observe/6369307b3bed499bbd86567871541856/evaluation。
+- 主机回归 246 passed / 8 opt-in skipped；新增 Trading 协议断网容器验收单独通过。原生 observe、模型探针及仅生成请求分别记账，不算完成 Case。
+
+上游依据：[TradingAgents provider 配置](https://github.com/TauricResearch/TradingAgents/blob/be952b8eccb49720509af544c6675233bc1f10d0/tradingagents/llm_clients/openai_client.py)、[GPT Researcher source API](https://github.com/assafelovic/gpt-researcher/blob/6f998577d547b1e54ec662dac63583aa11e3b84b/gpt_researcher/agent.py)、[KUMA 错误诊断](https://github.com/DefuzeX-AI/KUMA-DefuzeX/blob/main/docs/public-error-diagnostics.zh-CN.md)。
