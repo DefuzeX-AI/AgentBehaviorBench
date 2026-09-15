@@ -430,3 +430,111 @@ Harbor 的两类对 BBA 仍不够，因为 BBA 还会评测远程应用 Agent。
 React Agent 最适合第一个 ACP parity test。Article Explainer 和 Waku 可以随后验证领域输入与多 Agent 内部流程。TradingAgents 和 GPT Researcher 需要较强的结构化输入、长任务和 Artifact 映射，更适合在内部合约稳定后处理。
 
 真正应优先完成的是协议无关的内部 Session/Event 合约。否则每增加一种协议，Case Runner、重试、Viewer、Trace 和错误分类都会出现新的条件分支。
+
+## 九、有没有“简单配置即可加入”的 Bench
+
+有，但行业里的“简单配置”都有一个前提：Agent 已经完成一次标准化包装。平台可以在这之后只接收镜像、端点、命令或结果文件；目前没有可信方案能仅凭任意 GitHub 仓库地址，自动推断安装方式、输入协议、完成条件、权限和输出格式。
+
+| 项目 | 用户提交什么 | 是否实时运行 Agent | 首次接入是否需要代码 | 对 BBA 的意义 |
+| --- | --- | --- | --- | --- |
+| [AgentBeats](https://docs.agentbeats.dev/tutorial/) | 注册 Docker image；运行时选择 Agent，并填写 JSON config 和 secrets | 是 | 是，Agent 必须实现 A2A assessment flow 并容器化 | 最接近“接入一次，之后配置即可运行” |
+| [Exgentic](https://github.com/Exgentic/exgentic) | 选择统一协议下的 Agent/Benchmark plugin 和运行参数 | 是 | 新 Agent 需要实现 plugin/protocol；内置 Agent 可直接选 | 证明 Agent 和 Benchmark 可作为两个独立服务，通过统一协议组合 |
+| [Harbor](https://github.com/harbor-framework/harbor/blob/main/docs/content/docs/agents/index.mdx) | 内置 Agent 选参数；ACP Agent 填 package/source manifest | 是 | 普通 Agent 仍需写 `BaseAgent`/`BaseInstalledAgent`；只有原生 ACP Agent 接近纯配置 | 不能把 Harbor 描述成任意仓库的零代码接入 |
+| [SWE-bench](https://github.com/SWE-bench/SWE-bench/blob/main/docs/guides/quickstart.md) | predictions JSON，包含 patch 和 instance id | 否，Agent 在外部先运行 | 不需要接入运行时 | 适合作为 BBA 的离线结果导入模式，但无法评测内部过程 |
+| [Inspect Agent Bridge](https://inspect.aisi.org.uk/agent-bridge.html) | Python wrapper 或 sandbox bridge | 是 | 是 | 仍然属于适配器模式，不是只填配置 |
+
+### 1. 最接近目标的是 AgentBeats
+
+AgentBeats 将 Benchmark/Judge/Environment 称为 Green Agent，将被测 Agent 称为 Purple Agent。两者通过 A2A 交互，工具可以通过 MCP 暴露。Agent 作者先把自己的 Agent 做成符合约定的容器镜像；普通评测用户随后只需要：
+
+1. 注册镜像；
+2. 在页面选择 Green Agent 和 Purple Agent；
+3. 填入 secrets；
+4. 填一段 JSON config，例如 case 数量、领域和难度；
+5. 提交运行。
+
+它解决的是“每个 Agent 不需要为每个 Benchmark 再写一个 adapter”。它没有解决“任意 GitHub repo 无需修改即可执行”。容器的 `ENTRYPOINT` 仍需启动约定的 A2A server，并正确处理任务、Artifact 和结果。
+
+### 2. Harbor 为什么仍然需要内部人员
+
+Harbor 有两条线路：
+
+- 普通 Agent：实现 `BaseAgent` 或 `BaseInstalledAgent`，在 Python 代码里明确安装、启动、输入和取回输出的方法；
+- ACP Agent：仓库或 registry package 已经实现 ACP 后，可以通过 manifest 和命令接入。
+
+因此 Harbor 的 ACP 接入已经将后续使用压缩成配置，但首次适配工作仍由 Agent 作者或 Harbor 维护者承担。如果一个 GitHub Agent 只提供 Web UI、定制 Python API 或 LangGraph graph，Harbor 不能自动知道怎样把任务传进去。
+
+### 3. 为什么无法直接运行任意 GitHub Agent
+
+至少有以下信息不能安全、稳定地自动猜测：
+
+- 使用 pip、uv、Poetry、npm 还是 Docker 安装；
+- 真正入口是 CLI、HTTP、Python callable、Web UI 还是队列 worker；
+- 输入是字符串、messages、领域对象还是文件；
+- 输出完成的信号，以及结构化结果和 Artifact 在哪里；
+- 多轮 Session 如何创建、继续、取消和清理；
+- Agent 需要哪些 secrets、网络目标和可写目录；
+- 如何采集 trace，以及哪些异常代表 Agent 失败。
+
+AI 可以辅助生成 adapter，但生成结果仍应经过自动 conformance test，不能把猜测本身当成稳定接口。
+
+## 十、BBA 的低门槛接入设计
+
+BBA 应将目标定义为：**Agent 完成一次包装和认证后，后续加入 Benchmark 只需选择和配置，不再修改 BBA Python 代码。**
+
+建议提供四种 source/driver 组合：
+
+| 接入模式 | 最小配置 | 适用对象 |
+| --- | --- | --- |
+| `a2a-endpoint` | URL、认证 secret 引用 | 已部署的远程 Agent |
+| `a2a-container` | image digest、环境变量、资源限制 | 可复现的第三方 Agent |
+| `acp-command` | package/command、工作目录、权限 | 本地 coding/terminal Agent |
+| `result-import` | Result/trajectory 文件 | 无法交给 BBA 启动、但可以离线评分的 Agent |
+
+现有 Python/LangGraph binding 可以保留为高级兼容模式，不再成为推荐的公共接入方式。
+
+一个容器 Agent 的配置可以缩小为：
+
+```toml
+[agent]
+id = "my-research-agent"
+
+[source]
+kind = "container"
+image = "ghcr.io/acme/research-agent@sha256:..."
+
+[driver]
+protocol = "a2a"
+card_path = "/.well-known/agent-card.json"
+
+[capabilities]
+multi_turn = true
+artifacts = true
+```
+
+本地 ACP Agent 则可以是：
+
+```toml
+[agent]
+id = "my-coding-agent"
+
+[source]
+kind = "command"
+command = ["uvx", "my-agent-acp"]
+
+[driver]
+protocol = "acp"
+version = "1"
+```
+
+配置保存前，BBA 自动执行一次认证：
+
+1. 解析 Agent Card 或完成 ACP initialize；
+2. 检查必需的 secrets、网络和目录权限；
+3. 创建全新 Session，发送标准探测任务；
+4. 验证 stream、完成、Artifact、取消和 reset；
+5. 保存 capability certificate 和原始证据。
+
+通过认证后，Case Gen 只产生协议无关的 BBA Case。Case Runner 将 Case 交给统一 Driver，Agent 返回标准 Event/Artifact，Judge 消费保存后的 Result。增加新 Agent 时不再修改 Case Gen、重试、Viewer 或 Judge。
+
+这一设计可直接借用 AgentBeats 的责任分界：KUMA Case Gen、Judge 和环境属于 assessment side；被测 Agent 是独立 participant。A2A 负责跨容器或远程 Agent 调用，ACP 负责本地进程型 Agent，MCP 只负责 Agent 使用的工具。
