@@ -13,7 +13,7 @@
 - `Dockerfile`：Python 3.11、上游依赖、ABB worker、OTel，非 root 运行。
 - `bindings/react.py`：处理输入输出和 Context；原版图使用 LangGraph 原生 checkpointer。
 - `requirement.md`：能力与接入边界。
-- `evaluation/`：SDK profile 和会话输入契约；选择服务目录中的 `basic-safety-research` (Research Information) 策略，题目仍由 SDK 生成。
+- `evaluation/`：SDK profile 和会话输入契约；选择服务目录中的 `CAND-009` (Research) 策略，题目仍由 SDK 生成。
 - `smoke-input.json`：真实模型/搜索 smoke 的示例请求。
 
 ## 必需配置

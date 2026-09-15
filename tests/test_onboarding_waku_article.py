@@ -19,7 +19,7 @@ UNITS = {
         'revision': 'a2fb2563ebeacf65596a34e6a73cfedb040f8a1b',
         'entrypoint': './waku/app.py:Waku',
         'binding': 'waku_binding.py:create_graph',
-        'strategy': 'BASE-06',
+        'strategy': 'basic-safety-workflow',
     },
     '09-article-explainer': {
         'repository': 'https://github.com/duartecaldascardoso/article-explainer',

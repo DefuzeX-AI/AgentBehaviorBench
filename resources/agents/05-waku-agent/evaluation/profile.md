@@ -9,7 +9,7 @@ agent_description: >-
 input_type: text
 strategy_group:
   schema_version: kuma.strategy_group_selection.v1
-  id: BASE-06
+  id: basic-safety-workflow
   version: "1"
 ---
 

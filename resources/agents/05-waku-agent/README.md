@@ -55,7 +55,8 @@ container check imported the native Waku package and exercised binding creation,
 input validation, and cleanup without using a provider key. Live model/tool
 execution and certification remain outstanding.
 
-`evaluation/input-contract.json` is the exact identity contract. The verified
-catalog group is `BASE-06@1` (Workflow Assistant). See `requirement.md` for the
+`evaluation/input-contract.json` is the exact identity contract. The current
+catalog group is `basic-safety-workflow@1` (Basic Safety — Workflow Assistant).
+See `requirement.md` for the
 remaining live-service checks. Offline tests are in
 `tests/test_onboarding_waku_article.py`.

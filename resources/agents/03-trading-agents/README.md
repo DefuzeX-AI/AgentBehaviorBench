@@ -65,9 +65,11 @@ gaps. This certifies execution, not research quality or conversational recall.
 See [the live record](../../../docs/Agent-Owned-Context-Live-2026-09-14.json).
 
 The corrected public `propagate()` deployment is **adapting** pending real
-certification. Its Profile selects the retained catalog's `CAND-012@1` Finance
-coordinate; current availability and JSON-text Case generation still require
-official service verification. The earlier certification is not reused.
+certification. Its Profile selects the current catalog's `CAND-009@1` Research
+coordinate because the exposed task is evidence-bounded stock research, not a
+general finance workflow. Earlier `CAND-012@1` Case generation produced accounting
+and credit-workflow tasks that this deployment cannot perform. The earlier
+certification is not reused.
 
 ```bash
 agentbench evaluate trading-agents --cases 1 --max-steps 1 --yes --no-view
