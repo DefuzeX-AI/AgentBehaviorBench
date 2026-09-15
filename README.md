@@ -219,6 +219,7 @@ The most useful commands are:
 | Command | Use |
 | --- | --- |
 | `agentbench run` | Evaluate every enabled `ready` Agent with the selected SDK. This is the default command. |
+| `agentbench agent add https://github.com/owner/repository` | Download source into the next numbered Agent folder and print a JSON array of setup files. |
 | `agentbench evaluate react-agent --cases 1` | Evaluate one enabled Agent on a chosen number of independent Cases. |
 | `agentbench observe react-agent` | Run one enabled Agent with native input and save traces, without creating Cases or calling a Judge. |
 | `agentbench certify react-agent` | Run an `adapting` Agent and promote it to `ready` only after certification succeeds. |
@@ -228,6 +229,25 @@ The most useful commands are:
 | `agentbench reuse SUITE` | Start a linked new evaluation using the same Cases under the current code. |
 | `agentbench sdk list` | List adapter directories without importing SDK implementations. |
 | `agentbench clean --dry-run` | Show the local result history that would be moved to a recoverable archive. |
+
+To begin onboarding a new Agent:
+
+```bash
+agentbench agent add https://github.com/owner/repository
+```
+
+Source is downloaded to `resources/agents/NN-repository/agent/`, using one more
+than the largest existing directory number (`09` is followed by `10`). The outer
+`source-manifest.json` records the repository URL and exact commit. Existing
+Agent folders are never overwritten. Use `--agents-dir PATH` to select another
+parent directory.
+
+Standard output contains a sorted JSON array of paths relative to `agent/`:
+LangGraph configs and their Python entrypoints, dependency files, Docker files,
+README files and environment examples. Download status goes to standard error.
+This first onboarding step does not import the downloaded code, install its
+dependencies, generate benchmark configuration, or add an incomplete entry to
+`resources/registry.toml`.
 
 Useful `run` options:
 

@@ -1,6 +1,7 @@
 """Registered command features exposed by the AgentBench CLI."""
 
 from .base import CommandFeature
+from .agent import FEATURE as AGENT_FEATURE
 from .certify import FEATURE as CERTIFY_FEATURE
 from .run import FEATURE as RUN_FEATURE
 from .view import FEATURE as VIEW_FEATURE
@@ -13,6 +14,7 @@ from .reuse import FEATURE as REUSE_FEATURE
 
 FEATURES: tuple[CommandFeature, ...] = (
     RUN_FEATURE,
+    AGENT_FEATURE,
     VIEW_FEATURE,
     CERTIFY_FEATURE,
     OBSERVE_FEATURE,
