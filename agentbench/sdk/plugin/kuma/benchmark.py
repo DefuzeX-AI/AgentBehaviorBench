@@ -83,7 +83,7 @@ class KumaContainerRunner:
             api_key(self.environ)
         except ValueError as exc:
             raise ProviderSelectionError(str(exc)) from exc
-        for relative in ('evaluation/profile.md', 'evaluation/input-contract.json'):
+        for relative in ('requirement.md', 'evaluation/input-contract.json'):
             if not (registration.path / relative).is_file():
                 raise ProviderSelectionError(f'Missing Agent evaluation file: {relative}')
         try:

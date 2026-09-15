@@ -80,7 +80,7 @@ def test_profile_and_adapter_expose_text_encoded_native_task(tmp_path):
              'payload': '{"ticker":"AAPL","date":"2026-09-11"}'}]}
     repo = tmp_path/'repo'
     repo.mkdir()
-    run = create_run(repo_path=repo, agent_profile_path=UNIT/'evaluation/profile.md',
+    run = create_run(repo_path=repo, agent_profile_path=UNIT/'requirement.md',
         case_provider=case_provider, judge=False, allow_local=True, track_files=False, max_steps=1)
     try:
         assert seen[0].input_type == 'text'

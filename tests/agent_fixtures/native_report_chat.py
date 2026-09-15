@@ -202,7 +202,7 @@ async def execute_case(root, output, inputs, expected):
     case = {"case_id": "native-chat-" + uuid4().hex, "input_type": "text", "inputs": [
         {"input_id": f"turn-{number}", "payload_type": "text", "payload": value}
         for number, value in enumerate(inputs, 1)]}
-    prepared = real_create_run(repo_path=root / "agent", agent_profile_path=root / "evaluation/profile.md",
+    prepared = real_create_run(repo_path=root / "agent", agent_profile_path=root / "requirement.md",
         case_provider=lambda context: case, judge=False, allow_local=False, track_files=False,
         max_steps=len(inputs))
     path = root / "agent" / (case["case_id"] + ".json")

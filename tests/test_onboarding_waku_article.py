@@ -228,7 +228,7 @@ def test_complete_onboarding_contract_and_safe_source_tree(unit):
     assert json.loads((root / 'evaluation/input-contract.json').read_text()) == {
         'encoding': 'identity'
     }
-    profile = (root / 'evaluation/profile.md').read_text()
+    profile = (root / 'requirement.md').read_text()
     assert f"id: {expected['strategy']}" in profile
     assert (root / 'README.md').is_file() and (root / 'requirement.md').is_file()
     assert not any(path.name == '.git' for path in root.rglob('*'))

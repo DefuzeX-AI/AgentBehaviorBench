@@ -71,6 +71,7 @@ def evaluation_agent(agent, *, control=None, deadline=None):
                              'RUN python -m pip --isolated install --no-cache-dir '
                              '--index-url https://pypi.org/simple '
                              '-r /opt/abb-sdk/requirements.txt\n'
+                             'COPY requirement.md /opt/agent/requirement.md\n'
                              'COPY evaluation/ /opt/agent/evaluation/\nUSER ' + users[-1] + '\n')
         check()
         yield SimpleNamespace(path=root, agent_id=agent.agent_id, framework=agent.framework)

@@ -50,7 +50,7 @@ def test_registered_profile_passes_real_pypi_create_run_before_paid_generation(t
                 'inputs': [{'input_id': 'step-1', 'payload_type': 'text', 'payload': 'Local contract check'}]}
     repo = tmp_path/'repo'
     repo.mkdir()
-    run = create_run(repo_path=repo, agent_profile_path=ROOT/'resources/agents'/unit/'evaluation/profile.md',
+    run = create_run(repo_path=repo, agent_profile_path=ROOT/'resources/agents'/unit/'requirement.md',
                      case_provider=case_provider, judge=False, allow_local=True,
                      track_files=False, max_steps=1)
     try:

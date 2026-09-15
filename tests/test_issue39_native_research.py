@@ -140,7 +140,7 @@ def test_current_task_report_uses_public_custom_prompt_without_replaying_history
 
 def test_deployed_profile_and_configuration_separate_report_limit_from_native_chat():
     config = json.loads((UNIT / 'bindings/research.json').read_text())
-    profile = (UNIT / 'evaluation/profile.md').read_text()
+    profile = (UNIT / 'requirement.md').read_text()
     assert 'TOTAL_WORDS' not in config
     assert 'native chat endpoint' in profile
     assert 'Later responses use the original chat prompt' in profile

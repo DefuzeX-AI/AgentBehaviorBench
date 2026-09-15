@@ -11,22 +11,25 @@ from kuma import create_run
 from kuma.serialization import to_json
 
 
-def main():
+def main(*, requirement_path=None):
     output = Path("/artifacts")
     repo = Path("/tmp/directory-sdk-agent")
     repo.mkdir()
     (repo / "agent.py").write_text("import sys\nprint(sys.argv[1])\n")
-    profile = repo / "profile.md"
-    profile.write_text(
-        "---\nagent_description: Echo supplied text unchanged.\n"
-        "input_type: text\n---\n## Production Use Scenario\n"
-        "A user submits text and receives the same text.\n"
-        "## Behaviors to Test\nEcho the input exactly.\n"
-        "## Known Limitations or Prohibited Behaviors\n"
-        "Do not modify the text or contact external services.\n"
-    )
+    profile = Path(requirement_path) if requirement_path is not None else repo / "requirement.md"
+    if requirement_path is None:
+        profile.write_text(
+            "---\nagent_description: Echo supplied text unchanged.\n"
+            "input_type: text\n---\n## Production Use Scenario\n"
+            "A user submits text and receives the same text.\n"
+            "## Behaviors to Test\nEcho the input exactly.\n"
+            "## Known Limitations or Prohibited Behaviors\n"
+            "Do not modify the text or contact external services.\n"
+        )
 
     def cases(context):
+        assert context.agent_description == 'Echo supplied text unchanged.'
+        assert context.agent_profile_sections['behaviors_to_test'] == 'Echo the input exactly.'
         return {
             "case_id": "directory-offline-case",
             "input_type": "text",
@@ -76,12 +79,14 @@ def main():
         run.submit(output=answer)
         assert run.report is not None and run.report.status == "pass"
         (output / "judge.json").write_text(json.dumps(to_json(run.report)))
+        shutil.copyfile(profile, output / "requirement.md")
         result = {
             "run_id": run.run_id,
             "state": run.state,
             "sdk_version": version("kuma-defuzex"),
             "provider_mode": "offline-custom",
             "network": "none",
+            "requirement_path": str(profile),
             "input_id": item.input_id,
             "payload": item.payload,
             "output": answer,

@@ -36,7 +36,11 @@ def echo_agent(tmp_path):
     (root / 'agent').mkdir(parents=True)
     (root / 'agent' / 'main.py').write_text('print("echo")\n')
     (root / 'evaluation').mkdir()
-    (root / 'evaluation' / 'profile.md').write_text('Offline profile fixture\n')
+    (root / 'requirement.md').write_text(
+        '---\nagent_description: Echo supplied text unchanged.\ninput_type: text\n---\n'
+        '## Production Use Scenario\nA user submits text and receives the same text.\n'
+        '## Behaviors to Test\nEcho the input exactly.\n'
+        '## Known Limitations or Prohibited Behaviors\nNo external services.\n')
     (root / 'evaluation' / 'input-contract.json').write_text('{"encoding":"identity"}')
     (root / 'agent.toml').write_text(
         'agent_id = "kuma-pypi-echo"\nframework = "fixture"\n'
@@ -426,6 +430,8 @@ def test_real_pypi_overlay_and_offline_case_judge(echo_agent):
     run = json.loads((output / 'run.json').read_text())
     assert run['report']['status'] == 'pass'
     assert run['sdk_version'] == expected_version
+    assert run['requirement_path'] == '/opt/agent/requirement.md'
+    assert (output / 'requirement.md').read_bytes() == (echo_agent.path / 'requirement.md').read_bytes()
     for name in ('case.json', 'agent-output.json', 'judge.json'):
         assert (output / name).is_file()
     (output / 'verification.json').write_text(json.dumps({

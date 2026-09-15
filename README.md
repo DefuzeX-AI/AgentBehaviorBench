@@ -249,6 +249,15 @@ This first onboarding step does not import the downloaded code, install its
 dependencies, generate benchmark configuration, or add an incomplete entry to
 `resources/registry.toml`.
 
+Each configured Agent keeps its SDK evaluation specification in the outer
+`requirement.md`. For KUMA, this document must follow the Agent Profile format:
+YAML front matter and the required production-scenario, behaviors-to-test and
+limitations sections. Case generation passes this exact file through
+`agent_profile_path`; there is no separate `evaluation/profile.md`. Referenced
+input schemas can remain under `evaluation/`, with paths relative to
+`requirement.md`. The BBA input-delivery contract remains at
+`evaluation/input-contract.json`.
+
 Useful `run` options:
 
 ```bash

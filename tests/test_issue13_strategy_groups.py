@@ -20,7 +20,7 @@ def test_bundled_agent_uses_reviewed_strategy_group(unit, expected):
     """Parse the real Profile with KUMA and pin the reviewed public coordinate."""
     from kuma.repository.agent_profiles import parse_agent_profile
 
-    profile = parse_agent_profile(ROOT / 'resources/agents' / unit / 'evaluation/profile.md')
+    profile = parse_agent_profile(ROOT / 'resources/agents' / unit / 'requirement.md')
 
     assert profile.strategy_group is not None
     actual = (profile.strategy_group.id, profile.strategy_group.version)
@@ -30,8 +30,8 @@ def test_bundled_agent_uses_reviewed_strategy_group(unit, expected):
 
 def test_every_bundled_profile_is_covered_by_the_reviewed_mapping():
     profiles = {
-        path.parents[1].name
-        for path in (ROOT / 'resources/agents').glob('*/evaluation/profile.md')
+        path.parent.name
+        for path in (ROOT / 'resources/agents').glob('*/requirement.md')
     }
 
     assert profiles == set(EXPECTED)

@@ -103,7 +103,7 @@ def write_agent(root: Path) -> None:
     )
     (root / "evaluation").mkdir()
     (root / "evaluation/input-contract.json").write_text('{"encoding": "identity"}')
-    (source / "profile.md").write_text(
+    (root / "requirement.md").write_text(
         '---\nagent_description: Remember and recall values using Agent-owned SQLite.\n'
         'input_type: text\n---\n## Production Use Scenario\n'
         'Users ask to remember a value and recall it in the same session.\n'
@@ -140,7 +140,7 @@ async def execute_case(root: Path, work: Path, output: Path, inputs: list[str], 
         for i, payload in enumerate(inputs)
     ]}
     prepared = real_create_run(
-        repo_path=root / "agent", agent_profile_path=root / "agent/profile.md",
+        repo_path=root / "agent", agent_profile_path=root / "requirement.md",
         case_provider=lambda context: case, judge=False, allow_local=allow_local,
         track_files=False, max_steps=len(inputs),
     )

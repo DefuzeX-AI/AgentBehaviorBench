@@ -33,6 +33,6 @@ output = Path('/artifacts')
     'runner_contract': ['prepare_cases', 'run_case'],
     'native_environment_setting': os.environ['ABB_ACCEPTANCE_NATIVE_SETTING'],
 }, indent=2))
-main()
+main(requirement_path=Path('/opt/agent/requirement.md'))
 case = artifact_case(json.loads((output / 'case.json').read_text()))
 assert case['inputs'][0]['payload'] == 'directory adapter works'

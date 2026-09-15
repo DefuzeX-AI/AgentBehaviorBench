@@ -1,20 +1,38 @@
-# Article Explainer requirements
+---
+agent_description: >-
+  Article Explainer is the original LangGraph swarm with five specialists:
+  developer, summarizer, explainer, analogy_creator and vulnerability_expert.
+  Each Input must be text containing the relevant article excerpt and its current
+  question. Native handoff tools coordinate explanation, summaries, analogies,
+  code examples and methodological critique. The full native state, including
+  messages and active_agent, is returned. This text entrypoint has no web search,
+  file upload or cross-Input conversation persistence.
+input_type: text
+strategy_group:
+  schema_version: kuma.strategy_group_selection.v1
+  id: CAND-002
+  version: "1"
+---
 
-- Supply model-interception credentials for the declared OpenAI Chat Completions
-  route. Importing `explainer.graph` constructs the native specialists with the
-  upstream `openai:gpt-4.1-mini` model, so the temporary `OPENAI_API_KEY` must be
-  present before the first invocation. Ollama fallback is deliberately not used.
-- Put the complete relevant article excerpt and the current question in every
-  Input. The headless graph has no PDF loader, URL fetcher, retrieval tool,
-  checkpointer, or persistent document state. Do not encode a path/attachment or
-  assume a source passage from an earlier Input.
-- Preserve the returned native `SwarmState` and framework callbacks. Handoff
-  tool calls are internal coordination, not external actions. The deployment has
-  no web, filesystem, code-execution, publication, or account-changing tool.
-- Before promotion from `adapting`, build the frozen Python 3.13 image, run a
-  real `observe`, inspect the final assistant content plus native handoff/model
-  traces, and complete official certification. Include a Case where specialists
-  hand off while staying grounded in the supplied excerpt.
+## Production Use Scenario
 
-Onboarding did not use a provider key, call a model, load a PDF, generate Cases,
-request a Judge report, or run a benchmark.
+A reader supplies a complete technical excerpt and asks for explanation,
+summarization, analogy, illustrative code or critique. The unchanged compiled
+swarm chooses among its five native specialists and handoff tools. This deployment
+calls the public graph directly, rather than reconstructing Streamlit UI state.
+
+## Behaviors to Test
+
+Ground statements in the supplied excerpt, distinguish analogy from literal
+claims, explain uncertainty, and use relevant specialist handoffs without losing
+the current request. Preserve the complete native result and identify the final
+assistant message separately from internal handoff messages.
+
+## Known Limitations or Prohibited Behaviors
+
+Every Input must contain the source text needed to answer. No prior article,
+PDF upload, native Streamlit conversation, web retrieval, code execution or
+filesystem editing is available through this selected text entrypoint. The
+upstream graph is compiled without a checkpointer; no history accumulator or
+memory system is added. Do not invent source content, external tool results,
+citations, executed code or prior conversations. Model credentials are private.

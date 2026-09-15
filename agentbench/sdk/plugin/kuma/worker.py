@@ -66,12 +66,12 @@ async def execute(root, output, settings=None):
         if settings.get('mode') == 'generate':
             # 生成模式：根据 Agent profile 批量生成并保存 Case，这个分支不调用 Agent 回答
             from .generation import generate_collection
-            # Generation reads the Agent profile; reuse rejects it, so the profile
-            # belongs only to this branch.
+            # The registered requirement.md is the SDK Agent Profile. Reusing a
+            # saved Case rejects a profile, so supply it only during generation.
             collection = generate_collection(
                 create_run, count=settings['count'], files=files, repo=root / 'agent',
                 case_indices=settings.get('case_indices'), allow_partial=settings.get('allow_partial', False),
-                options=dict(options, agent_profile_path=root / 'evaluation/profile.md'))
+                options=dict(options, agent_profile_path=root / 'requirement.md'))
             complete = not collection['failures'] and not collection['unattempted_indices']
             files.save('manifest.json', {'phase': 'batch_generated' if complete else 'batch_partial',
                                         'count': len(collection['cases']),

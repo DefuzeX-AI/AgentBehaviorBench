@@ -95,7 +95,7 @@ def test_new_agent_adapter_profile_and_identity_input_contract_are_valid(tmp_pat
     repository.mkdir()
     run = create_run(
         repo_path=repository,
-        agent_profile_path=root / 'evaluation/profile.md',
+        agent_profile_path=root / 'requirement.md',
         case_provider=local_case,
         judge=False,
         allow_local=True,

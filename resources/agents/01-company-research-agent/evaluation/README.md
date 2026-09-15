@@ -1,6 +1,6 @@
 # Company evaluation strategy
 
-`profile.md` explicitly selects `CAND-009@1` (Research). This matches the
+`../requirement.md` explicitly selects `CAND-009@1` (Research). This matches the
 Company research workflow; it is a test-domain choice, not a guarantee that
 every generated task fits Company's native input.
 

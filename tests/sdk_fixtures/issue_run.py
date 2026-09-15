@@ -4,7 +4,7 @@ from contextlib import contextmanager
 
 def profile(repo):
     repo.mkdir(parents=True, exist_ok=True)
-    path = repo/'profile.md'
+    path = repo/'requirement.md'
     path.write_text('---\nagent_description: Remember user messages and use a local arithmetic tool.\ninput_type: text\n---\n'
         '## Production Use Scenario\nA conversation about arithmetic.\n'
         '## Behaviors to Test\nRetain earlier messages and return observed sums.\n'

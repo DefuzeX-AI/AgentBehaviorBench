@@ -17,7 +17,7 @@ from agentbench.sdk.plugin.kuma.benchmark import KumaContainerRunner
 def test_obsolete_or_invalid_contract_fails_during_host_preflight(tmp_path, contract):
     evaluation = tmp_path/'evaluation'
     evaluation.mkdir()
-    (evaluation/'profile.md').write_text('Not read by input preflight')
+    (tmp_path/'requirement.md').write_text('Not read by input preflight')
     (evaluation/'input-contract.json').write_text(json.dumps(contract))
     runner = KumaContainerRunner(environ={'KUMA_API_KEY': 'preflight-placeholder'})
     with pytest.raises(ProviderSelectionError, match='native session/context'):
