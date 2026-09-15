@@ -440,7 +440,7 @@ React Agent 最适合第一个 ACP parity test。Article Explainer 和 Waku 可�
 | [AgentBeats](https://docs.agentbeats.dev/tutorial/) | 注册 Docker image；运行时选择 Agent，并填写 JSON config 和 secrets | 是 | 是，Agent 必须实现 A2A assessment flow 并容器化 | 最接近“接入一次，之后配置即可运行” |
 | [Exgentic](https://github.com/Exgentic/exgentic) | 选择统一协议下的 Agent/Benchmark plugin 和运行参数 | 是 | 新 Agent 需要实现 plugin/protocol；内置 Agent 可直接选 | 证明 Agent 和 Benchmark 可作为两个独立服务，通过统一协议组合 |
 | [Harbor](https://github.com/harbor-framework/harbor/blob/main/docs/content/docs/agents/index.mdx) | 内置 Agent 选参数；ACP Agent 填 package/source manifest | 是 | 普通 Agent 仍需写 `BaseAgent`/`BaseInstalledAgent`；只有原生 ACP Agent 接近纯配置 | 不能把 Harbor 描述成任意仓库的零代码接入 |
-| [SWE-bench](https://github.com/SWE-bench/SWE-bench/blob/main/docs/guides/quickstart.md) | predictions JSON，包含 patch 和 instance id | 否，Agent 在外部先运行 | 不需要接入运行时 | 适合作为 BBA 的离线结果导入模式，但无法评测内部过程 |
+| [SWE-bench](https://github.com/SWE-bench/SWE-bench/blob/main/docs/guides/quickstart.md) | predictions JSON/JSONL，包含 patch、instance id 和 model name | 否，Agent 在外部先运行 | 不需要接入 SWE-bench 运行时；提交者仍需自行配置和运行 Agent | 适合作为 BBA 的离线结果导入模式，但无法由 Harness 评测内部过程 |
 | [Inspect Agent Bridge](https://inspect.aisi.org.uk/agent-bridge.html) | Python wrapper 或 sandbox bridge | 是 | 是 | 仍然属于适配器模式，不是只填配置 |
 
 ### 1. 最接近目标的是 AgentBeats
@@ -477,6 +477,30 @@ Harbor 有两条线路：
 - 如何采集 trace，以及哪些异常代表 Agent 失败。
 
 AI 可以辅助生成 adapter，但生成结果仍应经过自动 conformance test，不能把猜测本身当成稳定接口。
+
+### 4. SWE-bench 的“任意 Agent”具体是什么意思
+
+SWE-bench 将 Agent inference 与 evaluation 分成两个完全独立的阶段：
+
+```text
+任意 Agent ──提交者自行运行──> predictions.jsonl ──SWE-bench Harness──> 测试结果
+```
+
+Harness 接收的不是 Agent 配置，而是已经生成好的补丁。每条 prediction 至少包含：
+
+```json
+{
+  "instance_id": "sympy__sympy-20590",
+  "model_name_or_path": "my-agent-and-model",
+  "model_patch": "diff --git ..."
+}
+```
+
+因此任何能够读取 SWE-bench task 并输出 Git diff 的 Agent，都可以把结果交给 Harness；Agent 可以是 SWE-agent、OpenHands、自研服务，甚至是人工编排的程序。SWE-bench 不需要知道它如何安装、启动、调用工具或管理多轮上下文。
+
+这不等于 Agent 无需配置。提交者需要在 SWE-bench 之外自行完成 Agent 的安装、模型密钥、sandbox、任务输入、批量执行、失败恢复和 prediction 导出。官方 SWE-agent 本身也有独立的 YAML 配置，用于工具、prompt、模型和 Agent/Environment 接口。
+
+本地评分只需符合 prediction schema 并运行 Harness。要进入官方排行榜，还需要按当时的 submission policy 提交公开的 artifacts、logs、reasoning trajectories、metadata 和系统说明；部分榜单还限制提交者资格。排行榜准入和本地 Harness 评分是两件不同的事。
 
 ## 十、BBA 的低门槛接入设计
 
