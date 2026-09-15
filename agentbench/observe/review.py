@@ -21,13 +21,15 @@ def render_review(directory: Path):
     lines = [f"Run: {result['run_id']}", f"Agent: {result['agent_id']}  Status: {result['status']}"]
     if result.get("error"):
         lines.append("Error: " + result["error"])
-    spans, endings, calls = {}, {}, {}
+    spans, endings, controls, calls = {}, {}, {}, {}
     for event in read_events(directory):
         data = event["data"]
         if event["event"] == "span_start":
             spans[data["span_id"]] = data
-        elif event["event"] in {"span_end", "span_error"}:
+        elif event["event"] in {"span_end", "span_error", "span_control"}:
             endings[data["span_id"]] = event["event"]
+            if event["event"] == "span_control":
+                controls[data["span_id"]] = data.get("control", "unknown")
         elif event["event"] == "llm_request":
             calls[data["call_id"]] = data
         elif event["event"] == "incomplete_line":
@@ -41,7 +43,12 @@ def render_review(directory: Path):
             visited.add(parent)
             depth += 1
             parent = spans[parent].get("parent_span_id")
-        status = {"span_end": "ok", "span_error": "error"}.get(endings.get(span_id), "incomplete")
+        ending = endings.get(span_id)
+        status = {
+            "span_end": "ok",
+            "span_error": "error",
+            "span_control": f"control: {controls.get(span_id, 'unknown')}",
+        }.get(ending, "incomplete")
         lines.append("  " * min(depth + 1, 16) + f"{span.get('name', '?')} [{status}] {span_id}")
     lines.append("Model wire calls (not additional framework spans):")
     for call_id, call in calls.items():

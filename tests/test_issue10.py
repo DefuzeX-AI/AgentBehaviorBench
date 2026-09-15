@@ -7,6 +7,7 @@ from langgraph.errors import GraphBubbleUp
 from opentelemetry.sdk.trace import TracerProvider
 
 from agentbench.observe.invocation import InvocationObservation
+from agentbench.observe.review import render_review
 
 
 @pytest.mark.parametrize('control_flow', [True, False])
@@ -56,3 +57,32 @@ def test_real_tool_arguments_result_and_call_id_reach_kuma(tmp_path):
         assert tool_span['attributes']['gen_ai.tool.call.arguments'] == {'left': 2, 'right': 3}
         assert tool_span['attributes']['gen_ai.tool.call.result'] == actual.content
         assert tool_span['attributes']['gen_ai.tool.call.id'] == 'actual-tool-call'
+
+
+def test_offline_review_renders_control_flow_as_complete(tmp_path):
+    (tmp_path / 'run.json').write_text(json.dumps({
+        'run_id': 'demo-run',
+        'agent_id': 'demo-agent',
+        'status': 'succeeded',
+    }), encoding='utf-8')
+    events = [
+        {
+            'source': 'framework',
+            'event': 'span_start',
+            'data': {'span_id': 'route-1', 'name': 'route'},
+        },
+        {
+            'source': 'framework',
+            'event': 'span_control',
+            'data': {'span_id': 'route-1', 'control': 'ParentCommand'},
+        },
+    ]
+    (tmp_path / 'framework.jsonl').write_text(
+        ''.join(json.dumps(event) + '\n' for event in events),
+        encoding='utf-8',
+    )
+
+    review = render_review(tmp_path)
+
+    assert 'route [control: ParentCommand] route-1' in review
+    assert 'route [incomplete]' not in review
