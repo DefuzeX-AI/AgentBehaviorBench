@@ -27,7 +27,8 @@ class NetworkIsolatedAuthentication:
     """For declared local protocols without API keys, e.g. Ollama.
 
     Only safe behind the per-Agent private network namespace. Never expose this
-    proxy as a public shared gateway. The route still requires explicit approval.
+    proxy as a public shared gateway. This authentication mode must be explicitly
+    configured, including when a wire adapter recognizes the request itself.
     """
     name = "network-isolated"
 

@@ -14,9 +14,8 @@ from tests.sdk_fixtures.issue_run import profile
 @pytest.fixture
 def registration(tmp_path):
     root = tmp_path / 'agent'
-    (root / 'evaluation').mkdir(parents=True)
+    root.mkdir()
     (root / 'requirement.md').write_text('An offline test Agent')
-    (root / 'evaluation/input-contract.json').write_text('{"encoding":"identity"}')
     return SimpleNamespace(path=root, case_count=5, agent_id='test-agent')
 
 

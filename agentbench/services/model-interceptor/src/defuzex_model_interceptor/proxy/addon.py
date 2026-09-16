@@ -6,11 +6,12 @@ from uuid import uuid4
 from mitmproxy import http
 from ..observation.events import emit, failure_fields
 from ..security.redaction import redact
-from ..error import ErrorCode, InterceptionFailure, InterceptorAuthenticationError, RequestKind
-from ..registry import load_authentication, load_protocols, load_targets
+from ..error import ErrorCode, InterceptionFailure, InterceptorAuthenticationError, RequestKind, TargetRoutingError
+from ..registry import load_authentication, load_protocols, load_targets, load_wires
 from ..observation.capture import ResponseCapture
 from ..transport.json import json_bytes
 from ..routing.policy import EgressPolicy
+from ..routing.automatic import AutomaticModelRouter
 
 
 class ModelInterceptorAddon:
@@ -21,26 +22,12 @@ class ModelInterceptorAddon:
         self.credentials = {c.credential_id: c for c in config.credentials}
         self.secrets = tuple(v for c in config.credentials for v in (c.token, c.secret))
         self._validate_plugins()
+        self.automatic = AutomaticModelRouter(load_wires(), config.credentials, self.authentication)
 
     def running(self):
         emit("interceptor_ready", agent_id=self.config.agent_id)
 
     def request(self, flow):
-        route = self._route(flow)
-        if route is None and self.policy.permits_tool(flow.request):
-            # Bind tool egress to the approved Host, not a possibly different
-            # transparent destination IP/SNI supplied by the caller.
-            flow.request.host = flow.request.pretty_host.rstrip(".").lower()
-            span = flow.request.headers.pop("x-abb-framework-span", None)
-            tool = next(r for r in self.config.tool_routes if self.policy.matches(r, flow.request))
-            flow.metadata.update(abb_tool=True, purpose=tool.purpose,
-                defuzex_call_id=f"call_{uuid4().hex}", defuzex_started=time.monotonic(),
-                framework_span_id=span if span and len(span) <= 64 else None,
-                defuzex_source_host=flow.request.pretty_host,
-                defuzex_source_port=flow.request.port,
-                defuzex_source_path=flow.request.path.split('?', 1)[0])
-            emit('tool_request', **self._tool_fields(flow), **self._body(flow.request))
-            return
         span = flow.request.headers.pop("x-abb-framework-span", None)
         flow.metadata.update(defuzex_call_id=f"call_{uuid4().hex}", defuzex_started=time.monotonic(),
                              defuzex_source_host=flow.request.pretty_host,
@@ -48,10 +35,27 @@ class ModelInterceptorAddon:
                              defuzex_source_path=flow.request.path.split("?", 1)[0],
                              source_grpc=flow.request.headers.get("content-type", "").startswith("application/grpc"),
                              framework_span_id=span if span and len(span) <= 64 else None)
+        try:
+            route = self._route(flow)
+        except InterceptorAuthenticationError as exc:
+            self._error(flow, str(exc), 401, code=ErrorCode.AUTHENTICATION_FAILED)
+            return
+        except TargetRoutingError as exc:
+            self._error(flow, str(exc), 422, code=ErrorCode.REQUEST_PREPARATION_FAILED)
+            return
+        if route is None and self.policy.permits_tool(flow.request):
+            # Bind tool egress to the approved Host, not a possibly different
+            # transparent destination IP/SNI supplied by the caller.
+            flow.request.host = flow.request.pretty_host.rstrip(".").lower()
+            tool = next(r for r in self.config.tool_routes if self.policy.matches(r, flow.request))
+            flow.metadata.update(abb_tool=True, purpose=tool.purpose)
+            emit('tool_request', **self._tool_fields(flow), **self._body(flow.request))
+            return
         if route is None:
             self._error(flow, "Undeclared network request blocked", 403, code=ErrorCode.EGRESS_DENIED)
             return
         flow.metadata["defuzex_route"] = route.route_id
+        flow.metadata["defuzex_resolved_route"] = route
         credential = self.credentials[route.credential_id]
         source_body = flow.request.content or b""
         try:
@@ -205,8 +209,9 @@ class ModelInterceptorAddon:
                 'body_bytes': len(content), 'truncated': False}
 
     def _emit_response(self, flow, content, *, streaming):
-        route = next(r for r in self.config.routes if r.route_id == flow.metadata["defuzex_route"])
-        payload = self.protocols[route.protocol_plugin].decode_response(
+        route = flow.metadata["defuzex_resolved_route"]
+        decoder = self.protocols.get(route.protocol_plugin, self.protocols["json-http"])
+        payload = decoder.decode_response(
             content, flow.metadata.get("upstream_content_type", flow.response.headers.get("content-type", "")))
         emit("llm_response", **self._fields(flow),
              model=_model(payload) or flow.metadata.get("defuzex_target_model"),
@@ -262,7 +267,8 @@ class ModelInterceptorAddon:
             self._emit_error(flow, str(flow.error), code=ErrorCode.TRANSPORT_ERROR)
 
     def _route(self, flow):
-        return next((r for r in self.config.routes if self.policy.matches(r, flow.request)), None)
+        explicit = next((r for r in self.config.routes if self.policy.matches(r, flow.request)), None)
+        return explicit if explicit is not None else self.automatic.resolve(flow.request)
 
     def _validate_plugins(self):
         missing = ({r.protocol_plugin for r in self.config.routes} - self.protocols.keys()

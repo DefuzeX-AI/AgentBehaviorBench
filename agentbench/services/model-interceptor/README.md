@@ -36,7 +36,8 @@ src/
 │   │   ├── addon.py            # mitmproxy request/response lifecycle
 │   │   ├── loader.py           # mitmproxy script entry point
 │   │   └── netfilter.py        # Linux namespace routing rules
-│   ├── routing/policy.py       # Declared model and tool egress matching
+    │   ├── routing/automatic.py    # Adapter-owned model request recognition
+    │   ├── routing/policy.py       # Explicit route and tool egress matching
 │   ├── targets/openrouter.py  # Upstream URL, model and request preparation
 │   ├── security/
 │   │   ├── auth.py             # Shared bearer and isolated-network auth
@@ -91,6 +92,24 @@ For a new source API, put its conversion and any provider-specific credentials
 under `model/`, then register its wire factory and authentication implementation.
 For a new destination service, add an adapter under `targets/`. Reuse shared
 auth, JSON and SSE behavior when the protocol actually matches it.
+
+Model requests no longer require a per-Agent `llm_interception.routes` entry.
+An explicit route still takes precedence for custom endpoints. Otherwise the
+proxy matches the `SourceSignature` published by each registered wire factory,
+then authenticates against the configured per-run credentials. Signatures live
+beside the adapter and specify method, content type, paths and authentication
+plugin. More specific paths win; equally specific matches fail as ambiguous.
+Provider-compatible custom hosts work without duplicating model URL rules in
+every Agent manifest. Recognition does not grant a credential or forward traffic
+directly: every recognized call still uses authentication, conversion, the
+configured target and the complete request/response trace pipeline.
+
+`routes` may be omitted or empty in both Agent TOML and service JSON. Credentials
+are still required; a recognized protocol with missing/invalid credentials fails
+authentication and cannot fall through to a tool allowance. Third-party wire
+factories can publish a `signature` using the same contract; factories without
+one continue to work through explicit routes. No Agent-specific exceptions are
+used. Automatic routes live on the individual flow, never in shared config.
 
 Unknown HTTP egress is denied; non-root TCP is redirected on every port. IPv6
 and non-DNS UDP are blocked. Google supports header or query API keys and

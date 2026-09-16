@@ -7,6 +7,7 @@ Google GAPIC REST streaming expects a JSON array; alt=sse clients expect SSE.
 
 from defuzex_model_interceptor.transport.json import json_bytes, json_request
 from defuzex_model_interceptor.transport.sse import SSEDecoder
+from defuzex_model_interceptor.contracts import SourceSignature
 
 
 def _text(parts):
@@ -103,6 +104,14 @@ class GeminiWire:
 
     def __init__(self, grpc=False):
         self.grpc, self.sse = grpc, False
+        if grpc:
+            paths = tuple("/google.ai.generativelanguage.v1beta.GenerativeService/" + method
+                          for method in ("GenerateContent", "StreamGenerateContent"))
+        else:
+            paths = tuple(f"/{version}/models/*:{method}" for version in ("v1", "v1beta")
+                          for method in ("generateContent", "streamGenerateContent"))
+        self.signature = SourceSignature(paths, "google-api-key",
+                                         "application/grpc" if grpc else "application/json")
 
     @property
     def stream_type(self):

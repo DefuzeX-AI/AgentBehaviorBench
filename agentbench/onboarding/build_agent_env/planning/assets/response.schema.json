@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "summary",
+    "evidence",
+    "missing_information",
+    "bindings",
+    "needs_input_schema"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "needs_input",
+        "unsupported"
+      ]
+    },
+    "summary": {
+      "type": "string"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "missing_information": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "bindings": {
+      "type": "array",
+      "description": "NEW Python files to generate in the OUTER bindings directory, e.g. bindings/bridge.py. Every complete plan needs at least one binding, even for a compatible native graph. Not native source files, class names, graph nodes or file.py:symbol entrypoints. Incomplete plans use [].",
+      "items": {
+        "type": "string",
+        "pattern": "^bindings/[A-Za-z_][A-Za-z0-9_]*\\.py$"
+      }
+    },
+    "needs_input_schema": {
+      "type": "boolean",
+      "description": "Whether the selected SDK requires a separate JSON Schema for this structured input. A Python TypedDict alone does not satisfy an SDK requirement for a JSON Schema file."
+    }
+  },
+  "if": {"properties": {"status": {"const": "complete"}}},
+  "then": {"properties": {"bindings": {"minItems": 1}}},
+  "else": {"properties": {"bindings": {"maxItems": 0}}}
+}

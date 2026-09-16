@@ -15,7 +15,6 @@ from agentbench.adapter.langgraph.config import LangGraphAdapterConfig
 from agentbench.harness.registry import load_registry
 from agentbench.runtime.agentcontainer.config import docker_structure
 from agentbench.runtime.interception.config import InterceptionConfig
-from agentbench.sdk.common.input_binding import validate_input_contract
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -74,15 +73,14 @@ def test_new_agent_is_registered_as_adapting_with_pinned_source(agent_id):
 
 
 @pytest.mark.parametrize('agent_id', AGENTS)
-def test_new_agent_adapter_profile_and_identity_input_contract_are_valid(tmp_path, agent_id):
+def test_new_agent_adapter_and_profile_are_valid_without_input_contract(tmp_path, agent_id):
     from kuma import create_run
 
     unit = AGENTS[agent_id][0]
     root = ROOT / 'resources/agents' / unit
     config = LangGraphAdapterConfig.from_agent_dir(root)
     assert config.binding and (root / 'bindings' / config.binding.split(':', 1)[0]).is_file()
-    assert validate_input_contract(root / 'evaluation/input-contract.json') is None
-    assert json.loads((root / 'evaluation/input-contract.json').read_text()) == {'encoding': 'identity'}
+    assert not (root / 'evaluation/input-contract.json').exists()
 
     seen = []
     def local_case(context):

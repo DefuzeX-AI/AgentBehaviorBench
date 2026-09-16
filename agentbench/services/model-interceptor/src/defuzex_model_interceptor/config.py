@@ -69,7 +69,10 @@ class ServiceConfig:
         if not isinstance(raw, dict):
             raise ServiceConfigurationError("Interceptor configuration must be an object")
         credentials = tuple(_credential(item) for item in _list(raw, "credentials"))
-        routes = tuple(_route(item) for item in _list(raw, "routes"))
+        route_data = raw.get("routes", [])
+        if not isinstance(route_data, list):
+            raise ServiceConfigurationError("routes must be a list")
+        routes = tuple(_route(item) for item in route_data)
         ids = {item.credential_id for item in credentials}
         if any(route.credential_id not in ids for route in routes):
             raise ServiceConfigurationError("Route references an unknown credential")

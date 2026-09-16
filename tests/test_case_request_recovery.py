@@ -20,9 +20,8 @@ from tests.test_kuma_pypi import write_completed_case
 def attempt(tmp_path, monkeypatch):
     from agentbench.sdk.plugin.kuma import recovery_execution
     root = tmp_path / 'agent'
-    (root / 'evaluation').mkdir(parents=True)
+    root.mkdir()
     (root / 'requirement.md').write_text('Test Agent')
-    (root / 'evaluation/input-contract.json').write_text('{"encoding":"identity"}')
     agent = SimpleNamespace(path=root, case_count=1, agent_id='agent')
     content = {'case_id': 'case-one', 'inputs': [
         {'input_id': 'input-1', 'payload_type': 'text', 'payload': 'question'}]}

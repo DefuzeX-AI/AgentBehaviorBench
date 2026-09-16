@@ -15,6 +15,22 @@ class KumaEvaluationSDK:
         isolated_cases=True, cooperative_cancel=True,
     )
 
+    def onboarding_requirements(self) -> str:
+        from .onboarding import REQUIREMENTS
+        return REQUIREMENTS
+
+    def validate_onboarding(self, directory) -> None:
+        from .onboarding import validate
+        validate(directory)
+
+    def onboarding_context(self, *, environ, timeout):
+        from .onboarding_catalog import fetch
+        return fetch(environ=environ, timeout=timeout)
+
+    def validate_onboarding_context(self, directory, *, context):
+        from .onboarding_catalog import validate_selection
+        validate_selection(directory, context=context)
+
     def create_benchmark_runner(
         self, *, context: SDKRunnerContext, options: Mapping[str, object]
     ) -> EvaluationRunner:

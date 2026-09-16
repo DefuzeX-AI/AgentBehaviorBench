@@ -33,8 +33,6 @@ Do not contact external services.
 def unit(tmp_path):
     root = tmp_path / 'unit'
     (root / 'agent').mkdir(parents=True)
-    (root / 'evaluation').mkdir()
-    (root / 'evaluation/input-contract.json').write_text('{"encoding":"identity"}')
     (root / 'requirement.md').write_text(REQUIREMENT)
     (root / 'agent.toml').write_text(
         'agent_id = "requirement-test"\nframework = "fixture"\n'
@@ -78,6 +76,7 @@ def test_worker_passes_requirement_contents_to_real_sdk(unit, tmp_path, monkeypa
 
 
 def test_legacy_profile_does_not_replace_a_missing_requirement(unit):
+    (unit / 'evaluation').mkdir()
     (unit / 'requirement.md').rename(unit / 'evaluation/profile.md')
     runner = KumaContainerRunner(environ={'KUMA_API_KEY': 'offline-not-sent'})
     with pytest.raises(ProviderSelectionError, match='requirement.md'):
@@ -90,6 +89,23 @@ def test_evaluation_image_copies_the_same_requirement(unit):
         assert (staged.path / 'requirement.md').read_text() == REQUIREMENT
         dockerfile = (staged.path / 'Dockerfile').read_text()
         assert 'COPY requirement.md /opt/agent/requirement.md' in dockerfile
+        assert 'COPY evaluation/' not in dockerfile
+        assert not (staged.path / 'evaluation').exists()
+
+
+def test_optional_schema_is_preserved_in_evaluation_image(unit):
+    from kuma.repository.agent_profiles import parse_agent_profile
+
+    (unit / 'evaluation').mkdir()
+    schema = '{"type":"object","properties":{"topic":{"type":"string"}},"required":["topic"]}'
+    (unit / 'evaluation/input-schema.json').write_text(schema)
+    (unit / 'requirement.md').write_text(REQUIREMENT.replace(
+        'input_type: text', 'input_type: structured\ninput_schema: evaluation/input-schema.json'))
+    agent = SimpleNamespace(path=unit, agent_id='requirement-test', framework='fixture')
+    with evaluation_agent(agent) as staged:
+        assert 'COPY evaluation/ /opt/agent/evaluation/' in (staged.path / 'Dockerfile').read_text()
+        assert (staged.path / 'evaluation/input-schema.json').read_text() == schema
+        assert parse_agent_profile(staged.path / 'requirement.md').input_type == 'structured'
 
 
 def test_every_registered_requirement_is_a_valid_sdk_profile():

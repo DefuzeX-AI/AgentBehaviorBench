@@ -1,39 +1,31 @@
-"""Reject BBA-owned history before spending on Case generation or execution."""
-import json
+"""Agent evaluation directories are optional; requirement.md remains mandatory."""
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from agentbench.harness.errors import ProviderSelectionError
-from agentbench.sdk.common.input_binding import validate_input_contract
 from agentbench.sdk.plugin.kuma.benchmark import KumaContainerRunner
 
 
-@pytest.mark.parametrize('contract', [
-    {'encoding': 'identity', 'conversation': {'mode': mode}}
-    for mode in ('messages', 'text', 'native', 'none')
-] + [{}, [], None, {'encoding': 'template'}])
-def test_obsolete_or_invalid_contract_fails_during_host_preflight(tmp_path, contract):
-    evaluation = tmp_path/'evaluation'
-    evaluation.mkdir()
-    (tmp_path/'requirement.md').write_text('Not read by input preflight')
-    (evaluation/'input-contract.json').write_text(json.dumps(contract))
+def test_preflight_accepts_agent_without_evaluation_directory(tmp_path):
+    (tmp_path / 'requirement.md').write_text('Not read by host preflight')
     runner = KumaContainerRunner(environ={'KUMA_API_KEY': 'preflight-placeholder'})
-    with pytest.raises(ProviderSelectionError, match='native session/context'):
+    assert runner.validate_sdk(SimpleNamespace(path=tmp_path)) == 'official-container'
+    assert not (tmp_path / 'evaluation').exists()
+
+
+def test_preflight_still_requires_sdk_requirement(tmp_path):
+    runner = KumaContainerRunner(environ={'KUMA_API_KEY': 'preflight-placeholder'})
+    with pytest.raises(ProviderSelectionError, match='requirement.md'):
         runner.validate_sdk(SimpleNamespace(path=tmp_path))
 
 
-def test_all_registered_agents_use_current_input_contract():
+def test_registered_units_no_longer_require_an_identity_marker():
     root = Path(__file__).resolve().parents[1]/'resources/agents'
-    contracts = list(root.glob('*/evaluation/input-contract.json'))
-    assert contracts
-    for contract in contracts:
-        assert validate_input_contract(contract) is None
-
-
-def test_contract_validation_does_not_hide_invalid_json(tmp_path):
-    path = tmp_path/'input-contract.json'
-    path.write_text('{')
-    with pytest.raises(ValueError):
-        validate_input_contract(path)
+    assert not list(root.glob('*/evaluation/input-contract.json'))
+    for name in ('01-company-research-agent', '02-react-agent', '03-trading-agents', '04-gpt-researcher'):
+        assert not (root / name / 'evaluation').exists()
+    # Schemas and useful fixtures survive removal of the obsolete marker.
+    assert (root / '05-waku-agent/evaluation/smoke-input.json').is_file()
+    assert (root / '09-article-explainer/evaluation/smoke-input.json').is_file()

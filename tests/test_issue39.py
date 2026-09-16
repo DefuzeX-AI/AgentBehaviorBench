@@ -9,7 +9,6 @@ import pytest
 
 from agentbench.adapter.langgraph.config import LangGraphAdapterConfig
 from agentbench.runtime.interception.config import InterceptionConfig
-from agentbench.sdk.common.input_binding import validate_input_contract
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -23,7 +22,7 @@ def binding(unit, filename):
 
 
 @pytest.mark.parametrize('unit', ['03-trading-agents', '04-gpt-researcher'])
-def test_new_agents_load_with_explicit_routes_and_current_input_contract(unit):
+def test_new_agents_load_with_explicit_routes_without_input_contract(unit):
     import ast
     path = ROOT/'resources/agents'/unit
     config = LangGraphAdapterConfig.from_agent_dir(path)
@@ -35,8 +34,7 @@ def test_new_agents_load_with_explicit_routes_and_current_input_contract(unit):
     network = InterceptionConfig.from_agent_dir(path)
     assert network.required
     assert network.tool_routes
-    validate_input_contract(path/'evaluation/input-contract.json')
-    assert json.loads((path/'evaluation/input-contract.json').read_text()) == {'encoding': 'identity'}
+    assert not (path/'evaluation/input-contract.json').exists()
 
 
 @pytest.mark.parametrize('unit', ['02-react-agent', '03-trading-agents', '04-gpt-researcher'])

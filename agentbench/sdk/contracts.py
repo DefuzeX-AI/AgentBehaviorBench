@@ -75,6 +75,33 @@ class SDK(Protocol):
     def create_run(self, **kwargs: object) -> SDKRun: ...
 
 
+@runtime_checkable
+class SDKOnboarding(Protocol):
+    """Optional SDK-owned prompt contract and offline integration-file validation.
+
+    Discovery must not import optional SDK dependencies. These methods are called
+    explicitly during onboarding and never alter the execution plugin contract.
+    """
+
+    def onboarding_requirements(self) -> str: ...
+
+    def validate_onboarding(self, directory: Path) -> None: ...
+
+
+@runtime_checkable
+class SDKOnboardingContext(Protocol):
+    """Optional live SDK metadata for generation, fetched once per build attempt.
+
+    Returned data must be JSON-serializable public metadata without credentials.
+    Selection validation uses that exact snapshot and must not perform network I/O.
+    This capability is independent of offline validation and SDK discovery.
+    """
+
+    def onboarding_context(self, *, environ: Mapping[str, str], timeout: float) -> Mapping[str, object]: ...
+
+    def validate_onboarding_context(self, directory: Path, *, context: Mapping[str, object]) -> None: ...
+
+
 @dataclass(frozen=True, slots=True)
 class PreparedCase:
     """Immutable work description passed from preparation to one Case runner."""

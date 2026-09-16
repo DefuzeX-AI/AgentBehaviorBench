@@ -15,6 +15,7 @@ from container_run import main
 
 
 assert callable(execute)
+assert not Path('/opt/agent/evaluation').exists(), 'Agent evaluation directory is optional'
 assert os.environ['ABB_ACCEPTANCE_NATIVE_SETTING'] == 'preserved'
 selection = resolve_sdk('kuma')
 runner = selection.value.create_benchmark_runner(

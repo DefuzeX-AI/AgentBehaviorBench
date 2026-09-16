@@ -101,8 +101,6 @@ def write_agent(root: Path) -> None:
         '[adapter]\ntype = "langgraph"\nconfig = "langgraph.json"\n'
         'graph_id = "memory"\ninput_key = "question"\noutput_key = "answer"\n'
     )
-    (root / "evaluation").mkdir()
-    (root / "evaluation/input-contract.json").write_text('{"encoding": "identity"}')
     (root / "requirement.md").write_text(
         '---\nagent_description: Remember and recall values using Agent-owned SQLite.\n'
         'input_type: text\n---\n## Production Use Scenario\n'

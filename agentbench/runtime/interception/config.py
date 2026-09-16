@@ -86,7 +86,7 @@ class InterceptionConfig:
 
         environment = _string_mapping(section.get("environment", {}), "environment")
         credentials = _credentials(section.get("credentials"))
-        routes = _routes(section.get("routes"), credentials)
+        routes = _routes(section.get("routes", []), credentials)
         agent_envs = [item.agent_env for item in credentials]
         if len(set(agent_envs)) != len(agent_envs):
             raise InterceptionConfigurationError(
@@ -154,9 +154,9 @@ def _credentials(value: object) -> tuple[CredentialConfig, ...]:
 def _routes(
     value: object, credentials: tuple[CredentialConfig, ...]
 ) -> tuple[RouteConfig, ...]:
-    if not isinstance(value, list) or not value:
+    if not isinstance(value, list):
         raise InterceptionConfigurationError(
-            "llm_interception.routes must be a non-empty table array"
+            "llm_interception.routes must be a table array"
         )
     credential_ids = {item.credential_id for item in credentials}
     items: list[RouteConfig] = []

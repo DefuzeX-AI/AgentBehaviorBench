@@ -249,14 +249,73 @@ This first onboarding step does not import the downloaded code, install its
 dependencies, generate benchmark configuration, or add an incomplete entry to
 `resources/registry.toml`.
 
+Optional generation and certification stages:
+
+```bash
+# Generate integration files with OpenRouter; register as adapting after static checks.
+agentbench agent add https://github.com/owner/repository -b
+# Generate, then use the existing container certification workflow.
+agentbench agent add https://github.com/owner/repository -b -c
+# Use configuration you wrote yourself; no AI configuration request.
+agentbench agent add https://github.com/owner/repository -c
+# Answer a previous plan's questions and reuse the downloaded source.
+agentbench agent add https://github.com/owner/repository -b --answers answers.txt
+```
+
+`-b` means **generate the build configuration**, not build a Docker image. It reads
+bounded setup files and local imports without executing the Agent, then sends
+sanitized content to OpenRouter. Set `OPENROUTER_API_KEY` and
+`OPENROUTER_BUILD_MODEL` (or `OPENROUTER_MODEL`) in the host environment or `.env`.
+The model must support structured outputs. `--build-model` selects the generation
+model; `--model` selects the separate certification model. The selected SDK's
+PyPI requirements must be installed for its offline document validation.
+
+`-b` first creates a source-based plan, then generates **one file per request**:
+`agent.toml`, any required bindings (individually), `Dockerfile`, the optional input
+schema, and `requirement.md`. Each file is validated and installed immediately,
+before requesting the next. `.dockerignore` is written from a local template.
+Later requests receive the plan and previously validated file contents.
+
+The builders and their English prompts live in the corresponding subdirectories
+of [`agentbench/onboarding/build_agent_env/`](agentbench/onboarding/build_agent_env/README.md).
+Request settings and response schemas live in `openrouter_provider/assets/`.
+Override budgets/timeouts/model with `--build-settings PATH`, containing a TOML
+`[build]` table. `repair_attempts = 1` permits one additional paid correction per
+stage; only the current file is repaired. Set it to zero to disable corrections.
+HTTP transport retries are configured separately through `retries`.
+
+Failure or Ctrl-C preserves completed files. Running the same `-b` command reuses
+the source-matched plan in `onboarding/build-state.json`, validates existing files,
+and generates only missing files. Existing manual files are never overwritten;
+an invalid one stops the build with its path and reason. Answers or source changes
+trigger fresh planning while preserving existing files. Ambiguous inputs or
+unsupported network/protocol requirements produce questions.
+
+Attempts are saved under `NN-name/onboarding/<attempt-id>/`: `context.json` lists
+source files used/omitted, `plan.json` contains the plan, `steps/` records each
+file's model responses, candidate, validation feedback and saved/reused status,
+and `build-result.json` records completion or the failed stage. Registration
+happens only after all files pass the final combined check. `-b` and `-c` reuse
+manifest-matched downloads; plain `add` still rejects a duplicate checkout.
+
+Certification builds and executes the container through the existing `certify`
+command, including Case generation and Judge; it can call paid services. Use
+`-y` to skip its confirmation and `--no-view` to omit the results viewer. Only
+certification can promote `adapting` to `ready`; a Judge-reported behavioral issue
+does not necessarily mean the integration failed. `--registry PATH` selects a
+registry; a custom `--agents-dir` must remain inside that registry's repository.
+
 Each configured Agent keeps its SDK evaluation specification in the outer
 `requirement.md`. For KUMA, this document must follow the Agent Profile format:
 YAML front matter and the required production-scenario, behaviors-to-test and
 limitations sections. Case generation passes this exact file through
 `agent_profile_path`; there is no separate `evaluation/profile.md`. Referenced
-input schemas can remain under `evaluation/`, with paths relative to
-`requirement.md`. The BBA input-delivery contract remains at
-`evaluation/input-contract.json`.
+input schemas can remain under an optional `evaluation/` directory, with paths
+relative to `requirement.md`. Agents do not need an `evaluation/` directory or
+`input-contract.json`. Current Case inputs go directly to the framework adapter;
+native field mapping stays in `agent.toml`, and conversation state belongs to the
+Agent. Result artifacts under `results/.../evaluation/` are independent of this
+optional source directory and remain unchanged.
 
 Useful `run` options:
 

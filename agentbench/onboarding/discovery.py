@@ -13,13 +13,14 @@ SKIPPED_DIRECTORIES = frozenset({
     ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox", ".next",
 })
 FILE_PATTERNS = (
-    "*langgraph*.json", "pyproject.toml", "uv.lock", "poetry.lock", "pdm.lock",
+    "*langgraph*.json", "pyproject.toml", "uv.lock", "poetry.lock", "pdm.lock", "dependencies.lock",
     "requirements*.txt", "requirements*.in", "constraints*.txt", "setup.py", "setup.cfg",
     "pipfile", "pipfile.lock", "environment.yml", "environment.yaml",
     "dockerfile", "dockerfile.*", "*.dockerfile", ".dockerignore",
     "docker-compose*.yml", "docker-compose*.yaml", "compose.yml", "compose.yaml",
     "readme", "readme.*", ".env.example", ".env.sample", ".env.template",
     ".env.*.example", ".python-version", "runtime.txt",
+    "application.py", "app.py", "main.py", "__main__.py",
 )
 
 

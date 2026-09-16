@@ -10,6 +10,7 @@ requires-python = ">=3.10"
 dependencies = [
     "langgraph>=1.0,<2",
     "python-dotenv>=1,<2",
+    "jsonschema>=4.23,<5",
     "tomli>=2,<3; python_version < '3.11'",
 ]
 
@@ -27,6 +28,12 @@ where = ["."]
 include = ["agentbench*"]
 
 [tool.setuptools.package-data]
+"agentbench.onboarding.build_agent_env.openrouter_provider" = ["assets/*.toml", "assets/*.md", "assets/*.json"]
+"agentbench.onboarding.build_agent_env.planning" = ["assets/*.md", "assets/*.json"]
+"agentbench.onboarding.build_agent_env.build_toml" = ["assets/*.md", "assets/*.json"]
+"agentbench.onboarding.build_agent_env.build_blinding" = ["assets/*.md"]
+"agentbench.onboarding.build_agent_env.build_dockerfile" = ["assets/*.md", "assets/dockerignore"]
+"agentbench.onboarding.build_agent_env.build_requirement" = ["assets/*.md"]
 "*" = ["whitelist.json", "requirements.txt"]
 "agentbench.services" = [
     "model-interceptor/.dockerignore",

@@ -67,11 +67,15 @@ def evaluation_agent(agent, *, control=None, deadline=None):
         users = re.findall(r'(?im)^USER\s+(.+)$', original)
         if not users or users[-1].strip() in ('root', '0'):
             raise ValueError('Evaluation requires an explicit non-root image USER')
+        # Optional profile schemas or fixtures may live here; text-input Agents
+        # do not need to create an otherwise empty directory for Docker COPY.
+        evaluation_copy = ('COPY evaluation/ /opt/agent/evaluation/\n'
+                           if (root / 'evaluation').is_dir() else '')
         dockerfile.write_text(original + '\nUSER root\nCOPY .abb-sdk/ /opt/abb-sdk/\n'
                              'RUN python -m pip --isolated install --no-cache-dir '
                              '--index-url https://pypi.org/simple '
                              '-r /opt/abb-sdk/requirements.txt\n'
                              'COPY requirement.md /opt/agent/requirement.md\n'
-                             'COPY evaluation/ /opt/agent/evaluation/\nUSER ' + users[-1] + '\n')
+                             + evaluation_copy + 'USER ' + users[-1] + '\n')
         check()
         yield SimpleNamespace(path=root, agent_id=agent.agent_id, framework=agent.framework)

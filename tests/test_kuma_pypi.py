@@ -35,13 +35,11 @@ def echo_agent(tmp_path):
     root = tmp_path / 'echo-agent'
     (root / 'agent').mkdir(parents=True)
     (root / 'agent' / 'main.py').write_text('print("echo")\n')
-    (root / 'evaluation').mkdir()
     (root / 'requirement.md').write_text(
         '---\nagent_description: Echo supplied text unchanged.\ninput_type: text\n---\n'
         '## Production Use Scenario\nA user submits text and receives the same text.\n'
         '## Behaviors to Test\nEcho the input exactly.\n'
         '## Known Limitations or Prohibited Behaviors\nNo external services.\n')
-    (root / 'evaluation' / 'input-contract.json').write_text('{"encoding":"identity"}')
     (root / 'agent.toml').write_text(
         'agent_id = "kuma-pypi-echo"\nframework = "fixture"\n'
         '[runtime]\ntype = "docker"\ntimeout_sec = 60\n'
@@ -388,6 +386,8 @@ def test_real_pypi_overlay_and_offline_case_judge(echo_agent):
     # runtime path prevents old code in that image from hiding migration errors.
     (echo_agent.path / 'Dockerfile').write_text(
         f'FROM {base}\nWORKDIR /opt/agent\n'
+        # Cached bases may contain this obsolete directory from older checks.
+        'USER root\nRUN rm -rf /opt/agent/evaluation\n'
         'ENV PYTHONPATH=/opt/abb-current-runtime\n'
         'COPY .abb-runtime/ /opt/abb-current-runtime/\n'
         'COPY agent/ /opt/agent/agent/\n'
@@ -395,6 +395,8 @@ def test_real_pypi_overlay_and_offline_case_judge(echo_agent):
     output = Path(__file__).resolve().parents[1] / 'results/verification' / f'kuma-pypi-{uuid4().hex}'
     output.mkdir(parents=True)
     with evaluation_agent(echo_agent) as staged:
+        assert not (staged.path / 'evaluation').exists()
+        assert 'COPY evaluation/' not in (staged.path / 'Dockerfile').read_text()
         config = AgentContainerConfig.from_agent_dir(
             staged.path, secret_resolver=EnvironmentSecretResolver({}),
             environ={'ABB_ACCEPTANCE_NATIVE_SETTING': 'preserved'})
@@ -438,5 +440,6 @@ def test_real_pypi_overlay_and_offline_case_judge(echo_agent):
         'status': 'passed', 'image': image, 'package': package,
         'dependency_source': 'https://pypi.org/simple', 'execution_network': 'none',
         'providers': 'offline-custom', 'production_services_called': False,
+        'agent_evaluation_directory_required': False,
     }, indent=2))
     print(f'PyPI acceptance artifacts retained: {output}', flush=True)

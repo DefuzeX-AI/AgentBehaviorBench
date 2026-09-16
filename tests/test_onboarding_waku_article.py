@@ -225,9 +225,7 @@ def test_complete_onboarding_contract_and_safe_source_tree(unit):
     assert manifest['adapter']['binding'] == expected['binding']
     assert 'output_key' not in manifest['adapter']
     assert graph_config['graphs'][manifest['adapter']['graph_id']] == expected['entrypoint']
-    assert json.loads((root / 'evaluation/input-contract.json').read_text()) == {
-        'encoding': 'identity'
-    }
+    assert not (root / 'evaluation/input-contract.json').exists()
     profile = (root / 'requirement.md').read_text()
     assert f"id: {expected['strategy']}" in profile
     assert (root / 'README.md').is_file() and (root / 'requirement.md').is_file()
