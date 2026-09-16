@@ -1,5 +1,6 @@
 """Read bounded, identity-checked Kuma diagnostics without replacing failures."""
 import json
+import os
 from pathlib import Path
 import unicodedata
 
@@ -25,7 +26,11 @@ def artifact_path(directory, relative):
 
 
 def read_diagnostic(directory, relative):
-    """Return a diagnostic object, or an empty object if absent/unsafe/malformed."""
+    """Return a diagnostic object, or an empty object if absent/unsafe/malformed.
+
+    An empty object does not mean the artifact is absent; use unreadable_reason()
+    where a required artifact must not be mistaken for one that was never written.
+    """
     try:
         path = artifact_path(directory, relative)
         with path.open('rb') as stream:
@@ -36,6 +41,41 @@ def read_diagnostic(directory, relative):
         return value if isinstance(value, dict) else {}
     except (OSError, ValueError, RuntimeError):
         return {}
+
+
+# Artifacts whose absence changes what a failure means. An unreadable one is
+# reported as such instead of being folded into "no diagnostics".
+REQUIRED_ARTIFACTS = ('evaluation/manifest.json', 'evaluation/error.json',
+                      'evaluation/case-collection.json', 'evaluation/case.json',
+                      'evaluation/judge/report.json')
+
+
+def unreadable_reason(directory, relative):
+    """Explain why an existing artifact cannot be read; None if readable or absent."""
+    candidate = Path(directory) / relative
+    try:
+        if not candidate.exists() and not candidate.is_symlink():
+            return None
+    except OSError as exc:
+        return f'{relative}: {exc.strerror or type(exc).__name__}'
+    try:
+        path = artifact_path(directory, relative)
+        with path.open('rb'):
+            return None
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        detail = exc.strerror or type(exc).__name__
+        try:
+            info = candidate.stat()
+        except OSError:
+            return f'{relative}: {detail}'
+        getuid = getattr(os, 'getuid', None)
+        host = f'; host uid {getuid()}' if getuid is not None else ''
+        return (f'{relative}: {detail} (owner uid {info.st_uid}, '
+                f'mode {info.st_mode & 0o777:04o}{host})')
+    except (ValueError, RuntimeError) as exc:
+        return f'{relative}: {exc}'
 
 
 def _text(value, limit=500):
@@ -69,6 +109,10 @@ def collect_artifacts(directory, host, *, environ=None):
               'safe_case_replay': host.get('safe_case_replay') is True,
               'host_phase': host.get('phase'), 'host_error_type': host.get('error_type'),
               'completion': {key: summary.get(key) for key in ('execution', 'otel', 'submission', 'evidence')}}
+    unreadable = [reason for relative in REQUIRED_ARTIFACTS
+                  if (reason := unreadable_reason(directory, relative)) is not None]
+    if unreadable:
+        result['unreadable_artifacts'] = [_text(reason) for reason in unreadable]
     if error:
         result['sdk_error'] = {key: (value if isinstance(value, bool) else _text(value))
                                for key in ('type', 'message', 'code', 'retryable', 'request_id', 'client_request_id')
@@ -145,7 +189,7 @@ def collect_artifacts(directory, host, *, environ=None):
 def failure_message(artifacts):
     """Describe SDK classification first, then label related network evidence."""
     error = artifacts.get('sdk_error', {})
-    parts = []
+    parts = [f'unreadable artifact {reason}' for reason in artifacts.get('unreadable_artifacts', ())]
     if error:
         parts.append(f"{error.get('type', 'SDK error')} [{error.get('code', 'unknown')}]: {error.get('message', '')}")
     for item in artifacts.get('related_network_errors', ()):

@@ -1,11 +1,62 @@
 """Public SDK request recovery; never recreate a paid Run or replay the Agent."""
+import errno
+import os
+from pathlib import Path
+
 from .configuration import api_key, request_options
 from .diagnostics import read_diagnostic
+
+
+def ledger_access_error(repo_path, client_request_id=None):
+    """Return a PermissionError naming an unreadable ledger path, owner and mode.
+
+    The SDK stores request records owner-only and reports any read failure as an
+    unreadable record, which is also what corruption looks like. A record written
+    by a different uid is a permission problem with a known remedy, so name it
+    before the SDK is asked to read it. Absent ledgers stay the SDK's to report.
+    """
+    directory = Path(repo_path) / '.kuma' / 'requests'
+    try:
+        if directory.is_symlink() or not directory.is_dir():
+            return None
+    except OSError:
+        pass  # An untraversable parent is reported below as the ledger directory.
+    candidates = [directory]
+    try:
+        if client_request_id is not None:
+            candidates.append(directory / f'{client_request_id}.json')
+        else:
+            candidates.extend(sorted(directory.glob('kreq_*.json')))
+    except OSError:
+        pass
+    for path in candidates:
+        try:
+            if path.is_symlink() or not path.exists():
+                continue
+            if path.is_dir():
+                os.listdir(path)
+            else:
+                path.open('rb').close()
+        except PermissionError:
+            getuid = getattr(os, 'getuid', None)
+            reader = f'host uid {getuid()}' if getuid is not None else 'this host user'
+            try:
+                info = path.stat()
+                owner = f'owned by uid {info.st_uid} with mode {info.st_mode & 0o777:04o}'
+            except OSError:
+                owner = 'owner unknown'
+            return PermissionError(
+                errno.EACCES,
+                f'SDK request ledger is not readable by {reader} ({owner}); the evaluation '
+                'container must run as the host user for host-side recovery', str(path))
+    return None
 
 
 def inspect_requests(repo_path, client_request_id=None):
     """Read non-secret SDK request records from the original repository ledger."""
     from kuma import list_requests, show_request
+    if (error := ledger_access_error(repo_path, client_request_id)) is not None:
+        raise error
     if client_request_id is not None:
         return show_request(client_request_id, repo_path=repo_path).to_dict()
     return [record.to_dict() for record in list_requests(repo_path)]
@@ -39,6 +90,8 @@ def recover_request(repo_path, client_request_id, *, environ, base_url,
             if expected is not None and getattr(record, key) != expected:
                 raise ValueError(f'Recovery {key} does not match the original request')
 
+    if (error := ledger_access_error(repo_path, client_request_id)) is not None:
+        raise error
     check(show_request(client_request_id, repo_path=repo_path))
     credential, _ = api_key(environ)
     record = resume_request(client_request_id, repo_path=repo_path, api_key=credential,

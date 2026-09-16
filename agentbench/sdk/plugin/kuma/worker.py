@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import platform
+import sys
 from pathlib import Path
 from uuid import uuid4
 from importlib.metadata import version
@@ -156,6 +157,40 @@ async def execute(root, output, settings=None):
             provider.shutdown()
 
 
+class EvaluationSettingsError(RuntimeError):
+    """The host-mounted evaluation settings could not be loaded."""
+
+
+def read_settings(path):
+    """Load the mandatory host settings, naming why they cannot be read.
+
+    The host always writes this file before starting the container. A missing or
+    unreadable file must stop the worker: treating it as empty settings runs the
+    wrong mode and reports an unrelated error two layers later.
+    """
+    try:
+        value = json.loads(Path(path).read_text(encoding='utf-8'))
+    except FileNotFoundError as exc:
+        raise EvaluationSettingsError(f'Evaluation settings are missing at {path}') from exc
+    except PermissionError as exc:
+        raise EvaluationSettingsError(
+            f'Cannot read evaluation settings at {path}: permission denied for container '
+            f'uid {os.getuid()} gid {os.getgid()}{_ownership(path)}') from exc
+    except (OSError, ValueError) as exc:
+        raise EvaluationSettingsError(f'Cannot read evaluation settings at {path}: {exc}') from exc
+    if not isinstance(value, dict):
+        raise EvaluationSettingsError(f'Evaluation settings at {path} must be a JSON object')
+    return value
+
+
+def _ownership(path):
+    try:
+        info = os.stat(path)
+    except OSError:
+        return ''
+    return f' (file owner uid {info.st_uid} gid {info.st_gid}, mode {info.st_mode & 0o777:04o})'
+
+
 def main():
     # Parse Agent, artifact, and job-settings paths at the container entrypoint.
     parser = argparse.ArgumentParser(description=__doc__)
@@ -164,7 +199,14 @@ def main():
     parser.add_argument('--settings', type=Path, default=Path('/run/abb-input/evaluation.json'))
     args = parser.parse_args()
     # Read generation or execution settings from the host-mounted evaluation.json.
-    settings = json.loads(args.settings.read_text()) if args.settings.is_file() else {}
+    try:
+        settings = read_settings(args.settings)
+    except EvaluationSettingsError as exc:
+        # The host reads error.json; stderr alone only reaches diagnostics.json.
+        Artifacts(args.output).save('error.json', {
+            'phase': 'startup', 'type': type(exc).__name__, 'message': str(exc)})
+        print(exc, file=sys.stderr, flush=True)
+        return 1
     # Run the asynchronous flow and propagate its exit code.
     return asyncio.run(execute(args.agent_root, args.output, settings))
 
