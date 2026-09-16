@@ -133,13 +133,13 @@ class InteractionIndex:
                                 raise ValueError('Expected object')
                             records.append({'file': name, 'line': line, 'raw': row})
                         except ValueError:
-                            self.warnings.append(f'{name}:{line} JSON 不完整或无效')
+                            self.warnings.append(f'{name}:{line} contains incomplete or invalid JSON')
             else:
                 try:
                     self.artifacts[name] = {'value': json.loads(_read(root, name).read_text(encoding='utf-8')),
                         'timestamp': datetime.fromtimestamp(mtime / 1e9, timezone.utc).isoformat()}
                 except ValueError:
-                    self.warnings.append(f'{name}: JSON 不完整或无效')
+                    self.warnings.append(f'{name}: contains incomplete or invalid JSON')
 
         for name, item in self.artifacts.items():
             if name.endswith('/input.json'):
@@ -249,9 +249,9 @@ class InteractionIndex:
                 '_request': req or (first if not res else None), '_response': res, '_callbacks': related})
 
         labels = {'case.json': ('case', 'SDK Case'), 'input.json': ('case', 'SDK Input'),
-                  'mapped-input.json': ('input', '传给 Agent 的 Input'), 'request.json': ('input', 'Agent 调用'),
-                  'result.json': ('output', 'Agent 输出'), 'submission.json': ('submission', 'SDK 提交'),
-                  'report.json': ('judge', 'Judge 报告')}
+                  'mapped-input.json': ('input', 'Input passed to the Agent'), 'request.json': ('input', 'Agent invocation'),
+                  'result.json': ('output', 'Agent output'), 'submission.json': ('submission', 'SDK submission'),
+                  'report.json': ('judge', 'Judge report')}
         for name, artifact in self.artifacts.items():
             if Path(name).name not in labels:
                 continue

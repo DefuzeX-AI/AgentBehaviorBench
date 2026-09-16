@@ -48,7 +48,7 @@ def summarize(
         turn_rows.append({"turns": turns, "attempts": len(selected), "healthy": passed, "rate": passed / len(selected)})
 
     thirds: list[dict[str, Any]] = []
-    for label, start, stop in (("早期", 0, 13), ("中期", 13, 26), ("后期", 26, 39)):
+    for label, start, stop in (("Early", 0, 13), ("Middle", 13, 26), ("Late", 26, 39)):
         selected = [case for case in cases if start <= case["run_index"] - 1 < stop]
         passed = sum(case["healthy"] for case in selected)
         thirds.append({"period": label, "attempts": len(selected), "healthy": passed, "rate": passed / len(selected) if selected else 0})
@@ -118,7 +118,7 @@ def summarize(
 
     return {
         "meta": {
-            "title": "BBA Benchmark 日度结果分析",
+            "title": "BBA Benchmark Daily Results Analysis",
             "date": first_event_date,
             "generated_at": datetime.now().astimezone().isoformat(),
             "root": str(root.resolve()),

@@ -60,7 +60,7 @@ test('Suite identity cannot change from a polling response', () => {
   receive(store, snapshot(1));
   receive(store, { ...snapshot(2), suite_id: 'suite-other' });
   assert.equal(store.getState().suite.snapshot.suite_id, 'suite-a');
-  assert.match(store.getState().suite.error, /身份/);
+  assert.match(store.getState().suite.error, /identity/);
   assert.notEqual(caseKey('suite-a', 'alpha', 0), caseKey('suite-other', 'alpha', 0));
 });
 

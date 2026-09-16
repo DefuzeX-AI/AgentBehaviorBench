@@ -8,7 +8,6 @@ from pathlib import Path
 from uuid import uuid4
 from importlib.metadata import version
 from agentbench.sdk.common.artifacts import Artifacts
-from agentbench.sdk.common.input_binding import validate_input_contract
 from .runner import drive_run
 from .configuration import request_options, api_key
 from .compatibility import run_case
@@ -16,8 +15,9 @@ from agentbench.runtime.agentcontainer.session import AgentSession
 
 
 async def execute(root, output, settings=None):
-    # 这里进入容器内的评测流程，root 是 Agent 根目录，output 是产物目录，settings 是任务配置
-    # 导入官方 Kuma SDK、证据采集工具和实际调用 Agent 的函数
+    # Enter the in-container evaluation flow. root is the Agent directory,
+    # output stores artifacts, and settings contains the job configuration.
+    # Import the official KUMA SDK, evidence capture, and Agent invocation here.
     from kuma import create_run, DEFAULT_BASE_URL
     from kuma.otel import configure_trace_evidence
     from opentelemetry.sdk.trace import TracerProvider
@@ -28,23 +28,23 @@ async def execute(root, output, settings=None):
 
 
     
-    # 准备产物保存工具，并把 OpenTelemetry 采集的证据接给 Kuma SDK
+    # Prepare artifact storage and connect OpenTelemetry evidence to the KUMA SDK.
     files = Artifacts(output)
     provider = TracerProvider(resource=Resource.create({'service.name': 'abb-evaluation'}))
     capture = configure_trace_evidence(provider)
     
-    # 读取容器里的 Agent 配置，取得 Agent ID、框架等信息
+    # Read the in-container Agent manifest for its ID and framework.
     with (root / 'agent.toml').open('rb') as stream:
         manifest = tomllib.load(stream)
-    # SDK Run 尚未创建，先准备供后续 Agent 调用复用的会话对象
+    # Create the reusable Agent session before the SDK Run exists.
     run = None
     agent_session = AgentSession()
     settings = dict(settings or {})
     try:
-        # 仅校验逐轮原样输入契约；历史与记忆由 Agent 自己维护
-        validate_input_contract(root / 'evaluation/input-contract.json')
+        # Pass each current input directly to the adapter. The Agent owns history
+        # and memory, so no per-Agent input contract is required.
         configure_trust()
-        # 先保存当前进程、SDK 版本和初始任务状态，方便我们查看进度
+        # Save process, SDK, and initial state metadata for progress inspection.
         credential, credential_source = api_key(os.environ)
         files.save('process.json', {'pid': os.getpid(), 'container': platform.node(), 'mode': 'official',
                    'sdk': 'kuma', 'sdk_version': version('kuma-defuzex'), 'agent_id': manifest['agent_id'],
@@ -53,7 +53,8 @@ async def execute(root, output, settings=None):
                    'source': manifest.get('source'), 'repo': str(root / 'agent')})
         files.save('manifest.json', {'phase': 'case_generation', 'judge': 'pending'})
 
-        # 组装 SDK 参数，包括仓库路径、对话步数上限、密钥、trace 证据和等待时间
+        # Assemble SDK options for the repository, step limit, credentials,
+        # trace evidence, and request timing.
         options = dict(repo_path=root / 'agent',
                        max_steps=settings.get('max_steps'), 
                        allow_local=False, track_files=False, 
@@ -64,7 +65,8 @@ async def execute(root, output, settings=None):
 
         
         if settings.get('mode') == 'generate':
-            # 生成模式：根据 Agent profile 批量生成并保存 Case，这个分支不调用 Agent 回答
+            # Generation mode creates and saves Cases from the Agent Profile
+            # without invoking the Agent.
             from .generation import generate_collection
             # The registered requirement.md is the SDK Agent Profile. Reusing a
             # saved Case rejects a profile, so supply it only during generation.
@@ -77,25 +79,25 @@ async def execute(root, output, settings=None):
                                         'count': len(collection['cases']),
                                         'failed_count': len(collection['failures']),
                                         'unattempted_indices': collection['unattempted_indices']})
-            # Case 批量生成完成就结束，不进入下面的 Case 执行流程
+            # Stop after batch generation instead of entering Case execution.
             return 0 if complete else 1
         
-        # 执行模式必须提供已经保存的 Case 文件
+        # Execution mode requires a previously saved Case artifact.
         if settings.get('case_artifact') is None:
             raise ValueError('Evaluation requires a prepared Case artifact; generation belongs to batch preparation')
         # The SDK reuses a Case only from a saved artifact file inside the Run repository,
         # and rejects a Profile or strategy alongside it: the Case is already decided.
-        # 从已有 Case 创建本次 SDK Run，不重新生成 Case
+        # Create the SDK Run from the saved Case without generating another one.
         run = create_run(case_path=settings['case_artifact'], **options)
 
 
         # Current SDK has no public Case accessor. Keep this version-sensitive
         # snapshot in the KUMA boundary; never manufacture an official Case ID.
-        # 保存 SDK 实际加载的 Case，供宿主检查
+        # Save the Case actually loaded by the SDK for host-side validation.
         case = run_case(run)
         files.save('case.json', case)
         from agentbench.sdk.common.case_identity import case_content_sha256
-        # 对照宿主指定的 Case ID 和内容摘要，确认没有执行错 Case
+        # Match the Case ID and content digest supplied by the host.
         fingerprint = case_content_sha256(case)
         expected = settings['expected_case']
         matched = run.case_id == expected['case_id'] and fingerprint == expected['content_sha256']
@@ -104,67 +106,69 @@ async def execute(root, output, settings=None):
                                           'status': 'accepted' if matched else 'rejected'})
         if not matched:
             raise ValueError('SDK Case does not match the prepared identity; no Agent steps were executed')
-        # 记录 Case 事件，这里沿用 case_generated 事件名，实际加载的是已有 Case
+        # Retain the case_generated event name even though this loads a saved Case.
         from agentbench.observe.store import TraceStore
         TraceStore(output / 'sdk.jsonl', run.run_id, source='sdk').record(
             'case_generated', case_id=run.case_id, artifact='case.json')
 
         
         async def invoke(payload, folder, shared_provider):
-            # 每轮调用同一个 Agent 会话，payload 仅包含当前 Input
-            # shared_provider 是同一套 trace 采集对象
+            # Reuse one Agent session for every turn and pass only the current input.
+            # shared_provider is the common trace provider for the Case.
             request = folder / 'request.json'
             invocation_id = uuid4().hex
             observed_input = json.loads((folder / 'input.json').read_text())
-            # 写下本轮调用请求，带上 Case、Input 和会话身份
+            # Persist the invocation request with Case, input, and session identity.
             files.save(str(request.relative_to(output)), {
                 'schema': 'abb.invocation.v1', 'run_id': invocation_id, 'session_id': run.run_id,
                 'observation_context': {key: observed_input[key] for key in ('case_id', 'input_id') if isinstance(observed_input.get(key), str)},
                 'agent_id': manifest['agent_id'], 'framework': manifest['framework'], 'input': payload})
-            # 这里真正执行 Agent 的回答逻辑，并等待本轮调用结束
+            # Invoke the Agent and wait for this turn to complete.
             await invoke_agent(root, request, folder, provider=shared_provider, session=agent_session)
-            # 读取 Agent 写出的结果，交回上层对话流程
+            # Return the Agent result to the SDK dialogue driver.
             return json.loads((folder / 'result.json').read_text())
-        # 这里开始驱动整个 Case：取输入、调用上面的 invoke、提交输出并接收 Judge 报告
+        # Drive the Case by receiving inputs, invoking the Agent, submitting
+        # outputs, and collecting the Judge report.
         summary = await drive_run(run, invoke, output, provider=provider, repo_path=root / 'agent')
-        # 判断执行和证据是否完整，这里的退出码不判断 Judge 是否给出 pass
+        # The worker exit code checks execution and evidence completeness,
+        # independently of whether the Judge verdict is pass.
         return 0 if (summary['judge'] == 'received' and summary['otel'] == 'complete'
                      and summary['evidence'] == 'captured'
                      and summary['execution'] == 'succeeded') else 1
     except Exception as exc:
-        # 出错时保存错误信息，并用退出码 1 通知宿主
+        # Persist error details and return exit code 1 to the host.
         files.save('error.json', {'phase': 'case_generation' if run is None else 'evaluation',
                    'type': type(exc).__name__, 'message': str(exc), 'code': getattr(exc, 'code', None),
                    'retryable': getattr(exc, 'retryable', None), 'client_request_id': getattr(exc, 'client_request_id', None),
                    'request_id': getattr(exc, 'request_id', None)})
         return 1
     finally:
-        # 无论成功还是失败，都关闭 Agent 会话并保存会话状态
+        # Always close the Agent session and save its final state.
         try:
             await agent_session.aclose()
         finally:
             files.save('session.json', agent_session.snapshot())
-            # SDK Run 还停在等待输入或提交的阶段时，取消未完成的 Run
+            # Cancel an unfinished SDK Run that is still waiting for input or submission.
             if run is not None and run.state in ('ready', 'input_delivered'):
                 run.cancel()
-            # 最后刷新 trace 并关闭采集器
+            # Flush traces and close the provider last.
             provider.force_flush()
             provider.shutdown()
 
 
 def main():
-    # 容器进程先进入这里，读取 Agent 路径、产物路径和任务配置文件路径
+    # Parse Agent, artifact, and job-settings paths at the container entrypoint.
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--agent-root', type=Path, default=Path('/opt/agent'))
     parser.add_argument('--output', type=Path, default=Path('/run/abb-output'))
     parser.add_argument('--settings', type=Path, default=Path('/run/abb-input/evaluation.json'))
     args = parser.parse_args()
-    # 从宿主挂载进来的 evaluation.json 读取生成或执行模式等配置
+    # Read generation or execution settings from the host-mounted evaluation.json.
     settings = json.loads(args.settings.read_text()) if args.settings.is_file() else {}
-    # 启动异步执行流程，并把它的退出码返回给进程入口
+    # Run the asynchronous flow and propagate its exit code.
     return asyncio.run(execute(args.agent_root, args.output, settings))
 
 
 if __name__ == '__main__':
-    # Docker 执行 python -m agentbench.sdk.plugin.kuma.worker 时，从这里调用 main
+    # Docker enters here through python -m agentbench.sdk.plugin.kuma.worker.
     raise SystemExit(main())

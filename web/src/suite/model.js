@@ -2,17 +2,17 @@
 export const caseKey = (suiteId, agentId, index) => JSON.stringify([suiteId, agentId, index]);
 
 export const executionLabels = {
-  pending: '待生成', pending_generation: '待生成', generating: '生成中', prepared: '已准备', ready: '已准备', queued: '排队中',
-  running: '执行中', retrying: '正在重试', judging: '等待 Judge', waiting_judge: '等待 Judge',
-  completed: '已完成', succeeded: '已完成', retry_wait: '临时失败 / 等待重试',
-  recovering: '恢复请求中', reconciling: '状态核对中', interrupted: '进程中断',
-  blocked: '需要处理', needs_attention: '需要处理', failed: '执行失败', exhausted: '重试耗尽',
-  cancelled: '已取消', skipped: '已跳过', unknown: '状态未记录',
+  pending: 'Pending generation', pending_generation: 'Pending generation', generating: 'Generating', prepared: 'Prepared', ready: 'Prepared', queued: 'Queued',
+  running: 'Running', retrying: 'Retrying', judging: 'Waiting for Judge', waiting_judge: 'Waiting for Judge',
+  completed: 'Completed', succeeded: 'Completed', retry_wait: 'Temporary failure / retry pending',
+  recovering: 'Recovering request', reconciling: 'Reconciling status', interrupted: 'Interrupted',
+  blocked: 'Needs attention', needs_attention: 'Needs attention', failed: 'Execution failed', exhausted: 'Retries exhausted',
+  cancelled: 'Cancelled', skipped: 'Skipped', unknown: 'Status unavailable',
 };
 export const phaseLabels = {
-  generate: '生成 Case', case_generation: '生成 Case', prepare: '准备 Case',
-  execute: '执行 Case', benchmark_execution: '执行 Case / Judge', agent: 'Agent 执行',
-  judge: 'Judge', recovery: '恢复请求', recover: '恢复请求', completed: '完成',
+  generate: 'Generate Case', case_generation: 'Generate Case', prepare: 'Prepare Case',
+  execute: 'Execute Case', benchmark_execution: 'Execute Case / Judge', agent: 'Agent execution',
+  judge: 'Judge', recovery: 'Recover request', recover: 'Recover request', completed: 'Complete',
 };
 export const needsAttention = status => ['blocked', 'needs_attention', 'failed', 'exhausted', 'interrupted', 'cancelled', 'skipped'].includes(status);
 export const isComplete = status => ['completed', 'succeeded'].includes(status);
@@ -67,7 +67,7 @@ export function countCases(cases) {
 
 export function jobProgress(job) {
   const cases = job.cases || [];
-  if (!cases.length) return '尚无 Case';
+  if (!cases.length) return 'No Cases yet';
   let completed = 0;
   const remaining = new Map();
   for (const item of cases) {
@@ -75,12 +75,12 @@ export function jobProgress(job) {
     if (isComplete(status)) completed += 1;
     else remaining.set(status, (remaining.get(status) || 0) + 1);
   }
-  return [`已完成 ${completed}/${cases.length}`, ...Array.from(remaining,
+  return [`Completed ${completed}/${cases.length}`, ...Array.from(remaining,
     ([status, count]) => `${executionLabels[status] || status} ${count}`)].join(' · ');
 }
 
 export function errorText(error) {
   if (!error) return '';
   if (typeof error === 'string') return error;
-  return [error.code || error.type || error.error_type, error.message].filter(Boolean).join(' · ') || '错误详情未提供';
+  return [error.code || error.type || error.error_type, error.message].filter(Boolean).join(' · ') || 'No error details provided';
 }

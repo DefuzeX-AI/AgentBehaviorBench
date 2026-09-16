@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { eventIdentity, parseTrace, sortEvents } from './trace.js';
 
-test('parse JSONL, preserve raw Chinese content and source', () => {
-  const raw = { event: 'span_start', source: 'framework', run_id: 'run', data: { input: '中文\n"原样"' } };
+test('parse JSONL, preserve raw Unicode content and source', () => {
+  const raw = { event: 'span_start', source: 'framework', run_id: 'run', data: { input: 'café\n"verbatim"' } };
   const result = parseTrace(`\uFEFF${JSON.stringify(raw)}\n${JSON.stringify({ event: 'span_end' })}\n`, 'framework.jsonl');
   assert.equal(result.events.length, 2);
   assert.deepEqual(result.events[0].raw, raw);
@@ -14,7 +14,7 @@ test('parse JSONL, preserve raw Chinese content and source', () => {
 test('corrupt trailing line does not discard complete events', () => {
   const result = parseTrace('{"event":"llm_request"}\n{"event":', 'network.jsonl');
   assert.equal(result.events.length, 1);
-  assert.match(result.warnings[0], /行 2/);
+  assert.match(result.warnings[0], /line 2/);
 });
 
 test('accept pretty JSON arrays and reject non-events', () => {

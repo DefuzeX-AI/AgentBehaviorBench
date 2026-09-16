@@ -4,14 +4,14 @@ import { requestMessages, responseMessages } from './protocols.js';
 
 test('OpenAI stream reconstructs Unicode, interleaved choices and fragmented tool arguments', () => {
   const result = responseMessages({ events: [
-    { choices: [{ index: 0, delta: { content: '你好', tool_calls: [{ index: 0, id: 'x', function: { name: 'arbitrary', arguments: '{"城市":' } }] } }] },
-    { choices: [{ index: 1, delta: { content: '另一条' } }] },
-    { choices: [{ index: 0, delta: { content: '世界', tool_calls: [{ index: 0, function: { arguments: '"北京"}' } }] }, finish_reason: 'tool_calls' }] },
+    { choices: [{ index: 0, delta: { content: 'Olá, ', tool_calls: [{ index: 0, id: 'x', function: { name: 'arbitrary', arguments: '{"city":' } }] } }] },
+    { choices: [{ index: 1, delta: { content: 'separate choice' } }] },
+    { choices: [{ index: 0, delta: { content: 'mundo', tool_calls: [{ index: 0, function: { arguments: '"Montréal"}' } }] }, finish_reason: 'tool_calls' }] },
     { choices: [], usage: { total_tokens: 12 } }, '[DONE]',
   ] });
-  assert.equal(result.messages[0].content, '你好世界');
-  assert.deepEqual(result.messages[0].tool_calls, [{ id: 'x', name: 'arbitrary', arguments: { 城市: '北京' } }]);
-  assert.equal(result.messages[1].content, '另一条');
+  assert.equal(result.messages[0].content, 'Olá, mundo');
+  assert.deepEqual(result.messages[0].tool_calls, [{ id: 'x', name: 'arbitrary', arguments: { city: 'Montréal' } }]);
+  assert.equal(result.messages[1].content, 'separate choice');
   assert.equal(result.usage.total_tokens, 12);
 });
 
@@ -19,11 +19,11 @@ test('Anthropic streams and Gemini function calls are recognized by protocol fie
   const a = responseMessages({ events: [
     { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'tool-a', name: 'search', input: {} } },
     { type: 'content_block_delta', index: 0, delta: { partial_json: '{"q":' } },
-    { type: 'content_block_delta', index: 0, delta: { partial_json: '"任意内容"}' } },
+    { type: 'content_block_delta', index: 0, delta: { partial_json: '"résumé"}' } },
   ] });
-  assert.deepEqual(a.messages[0].tool_calls[0].arguments, { q: '任意内容' });
-  const g = responseMessages({ candidates: [{ content: { parts: [{ text: '检查' }, { functionCall: { name: 'x', args: { y: 1 } } }] } }] });
-  assert.equal(g.messages[0].content, '检查');
+  assert.deepEqual(a.messages[0].tool_calls[0].arguments, { q: 'résumé' });
+  const g = responseMessages({ candidates: [{ content: { parts: [{ text: 'checked' }, { functionCall: { name: 'x', args: { y: 1 } } }] } }] });
+  assert.equal(g.messages[0].content, 'checked');
   assert.deepEqual(g.messages[0].tool_calls[0].arguments, { y: 1 });
 });
 
@@ -33,8 +33,8 @@ test('Responses handles in-flight tools and uses completed output without duplic
     { type: 'response.function_call_arguments.delta', output_index: 0, item_id: 'item-a', delta: '{"n":2}' },
   ];
   assert.deepEqual(responseMessages({ events }).messages[0].tool_calls[0].arguments, { n: 2 });
-  events.push({ type: 'response.completed', response: { output: [{ type: 'message', content: [{ type: 'output_text', text: '完成' }] }], usage: { total_tokens: 3 } } });
-  assert.equal(responseMessages({ events }).messages[0].content, '完成');
+  events.push({ type: 'response.completed', response: { output: [{ type: 'message', content: [{ type: 'output_text', text: 'complete' }] }], usage: { total_tokens: 3 } } });
+  assert.equal(responseMessages({ events }).messages[0].content, 'complete');
 });
 
 test('request roles and tool-result IDs survive; unknown JSON stays available to raw view', () => {

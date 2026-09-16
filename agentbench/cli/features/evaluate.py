@@ -64,7 +64,7 @@ def execute(args):
             print('Enabled Agents:')
             for index, record in enumerate(records, 1):
                 print(f'{index}. {record["agent_id"]} status={record.get("status")}')
-            selection = input('选择 Agent 编号（q 退出）: ').strip()
+            selection = input('Select an Agent number (q to quit): ').strip()
             if selection.lower() == 'q':
                 return 0
         agent = resolve_agent(select_agent(records, selection), args.registry)

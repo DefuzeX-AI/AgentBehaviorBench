@@ -55,6 +55,6 @@ async function deliver(command, capability, dispatch, request) {
     }
     dispatch(actions.commandFinished({ ...body, command_id: command.command_id, status: body.status || 'accepted' }));
   } catch (error) {
-    dispatch(actions.commandFinished({ command_id: command.command_id, status: 'uncertain', error: `未确认命令是否接收：${error.message}` }));
+    dispatch(actions.commandFinished({ command_id: command.command_id, status: 'uncertain', error: `Command receipt is unconfirmed: ${error.message}` }));
   }
 }

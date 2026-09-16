@@ -105,7 +105,7 @@ def collect_report(root: Path, ledger_path: Path) -> dict[str, Any]:
                         "agent_id": raw_case.get("agent_id"),
                         "case_index": raw_case.get("case_index"),
                         "category": "case_generation_service",
-                        "reason": preview(raw_case.get("error") or "CaseGen 未生成 Case", 300),
+                        "reason": preview(raw_case.get("error") or "CaseGen did not produce a Case", 300),
                         "artifact_directory": raw_case.get("artifact_directory"),
                     }
                 )

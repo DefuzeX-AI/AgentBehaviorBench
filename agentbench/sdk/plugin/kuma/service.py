@@ -127,7 +127,7 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
     if not (environ.get('KUMA_API_KEY') or environ.get('DEFUZEX_API_KEY')):
         raise ValueError('KUMA_API_KEY or DEFUZEX_API_KEY is required')
 
-    # 创建本次任务的文件夹
+    # Create the artifact directory for this task.
     directory = output.resolve() / uuid4().hex
     directory.mkdir(parents=True, mode=0o700)
     files = Artifacts(directory, environ=environ)

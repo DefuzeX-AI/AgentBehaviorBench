@@ -209,17 +209,17 @@ class SuiteRunner:
             preparations = []
             try:
                 mode = None
-                # 给每个选中的 Agent 建立一个“Case 准备任务
+                # Create one Case-preparation job for each selected Agent.
                 for index, agent in enumerate(selected):
                     identity = MappingProxyType(dict(
                         suite_id=suite_id, job_id=f"agent_{uuid4().hex}", agent_id=agent.agent_id,
                         registration_index=index, phase="generate", case_index=None, case_id=None))
 
-                    # 创建一个 KumaContainerRunner 对象， 包括 case_count=2
+                    # Create the SDK runner with the Agent's configured Case count.
                     runner = create_runner(agent, identity)
-                    # 查 API Key、Agent 评测文件等是否具备
+                    # Validate credentials and the Agent's evaluation files.
                     mode = runner.validate_sdk(agent)
-                    # 把 Agent、执行器、任务身份装成一个准备任务，加入列表
+                    # Bundle the Agent, runner, and job identity into the preparation queue.
                     preparations.append(PreparationJob(agent, runner, identity))
 
             except Exception as exc:
@@ -227,7 +227,7 @@ class SuiteRunner:
                 raise SuiteConfigurationError(str(exc)) from exc
             sdk_progress("succeeded", f"Provider mode: {mode}")
 
-            # 所有agent的准备任务都创建好了，通知 CLI 这些任务已经排队
+            # Notify the CLI after all Agent preparation jobs have been queued.
             for job in preparations:
                 bus.publish({**job.identity, "event": "agent_queued", "status": "queued",
                              "requested_case_count": job.registration.case_count})
@@ -240,7 +240,7 @@ class SuiteRunner:
 
             # Actual worker scheduling begins here: prepare each Agent's Cases,
             # then execute ready Cases within the shared worker limit.
-            # 开始把准备任务交给线程
+            # Submit preparation jobs to the worker pool.
             items = CaseScheduler(
                 preparations, 
                 create_case_job=create_case_job, 

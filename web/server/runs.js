@@ -11,13 +11,13 @@ const validId = id => /^[a-zA-Z0-9_-]+$/.test(id);
 async function contained(root, target) {
   const base = await realpath(root);
   const resolved = await realpath(target);
-  if (!resolved.startsWith(base + path.sep)) throw new Error('路径越界');
+  if (!resolved.startsWith(base + path.sep)) throw new Error('Path escapes the allowed root');
   return resolved;
 }
 
 async function readBounded(file, max = MAX_BYTES) {
   const info = await stat(file);
-  if (!info.isFile() || info.size > max) throw new Error('文件过大或不是普通文件');
+  if (!info.isFile() || info.size > max) throw new Error('File is too large or is not a regular file');
   return readFile(file, 'utf8');
 }
 
@@ -30,17 +30,17 @@ export async function listRuns(root) {
       const file = await contained(root, path.join(root, e.name, 'run.json'));
       const metadata = JSON.parse(await readBounded(file));
       const info = await stat(file);
-      return { id: e.name, agent: String(metadata.agent_id || '未知 Agent'),
+      return { id: e.name, agent: String(metadata.agent_id || 'Unknown Agent'),
         status: String(metadata.status || 'unknown'), updated: info.mtime.toISOString() };
     } catch {
-      return { id: e.name, agent: '未知 Agent', status: 'unavailable', updated: null };
+      return { id: e.name, agent: 'Unknown Agent', status: 'unavailable', updated: null };
     }
   }));
   return runs.sort((a, b) => (b.updated || '').localeCompare(a.updated || ''));
 }
 
 export async function readRun(root, id) {
-  if (!validId(id)) throw new Error('无效任务编号');
+  if (!validId(id)) throw new Error('Invalid run ID');
   const directory = await contained(root, path.join(root, id));
   const entries = await readdir(directory, { withFileTypes: true });
   const candidates = ['network.jsonl', ...entries.filter(e => e.isDirectory() && e.name.startsWith('invocation-'))
@@ -55,10 +55,10 @@ export async function readRun(root, id) {
       remaining -= Buffer.byteLength(content);
       files.push({ name, content });
     } catch (error) {
-      if (error.code !== 'ENOENT') warnings.push(`${name}：无法读取（权限、路径或大小限制）`);
+      if (error.code !== 'ENOENT') warnings.push(`${name}: unreadable because of permissions, path, or size limits`);
     }
   }
-  if (!files.length) warnings.push('此任务尚无可读取的 trace 文件，可能未进入执行阶段。');
+  if (!files.length) warnings.push('This run has no readable trace files and may not have reached execution.');
   return { id, files, warnings };
 }
 
@@ -73,8 +73,8 @@ export function runsPlugin(root) {
       // Local, same-origin read-only API. Never enable CORS or arbitrary file paths.
       if (!/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(req.headers.host || '') ||
           (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) ||
-          req.headers['sec-fetch-site'] === 'cross-site') return reply(403, { error: '仅允许本地同源访问' });
-      if (req.method !== 'GET') return reply(405, { error: '仅支持读取' });
+          req.headers['sec-fetch-site'] === 'cross-site') return reply(403, { error: 'Only local same-origin access is allowed' });
+      if (req.method !== 'GET') return reply(405, { error: 'Only read requests are supported' });
       try {
         const metadata = /^\/api\/observe\/runs\/([a-zA-Z0-9_-]+)\/metadata$/.exec(url.pathname);
         if (metadata) return reply(200, JSON.parse(await readBounded(await contained(root, path.join(root, metadata[1], 'run.json')))));
@@ -95,8 +95,8 @@ export function runsPlugin(root) {
         if (url.pathname === '/api/observe/runs') return reply(200, { runs: await listRuns(root) });
         const match = /^\/api\/observe\/runs\/([a-zA-Z0-9_-]+)$/.exec(url.pathname);
         if (match) return reply(200, await readRun(root, match[1]));
-        return reply(404, { error: '任务不存在' });
-      } catch { return reply(404, { error: '任务不存在或无法读取，请刷新列表' }); }
+        return reply(404, { error: 'Run does not exist' });
+      } catch { return reply(404, { error: 'Run does not exist or is unreadable; refresh the list' }); }
     });
   }
   return { name: 'abb-local-runs', configureServer: install, configurePreviewServer: install };

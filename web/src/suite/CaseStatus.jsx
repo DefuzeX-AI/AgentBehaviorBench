@@ -7,7 +7,7 @@ export function ExecutionBadge({ status }) {
 }
 
 export function JudgeBadge({ status }) {
-  if (!status) return <span className="suite-muted">尚未获得</span>;
+  if (!status) return <span className="suite-muted">Not received</span>;
   return <span className={`suite-badge suite-badge-${status === 'pass' ? 'complete' : status === 'issue' || status === 'insufficient_evidence' ? 'waiting' : 'active'}`}>{status}</span>;
 }
 
@@ -18,9 +18,9 @@ function RetryTime({ at }) {
     return () => clearInterval(timer);
   }, []);
   const time = typeof at === 'number' ? (at < 1e12 ? at * 1000 : at) : Date.parse(at);
-  if (!Number.isFinite(time)) return <small>已安排重试，等待调度</small>;
+  if (!Number.isFinite(time)) return <small>Retry scheduled</small>;
   const seconds = Math.max(0, Math.ceil((time - now) / 1000));
-  return <small>{seconds > 0 ? `${seconds} 秒后重试` : '重试时间已到，等待调度'}</small>;
+  return <small>{seconds > 0 ? `Retry in ${seconds} seconds` : 'Retry is due and waiting to be scheduled'}</small>;
 }
 
 export default function CaseStatus({ item }) {
@@ -28,7 +28,7 @@ export default function CaseStatus({ item }) {
     <ExecutionBadge status={item.execution_status} />
     {item.execution_status === 'retry_wait' && <RetryTime at={item.retry_at} />}
     {(item.phase || item.stage) && <small>{phaseLabels[item.stage] || phaseLabels[item.phase] || item.stage || item.phase}</small>}
-    {item.current_step != null && <small>第 {item.current_step} 轮{item.total_steps != null ? ` / 共 ${item.total_steps} 轮` : ''}</small>}
+    {item.current_step != null && <small>Turn {item.current_step}{item.total_steps != null ? ` of ${item.total_steps}` : ''}</small>}
     {(item.error || item.result?.error) && <small className="suite-error-text">{errorText(item.error || item.result?.error)}</small>}
     {item.recovery_reason && <small>{item.recovery_reason}</small>}
   </div>;

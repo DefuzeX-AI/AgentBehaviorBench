@@ -300,7 +300,7 @@ def test_native_pubmed_transport_preserves_current_query_and_native_parser(monke
     spec.loader.exec_module(native)
     expected_query = 'Find clinical evidence for cancer therapy'
     if scenario == 'unicode':
-        expected_query = 'Find clinical evidence 癌症证据'
+        expected_query = 'Find clinical evidence for café oncology outcomes'
     elif scenario == 'long_query':
         expected_query = 'cancer therapy ' * 500
     calls = []

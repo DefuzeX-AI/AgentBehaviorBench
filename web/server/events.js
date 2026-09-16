@@ -30,7 +30,7 @@ export async function eventPage(root, run, offset = 0, limit = 100) {
         if (index++ < offset) continue;
         if (events.length >= limit) return { events, warnings, next: index - 1 };
         try { events.push({ file: name, raw: JSON.parse(text) }); }
-        catch { warnings.push(`${name}: JSON 不完整或格式错误`); }
+        catch { warnings.push(`${name}: incomplete or invalid JSON`); }
       }
     } finally { lines.close(); stream.destroy(); }
   }

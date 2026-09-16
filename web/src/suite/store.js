@@ -17,7 +17,7 @@ const suiteSlice = createSlice({
       const old = state.snapshot;
       // A bound endpoint must never silently swap to a different Suite.
       if (old?.suite_id && old.suite_id !== snapshot.suite_id) {
-        state.error = '返回的 Suite 身份与当前页面不一致，已保留原数据。';
+        state.error = 'Returned Suite identity does not match this page; existing data was retained.';
         return;
       }
       if (Number.isFinite(old?.revision) && (!Number.isFinite(snapshot.revision) || snapshot.revision < old.revision)) return;

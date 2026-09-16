@@ -110,7 +110,7 @@ def run_preparation_job(job: PreparationJob, *, control: RunControl,
                     (job.registration, job.identity["registration_index"] + 1, callbacks.total))
 
 
-        # 在这里 我们真正的开始调用 createcases 来创建 case（可以去看kuma 的 create_cases 方法）
+        # This is where Case creation begins through the selected SDK runner.
         partial = getattr(job.runner, 'prepare_case_batch', None)
         requested = tuple(range(job.registration.case_count)) if job.case_indices is None else job.case_indices
         if callable(partial):

@@ -79,7 +79,7 @@ def test_render_report_produces_filterable_standalone_html():
         },
         "per_agent": [{"agent_id": "react-agent", "attempts": 1, "unique_cases": 1, "healthy": 1, "rate": 1.0, "wilson_low": 0.2, "wilson_high": 1.0, "judge": {"pass": 1}}],
         "by_turns": [{"turns": 0, "attempts": 1, "healthy": 1, "rate": 1.0}],
-        "by_period": [{"period": "早期", "attempts": 1, "healthy": 1, "rate": 1.0}],
+        "by_period": [{"period": "early", "attempts": 1, "healthy": 1, "rate": 1.0}],
         "duration_by_agent": [{"agent_id": "react-agent", "n": 0, "median_seconds": None, "mean_seconds": None, "p90_seconds": None, "max_seconds": None}],
         "runs": [{"index": 1, "suite_id": "suite", "agents": ["react-agent"], "selected_case_counts": {"react-agent": 1}, "planned": 1, "generated": 1, "attempted": 1, "healthy": 1, "status": "complete", "qualifying": False, "artifact": None}],
         "cases": [{"healthy": True, "judge_status": "pass", "agent_id": "react-agent", "failure_category": "none", "run_index": 1, "case_index": 0, "title": "A case", "inputs": [], "attempt_number": 1, "case_id": "case_1", "suite_id": "suite", "description": "description", "failure_label": "ok", "case": {}, "judge_report": {"status": "pass", "issues": [], "evidence_gaps": []}, "network": {}, "raw_files": {}, "secondary_failures": [], "review_flags": [], "scope_review": None}],

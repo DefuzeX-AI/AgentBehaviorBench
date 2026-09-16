@@ -27,7 +27,7 @@ def build_trace_suite_runner(
 ) -> SuiteRunner:
     sink: TraceSink = activity_sink or NullTraceSink()
 
-    # 返回一个确定的sdk
+    # Return the selected SDK implementation.
     # ex:
     #   EvaluationPlan(
     #       selection=SDKSelection(

@@ -67,7 +67,7 @@ class CaseScheduler:
                 self.unprepared.append(state)
 
     def run(self) -> tuple[SuiteAgentResult, ...]:
-        # 开线程池
+        # Start the worker pool.
         pool = ThreadPoolExecutor(max_workers=self.workers, thread_name_prefix="abb-case")
         previous_sigint = None
         if threading.current_thread() is threading.main_thread():
@@ -151,7 +151,7 @@ class CaseScheduler:
         if not self.consumer_failed:
             self.bus.publish(event, callback, args)
 
-    # 线程排队操作
+    # Queue work for the worker pool.
     def _fill_slots(self, pool: ThreadPoolExecutor):
         while self.admission and not self.control.cancelled and len(self.inflight) < self.workers:
             if self.ready:
@@ -184,7 +184,7 @@ class CaseScheduler:
                     continue
                 function = run_case_job
 
-            # 遇到尚未准备 Cases 的 Agent 做出以下事情
+            # Prepare Cases for an Agent that does not have them yet.
             elif self.unprepared:
                 state = self.unprepared.popleft()
                 job = state.preparation
@@ -193,7 +193,7 @@ class CaseScheduler:
             else:
                 break
 
-            # 线程排队操作
+            # Queue work for the worker pool.
             try:
                 future = pool.submit(function, job, control=self.control, bus=self.bus, callbacks=self.callbacks)
             except BaseException as exc:

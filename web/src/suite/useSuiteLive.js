@@ -14,9 +14,9 @@ export default function useSuiteLive(endpoint, refresh) {
     async function poll() {
       try {
         const response = await fetch(endpoint, { cache: 'no-store', signal: controller.signal });
-        if (!response.ok) throw new Error(`读取 Suite 失败 HTTP ${response.status}`);
+        if (!response.ok) throw new Error(`Suite read failed with HTTP ${response.status}`);
         const snapshot = await response.json();
-        if (!Array.isArray(snapshot.jobs)) throw new Error('Suite 返回的数据缺少 Case 列表');
+        if (!Array.isArray(snapshot.jobs)) throw new Error('Suite response is missing the Case list');
         if (!controller.signal.aborted) dispatch(actions.snapshotReceived({ snapshot, updated: new Date().toLocaleTimeString('zh-CN') }));
       } catch (error) {
         if (!controller.signal.aborted) dispatch(actions.connectionFailed(error.message));

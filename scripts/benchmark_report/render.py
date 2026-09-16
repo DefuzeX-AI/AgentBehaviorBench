@@ -1,4 +1,4 @@
-"""Render collected benchmark data as a self-contained Chinese HTML report."""
+"""Render collected benchmark data as a self-contained English HTML report."""
 
 from __future__ import annotations
 
@@ -8,21 +8,21 @@ from typing import Any, Iterable
 
 
 FAILURE_LABELS = {
-    "judge_service": "远程 Judge 服务失败",
-    "integration_http_414": "Agent 接入：HTTP 414",
-    "integration_runtime": "Agent 接入：运行时错误",
-    "judge_insufficient_evidence": "Judge 证据不足",
-    "external_auth": "外部凭证认证失败",
-    "bba_trace_mapping": "BBA trace 映射缺陷",
-    "user_cancelled": "用户取消",
-    "other": "其他",
-    "none": "无",
+    "judge_service": "Remote Judge service failure",
+    "integration_http_414": "Agent integration: HTTP 414",
+    "integration_runtime": "Agent integration: runtime error",
+    "judge_insufficient_evidence": "Insufficient Judge evidence",
+    "external_auth": "External credential authentication failure",
+    "bba_trace_mapping": "BBA trace mapping defect",
+    "user_cancelled": "User cancelled",
+    "other": "Other",
+    "none": "None",
 }
 RUN_LABELS = {
-    "complete": "完整跑通",
-    "partial": "部分跑通",
-    "failed": "全部失败",
-    "preparation_failed": "准备阶段失败",
+    "complete": "Complete",
+    "partial": "Partially complete",
+    "failed": "Failed",
+    "preparation_failed": "Preparation failed",
 }
 
 
@@ -60,7 +60,7 @@ def json_block(value: Any, *, limit: int = 20_000) -> str:
     text = json.dumps(value, ensure_ascii=False, indent=2)
     truncated = len(text) > limit
     if truncated:
-        text = text[:limit] + "\n… [HTML 中已截断；请打开原始 artifact]"
+        text = text[:limit] + "\n… [truncated in HTML; open the original artifact]"
     return f'<pre class="json">{e(text)}</pre>'
 
 
@@ -88,7 +88,7 @@ def _failure_table(data: dict[str, Any]) -> str:
         count = counts.get(key, 0)
         if count:
             rows.append((e(FAILURE_LABELS[key]), f"<strong>{count}</strong>", pct(count / total)))
-    return table(("互斥主因", "次数", f"占 {total} 次失败"), rows)
+    return table(("Exclusive primary cause", "Count", f"Share of {total} failures"), rows)
 
 
 def _casegen_table(data: dict[str, Any]) -> str:
@@ -96,15 +96,15 @@ def _casegen_table(data: dict[str, Any]) -> str:
         (
             e(item.get("suite_id")),
             e(item.get("agent_id")),
-            e("批次" if item.get("case_index") is None else int(item["case_index"]) + 1),
+            e("Batch" if item.get("case_index") is None else int(item["case_index"]) + 1),
             e(item.get("reason")),
             raw_link(item.get("artifact_directory"), "artifact"),
         )
         for item in data["casegen_failures"]
     ]
     if not rows:
-        return '<p class="muted">没有 CaseGen 服务失败。</p>'
-    return table(("Suite", "Agent", "计划 Case", "原因", "原始目录"), rows)
+        return '<p class="muted">No CaseGen service failures.</p>'
+    return table(("Suite", "Agent", "Planned Case", "Reason", "Raw directory"), rows)
 
 
 def _agent_table(data: dict[str, Any]) -> str:
@@ -122,7 +122,7 @@ def _agent_table(data: dict[str, Any]) -> str:
                 f'issue {judge.get("issue", 0)} · pass {judge.get("pass", 0)} · insufficient {judge.get("insufficient_evidence", 0)} · missing {judge.get("missing", 0)}',
             )
         )
-    return table(("Agent", "Attempts", "唯一 Case", "严格跑通", "跑通率", "Wilson 95% CI", "Judge 原始状态"), rows)
+    return table(("Agent", "Attempts", "Unique Cases", "Strictly healthy", "Healthy rate", "Wilson 95% CI", "Raw Judge status"), rows)
 
 
 def _run_table(data: dict[str, Any]) -> str:
@@ -139,11 +139,11 @@ def _run_table(data: dict[str, Any]) -> str:
                 str(run["attempted"]),
                 str(run["healthy"]),
                 badge(RUN_LABELS[run["status"]], tone),
-                badge("是", "good") if run["qualifying"] else "",
+                badge("Yes", "good") if run["qualifying"] else "",
                 raw_link(run.get("artifact"), "events"),
             )
         )
-    return table(("#", "Suite", "Agents", "计划", "生成", "执行", "严格跑通", "Run 结果", "资格套件", "事件"), rows)
+    return table(("#", "Suite", "Agents", "Planned", "Generated", "Executed", "Strictly healthy", "Run result", "Qualifying suite", "Events"), rows)
 
 
 def _native_table(data: dict[str, Any]) -> str:
@@ -159,7 +159,7 @@ def _native_table(data: dict[str, Any]) -> str:
                 raw_link(item.get("artifact_directory"), "observe"),
             )
         )
-    return table(("Agent", "状态", "诊断", "工具 HTTP", "Artifact"), rows)
+    return table(("Agent", "Status", "Diagnosis", "Tool HTTP", "Artifact"), rows)
 
 
 def _stats_tables(data: dict[str, Any]) -> str:
@@ -185,19 +185,19 @@ def _stats_tables(data: dict[str, Any]) -> str:
     first = data["summary"]["first_seen"]
     reused = data["summary"]["reused"]
     reuse_rows = [
-        ("Case 首次出现", str(first["attempts"]), str(first["healthy"]), pct(first["healthy"] / first["attempts"] if first["attempts"] else None)),
-        ("复用 Case", str(reused["attempts"]), str(reused["healthy"]), pct(reused["healthy"] / reused["attempts"] if reused["attempts"] else None)),
+        ("First appearance of Case", str(first["attempts"]), str(first["healthy"]), pct(first["healthy"] / first["attempts"] if first["attempts"] else None)),
+        ("Reused Case", str(reused["attempts"]), str(reused["healthy"]), pct(reused["healthy"] / reused["attempts"] if reused["attempts"] else None)),
     ]
     return f"""
     <div class="grid three">
-      <section class="panel"><h3>按对话轮数</h3>{table(("Inputs", "Attempts", "跑通", "跑通率"), turn_rows)}</section>
-      <section class="panel"><h3>按测试时段</h3>{table(("时段", "Attempts", "跑通", "跑通率"), period_rows)}</section>
-      <section class="panel"><h3>Case 复用</h3>{table(("类型", "Attempts", "跑通", "跑通率"), reuse_rows)}</section>
+      <section class="panel"><h3>By conversation turns</h3>{table(("Inputs", "Attempts", "Healthy", "Healthy rate"), turn_rows)}</section>
+      <section class="panel"><h3>By test period</h3>{table(("Period", "Attempts", "Healthy", "Healthy rate"), period_rows)}</section>
+      <section class="panel"><h3>Case reuse</h3>{table(("Type", "Attempts", "Healthy", "Healthy rate"), reuse_rows)}</section>
     </div>
-    <section class="panel"><h3>Agent 单次 Input 执行时长（秒）</h3>
-      {table(("Agent", "完整区间 n", "中位数", "平均", "P90", "最大"), duration_rows)}
+    <section class="panel"><h3>Agent execution time per Input (seconds)</h3>
+      {table(("Agent", "Complete intervals n", "Median", "Mean", "P90", "Maximum"), duration_rows)}
     </section>
-    <p class="callout warn">这些是描述性统计。Agent 类型、Case 难度、代码修复和测试时间相互混杂，不能把差异解释成 Agent 的因果性能排名。复用 Case 多数发生在修复后，也存在选择偏差。</p>
+    <p class="callout warn">These are descriptive statistics. Agent type, Case difficulty, code fixes, and test timing are confounded, so differences cannot be interpreted as a causal Agent performance ranking. Most Case reuse occurred after fixes, which also introduces selection bias.</p>
     """
 
 
@@ -227,17 +227,17 @@ def _input_detail(item: dict[str, Any], index: int) -> str:
       <div class="detail-body">
         <p class="raw-links">{raw}</p>
         <div class="grid two">
-          <div><h5>KUMA 输入</h5>{json_block(item['input'])}</div>
-          <div><h5>传给 Agent 的 request / mapped input</h5>{json_block({'request': item['request'], 'mapped_input': item['mapped_input'], 'context': item['context']})}</div>
+          <div><h5>KUMA Input</h5>{json_block(item['input'])}</div>
+          <div><h5>Request / mapped input sent to the Agent</h5>{json_block({'request': item['request'], 'mapped_input': item['mapped_input'], 'context': item['context']})}</div>
         </div>
-        <h5>Agent 外部输出</h5>{json_block(item['result'])}
-        <h5>提交给 Judge 的结果与 capture status</h5>{json_block(item['submission'])}
-        <h5>Agent 内部 framework trace</h5>
-        <p class="muted">{framework['event_count']} 个事件；执行 {num(framework['duration_ms'], 1)} ms；类型 {e(json.dumps(framework['span_kinds'], ensure_ascii=False))}。表格按时长显示最多 80 个 span。</p>
-        {table(("Span", "Kind", "Status", "ms", "输出预览"), trace_rows) if trace_rows else '<p class="muted">没有 framework span。</p>'}
+        <h5>External Agent output</h5>{json_block(item['result'])}
+        <h5>Result and capture status submitted to the Judge</h5>{json_block(item['submission'])}
+        <h5>Internal Agent framework trace</h5>
+        <p class="muted">{framework['event_count']} events; execution {num(framework['duration_ms'], 1)} ms; kinds {e(json.dumps(framework['span_kinds'], ensure_ascii=False))}. The table shows up to 80 spans ordered by duration.</p>
+        {table(("Span", "Kind", "Status", "ms", "Output preview"), trace_rows) if trace_rows else '<p class="muted">No framework spans.</p>'}
         <h5>OTEL</h5>
-        <p class="muted">状态：{e(json.dumps(otel['status'], ensure_ascii=False))}。表格按时长显示最多 80 个 span。</p>
-        {table(("Span", "Kind", "Status", "ms", "Trace ID", "Span ID"), otel_rows) if otel_rows else '<p class="muted">没有 OTEL span。</p>'}
+        <p class="muted">Status: {e(json.dumps(otel['status'], ensure_ascii=False))}. The table shows up to 80 spans ordered by duration.</p>
+        {table(("Span", "Kind", "Status", "ms", "Trace ID", "Span ID"), otel_rows) if otel_rows else '<p class="muted">No OTEL spans.</p>'}
       </div>
     </details>
     """
@@ -245,7 +245,7 @@ def _input_detail(item: dict[str, Any], index: int) -> str:
 
 def _judge_detail(report: dict[str, Any] | None) -> str:
     if not isinstance(report, dict):
-        return '<p class="callout bad">没有有效 Judge report.json。请结合 failure category、manifest 和原始 artifact 判断。</p>'
+        return '<p class="callout bad">No valid Judge report.json. Use the failure category, manifest, and raw artifact to investigate.</p>'
     issues = report.get("issues", [])
     gaps = report.get("evidence_gaps", [])
     issue_rows = [
@@ -254,9 +254,9 @@ def _judge_detail(report: dict[str, Any] | None) -> str:
     ]
     return f"""
       <p>{badge(report.get('status'), 'good' if report.get('status') == 'pass' else 'warn')} confidence={e(report.get('confidence'))} · stop={e(report.get('stop_reason'))}</p>
-      {table(("Issue", "Severity", "Judge message"), issue_rows) if issue_rows else '<p class="muted">Judge 没有列出 issue。</p>'}
+      {table(("Issue", "Severity", "Judge message"), issue_rows) if issue_rows else '<p class="muted">The Judge listed no issues.</p>'}
       <h5>Evidence gaps</h5>{json_block(gaps)}
-      <details><summary>完整 Judge JSON</summary>{json_block(report)}</details>
+      <details><summary>Complete Judge JSON</summary>{json_block(report)}</details>
     """
 
 
@@ -272,7 +272,7 @@ def _case_card(case: dict[str, Any]) -> str:
         rows = [(e(item.get("type")), e(item.get("detail"))) for item in flags]
         if scope:
             rows.append((f"scope:{e(scope.get('scope_review'))}", e(scope.get("reason"))))
-        annotations = f'<h4>人工复核标记</h4>{table(("类型", "说明"), rows)}'
+        annotations = f'<h4>Manual review flags</h4>{table(("Type", "Description"), rows)}'
     secondary = "".join(f"<li>{e(item)}</li>" for item in case.get("secondary_failures", []))
     network = case.get("network", {})
     endpoint_rows = [
@@ -289,23 +289,23 @@ def _case_card(case: dict[str, Any]) -> str:
         <summary>
           <span class="case-number">#{case['run_index']}.{(case.get('case_index') or 0) + 1}</span>
           <span class="case-title">{e(case['title'])}</span>
-          {badge(case.get('agent_id'), 'neutral')} {badge('跑通' if healthy else '未跑通', status_tone)} {badge(judge, judge_tone)}
+          {badge(case.get('agent_id'), 'neutral')} {badge('Healthy' if healthy else 'Failed', status_tone)} {badge(judge, judge_tone)}
           <span class="case-meta">{len(case['inputs'])} inputs · attempt {case['attempt_number']}</span>
         </summary>
         <div class="case-body">
           <p class="ids"><code>{e(case.get('case_id'))}</code><br><code>{e(case.get('suite_id'))}</code></p>
           <p>{e(case.get('description'))}</p>
           <div class="classification">
-            <strong>主分类：</strong>{e(FAILURE_LABELS.get(case['failure_category'], case['failure_category']))} — {e(case['failure_label'])}
+            <strong>Primary classification:</strong> {e(FAILURE_LABELS.get(case['failure_category'], case['failure_category']))} — {e(case['failure_label'])}
             {f'<ul>{secondary}</ul>' if secondary else ''}
           </div>
           <p class="raw-links">{raw}</p>
           {annotations}
-          <h4>CaseGen 产物</h4>{json_block(case['case'])}
-          <h4>每轮输入、Agent trace、输出和 OTEL</h4>{inputs or '<p class="muted">这个 attempt 没有落盘 Input artifact。</p>'}
-          <h4>网络摘要</h4>
-          <p class="muted">{network.get('event_count', 0)} 个 interceptor 事件；事件类型 {e(json.dumps(network.get('events', {}), ensure_ascii=False))}。HTTP body 不嵌入报告，避免体积和敏感信息风险。</p>
-          {table(("事件", "Host", "Method", "Status", "次数"), endpoint_rows) if endpoint_rows else '<p class="muted">没有 response endpoint 记录。</p>'}
+          <h4>CaseGen artifact</h4>{json_block(case['case'])}
+          <h4>Input, Agent trace, output, and OTEL for each turn</h4>{inputs or '<p class="muted">This attempt has no saved Input artifacts.</p>'}
+          <h4>Network summary</h4>
+          <p class="muted">{network.get('event_count', 0)} interceptor events; event kinds {e(json.dumps(network.get('events', {}), ensure_ascii=False))}. HTTP bodies are not embedded in the report to control size and reduce exposure of sensitive information.</p>
+          {table(("Event", "Host", "Method", "Status", "Count"), endpoint_rows) if endpoint_rows else '<p class="muted">No response endpoint records.</p>'}
           <h4>Judge</h4>{_judge_detail(case.get('judge_report'))}
         </div>
       </details>
@@ -317,14 +317,14 @@ def _case_explorer(data: dict[str, Any]) -> str:
     cards = "".join(_case_card(case) for case in data["cases"])
     return f"""
     <section id="cases" class="section">
-      <div class="section-head"><div><p class="eyebrow">RAW EVIDENCE</p><h2>{len(data['cases'])} 次 Case attempt</h2></div><p>默认折叠。可按流水线状态、Judge 状态、Agent 或失败原因筛选。</p></div>
+      <div class="section-head"><div><p class="eyebrow">RAW EVIDENCE</p><h2>{len(data['cases'])} Case attempts</h2></div><p>Collapsed by default. Filter by pipeline status, Judge status, Agent, or failure cause.</p></div>
       <div class="toolbar">
-        <input id="search" type="search" placeholder="搜索 Agent、Case ID、Suite、标题或错误…">
+        <input id="search" type="search" placeholder="Search Agent, Case ID, Suite, title, or error…">
         <div id="filters">
-          <button class="active" data-value="all">全部 {len(data['cases'])}</button>
-          <button data-value="healthy">严格跑通</button><button data-value="failed">未跑通</button>
+          <button class="active" data-value="all">All {len(data['cases'])}</button>
+          <button data-value="healthy">Strictly healthy</button><button data-value="failed">Failed</button>
           <button data-value="issue">Judge issue</button><button data-value="pass">Judge pass</button>
-          <button data-value="insufficient_evidence">证据不足</button><button data-value="judge_service">Judge 服务失败</button>
+          <button data-value="insufficient_evidence">Insufficient evidence</button><button data-value="judge_service">Judge service failure</button>
           <button data-value="react-agent">ReAct</button><button data-value="trading-agents">Trading</button><button data-value="gpt-researcher">GPT Researcher</button>
         </div>
         <span id="visible-count"></span>
@@ -342,13 +342,13 @@ def render_report(data: dict[str, Any]) -> str:
     run_counts = s["run_statuses"]
     judge_counts = s["judge_counts"]
     healthy_judge = s["healthy_judge_counts"]
-    judge_service_codes = "、".join(
+    judge_service_codes = ", ".join(
         f"{name} {count}" for name, count in sorted(s["judge_service_codes"].items())
     )
     trace_reasons = s["trace_reasons"]
     sources = "".join(f"<li>{raw_link(path)}</li>" for path in data["source_documents"])
     return f"""<!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{e(data['meta']['title'])}</title>
@@ -360,65 +360,65 @@ def render_report(data: dict[str, Any]) -> str:
 </style>
 </head>
 <body><main class="wrap">
-<header class="hero"><div><p class="eyebrow">BBA / BENCHMARK FORENSICS / {e(data['meta']['date'])}</p><h1>今天的测试，究竟跑得怎么样？</h1><p class="lede">从 {s['runs']} 个 Run、{s['attempts']} 次真实 Case attempt、{s['input_artifacts']} 个落盘 Input artifact 出发，把“系统是否完整跑通”“Judge 是否返回报告”“Judge 报告认为 Agent 有问题”拆成三个不同问题。</p></div><div class="meta"><strong>报告生成</strong><br>{e(data['meta']['generated_at'])}<br><br><strong>Campaign</strong><br>{e(data['meta']['campaign_status'])} · {e(data['meta']['campaign_stop_reason'])}<br><br><strong>数据源</strong><br>{raw_link(data['meta']['ledger'])}</div></header>
+<header class="hero"><div><p class="eyebrow">BBA / BENCHMARK FORENSICS / {e(data['meta']['date'])}</p><h1>How did today's tests actually perform?</h1><p class="lede">Starting from {s['runs']} Runs, {s['attempts']} real Case attempts, and {s['input_artifacts']} saved Input artifacts, this report separates three questions: whether the system completed end to end, whether the Judge returned a report, and whether that report identified an Agent issue.</p></div><div class="meta"><strong>Report generated</strong><br>{e(data['meta']['generated_at'])}<br><br><strong>Campaign</strong><br>{e(data['meta']['campaign_status'])} · {e(data['meta']['campaign_stop_reason'])}<br><br><strong>Data source</strong><br>{raw_link(data['meta']['ledger'])}</div></header>
 
 <section class="section"><div class="cards">
-  <div class="metric"><strong>{s['attempts']}</strong><span>真实 Case attempts</span></div>
-  <div class="metric"><strong>{s['healthy']}</strong><span>严格流水线跑通 · {pct(s['healthy_rate'])}</span></div>
-  <div class="metric"><strong>{s['failed']}</strong><span>未严格跑通</span></div>
-  <div class="metric"><strong>{s['judge_reports']}</strong><span>有效 Judge reports</span></div>
-  <div class="metric"><strong>{s['unique_cases']}</strong><span>唯一 Case · {s['reused_attempts']} 次复用</span></div>
+  <div class="metric"><strong>{s['attempts']}</strong><span>Real Case attempts</span></div>
+  <div class="metric"><strong>{s['healthy']}</strong><span>Strictly healthy pipeline · {pct(s['healthy_rate'])}</span></div>
+  <div class="metric"><strong>{s['failed']}</strong><span>Not strictly healthy</span></div>
+  <div class="metric"><strong>{s['judge_reports']}</strong><span>Valid Judge reports</span></div>
+  <div class="metric"><strong>{s['unique_cases']}</strong><span>Unique Cases · {s['reused_attempts']} reused attempts</span></div>
 </div></section>
 
-<section class="section"><div class="section-head"><div><p class="eyebrow">DEFINITIONS</p><h2>先统一“跑通”的口径</h2></div><p>这里使用 campaign ledger 的严格验收结果：Agent 执行、OTEL、submission、evidence、Judge、host trace validation 与 cleanup 必须完成。Judge 的业务结论单独统计。</p></div>
-<div class="decision"><div><strong>CaseGen</strong><br>生成了可落盘、可执行的 Case。</div><div><strong>Agent + trace</strong><br>每轮输入完成，Agent 输出、framework trace 与 OTEL 落盘。</div><div><strong>Judge</strong><br>返回结构化 report.json；`issue` 仍是一份有效报告。</div><div><strong>Host 验收</strong><br>trace、cleanup 等全部通过，才记为严格跑通。</div></div>
-<p class="callout"><strong>关键区别：</strong>{s['healthy']} 次严格跑通中，Judge 有 {healthy_judge.get('issue',0)} 次 `issue`、{healthy_judge.get('pass',0)} 次 `pass`。这些 `issue` 代表“评测基础设施完整地产生了行为问题报告”，不是系统失败。责任归因还可能是 Agent 行为、Case/能力不匹配、接入层、Judge 误读或混合原因。</p>
+<section class="section"><div class="section-head"><div><p class="eyebrow">DEFINITIONS</p><h2>Define “healthy” first</h2></div><p>This report uses the campaign ledger's strict acceptance result: Agent execution, OTEL, submission, evidence, Judge, host trace validation, and cleanup must all complete. The Judge's behavioral verdict is counted separately.</p></div>
+<div class="decision"><div><strong>CaseGen</strong><br>Produced a saved, executable Case.</div><div><strong>Agent + trace</strong><br>Completed each input and saved Agent output, framework trace, and OTEL.</div><div><strong>Judge</strong><br>Returned a structured report.json; `issue` is still a valid report.</div><div><strong>Host acceptance</strong><br>Trace validation, cleanup, and all other checks passed.</div></div>
+<p class="callout"><strong>Key distinction:</strong> among {s['healthy']} strictly healthy attempts, the Judge returned {healthy_judge.get('issue',0)} `issue` verdicts and {healthy_judge.get('pass',0)} `pass` verdicts. An `issue` means the evaluation infrastructure successfully produced a behavioral finding; it is not a system failure. Attribution may still involve Agent behavior, Case/capability mismatch, the integration layer, Judge interpretation, or a mixture.</p>
 </section>
 
-<section class="section"><div class="section-head"><div><p class="eyebrow">FAILURES</p><h2>{s['failed']} 次未跑通：主因统计</h2></div><p>主因互斥，总和等于 {s['failed']}，便于计算比例。Case 上仍保留次因，例如 Judge 服务失败同时伴随 Agent HTTP 414。</p></div>
-<div class="grid two"><section class="panel"><h3>Case attempt 失败</h3>{_failure_table(data)}</section><section class="panel"><h3>生成与准备阶段</h3><p><strong>{s['casegen_service_failures']}</strong> 次远程 CaseGen 服务失败，未形成 attempt；<strong>{s['preparation_failures']}</strong> 次 Agent Profile 本地校验失败，尚未调用 CaseGen。</p><p class="muted">批量生成错误还派生出 {s['casegen_skipped_slots']} 个 CaseSkipped 占位结果；它们是失败的后果，不重复计为 CaseGen 根因。CaseGen 失败与后面的 160 attempts 分母分开。</p></section></div>
-<h3>CaseGen 服务失败清单</h3>{_casegen_table(data)}
+<section class="section"><div class="section-head"><div><p class="eyebrow">FAILURES</p><h2>{s['failed']} unsuccessful attempts: primary causes</h2></div><p>Primary causes are mutually exclusive and sum to {s['failed']}, which keeps percentages meaningful. Each Case still retains secondary causes, such as a Judge service failure accompanied by an Agent HTTP 414.</p></div>
+<div class="grid two"><section class="panel"><h3>Case attempt failures</h3>{_failure_table(data)}</section><section class="panel"><h3>Generation and preparation</h3><p><strong>{s['casegen_service_failures']}</strong> remote CaseGen service failures produced no attempt; <strong>{s['preparation_failures']}</strong> Agent Profiles failed local validation before CaseGen was called.</p><p class="muted">Batch generation errors also produced {s['casegen_skipped_slots']} CaseSkipped placeholders. They are consequences of the failures and are not counted again as CaseGen root causes. CaseGen failures are kept outside the denominator of the subsequent 160 attempts.</p></section></div>
+<h3>CaseGen service failures</h3>{_casegen_table(data)}
 </section>
 
-<section class="section"><div class="section-head"><div><p class="eyebrow">JUDGE</p><h2>Judge：结果、失败与责任归因</h2></div><p>{s['requests'].get('judge_posts',0)} 次 Judge POST 对应 {s['judge_reports']} 份结构化报告；其余 {s['attempts']-s['judge_reports']} 次没有有效报告。</p></div>
+<section class="section"><div class="section-head"><div><p class="eyebrow">JUDGE</p><h2>Judge results, failures, and attribution</h2></div><p>{s['requests'].get('judge_posts',0)} Judge POST requests produced {s['judge_reports']} structured reports; the remaining {s['attempts']-s['judge_reports']} attempts have no valid report.</p></div>
 <div class="grid three">
-<section class="panel"><h3>报告状态</h3><p>issue <strong>{judge_counts.get('issue',0)}</strong><br>pass <strong>{judge_counts.get('pass',0)}</strong><br>insufficient_evidence <strong>{judge_counts.get('insufficient_evidence',0)}</strong><br>missing <strong>{judge_counts.get('missing',0)}</strong></p></section>
-<section class="panel"><h3>无有效报告的 {s['attempts']-s['judge_reports']} 次</h3><p><strong>{sum(s['judge_service_codes'].values())}</strong> 次远程 Judge operation 失败：{e(judge_service_codes)}。</p><p><strong>{s['attempts']-s['judge_reports']-sum(s['judge_service_codes'].values())}</strong> 次在 Judge 返回有效报告前结束。</p></section>
-<section class="panel"><h3>Judge issues</h3><p>共 {sum(s['judge_issue_severities'].values())} 条：high {s['judge_issue_severities'].get('high',0)}、medium {s['judge_issue_severities'].get('medium',0)}、low {s['judge_issue_severities'].get('low',0)}。</p><p>{s['judge_reports']-s['reports_with_evidence_gaps']} / {s['judge_reports']} 份报告的 evidence_gaps 为空；其中 {judge_counts.get('insufficient_evidence',0)} 份 insufficient_evidence 没有提供更细原因。</p></section>
+<section class="panel"><h3>Report status</h3><p>issue <strong>{judge_counts.get('issue',0)}</strong><br>pass <strong>{judge_counts.get('pass',0)}</strong><br>insufficient_evidence <strong>{judge_counts.get('insufficient_evidence',0)}</strong><br>missing <strong>{judge_counts.get('missing',0)}</strong></p></section>
+<section class="panel"><h3>{s['attempts']-s['judge_reports']} attempts without a valid report</h3><p><strong>{sum(s['judge_service_codes'].values())}</strong> remote Judge operation failures: {e(judge_service_codes)}.</p><p><strong>{s['attempts']-s['judge_reports']-sum(s['judge_service_codes'].values())}</strong> attempts ended before the Judge returned a valid report.</p></section>
+<section class="panel"><h3>Judge issues</h3><p>{sum(s['judge_issue_severities'].values())} total: high {s['judge_issue_severities'].get('high',0)}, medium {s['judge_issue_severities'].get('medium',0)}, low {s['judge_issue_severities'].get('low',0)}.</p><p>{s['judge_reports']-s['reports_with_evidence_gaps']} / {s['judge_reports']} reports have empty evidence_gaps; {judge_counts.get('insufficient_evidence',0)} insufficient_evidence reports provide no more specific cause.</p></section>
 </div>
-<p class="callout warn"><strong>如何分辨 BBA 问题与正常 issue：</strong>若流水线严格跑通且有 report，Judge `issue` 首先作为正常评测结果保存；再用 Case scope、Agent 原生能力、entrypoint 语义和 Judge 文本做人工归因。若 execution/trace/Judge service/host validation 失败，则先归为基础设施或接入问题，并排除出干净的 Agent 能力统计。报告的 Case 详情已附上人工 review flags，但不篡改官方 Judge 结果。</p>
+<p class="callout warn"><strong>Distinguishing BBA defects from normal issues:</strong> when the pipeline is strictly healthy and has a report, preserve a Judge `issue` as a normal evaluation result, then review the Case scope, native Agent capability, entrypoint semantics, and Judge text for attribution. When execution, trace, Judge service, or host validation fails, classify the result as an infrastructure or integration problem first and exclude it from clean Agent capability statistics. Case details include manual review flags without changing the official Judge result.</p>
 </section>
 
-<section class="section"><div class="section-head"><div><p class="eyebrow">AGENTS</p><h2>按 Agent 查看</h2></div><p>Wilson 区间比简单百分比更能反映小样本不确定性。三组 Case 与测试阶段不同，因此不要横向解释为公平排行榜。</p></div>{_agent_table(data)}</section>
+<section class="section"><div class="section-head"><div><p class="eyebrow">AGENTS</p><h2>Results by Agent</h2></div><p>Wilson intervals express small-sample uncertainty better than raw percentages. The three Case groups and test phases differ, so do not interpret this as a fair cross-Agent ranking.</p></div>{_agent_table(data)}</section>
 
-<section class="section"><div class="section-head"><div><p class="eyebrow">DESCRIPTIVE STATISTICS</p><h2>有意义，但有边界的统计</h2></div></div>{_stats_tables(data)}</section>
+<section class="section"><div class="section-head"><div><p class="eyebrow">DESCRIPTIVE STATISTICS</p><h2>Useful statistics with clear limits</h2></div></div>{_stats_tables(data)}</section>
 
-<section class="section"><div class="section-head"><div><p class="eyebrow">TRACE & OTEL</p><h2>{s['input_artifacts']} 轮输入的可观测性</h2></div><p>每个 Case 下方可以展开查看输入、mapped request、Agent 输出、framework trace、OTEL span、submission 与 Judge。</p></div>
+<section class="section"><div class="section-head"><div><p class="eyebrow">TRACE & OTEL</p><h2>Observability across {s['input_artifacts']} Input turns</h2></div><p>Expand each Case to inspect its input, mapped request, Agent output, framework trace, OTEL spans, submission, and Judge report.</p></div>
 <div class="cards">
-<div class="metric"><strong>{s['input_artifacts']}</strong><span>落盘 Input artifacts</span></div><div class="metric"><strong>{s['input_statuses'].get('succeeded',0)}</strong><span>Agent Input succeeded</span></div><div class="metric"><strong>{s['otel_spans']:,}</strong><span>OTEL spans</span></div><div class="metric"><strong>{s['framework_spans']:,}</strong><span>framework spans</span></div><div class="metric"><strong>{s['otel_statuses'].get('complete',0)}</strong><span>OTEL complete</span></div>
+<div class="metric"><strong>{s['input_artifacts']}</strong><span>Saved Input artifacts</span></div><div class="metric"><strong>{s['input_statuses'].get('succeeded',0)}</strong><span>Successful Agent Inputs</span></div><div class="metric"><strong>{s['otel_spans']:,}</strong><span>OTEL spans</span></div><div class="metric"><strong>{s['framework_spans']:,}</strong><span>framework spans</span></div><div class="metric"><strong>{s['otel_statuses'].get('complete',0)}</strong><span>Complete OTEL captures</span></div>
 </div>
-<p class="callout warn">{s['submitted_steps']} 个已提交步骤中有 {s['trace_partial_steps']} 个 trace capture 是 `partial`：{e(json.dumps(trace_reasons, ensure_ascii=False))}。主要原因是 SDK allowlist 丢弃了部分属性；这属于 trace 保真度警告，不等于 Case 失败。严格跑通的 Judge 报告没有 evidence gap。</p>
+<p class="callout warn">Of {s['submitted_steps']} submitted steps, {s['trace_partial_steps']} trace captures are `partial`: {e(json.dumps(trace_reasons, ensure_ascii=False))}. The main cause is the SDK allowlist dropping some attributes. This is a trace-fidelity warning, not a Case failure. Strictly healthy Judge reports have no evidence gaps.</p>
 </section>
 
-<section class="section"><div class="section-head"><div><p class="eyebrow">INTEGRATION</p><h2>Benchmark 前的原生接入诊断</h2></div><p>这 {len(data['native_observations'])} 次观察不计入 {s['attempts']} 次 Case attempt。它们用于定位网络声明、第三方限流和 trace 接受问题。</p></div>{_native_table(data)}</section>
+<section class="section"><div class="section-head"><div><p class="eyebrow">INTEGRATION</p><h2>Native integration diagnostics before the benchmark</h2></div><p>These {len(data['native_observations'])} observations are not part of the {s['attempts']} Case attempts. They help locate network declaration, third-party rate-limit, and trace acceptance problems.</p></div>{_native_table(data)}</section>
 
-<section class="section"><div class="section-head"><div><p class="eyebrow">REFERENCE SUITE</p><h2>最完整的一次 3 Agents × 5 Cases</h2></div><p>{e(live.get('suite_id'))}</p></div>
-<div class="cards"><div class="metric"><strong>{live_counts.get('executed_cases','—')}</strong><span>Cases 全部执行完成</span></div><div class="metric"><strong>{live_counts.get('actual_inputs','—')}</strong><span>Inputs</span></div><div class="metric"><strong>{live_counts.get('judge_reports','—')}</strong><span>Judge reports</span></div><div class="metric"><strong>{live.get('concurrency',{}).get('observed_case_lifecycle_peak','—')}</strong><span>实测并发峰值</span></div><div class="metric"><strong>{num(live.get('total_elapsed_seconds'),1)}s</strong><span>Suite wall time</span></div></div>
-<p class="callout">该套件没有 CaseGen、Agent execution、Judge service、host validation 或 cleanup 失败。Judge 为 13 issue、1 insufficient_evidence、1 pass。按本报告严格口径，证据不足的 1 次不计入 128 个 healthy，所以这里是 14/15 严格跑通；原审计中的“执行完成 15”使用了较宽的执行口径。</p>
+<section class="section"><div class="section-head"><div><p class="eyebrow">REFERENCE SUITE</p><h2>The most complete 3 Agents × 5 Cases suite</h2></div><p>{e(live.get('suite_id'))}</p></div>
+<div class="cards"><div class="metric"><strong>{live_counts.get('executed_cases','—')}</strong><span>Cases completed execution</span></div><div class="metric"><strong>{live_counts.get('actual_inputs','—')}</strong><span>Inputs</span></div><div class="metric"><strong>{live_counts.get('judge_reports','—')}</strong><span>Judge reports</span></div><div class="metric"><strong>{live.get('concurrency',{}).get('observed_case_lifecycle_peak','—')}</strong><span>Observed peak concurrency</span></div><div class="metric"><strong>{num(live.get('total_elapsed_seconds'),1)}s</strong><span>Suite wall time</span></div></div>
+<p class="callout">This suite had no CaseGen, Agent execution, Judge service, host validation, or cleanup failures. The Judge returned 13 issue, 1 insufficient_evidence, and 1 pass verdict. Under this report's strict definition, the one insufficient-evidence attempt is excluded from the 128 healthy attempts, so this suite is 14/15 strictly healthy. The earlier audit's “15 executions completed” used a broader execution-only definition.</p>
 </section>
 
-<section class="section"><div class="section-head"><div><p class="eyebrow">COST</p><h2>已观测的模型用量</h2></div></div>
-<div class="grid two"><section class="panel"><h3>OpenRouter</h3><p><strong>{integer(usage.get('openrouter_responses'))}</strong> responses<br><strong>{integer(usage.get('reported_total_tokens'))}</strong> tokens<br><strong>${e(usage.get('reported_cost_usd','—'))}</strong> provider-reported subtotal</p></section><section class="panel"><h3>KUMA</h3><p>CaseGen/Judge 的 token 与费用没有在本地 artifacts 中暴露，因此不能把 OpenRouter 小计声称为整次 campaign 总费用。</p><p class="muted">另有 {usage.get('responses_without_cost','—')} 个 OpenRouter response 没有返回 cost 字段。</p></section></div>
+<section class="section"><div class="section-head"><div><p class="eyebrow">COST</p><h2>Observed model usage</h2></div></div>
+<div class="grid two"><section class="panel"><h3>OpenRouter</h3><p><strong>{integer(usage.get('openrouter_responses'))}</strong> responses<br><strong>{integer(usage.get('reported_total_tokens'))}</strong> tokens<br><strong>${e(usage.get('reported_cost_usd','—'))}</strong> provider-reported subtotal</p></section><section class="panel"><h3>KUMA</h3><p>CaseGen/Judge token usage and costs are not exposed in local artifacts, so the OpenRouter subtotal cannot be presented as the total campaign cost.</p><p class="muted">Another {usage.get('responses_without_cost','—')} OpenRouter responses have no cost field.</p></section></div>
 </section>
 
-<section class="section"><div class="section-head"><div><p class="eyebrow">RUN LEDGER</p><h2>{s['runs']} 个 Run 的完成情况</h2></div><p>{run_counts.get('complete',0)} 完整跑通、{run_counts.get('partial',0)} 部分跑通、{run_counts.get('failed',0)} 全部失败、{run_counts.get('preparation_failed',0)} 准备失败。完整跑通要求计划的每个 Case 都严格 healthy。</p></div>{_run_table(data)}</section>
+<section class="section"><div class="section-head"><div><p class="eyebrow">RUN LEDGER</p><h2>Completion status for {s['runs']} Runs</h2></div><p>{run_counts.get('complete',0)} complete, {run_counts.get('partial',0)} partially complete, {run_counts.get('failed',0)} failed, and {run_counts.get('preparation_failed',0)} preparation failures. A complete Run requires every planned Case to be strictly healthy.</p></div>{_run_table(data)}</section>
 
 {_case_explorer(data)}
 
-<footer><h3>来源与限制</h3><ul>{sources}</ul><p>报告对 API key、Authorization、Cookie、token、password 等字段进行递归脱敏。网络响应 body 不嵌入 HTML。原始 artifact 链接指向本机仓库；移动 HTML 时需保持它位于 results/analysis/。</p></footer>
+<footer><h3>Sources and limitations</h3><ul>{sources}</ul><p>The report recursively redacts fields such as API key, Authorization, Cookie, token, and password. Network response bodies are not embedded in the HTML. Raw artifact links point into the local repository; keep the HTML under results/analysis/ when moving it.</p></footer>
 </main>
 <script>
 const cards=[...document.querySelectorAll('.case-card')]; const search=document.getElementById('search'); const buttons=[...document.querySelectorAll('#filters button')]; const count=document.getElementById('visible-count'); let filter='all';
-function apply(){{const q=search.value.trim().toLowerCase();let n=0;cards.forEach(card=>{{const okFilter=filter==='all'||card.dataset.filter.split(' ').includes(filter);const okSearch=!q||card.dataset.search.includes(q);const show=okFilter&&okSearch;card.hidden=!show;if(show)n++;}});count.textContent=`显示 ${{n}} / ${{cards.length}} 次 attempt`;}}
+function apply(){{const q=search.value.trim().toLowerCase();let n=0;cards.forEach(card=>{{const okFilter=filter==='all'||card.dataset.filter.split(' ').includes(filter);const okSearch=!q||card.dataset.search.includes(q);const show=okFilter&&okSearch;card.hidden=!show;if(show)n++;}});count.textContent=`Showing ${{n}} / ${{cards.length}} attempts`;}}
 buttons.forEach(button=>button.addEventListener('click',()=>{{buttons.forEach(b=>b.classList.remove('active'));button.classList.add('active');filter=button.dataset.value;apply();}}));search.addEventListener('input',apply);apply();
 </script></body></html>"""

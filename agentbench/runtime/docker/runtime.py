@@ -121,12 +121,12 @@ class DockerRuntime:
 
     def start(self, agent: AgentDescriptor, *, invocation=None,
               preparation_deadline: Deadline | None = None) -> RuntimeSession:
-        # 先检查是否取消、准备是否超时，以及 Docker 是否可用
+        # Check cancellation, the preparation deadline, and Docker availability first.
         self.control.check()
         preparation = preparation_deadline or Deadline.after(self._limits.preparation_seconds)
         preparation.check()
         self._check_available(deadline=preparation)
-        # 读取 Agent 的容器配置和网络拦截配置
+        # Load the Agent container and network-interception configuration.
         config = AgentContainerConfig.from_agent_dir(
             agent.path,
             secret_resolver=self._secret_resolver,
@@ -134,17 +134,17 @@ class DockerRuntime:
         )
         interception = InterceptionConfig.from_agent_dir(agent.path)
         if interception is not None:
-            # 配置了网络拦截时，先确认模型服务和所需密钥
+            # Validate the model service and credentials before enabling interception.
             target = self._model_provider.resolve(self._environ)
             self._secret_resolver.require(target.credential_env)
         if invocation is not None:
-            # 有输入输出目录的任务：准备 worker 构建上下文，再构建镜像
+            # Jobs with input/output directories use the staged worker build context.
             with worker_build_context(config, control=self.control, deadline=preparation) as (context, dockerfile):
                 image = self._images.build(context=context, dockerfile=dockerfile, repository=config.agent_id,
                                            deadline=preparation, log_directory=self._build_logs())
             self._require_non_root_image(image, deadline=preparation)
         else:
-            # 普通启动：使用 Agent 自己的构建目录和 Dockerfile
+            # A regular launch uses the Agent's own build context and Dockerfile.
             image = self._images.build(
                 context=config.build_context,
                 dockerfile=config.dockerfile,
@@ -156,7 +156,7 @@ class DockerRuntime:
         self.control.check()
 
 
-        # 给本次容器和网络取独立名字，避免并发任务冲突。
+        # Use unique container and network names to isolate concurrent jobs.
         suffix = uuid4().hex
         network_name = f"defuzex-{suffix}-egress"
         agent_name = f"defuzex-{suffix}-agent"
@@ -171,10 +171,10 @@ class DockerRuntime:
         cleanup_error: DockerCleanupError | None = None
 
         def cleanup() -> None:
-            # 定义退出时的清理动作；这里只定义，尚未执行
+            # Define cleanup once so every exit path releases the same resources.
             nonlocal cleaned, cleanup_error
             with cleanup_lock:
-                # 防止多个退出路径重复清理同一批资源
+                # Prevent multiple exit paths from cleaning the same resources twice.
                 if cleaned:
                     if cleanup_error is not None:
                         raise cleanup_error
@@ -184,7 +184,7 @@ class DockerRuntime:
                 errors: list[str] = []
 
                 if planned_agent:
-                    # 先尝试正常停止 Agent，再移除容器
+                    # Stop the Agent gracefully before removing its container.
                     if process is not None and process.poll() is None and not self.control.forced:
                         try:
                             self._commands.run(["container", "stop", "--time", "5", agent_name],
@@ -200,13 +200,13 @@ class DockerRuntime:
                     trace_state.fail()
 
                 if interceptor is not None:
-                    # Agent 停止后，再关闭网络拦截器
+                    # Stop the network interceptor after the Agent exits.
                     try:
                         interceptor.close(deadline=deadline)
                     except Exception as exc:
                         errors.append(str(exc))
                 if planned_network:
-                    # 最后移除本次任务创建的 Docker 网络
+                    # Remove the Docker network created for this job last.
                     try:
                         self._remove_resource("network", network_name, deadline=deadline)
                     except Exception as exc:
@@ -219,7 +219,7 @@ class DockerRuntime:
             agent_environment = dict(config.environment)
             network_arguments: list[str]
             if interception is not None:
-                # 这里走网络拦截路径：记录 trace 状态，并创建任务网络
+                # The interception path records trace state and creates an isolated network.
                 trace_state = InterceptionTraceState()
                 self._require_non_root_image(image, deadline=preparation)
                 self._plan_resource("network", network_name, "network", suffix)
@@ -227,7 +227,7 @@ class DockerRuntime:
                 self._create_resource("network", network_name,
                                       ["network", "create", *self._labels("network", suffix), network_name],
                                       deadline=preparation)
-                # 这里启动网络拦截器，后续 Agent 的流量经过它
+                # Start the interceptor before routing Agent traffic through it.
                 interceptor, token_environment = self._start_interceptor(
                     agent_id=config.agent_id,
                     interception=interception,
@@ -238,20 +238,20 @@ class DockerRuntime:
                 )
                 agent_environment.update(interception.environment)
                 agent_environment.update(token_environment)
-                # 配置证书信任，让 Agent 能通过拦截器访问 HTTPS 服务
+                # Configure certificate trust for HTTPS traffic through the interceptor.
                 certificate_target = "/run/defuzex-ca/ca.pem"
                 agent_environment.update(
                     get_trust_plugin(interception.trust_plugin).agent_environment(
                         certificate_target
                     )
                 )
-                # Agent 与拦截器共享网络空间
+                # The Agent shares the interceptor's network namespace.
                 network_arguments = [
                     "--network",
                     f"container:{interceptor.container_name}",
                 ]
             else:
-                # 没有拦截配置时，创建不能直接访问外网的内部网络
+                # Without interception, create an internal network with no direct egress.
                 self._plan_resource("network", network_name, "network", suffix)
                 planned_network = True
                 self._create_resource("network", network_name,
@@ -259,7 +259,7 @@ class DockerRuntime:
                                       deadline=preparation)
                 network_arguments = ["--network", network_name]
 
-            # 组装 docker create 参数；此时还没有启动 Agent 容器
+            # Assemble docker-create arguments without starting the Agent yet.
             command = [
                 "create",
                 "--init",
@@ -272,7 +272,7 @@ class DockerRuntime:
                 *self._policy.run_arguments(),
             ]
             if interceptor is not None:
-                # 把拦截器证书挂载进 Agent 容器
+                # Mount the interceptor certificate into the Agent container.
                 command.extend(
                     (
                         "--mount",
@@ -283,29 +283,30 @@ class DockerRuntime:
                     )
                 )
             if invocation is not None:
-                # 把宿主输入目录和可写的结果目录挂载给 worker
+                # Mount the host input directory and writable artifact directory for the worker.
                 inputs, outputs = invocation
                 command.extend(("--mount", _bind_mount(inputs, "/run/abb-input")))
                 # All other filesystem locations retain the existing read-only policy.
                 command.extend(("--mount", f"type=bind,source={outputs},target=/run/abb-output"))
-            # 禁止生成 Python 缓存，并让日志及时输出
+            # Disable Python bytecode caches and flush logs promptly.
             agent_environment.update(
                 PYTHONDONTWRITEBYTECODE="1",
                 PYTHONUNBUFFERED="1",
             )
-            # 把环境变量、镜像和启动命令加入容器参数
+            # Add environment variables, image, and launch command to the container arguments.
             for key, value in sorted(agent_environment.items()):
                 command.extend(("--env", f"{key}={value}"))
             command.extend((image, *config.argv))
 
-            # 登记并创建 Agent 容器，便于失败时找到它并清理
+            # Register and create the Agent container so failures can clean it up reliably.
             self._plan_resource("container", agent_name, "agent", suffix)
             planned_agent = True
             self._create_resource("container", agent_name, command, deadline=preparation)
             preparation.check()
             
-            # 这里真正启动 Agent 容器，并接收 stdout/stderr 日志
-            # Kuma 评测的 config.argv 指向 Kuma worker，由它决定生成还是执行 Case
+            # Start the Agent container and capture stdout and stderr.
+            # For KUMA evaluations, config.argv starts the KUMA worker, which selects
+            # Case generation or Case execution from its settings.
             process = self._commands.start(
                 ["start", "--attach", agent_name], control=self.control,
                 stdin=subprocess.DEVNULL,
@@ -317,7 +318,7 @@ class DockerRuntime:
                 bufsize=1,
             )
 
-            # 包装成会话，供上层等待结束、检查 trace、关闭和清理资源。
+            # Wrap the process in a session used for waiting, trace validation, and cleanup.
             session = DockerSession(
                 process,
                 close_callback=cleanup,
@@ -338,7 +339,7 @@ class DockerRuntime:
             self.control.check()
             return session
         except BaseException as original:
-            # 启动中途失败，也要回收已经创建的容器、拦截器和网络。
+            # A partial startup must still release containers, interceptors, and networks.
             try:
                 if session is not None:
                     session.close()

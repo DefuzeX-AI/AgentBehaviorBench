@@ -53,13 +53,13 @@ export default function App() {
   useEffect(() => {
     if (imported || !suite.data) return;
     if (!Array.isArray(suite.data.events)) {
-      setWarnings(['运行结果缺少 events 数组']);
+      setWarnings(['Run result is missing the events array']);
       return;
     }
-    const parsed = parseTrace(JSON.stringify(suite.data.events), '当前 Suite');
+    const parsed = parseTrace(JSON.stringify(suite.data.events), 'Current Suite');
     setEvents(sortEvents(parsed.events));
     setWarnings([...parsed.warnings, ...(suite.data.parse_errors || []).map(error => error.message)]);
-    setFiles(['当前 Suite']);
+    setFiles(['Current Suite']);
   }, [suite.data, imported]);
 
   const sources = useMemo(() => [...new Set(events.map(event => event.source))], [events]);
@@ -83,7 +83,7 @@ export default function App() {
     for (const [index, file] of selected.entries()) {
       bytes += file.size;
       if (bytes > MAX_BYTES) {
-        nextWarnings.push(`${file.name}：本次导入总大小超过 20 MB，已跳过。`);
+        nextWarnings.push(`${file.name}: skipped because this import exceeds 20 MB.`);
         continue;
       }
       try {
@@ -92,7 +92,7 @@ export default function App() {
         nextWarnings.push(...parsed.warnings);
         names.push(file.name);
       } catch {
-        nextWarnings.push(`${file.name}：无法读取文件。`);
+        nextWarnings.push(`${file.name}: unable to read file.`);
       }
     }
     if (request.current !== current) return;
@@ -128,71 +128,71 @@ export default function App() {
       <header>
         <div><div className="brand">AGENT BEHAVIOR BENCH</div><h1>{bound ? 'Benchmark' : 'Trace'}</h1></div>
         <button className="primary" onClick={() => input.current.click()} disabled={loading}>
-          {loading ? '读取中…' : '打开 trace 文件'}
+          {loading ? 'Reading…' : 'Open trace files'}
         </button>
         <input ref={input} type="file" multiple accept=".jsonl,.json" hidden
           onChange={event => { loadFiles(Array.from(event.target.files)); event.target.value = ''; }} />
       </header>
-      <p className="description">{bound ? `Suite ${suite.data?.suite_id || '加载中'} · 每秒自动同步。展开多个 Case，对照每次执行及 Judge 结果。` : selected ? `Run ${selected}：选择下方视图查看运行记录。` : '从左侧选择运行记录自动加载，也可以手动打开 trace 文件。'}</p>
-      {suite.error && <p role="alert">{suite.error}；已显示的数据保留，连接恢复后继续同步。</p>}
+      <p className="description">{bound ? `Suite ${suite.data?.suite_id || 'loading'} · syncs every second. Expand Cases to compare attempts and Judge results.` : selected ? `Run ${selected}: choose a view below to inspect its records.` : 'Select a run on the left to load it automatically, or open trace files manually.'}</p>
+      {suite.error && <p role="alert">{suite.error}; displayed data is retained and will resume syncing when the connection recovers.</p>}
       {suite.data?.suite_error && <p role="alert">{suite.data.suite_error.message}</p>}
 
-      <nav className="trace-tabs" aria-label="Trace 视图">{bound && <button aria-pressed={view === 'suite'} onClick={() => { setImported(false); setView('suite'); }}>Suite 进度</button>}<button aria-pressed={view === 'otel'} onClick={() => setView('otel')}>OTel 调用树</button><button aria-pressed={view === 'evaluation'} onClick={() => setView('evaluation')}>Case / SDK / Judge</button><button aria-pressed={view === 'raw'} onClick={() => setView('raw')}>交互时间线</button><button aria-pressed={view === 'flow'} onClick={() => { setView('flow'); const url = new URL(location.href); const hash = new URLSearchParams(url.hash.slice(1)); hash.set('view', 'flow'); url.hash = hash.toString(); history.replaceState(null, '', url); }}>执行流程 · 原型</button></nav>
-      {view !== 'suite' && !selected && !imported && <p role="status">{listBusy ? '正在读取运行目录…' : listError ? `运行目录不可用：${listError}` : '此结果没有登记可查看的证据目录。可能尚未产出，或来源未提供；请在 Suite 进度查看已保存的输入和判决。'}</p>}
+      <nav className="trace-tabs" aria-label="Trace views">{bound && <button aria-pressed={view === 'suite'} onClick={() => { setImported(false); setView('suite'); }}>Suite progress</button>}<button aria-pressed={view === 'otel'} onClick={() => setView('otel')}>OTel call tree</button><button aria-pressed={view === 'evaluation'} onClick={() => setView('evaluation')}>Case / SDK / Judge</button><button aria-pressed={view === 'raw'} onClick={() => setView('raw')}>Interaction timeline</button><button aria-pressed={view === 'flow'} onClick={() => { setView('flow'); const url = new URL(location.href); const hash = new URLSearchParams(url.hash.slice(1)); hash.set('view', 'flow'); url.hash = hash.toString(); history.replaceState(null, '', url); }}>Execution flow · prototype</button></nav>
+      {view !== 'suite' && !selected && !imported && <p role="status">{listBusy ? 'Reading run directory…' : listError ? `Run directory unavailable: ${listError}` : 'This result does not identify a viewable evidence directory. It may not exist yet or the source did not provide it; use Suite progress to inspect saved inputs and verdicts.'}</p>}
       {view !== 'suite' && Object.entries(runMetadata.data?.evidence_availability || {}).filter(([, value]) => value.status !== 'available').map(([kind, value]) => <p role="status" key={kind}>{kind}: {value.status}{value.reason ? ` — ${value.reason}` : ''}</p>)}
       {view !== 'suite' && runMetadata.data?.artifacts?.received_report?.host_accepted === false && <p role="alert">
-        Judge 报告已保留（{runMetadata.data.artifacts.received_report.status}），宿主未接受该次执行。
-        请在「Case / SDK / Judge」查看原报告；拒绝原因：{runMetadata.data.error || '请查看运行诊断'}。
+        Judge report retained ({runMetadata.data.artifacts.received_report.status}), but the host rejected this execution.
+        Open “Case / SDK / Judge” for the original report. Rejection reason: {runMetadata.data.error || 'inspect the run diagnostics'}.
       </p>}
-      {view === 'suite' ? <SuiteOverview /> : view === 'flow' ? <Suspense fallback={<p>正在加载执行流程…</p>}><FlowPrototype key={selected} run={selected} revision={revision} /></Suspense> : view === 'otel' ? <TraceView run={selected} revision={revision} /> : view === 'evaluation' ? <EvaluationView run={selected} revision={revision} /> : view === 'raw' && selected ? <Suspense fallback={<p>正在加载交互时间线…</p>}><RawRunView key={selected} run={selected} revision={revision} /></Suspense> : <>
-      <section className="toolbar" aria-label="筛选 trace">
-        <label className="search"><span className="sr-only">搜索 trace</span>
-          <input type="search" placeholder="搜索事件、节点、run ID 或内容…" value={query}
+      {view === 'suite' ? <SuiteOverview /> : view === 'flow' ? <Suspense fallback={<p>Loading execution flow…</p>}><FlowPrototype key={selected} run={selected} revision={revision} /></Suspense> : view === 'otel' ? <TraceView run={selected} revision={revision} /> : view === 'evaluation' ? <EvaluationView run={selected} revision={revision} /> : view === 'raw' && selected ? <Suspense fallback={<p>Loading interaction timeline…</p>}><RawRunView key={selected} run={selected} revision={revision} /></Suspense> : <>
+      <section className="toolbar" aria-label="Filter traces">
+        <label className="search"><span className="sr-only">Search traces</span>
+          <input type="search" placeholder="Search events, nodes, run IDs, or content…" value={query}
             onChange={event => { setQuery(event.target.value); setLimit(PAGE_SIZE); }} />
         </label>
         {!!eventAgents.length && <label><span className="sr-only">Agent</span><select value={agentFilter}
           onChange={event => { setAgentFilter(event.target.value); setLimit(PAGE_SIZE); }}>
-          <option value="">全部 Agent</option>{eventAgents.map(agent => <option key={agent} value={agent}>{agent}</option>)}
+          <option value="">All Agents</option>{eventAgents.map(agent => <option key={agent} value={agent}>{agent}</option>)}
         </select></label>}
-        <label><span className="sr-only">来源</span><select value={source}
+        <label><span className="sr-only">Source</span><select value={source}
           onChange={event => { setSource(event.target.value); setLimit(PAGE_SIZE); }}>
-          <option value="">全部来源</option>
+          <option value="">All sources</option>
           {sources.map(item => <option key={item} value={item}>{item}</option>)}
         </select></label>
-        <button onClick={clear} disabled={!files.length && !warnings.length && !loading}>清空</button>
+        <button onClick={clear} disabled={!files.length && !warnings.length && !loading}>Clear</button>
       </section>
 
       <div className="summary" role="status">
-        <span>{filtered.length} / {events.length} 条事件</span>
-        <span className="filenames" title={files.join(' · ')}>{files.length ? files.join(' · ') : '尚未载入文件'}</span>
+        <span>{filtered.length} / {events.length} events</span>
+        <span className="filenames" title={files.join(' · ')}>{files.length ? files.join(' · ') : 'No files loaded'}</span>
       </div>
 
-      {warnings.length > 0 && <details className="warnings" open={!events.length}><summary>{warnings.length} 条读取提示</summary>
+      {warnings.length > 0 && <details className="warnings" open={!events.length}><summary>{warnings.length} read warnings</summary>
         <ul>{warnings.slice(0, 100).map((warning, index) => <li key={index}>{warning}</li>)}</ul>
-        {warnings.length > 100 && <p>仅展示前 100 条提示。</p>}
+        {warnings.length > 100 && <p>Only the first 100 warnings are shown.</p>}
       </details>}
 
       {!events.length ? <section className="empty">
-        <h2>{loading ? '正在加载任务 trace…' : selected ? '此任务暂无可显示的事件' : '选择左侧任务查看 trace'}</h2>
-        {selected ? <p>运行产生 trace 后，点击左侧「刷新」重新读取。</p> : <>
-          <p>也可以打开 <code>framework.jsonl</code> 或 <code>network.jsonl</code>。</p>
-          <p>点击事件展开完整 JSON，单次读取总大小不超过 20 MB。</p>
+        <h2>{loading ? 'Loading run traces…' : selected ? 'This run has no displayable events' : 'Select a run on the left to inspect traces'}</h2>
+        {selected ? <p>After the run produces traces, click “Refresh” on the left.</p> : <>
+          <p>You can also open <code>framework.jsonl</code> or <code>network.jsonl</code>.</p>
+          <p>Click an event to expand its full JSON. Each import is limited to 20 MB.</p>
         </>}
-      </section> : !filtered.length ? <section className="empty"><h2>没有匹配的事件</h2><p>试试其他关键词或来源。</p></section> :
-        <section className="events" aria-label="Trace 事件列表">
+      </section> : !filtered.length ? <section className="empty"><h2>No matching events</h2><p>Try another keyword or source.</p></section> :
+        <section className="events" aria-label="Trace event list">
           {filtered.slice(0, limit).map(event => <details className="event" key={event.id}>
             <summary>
               <span className={`event-name ${/error|fail/i.test(event.event) ? 'error' : ''}`}>{event.event}</span>
               <span className="source">{event.source}</span>
-              <time dateTime={event.timestamp || undefined}>{event.timestamp || '无时间戳'}</time>
+              <time dateTime={event.timestamp || undefined}>{event.timestamp || 'No timestamp'}</time>
             </summary>
             <div className="event-meta">{event.filename}{eventIdentity(event) && ` · ${eventIdentity(event)}`}</div>
             <pre>{JSON.stringify(event.raw, null, 2)}</pre>
           </details>)}
-          {filtered.length > limit && <button className="more" onClick={() => setLimit(value => value + PAGE_SIZE)}>再显示 {Math.min(PAGE_SIZE, filtered.length - limit)} 条</button>}
+          {filtered.length > limit && <button className="more" onClick={() => setLimit(value => value + PAGE_SIZE)}>Show {Math.min(PAGE_SIZE, filtered.length - limit)} more</button>}
         </section>}
       </>}
-      <footer>ABB / OBSERVE <span>{suite.data?.capabilities?.can_control ? '本地 Suite · 运行与恢复进度自动同步' : '本地只读 · 运行记录每秒自动同步'}</span></footer>
+      <footer>ABB / OBSERVE <span>{suite.data?.capabilities?.can_control ? 'Local Suite · execution and recovery progress sync automatically' : 'Local read-only · run records sync every second'}</span></footer>
     </main>
     </div>
   );

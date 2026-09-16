@@ -17,9 +17,9 @@
 <p align="center">
   English |
   <a href="docs/otherLanguages/README.fr.md">Français</a> |
-  <a href="docs/otherLanguages/README.ja.md">日本語</a> |
-  <a href="docs/otherLanguages/README.zh-CN.md">中文简体</a> |
-  <a href="docs/otherLanguages/README.zh-TW.md">中文繁體</a> |
+  <a href="docs/otherLanguages/README.ja.md">Japanese</a> |
+  <a href="docs/otherLanguages/README.zh-CN.md">Simplified Chinese</a> |
+  <a href="docs/otherLanguages/README.zh-TW.md">Traditional Chinese</a> |
   <a href="docs/otherLanguages/README.ko.md">한국어</a>
 </p>
 
@@ -280,7 +280,7 @@ add another Agent.
 
 See [troubleshooting and result interpretation](docs/Troubleshooting.md) for
 configuration, network, trace, Judge and exit-code failures, or the
-[中文操作指南](docs/Guide.zh-CN.md).
+[Chinese operation guide](docs/Guide.zh-CN.md).
 
 ## Overview
 

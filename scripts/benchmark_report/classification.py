@@ -11,7 +11,7 @@ from .artifacts import load_json, preview
 
 def primary_failure(case: dict[str, Any], manifest: dict[str, Any]) -> tuple[str, str]:
     if case.get("healthy"):
-        return ("none", "流水线严格验收通过")
+        return ("none", "Passed strict pipeline acceptance")
     error = case.get("error") if isinstance(case.get("error"), dict) else {}
     text = " ".join(str(v) for v in (error.get("type"), error.get("message"), case.get("failure")) if v).lower()
     acceptance_codes = {
@@ -22,22 +22,22 @@ def primary_failure(case: dict[str, Any], manifest: dict[str, Any]) -> tuple[str
     judge = manifest.get("judge")
     report_status = case.get("judge_status")
     if "cancel" in text:
-        return ("user_cancelled", "用户主动取消")
+        return ("user_cancelled", "Cancelled by the user")
     if judge == "failed" or any(code in text for code in ("model_invalid_result", "model_output_privacy_rejected", "service_busy", "request_failed")):
-        return ("judge_service", "远程 Judge 操作终止，未返回有效报告")
+        return ("judge_service", "The remote Judge operation ended without a valid report")
     if "ncbi_query_uri_too_long" in acceptance_codes or "414" in text or "uri too long" in text:
-        return ("integration_http_414", "GPT Researcher 的 PMC 请求使用过长 URI，HTTP 414")
+        return ("integration_http_414", "GPT Researcher used an overlong URI for a PMC request (HTTP 414)")
     if "multiple values" in text or "prompt_family" in text:
-        return ("integration_runtime", "Agent 接入层重复传入 prompt_family，执行失败")
+        return ("integration_runtime", "The Agent integration passed prompt_family twice and execution failed")
     if "401" in text or "authentication" in text:
-        return ("external_auth", "外部模型凭证认证失败，HTTP 401")
+        return ("external_auth", "External model credential authentication failed (HTTP 401)")
     if "immutable" in text or "dict-only" in text or "issue #20" in text:
-        return ("bba_trace_mapping", "BBA 把 SDK immutable trace mapping 当作非法 evidence")
+        return ("bba_trace_mapping", "BBA treated the SDK's immutable trace mapping as invalid evidence")
     if report_status == "insufficient_evidence":
-        return ("judge_insufficient_evidence", "Judge 返回 insufficient_evidence")
+        return ("judge_insufficient_evidence", "Judge returned insufficient_evidence")
     if manifest.get("execution") == "failed":
-        return ("integration_runtime", "Agent 执行失败")
-    return ("other", preview(error or case.get("failure") or "未分类失败", 220))
+        return ("integration_runtime", "Agent execution failed")
+    return ("other", preview(error or case.get("failure") or "Unclassified failure", 220))
 
 
 def secondary_failures(case: dict[str, Any], manifest: dict[str, Any]) -> list[str]:
@@ -50,9 +50,9 @@ def secondary_failures(case: dict[str, Any], manifest: dict[str, Any]) -> list[s
         if isinstance(item, dict) and item.get("code")
     }
     if ("ncbi_query_uri_too_long" in acceptance_codes or "414" in text or "uri too long" in text) and manifest.get("judge") == "failed":
-        reasons.append("同一次 attempt 也发生 GPT Researcher HTTP 414")
+        reasons.append("The same attempt also encountered a GPT Researcher HTTP 414")
     if manifest.get("execution") == "failed" and case.get("judge_status") in {"issue", "insufficient_evidence"}:
-        reasons.append("Agent 执行失败，但 Judge 仍返回报告；不能纳入干净能力统计")
+        reasons.append("Agent execution failed but the Judge still returned a report; exclude it from clean capability statistics")
     return reasons
 
 

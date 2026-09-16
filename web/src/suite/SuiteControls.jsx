@@ -7,7 +7,7 @@ export function RetryButton({ item }) {
   const capability = controlCapability(snapshot, window.location.origin);
   if (!capability || !item.can_retry) return null;
   return <button disabled={Boolean(error) || commandInFlight(command)} title={item.recovery_reason || undefined}
-    onClick={() => dispatch(sendSuiteCommand('retry', item))}>{item.recovery_action === 'resume_request' ? '恢复请求' : ['generate', 'generate_case'].includes(item.recovery_action) ? '补生成' : '从头重试此 Case'}</button>;
+    onClick={() => dispatch(sendSuiteCommand('retry', item))}>{item.recovery_action === 'resume_request' ? 'Resume request' : ['generate', 'generate_case'].includes(item.recovery_action) ? 'Generate missing Case' : 'Retry this Case from the beginning'}</button>;
 }
 
 export default function SuiteControls({ cases }) {
@@ -26,15 +26,15 @@ export default function SuiteControls({ cases }) {
   return <>
     <div className="suite-actions">
       {capability && <button className="primary" disabled={Boolean(error) || commandInFlight(command) || snapshot.can_resume === false || !cases.some(item => !['completed', 'succeeded'].includes(item.execution_status))}
-        onClick={() => dispatch(sendSuiteCommand('resume'))}>继续未完成</button>}
-      <button disabled={!snapshot} onClick={download}>导出当前报告</button>
-      {!capability && <span className="suite-muted">只读查看</span>}
+        onClick={() => dispatch(sendSuiteCommand('resume'))}>Resume unfinished work</button>}
+      <button disabled={!snapshot} onClick={download}>Export current report</button>
+      {!capability && <span className="suite-muted">Read-only view</span>}
     </div>
     {command && <div className={`suite-notice ${command.status === 'rejected' ? 'suite-command-error' : ''}`} role="status">
-      {command.status === 'sending' ? '正在发送恢复命令…' : command.status === 'uncertain' ? '连接中断，尚未确认命令是否接收。' :
-        command.status === 'rejected' ? '恢复命令未执行。' : ['completed', 'succeeded', 'finished'].includes(command.status) ? '恢复命令已处理，结果持续同步。' : '恢复命令已接收，等待调度器处理。'}
+      {command.status === 'sending' ? 'Sending recovery command…' : command.status === 'uncertain' ? 'Connection interrupted; command receipt is unconfirmed.' :
+        command.status === 'rejected' ? 'Recovery command was not executed.' : ['completed', 'succeeded', 'finished'].includes(command.status) ? 'Recovery command processed; results continue to sync.' : 'Recovery command received and waiting for the scheduler.'}
       {command.error && <span> {typeof command.error === 'string' ? command.error : command.error.message}</span>}
-      {command.status === 'uncertain' && capability && <button onClick={() => dispatch(resendSuiteCommand())}>核对并重发原命令</button>}
+      {command.status === 'uncertain' && capability && <button onClick={() => dispatch(resendSuiteCommand())}>Reconcile and resend the original command</button>}
     </div>}
   </>;
 }

@@ -95,7 +95,7 @@ def run_benchmark_once(
 
     # step 1: prepare suite
     suite_id = runner.new_suite_id()
-    parallelism = runner.concurrency.max_parallel_cases # 配置允许同时执行多少个 Case
+    parallelism = runner.concurrency.max_parallel_cases  # Configured concurrent Case limit.
     total_case_count = sum(agent.case_count for agent in agents) # Agent x Case = total Case count
     effective_workers = min(total_case_count, parallelism)
     concurrent = effective_workers > 1
@@ -106,7 +106,7 @@ def run_benchmark_once(
     activity = llm_activity or LLMActivity(output_fn)
     progress_printer = None
     primary_error = None
-    keep_viewer_on_error = False #出错后是否保留viewer
+    keep_viewer_on_error = False  # Whether to keep the viewer open after an error.
     controller = None
 
     try:
@@ -179,11 +179,11 @@ def run_benchmark_once(
         if result_log is not None and hasattr(result_log, 'store'):
             recovery_options['retain_case'] = result_log.store.retain_case
         result = runner.run(
-            agents, # 被测的agents
+            agents,  # Agents under evaluation.
             suite_id=suite_id,
-            # 某个 Agent 开始时，怎么显示
+            # Render the start of an Agent run.
             on_agent_start=lambda agent, index, total: print_agent_start(agent, index, total, output_fn),
-            # 某个 Agent 完成时，怎么显示
+            # Render the completion of an Agent run.
             on_agent_complete=lambda item: _handle_agent_complete(
                 item, output_fn, None if viewer is None else viewer.url, concurrent=concurrent),
             on_progress=progress_printer,

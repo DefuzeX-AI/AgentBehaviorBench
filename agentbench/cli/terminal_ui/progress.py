@@ -131,7 +131,7 @@ class ProgressPrinter:
 def configuration_error(message: object) -> str:
     """Format a fatal suite configuration error."""
 
-    return f"{ANSI_RED}【Configuration error】 {message}{ANSI_RESET}"
+    return f"{ANSI_RED}[Configuration error] {message}{ANSI_RESET}"
 
 
 def _stage_label(event: BenchmarkProgress) -> str:
