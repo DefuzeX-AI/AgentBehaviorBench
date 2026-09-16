@@ -42,10 +42,11 @@ def require_viewer_assets():
     if missing:
         import shlex
         if not (WEB_ROOT.parent / 'package.json').is_file():
-            # No viewer sources to build here: an installed package ships no web/.
+            # Nothing to build here: an installed package ships no web/, and neither
+            # does a project directory outside the checkout.
             raise ViewerUnavailable(
-                f'Trace UI not found at {WEB_ROOT}. The installed package does not include it; '
-                'build web/ in an AgentBehaviorBench checkout (npm ci && npm run build) '
+                f'Trace UI not found at {WEB_ROOT}, and {WEB_ROOT.parent} has no viewer sources to build. '
+                'Build web/ in an AgentBehaviorBench checkout (npm ci && npm run build) '
                 'and set ABB_WEB_ROOT to that web/dist')
         raise ViewerUnavailable(f'Trace UI not built or incomplete. Run: cd {shlex.quote(str(WEB_ROOT.parent))} && npm ci && npm run build')
 

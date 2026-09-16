@@ -64,7 +64,7 @@ def test_installed_clean_never_touches_site_packages(tmp_path):
 
 def test_installed_viewer_explains_where_its_assets_come_from(tmp_path):
     _, project, paths = _installed(tmp_path)
-    assert 'installed package does not include it' in paths['viewer']
+    assert f'{project / "web"} has no viewer sources to build' in paths['viewer']
     assert 'ABB_WEB_ROOT' in paths['viewer']
     assert 'npm ci' in paths['viewer'] and f'cd {project}' not in paths['viewer']
 
