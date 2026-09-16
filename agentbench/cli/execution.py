@@ -17,7 +17,7 @@ from agentbench.harness.result import BenchmarkSuiteResult
 
 from .terminal_ui.presentation import (
     agent_view_url,
-    case_event_status,
+    format_case_event,
     print_agent_complete,
     print_agent_start,
     print_suite_summary,
@@ -169,10 +169,7 @@ def run_benchmark_once(
             if result_log is not None:
                 result_log.append_event(event)
             if event.get("event") in {"case_started", "case_completed"}:
-                case_index = event.get("case_index")
-                label = case_index + 1 if isinstance(case_index, int) else "?"
-                output_fn(f"[{event.get('agent_id')} | case={label} | job={event.get('job_id')}] "
-                          f"{event['event']}: {case_event_status(event)}")
+                output_fn(format_case_event(event))
 
         # step 2: run suite
         recovery_options = {}

@@ -24,6 +24,7 @@ from .constants import (
     ANSI_RESET,
     ANSI_YELLOW,
 )
+from .formatting import case_identity
 
 PANEL_WIDTH = AGENT_SEPARATOR_WIDTH
 PANEL_INNER_WIDTH = PANEL_WIDTH - 2
@@ -176,6 +177,15 @@ def case_event_status(event):
     status = getattr(case, 'execution_status', None) or event.get('status', 'running')
     verdict = getattr(case, 'judge_status', None)
     return f'{status} | judge={verdict}' if verdict is not None else status
+
+
+def format_case_event(event) -> str:
+    """Render Case lifecycle events with one stable, compact identity."""
+    identity = case_identity(event.get('agent_id'), event.get('case_index'), event.get('job_id'))
+    if event.get('event') == 'case_started':
+        return f"{identity} {'Retrying' if event.get('status') == 'retrying' else 'Started'}"
+    status = case_event_status(event).replace(' | judge=', ' · Judge ')
+    return f'{identity} Finished · {status}'
 
 
 def print_viewer_footer(

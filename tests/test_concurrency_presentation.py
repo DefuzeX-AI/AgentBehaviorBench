@@ -10,7 +10,7 @@ from agentbench.cli.execution import run_benchmark_once
 from agentbench.cli.result_export import start_result_log
 from agentbench.cli.terminal_ui.llm_activity import LLMActivity
 from agentbench.cli.terminal_ui.progress import ProgressPrinter
-from agentbench.cli.terminal_ui.presentation import print_agent_complete
+from agentbench.cli.terminal_ui.presentation import format_case_event, print_agent_complete
 from agentbench.cli.viewer import parse_result_log
 from agentbench.harness.progress import BenchmarkProgress
 from agentbench.harness.concurrency import ConcurrencySettings
@@ -96,13 +96,79 @@ def test_concurrent_terminal_events_are_self_identifying_and_never_animate():
                                                  "payload": {"prompt": agent}}))
     for agent in ("b", "a"):
         activity.emit(TraceEvent("llm_response", {"agent_id": agent, "job_id": f"job-{agent}",
+                                                  "case_index": 0,
                                                   "call_id": "same-call", "payload": {"output": f"reply-{agent}"}}))
     assert len(lines) == 6
-    assert "[a | job=job-a | case=1 | run=run-a]" in lines[0]
-    assert "job=job-b" in lines[4] and "reply-b" in lines[4]
-    assert "job=job-a" in lines[5] and "reply-a" in lines[5]
+    assert lines[0] == "[a · case 1] Case generation · started"
+    assert "[b · case 1] Model ←" in lines[4] and "reply-b" in lines[4]
+    assert "[a · case 1] Model ←" in lines[5] and "reply-a" in lines[5]
     assert activity._animation_thread is None and progress._animation_thread is None
     progress.close()
+
+
+@pytest.mark.parametrize('concurrent', [False, True])
+def test_evaluation_http_polls_are_compact_and_failures_remain_visible(concurrent):
+    lines = []
+    activity = LLMActivity(lines.append, live_updates=False)
+    activity.set_concurrent(concurrent)
+    base = {'agent_id': 'react-agent', 'job_id': 'case-job', 'case_index': 0,
+            'artifact_run_id': 'run-one', 'purpose': 'evaluation', 'method': 'GET',
+            'host': 'defuzex.ai', 'path': '/api/agentdefuze/sdk/v2/operations/operation-id/'}
+    for index in range(25):
+        data = {**base, 'call_id': f'call-{index}'}
+        activity.emit(TraceEvent('tool_request', data))
+        activity.emit(TraceEvent('tool_response', {**data, 'status': 200}))
+    assert len(lines) == 3
+    assert 'polling started' in lines[0]
+    assert '10 status checks' in lines[1]
+    assert '25 status checks' in lines[2]
+    assert all('operation-id' not in line and 'call-' not in line for line in lines)
+
+    activity.emit(TraceEvent('tool_error', {**base, 'call_id': 'failed-call',
+                                           'error': 'connection timed out'}))
+    assert len(lines) == 4
+    assert 'connection timed out' in lines[-1]
+    assert 'failed-call' in lines[-1]
+
+    activity.emit(TraceEvent('tool_response', {**base, 'call_id': 'bad-status', 'status': 503}))
+    assert 'HTTP 503' in lines[-1] and 'bad-status' in lines[-1]
+
+
+def test_nonpolling_evaluation_http_prints_one_result_line():
+    lines = []
+    activity = LLMActivity(lines.append, live_updates=False)
+    activity.set_concurrent(True)
+    data = {'agent_id': 'react-agent', 'case_index': 1, 'purpose': 'evaluation',
+            'method': 'POST', 'host': 'defuzex.ai', 'path': '/api/agentdefuze/sdk/v2/runs/',
+            'call_id': 'request-id'}
+    activity.emit(TraceEvent('tool_request', data))
+    activity.emit(TraceEvent('tool_response', {**data, 'status': 201}))
+    assert lines == ['[react-agent · case 2] SDK API · POST defuzex.ai/api/agentdefuze/sdk/v2/runs/ → HTTP 201']
+
+
+def test_poll_summaries_keep_parallel_cases_separate():
+    lines = []
+    activity = LLMActivity(lines.append, live_updates=False)
+    activity.set_concurrent(True)
+    for case in (0, 1):
+        data = {'agent_id': 'react-agent', 'job_id': f'job-{case}', 'case_index': case,
+                'artifact_run_id': f'run-{case}', 'purpose': 'evaluation', 'method': 'GET',
+                'host': 'defuzex.ai', 'path': '/api/operations/same-path/'}
+        for index in range(10):
+            activity.emit(TraceEvent('tool_request', {**data, 'call_id': f'{case}-{index}'}))
+            activity.emit(TraceEvent('tool_response', {**data, 'call_id': f'{case}-{index}', 'status': 200}))
+    assert len(lines) == 4
+    assert lines[0].startswith('[react-agent · case 1]')
+    assert lines[1].startswith('[react-agent · case 1]') and '10 status checks' in lines[1]
+    assert lines[2].startswith('[react-agent · case 2]')
+    assert lines[3].startswith('[react-agent · case 2]') and '10 status checks' in lines[3]
+
+
+def test_case_lifecycle_line_keeps_verdict_without_long_job_id():
+    event = {'event': 'case_completed', 'agent_id': 'react-agent', 'case_index': 2,
+             'job_id': 'case_0123456789abcdef', 'status': 'completed',
+             'case_result': SimpleNamespace(execution_status='completed', judge_status='issue')}
+    assert format_case_event(event) == '[react-agent · case 3] Finished · completed · Judge issue'
 
 
 def test_cli_persists_standard_events_once_and_uses_callbacks_only_for_display(tmp_path):

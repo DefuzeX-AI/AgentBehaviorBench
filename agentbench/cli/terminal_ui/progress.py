@@ -11,6 +11,7 @@ from agentbench.harness.progress import BenchmarkProgress
 
 from . import LLMActivity
 from .constants import ANSI_GREEN, ANSI_RED, ANSI_RESET, ANSI_YELLOW
+from .formatting import case_identity
 
 DOT_FRAMES = (".  ", ".. ", "...")
 ANIMATION_INTERVAL_SECONDS = 0.35
@@ -44,16 +45,10 @@ class ProgressPrinter:
 
     def __call__(self, event: BenchmarkProgress) -> None:
         if self._concurrent:
-            identity = [event.agent_id or "suite"]
-            for field, label in (("job_id", "job"), ("case_index", "case"),
-                                 ("artifact_run_id", "run")):
-                value = getattr(event, field, None)
-                if value is not None:
-                    if field == "case_index" and isinstance(value, int):
-                        value += 1
-                    identity.append(f"{label}={value}")
-            detail = f" | {event.detail}" if event.detail else ""
-            self._output_fn(f"[{' | '.join(identity)}] {event.stage}: {event.status}{detail}")
+            identity = case_identity(event.agent_id or "suite", event.case_index, event.job_id)
+            stage = event.stage.replace("_", " ").capitalize()
+            detail = f" · {event.detail}" if event.detail else ""
+            self._output_fn(f"{identity} {stage} · {event.status}{detail}")
             return
         if event.status == "started":
             self._start_stage(_stage_label(event))
