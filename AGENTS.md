@@ -119,8 +119,10 @@ the suite passes.
 
 ## Maintain the user documentation
 
-Keep README's setup and onboarding links usable. Keep the Agent addition guide
-command-first and add troubleshooting as issues are confirmed.
+Keep README's setup and onboarding links usable. Order the Agent addition guide
+as environment setup, the runnable add command, then each file's purpose. Mark
+automatic internal records separately from user-prepared configuration. Add
+troubleshooting as issues are confirmed.
 
 - Separate host CLI dependencies, frontend build dependencies, host SDK validation
   and Agent image/service dependencies. Derive versions from pyproject.toml,

@@ -1,119 +1,217 @@
 # Add an Agent
 
-Run from the ABB checkout with its `.venv` activated. Complete
-[host installation and viewer setup](../README.md#before-you-start) first.
-[中文操作与接入指南](Guide.zh-CN.md#添加-agent) is also available.
+Follow this order: **prepare the environment → run the add command → review the
+files it creates**. A user or coding assistant can follow the same workflow.
+Run all commands from the ABB repository root unless a command changes directory.
+[中文操作指南](Guide.zh-CN.md#添加-agent) is also available.
 
-## 1. Check the actual deployment requirements
+## 1. Prepare the environment
 
-Inspect the upstream README, dependency manifests, tool definitions and entrypoint:
+### Install ABB and its host dependencies
 
-| Requirement | What to verify |
-| --- | --- |
-| Framework and entrypoint | A real invokable Agent/graph, factory, input and final output. Current automatic generation supports LangGraph; a web UI alone is not an Agent entrypoint. |
-| Runtime | Python/Node versions, OS packages, CPU architecture, browser binaries, writable directories and memory needs belong in the Agent image/environment. Host Node for ABB's viewer does not install an Agent's browser or MCP server. |
-| Models | Native protocol, tool calling and interception routes. The build model and tested Agent model are separate settings. |
-| Tools and services | Exact tools, external APIs, databases, MCP processes, fixtures and required keys. Installing a database driver does not start a database. |
-| State and side effects | Session state, writes and external actions. Do not mark `replay_safe` true just to enable retries. |
-| Evaluation scope | Tasks the deployed tools can perform, available evidence, and what the Agent should do when data or capabilities are missing. |
-
-The current environment service provider includes MongoDB; this does not imply
-arbitrary Compose stacks, browsers or other databases are provisioned automatically.
-Inspect generated environment configuration and real startup. Source discovery
-does not guarantee every build input, submodule or dependency was captured.
-
-## 2. Download, then configure
+Complete [ABB installation](../README.md#before-you-start) first. You need Git,
+Python 3.10+ with an activated virtual environment, and a running Docker engine
+for certification. Then install the selected SDK's host validation dependencies:
 
 ```bash
-agentbench agent add https://github.com/owner/repository
+source .venv/bin/activate
+python -m pip install -e .
+python -m pip install -r agentbench/sdk/plugin/kuma/requirements.txt
+git --version
+agentbench sdk list
+docker info
 ```
 
-Use a repository HTTPS URL, not a file or `/tree/branch` URL. Plain `add` downloads
-the default branch into the next numbered `resources/agents/NN-name/agent/`, saves
-`source-manifest.json` with its revision, and prints discovered setup paths as JSON.
-It does not install dependencies, register a ready Agent or execute it. Inspect
-the saved source revision; the CLI currently has no `--revision` option.
+`sdk list` should show `kuma`; `docker info` must succeed as the same user who will
+run ABB. Download/configuration generation alone does not require Docker, but
+`-c` certification does. The host SDK installation and the SDK installed inside
+an evaluation image are separate.
 
-For assisted configuration with KUMA:
+### Configure credentials and models
+
+Create `.env` only if it does not already exist:
 
 ```bash
-python -m pip install -r agentbench/sdk/plugin/kuma/requirements.txt
+test -f .env || cp .env.example .env
+```
+
+Edit the file locally:
+
+```dotenv
+KUMA_API_KEY=
+OPENROUTER_API_KEY=
+OPENROUTER_MODEL=openai/gpt-4.1-mini
+# Optional separate model for integration-file generation:
+# OPENROUTER_BUILD_MODEL=
+# Add the tool credentials required by your Agent, for example:
+# TAVILY_API_KEY=
+```
+
+- **KUMA key:** needed to fetch the current strategy catalog and to generate/judge
+  Cases. ABB also accepts `DEFUZEX_API_KEY`; a nonempty `KUMA_API_KEY` takes precedence.
+- **OpenRouter key and model:** used to generate integration files and run the
+  Agent. The generation model must support **strict structured outputs**; a model
+  that works for ordinary chat is not necessarily suitable. The sample model slug
+  above is a configuration example, not an implicit runtime default.
+- **Agent dependencies:** read its upstream setup instructions and prepare required
+  tool keys, datasets and external services. A database driver does not start a
+  database; downloading an Agent does not provision its whole deployment.
+
+Key-retrieval links are in [the configuration guide](../README.md#configure-a-real-evaluation).
+Exported shell variables override `.env`. Use `--env-file PATH` for another file.
+The CLI resolves declared credentials; it does not mount the entire `.env` into
+containers. Keep credentials out of source files and generated configuration.
+
+### Prepare the viewer, if wanted
+
+For the browser UI, install Node.js **20.19+ on 20.x, or 22.12+**, with npm, then:
+
+```bash
+cd web
+npm ci
+npm run build
+cd ..
+```
+
+This prepares ABB's viewer, not an Agent's browser or Node/MCP dependencies.
+Use `--no-view` on the add command below to skip starting the viewer; headless
+execution does not require Node or `web/dist`.
+
+## 2. Run the add command
+
+Replace the URL with the Agent's GitHub repository. Use the repository URL itself,
+not a file or `/tree/branch` URL:
+
+```bash
+agentbench agent add https://github.com/owner/repository -b -c
+```
+
+- `-b`: generate and validate the integration files, then register the Agent as
+  `adapting`. It does not mean “build the Docker image.”
+- `-c`: build/run the configured Agent through certification. Successful execution
+  of its configured Cases promotes it to `ready`; Judge findings can still exist.
+
+ABB downloads source, plans the integration, saves each validated file, and then
+asks for certification confirmation. Configuration generation and certification
+can call paid services. Current automatic configuration supports **LangGraph**;
+other frameworks need adapter support before this flow can run them.
+
+To generate the files and inspect them before certification, omit `-c`:
+
+```bash
 agentbench agent add https://github.com/owner/repository -b
 ```
 
-`.env` needs `KUMA_API_KEY` (or ABB's `DEFUZEX_API_KEY` alias) for the strategy
-catalog, plus `OPENROUTER_API_KEY` and a build model selected through
-`--build-model`, a `[build].model` setting, `OPENROUTER_BUILD_MODEL`, or the
-`OPENROUTER_MODEL` fallback, in that order.
-The build model must support strict structured outputs. A working chat model is
-not necessarily compatible with `-b`.
+Without either flag, `agentbench agent add URL` only downloads source and lists
+setup files; it does not generate configuration or register a runnable Agent.
+The downloader records the default branch's revision; there is currently no
+`--revision` option.
 
-`-b` means **generate build configuration**, not build or launch the container.
-It obtains SDK context, plans from source, generates each file separately,
-validates it, and saves it before continuing. Final validation registers `adapting`.
-Source context is sent to the configured model service; `.env` is excluded.
+Useful options:
+
+| Option | Use |
+| --- | --- |
+| `--no-view` | Certify without opening the viewer. Results are still saved. |
+| `--build-model MODEL` | Model for generating integration files. |
+| `--model MODEL` | Model for the Agent during certification. |
+| `--answers answers.txt` | Supply text answers to questions from a previous plan. |
+| `--with-observe` | With `-b`, generate native input prompts for `observe`. |
+| `--build-settings settings.toml` | Override generation settings using a `[build]` table. |
+
+Build-model precedence is `--build-model`, the settings file's `model`,
+`OPENROUTER_BUILD_MODEL`, then `OPENROUTER_MODEL`. Read the
+[packaged settings](../agentbench/onboarding/build_agent_env/openrouter_provider/assets/settings.toml)
+before changing budgets, timeouts or retries.
+
+## 3. Understand the files
+
+The Agent unit is placed under `resources/agents/NN-name/`. The command generates
+integration files around the downloaded source; you do not need to create all of
+these by hand before running it.
 
 ```text
 resources/agents/NN-name/
-├── agent/                   # Upstream source; preserve behavior
-├── source-manifest.json     # Source URL and revision
-├── agent.toml               # Runtime, adapter, routes and environment
-├── bindings/                # Outer factory and native boundary adaptation
-├── Dockerfile
-├── .dockerignore
-├── requirement.md           # SDK evaluation profile
-└── evaluation/              # Optional referenced schema/fixtures
+├── agent/                   # Downloaded upstream source
+├── agent.toml               # ABB execution configuration
+├── bindings/                # Boundary between ABB and the native Agent
+├── Dockerfile               # Agent image build instructions
+├── .dockerignore            # Files excluded from the image build context
+├── requirement.md           # Evaluation description for the selected SDK
+└── evaluation/              # Optional referenced schemas or fixtures
 ```
 
-Bindings belong outside `agent/`. A generated factory is synchronous, accepts no
-arguments and returns the real invokable object. Keep reasoning/tool execution
-in the upstream Agent. Translate boundary formats without inventing answers or
-silently removing tools to make certification pass.
+### `agent/` — the Agent's own source
 
-KUMA's `requirement.md` needs YAML front matter and its three required sections.
-The current official generation path accepts text inputs; native mapping belongs
-in `agent.toml`/the binding. Multiple required business fields that cannot be
-obtained from text need a reviewed input design, not invented values. There is no
-mandatory `evaluation/` folder or `input-contract.json`.
+The downloaded repository lives here. Its graph, reasoning and tools remain the
+real implementation. Put ABB integration files outside this directory so that
+adapting an Agent does not silently replace its behavior.
 
-The Profile must describe **deployed** tools, missing capabilities, required data,
-observable behavior and honest refusal/clarification behavior. Future extensions
-are not installed tools. A search-only Agent can explain a computation but cannot
-execute a sampler, persist a file or configure a real concurrency controller.
-A Profile defines evaluation expectations; it does not add tools or inject a
-system prompt. Choose a strategy group from the fresh SDK catalog; the attempt's
-`sdk-context.json` records that snapshot. Do not copy an old group ID from an issue.
+### `agent.toml` — how ABB starts and invokes the Agent
 
-## 3. Inspect and continue generation
+Defines the Agent ID, framework, source revision, Docker build/launch settings,
+adapter, input/output mapping, environment declarations and model/tool routes.
+Check that entrypoint paths and required inputs match the actual source. Declaring
+a route or environment variable does not implement a tool or provision a service.
 
-```bash
-# Put answers to a plan's questions in a local text file.
-agentbench agent add https://github.com/owner/repository -b --answers answers.txt
-# Optionally generate native Observe prompts from the input definition.
-agentbench agent add https://github.com/owner/repository -b --with-observe
-```
+### `bindings/*.py` — how native inputs and outputs cross the boundary
 
-Records live under `cache/onboarding/<unit-name>-<path-digest>/`, relative to the
-registry's project root, **outside the Agent unit**. `build-state.json` tracks the
-plan and file hashes. Attempts contain source context, plan, SDK context,
-per-file `steps/` and `build-result.json`.
+Exports a synchronous, zero-argument factory returning the actual invokable Agent.
+The binding handles source-backed input/output adaptation and lifecycle cleanup.
+It must not fabricate answers or substitute a simplified Agent to pass a test.
+Valid Python syntax alone does not prove the graph can load and execute.
 
-Rerunning `-b` reuses source-matched state and revalidates files. It preserves manual
-files and stops on conflicts. Fix the reported file rather than deleting the entire
-Agent/cache. Partial work remains after failure or Ctrl+C. Plain `add` rejects
-duplicate source directories; `-b`/`-c` can reuse matching downloads.
+### `Dockerfile` — what is installed inside the Agent container
 
-`--build-settings PATH` accepts a TOML `[build]` table. Read
-[the packaged defaults](../agentbench/onboarding/build_agent_env/openrouter_provider/assets/settings.toml)
-before changing timeouts, context/output budgets or retry counts. A larger timeout
-does not solve unsupported schemas. `--build-model` selects the generation model;
-`--model` selects the certification model.
+Installs the Agent's Python/system dependencies and copies its source, binding and
+configuration. Check CPU architecture, interpreter, writable locations and any
+Agent-specific browser or Node requirements. The current KUMA overlay installs
+its SDK with `python -m pip`; that selected interpreter must support pip.
 
-## 4. Verify native execution, then certify
+### `.dockerignore` — what stays out of the build
 
-Save native input matching the binding in a JSON file. Bundled ReAct accepts, for
-example, `{"message":"Search for LangGraph documentation and summarize it."}`.
-Do not reuse that shape for an Agent with a different contract.
+Excludes secrets, host virtual environments, caches and results from the build
+context. It must still include the source and configuration the image needs.
+`-b` writes this file from ABB's template.
+
+### `requirement.md` — what the evaluation should test
+
+Describes the deployed Agent's purpose, observable behavior, actual tools and
+limitations. KUMA requires YAML front matter plus Production Use Scenario,
+Behaviors to Test, and Known Limitations or Prohibited Behaviors sections.
+Its strategy group is selected from the current SDK catalog.
+
+Describe present capabilities, not possible extensions. A search-only Agent can
+explain a computation but cannot execute a sampler or persist a file. State what
+it should do when a capability or required input is missing. This Profile guides
+evaluation; it does not add tools, change the system prompt or modify saved Cases.
+
+### `evaluation/` — optional supporting files
+
+Only needed when the Profile references schemas or fixtures. It is not mandatory,
+and there is no required `input-contract.json`. The current official KUMA generation
+path accepts text; a locally valid structured schema does not establish remote
+support. Native mapping remains in `agent.toml` and the binding.
+
+### Registry and automatic records
+
+`resources/registry.toml` is outside the unit. It stores each Agent's path, enabled
+flag, `adapting`/`ready` state and `case` count. Final generation registers adapting;
+certification controls promotion. `run` selects enabled ready Agents.
+
+The downloader also creates **`source-manifest.json` automatically** to record the
+repository and revision for download reuse. It is an internal ABB record, not a
+KUMA-required file or a document the user must prepare. Leave generated records
+in place when continuing the add workflow.
+
+Generation attempts and checkpoints live separately under
+`cache/onboarding/<unit-name>-<path-digest>/`. `build-state.json` tracks reusable
+work; attempt directories contain the plan, SDK catalog, per-file `steps/` and
+`build-result.json`. These are also automatic records, not Agent source files.
+
+## After generation
+
+For an integration generated with `-b` alone, save input matching its binding in a
+JSON file, then check native execution and certify:
 
 ```bash
 agentbench observe AGENT_ID --input native-input.json
@@ -121,43 +219,18 @@ agentbench evaluate AGENT_ID --cases 1 --no-view
 agentbench certify AGENT_ID --no-view
 ```
 
-`observe` calls the Agent/model/tools without Case generation or Judge. Its model
-and tool calls can be billed. Resolve native startup, input and route failures here
-first. `evaluate --cases 1` does not change the registry's Case count; `certify`
-uses that registered count, so check it before starting.
+Use the generated Agent ID. `observe` calls the Agent/model/tools without KUMA
+Case generation or Judge; those model/tool calls can still be billed.
+`evaluate --cases 1` does not change the registry's count; `certify` uses that count,
+so check it first. Already-ready Agents return without a new certification run;
+use `evaluate` to validate subsequent changes.
 
-The combined flow, or certification of manually prepared files:
+If generation stops, read `build-result.json` and the failed step, correct the
+reported problem and rerun the same `-b` command. Completed files are retained and
+revalidated; manual conflicts stop generation instead of being overwritten.
+Use `--answers answers.txt` if planning asks for information.
 
-```bash
-agentbench agent add https://github.com/owner/repository -b -c --no-view
-agentbench agent add https://github.com/owner/repository -c --no-view
-```
-
-Certification can use paid services. It promotes `adapting` to `ready` when all
-requested Cases complete without invocation errors; Judge issues alone do not
-prevent promotion. Already-ready registrations return without a new run: use
-`evaluate` to validate changes. `enabled` independently controls selection; `run`
-includes only enabled ready Agents. Do not edit readiness to claim acceptance.
-
-## Troubleshooting by file
-
-| File / stage | Check |
-| --- | --- |
-| `agent.toml` | Real entrypoint, input mapping, timeout, declared env keys, model/tool routes. Every required input needs a truthful source. |
-| `bindings/*.py` | Factory imports, graph API version, final output and lifecycle. Valid syntax does not prove the graph loads. |
-| `Dockerfile` | Base architecture, dependencies, selected Python interpreter, binding COPY and writable locations. The SDK overlay currently expects `python -m pip`. |
-| `.dockerignore` | Include required source/config/bindings; exclude `.env`, host venvs, caches and results. |
-| `requirement.md` | Official parser validity, current strategy coordinates and factual capability boundaries. Installation/plumbing details are not behavioral test criteria. |
-| Optional input schema | Relative path and fields match the binding. Local parsing does not prove remote generation supports that input type. |
-| `.env` | Key precedence, build vs Agent model, and required tool keys. Never paste values into bug reports. |
-| `resources/registry.toml` | Unit path, ID, enabled flag, lifecycle state and Case count. |
-| `cache/onboarding/…` | Failed file/stage and validation feedback before retrying. |
-
-Known runtime defects are not fixed by documentation: image-local dependencies
-may be hidden by a bind mount ([#66](https://github.com/DefuzeX-AI/AgentBehaviorBench/issues/66));
-an interpreter without pip can fail the SDK overlay
-([#65](https://github.com/DefuzeX-AI/AgentBehaviorBench/issues/65)). Native Linux
-ownership/recovery also needs real acceptance checks. Preserve startup errors
-and artifacts. See [troubleshooting](Troubleshooting.md),
-[the issue audit](Documentation-Issue-Audit.md) and
-[builder internals](../agentbench/onboarding/build_agent_env/README.md).
+For missing dependencies, unsupported deployments, trace/Judge failures or blocked
+recovery, see [troubleshooting](Troubleshooting.md) and
+[known issues](Documentation-Issue-Audit.md). Builder implementation details are
+in [the developer guide](../agentbench/onboarding/build_agent_env/README.md).
