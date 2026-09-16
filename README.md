@@ -65,7 +65,7 @@ or network. The `OFFLINE_RESULT=` line identifies the saved file. It demonstrate
 the harness and viewer format; it does not test the official Kuma service.
 
 KUMA's adapter lives in `agentbench/sdk/plugin/kuma/`. Its evaluation image
-installs `kuma-defuzex[otel]==0.2.4` from PyPI, as declared in the adapter's
+installs `kuma-defuzex[otel]==0.2.7` from PyPI, as declared in the adapter's
 `requirements.txt`; no local SDK source checkout is required. The distribution
 is named `kuma-defuzex`, while Python code imports `kuma`.
 

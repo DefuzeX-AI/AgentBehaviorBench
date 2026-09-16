@@ -12,7 +12,7 @@ def request_options(value=None):
     Returns:
         A new JSON-safe mapping for create_run or resume_request.
     Raises:
-        ValueError: On unknown keys or values outside the pinned 0.2.4 contract.
+        ValueError: On unknown keys or values outside the pinned 0.2.7 contract.
     """
     if value is None:
         return {}
