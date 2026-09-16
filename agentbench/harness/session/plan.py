@@ -29,9 +29,8 @@ def validate_suite_id(suite_id):
 
 
 def environment_secrets(environ=None):
-    values = os.environ if environ is None else environ
-    return tuple(value for key, value in values.items() if isinstance(value, str) and value
-                 and any(word in key.upper() for word in ('KEY', 'TOKEN', 'SECRET', 'PASSWORD')))
+    from agentbench.observe.store import environment_secrets as harvest
+    return harvest(environ)
 
 
 def public_configuration(value, secrets=()):
