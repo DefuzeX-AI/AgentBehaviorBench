@@ -9,6 +9,7 @@ from agentbench.harness.errors import ProviderSelectionError
 from agentbench.harness.progress import emit_progress
 from agentbench.harness.result import BenchmarkResult, BenchmarkStepResult
 from agentbench.runtime.contracts.execution import RunControl
+from agentbench.runtime.interception import resolve_model_provider
 from agentbench.sdk.common.artifacts import Artifacts
 from agentbench.sdk.contracts import PreparedCase, PreparedCaseBatch, RunnerRecoveryCapabilities
 from agentbench.sdk.common.case_identity import case_content_sha256
@@ -81,6 +82,8 @@ class KumaContainerRunner:
         try:
             api_key(self.environ)
             backend_url(self.environ)
+            # An unknown ABB_MODEL_PROVIDER fails here, before a Case is paid for.
+            resolve_model_provider(environ=self.environ)
         except ValueError as exc:
             raise ProviderSelectionError(str(exc)) from exc
         if not (registration.path / 'requirement.md').is_file():

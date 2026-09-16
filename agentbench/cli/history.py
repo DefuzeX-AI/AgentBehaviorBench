@@ -3,9 +3,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 from agentbench.harness.session.references import collect_suite_references, history_guard
+from agentbench.project import project_root
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+# Results and the history trash belong to the project, never to site-packages.
+PROJECT_ROOT = project_root()
 
 
 def history_entries(root=PROJECT_ROOT):

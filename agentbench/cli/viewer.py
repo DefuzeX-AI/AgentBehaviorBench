@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Callable
 from html import escape
 import threading
@@ -12,9 +13,14 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import quote, unquote, urlparse, parse_qs
 
+from agentbench.project import project_root
+
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
-WEB_ROOT = Path(__file__).resolve().parents[2] / "web" / "dist"
+# Built viewer assets: ABB_WEB_ROOT, else web/dist of the project (a checkout, or
+# the working directory of an installed CLI; see agentbench.project).
+WEB_ROOT = (Path(os.environ["ABB_WEB_ROOT"]).expanduser().resolve() if os.environ.get("ABB_WEB_ROOT", "").strip()
+            else project_root() / "web" / "dist")
 
 
 class ViewerUnavailable(OSError):
@@ -35,6 +41,12 @@ def require_viewer_assets():
                 break
     if missing:
         import shlex
+        if not (WEB_ROOT.parent / 'package.json').is_file():
+            # No viewer sources to build here: an installed package ships no web/.
+            raise ViewerUnavailable(
+                f'Trace UI not found at {WEB_ROOT}. The installed package does not include it; '
+                'build web/ in an AgentBehaviorBench checkout (npm ci && npm run build) '
+                'and set ABB_WEB_ROOT to that web/dist')
         raise ViewerUnavailable(f'Trace UI not built or incomplete. Run: cd {shlex.quote(str(WEB_ROOT.parent))} && npm ci && npm run build')
 
 

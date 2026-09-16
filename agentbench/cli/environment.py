@@ -11,9 +11,11 @@ from types import MappingProxyType
 from dotenv import load_dotenv
 
 from agentbench.harness.concurrency import ConcurrencySettings
+from agentbench.project import project_root
 
 
-DEFAULT_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+# The project's .env, not one beside the installed package.
+DEFAULT_ENV_FILE = project_root() / ".env"
 
 
 class EnvironmentFileError(ValueError):

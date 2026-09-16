@@ -193,6 +193,17 @@ OPENROUTER_HTTP_REFERER=https://example.com
 OPENROUTER_APP_TITLE=AgentBehaviorBench
 ```
 
+Installed as a package rather than run from this checkout, `agentbench` treats
+the working directory as the project: `resources/registry.toml`, `.env`,
+`results/` and `cache/` are resolved there, and `ABB_PROJECT_ROOT` selects
+another directory. The package does not include the result viewer; build `web/`
+in a checkout and set `ABB_WEB_ROOT` to its `web/dist`.
+
+`ABB_MODEL_PROVIDER` selects the host model target provider (default
+`openrouter`). Another provider is a package that registers a factory, called
+with `model=`, in the `defuzex_agentbench.model_providers` entry-point group;
+framework adapters register in `defuzex_agentbench.adapters` the same way.
+
 ## Included Agents
 
 | Agent | Configured scope | Readiness |

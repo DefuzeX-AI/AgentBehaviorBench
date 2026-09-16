@@ -31,11 +31,11 @@ from agentbench.runtime.interception import (
     InterceptorImageProvider,
     ModelTargetProvider,
     NullTraceSink,
-    OpenRouterProvider,
     RunningModelInterceptor,
     TraceEvent,
     TraceSink,
     get_trust_plugin,
+    resolve_model_provider,
 )
 
 from .image_builder import DockerImageBuilder
@@ -108,7 +108,7 @@ class DockerRuntime:
             interceptor_image_provider
             or default_interceptor_image_provider(self._images, self._environ)
         )
-        self._model_provider = model_provider or OpenRouterProvider()
+        self._model_provider = model_provider or resolve_model_provider(environ=self._environ)
         self._trace_sink = trace_sink or NullTraceSink()
         self._trace_max_bytes = trace_max_bytes
         self.artifact_root = artifact_root

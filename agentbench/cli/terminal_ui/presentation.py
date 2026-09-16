@@ -248,8 +248,8 @@ def panel_line(text: str) -> str:
 
 
 def display_path(path: Path) -> str:
-    # presentation.py -> terminal_ui -> cli -> agentbench -> repository root
-    repo_root = Path(__file__).resolve().parents[3]
+    from agentbench.project import project_root
+    repo_root = project_root()
     try:
         return str(path.relative_to(repo_root))
     except ValueError:

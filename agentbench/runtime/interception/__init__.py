@@ -10,6 +10,8 @@ from .image import InterceptorImageProvider, StaticInterceptorImageProvider
 from .plugins import TrustPlugin, get_trust_plugin
 from .providers import (
     DEFAULT_OPENROUTER_BASE_URL,
+    MODEL_PROVIDER_ENTRY_POINT_GROUP,
+    MODEL_PROVIDER_ENV,
     OPENROUTER_API_KEY_ENV,
     OPENROUTER_BASE_URL_ENV,
     OPENROUTER_MODEL_ENV,
@@ -17,6 +19,7 @@ from .providers import (
     ModelTargetProvider,
     OpenRouterProvider,
     StaticModelTargetProvider,
+    resolve_model_provider,
 )
 from .session import RunningModelInterceptor
 from .trace import (
@@ -50,4 +53,7 @@ __all__ = [
     "TraceSink",
     "TrustPlugin",
     "get_trust_plugin",
+    "MODEL_PROVIDER_ENTRY_POINT_GROUP",
+    "MODEL_PROVIDER_ENV",
+    "resolve_model_provider",
 ]

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
+from importlib.metadata import entry_points
 from types import MappingProxyType
 from typing import Mapping, Protocol, runtime_checkable
 from urllib.parse import urlsplit
@@ -76,6 +78,43 @@ class OpenRouterProvider:
             credential_env=OPENROUTER_API_KEY_ENV,
             headers=MappingProxyType(headers),
         )
+
+
+MODEL_PROVIDER_ENTRY_POINT_GROUP = "defuzex_agentbench.model_providers"
+MODEL_PROVIDER_ENV = "ABB_MODEL_PROVIDER"
+DEFAULT_MODEL_PROVIDER = "openrouter"
+
+
+def resolve_model_provider(
+    name: str | None = None,
+    *,
+    model: str | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> ModelTargetProvider:
+    """Construct the host model target provider selected by name.
+
+    The name comes from ``name``, else ``ABB_MODEL_PROVIDER``, else ``openrouter``.
+    Providers other than the built-in one register a factory accepting ``model=``
+    under the ``defuzex_agentbench.model_providers`` entry-point group, like the
+    interceptor's other plugin layers; a plugin cannot replace a built-in name.
+    """
+    values = os.environ if environ is None else environ
+    selected = (name or values.get(MODEL_PROVIDER_ENV, "") or DEFAULT_MODEL_PROVIDER).strip().lower()
+    factories: dict[str, object] = {DEFAULT_MODEL_PROVIDER: OpenRouterProvider}
+    registered = [entry for entry in entry_points(group=MODEL_PROVIDER_ENTRY_POINT_GROUP)
+                  if entry.name.strip().lower() not in factories]
+    if selected not in factories:
+        entry = next((entry for entry in registered if entry.name.strip().lower() == selected), None)
+        if entry is None:
+            available = ", ".join(sorted({*factories, *(entry.name.strip().lower() for entry in registered)}))
+            raise InterceptionConfigurationError(
+                f"Unknown model target provider {selected!r}; available: {available}")
+        factories[selected] = entry.load()
+    provider = factories[selected](model=model)
+    if not isinstance(provider, ModelTargetProvider):
+        raise InterceptionConfigurationError(
+            f"Model target provider {selected!r} does not implement resolve(environ)")
+    return provider
 
 
 @dataclass(frozen=True, slots=True)

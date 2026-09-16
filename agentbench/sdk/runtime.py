@@ -11,7 +11,7 @@ from agentbench.harness import AgentRunner, BenchmarkRunner
 from agentbench.harness.errors import ProviderSelectionError
 from agentbench.runtime import RuntimeFactory
 from agentbench.runtime.docker import DockerRuntime
-from agentbench.runtime.interception import OpenRouterProvider
+from agentbench.runtime.interception import resolve_model_provider
 
 from .contracts import EvaluationRunner, EvaluationSDKPlugin, SDKRunnerContext
 from .plugins import EvaluationPlan, plugin_execution
@@ -70,13 +70,14 @@ def build_evaluation_runner(
         raise ProviderSelectionError(
             "A plain create_run SDK can only execute in the host process"
         )
+    model_provider = resolve_model_provider(model=model, environ=context.environ)
     runtime_factory = RuntimeFactory(
         docker_builder=lambda: DockerRuntime(
             environ=context.environ,
             control=control,
             build_coordinator=build_coordinator,
             identity=job_context,
-            model_provider=OpenRouterProvider(model=model),
+            model_provider=model_provider,
             trace_sink=trace_sink,  # type: ignore[arg-type]
             trace_max_bytes=trace_max_bytes,
         )
