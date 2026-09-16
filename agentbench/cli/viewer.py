@@ -169,16 +169,20 @@ def build_viewer_handler(
                 return
             if run_api is not None and parsed.path.startswith('/api/observe/'):
                 try:
-                    self._send_json(run_api.route(parsed.path, parse_qs(parsed.query)))
+                    payload = run_api.route(parsed.path, parse_qs(parsed.query))
                 except (OSError, ValueError, KeyError, StopIteration):
                     self._send_json({'error': 'Artifact unavailable'}, status=HTTPStatus.NOT_FOUND)
+                else:
+                    self._send_json(payload)
                 return
             result_api_path = _suite_result_api_path(expected_suite_id)
             if parsed.path == result_api_path:
                 try:
-                    self._send_json(controlled_snapshot(parse_result_log(result_log), result_log))
+                    payload = controlled_snapshot(parse_result_log(result_log), result_log)
                 except (OSError, ValueError, KeyError):
                     self._send_json({'error': 'Suite snapshot unavailable'}, status=HTTPStatus.SERVICE_UNAVAILABLE)
+                else:
+                    self._send_json(payload)
                 return
             if parsed.path == "/api/result" or parsed.path.startswith(
                 "/api/suites/"
@@ -254,12 +258,17 @@ def build_viewer_handler(
             self, payload: object, *, status: HTTPStatus = HTTPStatus.OK
         ) -> None:
             body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-            self.send_response(status)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            self.wfile.write(body)
+            try:
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                # A browser can cancel a polling request while its JSON body is
+                # being sent. Nothing can be delivered on that connection now.
+                self.close_connection = True
 
     return ViewerHandler
 
