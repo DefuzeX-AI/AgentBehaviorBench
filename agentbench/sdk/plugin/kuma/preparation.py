@@ -212,9 +212,13 @@ def _failure(index, item, artifacts, fallback=None, secrets=()):
             'reason': 'Original Case generation request failed; an explicit request may generate this missing slot'}
     if request:
         artifacts['generation_request'] = request
+    message = item.get('error_message') or item.get('message') or str(fallback or 'Case generation failed')
+    if code in ('network_error', 'network_timeout') and artifacts.get('sdk_base_url'):
+        # An unreachable Backend is usually a configuration question; say which one.
+        message = f"{message} (KUMA backend: {artifacts['sdk_base_url']})"
     return PreparationFailure(
         index, item.get('error_type') or item.get('type') or type(fallback).__name__,
-        redact(item.get('error_message') or item.get('message') or str(fallback or 'Case generation failed'), secrets),
+        redact(message, secrets),
         phase=item.get('phase') or 'case_generation', code=item.get('code'),
         retryable=item.get('retryable'), client_request_id=item.get('client_request_id'),
         request_id=item.get('request_id'), artifacts=artifacts)

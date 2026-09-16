@@ -15,7 +15,7 @@ from agentbench.sdk.common.case_identity import case_content_sha256
 
 from .service import evaluate
 from .diagnostics import evaluation_failure, collect_artifacts
-from .configuration import request_options, api_key
+from .configuration import backend_url, request_options, api_key
 from .case_files import artifact_digest
 from .preparation import prepare_batch
 
@@ -80,6 +80,7 @@ class KumaContainerRunner:
     def validate_sdk(self, registration):
         try:
             api_key(self.environ)
+            backend_url(self.environ)
         except ValueError as exc:
             raise ProviderSelectionError(str(exc)) from exc
         if not (registration.path / 'requirement.md').is_file():

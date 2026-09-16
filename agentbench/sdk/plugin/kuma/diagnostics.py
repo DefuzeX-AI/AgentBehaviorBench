@@ -127,6 +127,9 @@ def collect_artifacts(directory, host, *, environ=None):
             break
     report = read_diagnostic(directory, 'evaluation/judge/report.json')
     case = read_diagnostic(directory, 'evaluation/case.json')
+    backend = read_diagnostic(directory, 'evaluation/process.json').get('sdk_base_url')
+    if isinstance(backend, str) and backend:
+        result['sdk_base_url'] = _text(backend)
     case_id, run_id = summary.get('case_id'), summary.get('run_id')
     request = summary.get('request')
     if (isinstance(request, dict) and request.get('request_type') == 'judgment'
@@ -192,6 +195,10 @@ def failure_message(artifacts):
     parts = [f'unreadable artifact {reason}' for reason in artifacts.get('unreadable_artifacts', ())]
     if error:
         parts.append(f"{error.get('type', 'SDK error')} [{error.get('code', 'unknown')}]: {error.get('message', '')}")
+        if error.get('code') in ('network_error', 'network_timeout') and artifacts.get('sdk_base_url'):
+            # A client-side resolution or connect failure never reaches the interceptor,
+            # so no related network event names the Backend; the SDK's own record does.
+            parts.append(f"KUMA backend: {artifacts['sdk_base_url']}")
     for item in artifacts.get('related_network_errors', ()):
         parts.append(f"related network: {item.get('error_code') or 'unclassified'} "
                      f"{item.get('method') or ''} {item.get('host') or ''}{item.get('path') or ''}: {item.get('error') or ''}")

@@ -7,6 +7,7 @@ import tempfile
 from types import SimpleNamespace
 from agentbench.runtime.docker.worker_build import _ignore
 from agentbench.sdk.common.whitelist import whitelist_toml
+from .configuration import DEFAULT_BASE_URL
 from .manifest import extend_runtime_environment
 
 # The SDK has to land in the interpreter the worker runs: whatever `python` the Agent
@@ -27,12 +28,14 @@ SDK_INSTALL = (
 
 
 @contextmanager
-def evaluation_agent(agent, *, control=None, deadline=None):
+def evaluation_agent(agent, *, control=None, deadline=None, backend=DEFAULT_BASE_URL):
     """Stage an Agent and install the adapter's pinned PyPI SDK in its image.
 
     The host does not need an SDK checkout or installation. Dependencies belong
     to this adapter and are installed only while building the evaluation image.
-    The Agent source and its original Dockerfile remain unchanged.
+    The Agent source and its original Dockerfile remain unchanged. ``backend`` is
+    the normalized KUMA Backend URL; the container receives KUMA_BASE_URL and its
+    egress admits exactly that Backend.
     """
     requirements = Path(__file__).with_name('requirements.txt')
     def check():
@@ -75,8 +78,10 @@ def evaluation_agent(agent, *, control=None, deadline=None):
                                f'argv = ["python", "-m", "{__package__}.worker"]', source)
         if count != 1:
             raise ValueError('Expected one explicit launch.argv')
-        source = extend_runtime_environment(source, ('KUMA_API_KEY', 'DEFUZEX_API_KEY'))
-        source += whitelist_toml(Path(__file__).with_name('whitelist.json'))
+        source = extend_runtime_environment(source, ('KUMA_API_KEY', 'DEFUZEX_API_KEY', 'KUMA_BASE_URL'))
+        source += whitelist_toml(Path(__file__).with_name('whitelist.json'), (
+            {'url': backend, 'methods': ['GET', 'POST']},
+            {'url': backend + '/*', 'methods': ['GET', 'POST']}))
         (root / 'agent.toml').write_text(source)
         dockerfile = root / 'Dockerfile'
         original = dockerfile.read_text()

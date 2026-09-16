@@ -49,10 +49,14 @@ def build_evaluation_runner(
                 context=context,
                 options=plan.options,
             )
-        except ModuleNotFoundError as exc:
+        except ImportError as exc:
+            # ModuleNotFoundError is only "no such module"; an import of a name the
+            # module lacks, or a partially installed package, is its parent class.
+            cause = (f"missing module {exc.name!r}" if isinstance(exc, ModuleNotFoundError)
+                     else f"import failed: {exc}")
             raise ProviderSelectionError(
                 f"Could not create SDK {plan.selection.reference.name!r} runner: "
-                f"missing module {exc.name!r}. Check the adapter's dependencies."
+                f"{cause}. Check the adapter's dependencies."
             ) from exc
         if not all(callable(getattr(runner, method, None))
                    for method in ('validate_sdk', 'prepare_cases', 'run_case')):
