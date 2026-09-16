@@ -2,6 +2,14 @@
 from collections.abc import Mapping
 import math
 
+# The SDK needs a repository with its .kuma ledger on the same filesystem, and the
+# host reads that ledger afterwards, so both are bind mounts. Mounting them over
+# /opt/agent/agent hid everything the Agent image built there -- a virtualenv on
+# PATH, installed dependencies -- so the worker fell through to another interpreter.
+# The mount source is a copy of the Agent source either way, and the SDK
+# fingerprints tree content rather than its path, so only the location changes.
+SDK_REPOSITORY = '/opt/abb-sdk-repo'
+
 
 def request_options(value=None):
     """Validate explicit HTTP options; omitted keys retain official SDK defaults.

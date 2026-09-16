@@ -9,6 +9,22 @@ from agentbench.runtime.docker.worker_build import _ignore
 from agentbench.sdk.common.whitelist import whitelist_toml
 from .manifest import extend_runtime_environment
 
+# The SDK has to land in the interpreter the worker runs: whatever `python` the Agent
+# image's PATH resolves to. That interpreter need not have pip -- a uv-created venv
+# first on PATH has none. ensurepip installs pip from the standard library's bundled
+# wheel, so bootstrapping needs no network. If neither exists, name the interpreter.
+SDK_INSTALL = (
+    'RUN interpreter="$(command -v python)" '
+    '|| { echo "ABB evaluation overlay: no python on the image PATH" >&2; exit 1; }; '
+    'python -m pip --version >/dev/null 2>&1 '
+    '|| python -m ensurepip --default-pip >/dev/null '
+    '|| { echo "ABB evaluation overlay: $interpreter has no pip module and no ensurepip;'
+    ' install pip into that interpreter in the Agent Dockerfile" >&2; exit 1; }; '
+    'python -m pip --isolated install --no-cache-dir '
+    '--index-url https://pypi.org/simple '
+    '-r /opt/abb-sdk/requirements.txt\n'
+)
+
 
 @contextmanager
 def evaluation_agent(agent, *, control=None, deadline=None):
@@ -72,9 +88,7 @@ def evaluation_agent(agent, *, control=None, deadline=None):
         evaluation_copy = ('COPY evaluation/ /opt/agent/evaluation/\n'
                            if (root / 'evaluation').is_dir() else '')
         dockerfile.write_text(original + '\nUSER root\nCOPY .abb-sdk/ /opt/abb-sdk/\n'
-                             'RUN python -m pip --isolated install --no-cache-dir '
-                             '--index-url https://pypi.org/simple '
-                             '-r /opt/abb-sdk/requirements.txt\n'
+                             + SDK_INSTALL +
                              'COPY requirement.md /opt/agent/requirement.md\n'
                              + evaluation_copy + 'USER ' + users[-1] + '\n')
         check()

@@ -5,17 +5,21 @@ import json
 import os
 import platform
 import sys
+import traceback
 from pathlib import Path
 from uuid import uuid4
 from importlib.metadata import version
 from agentbench.sdk.common.artifacts import Artifacts
 from .runner import drive_run
-from .configuration import request_options, api_key
+from .configuration import SDK_REPOSITORY, request_options, api_key
 from .compatibility import run_case
 from agentbench.runtime.agentcontainer.session import AgentSession
 
 
-async def execute(root, output, settings=None):
+async def execute(root, output, settings=None, sdk_repo=None):
+    # sdk_repo is the SDK repository/ledger root, mounted apart from the Agent tree
+    # so the image's own /opt/agent/agent stays visible; in place when omitted.
+    repository = Path(sdk_repo) if sdk_repo is not None else root / 'agent'
     # Enter the in-container evaluation flow. root is the Agent directory,
     # output stores artifacts, and settings contains the job configuration.
     # Import the official KUMA SDK, evidence capture, and Agent invocation here.
@@ -51,12 +55,12 @@ async def execute(root, output, settings=None):
                    'sdk': 'kuma', 'sdk_version': version('kuma-defuzex'), 'agent_id': manifest['agent_id'],
                    'sdk_base_url': DEFAULT_BASE_URL,
                    'api_key_source': credential_source,
-                   'source': manifest.get('source'), 'repo': str(root / 'agent')})
+                   'source': manifest.get('source'), 'repo': str(repository)})
         files.save('manifest.json', {'phase': 'case_generation', 'judge': 'pending'})
 
         # Assemble SDK options for the repository, step limit, credentials,
         # trace evidence, and request timing.
-        options = dict(repo_path=root / 'agent',
+        options = dict(repo_path=repository,
                        max_steps=settings.get('max_steps'), 
                        allow_local=False, track_files=False, 
                        save_local=True,
@@ -72,7 +76,7 @@ async def execute(root, output, settings=None):
             # The registered requirement.md is the SDK Agent Profile. Reusing a
             # saved Case rejects a profile, so supply it only during generation.
             collection = generate_collection(
-                create_run, count=settings['count'], files=files, repo=root / 'agent',
+                create_run, count=settings['count'], files=files, repo=repository,
                 case_indices=settings.get('case_indices'), allow_partial=settings.get('allow_partial', False),
                 options=dict(options, agent_profile_path=root / 'requirement.md'))
             complete = not collection['failures'] and not collection['unattempted_indices']
@@ -130,7 +134,7 @@ async def execute(root, output, settings=None):
             return json.loads((folder / 'result.json').read_text())
         # Drive the Case by receiving inputs, invoking the Agent, submitting
         # outputs, and collecting the Judge report.
-        summary = await drive_run(run, invoke, output, provider=provider, repo_path=root / 'agent')
+        summary = await drive_run(run, invoke, output, provider=provider, repo_path=repository)
         # The worker exit code checks execution and evidence completeness,
         # independently of whether the Judge verdict is pass.
         return 0 if (summary['judge'] == 'received' and summary['otel'] == 'complete'
@@ -197,6 +201,7 @@ def main():
     parser.add_argument('--agent-root', type=Path, default=Path('/opt/agent'))
     parser.add_argument('--output', type=Path, default=Path('/run/abb-output'))
     parser.add_argument('--settings', type=Path, default=Path('/run/abb-input/evaluation.json'))
+    parser.add_argument('--sdk-repo', type=Path, default=Path(SDK_REPOSITORY))
     args = parser.parse_args()
     # Read generation or execution settings from the host-mounted evaluation.json.
     try:
@@ -208,7 +213,18 @@ def main():
         print(exc, file=sys.stderr, flush=True)
         return 1
     # Run the asynchronous flow and propagate its exit code.
-    return asyncio.run(execute(args.agent_root, args.output, settings))
+    try:
+        return asyncio.run(execute(args.agent_root, args.output, settings, sdk_repo=args.sdk_repo))
+    except ImportError as exc:
+        # The SDK and trace tooling are imported before execute() can record an
+        # error. A missing module here usually means the image's `python` is not
+        # the interpreter the evaluation overlay installed into, so name it.
+        traceback.print_exc()
+        message = f'{exc} (interpreter {sys.executable})'
+        Artifacts(args.output).save('error.json', {
+            'phase': 'startup', 'type': type(exc).__name__, 'message': message})
+        print(message, file=sys.stderr, flush=True)
+        return 1
 
 
 if __name__ == '__main__':
