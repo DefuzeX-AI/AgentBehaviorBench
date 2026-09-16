@@ -20,6 +20,7 @@ from .constants import (
 )
 from .evaluation_http import EvaluationHTTPFormatter
 from .formatting import case_identity, short_id
+from .live_cases import LiveCases
 
 PREVIEW_CHAR_LIMIT = 72
 ACTIVITY_ANIMATION_INTERVAL_SECONDS = 0.35
@@ -79,11 +80,16 @@ class LLMActivity:
         self._call_count = 0
         self._rendered_line_count = 0
         self._concurrent = False
+        self._live_cases: LiveCases | None = None
 
     def set_concurrent(self, enabled: bool) -> None:
         """Use permanent identity-prefixed events when several Agents run."""
         self.close()
         self._concurrent = enabled
+
+    def set_live_cases(self, display: LiveCases | None) -> None:
+        """Send concurrent trace updates to one shared terminal dashboard."""
+        self._live_cases = display
 
     def start_stage(self, label: str) -> None:
         """Start the benchmark stage line and its shared animation loop."""
@@ -128,6 +134,9 @@ class LLMActivity:
         """Consume one structured interception event."""
 
         if event.event == "interceptor_ready":
+            return
+        if self._live_cases is not None:
+            self._live_cases.on_trace(event)
             return
         if self._concurrent:
             self._emit_concurrent(event)

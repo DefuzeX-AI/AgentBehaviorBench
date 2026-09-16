@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 
-def case_identity(agent_id: object, case_index: object = None, job_id: object = None) -> str:
+def case_identity(agent_id: object, case_index: object = None, job_id: object = None,
+                  case_count: object = None) -> str:
     """Identify a concurrent Case without repeating artifact IDs on every line."""
     parts = [str(agent_id or "agent")]
     if type(case_index) is int:
-        parts.append(f"case {case_index + 1}")
+        total = f"/{case_count}" if type(case_count) is int and case_count > case_index else ""
+        parts.append(f"case {case_index + 1}{total}")
     elif job_id:
         parts.append(f"job {short_id(job_id)}")
     return f"[{' · '.join(parts)}]"

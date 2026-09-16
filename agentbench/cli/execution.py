@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from builtins import print as builtin_print
+import sys
 
 from agentbench.harness import (
     ProviderSelectionError,
@@ -24,6 +26,7 @@ from .terminal_ui.presentation import (
     print_viewer_footer,
 )
 from .terminal_ui.progress import ProgressPrinter, configuration_error
+from .terminal_ui.live_cases import LiveCases
 from .result_export import ResultLogWriter, start_result_log
 from .terminal_ui import LLMActivity
 from .viewer import RunningViewer
@@ -105,9 +108,15 @@ def run_benchmark_once(
     viewer: RunningViewer | None = None
     activity = llm_activity or LLMActivity(output_fn)
     progress_printer = None
+    live_cases: LiveCases | None = None
     primary_error = None
     keep_viewer_on_error = False  # Whether to keep the viewer open after an error.
     controller = None
+
+    def close_live_cases() -> None:
+        if live_cases is not None:
+            live_cases.close()
+            activity.set_live_cases(None)
 
     try:
         if output_path is not None:
@@ -152,7 +161,14 @@ def run_benchmark_once(
 
         output_fn(f"Case workers: {effective_workers} (configured: {parallelism})")
         activity.set_concurrent(concurrent)
-        progress_printer = ProgressPrinter(output_fn, llm_activity=activity, concurrent=concurrent)
+        if concurrent and output_fn is builtin_print and sys.stdout.isatty():
+            live_cases = LiveCases({agent.agent_id: agent.case_count for agent in agents}, effective_workers)
+            activity.set_live_cases(live_cases)
+        progress_printer = ProgressPrinter(output_fn, llm_activity=activity, concurrent=concurrent,
+                                           live_cases=live_cases)
+
+        def terminal_output(line: str) -> None:
+            (live_cases.write if live_cases is not None else output_fn)(line)
 
 
         def on_event(event):
@@ -168,8 +184,16 @@ def run_benchmark_once(
 
             if result_log is not None:
                 result_log.append_event(event)
-            if event.get("event") in {"case_started", "case_completed"}:
+            if live_cases is not None and event.get("event") in {"case_prepared", "case_started", "case_completed"}:
+                live_cases.on_event(event)
+            elif event.get("event") in {"case_started", "case_completed"}:
                 output_fn(format_case_event(event))
+
+        def on_tick() -> None:
+            if result_log is not None:
+                result_log.flush_if_due()
+            if live_cases is not None:
+                live_cases.flush()
 
         # step 2: run suite
         recovery_options = {}
@@ -179,16 +203,17 @@ def run_benchmark_once(
             agents,  # Agents under evaluation.
             suite_id=suite_id,
             # Render the start of an Agent run.
-            on_agent_start=lambda agent, index, total: print_agent_start(agent, index, total, output_fn),
+            on_agent_start=lambda agent, index, total: print_agent_start(agent, index, total, terminal_output),
             # Render the completion of an Agent run.
             on_agent_complete=lambda item: _handle_agent_complete(
-                item, output_fn, None if viewer is None else viewer.url, concurrent=concurrent),
+                item, terminal_output, None if viewer is None else viewer.url, concurrent=concurrent),
             on_progress=progress_printer,
             on_event=on_event,
-            on_tick=None if result_log is None else result_log.flush_if_due,
+            on_tick=on_tick if result_log is not None or live_cases is not None else None,
             **recovery_options,
         )
 
+        close_live_cases()
         if result_log is not None:
             result_log.append_suite_complete(result)
         print_suite_summary(result, output_fn)
@@ -198,6 +223,7 @@ def run_benchmark_once(
             )
         return BenchmarkExecution(0 if result.passed else 1, result, result_log, viewer)
     except (ProviderSelectionError, SuiteConfigurationError) as exc:
+        close_live_cases()
         primary_error, keep_viewer_on_error = exc, True
         _retain_failure(result_log, exc, output_fn)
         _after_failure(lambda: output_fn(configuration_error(exc)), exc, "Display configuration error", output_fn)
@@ -206,6 +232,7 @@ def run_benchmark_once(
                 result_log.path, None if viewer is None else viewer.url, output_fn), exc, "Display result path", output_fn)
         return BenchmarkExecution(1, None, result_log, viewer)
     except KeyboardInterrupt as exc:
+        close_live_cases()
         primary_error = exc
         retained = _retain_failure(result_log, exc, output_fn)
         message = ('Benchmark interrupted.' if result_log is None else
@@ -214,10 +241,12 @@ def run_benchmark_once(
         _after_failure(lambda: output_fn(message), exc, "Display interruption", output_fn)
         return BenchmarkExecution(130, None, result_log, None)
     except BaseException as exc:
+        close_live_cases()
         primary_error = exc
         _retain_failure(result_log, exc, output_fn)
         raise
     finally:
+        close_live_cases()
         cleanup_error = None
         actions = [("Close terminal progress", activity.close if progress_printer is None else progress_printer.close)]
         if result_log is not None:

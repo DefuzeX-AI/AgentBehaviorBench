@@ -1,6 +1,8 @@
 """Concurrency boundaries for event persistence and read-only presentation."""
 
 import json
+import sys
+from io import StringIO
 from types import SimpleNamespace
 
 import pytest
@@ -9,6 +11,7 @@ from agentbench.adapter import AdapterInvocation
 from agentbench.cli.execution import run_benchmark_once
 from agentbench.cli.result_export import start_result_log
 from agentbench.cli.terminal_ui.llm_activity import LLMActivity
+from agentbench.cli.terminal_ui.live_cases import LiveCases
 from agentbench.cli.terminal_ui.progress import ProgressPrinter
 from agentbench.cli.terminal_ui.presentation import format_case_event, print_agent_complete
 from agentbench.cli.viewer import parse_result_log
@@ -144,6 +147,146 @@ def test_nonpolling_evaluation_http_prints_one_result_line():
     activity.emit(TraceEvent('tool_request', data))
     activity.emit(TraceEvent('tool_response', {**data, 'status': 201}))
     assert lines == ['[react-agent · case 2] SDK API · POST defuzex.ai/api/agentdefuze/sdk/v2/runs/ → HTTP 201']
+
+
+def test_generation_uses_saved_case_collection_for_live_case_number(tmp_path):
+    lines = []
+    activity = LLMActivity(lines.append, live_updates=False)
+    activity.set_concurrent(True)
+    evaluation = tmp_path / 'evaluation'
+    evaluation.mkdir()
+    collection = evaluation / 'case-collection.json'
+    base = {'agent_id': 'react-agent', 'job_id': 'job-long-identifier',
+            'artifact_directory': str(tmp_path), 'artifact_run_id': 'run-1',
+            'purpose': 'evaluation', 'phase': 'generate', 'host': 'defuzex.ai'}
+
+    def save(active, ready, failed=0):
+        collection.write_text(json.dumps({'requested_count': 3, 'active_case_index': active,
+                                          'cases': [{}] * ready, 'failures': [{}] * failed}))
+
+    def emit(kind, method, path, call_id, status=None):
+        data = {**base, 'method': method, 'path': path, 'call_id': call_id}
+        if status is not None:
+            data['status'] = status
+        activity.emit(TraceEvent(kind, data))
+
+    save(0, 0)
+    emit('tool_request', 'GET', '/api/sdk/entitlements/', 'check-1')
+    emit('tool_response', 'GET', '/api/sdk/entitlements/', 'check-1', 200)
+    emit('tool_request', 'POST', '/api/sdk/cases/generate/', 'generate-1')
+    emit('tool_response', 'POST', '/api/sdk/cases/generate/', 'generate-1', 202)
+    emit('tool_request', 'GET', '/api/sdk/operations/one/', 'poll-1')
+    emit('tool_response', 'GET', '/api/sdk/operations/one/', 'poll-1', 200)
+    assert lines == ['[react-agent · case 1/3] Generating · 0/3 saved',
+                     '[react-agent · case 1/3] Waiting for SDK']
+
+    save(1, 1)
+    emit('tool_request', 'POST', '/api/sdk/cases/generate/', 'generate-2')
+    emit('tool_response', 'POST', '/api/sdk/cases/generate/', 'generate-2', 202)
+    emit('tool_request', 'GET', '/api/sdk/operations/two/', 'poll-2')
+    assert lines[-2:] == ['[react-agent · case 2/3] Generating · 1/3 saved',
+                          '[react-agent · case 2/3] Waiting for SDK']
+
+    save(2, 1, 1)
+    emit('tool_request', 'POST', '/api/sdk/cases/generate/', 'generate-3')
+    emit('tool_response', 'POST', '/api/sdk/cases/generate/', 'generate-3', 503)
+    assert lines[-2:] == ['[react-agent · case 3/3] Generating · 1/3 saved · 1 failed',
+                          '[react-agent · case 3/3] SDK API · POST defuzex.ai/api/sdk/cases/generate/ → HTTP 503 · call=generate-3']
+
+
+def test_generation_progress_ignores_unreadable_collection(tmp_path):
+    lines = []
+    activity = LLMActivity(lines.append, live_updates=False)
+    activity.set_concurrent(True)
+    activity.emit(TraceEvent('tool_response', {
+        'agent_id': 'react-agent', 'job_id': 'job-1', 'phase': 'generate',
+        'artifact_directory': str(tmp_path), 'purpose': 'evaluation', 'method': 'GET',
+        'host': 'defuzex.ai', 'path': '/api/sdk/entitlements/', 'status': 200}))
+    assert lines == []
+
+
+def test_live_cases_tracks_running_slots_and_replacements():
+    stream = StringIO()
+    display = LiveCases({'react-agent': 10}, 3, stream=stream, refresh_seconds=0)
+    for index in range(3):
+        display.on_event({'event': 'case_started', 'agent_id': 'react-agent', 'case_index': index})
+    lines = display.snapshot_lines()
+    assert '3 running / 10 total · 3 workers' in lines[0]
+    assert sum('react-agent' in line and '#' in line for line in lines) == 3
+    assert any('7 pending · 0 finished' in line for line in lines)
+
+    display.on_trace(TraceEvent('llm_request', {'agent_id': 'react-agent', 'case_index': 1}))
+    assert any('#02' in line and 'Model call 1' in line for line in display.snapshot_lines())
+    display.on_event({'event': 'case_completed', 'agent_id': 'react-agent', 'case_index': 0,
+                      'status': 'completed', 'case_result': SimpleNamespace(
+                          execution_status='completed', judge_status='issue')})
+    display.on_event({'event': 'case_started', 'agent_id': 'react-agent', 'case_index': 3})
+    lines = display.snapshot_lines()
+    assert '3 running / 10 total · 3 workers' in lines[0]
+    assert any('#04' in line for line in lines)
+    assert not any('#01' in line for line in lines)
+    assert any('6 pending · 1 finished' in line for line in lines)
+    assert 'Judge issue' in stream.getvalue()
+    display.close()
+
+
+def test_live_cases_can_show_ten_concurrent_cases():
+    display = LiveCases({'react-agent': 10}, 10, stream=StringIO(), refresh_seconds=0)
+    for index in range(10):
+        display.on_event({'event': 'case_started', 'agent_id': 'react-agent', 'case_index': index})
+    lines = display.snapshot_lines()
+    assert '10 running / 10 total · 10 workers' in lines[0]
+    assert sum('react-agent' in line and '#' in line for line in lines) == 10
+    assert any('0 pending · 0 finished' in line for line in lines)
+    display.close()
+
+
+def test_live_cases_shows_actual_generation_slot(tmp_path):
+    stream = StringIO()
+    display = LiveCases({'react-agent': 10}, 3, stream=stream, refresh_seconds=0)
+    display.on_progress(BenchmarkProgress(stage='case_generation', status='started',
+                                          agent_id='react-agent', phase='generate', case_count=10))
+    evaluation = tmp_path / 'evaluation'
+    evaluation.mkdir()
+    (evaluation / 'case-collection.json').write_text(json.dumps({
+        'requested_count': 10, 'active_case_index': 3,
+        'cases': [{}, {}, {}], 'failures': []}))
+    display.on_trace(TraceEvent('tool_request', {'agent_id': 'react-agent', 'phase': 'generate',
+                                                 'artifact_directory': str(tmp_path)}))
+    assert any('generating Case 4/10 · 3 saved' in line for line in display.snapshot_lines())
+    display.close()
+
+
+def test_cli_uses_live_case_rows_for_interactive_parallel_run(monkeypatch):
+    class Terminal(StringIO):
+        def isatty(self):
+            return True
+
+    stream = Terminal()
+    monkeypatch.setattr(sys, 'stdout', stream)
+    activity = LLMActivity(print)
+
+    class Runner:
+        concurrency = ConcurrencySettings(2)
+
+        def new_suite_id(self):
+            return 'suite'
+
+        def run(self, agents, *, suite_id, on_agent_start, on_agent_complete, on_progress,
+                on_event, on_tick):
+            on_agent_start(agents[0], 1, 1)
+            for index in range(2):
+                on_event({'event': 'case_started', 'agent_id': 'react-agent', 'case_index': index})
+            activity.emit(TraceEvent('llm_request', {'agent_id': 'react-agent', 'case_index': 1}))
+            on_tick()
+            return BenchmarkSuiteResult(suite_id, ('react-agent',), (failed('react-agent'),))
+
+    run_benchmark_once((SimpleNamespace(agent_id='react-agent', case_count=2),), runner=Runner(),
+                       output_path=None, output_fn=print, viewer_starter=None, llm_activity=activity)
+    output = stream.getvalue()
+    assert 'LIVE CASES  2 running / 2 total · 2 workers' in output
+    assert '#01' in output and '#02' in output
+    assert 'Model call 1' in output
 
 
 def test_poll_summaries_keep_parallel_cases_separate():
