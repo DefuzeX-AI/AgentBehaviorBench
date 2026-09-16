@@ -119,7 +119,7 @@ agentbench run --sdk kuma --sdk-options sdk-options.json
 ```
 
 La référence complète est en anglais : [CLI reference](../../README.md#cli-and-repository-layout). Pour
-ajouter un agent, consultez le [guide d'intégration (anglais)](../How%20To%20Add%20Agent.md).
+ajouter un agent, consultez le [guide d'intégration](How%20To%20Add%20Agent.fr.md).
 
 ## Organisation du dépôt
 

@@ -1,7 +1,7 @@
 # Results and troubleshooting
 
 [Setup](../README.md) · [Agent onboarding](How%20To%20Add%20Agent.md) ·
-[中文指南](Guide.zh-CN.md)
+[中文指南](otherLanguages/Guide.zh-CN.md)
 
 ## Check the failing stage
 

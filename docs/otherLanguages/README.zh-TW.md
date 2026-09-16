@@ -1,6 +1,6 @@
 # AgentBehaviorBench (ABB)
 
-> 網頁建置需要 Node.js 20.x 至少 20.19 或 22.12+，以及 npm。先在 `web/` 執行 `npm ci`、`npm run build`，再使用 `agentbench view`。`--no-view` 不需要網頁建置。最新安裝、憑據與限制見 [主指南（英文）](../../README.md) 或 [操作指南（簡體中文）](../Guide.zh-CN.md)。
+> 網頁建置需要 Node.js 20.x 至少 20.19 或 22.12+，以及 npm。先在 `web/` 執行 `npm ci`、`npm run build`，再使用 `agentbench view`。`--no-view` 不需要網頁建置。最新安裝、憑據與限制見 [主指南（英文）](../../README.md) 或 [操作指南（簡體中文）](Guide.zh-CN.md)。
 
 <p align="center">
   <img alt="AgentBehaviorBench — 羊駝 Agent 工作流程審查" src="../figures/title.png" width="720" style="border-radius: 24px;">
@@ -113,7 +113,7 @@ agentbench run --sdk kuma --sdk-options sdk-options.json
 ```
 
 完整參數請見英文 [CLI reference](../../README.md#cli-and-repository-layout)，新增 Agent 請見
-[agent onboarding guide (English)](../How%20To%20Add%20Agent.md)。
+[Agent 接入指南](How%20To%20Add%20Agent.zh-TW.md)。
 
 ## 目錄結構
 

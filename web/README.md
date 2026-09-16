@@ -1,79 +1,88 @@
 # ABB Viewer — Vite + React + Redux
 
-本地 Suite 多 Case 总览和独立 Run 的评测、OTel、交互详情。
+A local multi-Case Suite overview and per-run evaluation, OTel and interaction details.
 
-## 首次安装与普通查看
+## Install and view results
 
-宿主机需要 Node.js 20.x 至少 20.19，或 22.12+，以及 npm；版本依据
-`package-lock.json` 中的 Vite。Python 安装不会安装网页依赖或生成 `dist/`。
+The host needs npm and Node.js 20.19+ on 20.x, or 22.12+, as required by the locked
+Vite dependency. Python installation does not install web dependencies or build dist/.
 
 ```sh
 cd web
 npm ci
 npm run build
 cd ..
-# 使用评测或离线示例打印的真实路径。
+# Use the actual result path printed by an evaluation or offline demo.
 agentbench view results/suites/<suite-id>/events.json
 ```
 
-普通 `view` 由 Python 提供 `web/dist` 和结果 API，不需要启动 npm 开发服务器。
-首次 clone 或前端修改后需要构建；headless 评测使用 `--no-view` 可跳过 Node 和构建。
-保持 viewer 命令运行，并打开终端打印的完整 URL。`dist/index.html` 不是独立报告，
-直接双击或单独发送它无法获得完整评测页面。
+Normal view serves web/dist and result APIs through Python; no npm development
+server is needed. Build after cloning or frontend changes. Headless evaluation
+uses --no-view and can skip Node and the build. Keep the viewer command running
+and open its exact printed URL. dist/index.html is not a standalone report: opening
+or sending that file alone cannot provide the full evaluation page.
 
-## 前端开发
+## Frontend development
 
-完成 npm ci 后：
+After npm ci:
 
 ```sh
 cd web
 npm run dev
 ```
 
-打开终端显示的本地地址。左侧自动列出 `results/observe/` 下的运行任务，默认加载最新一项。
-点击任务即可合并读取它的框架与网络 trace；点击「刷新」更新任务列表和当前任务内容。
-每个条目代表一次独立 observe 运行，以运行目录 ID 定位，不按 Agent 合并。
-列表只显示通用元数据：`agent_id`、运行 ID、`status` 和记录修改时间；不解析业务输入字段。
-因此研究、编程等不同 Agent，以及同一 Agent 的多次运行，都使用相同的展示规则。
-没有 trace、文件损坏、读取失败均给出提示。仍可点击「打开 trace 文件」手动多选：
+Open the printed local address. The sidebar lists runs under results/observe/ and
+selects the newest entry by default. Select a run to combine its framework and
+network traces; refresh to update the list and contents. Entries identify individual
+runs by artifact directory ID, not by Agent name. The list uses generic metadata
+(agent_id, run ID, status and modification time), not business-specific input fields.
+
+Missing traces, malformed files and read failures show diagnostics. You can also
+import multiple trace files manually:
 
 - `results/observe/<run-id>/network.jsonl`
 - `results/observe/<run-id>/invocation-*/output/framework.jsonl`
 
-页面按时间排列事件，支持搜索、来源筛选、展开完整 JSON；每次选文件替换当前列表。
-也支持 JSON 事件数组。每条记录需包含 `event`，因此 `run.json` 不是 trace 输入文件。
-损坏行会提示并跳过；单次文件总大小上限 20 MB，每批显示 100 条。
+Events appear in time order, with search, source filtering and expandable JSON.
+A new file selection replaces the current list. JSON event arrays are supported;
+each record needs event, so run.json is not a trace input file. Malformed lines are
+reported and skipped. Each import is limited to 20 MB, with 100 entries per batch.
 
-任务接口由 `server/runs.js` 提供，Vite 开发和 preview 模式均支持，无需另开 Python 服务。
-只允许本地同源 GET，限定读取 `results/observe/` 中的 trace，拒绝路径越界，单次最多 20 MB。
-手动导入文件不上传；本地运行产物每秒同步。OTel 支持执行图和调用树，载荷按需加载。
+server/runs.js provides the run API in Vite dev and preview modes without a separate
+Python server. It permits local same-origin GET requests and confined artifact
+reads, rejects path traversal and limits reads to 20 MB. Manual imports stay in the
+browser. Local artifacts refresh every second. OTel supports graph and tree views
+with payloads loaded on demand.
 
-Python `view` 提供 `web/dist` 构建产物，并自动加载绑定运行的
-原始事件。未构建或资源不完整时，CLI 预检查退出并给出构建命令。
-绑定 Suite 时默认展示所有 Agent 的全部 Case，可同时展开多个 Case。
+Python view serves the built UI and bound run events. If assets are missing or
+incomplete, CLI preflight exits with build instructions. A bound Suite displays
+all Agents and Cases and supports expanding several Cases simultaneously.
 
-## Suite 与恢复
+## Suites and recovery
 
-Suite 页面读取 Python 提供的统一快照。Redux 管理快照 revision、筛选、展开位置、
-历史 Attempt 选择和恢复命令；执行状态与 Judge 判决分别显示。
-详情严格使用该 Attempt 的 `artifact_run_id`，不会通过 Agent 名称猜测运行目录。
-断线时保留已有内容，恢复连接后同步；已选历史 Attempt 不自动切换到最新执行。
+The Suite page reads a unified Python snapshot. Redux manages snapshot revision,
+filters, expanded rows, selected historical attempts and recovery commands.
+Execution state and Judge verdict are displayed separately. Details use the
+attempt's artifact_run_id, without guessing from Agent names. A disconnect preserves
+the current content until reconnection; historical selections do not jump to a new attempt.
 
-受控会话提供“继续未完成”和按 Case 恢复。只读历史记录隐藏恢复操作。
-命令携带服务提供的控制 token 和幂等 command ID；网络响应不明确时重发原 ID。
-导出的当前报告是 JSON 快照，包含全部 Case 和尝试历史，不包含会话控制凭据。
-它不打包每个引用的 trace，也不生成独立 HTML；分享完整产物见
-[结果与故障排查](../docs/Troubleshooting.md#share-a-report)（英文）。
+Controlled sessions offer continuation and per-Case recovery. Read-only history
+hides recovery actions. Commands include the server's control token and an idempotent
+command ID; uncertain responses are retried with that same ID. Export current report
+downloads a JSON snapshot with Cases and attempt history, excluding control credentials.
+It does not bundle every trace or generate standalone HTML; see
+[sharing results](../docs/Troubleshooting.md#share-a-report).
 
-开发时对照正在运行的 Python Viewer：
+To develop against a running Python viewer:
 
 ```sh
 ABB_VIEWER_BACKEND=http://127.0.0.1:<viewer-port> ABB_SUITE_ID=<suite-id> npm run dev
 ```
 
-这两个值必须同时提供。Vite 将 `/api` 代理给该本地 Viewer，注入准确的 Suite API 路径；
-恢复规则只由 Python 实现。未设置时仍使用独立 Run 的只读本地目录 API。
-不要用这两个开发环境变量生成要分发的构建，生产页面由 Python 绑定 Suite。
+Set both values together. Vite proxies /api to that local viewer and injects the
+exact Suite API path; recovery rules remain in Python. Without these values, the
+read-only standalone run directory API remains in use. Do not set these development
+variables when building distributable assets: Python binds production pages to a Suite.
 
 ```sh
 npm test
@@ -81,5 +90,5 @@ npm run build
 npm run preview
 ```
 
-完整安装步骤见 [主 README](../README.md)（英文）和
-[中文操作指南](../docs/Guide.zh-CN.md)。
+See [README](../README.md), [the operation guide](../docs/Guide.md), or
+[简体中文操作指南](../docs/otherLanguages/Guide.zh-CN.md) for setup.

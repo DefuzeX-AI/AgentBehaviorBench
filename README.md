@@ -34,7 +34,7 @@ services such as Tavily supply its tools. These are separate accounts and roles.
 A completed evaluation may receive `pass`, `issue`, or `insufficient_evidence`.
 An `issue` is a behavioral finding; it is not automatically a container failure.
 See [results and troubleshooting](docs/Troubleshooting.md) and the
-[Chinese operation guide](docs/Guide.zh-CN.md).
+[operation guide](docs/Guide.md).
 
 ## Before you start
 
@@ -255,8 +255,9 @@ results; their saved paths may need relocation. See [sharing and failure diagnos
 
 ## Add your Agent
 
-Start with [the Agent onboarding guide](docs/How%20To%20Add%20Agent.md), or
-[the Chinese guide](docs/Guide.zh-CN.md#添加-agent).
+Start with [the Agent onboarding guide](docs/How%20To%20Add%20Agent.md).
+Use its language selector for the French, Japanese, Simplified Chinese,
+Traditional Chinese and Korean editions.
 
 ```bash
 agentbench agent add https://github.com/owner/repository

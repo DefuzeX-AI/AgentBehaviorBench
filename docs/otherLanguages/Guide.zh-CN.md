@@ -1,5 +1,7 @@
 # ABB 安装、运行与 Agent 接入
 
+[English](../Guide.md) | 简体中文
+
 ABB 负责选择 Agent、容器执行、Case 并发、证据和本地结果；KUMA SDK 定义评测
 协议，调用 DefuzeX 服务生成 Case 和判分。OpenRouter 是被测 Agent 的模型服务，
 Tavily 是部分 Agent 的搜索服务。三类服务的凭据和额度相互独立。
@@ -117,77 +119,8 @@ agentbench run --yes --no-view --output results/benchmark.json
 
 ## 添加 Agent
 
-### 1. 先把环境配好
-
-完成上面的 ABB/宿主机 KUMA 安装和 `.env` 配置：KUMA key 用于策略目录及评测，
-OpenRouter key 和模型用于生成配置与执行 Agent。生成模型必须支持严格结构化输出；
-`docker info` 必须成功。需要网页时先构建 web/，否则加 `--no-view`。
-再按目标仓库的说明准备它自己的工具 key、数据和外部服务。
-
-生成模型按 `--build-model`、build settings 的 `model`、`OPENROUTER_BUILD_MODEL`、
-`OPENROUTER_MODEL` 顺序选取；`--model` 单独控制认证时的 Agent 模型。
-
-### 2. 运行添加命令
-
-用户或协助接入的 coding agent 都可以从 ABB 根目录执行，替换目标仓库 URL：
-
-```bash
-agentbench agent add https://github.com/owner/repository -b -c
-```
-
-- `-b`：生成并验证接入文件，登记为 adapting，不是立即构建 Docker 镜像。
-- `-c`：进入实际容器认证，通过执行验收后变为 ready。
-- 不需要网页时追加 `--no-view`。
-
-程序会下载源码、规划接入、逐文件生成和验证，然后询问是否进行认证。
-生成与认证可能产生费用。目前自动配置支持 LangGraph，不代表任意 Agent 仓库都可直接运行。
-
-想先检查生成的文件，去掉 `-c`：
-
-```bash
-agentbench agent add https://github.com/owner/repository -b
-```
-
-两个参数都不加时，只下载源码、输出发现的配置路径，不会生成接入文件或注册可运行 Agent。
-
-### 3. 了解每个文件做什么
-
-接入文件位于 `resources/agents/NN-name/`，由命令生成，不要求用户在运行命令前手写齐全。
-
-| 文件 | 作用 |
-| --- | --- |
-| `agent/` | 下载的原始 Agent 源码，保留真实推理和工具行为。 |
-| `agent.toml` | 告诉 ABB 如何构建、启动、调用 Agent，以及输入输出映射、环境变量、模型和工具路由。 |
-| `bindings/*.py` | 连接 ABB 与原生 Agent，处理格式转换和生命周期；不能替换成假的简化 Agent。 |
-| `Dockerfile` | 安装容器内依赖，复制源码和接入文件；宿主机安装不等于容器已安装。 |
-| `.dockerignore` | 排除 key、宿主机 venv、缓存和结果，保留构建所需源码；由 ABB 模板生成。 |
-| `requirement.md` | 向 SDK 描述实际能力、行为要求和限制，指导评测；它不会给 Agent 增加工具。 |
-| `evaluation/` | 可选的 schema/fixture；没有引用时不用创建，也不要求 input-contract.json。 |
-| `resources/registry.toml` | 位于单元之外，登记路径、启用状态、adapting/ready 和 Case 数量。 |
-
-Profile 要写已部署的能力，而不是“理论上可以扩展”：只有搜索工具就明确没有代码执行、
-文件持久化或服务控制能力。策略组从当前 SDK 目录选择，不照抄历史 ID。
-
-`source-manifest.json` 是**下载器自动生成的内部来源记录**，用于识别仓库和 revision、
-复用下载；不是 KUMA 要求用户准备的配置文件。
-`cache/onboarding/<unit-name>-<path-digest>/` 下的计划、steps 和 build-state.json
-也是自动记录，不属于 Agent 源码。
-
-只运行 `-b` 后，可准备与 binding 匹配的 native-input.json，再逐步验证：
-
-```bash
-agentbench observe AGENT_ID --input native-input.json
-agentbench evaluate AGENT_ID --cases 1 --no-view
-agentbench certify AGENT_ID --no-view
-```
-
-`observe` 不调用 Case/Judge，但模型和工具仍可能收费。`evaluate --cases 1` 不修改
-注册表数量，`certify` 使用注册表中的 Case 数。Judge issue 可以与认证成功并存。
-已 ready 时 `certify` 直接返回，修改后的重新验证使用 `evaluate`。
-
-生成中断时看 `build-result.json` 和失败步骤，修正后重跑原 `-b` 命令；它会复用有效文件，
-人工文件冲突会停止。规划需要补充信息时可加 `--answers answers.txt`。
-详细说明见 [Agent 接入指南（英文）](How%20To%20Add%20Agent.md)。
+请按 [Agent 接入指南](How%20To%20Add%20Agent.zh-CN.md) 操作：先配置环境，
+再运行添加命令，最后了解每个文件的用途。该指南提供与 README 相同的六种语言。
 
 ## 结果与故障处理
 
@@ -220,5 +153,5 @@ Suite 在 `results/suites/<suite-id>/` 保存计划、Case 和 events.json；每
 把其他历史移到 `cache/history-trash/`，不删除 Agent、key、注册表或 Docker 镜像。
 先停止运行与查看器，再确认清理。
 
-更详细的限制见 [故障排查（英文）](Troubleshooting.md) 和
-[文档 issue 核对记录（英文）](Documentation-Issue-Audit.md)。
+更详细的限制见 [故障排查（英文）](../Troubleshooting.md) 和
+[文档 issue 核对记录（英文）](../Documentation-Issue-Audit.md)。

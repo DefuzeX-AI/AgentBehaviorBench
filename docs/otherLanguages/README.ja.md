@@ -118,7 +118,7 @@ agentbench run --sdk kuma --sdk-options sdk-options.json
 ```
 
 すべての引数は英語版の [CLI reference](../../README.md#cli-and-repository-layout) を、Agent の追加は
-[agent onboarding guide (English)](../How%20To%20Add%20Agent.md) を参照してください。
+[Agent の追加ガイド](How%20To%20Add%20Agent.ja.md) を参照してください。
 
 ## リポジトリ構成
 

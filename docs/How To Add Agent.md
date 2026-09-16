@@ -1,9 +1,11 @@
 # Add an Agent
 
+English | [Français](otherLanguages/How%20To%20Add%20Agent.fr.md) | [日本語](otherLanguages/How%20To%20Add%20Agent.ja.md) | [简体中文](otherLanguages/How%20To%20Add%20Agent.zh-CN.md) | [繁體中文](otherLanguages/How%20To%20Add%20Agent.zh-TW.md) | [한국어](otherLanguages/How%20To%20Add%20Agent.ko.md)
+
 Follow this order: **prepare the environment → run the add command → review the
 files it creates**. A user or coding assistant can follow the same workflow.
 Run all commands from the ABB repository root unless a command changes directory.
-[中文操作指南](Guide.zh-CN.md#添加-agent) is also available.
+This English page is the default; use the language links above for translations.
 
 ## 1. Prepare the environment
 

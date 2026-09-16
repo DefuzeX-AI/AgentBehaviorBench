@@ -90,3 +90,18 @@ During local install verification, Python 3.14 ignored the editable-install .pth
 because it had macOS's hidden file flag. Clearing that flag on the single ABB .pth
 restored the console command. This was a local environment repair, not a repository
 code change or evidence that every installation has that condition.
+
+## Localization follow-up
+
+Default unsuffixed entry points are English: Guide.md and How To Add Agent.md.
+The Chinese operation guide moved to otherLanguages/Guide.zh-CN.md; its onboarding
+section links to the dedicated translation rather than maintaining a second copy.
+How To Add Agent now has French, Japanese, Simplified Chinese, Traditional Chinese
+and Korean editions under otherLanguages/, matching every localized README.
+Each README links to its matching guide, and each guide links to all other languages.
+The web README also uses English as its default language.
+
+All five onboarding translations retain the default guide's eight command/example
+blocks and four main sections. test_issue46.py verifies local path spelling,
+per-language README routing and reciprocal language navigation (2 tests passed).
+This follow-up changes documentation and navigation checks only.

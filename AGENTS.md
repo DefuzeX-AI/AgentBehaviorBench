@@ -135,8 +135,11 @@ troubleshooting as issues are confirmed.
 - Verify commands against actual `--help`, configuration precedence against code,
   and local links against exact Git path spelling/case. Do not leave empty
   troubleshooting headings or links to removed reports/CLI guides.
-- Keep the Chinese operation guide aligned with prerequisites and onboarding.
-  Label untranslated deeper links in localized entry points.
+- Keep unsuffixed public documentation entry points in English. Put translations
+  under docs/otherLanguages/ with language suffixes and reciprocal language links.
+  Maintain How To Add Agent in every README language, with the same environment,
+  command and file-purpose structure. Each localized README must link to its own
+  onboarding translation; label any remaining untranslated deeper references.
 - Treat issue reports as claims to check against the current revision. Record
   documentation fixes separately from unresolved runtime/packaging issues; never
   claim that documenting a workaround resolves a code defect.

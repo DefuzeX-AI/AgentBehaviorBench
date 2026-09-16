@@ -116,7 +116,7 @@ agentbench run --sdk kuma --sdk-options sdk-options.json
 ```
 
 전체 인수는 영어 [CLI reference](../../README.md#cli-and-repository-layout)를, Agent 추가는
-[agent onboarding guide (English)](../How%20To%20Add%20Agent.md)를 참조하세요.
+[Agent 추가 가이드](How%20To%20Add%20Agent.ko.md)를 참조하세요.
 
 ## 저장소 구성
 
