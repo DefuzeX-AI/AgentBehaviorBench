@@ -204,11 +204,13 @@ def build_viewer_handler(
 
             suite_path = _suite_view_path(expected_suite_id)
             if parsed.path.rstrip("/") == suite_path.rstrip("/"):
-                index = WEB_ROOT / "index.html"
-                if not index.is_file():
-                    self.send_error(HTTPStatus.SERVICE_UNAVAILABLE,
-                                    "Trace UI not built. Run npm install and npm run build in web/.")
+                try:
+                    require_viewer_assets()
+                except ViewerUnavailable as exc:
+                    # The same wording as `agentbench view`; paths go in the body, not the status line.
+                    self.send_error(HTTPStatus.SERVICE_UNAVAILABLE, explain=str(exc))
                     return
+                index = WEB_ROOT / "index.html"
                 html = index.read_text(encoding="utf-8")
                 if suite_view:
                     html = html.replace("<head>", f'<head><meta name="abb-result-api" content="{escape(result_api_path, quote=True)}">', 1)
