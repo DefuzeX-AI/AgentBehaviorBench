@@ -129,7 +129,7 @@ OPENROUTER_APP_TITLE=AgentBehaviorBench
 | `agentbench evaluate company-research-agent --cases 1` | 指定数の独立した Case で 1 つの Agent を評価します。 |
 | `agentbench observe company-research-agent` | ネイティブ入力で Agent を実行して trace を保存します。Case の作成や Judge 呼び出しは行いません。 |
 | `agentbench certify NEW-AGENT` | `adapting` Agent を認定し、成功時に `ready` へ昇格します。 |
-| `agentbench view results/benchmark.json` | 保存済み結果をローカルビューアで開きます（先に `web/` をビルド。クイックスタート参照）。 |
+| `agentbench view RESULT.json` | 保存済み結果をローカルビューアで開きます。パスは実行終了時に `Result saved:` の後に表示されるタイムスタンプ付きファイルです（先に `web/` をビルド。クイックスタート参照）。 |
 | `agentbench sdk list` | SDK adapter ディレクトリを、実装を import せずに一覧表示します。 |
 | `agentbench clean --dry-run` | `clean` が `cache/history-trash/` へ移動する、`results/` 内の参照されていない項目を表示します。削除はしません。 |
 

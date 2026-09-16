@@ -122,7 +122,7 @@ OPENROUTER_APP_TITLE=AgentBehaviorBench
 | `agentbench evaluate company-research-agent --cases 1` | 以指定數量的獨立 Case 評測一個 Agent。 |
 | `agentbench observe company-research-agent` | 使用原生輸入執行一個 Agent 並保存 trace，不建立 Case，也不呼叫 Judge。 |
 | `agentbench certify NEW-AGENT` | 認證 `adapting` Agent；成功後將其升為 `ready`。 |
-| `agentbench view results/benchmark.json` | 在本機檢視器重新開啟結果（需先建置 `web/`，見快速開始）。 |
+| `agentbench view RESULT.json` | 在本機檢視器重新開啟結果；路徑是執行結束時 `Result saved:` 後印出的檔案（含時間戳記）。需先建置 `web/`，見快速開始。 |
 | `agentbench sdk list` | 列出 SDK adapter 目錄，不匯入 SDK 實作。 |
 | `agentbench clean --dry-run` | 預覽 `clean` 會移入 `cache/history-trash/` 的 `results/` 下未被參照的項目；不會刪除任何內容。 |
 

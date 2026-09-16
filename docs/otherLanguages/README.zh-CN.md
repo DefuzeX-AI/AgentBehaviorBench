@@ -123,7 +123,7 @@ OPENROUTER_APP_TITLE=AgentBehaviorBench
 | `agentbench evaluate react-agent --cases 1` | 用指定数量的独立 Case 评测一个 Agent。 |
 | `agentbench observe react-agent` | 用原生输入运行一个 Agent 并保存 trace，不创建 Case，也不调用 Judge。 |
 | `agentbench certify NEW-AGENT` | 认证 `adapting` Agent；成功后将其提升为 `ready`。 |
-| `agentbench view results/benchmark.json` | 在本地查看器中重新打开结果（需先构建 `web/`，见快速开始）。 |
+| `agentbench view RESULT.json` | 在本地查看器中重新打开结果；路径是运行结束时 `Result saved:` 后打印的文件（带时间戳）。需先构建 `web/`，见快速开始。 |
 | `agentbench sdk list` | 列出 SDK 适配器目录，不导入 SDK 实现。 |
 | `agentbench clean --dry-run` | 预览 `clean` 会移入 `cache/history-trash/` 的 `results/` 下未被引用的条目；不会删除任何内容。 |
 

@@ -132,7 +132,7 @@ version installée ; c'est la référence complète des options.
 | `agentbench evaluate company-research-agent --cases 1` | Évalue un agent sur un nombre choisi de Cases indépendants. |
 | `agentbench observe company-research-agent` | Exécute un agent avec une entrée native et enregistre les traces, sans Case ni Judge. |
 | `agentbench certify NEW-AGENT` | Certifie un agent `adapting` et le promeut en `ready` en cas de succès. |
-| `agentbench view results/benchmark.json` | Rouvre un résultat dans le visualiseur local (construisez `web/` d'abord ; voir Démarrage rapide). |
+| `agentbench view RESULT.json` | Rouvre dans le visualiseur local le résultat dont le chemin horodaté suit `Result saved:` à la fin d'une exécution (construisez `web/` d'abord ; voir Démarrage rapide). |
 | `agentbench sdk list` | Liste les répertoires d'adaptateurs SDK sans importer leurs implémentations. |
 | `agentbench clean --dry-run` | Affiche les entrées non référencées de `results/` que `clean` déplacerait dans `cache/history-trash/`. Rien n'est supprimé. |
 

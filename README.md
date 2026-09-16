@@ -67,11 +67,12 @@ the harness and viewer format; it does not test the official Kuma service.
 
 The result viewer is built from `web/` and is not checked in. Build it once
 before opening results; `run`, `evaluate` and `certify` start it after a run, and
-`agentbench view` reopens a saved result:
+`agentbench view` reopens a saved result. Result files are timestamped, so open
+the path the run printed, here after `OFFLINE_RESULT=`:
 
 ```bash
 (cd web && npm ci && npm run build)   # Windows PowerShell: cd web; npm ci; npm run build; cd ..
-agentbench view results/offline-demo.json
+agentbench view results/offline-demo-YYYYMMDD-HHMMSS.json
 ```
 
 KUMA's adapter lives in `agentbench/sdk/plugin/kuma/`. Its evaluation image
@@ -242,7 +243,7 @@ The most useful commands are:
 | `agentbench evaluate react-agent --cases 1` | Evaluate one enabled Agent on a chosen number of independent Cases. |
 | `agentbench observe react-agent` | Run one enabled Agent with native input and save traces, without creating Cases or calling a Judge. |
 | `agentbench certify NEW-AGENT` | Run an `adapting` Agent and promote it to `ready` only after certification succeeds. |
-| `agentbench view results/benchmark.json` | Reopen a saved benchmark result in the local viewer (build `web/` first; see Quick start). |
+| `agentbench view RESULT.json` | Reopen a saved result, the path a run prints after `Result saved:`, in the local viewer (build `web/` first; see Quick start). |
 | `agentbench resume SUITE` | Continue unfinished slots using saved Cases and original request state. |
 | `agentbench retry SUITE --agent ID --case N` | Explicitly recover one unfinished Case; numbers start at 1. |
 | `agentbench reuse SUITE` | Start a linked new evaluation using the same Cases under the current code. |
