@@ -72,6 +72,13 @@ for stage ordering, checkpoints and extension points.
   `requirement.md` as its Agent Profile. An `evaluation/` directory is optional for
   referenced schemas or fixtures; do not require an empty directory or restore
   the obsolete `evaluation/input-contract.json` marker.
+- Ground Agent Profiles in the deployed tool definitions, binding and configuration.
+  Enumerate what tools can actually do, what task data must be supplied and what is
+  unavailable. Do not turn extensible architecture into claimed capabilities or
+  describe installation/interception plumbing as behavioral test criteria. State
+  how missing capabilities should be handled without claiming unperformed actions.
+  Profile edits change future evaluation context; they do not add Agent tools or
+  alter previously generated Cases. Validate with the pinned official SDK parser.
 - Obtain available strategy groups through the SDK onboarding context, supply
   that catalog to generation and validate selections against the same snapshot.
   Do not invent or hardcode a strategy group ID in generic onboarding code.
@@ -112,8 +119,32 @@ the suite passes.
 
 ## Maintain the user documentation
 
-Keep README's setup and onboarding links usable. Keep the Agent addition guide
-command-first and add troubleshooting under the relevant file as issues are
-confirmed. Match link spelling and case to Git's tracked paths. Update references
-when moving or removing files, and avoid fixed Agent counts or readiness claims
-that duplicate `resources/registry.toml`.
+Keep README's setup and onboarding links usable. Order the Agent addition guide
+as environment setup, the runnable add command, then each file's purpose. Mark
+automatic internal records separately from user-prepared configuration. Add
+troubleshooting as issues are confirmed.
+
+- Separate host CLI dependencies, frontend build dependencies, host SDK validation
+  and Agent image/service dependencies. Derive versions from pyproject.toml,
+  web/package-lock.json and plugin requirements; explain which workflows need them.
+- Document Node/npm and `npm ci` / `npm run build` before promising a viewer.
+  Headless runs do not need frontend assets; Python serves the built normal viewer.
+- Verify installation with CLI help, SDK discovery and the zero-credential offline
+  demo before asking users to configure paid services. Use the printed timestamped
+  result path when demonstrating `view`.
+- Verify commands against actual `--help`, configuration precedence against code,
+  and local links against exact Git path spelling/case. Do not leave empty
+  troubleshooting headings or links to removed reports/CLI guides.
+- Keep unsuffixed public documentation entry points in English. Put translations
+  under docs/otherLanguages/ with language suffixes and reciprocal language links.
+  Maintain How To Add Agent in every README language, with the same environment,
+  command and file-purpose structure. Each localized README must link to its own
+  onboarding translation; label any remaining untranslated deeper references.
+- Treat issue reports as claims to check against the current revision. Record
+  documentation fixes separately from unresolved runtime/packaging issues; never
+  claim that documenting a workaround resolves a code defect.
+- Keep readiness, enabled state and Case counts in resources/registry.toml rather
+  than duplicating transient acceptance claims in documentation.
+- Explain execution status separately from Judge verdict. Do not equate a received
+  report with host acceptance, evidence insufficiency with a proven Agent defect,
+  or a JSON export with a standalone HTML/full-trace archive.

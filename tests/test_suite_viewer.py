@@ -136,6 +136,56 @@ def test_readonly_viewer_does_not_start_control_for_imported_history(store, monk
         assert request(base + '/api/suites/suite_view/commands', body={'action': 'resume'}, origin=base)[0] == 403
 
 
+@pytest.mark.parametrize('path', ['/api/suites/suite_view/result', '/api/observe/runs'])
+@pytest.mark.parametrize('failure, write_number', [
+    (BrokenPipeError, 1), (ConnectionResetError, 2),
+])
+def test_disconnected_viewer_client_does_not_send_another_response(store, path, failure, write_number):
+    """A browser cancellation during headers or body must not trigger a fallback reply."""
+    class DroppedConnection:
+        writes = 0
+
+        def write(self, payload):
+            self.writes += 1
+            if self.writes == write_number:
+                raise failure('client disconnected')
+            return len(payload)
+
+    handler_type = viewer.build_viewer_handler(store.path, expected_suite_id='suite_view')
+    handler = object.__new__(handler_type)
+    handler.path = path
+    handler.command = 'GET'
+    handler.requestline = f'GET {path} HTTP/1.1'
+    handler.request_version = 'HTTP/1.1'
+    handler.headers = {'Host': '127.0.0.1:8765'}
+    handler.wfile = DroppedConnection()
+
+    handler.do_GET()
+
+    assert handler.wfile.writes == write_number
+
+
+def test_invalid_suite_snapshot_still_returns_service_error(store, monkeypatch):
+    handler_type = viewer.build_viewer_handler(store.path, expected_suite_id='suite_view')
+    handler = object.__new__(handler_type)
+    handler.path = '/api/suites/suite_view/result'
+    handler.command = 'GET'
+    handler.requestline = 'GET /api/suites/suite_view/result HTTP/1.1'
+    handler.request_version = 'HTTP/1.1'
+    handler.headers = {'Host': '127.0.0.1:8765'}
+    handler.wfile = io.BytesIO()
+
+    def invalid_snapshot(_):
+        raise ValueError('invalid snapshot')
+
+    monkeypatch.setattr(viewer, 'parse_result_log', invalid_snapshot)
+    handler.do_GET()
+
+    response = handler.wfile.getvalue()
+    assert b'503 Service Unavailable' in response
+    assert b'Suite snapshot unavailable' in response
+
+
 @pytest.mark.parametrize('headers, body', [
     ({'Content-Type': 'text/plain', 'Content-Length': '2'}, b'{}'),
     ({'Content-Type': 'application/json', 'Content-Length': '20000'}, b'{}'),

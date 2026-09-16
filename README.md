@@ -1,10 +1,5 @@
 # AgentBehaviorBench (ABB)
 
-> **Before you run ABB:** install Python 3.10+, Docker Desktop or Docker
-> Engine (running). The KUMA evaluation image installs its SDK from PyPI. The bundled
-> ReAct research Agent needs `KUMA_API_KEY` (or `DEFUZEX_API_KEY`),
-> `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, and `TAVILY_API_KEY`.
-
 <p align="center">
   <img
     alt="AgentBehaviorBench — llama agents reviewing workflows"
@@ -29,358 +24,296 @@
   <img alt="Package version 0.1.0" src="https://img.shields.io/badge/pypi%20package-0.1.0-2acb16">
 </p>
 
-AgentBehaviorBench runs registered AI agents in isolated runtimes, captures
-their execution evidence, and evaluates the result through a selectable SDK.
-SDK adapters are discovered from directories under `agentbench/sdk/plugin/`. With
-one adapter it is selected automatically; with several, choose `--sdk NAME`.
-This checkout currently includes KUMA. Results are written locally and can be
-inspected in ABB's browser viewer.
+ABB is for developers evaluating how an Agent behaves in a concrete task: what
+it was asked, what it actually did, and whether the evidence supports its answer.
+ABB runs Agents, isolates Cases, captures traffic and traces, and saves results.
+The **KUMA SDK** defines Cases and submits evidence to the **DefuzeX service** for
+Case generation and judging. OpenRouter supplies the tested Agent's model;
+services such as Tavily supply its tools. These are separate accounts and roles.
 
-ABB owns Agent selection, containers, concurrency, observation and local results.
-Kuma owns the Case/Input/Submission/Report contract and calls the DefuzeX service
-for official scenario generation and judging. A Case tests behavior in a scenario;
-its Judge report is not a general intelligence score. A behavioral `issue` is a
-completed evaluation finding. An invocation or evidence failure is recorded separately.
+A completed evaluation may receive `pass`, `issue`, or `insufficient_evidence`.
+An `issue` is a behavioral finding; it is not automatically a container failure.
+See [results and troubleshooting](docs/Troubleshooting.md) and the
+[operation guide](docs/Guide.md).
 
-## Quick start
+## Before you start
 
-From the repository root, create a virtual environment and install ABB:
+Use a **source checkout with an editable installation** for the complete CLI,
+Agent resources and viewer. A standalone Python wheel does not include the
+repository's `resources/` or `web/dist/` assets.
+
+| Install on the host | Needed for | Verify |
+| --- | --- | --- |
+| Git | Clone ABB and download Agent repositories | `git --version` |
+| Python 3.10+ with pip and venv | CLI, harness and offline demo | `python3 --version` |
+| Docker Desktop or Docker Engine, running and accessible to your user | Docker Agent execution and official evaluation | `docker info` |
+| Node.js **20.19+ in the 20.x line, or 22.12+** and npm | Build the browser viewer; optional for headless runs | `node --version` and `npm --version` |
+| A browser | Open the local viewer URL | Use the exact URL printed by ABB |
+
+Node's version requirement comes from the locked Vite dependencies in
+[web/package-lock.json](web/package-lock.json). Node is needed to build or develop
+the viewer; the normal `agentbench view` server is Python and serves `web/dist`.
+Installing Python dependencies does **not** install or build the web application.
+
+- **macOS:** install and start [Docker Desktop](https://docs.docker.com/desktop/setup/install/mac-install/).
+  Agent base images and binary dependencies must support your CPU architecture.
+- **Linux:** install [Docker Engine](https://docs.docker.com/engine/install/), then follow
+  its [post-installation guidance](https://docs.docker.com/engine/install/linux-postinstall/)
+  so the same user running ABB can access Docker. `docker info` must succeed.
+- **Windows:** use [Docker Desktop with WSL 2](https://docs.docker.com/desktop/features/wsl/)
+  and a Linux distribution for the shell commands below. Native PowerShell and
+  individual Agent images have not been verified by this documentation update.
+- The offline demo uses an in-process Agent and needs no Docker. This is not an
+  automatic fallback for Docker registrations. Agent Python packages, browsers,
+  database services, local models and tool credentials are **per-Agent requirements**;
+  downloading a repository does not provision them.
+
+First installation requires access to Python/npm registries; Docker builds also
+need image registries and Agent dependency sources. Official runs require access
+to DefuzeX, OpenRouter and the selected Agent's permitted tool endpoints. For
+custom endpoints and network failures, see [troubleshooting](docs/Troubleshooting.md).
+
+## Install and verify without credentials
 
 ```bash
+git clone https://github.com/DefuzeX-AI/AgentBehaviorBench.git
+cd AgentBehaviorBench
 python3 -m venv .venv
-source .venv/bin/activate              # Windows PowerShell: .venv\Scripts\Activate.ps1
+source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -e "."
-agentbench sdk list                   # Should list kuma without requiring credentials.
+python -m pip install -e .
+agentbench --help
+agentbench sdk list
 ```
 
-Try the complete local flow before configuring accounts:
+`--help` should list commands including `run`, `agent`, `observe` and `view`.
+`sdk list` should list `kuma`; discovery does not test credentials or install the
+SDK. If the console command points at an old checkout, activate this environment
+and repeat `python -m pip install -e .`.
+
+Try the harness without Docker, keys or model calls:
 
 ```bash
 python -m examples.offline_demo --output results/offline-demo.json
 ```
 
-This runs an echo Agent and deterministic local Judge without Docker, credentials,
-or network. The `OFFLINE_RESULT=` line identifies the saved file. It demonstrates
-the harness and viewer format; it does not test the official Kuma service.
+Expected summary: `Case execution: 1/1 completed | Judge: pass=1`.
+The `OFFLINE_RESULT=` line prints the **actual timestamped file path**. It is a
+local echo Agent with a deterministic Judge, not an official KUMA acceptance run.
 
-KUMA's adapter lives in `agentbench/sdk/plugin/kuma/`. Its evaluation image
-installs `kuma-defuzex[otel]==0.2.7` from PyPI, as declared in the adapter's
-`requirements.txt`; no local SDK source checkout is required. The distribution
-is named `kuma-defuzex`, while Python code imports `kuma`.
-
-Create the local environment file and add the required credentials:
+## Build and open the viewer
 
 ```bash
-cp .env.example .env                   # Windows PowerShell: Copy-Item .env.example .env
+cd web
+npm ci
+npm run build
+cd ..
+# Replace the example path with the exact OFFLINE_RESULT path printed above.
+agentbench view results/offline-demo-YYYYMMDD-HHMMSS.json
 ```
+
+The build creates `web/dist/index.html` and its assets. A fresh clone has no
+`web/dist`; rebuild after changing frontend code or dependencies. Open the exact
+`View:` URL, including its Suite path. ABB defaults to local port 8765 and selects
+an available port if occupied. Keep the command running while viewing results;
+Ctrl+C stops the viewer. You do not need `npm run dev` for normal benchmark use.
+
+Use `--no-view` with `run`, `evaluate` or `certify` to save results without starting
+the viewer; Node and the frontend build are then unnecessary. Build later and
+open the saved result. Frontend development instructions are in [web/README.md](web/README.md).
+
+## Configure a real evaluation
+
+Copy the template once; keep an existing `.env` when upgrading:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` locally:
 
 ```dotenv
-# Required when using the KUMA evaluation SDK. DEFUZEX_API_KEY is accepted too.
 KUMA_API_KEY=
-
-# Required for model calls made by Docker-based Agents.
 OPENROUTER_API_KEY=
 OPENROUTER_MODEL=openai/gpt-4.1-mini
-
-# Required by the ReAct and Company Research Agents for web research.
 TAVILY_API_KEY=
+ABB_MAX_PARALLEL_CASES=1
 ```
 
-Install [Docker for your platform](https://docs.docker.com/get-started/get-docker/)
-and start it. Check `docker info` before running an Agent. The checked-in registry
-currently enables five Agents. ReAct and GPT Researcher are `ready`;
-TradingAgents, Waku Agent and Article Explainer are `adapting`. Company Research
-remains disabled. Evaluate an adapting Agent and certify it only after its native
-deployment requirements are satisfied:
+| Setting | Meaning / where to obtain it |
+| --- | --- |
+| `KUMA_API_KEY` | Official Case/Judge access. See [DefuzeX SDK documentation](https://defuzex.ai/documentation?view=sdk) and [KUMA documentation](https://github.com/DefuzeX-AI/KUMA-DefuzeX). Use the key issued for that service. |
+| `DEFUZEX_API_KEY` | ABB's alternative name for the same service credential. A nonempty `KUMA_API_KEY` takes precedence; only one is needed. |
+| `OPENROUTER_API_KEY` | Model access from [OpenRouter API keys](https://openrouter.ai/settings/keys). |
+| `OPENROUTER_MODEL` | **Required model slug**, not a key. The value in `.env.example` is an example, not a runtime fallback. Select a model supported by your account and the Agent's tool/protocol needs. |
+| `TAVILY_API_KEY` | Search access from [Tavily](https://app.tavily.com/) for Agents using its search tool. |
+| `ABB_MAX_PARALLEL_CASES` | Positive integer; default 1. For example 4 permits up to four concurrent Cases across all selected Agents. |
+
+These commands need different services:
+
+| Action | Docker | KUMA key | OpenRouter key + model | Agent tool keys |
+| --- | --- | --- | --- | --- |
+| CLI help, SDK discovery, offline demo, saved-result viewer | No | No | No | No |
+| `agent add URL` (download only) | No | No | No | No |
+| `agent add URL -b` with KUMA | No | Yes, for strategy catalog | Yes, structured-output build model | Not executed during generation |
+| `observe` a Docker Agent | Yes | No | Yes | As declared by that Agent |
+| `evaluate`, `run`, `certify` with KUMA and Docker Agents | Yes | Yes | Yes | As declared by that Agent |
+
+Model, search and evaluation services have separate quotas/billing. An API key's
+existence does not prove the chosen model or endpoint is usable. `observe` is a
+useful native-input check before paying for Case generation; its model/tool calls
+can still be billed.
+
+The CLI loads the checkout's `.env`. Exported shell variables take precedence,
+including an exported empty value; `--env-file PATH` selects a different file.
+`--model MODEL` overrides the Agent model for that command. Python library callers
+supply their environment explicitly. `.env` is not copied wholesale into Agent
+containers: the runtime resolves declared keys and the interceptor supplies model
+credentials. The bundled ReAct route therefore does not require a real
+`ANTHROPIC_API_KEY` on the host.
+
+KUMA's distribution is `kuma-defuzex`; the Python import is `kuma`. Evaluation
+images install the pinned package from
+[the plugin requirements](agentbench/sdk/plugin/kuma/requirements.txt). For `-b`
+profile validation and host SDK inspection, install the same requirements in
+**this host venv**:
 
 ```bash
-agentbench evaluate trading-agents --cases 1 --max-steps 1
-agentbench certify trading-agents
+python -m pip install -r agentbench/sdk/plugin/kuma/requirements.txt
+python -c "from importlib.metadata import version; import kuma; print(version('kuma-defuzex')); print(kuma.__file__)"
 ```
 
-Certification requires successful execution and accepted evidence for every Case;
-a Judge finding does not prevent readiness. Once certification makes it `ready`,
-run every enabled ready Agent:
+Do not use the old `.[defuzex]` extra or a local SDK checkout as a substitute.
+An IDE must select this same `.venv` interpreter to resolve KUMA imports.
+
+## Run one Agent, then a Suite
+
+Inspect available enabled Agents before starting a run:
+
+```bash
+agentbench observe --list
+agentbench evaluate react-agent --cases 1 --no-view
+```
+
+The single-Case example asks for confirmation, then runs Case generation, Agent
+execution, evidence capture and Judge. One Case can contain multiple ordered
+inputs. `--max-steps` can bound the SDK's input execution, but truncating a scenario
+may affect whether Judge has sufficient evidence.
+
+`resources/registry.toml` is authoritative for IDs, `enabled`, `status` and `case`
+counts. The source units currently present are ReAct (Tavily search) and Company
+Research (company research); both declare Tavily access. Do not infer readiness
+or enabled state from an old README or campaign report.
+
+- `adapting`: integration has been registered but needs certification.
+- `certify AGENT_ID`: executes the configured Cases and promotes to `ready` only
+  when execution completes successfully. Judge issues can coexist with readiness.
+  Calling it on an already-ready Agent returns without a new certification run.
+- `run`: selects all enabled `ready` Agents and uses each registry `case` count.
+
+After the single-Agent check:
 
 ```bash
 agentbench run
-```
-
-ABB asks you to confirm the selected Agents, saves a result snapshot under
-`results/`, and starts the local viewer. Use `--yes --no-view` for a non-interactive
-or headless run:
-
-```bash
+# Non-interactive and headless:
 agentbench run --yes --no-view --output results/benchmark.json
 ```
 
-To execute up to four Cases at once, set this single value in `.env`:
+Set `ABB_MAX_PARALLEL_CASES=4` for up to four concurrent Cases. Cases from one Agent
+can share the pool; inputs inside each Case stay ordered. Each Case has its own
+execution session and artifacts. This setting does not limit tool concurrency
+inside an Agent. More workers consume more Docker resources and service quota.
 
-```dotenv
-ABB_MAX_PARALLEL_CASES=4
-```
+## Results, recovery and sharing
 
-The default is `1`. Cases from the same Agent can run together: one Agent with
-four Cases can use all four workers. Across several Agents, the shared pool
-never exceeds the configured Case limit. Inputs within one Case remain ordered.
-ABB prepares each Agent's Case collection once, then gives each Case its own
-runner, container session, working files, trace identity, and result.
-
-The startup line shows the actual pool size, for example
-`Case workers: 4 (configured: 4)`. Image caching and build coordination are
-internal. Each Case keeps its own status, and final results are ordered by
-Agent registration then Case index. Ctrl+C cancels active work, retains finished
-Case results, and records cancelled or skipped Cases explicitly.
-
-Directory SDK runs also retain a fixed plan and immutable Case files under
-`results/suites/<suite-id>/` (or `suites/` beside a custom output base). Reopen the
-printed `events.json` path to view all Cases and their attempt histories together.
-The viewer can continue unfinished work or retry an eligible Case; its partial
-report includes completed results even while other Cases are blocked.
+Use the printed paths, not a guessed filename: output bases may be timestamped.
+A managed Suite keeps its plan, Cases and event history under
+`results/suites/<suite-id>/`; detailed attempts are under `results/observe/<run-id>/`.
+The viewer shows Agent/Case rows, attempt history, execution state, Judge verdict,
+inputs/outputs and available OTel details. A completed `issue` is not retried until
+it becomes a `pass`.
 
 ```bash
+agentbench view results/suites/<suite-id>/events.json
 agentbench resume results/suites/<suite-id>/events.json
 agentbench retry results/suites/<suite-id>/events.json --agent react-agent --case 3
+agentbench reuse results/suites/<suite-id>/events.json
 ```
 
-Completed Judge findings are retained, including `issue`; they are not retried
-until a passing verdict appears. Safe transient execution failures have at most
-two automatic retries by default. `--case-retries 0` disables these, and
-`--retry-delay` sets the initial backoff for run/evaluate/certify. Unknown accepted
-requests and unconfirmed cleanup remain blocked instead of duplicating work.
-See [recovery behavior and module boundaries](docs/Suite-Recovery-Implementation.md)
-and [reusing Cases after changing code or model](docs/Case-Reuse-Commands.md).
+`resume` continues eligible unfinished work; `retry` targets an unfinished Case
+(numbered from 1); `reuse` creates a new linked Suite using saved Cases and current
+code. Recovery depends on saved request state, replay safety and cleanup. Some
+uncertain requests remain blocked. These commands do not promise every failure
+can be retried. `--case-retries 0` disables automatic Case retries for new runs;
+inspect command help for backoff options.
 
-Concurrent execution requires an SDK adapter supporting independent Case
-execution and cancellation. Python callers pass
-`ConcurrencySettings(max_parallel_cases=4)` to `SuiteRunner`; the library does
-not implicitly load a dotenv file.
+**Export current report** downloads a JSON snapshot, not a standalone HTML report
+or an archive of every trace. `web/dist/index.html` also depends on its assets and
+local APIs; sending that HTML alone does not share the evaluation. Preserve the
+Suite and its referenced attempt directories together when transferring full
+results; their saved paths may need relocation. See [sharing and failure diagnosis](docs/Troubleshooting.md).
 
-See the [Case concurrency design](docs/Case-Concurrency-Design.md) and
-[implementation guide](docs/Case-Concurrency-Implementation.md) for interfaces,
-changed files, worker/image/container counts, result shape, and validation.
+## Add your Agent
 
-## Requirements and environment
-
-| Requirement | Why it is needed |
-| --- | --- |
-| Python 3.10 or newer | ABB host CLI and harness. |
-| Docker Desktop / Docker Engine | Docker Agents need a running engine before `run`, `evaluate`, `certify`, or `observe`. The offline demo does not. |
-| `KUMA_API_KEY` or `DEFUZEX_API_KEY` | Case and Judge access when using the KUMA SDK. |
-| `OPENROUTER_API_KEY` | Model traffic from Docker Agents is routed through ABB's interceptor to OpenRouter. |
-| `OPENROUTER_MODEL` | Required model slug. `.env.example` contains an example value, not an implicit runtime default. Choose one your account can use. |
-| `TAVILY_API_KEY` | Web-search credential for ReAct and Company Research. |
-
-`.env` is ignored by Git. Environment variables already exported by the shell
-override values in `.env`; `--env-file PATH` selects another dotenv file; and
-`--model MODEL` overrides `OPENROUTER_MODEL` for one command.
-
-Get model credentials from [OpenRouter keys](https://openrouter.ai/settings/keys),
-and search credentials from the [Tavily dashboard](https://app.tavily.com/).
-For Kuma credentials, follow the [official API key guide](https://github.com/DefuzeX-AI/KUMA-DefuzeX/blob/main/docs/sdk-guide.md#api-key)
-and obtain an account key from your DefuzeX service administrator if none was issued.
-ABB selects non-empty `KUMA_API_KEY` first, then `DEFUZEX_API_KEY` (an ABB alias),
-and passes it explicitly to Kuma. A host SDK credential file is not mounted into
-the container. Never put keys in CLI arguments, committed profiles, or reports.
-
-The optional variables below are only needed when you want to identify
-OpenRouter requests or use a compatible endpoint:
-
-```dotenv
-OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
-OPENROUTER_HTTP_REFERER=https://example.com
-OPENROUTER_APP_TITLE=AgentBehaviorBench
-```
-
-## Included Agents
-
-| Agent | Configured scope | Readiness |
-| --- | --- | --- |
-| ReAct | Native Tavily search and iterative reasoning | Ready in the checked-in registry; real execution artifacts retained. |
-| TradingAgents | Market analysis with Yahoo Finance; no order execution | Enabled and adapting; the current native entrypoint and input contract require certification. |
-| GPT Researcher | Academic research with NCBI retrieval and local CPU embeddings | Ready in the checked-in registry; real execution artifacts retained. |
-| Company Research | Existing company research unit | Disabled; retained status is not current acceptance evidence. |
-| Waku Agent | Native personal-assistant loop, Case-local memory and constrained local tools | Enabled and adapting; source and offline boundary verified, live model/tool evidence pending. |
-| Article Explainer | Native five-specialist compiled swarm | Enabled and adapting; live model/handoff evidence pending. |
-
-Check `resources/registry.toml` for the current status and the
-[campaign ledger](docs/Benchmark-Campaign-Ledger.json) for measured execution
-coverage. Readiness validates the configured binding; it does not guarantee a
-passing Judge verdict for every generated Case. The Waku and Article onboarding evidence,
-source pins and remaining blockers are recorded in
-[the 2026-09-14 onboarding report](docs/New-Agent-Onboarding-2026-09-14.md).
-
-## CLI
-
-Run `agentbench --help` or any command with `--help` for the installed CLI.
-The most useful commands are:
-
-| Command | Use |
-| --- | --- |
-| `agentbench run` | Evaluate every enabled `ready` Agent with the selected SDK. This is the default command. |
-| `agentbench agent add https://github.com/owner/repository` | Download source into the next numbered Agent folder and print a JSON array of setup files. |
-| `agentbench evaluate react-agent --cases 1` | Evaluate one enabled Agent on a chosen number of independent Cases. |
-| `agentbench observe react-agent` | Run one enabled Agent with native input and save traces, without creating Cases or calling a Judge. |
-| `agentbench certify react-agent` | Run an `adapting` Agent and promote it to `ready` only after certification succeeds. |
-| `agentbench view results/benchmark.json` | Reopen a saved benchmark result in the local viewer. |
-| `agentbench resume SUITE` | Continue unfinished slots using saved Cases and original request state. |
-| `agentbench retry SUITE --agent ID --case N` | Explicitly recover one unfinished Case; numbers start at 1. |
-| `agentbench reuse SUITE` | Start a linked new evaluation using the same Cases under the current code. |
-| `agentbench sdk list` | List adapter directories without importing SDK implementations. |
-| `agentbench clean --dry-run` | Show the local result history that would be moved to a recoverable archive. |
-
-To begin onboarding a new Agent:
+Start with [the Agent onboarding guide](docs/How%20To%20Add%20Agent.md).
+Use its language selector for the French, Japanese, Simplified Chinese,
+Traditional Chinese and Korean editions.
 
 ```bash
 agentbench agent add https://github.com/owner/repository
-```
-
-Source is downloaded to `resources/agents/NN-repository/agent/`, using one more
-than the largest existing directory number (`09` is followed by `10`). The outer
-`source-manifest.json` records the repository URL and exact commit. Existing
-Agent folders are never overwritten. Use `--agents-dir PATH` to select another
-parent directory.
-
-Standard output contains a sorted JSON array of paths relative to `agent/`:
-LangGraph configs and their Python entrypoints, dependency files, Docker files,
-README files and environment examples. Download status goes to standard error.
-This first onboarding step does not import the downloaded code, install its
-dependencies, generate benchmark configuration, or add an incomplete entry to
-`resources/registry.toml`.
-
-Optional generation and certification stages:
-
-```bash
-# Generate integration files with OpenRouter; register as adapting after static checks.
 agentbench agent add https://github.com/owner/repository -b
-# Generate, then use the existing container certification workflow.
 agentbench agent add https://github.com/owner/repository -b -c
-# Use configuration you wrote yourself; no AI configuration request.
-agentbench agent add https://github.com/owner/repository -c
-# Answer a previous plan's questions and reuse the downloaded source.
-agentbench agent add https://github.com/owner/repository -b --answers answers.txt
 ```
 
-`-b` means **generate the build configuration**, not build a Docker image. It reads
-bounded setup files and local imports without executing the Agent, then sends
-sanitized content to OpenRouter. Set `OPENROUTER_API_KEY` and
-`OPENROUTER_BUILD_MODEL` (or `OPENROUTER_MODEL`) in the host environment or `.env`.
-The model must support structured outputs. `--build-model` selects the generation
-model; `--model` selects the separate certification model. The selected SDK's
-PyPI requirements must be installed for its offline document validation.
+Plain `add` downloads source. `-b` generates and validates integration files one at
+a time; `-c` runs certification. Downloaded does not mean configured, and generated
+does not mean executable. Framework support and external services must be checked
+before committing to a full run. Current automatic configuration supports LangGraph.
 
-`-b` first creates a source-based plan, then generates **one file per request**:
-`agent.toml`, any required bindings (individually), `Dockerfile`, the optional input
-schema, and `requirement.md`. Each file is validated and installed immediately,
-before requesting the next. `.dockerignore` is written from a local template.
-Later requests receive the plan and previously validated file contents.
+## CLI and repository layout
 
-The builders and their English prompts live in the corresponding subdirectories
-of [`agentbench/onboarding/build_agent_env/`](agentbench/onboarding/build_agent_env/README.md).
-Request settings and response schemas live in `openrouter_provider/assets/`.
-Override budgets/timeouts/model with `--build-settings PATH`, containing a TOML
-`[build]` table. `repair_attempts = 1` permits one additional paid correction per
-stage; only the current file is repaired. Set it to zero to disable corrections.
-HTTP transport retries are configured separately through `retries`.
-
-Failure or Ctrl-C preserves completed files. Running the same `-b` command reuses
-the source-matched plan in `onboarding/build-state.json`, validates existing files,
-and generates only missing files. Existing manual files are never overwritten;
-an invalid one stops the build with its path and reason. Answers or source changes
-trigger fresh planning while preserving existing files. Ambiguous inputs or
-unsupported network/protocol requirements produce questions.
-
-Attempts are saved under `NN-name/onboarding/<attempt-id>/`: `context.json` lists
-source files used/omitted, `plan.json` contains the plan, `steps/` records each
-file's model responses, candidate, validation feedback and saved/reused status,
-and `build-result.json` records completion or the failed stage. Registration
-happens only after all files pass the final combined check. `-b` and `-c` reuse
-manifest-matched downloads; plain `add` still rejects a duplicate checkout.
-
-Certification builds and executes the container through the existing `certify`
-command, including Case generation and Judge; it can call paid services. Use
-`-y` to skip its confirmation and `--no-view` to omit the results viewer. Only
-certification can promote `adapting` to `ready`; a Judge-reported behavioral issue
-does not necessarily mean the integration failed. `--registry PATH` selects a
-registry; a custom `--agents-dir` must remain inside that registry's repository.
-
-Each configured Agent keeps its SDK evaluation specification in the outer
-`requirement.md`. For KUMA, this document must follow the Agent Profile format:
-YAML front matter and the required production-scenario, behaviors-to-test and
-limitations sections. Case generation passes this exact file through
-`agent_profile_path`; there is no separate `evaluation/profile.md`. Referenced
-input schemas can remain under an optional `evaluation/` directory, with paths
-relative to `requirement.md`. Agents do not need an `evaluation/` directory or
-`input-contract.json`. Current Case inputs go directly to the framework adapter;
-native field mapping stays in `agent.toml`, and conversation state belongs to the
-Agent. Result artifacts under `results/.../evaluation/` are independent of this
-optional source directory and remain unchanged.
-
-Useful `run` options:
-
-```bash
-# Use an explicit model for this run.
-agentbench run --model openai/gpt-4.1-mini
-
-# Select a discovered adapter directory and pass it a JSON options file.
-agentbench run --sdk kuma --sdk-options sdk-options.json
-
-```
-
-To add an SDK, create an adapter package with a `plugin.py` entry under
-`agentbench/sdk/plugin/`; no central name list or package entry-point registration is
-needed. See [the SDK adapter guide](docs/SDK-Directory-Adapters.md) for the
-interface, dependency rules, Python usage, and verification commands.
-
-See [the CLI reference](docs/CLI.md) for the complete command and option
-reference, and [the agent onboarding guide](docs/How%20To%20Add%20Agent.md) to
-add another Agent.
-
-See [troubleshooting and result interpretation](docs/Troubleshooting.md) for
-configuration, network, trace, Judge and exit-code failures, or the
-[Chinese operation guide](docs/Guide.zh-CN.md).
-
-## Overview
-
-ABB is designed to make Agent evaluation reproducible. An Agent is declared in
-the registry, adapted to ABB's runtime contract, evaluated with an SDK, and
-saved with inspectable execution evidence. Agents progress from `adapting` to
-`ready` only through the certification flow.
-
-The execution path is:
+Run `agentbench --help` and `agentbench COMMAND --help` for the current options.
+`observe` uses native input without Judge; `sdk list` discovers plugins;
+`clean --dry-run` previews recoverable history cleanup.
 
 ```text
-resources/registry.toml
-        -> CLI selection
-        -> SuiteRunner / evaluation SDK
-        -> Agent adapter and runtime
-        -> result snapshot and local viewer
+AgentBehaviorBench/
+├── agentbench/
+│   ├── cli/                 # Commands and local viewer server
+│   ├── onboarding/          # Source discovery and integration generation
+│   ├── adapter/             # Native framework invocation
+│   ├── harness/             # Case scheduling, retries and results
+│   ├── runtime/             # Containers and interception
+│   └── sdk/plugin/          # Evaluation SDK integrations
+├── resources/
+│   ├── registry.toml
+│   └── agents/              # Upstream source + outer integration files
+├── examples/               # Offline demonstration
+├── web/                    # React viewer; npm builds dist/
+├── docs/
+├── results/                # Generated Suite and execution artifacts
+└── cache/                  # Generated onboarding records and archives
 ```
-
-![AgentBehaviorBench execution architecture](docs/figures/framework.png)
-
-## Repository layout
-
-- `resources/registry.toml` declares each Agent, its status, and its runtime.
-- `resources/agents/` contains each Agent unit and its ABB configuration.
-- `agentbench/cli/` provides the terminal commands.
-- `agentbench/harness/` owns suite execution, results, and registry loading.
-- `agentbench/runtime/` runs Agents locally or in Docker and intercepts model
-  traffic for Docker runtimes.
-- `agentbench/services/` contains runtime services shipped with AgentBench,
-  including the Model Interceptor Docker build context.
-- `agentbench/sdk/plugin/` contains SDK adapter packages, shared contracts, and directory discovery.
 
 ## Development
 
-Run the test suite after installing development dependencies:
+Install test tools explicitly; there is no `dev` dependency extra:
 
 ```bash
+python -m pip install pytest
+python -m pip install -r agentbench/sdk/plugin/kuma/requirements.txt
 python -m pytest
+cd web
+npm ci
+npm test
+npm run build
 ```
 
-For repository conventions, see [AGENTS.md](AGENTS.md).
+Some tests require separate service dependencies, Docker, or Agent fixtures; read
+the relevant module instructions and report missing prerequisites separately.
+See [AGENTS.md](AGENTS.md) for contributor boundaries and
+[the documentation issue audit](docs/Documentation-Issue-Audit.md) for this revision's
+upstream findings and remaining limitations.
 
 ## License
 

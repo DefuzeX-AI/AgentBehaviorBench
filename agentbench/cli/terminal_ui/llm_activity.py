@@ -18,6 +18,9 @@ from .constants import (
     ANSI_RESET,
     ANSI_YELLOW,
 )
+from .evaluation_http import EvaluationHTTPFormatter
+from .formatting import case_identity, short_id
+from .live_cases import LiveCases
 
 PREVIEW_CHAR_LIMIT = 72
 ACTIVITY_ANIMATION_INTERVAL_SECONDS = 0.35
@@ -72,15 +75,21 @@ class LLMActivity:
         self._stage_label: str | None = None
         self._stage_frame = 0
         self._calls: OrderedDict[str, _CallActivity] = OrderedDict()
+        self._evaluation_http = EvaluationHTTPFormatter()
         self._latest_call_id: str | None = None
         self._call_count = 0
         self._rendered_line_count = 0
         self._concurrent = False
+        self._live_cases: LiveCases | None = None
 
     def set_concurrent(self, enabled: bool) -> None:
         """Use permanent identity-prefixed events when several Agents run."""
         self.close()
         self._concurrent = enabled
+
+    def set_live_cases(self, display: LiveCases | None) -> None:
+        """Send concurrent trace updates to one shared terminal dashboard."""
+        self._live_cases = display
 
     def start_stage(self, label: str) -> None:
         """Start the benchmark stage line and its shared animation loop."""
@@ -91,6 +100,7 @@ class LLMActivity:
             self._stage_label = label.rstrip(".")
             self._stage_frame = 0
             self._calls.clear()
+            self._evaluation_http.reset()
             self._latest_call_id = None
             self._call_count = 0
             if not self._live_updates:
@@ -124,6 +134,9 @@ class LLMActivity:
         """Consume one structured interception event."""
 
         if event.event == "interceptor_ready":
+            return
+        if self._live_cases is not None:
+            self._live_cases.on_trace(event)
             return
         if self._concurrent:
             self._emit_concurrent(event)
@@ -191,44 +204,35 @@ class LLMActivity:
     def _emit_concurrent(self, event: TraceEvent) -> None:
         # No mutable call panel: identical call IDs in separate jobs cannot
         # overwrite each other's display state, even when traces arrive late.
-        if event.event not in {"llm_request", "llm_response", "llm_error",
-                               "tool_request", "tool_response", "tool_error"}:
-            return
         data = event.data
-        if event.event.startswith("tool_") and data.get("purpose") != "evaluation":
+        if event.event.startswith("tool_"):
+            if data.get("purpose") == "evaluation":
+                self._write_evaluation_http(event)
             return
-        identity = [str(data.get("agent_id") or "agent")]
-        for field, label in (("job_id", "job"), ("case_index", "case"),
-                             ("artifact_run_id", "run"), ("call_id", "call")):
-            value = data.get(field)
-            if value is not None:
-                if field == "case_index" and isinstance(value, int):
-                    value += 1
-                identity.append(f"{label}={value}")
-        if event.event.endswith("error"):
+        if event.event not in {"llm_request", "llm_response", "llm_error"}:
+            return
+        identity = case_identity(data.get("agent_id"), data.get("case_index"), data.get("job_id"))
+        call_id = data.get("call_id")
+        hint = f" #{short_id(call_id, 6)}" if call_id else ""
+        if event.event == "llm_error":
+            label = f"Model error{hint}"
             preview = _truncate_preview(str(data.get("error", "Request failed")), self._preview_chars)
-        elif event.event.startswith("tool_"):
-            preview = f"{data.get('method', '')} {data.get('host', '')}{str(data.get('path', '')).split('?', 1)[0]} | {data.get('status', 'ALLOWED')}"
         else:
+            label = (f"Model → {_provider(data)}{hint}" if event.event == "llm_request"
+                     else f"Model ← HTTP {data.get('status', '?')}{hint}")
             preview = _event_preview(event, self._preview_chars)
         with self._lock:
-            self._output_fn(f"[{' | '.join(identity)}] {event.event}: {preview}")
+            self._output_fn(f"{identity} {label} · {preview}")
 
     def _write_evaluation_http(self, event: TraceEvent) -> None:
-        """Keep SDK egress visible without implying the whole Run succeeded."""
-        data = event.data
-        call_id = data.get('call_id')
-        if not isinstance(call_id, str) or not call_id:
-            return
-        address = str(data.get('host', '')) + str(data.get('path', '')).split('?', 1)[0]
-        if event.event == 'tool_request':
-            status = 'ALLOWED'
-        elif event.event == 'tool_response':
-            status = f"HTTP {data.get('status', '?')}"
-        else:
-            status = f"FAILED: {data.get('error', 'Network request failed')}"
-        line = f"[EVALUATION HTTP] {data.get('method', '')} {address} | {status} | call={call_id}"
-        self.write_static('    ' + _truncate_preview(line, 512))
+        """Summarize routine SDK polling; always expose failures immediately."""
+        with self._lock:
+            line = self._evaluation_http.render(event)
+            if line is not None:
+                if self._concurrent:
+                    self._output_fn(line)
+                else:
+                    self.write_static('    ' + line)
 
     def write_static(self, text: str) -> None:
         """Print permanent output without corrupting the temporary panel."""
@@ -359,6 +363,7 @@ class LLMActivity:
     def _reset_locked(self) -> None:
         self._stage_label = None
         self._calls.clear()
+        self._evaluation_http.reset()
         self._latest_call_id = None
         self._call_count = 0
         self._stage_frame = 0

@@ -1,5 +1,7 @@
 # AgentBehaviorBench (ABB)
 
+> Prérequis du navigateur : Node.js 20.19+ (20.x) ou 22.12+, avec npm. Dans `web/`, exécutez `npm ci` puis `npm run build` avant `agentbench view`. Les exécutions `--no-view` ne nécessitent pas cette compilation. Installation, clés et limites à jour : [guide principal (anglais)](../../README.md).
+
 <p align="center">
   <img alt="AgentBehaviorBench — agents lamas qui évaluent des flux" src="../figures/title.png" width="720" style="border-radius: 24px;">
 </p>
@@ -116,8 +118,8 @@ agentbench run --model openai/gpt-4.1-mini
 agentbench run --sdk kuma --sdk-options sdk-options.json
 ```
 
-La référence complète est en anglais : [CLI reference](../CLI.md). Pour
-ajouter un agent, consultez le [guide d'intégration](../How%20To%20Add%20Agent.md).
+La référence complète est en anglais : [CLI reference](../../README.md#cli-and-repository-layout). Pour
+ajouter un agent, consultez le [guide d'intégration](How%20To%20Add%20Agent.fr.md).
 
 ## Organisation du dépôt
 

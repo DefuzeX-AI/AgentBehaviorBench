@@ -1,5 +1,7 @@
 # AgentBehaviorBench (ABB)
 
+> ブラウザー UI のビルドには Node.js 20.19+（20.x）または 22.12+ と npm が必要です。`web/` で `npm ci`、`npm run build` を実行してから `agentbench view` を使ってください。`--no-view` ではビルド不要です。最新の導入手順・認証設定・制約は [メインガイド（英語）](../../README.md) を参照してください。
+
 <p align="center">
   <img alt="AgentBehaviorBench — ワークフローを評価するアルパカ Agent" src="../figures/title.png" width="720" style="border-radius: 24px;">
 </p>
@@ -115,8 +117,8 @@ agentbench run --model openai/gpt-4.1-mini
 agentbench run --sdk kuma --sdk-options sdk-options.json
 ```
 
-すべての引数は英語版の [CLI reference](../CLI.md) を、Agent の追加は
-[agent onboarding guide](../How%20To%20Add%20Agent.md) を参照してください。
+すべての引数は英語版の [CLI reference](../../README.md#cli-and-repository-layout) を、Agent の追加は
+[Agent の追加ガイド](How%20To%20Add%20Agent.ja.md) を参照してください。
 
 ## リポジトリ構成
 

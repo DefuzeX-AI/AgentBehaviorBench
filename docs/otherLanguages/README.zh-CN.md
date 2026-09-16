@@ -1,152 +1,36 @@
 # AgentBehaviorBench (ABB)
 
-<p align="center">
-  <img alt="AgentBehaviorBench — 羊驼 Agent 工作流评审" src="../figures/title.png" width="720" style="border-radius: 24px;">
-</p>
+[English](../../README.md) · [中文安装与操作指南](Guide.zh-CN.md)
 
-<p align="center">
-  <a href="../../README.md">English</a> |
-  <a href="README.fr.md">Français</a> |
-  <a href="README.ja.md">日本語</a> |
-  中文简体 |
-  <a href="README.zh-TW.md">中文繁體</a> |
-  <a href="README.ko.md">한국어</a>
-</p>
-
-<p align="center">
-  <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-8a008a">
-  <img alt="MIT License" src="https://img.shields.io/badge/License-MIT-0086c9">
-  <img alt="Package 0.1.0" src="https://img.shields.io/badge/pypi%20package-0.1.0-2acb16">
-</p>
-
-> **运行 ABB 前请先准备：**Python 3.10+、已启动的 Docker Desktop 或 Docker
-> Engine。KUMA 会在构建评测容器时自动从 PyPI 安装。ReAct Agent 需要
-> `KUMA_API_KEY`（或 `DEFUZEX_API_KEY`）、`OPENROUTER_API_KEY`、
-> `OPENROUTER_MODEL` 和 `TAVILY_API_KEY`。
-
-AgentBehaviorBench 在隔离运行时中执行已注册的 AI Agent，收集执行证据，并通过
-可选 SDK 评测结果。SDK 从 `agentbench/sdk/plugin/` 的适配器目录自动发现：只有一个时
-自动选择，有多个时通过 `--sdk NAME` 指定。当前目录包含 KUMA；结果保存在本地，
-并可在 ABB 浏览器查看器中检查。
+ABB 运行 Agent、隔离 Case、收集输入输出及工具/OTel 证据；KUMA SDK 调用 DefuzeX
+服务生成 Case 和评判行为。评测发现 issue 与容器执行失败是不同结果。
 
 ![AgentBehaviorBench 执行架构](../figures/framework.png)
 
-操作、结果判断和故障处理见[中文操作指南](../Guide.zh-CN.md)。
+## 前置条件
 
-## 快速开始
+- Git、Python 3.10+（含 pip/venv）。
+- Docker Agent 需要已启动、当前用户可访问的 Docker：先运行 `docker info`。
+- 网页构建需要 Node.js 20.x 至少 20.19 或 22.12+，以及 npm。在 web/ 执行
+  `npm ci`、`npm run build`。普通网页由 Python 提供，不需要一直运行 npm。
+- 无界面评测可使用 `--no-view`，不需要 Node/网页构建。
+- 正式 KUMA 评测需要 KUMA key、OpenRouter key 和模型名称，以及 Agent 自己的工具
+  key。离线示例和查看已保存结果不需要这些凭据。
 
-在仓库根目录创建虚拟环境，并安装 ABB：
+## 从安装到首次运行
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate              # Windows PowerShell: .venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e "."
-```
+完整可复制命令、Windows/WSL 与 Docker 平台说明、凭据链接及优先级见
+[中文操作指南](Guide.zh-CN.md)。先完成不需要 Docker/key 的离线示例，再配置正式服务。
 
-创建本地环境文件并填写凭据：
+- [零凭据验证与网页构建](Guide.zh-CN.md#零凭据验证与网页构建)
+- [配置真实评测](Guide.zh-CN.md#配置真实评测)
+- [添加 Agent](How%20To%20Add%20Agent.zh-CN.md)
+- [结果与故障处理](Guide.zh-CN.md#结果与故障处理)
+- [逐文件 Agent 接入指南](How%20To%20Add%20Agent.zh-CN.md)
+- [网页开发指南（英文）](../../web/README.md)
+- [文档 issue 核对记录（英文）](../Documentation-Issue-Audit.md)
 
-```bash
-cp .env.example .env                   # Windows PowerShell: Copy-Item .env.example .env
-```
+当前 Agent、启用状态和 Case 数以 [注册表](../../resources/registry.toml) 为准。
+全部 CLI 参数使用 `agentbench --help` 和 `agentbench COMMAND --help` 查看。
 
-```dotenv
-KUMA_API_KEY=
-OPENROUTER_API_KEY=
-OPENROUTER_MODEL=openai/gpt-4.1-mini
-TAVILY_API_KEY=
-```
-
-启动 Docker 后，运行所有注册表中 `enabled = true` 且状态为 `ready` 的 Agent：
-
-```bash
-agentbench run
-```
-
-ABB 会要求确认选中的 Agent，在 `results/` 下保存结果快照并启动本地查看器。无
-界面或自动化运行请使用：
-
-```bash
-agentbench run --yes --no-view --output results/benchmark.json
-```
-
-## 依赖与环境变量
-
-| 项目 | 用途 |
-| --- | --- |
-| Python 3.10 或更高版本 | ABB 主机 CLI 与 harness。 |
-| Docker Desktop / Docker Engine | 当前可运行的内置 Agent 在 Docker 中执行；执行前 Docker 必须已启动。 |
-| `KUMA_API_KEY` 或 `DEFUZEX_API_KEY` | 使用 KUMA SDK 时所需的 Case 与 Judge 访问凭据。 |
-| `OPENROUTER_API_KEY` | Docker Agent 的模型流量经 ABB interceptor 转发到 OpenRouter。 |
-| `OPENROUTER_MODEL` | 本次运行使用的模型名称。 |
-| `TAVILY_API_KEY` | ReAct Agent 的网页搜索凭据。 |
-
-`.env` 被 Git 忽略。Shell 中已导出的变量会覆盖 `.env`；`--env-file PATH` 可选择
-其他 dotenv 文件；`--model MODEL` 可只覆盖单次命令的模型。
-
-可选 OpenRouter 设置：
-
-```dotenv
-OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
-OPENROUTER_HTTP_REFERER=https://example.com
-OPENROUTER_APP_TITLE=AgentBehaviorBench
-```
-
-## CLI
-
-运行 `agentbench --help` 或 `agentbench <command> --help` 查看已安装版本的帮助。
-
-| 命令 | 用途 |
-| --- | --- |
-| `agentbench run` | 评测所有启用且 `ready` 的 Agent；这是默认命令。 |
-| `agentbench evaluate react-agent --cases 1` | 用指定数量的独立 Case 评测一个 Agent。 |
-| `agentbench observe react-agent` | 用原生输入运行一个 Agent 并保存 trace，不创建 Case，也不调用 Judge。 |
-| `agentbench certify react-agent` | 认证 `adapting` Agent；成功后将其提升为 `ready`。 |
-| `agentbench view results/benchmark.json` | 在本地查看器中重新打开结果。 |
-| `agentbench sdk list` | 列出 SDK 适配器目录，不导入 SDK 实现。 |
-| `agentbench clean --dry-run` | 预览将被移动到可恢复归档的本地结果历史。 |
-
-常用 `run` 选项：
-
-```bash
-agentbench run --model openai/gpt-4.1-mini
-agentbench run --sdk kuma --sdk-options sdk-options.json
-```
-
-完整参数请见英文 [CLI reference](../CLI.md)，添加 Agent 请见
-[agent onboarding guide](../How%20To%20Add%20Agent.md)。
-
-## 目录结构
-
-```text
-AgentBehaviorBench/
-├── resources/registry.toml
-├── resources/agents/
-├── agentbench/cli/
-├── agentbench/harness/
-├── agentbench/runtime/
-├── agentbench/sdk/plugin/kuma/
-└── results/
-```
-
-- `resources/registry.toml` 声明 Agent、状态和运行时。
-- `resources/agents/` 保存每个 Agent 单元及其 ABB 配置。
-- `agentbench/cli/` 提供命令行入口。
-- `agentbench/harness/` 负责 suite 执行、结果和注册表加载。
-- `agentbench/runtime/` 在本地或 Docker 运行 Agent。
-- `agentbench/sdk/plugin/` 包含 SDK 适配器、公共接口和目录发现逻辑。
-
-添加 SDK 只需新增包含 `__init__.py` 和 `plugin.py` 的适配器目录，不需要修改
-核心名称名单或注册安装包 entry point。详见 [SDK 适配器指南](../SDK-Directory-Adapters.md)。
-
-## 开发
-
-```bash
-python -m pytest
-```
-
-仓库约定见 [AGENTS.md](../../AGENTS.md) 和 [docs/AGENTS.md](../../AGENTS.md)。
-
-## 许可证
-
-MIT，见 [LICENSE](../../LICENSE)。
+贡献约定见 [AGENTS.md（英文）](../../AGENTS.md)。MIT，见 [LICENSE](../../LICENSE)。
