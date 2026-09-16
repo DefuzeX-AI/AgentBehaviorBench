@@ -13,8 +13,7 @@
   English |
   <a href="docs/otherLanguages/README.fr.md">Français</a> |
   <a href="docs/otherLanguages/README.ja.md">Japanese</a> |
-  <a href="docs/otherLanguages/README.zh-CN.md">Simplified Chinese</a> |
-  <a href="docs/otherLanguages/README.zh-TW.md">Traditional Chinese</a> |
+  <a href="docs/otherLanguages/README.zh-CN.md">中文</a> |
   <a href="docs/otherLanguages/README.ko.md">한국어</a>
 </p>
 
@@ -256,8 +255,7 @@ results; their saved paths may need relocation. See [sharing and failure diagnos
 ## Add your Agent
 
 Start with [the Agent onboarding guide](docs/How%20To%20Add%20Agent.md).
-Use its language selector for the French, Japanese, Simplified Chinese,
-Traditional Chinese and Korean editions.
+Use its language selector for the French, Japanese, Chinese and Korean editions.
 
 ```bash
 agentbench agent add https://github.com/owner/repository

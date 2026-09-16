@@ -1,6 +1,6 @@
 # Agent の追加
 
-[English](../How%20To%20Add%20Agent.md) | [Français](How%20To%20Add%20Agent.fr.md) | 日本語 | [简体中文](How%20To%20Add%20Agent.zh-CN.md) | [繁體中文](How%20To%20Add%20Agent.zh-TW.md) | [한국어](How%20To%20Add%20Agent.ko.md)
+[English](../How%20To%20Add%20Agent.md) | [Français](How%20To%20Add%20Agent.fr.md) | 日本語 | [中文](How%20To%20Add%20Agent.zh-CN.md) | [한국어](How%20To%20Add%20Agent.ko.md)
 
 **環境設定 → 追加コマンドの実行 → 生成ファイルの確認** の順に進めます。
 ユーザーも coding agent も同じ手順を使えます。ディレクトリを変更する指示がない限り、

@@ -1,6 +1,6 @@
 # Ajouter un Agent
 
-[English](../How%20To%20Add%20Agent.md) | Français | [日本語](How%20To%20Add%20Agent.ja.md) | [简体中文](How%20To%20Add%20Agent.zh-CN.md) | [繁體中文](How%20To%20Add%20Agent.zh-TW.md) | [한국어](How%20To%20Add%20Agent.ko.md)
+[English](../How%20To%20Add%20Agent.md) | Français | [日本語](How%20To%20Add%20Agent.ja.md) | [中文](How%20To%20Add%20Agent.zh-CN.md) | [한국어](How%20To%20Add%20Agent.ko.md)
 
 Suivez cet ordre : **préparer l’environnement → lancer la commande → examiner les
 fichiers créés**. Un utilisateur ou un assistant de programmation peut suivre le

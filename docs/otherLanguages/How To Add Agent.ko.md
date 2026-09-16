@@ -1,6 +1,6 @@
 # Agent 추가
 
-[English](../How%20To%20Add%20Agent.md) | [Français](How%20To%20Add%20Agent.fr.md) | [日本語](How%20To%20Add%20Agent.ja.md) | [简体中文](How%20To%20Add%20Agent.zh-CN.md) | [繁體中文](How%20To%20Add%20Agent.zh-TW.md) | 한국어
+[English](../How%20To%20Add%20Agent.md) | [Français](How%20To%20Add%20Agent.fr.md) | [日本語](How%20To%20Add%20Agent.ja.md) | [中文](How%20To%20Add%20Agent.zh-CN.md) | 한국어
 
 **환경 설정 → 추가 명령 실행 → 생성된 파일 확인** 순서로 진행합니다. 사용자와 coding agent
 모두 같은 절차를 따를 수 있습니다. 디렉터리를 바꾸는 명령이 없으면 ABB 저장소 루트에서 실행하세요.

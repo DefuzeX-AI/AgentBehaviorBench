@@ -1,6 +1,6 @@
 # ABB 安装、运行与 Agent 接入
 
-[English](../Guide.md) | 简体中文
+[English](../Guide.md) | 中文
 
 ABB 负责选择 Agent、容器执行、Case 并发、证据和本地结果；KUMA SDK 定义评测
 协议，调用 DefuzeX 服务生成 Case 和判分。OpenRouter 是被测 Agent 的模型服务，

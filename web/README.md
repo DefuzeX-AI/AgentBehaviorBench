@@ -91,4 +91,4 @@ npm run preview
 ```
 
 See [README](../README.md), [the operation guide](../docs/Guide.md), or
-[简体中文操作指南](../docs/otherLanguages/Guide.zh-CN.md) for setup.
+[中文操作指南](../docs/otherLanguages/Guide.zh-CN.md) for setup.

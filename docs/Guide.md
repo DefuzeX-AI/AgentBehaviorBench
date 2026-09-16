@@ -1,6 +1,6 @@
 # ABB operation guide
 
-English | [简体中文](otherLanguages/Guide.zh-CN.md)
+English | [中文](otherLanguages/Guide.zh-CN.md)
 
 ABB runs Agents, schedules Cases and saves execution evidence. KUMA defines the
 evaluation contract and calls DefuzeX for Case generation and judging. OpenRouter
