@@ -1,51 +1,31 @@
-"""Discover evaluation SDK plugins and build immutable execution plans."""
+"""Select directory-discovered SDK adapters and normalize execution plans."""
 
 from __future__ import annotations
 
-import importlib
-import importlib.metadata
-import re
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Literal
 
 from agentbench.harness.errors import ProviderSelectionError
-from .contracts import EvaluationSDKPlugin, SDKRunnerContext
 
-
-SDK_ENTRY_POINT_GROUP = "defuzex_agentbench.evaluation_sdks"
-SDK_PLUGIN_API_VERSION = "agentbench.evaluation_sdk.v1"
-
-
-@dataclass(frozen=True, slots=True)
-class SDKReference:
-    """Stable provenance for one SDK selection."""
-
-    name: str
-    source: Literal["builtin", "entry-point", "python"]
-    object_ref: str
-    distribution: str | None = None
-    version: str | None = None
-
-    @property
-    def qualified_name(self) -> str:
-        if self.distribution is None:
-            return self.name
-        return f"{self.distribution}::{self.name}"
-
+from .contracts import (
+    EvaluationSDKPlugin,
+    SDKReference,
+)
+from .contracts import SDKRunnerContext as SDKRunnerContext
+from .discovery import discover_sdks, load_sdk
 
 @dataclass(frozen=True, slots=True)
 class SDKSelection:
-    """A resolved SDK value plus the provenance needed for diagnostics."""
+    """A resolved SDK value plus its identity for diagnostics."""
 
     reference: SDKReference
     value: object
 
-
 @dataclass(frozen=True, slots=True)
 class EvaluationPlan:
-    """One composition-root decision consumed by the execution builder."""
+    """One SDK selection and a defensive, read-only copy of its options."""
 
     selection: SDKSelection
     options: Mapping[str, object]
@@ -53,43 +33,88 @@ class EvaluationPlan:
     def __post_init__(self) -> None:
         object.__setattr__(self, "options", MappingProxyType(dict(self.options)))
 
+def resolve_sdk(spec: str | None = None) -> SDKSelection:
+    """Select and load one adapter from the SDK directory.
 
-def builtin_sdk_selection(name="kuma") -> SDKSelection:
-    """Return the official KUMA adapter without importing KUMA itself."""
+    Args:
+        spec: Directory name, matched case-insensitively after trimming
+            whitespace. If omitted, exactly one adapter must be discovered.
+            Import strings and installed package entry points are not accepted.
 
-    if name == "panda":
-        from .panda import plugin
+    Returns:
+        The selected plugin instance and its directory-derived identity.
+
+    Raises:
+        ProviderSelectionError: If the selection is empty, unknown, ambiguous,
+            or the selected adapter cannot be loaded or violates the interface.
+    """
+
+    requested = None if spec is None else spec.strip()
+    if requested == "":
+        raise ProviderSelectionError("SDK selection cannot be empty")
+
+    references = discover_sdks()
+    if not references:
+        raise ProviderSelectionError(
+            "No SDK adapters found. Add an adapter package with __init__.py "
+            "and plugin.py under agentbench/sdk/plugin/."
+        )
+
+    choices = ", ".join(reference.name for reference in references)
+    if requested is None:
+        if len(references) != 1:
+            raise ProviderSelectionError(
+                f"Multiple SDK adapters found: {choices}. Select one with --sdk NAME "
+                "or resolve_sdk(NAME) in Python."
+            )
+        reference = references[0]
     else:
-        from .kuma import plugin
+        reference = next(
+            (
+                item
+                for item in references
+                if item.name.casefold() == requested.casefold()
+            ),
+            None,
+        )
+        if reference is None:
+            raise ProviderSelectionError(
+                f"Unknown SDK {requested!r}. Available adapters: {choices}. "
+                "SDK names must match a directory under agentbench/sdk/plugin/."
+            )
 
-    return SDKSelection(
-        reference=SDKReference(
-            name=plugin.name,
-            source="builtin",
-            object_ref=f"agentbench.sdk.{name}:plugin",
-            distribution="defuzex-agentbench",
-            version=_distribution_version("defuzex-agentbench"),
-        ),
-        value=plugin,
-    )
+    value = load_sdk(reference)
+    if isinstance(value, type) or not isinstance(value, EvaluationSDKPlugin):
+        raise ProviderSelectionError(
+            f"SDK {reference.name!r} must export a plugin instance implementing "
+            "execution and create_benchmark_runner()."
+        )
 
+    plugin_execution(value)
+    return SDKSelection(reference=reference, value=value)
 
-def python_sdk_selection(
-    sdk: object, *, object_ref: str | None = None
-) -> SDKSelection:
-    """Adapt an SDK object already present in the calling interpreter."""
+def python_sdk_selection(sdk: object) -> SDKSelection:
+    """Validate an SDK object explicitly supplied by a Python caller.
 
+    This override does not register an adapter or change directory discovery.
+    Raw SDK objects must expose create_run(); adapter instances implement
+    EvaluationSDKPlugin. Neither is imported automatically from a string.
+    """
     plugin_execution(sdk)
-    reference = object_ref or _python_object_ref(sdk)
+    module = getattr(sdk, "__module__", None)
+    name = getattr(sdk, "__qualname__", None) or getattr(sdk, "__name__", None)
+    reference = (
+        f"{module}:{name}"
+        if module and name
+        else str(
+            getattr(sdk, "__name__", None)
+            or f"{type(sdk).__module__}:{type(sdk).__qualname__}"
+        )
+    )
     return SDKSelection(
-        reference=SDKReference(
-            name=reference,
-            source="python",
-            object_ref=reference,
-        ),
+        reference=SDKReference(name=reference, source="python", object_ref=reference),
         value=sdk,
     )
-
 
 def evaluation_plan(
     *,
@@ -97,232 +122,70 @@ def evaluation_plan(
     selection: SDKSelection | None = None,
     options: Mapping[str, object] | None = None,
 ) -> EvaluationPlan:
-    """Normalize Python and CLI composition roots to one execution plan."""
+    """Build a normalized evaluation plan for CLI and Python callers.
 
+    At most one SDK source may be supplied. Without an explicit source, the
+    sole directory-discovered adapter is selected; there is no named default.
+    All parameters are keyword-only.
+
+    Args:
+        sdk: An already imported Python SDK object exposing create_run(), or
+            an EvaluationSDKPlugin instance. Must not be supplied together
+            with selection. Objects are validated, not implicitly constructed.
+        selection: A previously resolved SDKSelection, normally produced by
+            resolve_sdk(name). Must not be supplied together with sdk.
+        options: SDK-specific configuration forwarded to its runner factory.
+            A defensive shallow copy is stored as a read-only mapping; None
+            means no options. The adapter owns defaults and option validation.
+
+    Returns:
+        An EvaluationPlan containing the SDK selection and read-only options.
+
+    Raises:
+        ValueError: If sdk and selection are both supplied.
+        ProviderSelectionError: If automatic selection is missing or ambiguous,
+            loading fails, or a supplied SDK violates the supported interface.
+    """
     if sdk is not None and selection is not None:
         raise ValueError("Pass sdk or selection, not both")
-    resolved = selection
-    if resolved is None:
-        resolved = (
-            builtin_sdk_selection() if sdk is None else python_sdk_selection(sdk)
-        )
-    return EvaluationPlan(selection=resolved, options=options or {})
 
-
-def installed_sdk_references(
-    *, entry_points_provider: Callable[[], object] | None = None
-) -> tuple[SDKReference, ...]:
-    """Read installed plugin metadata without importing third-party code."""
-
-    points = _sdk_entry_points(entry_points_provider)
-    references = [_reference_for_entry_point(point) for point in points]
-    references.append(builtin_sdk_selection().reference)
-    references.append(builtin_sdk_selection("panda").reference)
-    unique = {
-        (
-            reference.source,
-            reference.distribution,
-            reference.name,
-            reference.object_ref,
-        ): reference
-        for reference in references
-    }
-    return tuple(
-        sorted(
-            unique.values(),
-            key=lambda item: (
-                item.name.casefold(),
-                item.distribution or "",
-                item.object_ref,
-            ),
-        )
+    if selection is None:
+        selection = resolve_sdk() if sdk is None else python_sdk_selection(sdk)
+    else:
+        plugin_execution(selection.value)
+    return EvaluationPlan(
+        selection=selection,
+        options={} if options is None else options
     )
-
-
-def resolve_sdk(
-    spec: str,
-    *,
-    entry_points_provider: Callable[[], object] | None = None,
-) -> SDKSelection:
-    """Resolve a built-in, installed entry point, or explicit Python import."""
-
-    requested = spec.strip()
-    if not requested:
-        raise ProviderSelectionError("SDK selection cannot be empty")
-    if requested.casefold() in {"kuma", "panda"}:
-        return builtin_sdk_selection(requested.casefold())
-    if requested.startswith("python:"):
-        return _load_python_sdk(requested.removeprefix("python:"), explicit=True)
-
-    distribution, separator, name = requested.partition("::")
-    if separator:
-        if not distribution or not name or "::" in name:
-            raise ProviderSelectionError(
-                "Qualified SDK names must use DISTRIBUTION::NAME"
-            )
-        matches = [
-            point
-            for point in _sdk_entry_points(entry_points_provider)
-            if point.name == name
-            and _normalized_distribution(_entry_point_distribution(point))
-            == _normalized_distribution(distribution)
-        ]
-        return _load_entry_point(requested, matches)
-
-    matches = [
-        point
-        for point in _sdk_entry_points(entry_points_provider)
-        if point.name == requested
-    ]
-    if matches:
-        return _load_entry_point(requested, matches)
-
-    # Compatibility for the original --sdk MODULE[:OBJECT] interface. New CLI
-    # usage should spell this as python:MODULE[:OBJECT] so locality is explicit.
-    return _load_python_sdk(requested, explicit=False)
-
 
 def plugin_execution(value: object) -> Literal["container", "local"]:
-    """Return the execution locality exposed by a selected SDK value."""
+    """Validate an SDK's interface and return its execution location.
 
-    if isinstance(value, EvaluationSDKPlugin):
-        if value.api_version != SDK_PLUGIN_API_VERSION:
+    Adapter-shaped objects are checked strictly: an invalid adapter must not
+    silently fall back to the plain create_run() interface.
+    """
+    if isinstance(value, type):
+        raise ProviderSelectionError("Pass an SDK instance, not a class")
+    if any(
+        hasattr(value, field)
+        for field in (
+            "create_benchmark_runner",
+            "execution",
+        )
+    ):
+        if not callable(getattr(value, "create_benchmark_runner", None)):
             raise ProviderSelectionError(
-                f"Unsupported SDK plugin API version: {value.api_version!r}"
+                "SDK plugin must expose create_benchmark_runner()"
             )
-        if value.execution not in {"container", "local"}:
+
+        execution = getattr(value, "execution", None)
+        if execution not in ("container", "local"):
             raise ProviderSelectionError(
-                f"Unsupported SDK plugin execution mode: {value.execution!r}"
+                f"Unsupported SDK plugin execution mode: {execution!r}"
             )
-        return value.execution
-    _validate_loaded_sdk(value)
-    return "local"
-
-
-def _load_entry_point(requested: str, matches: list[object]) -> SDKSelection:
-    if not matches:
-        raise ProviderSelectionError(
-            f"No installed evaluation SDK matches {requested!r}"
-        )
-    if len(matches) > 1:
-        choices = ", ".join(
-            sorted(
-                f"{_entry_point_distribution(point)}::{point.name}"
-                for point in matches
-            )
-        )
-        raise ProviderSelectionError(
-            f"Evaluation SDK {requested!r} is ambiguous; choose one of: {choices}"
-        )
-    point = matches[0]
-    try:
-        loaded = point.load()
-        value = loaded() if isinstance(loaded, type) else loaded
-        plugin_execution(value)
-    except ProviderSelectionError:
-        raise
-    except Exception as exc:
-        raise ProviderSelectionError(
-            f"Could not load evaluation SDK {requested!r}"
-        ) from exc
-    return SDKSelection(reference=_reference_for_entry_point(point), value=value)
-
-
-def _load_python_sdk(spec: str, *, explicit: bool) -> SDKSelection:
-    module_name, separator, attribute = spec.partition(":")
-    if not module_name or (separator and not attribute):
-        prefix = "python:" if explicit else ""
-        raise ProviderSelectionError(
-            f"SDK import must use {prefix}MODULE or {prefix}MODULE:OBJECT"
-        )
-    try:
-        value = importlib.import_module(module_name)
-        if separator:
-            value = getattr(value, attribute)
-    except (ImportError, AttributeError) as exc:
-        hint = (
-            " Install a plugin or use python:MODULE[:OBJECT]."
-            if not explicit
-            else ""
-        )
-        raise ProviderSelectionError(
-            f"Could not import evaluation SDK {spec!r}.{hint}"
-        ) from exc
-    plugin_execution(value)
-    object_ref = f"{module_name}:{attribute}" if separator else module_name
-    selection = python_sdk_selection(value, object_ref=object_ref)
-    if explicit:
-        return selection
-    return SDKSelection(
-        reference=SDKReference(
-            name=selection.reference.name,
-            source="python",
-            object_ref=selection.reference.object_ref,
-        ),
-        value=selection.value,
-    )
-
-
-def _validate_loaded_sdk(value: object) -> None:
-    if isinstance(value, type) or not callable(getattr(value, "create_run", None)):
+        return execution
+    if not callable(getattr(value, "create_run", None)):
         raise ProviderSelectionError(
             "SDK must expose create_run(), or implement EvaluationSDKPlugin"
         )
-
-
-def _sdk_entry_points(
-    provider: Callable[[], object] | None,
-) -> tuple[object, ...]:
-    result = (provider or importlib.metadata.entry_points)()
-    if hasattr(result, "select"):
-        return tuple(result.select(group=SDK_ENTRY_POINT_GROUP))
-    if isinstance(result, Mapping):
-        return tuple(result.get(SDK_ENTRY_POINT_GROUP, ()))
-    return tuple(
-        point
-        for point in result  # type: ignore[union-attr]
-        if getattr(point, "group", None) == SDK_ENTRY_POINT_GROUP
-    )
-
-
-def _reference_for_entry_point(point: object) -> SDKReference:
-    distribution = _entry_point_distribution(point)
-    dist = getattr(point, "dist", None)
-    return SDKReference(
-        name=str(point.name),
-        source="entry-point",
-        object_ref=str(point.value),
-        distribution=distribution,
-        version=getattr(dist, "version", None),
-    )
-
-
-def _entry_point_distribution(point: object) -> str:
-    dist = getattr(point, "dist", None)
-    metadata = getattr(dist, "metadata", None)
-    if metadata is not None:
-        name = metadata.get("Name")
-        if name:
-            return str(name)
-    name = getattr(dist, "name", None)
-    return str(name or "unknown-distribution")
-
-
-def _distribution_version(name: str) -> str | None:
-    try:
-        return importlib.metadata.version(name)
-    except importlib.metadata.PackageNotFoundError:
-        return None
-
-
-def _normalized_distribution(value: str) -> str:
-    return re.sub(r"[-_.]+", "-", value).casefold()
-
-
-def _python_object_ref(value: object) -> str:
-    module = getattr(value, "__module__", None)
-    name = getattr(value, "__qualname__", None) or getattr(value, "__name__", None)
-    if module and name:
-        return f"{module}:{name}"
-    module_name = getattr(value, "__name__", None)
-    return str(module_name or type(value).__name__)
+    return "local"

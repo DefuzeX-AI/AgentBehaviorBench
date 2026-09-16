@@ -2,57 +2,57 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 
 from agentbench.harness import SDK, SuiteRunner
+from agentbench.harness.concurrency import ConcurrencySettings
 from agentbench.runtime.interception import (
     NullTraceSink,
-    TerminalTraceSink,
-    TraceEvent,
     TraceSink,
 )
 from agentbench.sdk.plugins import SDKSelection, evaluation_plan
-from agentbench.sdk.runtime import build_evaluation_runner
+from agentbench.sdk.runtime import build_evaluation_runner_factory
 
 
 def build_trace_suite_runner(
     *,
-    mode: str,
     max_bytes: int,
-    output_fn: Callable[[str], None],
     model: str | None = None,
     activity_sink: TraceSink | None = None,
     sdk: SDK | None = None,
     sdk_selection: SDKSelection | None = None,
     sdk_options: Mapping[str, object] | None = None,
+    concurrency: ConcurrencySettings | None = None,
+    environ: Mapping[str, str] | None = None,
 ) -> SuiteRunner:
-    if mode not in {"off", "terminal"}:
-        raise ValueError(f"Unsupported LLM trace mode: {mode!r}")
-    sinks: list[TraceSink] = []
-    if activity_sink is not None:
-        sinks.append(activity_sink)
-    if mode == "terminal":
-        trace_output = getattr(activity_sink, "write_static", output_fn)
-        sinks.append(TerminalTraceSink(trace_output))
-    sink: TraceSink = _CompositeTraceSink(tuple(sinks)) if sinks else NullTraceSink()
+    sink: TraceSink = activity_sink or NullTraceSink()
+
+    # Return the selected SDK implementation.
+    # ex:
+    #   EvaluationPlan(
+    #       selection=SDKSelection(
+    #           reference=SDKReference(
+    #               name='kuma',
+    #               source='directory',
+    #               object_ref='agentbench.sdk.plugin.kuma.plugin:plugin'
+    #           ),
+    #           value=<agentbench.sdk.plugin.kuma.plugin.KumaEvaluationSDK object at 0x...>
+    #       ),
+    #       options=mappingproxy({})
+    #   )
     plan = evaluation_plan(
         sdk=sdk,
         selection=sdk_selection,
         options=sdk_options,
     )
-    benchmark_runner = build_evaluation_runner(
+
+    # Runner instance
+    runner_factory = build_evaluation_runner_factory(
         plan,
         model=model,
         trace_sink=sink,
         trace_max_bytes=max_bytes,
+        environ=environ,
     )
-    return SuiteRunner(benchmark_runner=benchmark_runner)
 
-
-class _CompositeTraceSink:
-    def __init__(self, sinks: tuple[TraceSink, ...]) -> None:
-        self._sinks = sinks
-
-    def emit(self, event: TraceEvent) -> None:
-        for sink in self._sinks:
-            sink.emit(event)
+    return SuiteRunner(runner_factory=runner_factory, concurrency=concurrency, trace_sink=sink)

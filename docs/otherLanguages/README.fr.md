@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="../README.md">English</a> |
+  <a href="../../README.md">English</a> |
   Français |
   <a href="README.ja.md">日本語</a> |
   <a href="README.zh-CN.md">中文简体</a> |
@@ -20,7 +20,8 @@
 </p>
 
 > **Avant d'exécuter ABB :** installez Python 3.10+, Docker Desktop ou Docker
-> Engine (en cours d'exécution), ainsi que la dépendance optionnelle DefuzeX.
+> Engine (en cours d'exécution). KUMA est installé automatiquement depuis PyPI
+> lors de la construction du conteneur d'évaluation.
 > Le Company Research Agent prêt à l'emploi requiert `KUMA_API_KEY` (ou
 > `DEFUZEX_API_KEY`), `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` et
 > `TAVILY_API_KEY`.
@@ -34,14 +35,13 @@ sont enregistrés localement et consultables dans le visualiseur ABB.
 
 ## Démarrage rapide
 
-À la racine du dépôt, créez un environnement virtuel et installez ABB avec
-l'extra DefuzeX :
+À la racine du dépôt, créez un environnement virtuel et installez ABB :
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate              # Windows PowerShell: .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -e ".[defuzex]"
+python -m pip install -e "."
 ```
 
 Créez le fichier d'environnement local et renseignez les identifiants :
@@ -68,7 +68,7 @@ ABB demande une confirmation, enregistre un instantané dans `results/` et lance
 le visualiseur local. Pour une exécution sans interface :
 
 ```bash
-agentbench run --no-view --output results/benchmark.json
+agentbench run --yes --no-view --output results/benchmark.json
 ```
 
 ## Prérequis et variables d'environnement
@@ -114,11 +114,10 @@ Options `run` fréquentes :
 ```bash
 agentbench run --model openai/gpt-4.1-mini
 agentbench run --sdk kuma --sdk-options sdk-options.json
-agentbench run --llm-trace terminal
 ```
 
-La référence complète est en anglais : [CLI reference](../docs/CLI.md). Pour
-ajouter un agent, consultez le [guide d'intégration](../docs/How%20To%20Add%20Agent.md).
+La référence complète est en anglais : [CLI reference](../CLI.md). Pour
+ajouter un agent, consultez le [guide d'intégration](../How%20To%20Add%20Agent.md).
 
 ## Organisation du dépôt
 
@@ -135,7 +134,7 @@ resources/registry.toml
 - `agentbench/cli/` fournit les commandes du terminal.
 - `agentbench/harness/` gère l'exécution, les résultats et le registre.
 - `agentbench/runtime/` exécute les agents localement ou dans Docker.
-- `agentbench/sdk/` contient les adaptateurs SDK intégrés et la découverte de plugins.
+- `agentbench/sdk/plugin/` contient les adaptateurs SDK intégrés et la découverte de plugins.
 
 ## Développement
 
@@ -143,9 +142,9 @@ resources/registry.toml
 python -m pytest
 ```
 
-Consultez [AGENTS.md](../AGENTS.md) et [docs/AGENTS.md](../docs/AGENTS.md) pour
+Consultez [AGENTS.md](../../AGENTS.md) et [docs/AGENTS.md](../../AGENTS.md) pour
 les conventions du dépôt.
 
 ## Licence
 
-MIT. Voir [LICENSE](../LICENSE).
+MIT. Voir [LICENSE](../../LICENSE).

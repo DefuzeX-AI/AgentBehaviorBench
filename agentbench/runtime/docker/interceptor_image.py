@@ -12,6 +12,7 @@ from agentbench.runtime.interception import (
 )
 
 from .image_builder import DockerImageBuilder
+from agentbench.runtime.contracts.execution import Deadline
 
 
 INTERCEPTOR_IMAGE_ENV = "DEFUZEX_MODEL_INTERCEPTOR_IMAGE"
@@ -22,11 +23,14 @@ class LocalInterceptorImageProvider:
     builder: DockerImageBuilder
     context: Path
 
-    def resolve_image(self) -> str:
+    def resolve_image(self, *, deadline: Deadline | None = None,
+                      log_directory: Path | None = None) -> str:
         return self.builder.build(
             context=self.context,
             dockerfile=self.context / "Dockerfile",
             repository="model-interceptor",
+            deadline=deadline,
+            log_directory=log_directory,
         )
 
 

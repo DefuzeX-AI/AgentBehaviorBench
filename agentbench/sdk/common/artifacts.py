@@ -16,9 +16,10 @@ def plain(value):
 
 
 class Artifacts:
-    def __init__(self, directory):
+    def __init__(self, directory, *, environ=None):
         self.directory = directory
-        self.secrets = tuple(v for k, v in os.environ.items()
+        environment = os.environ if environ is None else environ
+        self.secrets = tuple(v for k, v in environment.items()
                              if any(x in k.upper() for x in ('KEY', 'TOKEN', 'SECRET', 'PASSWORD')))
 
     def save(self, relative, value):

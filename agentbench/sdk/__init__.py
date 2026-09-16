@@ -1,19 +1,22 @@
-"""Evaluation SDK contracts and lazy plugin selection helpers."""
+"""Evaluation SDK contracts and lazy directory discovery/selection helpers."""
 
 from .contracts import (
     EvaluationRunner, EvaluationSDKPlugin, SDK, SDKReport, SDKRun,
-    SDKRunFactory, SDKRunnerContext, SDKTestInput,
+    SDKRunFactory, SDKRunnerContext, SDKTestInput, SDKReference,
+    PreparedCase, PreparedCaseBatch, PreparationFailure, PartialCasePreparation,
+    RunnerConcurrencyCapabilities, RunnerRecoveryCapabilities,
 )
 
 _PLUGIN_EXPORTS = {
-    "SDK_ENTRY_POINT_GROUP", "SDK_PLUGIN_API_VERSION", "EvaluationPlan",
-    "SDKReference", "SDKSelection", "evaluation_plan", "installed_sdk_references",
-    "resolve_sdk",
+    "EvaluationPlan", "SDKSelection", "evaluation_plan", "resolve_sdk",
 }
 
 
 def __getattr__(name):
     # Contracts work before the harness is imported, without SDK dependencies.
+    if name == "discover_sdks":
+        from .discovery import discover_sdks
+        return discover_sdks
     if name in _PLUGIN_EXPORTS:
         from . import plugins
         return getattr(plugins, name)
@@ -22,5 +25,8 @@ def __getattr__(name):
 
 __all__ = [
     "EvaluationRunner", "EvaluationSDKPlugin", "SDK", "SDKReport", "SDKRun",
-    "SDKRunFactory", "SDKRunnerContext", "SDKTestInput", *sorted(_PLUGIN_EXPORTS),
+    "SDKRunFactory", "SDKRunnerContext", "SDKTestInput", "SDKReference",
+    "PreparedCase", "PreparedCaseBatch", "PreparationFailure", "PartialCasePreparation",
+    "RunnerConcurrencyCapabilities", "RunnerRecoveryCapabilities",
+    "discover_sdks", *sorted(_PLUGIN_EXPORTS),
 ]

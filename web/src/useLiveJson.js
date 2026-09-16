@@ -13,7 +13,7 @@ export default function useLiveJson(url, revision, live = true) {
     async function poll() {
       try {
         const response = await fetch(url, { signal: controller.signal, cache: 'no-store' });
-        if (!response.ok) throw new Error(`读取失败 HTTP ${response.status}`);
+        if (!response.ok) throw new Error(`Read failed with HTTP ${response.status}`);
         const data = await response.json();
         if (!controller.signal.aborted) setState(old => ({
           data: JSON.stringify(old.data) === JSON.stringify(data) ? old.data : data,

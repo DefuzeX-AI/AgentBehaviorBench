@@ -8,7 +8,7 @@ export function parseTrace(text, filename) {
   function append(value, location) {
     if (!value || typeof value !== 'object' || Array.isArray(value)
         || typeof value.event !== 'string' || !value.event.trim()) {
-      warnings.push(`${filename} · ${location}：不是 trace 事件（缺少 event）。`);
+      warnings.push(`${filename} · ${location}: not a trace event (missing event).`);
       return;
     }
     events.push({
@@ -17,7 +17,11 @@ export function parseTrace(text, filename) {
       event: value.event,
       source: typeof value.source === 'string' ? value.source : 'unknown',
       timestamp: typeof value.timestamp === 'string' ? value.timestamp : '',
-      runId: typeof value.run_id === 'string' ? value.run_id : '',
+      runId: typeof value.artifact_run_id === 'string' ? value.artifact_run_id : typeof value.run_id === 'string' ? value.run_id : '',
+      agentId: typeof value.agent_id === 'string' ? value.agent_id : '',
+      jobId: typeof value.job_id === 'string' ? value.job_id : '',
+      caseIndex: value.case_index ?? null,
+      caseId: typeof value.case_id === 'string' ? value.case_id : '',
       raw: value,
       search: JSON.stringify(value).toLowerCase(),
     });
@@ -25,16 +29,22 @@ export function parseTrace(text, filename) {
 
   try {
     const json = JSON.parse(content);
-    if (Array.isArray(json)) json.forEach((value, i) => append(value, `记录 ${i + 1}`));
-    else append(json, '记录 1');
+    if (Array.isArray(json)) json.forEach((value, i) => append(value, `record ${i + 1}`));
+    else append(json, 'record 1');
   } catch {
     content.split(/\r?\n/).forEach((line, i) => {
       if (!line.trim()) return;
-      try { append(JSON.parse(line), `行 ${i + 1}`); }
-      catch { warnings.push(`${filename} · 行 ${i + 1}：JSON 不完整或格式错误，已跳过。`); }
+      try { append(JSON.parse(line), `line ${i + 1}`); }
+      catch { warnings.push(`${filename} · line ${i + 1}: incomplete or invalid JSON; skipped.`); }
     });
   }
   return { events, warnings };
+}
+
+export function eventIdentity(event) {
+  return [event.agentId, event.jobId && `Job ${event.jobId}`,
+    event.caseIndex != null && `Case ${typeof event.caseIndex === 'number' ? event.caseIndex + 1 : event.caseIndex}`, event.caseId,
+    event.runId && `Run ${event.runId}`].filter(Boolean).join(' · ');
 }
 
 export function sortEvents(events) {

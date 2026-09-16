@@ -2,7 +2,35 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from fnmatch import fnmatchcase
 from typing import Protocol, runtime_checkable
+
+
+@dataclass(frozen=True, slots=True)
+class SourceSignature:
+    """Adapter-owned request recognition, independent of Agent route declarations.
+
+    Matching identifies a protocol, not authorization: the proxy must still
+    validate the request against a configured per-run credential before sending
+    anything to its configured model target. Paths exclude query parameters.
+    """
+
+    paths: tuple[str, ...]
+    auth_plugin: str
+    content_type: str = "application/json"
+    method: str = "POST"
+
+    def matches(self, request) -> bool:
+        media = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+        return (request.method.upper() == self.method
+                and (media == self.content_type or media.startswith(self.content_type + "+"))
+                and any(fnmatchcase(request.path.split("?", 1)[0], path) for path in self.paths))
+
+    def specificity(self, request) -> int:
+        """Prefer longer literal paths when protocol suffix patterns overlap."""
+        path = request.path.split("?", 1)[0]
+        return max((len(pattern.replace("*", "")) for pattern in self.paths
+                    if fnmatchcase(path, pattern)), default=0)
 
 
 @runtime_checkable

@@ -23,7 +23,7 @@ def select_agent(records, choice):
     for item in records:
         if item["agent_id"] == choice:
             return item
-    raise ValueError("请选择菜单中的编号或 enabled Agent ID")
+    raise ValueError("Select a number from the menu or an enabled Agent ID")
 
 
 def resolve_agent(record, registry_path):

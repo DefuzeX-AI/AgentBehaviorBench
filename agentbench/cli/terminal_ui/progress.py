@@ -26,8 +26,10 @@ class ProgressPrinter:
         llm_activity: LLMActivity | None = None,
         live_updates: bool | None = None,
         animation_interval: float = ANIMATION_INTERVAL_SECONDS,
+        concurrent: bool = False,
     ) -> None:
         self._output_fn = output_fn
+        self._concurrent = concurrent
         self._llm_activity = llm_activity
         self._active_label: str | None = None
         self._animation_interval = animation_interval
@@ -41,6 +43,18 @@ class ProgressPrinter:
         )
 
     def __call__(self, event: BenchmarkProgress) -> None:
+        if self._concurrent:
+            identity = [event.agent_id or "suite"]
+            for field, label in (("job_id", "job"), ("case_index", "case"),
+                                 ("artifact_run_id", "run")):
+                value = getattr(event, field, None)
+                if value is not None:
+                    if field == "case_index" and isinstance(value, int):
+                        value += 1
+                    identity.append(f"{label}={value}")
+            detail = f" | {event.detail}" if event.detail else ""
+            self._output_fn(f"[{' | '.join(identity)}] {event.stage}: {event.status}{detail}")
+            return
         if event.status == "started":
             self._start_stage(_stage_label(event))
             return
@@ -117,7 +131,7 @@ class ProgressPrinter:
 def configuration_error(message: object) -> str:
     """Format a fatal suite configuration error."""
 
-    return f"{ANSI_RED}【Configuration error】 {message}{ANSI_RESET}"
+    return f"{ANSI_RED}[Configuration error] {message}{ANSI_RESET}"
 
 
 def _stage_label(event: BenchmarkProgress) -> str:

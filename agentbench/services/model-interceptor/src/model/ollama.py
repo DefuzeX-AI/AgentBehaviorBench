@@ -2,6 +2,7 @@
 from datetime import datetime, timezone
 from defuzex_model_interceptor.transport.sse import SSEDecoder
 from defuzex_model_interceptor.transport.json import json_request, json_bytes
+from defuzex_model_interceptor.contracts import SourceSignature
 
 
 class OllamaWire:
@@ -9,6 +10,8 @@ class OllamaWire:
         self.generate = generate
         self.source_model = None
         self.streaming = True
+        self.signature = SourceSignature(("/api/generate" if generate else "/api/chat",),
+                                         "network-isolated")
 
     endpoint = "/chat/completions"
     response_type = "application/json"

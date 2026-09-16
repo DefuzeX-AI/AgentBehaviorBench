@@ -9,7 +9,8 @@ from pathlib import Path
 
 from ..errors import AgentInvocationError, ProviderSelectionError
 from ..progress import ProgressCallback, emit_progress
-from ..protocols import SDK, SDKReport, SDKRun, SDKRunFactory
+from agentbench.sdk.contracts import PreparedCase, SDK, SDKReport, SDKRun
+from agentbench.runtime.contracts.execution import RunControl
 from ..registry import AgentRegistration
 from ..result import BenchmarkResult, BenchmarkStepFailure, BenchmarkStepResult
 from .agent_runner import AgentRunner
@@ -29,68 +30,38 @@ class BenchmarkRunner:
         sdk: SDK | None = None,
         sdk_options: Mapping[str, object] | None = None,
         agent_runner: AgentRunner | None = None,
-        sdk_run_factory: SDKRunFactory | None = None,
         environ: Mapping[str, str] | None = None,
         observation_factory=None,
+        control: RunControl | None = None,
     ) -> None:
-        if sdk is not None and sdk_run_factory is not None:
-            raise ValueError("Pass sdk or sdk_run_factory, not both")
         self._observation_factory = observation_factory
         self._sdk = sdk
         self._sdk_options = dict(sdk_options or {})
         self._agent_runner = agent_runner or AgentRunner()
-        self._sdk_run_factory = sdk_run_factory
-        self._environ = os.environ if environ is None else environ
+        self._environ = dict(os.environ if environ is None else environ)
+        self._control = control or RunControl()
 
     def run(self, *args, **kwargs) -> BenchmarkResult:
         """Synchronous entry; all Inputs and cleanup share one event loop."""
         return _run_sync(self.arun, *args, **kwargs)
 
-    def run_defuzex(self, *args, **kwargs) -> BenchmarkResult:
-        return _run_sync(self.arun_defuzex, *args, **kwargs)
+    def prepare_cases(self, registration: AgentRegistration, *, on_progress=None) -> tuple[PreparedCase, ...]:
+        """Describe independent SDK Run requests without starting an Agent."""
+        self._control.check()
+        self.validate_sdk(registration)
+        return tuple(PreparedCase(index) for index in range(registration.case_count))
 
-    async def arun_defuzex(
-        self,
-        registration: AgentRegistration,
-        *,
-        requirement_path: str | Path | None = None,
-        case_provider: object | None = None,
-        judge_provider: object | None = None,
-        api_key: str | None = None,
-        max_inputs: int | None = None,
-        allow_local: bool = False,
-        track_files: bool = True,
-        save_local: bool = False,
-        on_progress: ProgressCallback | None = None,
-        on_step_start: StepStartCallback | None = None,
-        on_step_complete: StepCompleteCallback | None = None,
-        on_step_failure: StepFailureCallback | None = None,
-    ) -> BenchmarkResult:
-        """Start one Agent, create its SDK Run, and execute the handshake."""
-
-        from agentbench.sdk.defuzex import create_run
-
-        provider_mode, run_kwargs = self._prepare_defuzex(
-            registration=registration,
-            requirement_path=requirement_path,
-            case_provider=case_provider,
-            judge_provider=judge_provider,
-            api_key=api_key,
-            max_inputs=max_inputs,
-            allow_local=allow_local,
-            track_files=track_files,
-            save_local=save_local,
-        )
-
-        return await self._execute(
-            registration,
-            create_run=lambda: (self._sdk_run_factory or create_run)(**run_kwargs),
-            provider_mode=provider_mode,
-            on_progress=on_progress,
-            on_step_start=on_step_start,
-            on_step_complete=on_step_complete,
-            on_step_failure=on_step_failure,
-        )
+    def run_case(self, registration: AgentRegistration, case: PreparedCase, *,
+                 on_progress=None, on_step_start=None, on_step_complete=None,
+                 on_step_failure=None) -> BenchmarkResult:
+        """Create and execute one SDK Run for the selected Case work item."""
+        self._control.check()
+        if not isinstance(case, PreparedCase):
+            raise TypeError('run_case requires a PreparedCase')
+        if case.case_index >= registration.case_count:
+            raise ValueError('Prepared Case index exceeds the registered Case count')
+        return self.run(registration, on_progress=on_progress, on_step_start=on_step_start,
+                        on_step_complete=on_step_complete, on_step_failure=on_step_failure)
 
     async def _execute(
         self,
@@ -103,6 +74,7 @@ class BenchmarkRunner:
         on_step_complete: StepCompleteCallback | None = None,
         on_step_failure: StepFailureCallback | None = None,
     ) -> BenchmarkResult:
+        self._control.check()
         emit_progress(
             on_progress,
             stage="agent_start",
@@ -217,7 +189,8 @@ class BenchmarkRunner:
 
         A supplied SDK receives repo_path plus sdk_options unchanged. It owns
         credentials, providers, validation and judging. No DefuzeX settings are
-        added to that path. Omitting sdk preserves the DefuzeX default.
+        added to that path. Use SuiteRunner for directory-discovered adapters;
+        this lower-level runner requires an SDK object or an existing SDKRun.
         """
         callbacks = dict(
             on_progress=on_progress,
@@ -240,8 +213,6 @@ class BenchmarkRunner:
                     on_step_complete=on_step_complete,
                     on_step_failure=on_step_failure,
                 )
-        if self._sdk is None:
-            return await self.arun_defuzex(registration, **self._sdk_options, **callbacks)
         mode = self.validate_sdk(registration)
         kwargs = {"repo_path": registration.path, **self._sdk_options}
         return await self._execute(
@@ -254,7 +225,10 @@ class BenchmarkRunner:
     def validate_sdk(self, registration: AgentRegistration) -> str:
         """Check the selected SDK interface without starting an Agent or Run."""
         if self._sdk is None:
-            return self.validate_defuzex(registration, **self._sdk_options)
+            raise ProviderSelectionError(
+                "BenchmarkRunner requires an explicit SDK object; use SuiteRunner "
+                "for directory-discovered adapters, or pass an existing SDKRun to run()."
+            )
         if isinstance(self._sdk, type) or not callable(
             getattr(self._sdk, "create_run", None)
         ):
@@ -266,34 +240,6 @@ class BenchmarkRunner:
                 "repo_path is supplied per Agent; omit it from sdk_options"
             )
         return "custom"
-
-    def validate_defuzex(
-        self,
-        registration: AgentRegistration,
-        *,
-        requirement_path: str | Path | None = None,
-        case_provider: object | None = None,
-        judge_provider: object | None = None,
-        api_key: str | None = None,
-        max_inputs: int | None = None,
-        allow_local: bool = False,
-        track_files: bool = True,
-        save_local: bool = False,
-    ) -> str:
-        """Validate shared SDK and Provider configuration without networking."""
-
-        provider_mode, _ = self._prepare_defuzex(
-            registration=registration,
-            requirement_path=requirement_path,
-            case_provider=case_provider,
-            judge_provider=judge_provider,
-            api_key=api_key,
-            max_inputs=max_inputs,
-            allow_local=allow_local,
-            track_files=track_files,
-            save_local=save_local,
-        )
-        return provider_mode
 
     async def _run_with_running(
         self,
@@ -341,7 +287,11 @@ class BenchmarkRunner:
         run_config = {"configurable": {"thread_id": sdk_run.run_id}}
 
         adapter_name = running.adapter_name
-        while (test_input := sdk_run.get_input(full=True)) is not None:
+        while True:
+            self._control.check()
+            test_input = sdk_run.get_input(full=True)
+            if test_input is None:
+                break
             if on_step_start is not None:
                 on_step_start(
                     registration.agent_id,
@@ -401,38 +351,6 @@ class BenchmarkRunner:
             steps=tuple(steps),
             history_count=len(sdk_run.history),
         )
-
-    def _prepare_defuzex(
-        self,
-        *,
-        registration: AgentRegistration,
-        requirement_path: str | Path | None,
-        case_provider: object | None,
-        judge_provider: object | None,
-        api_key: str | None,
-        max_inputs: int | None,
-        allow_local: bool,
-        track_files: bool,
-        save_local: bool,
-    ) -> tuple[str, dict[str, object]]:
-        from agentbench.sdk.defuzex import DefuzeConfiguration, validate_installation
-
-        if self._sdk is not None:
-            raise ValueError("Use run() and validate_sdk() with an injected sdk")
-        provider_mode, run_kwargs = DefuzeConfiguration(self._environ).prepare(
-            registration=registration,
-            requirement_path=requirement_path,
-            case_provider=case_provider,
-            judge_provider=judge_provider,
-            api_key=api_key,
-            max_inputs=max_inputs,
-            allow_local=allow_local,
-            track_files=track_files,
-            save_local=save_local,
-        )
-        if self._sdk_run_factory is None:
-            validate_installation(provider_mode, run_kwargs)
-        return provider_mode, run_kwargs
 
     @staticmethod
     def _record_failed_submission(sdk_run: SDKRun, exc: Exception) -> None:

@@ -10,7 +10,6 @@ import shutil
 import subprocess
 import tempfile
 import threading
-import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from uuid import uuid4
@@ -21,6 +20,9 @@ from agentbench.runtime.contracts import (
     EnvironmentSecretResolver,
     RuntimeSession,
     SecretResolver,
+)
+from agentbench.runtime.contracts.execution import (
+    Deadline, DockerCleanupError, RunControl, RuntimeInfrastructureError, RuntimeLimits,
 )
 from agentbench.runtime.interception import (
     DEFAULT_TRACE_MAX_BYTES,
@@ -37,15 +39,22 @@ from agentbench.runtime.interception import (
 )
 
 from .image_builder import DockerImageBuilder
-from .interceptor_image import default_interceptor_image_provider
+from .build_coordinator import BuildCoordinator
+from .command import DockerCommandRunner, DockerCommandTimeout
+from .interceptor_image import LocalInterceptorImageProvider, default_interceptor_image_provider
 from .interceptor_policy import InterceptorPolicy
 from .policy import DockerPolicy
 from .session import DockerSession
+from .resources import ResourceRegistry
 from .worker_build import worker_build_context
 
 
 class DockerRuntimeError(RuntimeError):
     """Raised when an isolated Docker session cannot be started."""
+
+
+class DockerUnavailableError(DockerRuntimeError, RuntimeInfrastructureError):
+    """A shared Docker daemon failure must stop further Suite dispatch."""
 
 
 class DockerRuntime:
@@ -64,19 +73,37 @@ class DockerRuntime:
         artifact_root: Path | None = None,
         timeout_sec: float | None = None,
         run_id: str | None = None,
+        control: RunControl | None = None,
+        build_coordinator: BuildCoordinator | None = None,
+        identity: Mapping[str, object] | None = None,
+        resource_registry: ResourceRegistry | None = None,
+        limits: RuntimeLimits | None = None,
+        command_environ: Mapping[str, str] | None = None,
     ) -> None:
         if trace_max_bytes < 1024:
             raise ValueError("trace_max_bytes must be at least 1024")
         if timeout_sec is not None and (isinstance(timeout_sec, bool) or not math.isfinite(timeout_sec) or timeout_sec <= 0):
             raise ValueError("timeout_sec must be finite and positive")
         self._executable = executable
-        self._environ = os.environ if environ is None else environ
+        self._environ = dict(os.environ if environ is None else environ)
+        self.control = control or RunControl()
+        self.identity = dict(identity or {})
+        self._limits = limits or RuntimeLimits()
+        self._resources = resource_registry or ResourceRegistry()
+        self._uncertain_resources: set[tuple[str, str]] = set()
+        client_environment = dict(os.environ if command_environ is None else command_environ)
+        client_environment.update(self._environ)
+        self._commands = DockerCommandRunner(executable, environ=client_environment)
         self._secret_resolver = secret_resolver or EnvironmentSecretResolver(
             self._environ
         )
         self._policy = policy or DockerPolicy()
         self._interceptor_policy = interceptor_policy or InterceptorPolicy()
-        self._images = DockerImageBuilder(executable)
+        self._images = DockerImageBuilder(
+            executable, coordinator=build_coordinator or BuildCoordinator(),
+            control=self.control, command_runner=self._commands,
+            build_timeout=self._limits.build_seconds,
+        )
         self._interceptor_images = (
             interceptor_image_provider
             or default_interceptor_image_provider(self._images, self._environ)
@@ -92,8 +119,14 @@ class DockerRuntime:
         return self._timeout_override or AgentContainerConfig.from_agent_dir(
             agent.path, secret_resolver=self._secret_resolver, environ=self._environ).timeout_sec
 
-    def start(self, agent: AgentDescriptor, *, invocation=None) -> RuntimeSession:
-        self._check_available()
+    def start(self, agent: AgentDescriptor, *, invocation=None,
+              preparation_deadline: Deadline | None = None) -> RuntimeSession:
+        # Check cancellation, the preparation deadline, and Docker availability first.
+        self.control.check()
+        preparation = preparation_deadline or Deadline.after(self._limits.preparation_seconds)
+        preparation.check()
+        self._check_available(deadline=preparation)
+        # Load the Agent container and network-interception configuration.
         config = AgentContainerConfig.from_agent_dir(
             agent.path,
             secret_resolver=self._secret_resolver,
@@ -101,71 +134,145 @@ class DockerRuntime:
         )
         interception = InterceptionConfig.from_agent_dir(agent.path)
         if interception is not None:
+            # Validate the model service and credentials before enabling interception.
             target = self._model_provider.resolve(self._environ)
             self._secret_resolver.require(target.credential_env)
         if invocation is not None:
-            with worker_build_context(config) as (context, dockerfile):
-                image = self._images.build(context=context, dockerfile=dockerfile, repository=config.agent_id)
-            self._require_non_root_image(image)
+            # Jobs with input/output directories use the staged worker build context.
+            with worker_build_context(config, control=self.control, deadline=preparation) as (context, dockerfile):
+                image = self._images.build(context=context, dockerfile=dockerfile, repository=config.agent_id,
+                                           deadline=preparation, log_directory=self._build_logs())
+            self._require_non_root_image(image, deadline=preparation)
         else:
+            # A regular launch uses the Agent's own build context and Dockerfile.
             image = self._images.build(
                 context=config.build_context,
                 dockerfile=config.dockerfile,
                 repository=config.agent_id,
+                deadline=preparation,
+                log_directory=self._build_logs(),
             )
 
-        suffix = uuid4().hex[:12]
+        self.control.check()
+
+
+        # Use unique container and network names to isolate concurrent jobs.
+        suffix = uuid4().hex
         network_name = f"defuzex-{suffix}-egress"
         agent_name = f"defuzex-{suffix}-agent"
         interceptor: RunningModelInterceptor | None = None
         trace_state: InterceptionTraceState | None = None
-        created_network = False
+        planned_network = False
+        planned_agent = False
+        process: subprocess.Popen[str] | None = None
+        session: DockerSession | None = None
+        cleanup_lock = threading.Lock()
+        cleaned = False
+        cleanup_error: DockerCleanupError | None = None
+
+        def cleanup() -> None:
+            # Define cleanup once so every exit path releases the same resources.
+            nonlocal cleaned, cleanup_error
+            with cleanup_lock:
+                # Prevent multiple exit paths from cleaning the same resources twice.
+                if cleaned:
+                    if cleanup_error is not None:
+                        raise cleanup_error
+                    return
+                cleaned = True
+                deadline = Deadline.after(self._limits.cleanup_seconds)
+                errors: list[str] = []
+
+                if planned_agent:
+                    # Stop the Agent gracefully before removing its container.
+                    if process is not None and process.poll() is None and not self.control.forced:
+                        try:
+                            self._commands.run(["container", "stop", "--time", "5", agent_name],
+                                               cleanup=True, timeout=7, deadline=deadline)
+                        except Exception:
+                            pass  # Force removal below is authoritative.
+                    try:
+                        self._remove_resource("container", agent_name, deadline=deadline)
+                    except Exception as exc:
+                        errors.append(str(exc))
+
+                if self.control.cancelled and trace_state is not None:
+                    trace_state.fail()
+
+                if interceptor is not None:
+                    # Stop the network interceptor after the Agent exits.
+                    try:
+                        interceptor.close(deadline=deadline)
+                    except Exception as exc:
+                        errors.append(str(exc))
+                if planned_network:
+                    # Remove the Docker network created for this job last.
+                    try:
+                        self._remove_resource("network", network_name, deadline=deadline)
+                    except Exception as exc:
+                        errors.append(str(exc))
+                if errors:
+                    cleanup_error = DockerCleanupError("; ".join(errors))
+                    raise cleanup_error
 
         try:
             agent_environment = dict(config.environment)
             network_arguments: list[str]
             if interception is not None:
+                # The interception path records trace state and creates an isolated network.
                 trace_state = InterceptionTraceState()
-                self._require_non_root_image(image)
-                self._run("network", "create", network_name)
-                created_network = True
+                self._require_non_root_image(image, deadline=preparation)
+                self._plan_resource("network", network_name, "network", suffix)
+                planned_network = True
+                self._create_resource("network", network_name,
+                                      ["network", "create", *self._labels("network", suffix), network_name],
+                                      deadline=preparation)
+                # Start the interceptor before routing Agent traffic through it.
                 interceptor, token_environment = self._start_interceptor(
                     agent_id=config.agent_id,
                     interception=interception,
                     suffix=suffix,
                     network_name=network_name,
                     trace_state=trace_state,
+                    deadline=preparation,
                 )
                 agent_environment.update(interception.environment)
                 agent_environment.update(token_environment)
+                # Configure certificate trust for HTTPS traffic through the interceptor.
                 certificate_target = "/run/defuzex-ca/ca.pem"
                 agent_environment.update(
                     get_trust_plugin(interception.trust_plugin).agent_environment(
                         certificate_target
                     )
                 )
+                # The Agent shares the interceptor's network namespace.
                 network_arguments = [
                     "--network",
                     f"container:{interceptor.container_name}",
                 ]
             else:
-                self._run("network", "create", "--internal", network_name)
-                created_network = True
+                # Without interception, create an internal network with no direct egress.
+                self._plan_resource("network", network_name, "network", suffix)
+                planned_network = True
+                self._create_resource("network", network_name,
+                                      ["network", "create", "--internal", *self._labels("network", suffix), network_name],
+                                      deadline=preparation)
                 network_arguments = ["--network", network_name]
 
+            # Assemble docker-create arguments without starting the Agent yet.
             command = [
-                self._executable,
-                "run",
-                "--rm",
+                "create",
                 "--init",
                 "--name",
                 agent_name,
+                *self._labels("agent", suffix),
                 *network_arguments,
                 "--workdir",
                 config.workdir,
                 *self._policy.run_arguments(),
             ]
             if interceptor is not None:
+                # Mount the interceptor certificate into the Agent container.
                 command.extend(
                     (
                         "--mount",
@@ -176,20 +283,32 @@ class DockerRuntime:
                     )
                 )
             if invocation is not None:
+                # Mount the host input directory and writable artifact directory for the worker.
                 inputs, outputs = invocation
                 command.extend(("--mount", _bind_mount(inputs, "/run/abb-input")))
                 # All other filesystem locations retain the existing read-only policy.
                 command.extend(("--mount", f"type=bind,source={outputs},target=/run/abb-output"))
+            # Disable Python bytecode caches and flush logs promptly.
             agent_environment.update(
                 PYTHONDONTWRITEBYTECODE="1",
                 PYTHONUNBUFFERED="1",
             )
+            # Add environment variables, image, and launch command to the container arguments.
             for key, value in sorted(agent_environment.items()):
                 command.extend(("--env", f"{key}={value}"))
             command.extend((image, *config.argv))
 
-            process = subprocess.Popen(
-                command,
+            # Register and create the Agent container so failures can clean it up reliably.
+            self._plan_resource("container", agent_name, "agent", suffix)
+            planned_agent = True
+            self._create_resource("container", agent_name, command, deadline=preparation)
+            preparation.check()
+            
+            # Start the Agent container and capture stdout and stderr.
+            # For KUMA evaluations, config.argv starts the KUMA worker, which selects
+            # Case generation or Case execution from its settings.
+            process = self._commands.start(
+                ["start", "--attach", agent_name], control=self.control,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -199,22 +318,13 @@ class DockerRuntime:
                 bufsize=1,
             )
 
-            cleaned = False
-
-            def cleanup() -> None:
-                nonlocal cleaned
-                if cleaned:
-                    return
-                cleaned = True
-                self._run_quiet("container", "rm", "--force", agent_name)
-                if interceptor is not None:
-                    interceptor.close()
-                if created_network:
-                    self._run_quiet("network", "rm", network_name)
-
-            return DockerSession(
+            # Wrap the process in a session used for waiting, trace validation, and cleanup.
+            session = DockerSession(
                 process,
                 close_callback=cleanup,
+                control=self.control,
+                default_timeout=self._timeout_override or config.timeout_sec,
+                runtime_error_checker=trace_state.check_persistence if trace_state is not None else None,
                 trace_checkpoint=(
                     trace_state.checkpoint
                     if interception is not None and interception.required
@@ -226,12 +336,20 @@ class DockerRuntime:
                     else None
                 ),
             )
-        except BaseException:
-            self._run_quiet("container", "rm", "--force", agent_name)
-            if interceptor is not None:
-                interceptor.close()
-            if created_network:
-                self._run_quiet("network", "rm", network_name)
+            self.control.check()
+            return session
+        except BaseException as original:
+            # A partial startup must still release containers, interceptors, and networks.
+            try:
+                if session is not None:
+                    session.close()
+                else:
+                    cleanup()
+            except DockerCleanupError as exc:
+                raise exc from original
+            finally:
+                if process is not None and session is None:
+                    DockerCommandRunner.terminate(process)
             raise
 
     def _start_interceptor(
@@ -242,13 +360,25 @@ class DockerRuntime:
         suffix: str,
         network_name: str,
         trace_state: InterceptionTraceState,
+        deadline: Deadline | None = None,
     ) -> tuple[RunningModelInterceptor, dict[str, str]]:
-        image = self._interceptor_images.resolve_image()
+        if deadline is not None:
+            deadline.check()
+        if isinstance(self._interceptor_images, LocalInterceptorImageProvider):
+            image = self._interceptor_images.resolve_image(deadline=deadline, log_directory=self._build_logs())
+        else:
+            image = self._interceptor_images.resolve_image()
+        # Explicit/static images must already be available; hidden Docker pulls
+        # inside run would escape the single build preparation policy.
+        self._run("image", "inspect", image, deadline=deadline)
         container_name = f"defuzex-{suffix}-interceptor"
         secret_dir = Path(tempfile.mkdtemp(prefix="defuzex-model-interceptor-"))
         config_file = secret_dir / "interceptor_config.json"
         ca_dir = secret_dir / "ca"
         ca_certificate = ca_dir / "mitmproxy-ca-cert.pem"
+        planned = False
+        log_process = None
+        trace_reader = None
         try:
             ca_dir.mkdir()
             token_environment: dict[str, str] = {}
@@ -315,6 +445,7 @@ class DockerRuntime:
                 "--init",
                 "--name",
                 container_name,
+                *self._labels("interceptor", suffix),
                 "--network",
                 network_name,
                 *self._interceptor_policy.run_arguments(),
@@ -328,19 +459,39 @@ class DockerRuntime:
                     ("--mount", _bind_mount(path, f"/run/secrets/{path.name}"))
                 )
             command.append(image)
-            self._run(*command)
-            self._wait_for_interceptor(container_name, ca_certificate)
+            self._plan_resource("container", container_name, "interceptor", suffix)
+            planned = True
+            self._create_resource("container", container_name, command, deadline=deadline)
+            self._wait_for_interceptor(container_name, ca_certificate, deadline=deadline)
             if not ca_certificate.is_file():
                 raise DockerRuntimeError("Model interceptor CA was not exported")
-            log_process = self._follow_trace(container_name, trace_state)
-        except BaseException:
-            self._run_quiet("container", "rm", "--force", container_name)
-            shutil.rmtree(secret_dir, ignore_errors=True)
+            log_process, trace_reader = self._follow_trace(container_name, trace_state)
+            self.control.check()
+        except BaseException as original:
+            try:
+                if planned:
+                    self._remove_resource("container", container_name)
+            except DockerCleanupError as exc:
+                raise exc from original
+            finally:
+                if log_process is not None:
+                    DockerCommandRunner.terminate(log_process)
+                if trace_reader is not None:
+                    trace_reader.join(timeout=2)
+                shutil.rmtree(secret_dir, ignore_errors=True)
             raise
 
-        def close_interceptor() -> None:
-            self._run_quiet("container", "rm", "--force", container_name)
-            shutil.rmtree(secret_dir, ignore_errors=True)
+        def close_interceptor(deadline: Deadline | None = None) -> None:
+            try:
+                if not self.control.forced:
+                    try:
+                        self._commands.run(["container", "stop", "--time", "2", container_name],
+                                           cleanup=True, timeout=4, deadline=deadline)
+                    except Exception:
+                        pass  # The removal command determines cleanup success.
+                self._remove_resource("container", container_name, deadline=deadline)
+            finally:
+                shutil.rmtree(secret_dir, ignore_errors=True)
 
         return (
             RunningModelInterceptor(
@@ -348,15 +499,17 @@ class DockerRuntime:
                 ca_certificate=ca_certificate,
                 _close_callback=close_interceptor,
                 _log_process=log_process,
+                _trace_reader=trace_reader,
+                _close_with_deadline=close_interceptor,
             ),
             token_environment,
         )
 
     def _follow_trace(
         self, container_name: str, trace_state: InterceptionTraceState
-    ) -> subprocess.Popen[str]:
-        process = subprocess.Popen(
-            [self._executable, "logs", "--follow", container_name],
+    ) -> tuple[subprocess.Popen[str], threading.Thread]:
+        process = self._commands.start(
+            ["logs", "--follow", container_name], control=self.control,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
             text=True,
@@ -369,50 +522,54 @@ class DockerRuntime:
 
         def consume() -> None:
             assert process.stdout is not None
-            for line in process.stdout:
-                event = TraceEvent.from_log_line(line.rstrip("\r\n"))
-                if event is not None:
-                    try:
+            try:
+                for line in process.stdout:
+                    event = TraceEvent.from_log_line(line.rstrip("\r\n"))
+                    if event is not None:
                         # A pair is complete only after its full event is saved.
                         self._trace_sink.emit(event)
-                    except Exception:
-                        trace_state.fail()
-                        return
-                    trace_state.emit(event)
+                        trace_state.emit(event)
+            except Exception as exc:
+                trace_state.fail(exc)
+            finally:
+                process.stdout.close()
 
-        threading.Thread(
+        reader = threading.Thread(
             target=consume,
             daemon=True,
             name=f"{container_name}-trace",
-        ).start()
-        return process
+        )
+        reader.start()
+        return process, reader
 
-    @staticmethod
     def _required_trace_callback(
+        self,
         trace_state: InterceptionTraceState,
     ) -> Callable[[object], None]:
         def require_trace(value: object) -> None:
             checkpoint = int(value)
-            if not trace_state.wait_for_completion_after(checkpoint, timeout=2):
+            if not trace_state.wait_for_completion_after(checkpoint, timeout=2, control=self.control):
                 raise DockerRuntimeError(
-                    "Agent invocation completed without a matched LLM request/response trace"
+                    "Agent invocation trace was not accepted: " + trace_state.diagnostic()
                 )
-            if not trace_state.wait_for_idle():
-                raise DockerRuntimeError("Model trace is incomplete: unfinished pair, capture error, truncation, or failed persistence")
+            if not trace_state.wait_for_idle(control=self.control):
+                raise DockerRuntimeError("Model trace is incomplete: " + trace_state.diagnostic())
 
         return require_trace
 
     def _wait_for_interceptor(
-        self, container_name: str, ca_certificate: Path
+        self, container_name: str, ca_certificate: Path, *, deadline: Deadline | None = None,
     ) -> None:
-        deadline = time.monotonic() + 45
-        while time.monotonic() < deadline:
-            logs = self._run_quiet("logs", container_name, capture=True)
+        startup = Deadline.after(self._limits.startup_seconds)
+        deadline = startup if deadline is None else Deadline(min(startup.expires_at, deadline.expires_at))
+        while deadline.remaining():
+            self.control.check()
+            logs = self._run_quiet("logs", container_name, capture=True, deadline=deadline)
             if (
                 logs is not None
                 and '"event": "interceptor_ready"' in logs.stdout
             ):
-                self._export_ca(container_name, ca_certificate)
+                self._export_ca(container_name, ca_certificate, deadline=deadline)
                 return
             state = self._run_quiet(
                 "inspect",
@@ -420,41 +577,41 @@ class DockerRuntime:
                 "{{.State.Running}}",
                 container_name,
                 capture=True,
+                deadline=deadline,
             )
             if state is not None and state.stdout.strip() == "false":
                 detail = logs.stdout.strip() if logs is not None else ""
                 raise DockerRuntimeError(
                     f"Model interceptor stopped during startup{': ' + detail if detail else ''}"
                 )
-            time.sleep(0.25)
-        logs = self._run_quiet("logs", container_name, capture=True)
-        detail = logs.stdout.strip() if logs is not None else ""
+            self.control.wait(min(0.25, deadline.remaining()))
         raise DockerRuntimeError(
-            f"Model interceptor did not become ready{': ' + detail if detail else ''}"
+            "Model interceptor did not become ready within its startup budget"
         )
 
-    def _export_ca(self, container_name: str, destination: Path) -> None:
+    def _export_ca(self, container_name: str, destination: Path, *, deadline: Deadline | None = None) -> None:
         """Copy only the public CA; private key stays in interceptor tmpfs."""
         import ssl
         # Docker's archive/cp endpoint cannot reliably read a live tmpfs mount.
         # Read the single public PEM through exec; never export the CA directory.
-        pem = self._run("exec", container_name, "cat", "/run/defuzex/ca/mitmproxy-ca-cert.pem").stdout
+        pem = self._run("exec", container_name, "cat", "/run/defuzex/ca/mitmproxy-ca-cert.pem", deadline=deadline).stdout
         if "PRIVATE KEY" in pem or "-----BEGIN CERTIFICATE-----" not in pem:
             raise DockerRuntimeError("Invalid interceptor public CA export")
         ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT).load_verify_locations(cadata=pem)
-        with tempfile.NamedTemporaryFile(mode="w", encoding="ascii", dir=destination.parent, delete=False) as stream:
-            owned = Path(stream.name)
-            try:
+        stream = tempfile.NamedTemporaryFile(mode="w", encoding="ascii", dir=destination.parent, delete=False)
+        owned = Path(stream.name)
+        try:
+            with stream:
                 stream.write(pem)
-                stream.flush()
-                owned.chmod(0o644)
-                owned.replace(destination)
-            finally:
-                owned.unlink(missing_ok=True)
+            # Windows cannot replace or remove a file while this handle is open.
+            owned.chmod(0o644)
+            owned.replace(destination)
+        finally:
+            owned.unlink(missing_ok=True)
 
-    def _require_non_root_image(self, image: str) -> None:
+    def _require_non_root_image(self, image: str, *, deadline: Deadline | None = None) -> None:
         result = self._run(
-            "image", "inspect", "--format", "{{.Config.User}}", image
+            "image", "inspect", "--format", "{{.Config.User}}", image, deadline=deadline,
         )
         user = result.stdout.strip()
         if not user or user in {"0", "root", "0:0", "root:root"}:
@@ -462,14 +619,17 @@ class DockerRuntime:
                 "Transparent interception requires an Agent image with a non-root USER"
             )
 
-    def _check_available(self) -> None:
-        result = self._run_quiet("info", "--format", "{{.ServerVersion}}", capture=True)
+    def _check_available(self, *, deadline: Deadline | None = None) -> None:
+        try:
+            result = self._run_quiet("info", "--format", "{{.ServerVersion}}", capture=True, deadline=deadline)
+        except DockerCommandTimeout as exc:
+            raise DockerUnavailableError("Docker daemon availability check timed out") from exc
         if result is None or result.returncode != 0:
             detail = result.stderr.strip() if result is not None else "docker not found"
-            raise DockerRuntimeError(f"Docker daemon is unavailable: {detail}")
+            raise DockerUnavailableError(f"Docker daemon is unavailable: {detail}")
 
-    def _run(self, *args: str) -> subprocess.CompletedProcess[str]:
-        result = self._run_quiet(*args, capture=True)
+    def _run(self, *args: str, deadline: Deadline | None = None) -> subprocess.CompletedProcess[str]:
+        result = self._run_quiet(*args, capture=True, deadline=deadline)
         if result is None:
             raise DockerRuntimeError("Docker executable was not found")
         if result.returncode != 0:
@@ -478,19 +638,67 @@ class DockerRuntime:
         return result
 
     def _run_quiet(
-        self, *args: str, capture: bool = False
+        self, *args: str, capture: bool = False, deadline: Deadline | None = None,
     ) -> subprocess.CompletedProcess[str] | None:
         try:
-            return subprocess.run(
-                [self._executable, *args],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                check=False,
+            return self._commands.run(
+                args, control=self.control, timeout=self._limits.command_seconds,
+                deadline=deadline,
             )
         except FileNotFoundError:
             return None
+
+    def _build_logs(self) -> Path | None:
+        return self.artifact_root / "docker-build" if self.artifact_root is not None else None
+
+    def _resource_identity(self, role: str, suffix: str) -> dict[str, object]:
+        return {
+            "suite_id": self.identity.get("suite_id") or self.run_id or suffix,
+            "job_id": self.identity.get("job_id") or self.run_id or suffix,
+            "artifact_run_id": self.identity.get("artifact_run_id") or self.run_id or suffix,
+            "role": role,
+        }
+
+    def _labels(self, role: str, suffix: str) -> list[str]:
+        return [part for key, value in self._resource_identity(role, suffix).items()
+                for part in ("--label", f"abb.{key}={value}")]
+
+    def _plan_resource(self, kind: str, name: str, role: str, suffix: str) -> None:
+        self._resources.plan(kind, name, self._resource_identity(role, suffix))
+
+    def _create_resource(self, kind: str, name: str, arguments: list[str], *, deadline: Deadline | None) -> None:
+        try:
+            created = self._run(*arguments, deadline=deadline)
+        except BaseException as exc:
+            if getattr(exc, "docker_client_interrupted", False):
+                self._uncertain_resources.add((kind, name))
+            raise
+        self._resources.created(kind, name, created.stdout.strip())
+
+    def _remove_resource(self, kind: str, name: str, *, deadline: Deadline | None = None) -> None:
+        deadline = deadline or Deadline.after(self._limits.cleanup_seconds)
+        try:
+            arguments = [kind, "rm", *(["--force"] if kind == "container" else []), name]
+            removed = self._commands.run(arguments, cleanup=True, timeout=15, deadline=deadline)
+            if removed.returncode != 0:
+                # An interrupted creation may have left nothing. Only explicit
+                # absence is success; daemon/network errors must remain visible.
+                detail = (removed.stderr or removed.stdout).strip()
+                missing = "no such container" if kind == "container" else "no such network"
+                if missing not in detail.lower() and not (kind == "network" and "not found" in detail.lower() and name in detail):
+                    raise DockerCleanupError(f"Could not remove owned {kind} {name}: {detail}")
+                if (kind, name) in self._uncertain_resources:
+                    raise DockerCleanupError(
+                        f"Creation of {kind} {name} was interrupted and the daemon reports absence; "
+                        "a delayed create cannot be ruled out"
+                    )
+            self._uncertain_resources.discard((kind, name))
+            self._resources.removed(kind, name)
+        except Exception as exc:
+            self._resources.failed(kind, name, str(exc))
+            if isinstance(exc, DockerCleanupError):
+                raise
+            raise DockerCleanupError(f"Could not confirm removal of {kind} {name}: {exc}") from exc
 
 
 def _bind_mount(source: Path, target: str) -> str:

@@ -13,10 +13,10 @@ from agentbench.sdk.plugins import resolve_sdk
 def configure_sdk_parser(parser: ArgumentParser) -> None:
     parser.add_argument(
         "--sdk",
-        metavar="NAME|DISTRIBUTION::NAME|python:MODULE[:OBJECT]",
+        metavar="NAME",
         help=(
-            "Select an installed SDK plugin by entry-point name. "
-            "Use python:MODULE[:OBJECT] for host-side development imports."
+            "Select an adapter directory listed by 'agentbench sdk list'. "
+            "Omit only when exactly one adapter is available."
         ),
     )
     parser.add_argument(

@@ -9,7 +9,7 @@ async function fixture(t) {
   const root = await mkdtemp(path.join(tmpdir(), 'abb-runs-test-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   await mkdir(path.join(root, 'run1/invocation-a/output'), { recursive: true });
-  await writeFile(path.join(root, 'run1/run.json'), JSON.stringify({ agent_id: 'research-agent', input: { query: '中文任务' }, status: 'succeeded', output: 'not in list' }));
+  await writeFile(path.join(root, 'run1/run.json'), JSON.stringify({ agent_id: 'research-agent', input: { query: 'multilingual task' }, status: 'succeeded', output: 'not in list' }));
   return root;
 }
 

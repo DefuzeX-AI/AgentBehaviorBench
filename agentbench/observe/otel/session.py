@@ -1,5 +1,6 @@
 """Convert live framework notifications to real OTel spans, never replay logs."""
 import threading
+import json
 from opentelemetry import trace
 from opentelemetry.context import Context
 from opentelemetry.sdk.resources import Resource
@@ -24,6 +25,15 @@ class OtelSession:
         self.lock = threading.RLock()
         self.error = None
 
+    def _tool_content(self, span, label, value):
+        """Attach observed JSON tool content; unsupported values stay omitted."""
+        try:
+            payload = json.dumps(redact(value, self.exporter.secrets), ensure_ascii=True, allow_nan=False)
+        except (ValueError, TypeError, RecursionError):
+            span.set_attribute(f'abb.tool_{label}_omission', 'not_json_serializable')
+            return
+        span.set_attribute(f'gen_ai.tool.call.{label}', payload)
+
     def record(self, event, **data):
         with self.lock:
             identity = {f'abb.{key}': data[key] for key in ('input_id', 'case_id', 'agent_id') if isinstance(data.get(key), str)}
@@ -45,17 +55,31 @@ class OtelSession:
                 if data['span_id'] in self.spans:
                     raise ValueError('Duplicate framework span start')
                 self.spans[data['span_id']] = span
+                if kind == 'tool':
+                    span.set_attribute('gen_ai.tool.name', data.get('name', 'tool'))
+                    span.set_attribute('gen_ai.tool.type', 'function')
+                    if isinstance(data.get('tool_call_id'), str):
+                        span.set_attribute('gen_ai.tool.call.id', data['tool_call_id'])
+                    self._tool_content(span, 'arguments', data.get('input'))
                 self.exporter.payload(span, 'input', data.get('input'))
                 self.exporter.payload(span, 'metadata', data.get('metadata'))
-            elif event in ('span_end', 'span_error'):
+            elif event in ('span_end', 'span_error', 'span_control'):
                 span = self.spans.pop(data['span_id'], None)
                 if span is None:
                     self.error = 'Missing span start'
                     return
                 label = 'error' if event == 'span_error' else 'output'
                 self.exporter.payload(span, label, data.get(label))
+                if event == 'span_end' and span.attributes.get('abb.kind') == 'tool':
+                    self._tool_content(span, 'result', data.get('output'))
+                    if isinstance(data.get('tool_call_id'), str):
+                        span.set_attribute('gen_ai.tool.call.id', data['tool_call_id'])
+                    if data.get('tool_status') == 'error':
+                        span.set_status(Status(StatusCode.ERROR, 'Tool returned an error outcome'))
                 if event == 'span_error':
                     span.set_status(Status(StatusCode.ERROR, 'Agent step raised an exception'))
+                elif event == 'span_control':
+                    span.set_attribute('abb.control_flow', data['control'])
                 span.end()
             elif event in ('execution_end', 'execution_error') and self.root:
                 label = 'output' if event == 'execution_end' else 'error'

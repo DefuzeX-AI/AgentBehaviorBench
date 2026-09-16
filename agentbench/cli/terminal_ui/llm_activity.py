@@ -42,7 +42,10 @@ class _CallActivity:
 
 
 class LLMActivity:
-    """Render one short, self-erasing panel for the current LLM call."""
+    """
+        Render one short, self-erasing panel for the current LLM call.
+    
+    """
 
     def __init__(
         self,
@@ -72,6 +75,12 @@ class LLMActivity:
         self._latest_call_id: str | None = None
         self._call_count = 0
         self._rendered_line_count = 0
+        self._concurrent = False
+
+    def set_concurrent(self, enabled: bool) -> None:
+        """Use permanent identity-prefixed events when several Agents run."""
+        self.close()
+        self._concurrent = enabled
 
     def start_stage(self, label: str) -> None:
         """Start the benchmark stage line and its shared animation loop."""
@@ -115,6 +124,13 @@ class LLMActivity:
         """Consume one structured interception event."""
 
         if event.event == "interceptor_ready":
+            return
+        if self._concurrent:
+            self._emit_concurrent(event)
+            return
+        if (event.event in {'tool_request', 'tool_response', 'tool_error'}
+                and event.data.get('purpose') == 'evaluation'):
+            self._write_evaluation_http(event)
             return
         if event.event not in {"llm_request", "llm_response", "llm_error"}:
             return
@@ -171,6 +187,48 @@ class LLMActivity:
 
             if self._stage_label is not None:
                 self._render_live_block_locked()
+
+    def _emit_concurrent(self, event: TraceEvent) -> None:
+        # No mutable call panel: identical call IDs in separate jobs cannot
+        # overwrite each other's display state, even when traces arrive late.
+        if event.event not in {"llm_request", "llm_response", "llm_error",
+                               "tool_request", "tool_response", "tool_error"}:
+            return
+        data = event.data
+        if event.event.startswith("tool_") and data.get("purpose") != "evaluation":
+            return
+        identity = [str(data.get("agent_id") or "agent")]
+        for field, label in (("job_id", "job"), ("case_index", "case"),
+                             ("artifact_run_id", "run"), ("call_id", "call")):
+            value = data.get(field)
+            if value is not None:
+                if field == "case_index" and isinstance(value, int):
+                    value += 1
+                identity.append(f"{label}={value}")
+        if event.event.endswith("error"):
+            preview = _truncate_preview(str(data.get("error", "Request failed")), self._preview_chars)
+        elif event.event.startswith("tool_"):
+            preview = f"{data.get('method', '')} {data.get('host', '')}{str(data.get('path', '')).split('?', 1)[0]} | {data.get('status', 'ALLOWED')}"
+        else:
+            preview = _event_preview(event, self._preview_chars)
+        with self._lock:
+            self._output_fn(f"[{' | '.join(identity)}] {event.event}: {preview}")
+
+    def _write_evaluation_http(self, event: TraceEvent) -> None:
+        """Keep SDK egress visible without implying the whole Run succeeded."""
+        data = event.data
+        call_id = data.get('call_id')
+        if not isinstance(call_id, str) or not call_id:
+            return
+        address = str(data.get('host', '')) + str(data.get('path', '')).split('?', 1)[0]
+        if event.event == 'tool_request':
+            status = 'ALLOWED'
+        elif event.event == 'tool_response':
+            status = f"HTTP {data.get('status', '?')}"
+        else:
+            status = f"FAILED: {data.get('error', 'Network request failed')}"
+        line = f"[EVALUATION HTTP] {data.get('method', '')} {address} | {status} | call={call_id}"
+        self.write_static('    ' + _truncate_preview(line, 512))
 
     def write_static(self, text: str) -> None:
         """Print permanent output without corrupting the temporary panel."""

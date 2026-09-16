@@ -33,7 +33,7 @@ def configure_parser(parser):
 def model_name(value):
     if value.strip().isdecimal():
         raise ArgumentTypeError(
-            f"--model 指定模型名称，不是 Agent 编号；选择 {value.strip()} 号 Agent 请使用 observe {value.strip()}"
+            f"--model expects a model name, not an Agent number; use 'observe {value.strip()}' to select Agent {value.strip()}"
         )
     return value
 
@@ -51,7 +51,7 @@ def native_input(agent, path, input_fn=input):
             answer = input_fn(field.get("label", field["name"]) + ": ").strip()
             if answer or not field.get("required", False):
                 break
-            print("此字段必填。")
+            print("This field is required.")
         if answer:
             value[field["name"]] = answer
     return value
@@ -73,12 +73,12 @@ def execute(args):
         if args.list:
             return 0
         if not records:
-            raise ValueError("没有 enabled Agent")
+            raise ValueError("No enabled Agents are available")
         if args.timeout is not None and (not math.isfinite(args.timeout) or args.timeout <= 0):
             raise ValueError("--timeout must be finite and positive")
         choice = selected
         while True:
-            choice = choice or input("选择 Agent 编号（q 退出）: ").strip()
+            choice = choice or input("Select an Agent number (q to quit): ").strip()
             if selected is None and choice.lower() == "q":
                 return 0
             try:
@@ -87,7 +87,7 @@ def execute(args):
             except ValueError:
                 if selected is not None:
                     raise
-                print("无效选择，请重试。")
+                print("Invalid selection. Try again.")
                 choice = None
         agent = resolve_agent(record, args.registry)
         print(f"Selected Agent: {agent.agent_id}")
@@ -99,7 +99,7 @@ def execute(args):
         observe(agent, value, output=args.output, environ=environ, timeout=args.timeout)
         return 0
     except (KeyboardInterrupt, EOFError):
-        print("Observe 已取消；已有记录保留。")
+        print("Observe cancelled; existing artifacts were retained.")
         return 130
     except Exception as exc:
         print(f"Observe failed: {exc}")

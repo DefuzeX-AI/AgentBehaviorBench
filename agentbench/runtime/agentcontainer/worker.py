@@ -26,6 +26,22 @@ def configure_trust():
 
 
 async def execute(root: Path, request: Path, output: Path, *, provider=None, session=None):
+    """Execute one current Input, optionally in an existing Case's Agent session.
+
+    Args:
+        root: Agent unit directory with its manifest and native entrypoint.
+        request: JSON invocation envelope containing current input and identity.
+        output: Per-invocation artifact directory.
+        provider: Optional shared OpenTelemetry provider.
+        session: Case-owned AgentSession reused across Inputs; None creates and
+            closes a standalone session for this invocation.
+    Returns:
+        Zero on successful execution, one on a recorded Agent/runtime failure.
+
+    The worker never constructs conversation history or manages Agent databases.
+    A shared session reserves its thread identity so different Cases cannot be
+    redirected to one checkpoint thread by invocation configuration.
+    """
     envelope = json.loads(request.read_text(encoding="utf-8"))
     run_id = envelope["run_id"]
     if envelope.get("schema") != "abb.invocation.v1" or not isinstance(run_id, str):
@@ -49,7 +65,12 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None, ses
         if "callbacks" in config:
             raise ValueError("Host callbacks cannot cross a JSON process boundary")
         config = observed.config(config)
-        config.setdefault("configurable", {}).setdefault("thread_id", envelope.get('session_id', run_id))
+        session_id = envelope.get('session_id', run_id)
+        configurable = dict(config.get("configurable") or {})
+        if not owned_session and configurable.get("thread_id", session_id) != session_id:
+            raise ValueError("A Case invocation cannot override its Agent session thread_id")
+        configurable.setdefault("thread_id", session_id)
+        config["configurable"] = configurable
         config.setdefault("metadata", {}).update(abb_run_id=run_id)
         store.record("execution_start", input=envelope["input"])
         adapter = session.load(root, envelope)
@@ -61,7 +82,9 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None, ses
         result.update(status="succeeded", output=invocation.output, raw_output=invocation.raw_output)
         store.record("execution_end", output=invocation.output)
     except BaseException as exc:
-        result.update(status="failed", error_type=type(exc).__name__, error=str(exc))
+        status = ('cancelled' if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt)) else
+                  'timeout' if isinstance(exc, TimeoutError) else 'failed')
+        result.update(status=status, error_type=type(exc).__name__, error=str(exc))
         store.record("execution_error", error_type=type(exc).__name__, error=str(exc))
     finally:
         if owned_session:

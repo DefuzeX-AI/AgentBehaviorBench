@@ -1,5 +1,7 @@
 """LangChain callbacks: real execution IDs and parent IDs, no fabricated spans."""
 from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.messages import ToolMessage
+from langgraph.errors import GraphBubbleUp
 from .correlation import current_span
 
 
@@ -17,14 +19,18 @@ class TraceCallback(BaseCallbackHandler):
         self.store.record("span_start", kind=kind, span_id=str(run_id),
                           parent_span_id=str(parent_run_id) if parent_run_id else None,
                           name=kwargs.get("name") or (serialized or {}).get("name", kind),
-                          input=value, metadata=kwargs.get("metadata"))
+                          input=value, metadata=kwargs.get("metadata"), tool_call_id=kwargs.get('tool_call_id'))
 
     def _end(self, value, run_id, **kwargs):
         current_span.set(str(kwargs["parent_run_id"]) if kwargs.get("parent_run_id") else None)
-        self.store.record("span_end", span_id=str(run_id), output=value)
+        self.store.record("span_end", span_id=str(run_id), output=value,
+                          tool_call_id=kwargs.get('tool_call_id'), tool_status=kwargs.get('tool_status'))
 
     def _error(self, error, run_id, **kwargs):
         current_span.set(str(kwargs["parent_run_id"]) if kwargs.get("parent_run_id") else None)
+        if isinstance(error, GraphBubbleUp):
+            self.store.record("span_control", span_id=str(run_id), control=type(error).__name__)
+            return
         self.store.record("span_error", span_id=str(run_id), error=str(error))
 
     def on_chain_start(self, serialized, inputs, *, run_id, parent_run_id=None, **kwargs):
@@ -37,11 +43,17 @@ class TraceCallback(BaseCallbackHandler):
         self._start("llm", serialized, prompts, run_id, parent_run_id, **kwargs)
 
     def on_tool_start(self, serialized, input_str, *, run_id, parent_run_id=None, **kwargs):
-        self._start("tool", serialized, input_str, run_id, parent_run_id, **kwargs)
+        value = kwargs['inputs'] if kwargs.get('inputs') is not None else input_str
+        self._start("tool", serialized, value, run_id, parent_run_id, **kwargs)
+
+    def on_tool_end(self, output, *, run_id, **kwargs):
+        if isinstance(output, ToolMessage):
+            kwargs.update(tool_call_id=output.tool_call_id, tool_status=output.status)
+            output = output.content
+        self._end(output, run_id, **kwargs)
 
     on_chain_end = _end
     on_llm_end = _end
-    on_tool_end = _end
     on_chain_error = _error
     on_llm_error = _error
     on_tool_error = _error

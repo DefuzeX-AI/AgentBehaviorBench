@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from html import escape
 import threading
 from dataclasses import dataclass
@@ -45,11 +46,18 @@ class RunningViewer:
     thread: threading.Thread
     base_url: str
     url: str
+    on_stop: Callable[[], None] | None = None
 
     def stop(self) -> None:
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(timeout=2)
+        try:
+            if self.on_stop is not None:
+                self.on_stop()
+        finally:
+            try:
+                self.server.shutdown()
+            finally:
+                self.server.server_close()
+                self.thread.join(timeout=2)
 
 
 def serve_result_log(
@@ -61,21 +69,27 @@ def serve_result_log(
     """Serve the static viewer and result-log API until interrupted."""
 
     path = Path(result_log).resolve()
-    if not path.exists():
-        raise FileNotFoundError(f"Result log not found: {path}")
+    if not path.is_file():
+        raise FileNotFoundError(f"Result log is not a file: {path}")
+    if not 0 <= port <= 65535:
+        raise ValueError('Port must be between 0 and 65535')
 
     require_viewer_assets()
     server = create_viewer_server(path, host=host, port=port)
     base_url = f"http://{host}:{server.server_port}"
     url = _locked_viewer_url(base_url, _result_log_suite_id(path))
-    print(f"View: {url}")
-    print(f"Result log: {path}")
+    print(f"View: {url}", flush=True)
+    print(f"Result log: {path}", flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         print("\nViewer stopped.")
     finally:
-        server.server_close()
+        from .sessions.control import close_control
+        try:
+            close_control(path)
+        finally:
+            server.server_close()
 
 
 def start_viewer_server(
@@ -93,11 +107,13 @@ def start_viewer_server(
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     base_url = f"http://{host}:{server.server_port}"
+    from .sessions.control import close_control
     return RunningViewer(
         server=server,
         thread=thread,
         base_url=base_url,
         url=_locked_viewer_url(base_url, suite_id),
+        on_stop=lambda: close_control(path),
     )
 
 
@@ -147,13 +163,11 @@ def build_viewer_handler(
 
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
+            from .viewer_control import controlled_snapshot, local_origin
+            if parsed.path.startswith('/api/') and not local_origin(self.headers):
+                self._send_json({'error': 'Same-origin reads only'}, status=HTTPStatus.FORBIDDEN)
+                return
             if run_api is not None and parsed.path.startswith('/api/observe/'):
-                origin = self.headers.get('Origin')
-                host = self.headers.get('Host', '')
-                if (urlparse(f'http://{host}').hostname not in ('localhost', '127.0.0.1', '::1')
-                    or (origin and origin != f'http://{host}') or self.headers.get('Sec-Fetch-Site') == 'cross-site'):
-                    self._send_json({'error': 'Same-origin reads only'}, status=HTTPStatus.FORBIDDEN)
-                    return
                 try:
                     self._send_json(run_api.route(parsed.path, parse_qs(parsed.query)))
                 except (OSError, ValueError, KeyError, StopIteration):
@@ -161,7 +175,10 @@ def build_viewer_handler(
                 return
             result_api_path = _suite_result_api_path(expected_suite_id)
             if parsed.path == result_api_path:
-                self._send_json(parse_result_log(result_log))
+                try:
+                    self._send_json(controlled_snapshot(parse_result_log(result_log), result_log))
+                except (OSError, ValueError, KeyError):
+                    self._send_json({'error': 'Suite snapshot unavailable'}, status=HTTPStatus.SERVICE_UNAVAILABLE)
                 return
             if parsed.path == "/api/result" or parsed.path.startswith(
                 "/api/suites/"
@@ -196,6 +213,33 @@ def build_viewer_handler(
 
             self.path = _static_path(parsed.path)
             super().do_GET()
+
+        def do_POST(self) -> None:
+            from .viewer_control import bound_controller, local_origin, read_command, valid_token
+            if not local_origin(self.headers, require_origin=True):
+                self._send_json({'error': 'Same-origin commands only'}, status=HTTPStatus.FORBIDDEN)
+                return
+            controller = bound_controller(result_log)
+            if controller is None:
+                self._send_json({'error': 'This viewer is read-only'}, status=HTTPStatus.FORBIDDEN)
+                return
+            if urlparse(self.path).path != controller.capabilities.get('control_url'):
+                self._send_suite_mismatch()
+                return
+            try:
+                token = self.headers.get('X-ABB-Control-Token', '')
+                if not valid_token(controller, token):
+                    raise PermissionError('Invalid control credential')
+                payload = read_command(self.headers, self.rfile)
+                reply = controller.submit(payload, token, origin_valid=True)
+            except PermissionError:
+                self._send_json({'error': 'Invalid control credential'}, status=HTTPStatus.FORBIDDEN)
+            except ValueError as exc:
+                self._send_json({'error': str(exc)}, status=HTTPStatus.BAD_REQUEST)
+            except RuntimeError as exc:
+                self._send_json({'error': str(exc)}, status=HTTPStatus.CONFLICT)
+            else:
+                self._send_json(reply, status=HTTPStatus.ACCEPTED)
 
         def _send_suite_mismatch(self) -> None:
             self._send_json(
@@ -240,6 +284,9 @@ def parse_result_log(path: str | Path) -> dict[str, object]:
         parse_errors.append({"message": str(exc)})
 
     suite_id: str | None = None
+    configured_workers: int | None = None
+    effective_workers: int | None = None
+    total_case_count: int | None = None
     selected_agent_ids: list[str] = []
     agents: list[dict[str, object]] = []
     step_events_by_agent: dict[str, list[dict[str, object]]] = {}
@@ -249,6 +296,9 @@ def parse_result_log(path: str | Path) -> dict[str, object]:
     for event in events:
         event_type = event.get("event")
         if event_type == "run_started":
+            configured_workers = event.get("configured_workers")
+            effective_workers = event.get("effective_workers")
+            total_case_count = event.get("total_case_count")
             event_suite_id = event.get("suite_id")
             if isinstance(event_suite_id, str):
                 suite_id = event_suite_id
@@ -276,20 +326,52 @@ def parse_result_log(path: str | Path) -> dict[str, object]:
     if suite_error is not None:
         state = "failed"
 
+    from agentbench.observe.view_api import suite_jobs
+    jobs = suite_jobs(events)
+    final_agents = {item.get("agent_id"): item for item in agents}
+    agents = [{**{"agent_id": job["agent_id"], "status": job["status"],
+                  "case_results": [case["result"] for case in job["cases"] if case["result"] is not None]},
+               **final_agents.get(job["agent_id"], {}), "cases": job["cases"]} for job in jobs]
     agents = _merge_step_events(agents, step_events_by_agent)
+    selected_order = {agent_id: index for index, agent_id in enumerate(selected_agent_ids)}
+    agents.sort(key=lambda item: selected_order.get(item.get("agent_id"), len(selected_order)))
+    for item in agents:
+        groups = {}
+        for event in item.get("step_events", []):
+            key = (event.get("job_id"), event.get("case_index"), event.get("case_id"),
+                   event.get("artifact_run_id"))
+            group = groups.setdefault(key, {"job_id": key[0], "case_index": key[1],
+                                            "case_id": key[2], "artifact_run_id": key[3], "events": []})
+            group["events"].append(event)
+        item["case_step_events"] = list(groups.values())
+        for case in item.get("cases", []):
+            case["step_events"] = [event for event in item.get("step_events", [])
+                                   if event.get("case_index") == case["case_index"]]
 
-    return {
+    payload = {
         "path": str(result_path),
         "suite_id": suite_id,
+        "configured_workers": configured_workers,
+        "effective_workers": effective_workers,
+        "total_case_count": total_case_count,
         "state": state,
         "selected_agent_ids": selected_agent_ids,
         "agents": agents,
+        "jobs": jobs,
         "summary": summary,
         "suite_error": suite_error,
         "parse_errors": parse_errors,
         "event_count": len(events),
         "events": events,
     }
+    from agentbench.observe.suite_reader import persisted_snapshot
+    canonical = persisted_snapshot(result_path)
+    if canonical is not None:
+        payload.update(canonical)
+        payload['agents'] = [dict(job, case_results=[case['result'] for case in job['cases']
+                                                    if case['result'] is not None])
+                             for job in canonical['jobs']]
+    return payload
 
 
 def _result_log_suite_id(path: Path) -> str | None:
@@ -338,7 +420,7 @@ def _merge_step_events(
         merged.append(
             {
                 "agent_id": agent_id,
-                "benchmark": None,
+                "case_results": [],
                 "error": {
                     "type": "Incomplete",
                     "message": "Agent did not produce a final suite result.",

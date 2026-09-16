@@ -10,12 +10,12 @@ requires-python = ">=3.10"
 dependencies = [
     "langgraph>=1.0,<2",
     "python-dotenv>=1,<2",
+    "jsonschema>=4.23,<5",
     "tomli>=2,<3; python_version < '3.11'",
 ]
 
 [project.optional-dependencies]
 otel = ["opentelemetry-sdk>=1.30,<2"]
-defuzex = ["defuzex>=4,<5"]
 
 [project.scripts]
 agentbench = "agentbench.cli.main:cli"
@@ -28,6 +28,13 @@ where = ["."]
 include = ["agentbench*"]
 
 [tool.setuptools.package-data]
+"agentbench.onboarding.build_agent_env.openrouter_provider" = ["assets/*.toml", "assets/*.md", "assets/*.json"]
+"agentbench.onboarding.build_agent_env.planning" = ["assets/*.md", "assets/*.json"]
+"agentbench.onboarding.build_agent_env.build_toml" = ["assets/*.md", "assets/*.json"]
+"agentbench.onboarding.build_agent_env.build_blinding" = ["assets/*.md"]
+"agentbench.onboarding.build_agent_env.build_dockerfile" = ["assets/*.md", "assets/dockerignore"]
+"agentbench.onboarding.build_agent_env.build_requirement" = ["assets/*.md"]
+"*" = ["whitelist.json", "requirements.txt"]
 "agentbench.services" = [
     "model-interceptor/.dockerignore",
     "model-interceptor/Dockerfile",
@@ -42,4 +49,5 @@ include = ["agentbench*"]
 [tool.pytest.ini_options]
 cache_dir = "cache/pytest"
 testpaths = ["tests"]
+python_files = ["test_*.py", "*_testing.py"]
 addopts = ["--import-mode=importlib"]

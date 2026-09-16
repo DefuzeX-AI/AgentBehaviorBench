@@ -1,10 +1,10 @@
 // Read-only prototype: collapse framework wrappers structurally, never by Agent name.
-export const kinds = { chat: 'Chat', tool: 'Tool', http: 'HTTP', sdk: 'SDK', case: 'Case', input: 'Input', output: 'Output', submission: 'Submission', judge: 'Judge', span: '调用' };
+export const kinds = { chat: 'Chat', tool: 'Tool', http: 'HTTP', sdk: 'SDK', case: 'Case', input: 'Input', output: 'Output', submission: 'Submission', judge: 'Judge', span: 'Call' };
 export const inputKey = r => r.input_id ? JSON.stringify([r.case_id, r.input_id]) : '';
 export const spanKey = s => `${s.invocation}:${s.trace_id}:${s.span_id}`;
-export const time = value => value ? new Date(value).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3, hour12: false }) : '无时间戳';
+export const time = value => value ? new Date(value).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3, hour12: false }) : 'No timestamp';
 export const elapsed = value => value == null ? '—' : value < 1000 ? `${Math.round(value)} ms` : `${(value / 1000).toFixed(2)} s`;
-export const statusText = value => ({ complete: '已完成', recorded: '已记录', failed: '异常', pending: '等待响应', unknown: '信息不足' }[value] || value);
+export const statusText = value => ({ complete: 'Completed', recorded: 'Recorded', failed: 'Error', pending: 'Waiting for response', unknown: 'Insufficient information' }[value] || value);
 
 export function makeModel(rows, spans) {
   const inputGroups = new Map();

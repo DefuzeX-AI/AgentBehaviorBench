@@ -1,5 +1,7 @@
 """Benchmark orchestration helpers."""
 
+from .concurrency import ConcurrencySettings, ConcurrencyConfigurationError
+
 from .errors import (
     AgentInvocationError,
     AgentNotRunningError,
@@ -8,19 +10,23 @@ from .errors import (
     SuiteConfigurationError,
 )
 from .progress import BenchmarkProgress, ProgressCallback
-from .protocols import EvaluationRunner, SDK, SDKReport, SDKRun, SDKRunFactory, SDKTestInput
+from agentbench.sdk.contracts import EvaluationRunner, SDK, SDKReport, SDKRun, SDKRunFactory, SDKTestInput
 from .registry import AgentRegistration, AgentRegistry, load_registry
 from .result import (
     BenchmarkResult,
     BenchmarkStepFailure,
     BenchmarkStepResult,
     BenchmarkSuiteResult,
+    CaseResult,
+    EvaluationFailure,
     SuiteAgentResult,
 )
 from .runner import AgentRunner, BenchmarkRunner, RunningAgent, SuiteRunner
 
 __all__ = [
     "AgentInvocationError",
+    "ConcurrencySettings",
+    "ConcurrencyConfigurationError",
     "AgentNotRunningError",
     "AgentRegistration",
     "AgentRegistry",
@@ -32,6 +38,8 @@ __all__ = [
     "BenchmarkStepFailure",
     "BenchmarkStepResult",
     "BenchmarkSuiteResult",
+    "CaseResult",
+    "EvaluationFailure",
     "EvaluationRunner",
     "ProviderSelectionError",
     "ProgressCallback",

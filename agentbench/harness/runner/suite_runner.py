@@ -1,238 +1,290 @@
-"""
-
-Run an evaluation SDK benchmark suite across registered agents.
-
-
-"""
+"""Prepare Agent batches and execute independent Cases through one bounded pool."""
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
+from dataclasses import asdict
+import threading
+from types import MappingProxyType
 from uuid import uuid4
 
-from ..errors import ProviderSelectionError, SuiteConfigurationError
-from ..progress import ProgressCallback, emit_progress
-from ..protocols import EvaluationRunner, SDK
+from agentbench.sdk.contracts import EvaluationRunner, PreparedCase, SDK
+
+from ..concurrency import ConcurrencySettings
+from ..errors import SuiteConfigurationError
+from ..events import EventBus, QueuedTraceSink
+from ..jobs import CaseJob, PreparationJob, SuiteCallbacks
+from ..progress import BenchmarkProgress
 from ..registry import AgentRegistration
-from ..result import BenchmarkSuiteResult, SuiteAgentResult
-from .benchmark_runner import (
-    StepCompleteCallback,
-    StepFailureCallback,
-    StepStartCallback,
-)
+from ..result import BenchmarkSuiteResult
+from ..scheduler import CaseScheduler
+from ..scheduling import RetryPolicy
 
 
 class SuiteRunner:
-    """
+    """One Suite owns factories, cancellation, Case dispatch and ordered results."""
 
-    Sequentially execute one benchmark for every selected Agent.
-
-    create suit -> run benchmark for each agent -> collect results -> return suite result
-
-    """
-
-    def __init__(
-        self,
-        *,
-        sdk: SDK | None = None,
-        sdk_options: Mapping[str, object] | None = None,
-        benchmark_runner: EvaluationRunner | None = None,
-    ) -> None:
-        if benchmark_runner is not None and (
+    def __init__(self, *, sdk: SDK | None = None,
+                 sdk_options: Mapping[str, object] | None = None,
+                 benchmark_runner: EvaluationRunner | None = None,
+                 runner_factory=None, concurrency: ConcurrencySettings | None = None,
+                 trace_sink=None, retry_policy: RetryPolicy | None = None) -> None:
+        if (benchmark_runner is not None or runner_factory is not None) and (
             sdk is not None or sdk_options is not None
         ):
-            raise ValueError(
-                "Configure sdk on either SuiteRunner or benchmark_runner, not both"
-            )
-        if benchmark_runner is None:
-            from agentbench.runtime.interception import NullTraceSink
-            from agentbench.sdk.plugins import evaluation_plan
-            from agentbench.sdk.runtime import build_evaluation_runner
+            raise ValueError("Configure SDK on the supplied runner/factory or SuiteRunner, not both")
+        if benchmark_runner is not None and runner_factory is not None:
+            raise ValueError("Pass benchmark_runner or runner_factory, not both")
+        if concurrency is not None and not isinstance(concurrency, ConcurrencySettings):
+            raise TypeError("concurrency must be ConcurrencySettings")
 
-            benchmark_runner = build_evaluation_runner(
-                evaluation_plan(sdk=sdk, options=sdk_options),
-                model=None,
-                trace_sink=NullTraceSink(),
-                trace_max_bytes=262144,
-            )
+        
+        self.concurrency = concurrency or ConcurrencySettings()
+        self._trace_sink = trace_sink
+        self._run_lock = threading.Lock()
+        self._active_control = None
+        self.retry_policy = retry_policy or RetryPolicy()
+
+        
+        if benchmark_runner is None and runner_factory is None:
+            from agentbench.runtime.interception import DEFAULT_TRACE_MAX_BYTES, NullTraceSink
+            from agentbench.sdk.plugins import evaluation_plan
+            from agentbench.sdk.runtime import build_evaluation_runner_factory
+
+
+            runner_factory = build_evaluation_runner_factory(
+                evaluation_plan(sdk=sdk, options=sdk_options), model=None,
+                trace_sink=trace_sink or NullTraceSink(), trace_max_bytes=DEFAULT_TRACE_MAX_BYTES)
         self._benchmark_runner = benchmark_runner
+        self._runner_factory = runner_factory
 
     @staticmethod
     def new_suite_id() -> str:
-        """Return an ID for one benchmark suite execution."""
-
         return f"suite_{uuid4().hex}"
 
-    def run(
-        self, registrations: Iterable[AgentRegistration], **kwargs: object
-    ) -> BenchmarkSuiteResult:
-        """Run a suite with the injected SDK and common progress callbacks.
+    def cancel(self, *, force: bool = False) -> None:
+        control = self._active_control
+        if control is not None:
+            control.force_cancel() if force else control.cancel()
 
-        Configure SDK-specific options in the constructor's sdk_options.
+    def run(self, registrations: Iterable[AgentRegistration], *, suite_id=None,
+            continue_on_error=True, on_agent_start=None, on_agent_complete=None,
+            on_progress=None, on_step_start=None, on_step_complete=None,
+            on_step_failure=None, on_event=None, on_tick=None, resume_state=None,
+            retain_case=None, retry_policy=None, run_control=None) -> BenchmarkSuiteResult:
+        """Run one Suite: validate Agents, prepare Cases, schedule jobs, and collect results.
+
+        This method waits for the Suite to finish. CaseScheduler creates the
+        worker thread pool; the setup below does not start Case worker threads.
+        Worker events are delivered through EventBus to callbacks on the
+        coordinating thread. Optional callbacks default to None (no handler).
+
+        Args:
+            registrations: Iterable of AgentRegistration objects selected by
+                the caller. Each registration supplies an agent_id and a
+                positive case_count. The selection must be nonempty and IDs
+                must be unique. Its order is retained in the Suite result.
+            suite_id: Nonempty string identifying this Suite in events and
+                results. None generates a new ID; an existing ID is reused.
+            continue_on_error: Whether to keep scheduling after ordinary job
+                failures. False stops new admissions after a failure; shared
+                infrastructure failures and cancellation can stop the Suite
+                regardless of this option.
+            on_agent_start: Callback(agent, index, total). Receives the Agent
+                registration, its one-based selection index, and Agent count.
+            on_agent_complete: Callback(item). Receives a SuiteAgentResult
+                when an Agent reaches its terminal outcome, including failure.
+            on_progress: Callback(event). Receives a BenchmarkProgress object
+                describing a stage, status, and available task identity.
+            on_step_start: Callback(agent_id, input_id, payload). Receives the
+                Agent ID, SDK Input ID, and input payload for a Case step.
+            on_step_complete: Callback(agent_id, step). Receives the Agent ID
+                and a BenchmarkStepResult for a completed step.
+            on_step_failure: Callback(agent_id, failure). Receives the Agent ID
+                and a BenchmarkStepFailure for a failed step. Step notification
+                timing depends on the runner; container runners may replay
+                step events from validated artifacts after execution.
+            on_event: Callback(event). Receives a dictionary describing a
+                Suite/job event, used by the CLI for result logging and output.
+            on_tick: Callback() invoked during event-bus draining, including
+                while waiting for jobs. Used to flush buffered logs when due;
+                this is not a separate timer thread or an exact-time guarantee.
+            resume_state: Validated AgentSeed values keyed by Agent ID. Completed
+                Cases are retained and prepared Cases skip generation.
+            retain_case: Optional Callback(agent_id, PreparedCase) returning a
+                durable descriptor before its prepared event is published.
+            retry_policy: Optional RetryPolicy override for this invocation.
+            run_control: Optional external RunControl preserving cancellation
+                requested before this method initializes its runtime resources.
+
+        Returns:
+            BenchmarkSuiteResult containing the Suite ID, selected Agent IDs,
+            and ordered Agent outcomes with their Case results. A returned
+            result can contain failed Cases; returning does not imply a pass.
+
+        Raises:
+            ValueError: The Agent selection or Suite ID is invalid.
+            SuiteConfigurationError: The runner cannot support the requested
+                concurrency, this instance is already running, or SDK/runner
+                setup fails validation.
+            Other execution, cancellation, callback, or cleanup exceptions may
+            propagate. The execution handler preserves available partial_items
+            on exceptions and closes the Suite session before releasing its lock.
         """
-        allowed = {
-            "suite_id",
-            "continue_on_error",
-            "on_agent_start",
-            "on_agent_complete",
-            "on_progress",
-            "on_step_start",
-            "on_step_complete",
-            "on_step_failure",
-        }
-        unexpected = set(kwargs) - allowed
-        if unexpected:
-            raise TypeError(
-                f"Pass SDK settings via sdk_options; unsupported run options: {sorted(unexpected)}"
-            )
-        return self._run_suite(registrations, _use_sdk=True, **kwargs)
+        from agentbench.runtime.contracts.execution import RunControl
 
-    def run_defuzex(
-        self, registrations: Iterable[AgentRegistration], **kwargs: object
-    ) -> BenchmarkSuiteResult:
-        """Compatibility entry point for the original DefuzeX options."""
-        return self._run_suite(registrations, **kwargs)
+        if run_control is not None and not isinstance(run_control, RunControl):
+            raise TypeError('run_control must be a RunControl')
 
-    def _run_suite(
-        self,
-        registrations: Iterable[AgentRegistration],
-        *,
-        _use_sdk: bool = False,
-        case_provider: object | None = None,
-        judge_provider: object | None = None,
-        api_key: str | None = None,
-        suite_id: str | None = None,
-        max_inputs: int | None = None,
-        allow_local: bool = False,
-        track_files: bool = True,
-        save_local: bool = False,
-        continue_on_error: bool = True,
-        on_agent_start: (Callable[[AgentRegistration, int, int], None] | None) = None,
-        on_agent_complete: Callable[[SuiteAgentResult], None] | None = None,
-        on_progress: ProgressCallback | None = None,
-        on_step_start: StepStartCallback | None = None,
-        on_step_complete: StepCompleteCallback | None = None,
-        on_step_failure: StepFailureCallback | None = None,
-    ) -> BenchmarkSuiteResult:
-        """Run selected Agents and retain both reports and execution errors."""
-
-        if suite_id is None:
-            suite_id = self.new_suite_id()
-        elif not suite_id.strip():
-            raise ValueError("Suite ID cannot be empty")
+        # Freeze the iterable so validation and scheduling use the same selection.
         selected = tuple(registrations)
         self._validate_selection(selected)
-        begin_suite = getattr(self._benchmark_runner, 'begin_suite', None)
-        if callable(begin_suite):
-            begin_suite(suite_id)
-        items: list[SuiteAgentResult] = []
 
-        emit_progress(
-            on_progress,
-            stage="sdk_check",
-            status="started",
-        )
+        # Keep the caller's ID so CLI logs and worker events identify one Suite.
+        suite_id = self.new_suite_id() if suite_id is None else suite_id
+
+        if not isinstance(suite_id, str) or not suite_id.strip():
+            raise ValueError("Suite ID cannot be empty")
+        
+        # Compute capacity only; the scheduler creates the worker pool later.
+        workers = self.concurrency.effective_workers(sum(agent.case_count for agent in selected))
+        if workers > 1 and (self._runner_factory is None
+                           or not getattr(self._runner_factory, "supports_concurrency", False)):
+            raise SuiteConfigurationError(
+                "Parallel Cases require a runner factory declaring isolated Cases and cooperative cancellation; "
+                "use ABB_MAX_PARALLEL_CASES=1 for this SDK/runner.")
+        
+        # Reject a second Suite on this instance without waiting. This lock does
+        # not prevent independent Cases within the current Suite from overlapping.
+        if not self._run_lock.acquire(blocking=False):
+            raise SuiteConfigurationError("This SuiteRunner is already running a suite")
+        
+        # Share one cancellation signal and route worker notifications back to
+        # the coordinator instead of calling terminal/log handlers from workers.
+        control = run_control if run_control is not None else RunControl()
+        self._active_control = control
+        bus = EventBus(on_event=on_event, on_tick=on_tick)
+        callbacks = SuiteCallbacks(len(selected), on_agent_start, on_agent_complete, on_progress,
+                                   on_step_start, on_step_complete, on_step_failure)
+        # Track resources, completed outcomes, and the original error for cleanup.
+        session = None
+        items = ()
+        active_error = None
+        runners: dict[int, EvaluationRunner] = {}
+
         try:
-            if _use_sdk:
-                provider_mode = self._benchmark_runner.validate_sdk(selected[0])
-            else:
-                provider_mode = self._benchmark_runner.validate_defuzex(
-                    selected[0],
-                    case_provider=case_provider,
-                    judge_provider=judge_provider,
-                    api_key=api_key,
-                    max_inputs=max_inputs,
-                    allow_local=allow_local,
-                    track_files=track_files,
-                    save_local=save_local,
-                )
-        except Exception as exc:
-            emit_progress(
-                on_progress,
-                stage="sdk_check",
-                status="failed",
-                detail=_error_detail(exc),
-            )
-            raise SuiteConfigurationError(str(exc)) from exc
-        emit_progress(
-            on_progress,
-            stage="sdk_check",
-            status="succeeded",
-            detail=f"Provider mode: {provider_mode}",
-        )
+            control.check()
+            if self._runner_factory is not None:
+                # Open resources owned by this Suite, using its ID and control.
+                session = self._runner_factory.open_suite(suite_id, control)
 
-        for index, registration in enumerate(selected, start=1):
-            if on_agent_start is not None:
-                on_agent_start(registration, index, len(selected))
+            def create_runner(registration, identity):
+                """Return a task runner for an Agent and its Suite/job identity.
 
-            benchmarks = []
-            run_error: Exception | None = None
-            for _ in range(registration.case_count):
-                try:
-                    if _use_sdk:
-                        benchmark = self._benchmark_runner.run(
-                            registration,
-                            on_progress=on_progress,
-                            on_step_start=on_step_start,
-                            on_step_complete=on_step_complete,
-                            on_step_failure=on_step_failure,
-                        )
-                    else:
-                        benchmark = self._benchmark_runner.run_defuzex(
-                            registration,
-                            case_provider=case_provider,
-                            judge_provider=judge_provider,
-                            api_key=api_key,
-                            max_inputs=max_inputs,
-                            allow_local=allow_local,
-                            track_files=track_files,
-                            save_local=save_local,
-                            on_progress=on_progress,
-                            on_step_start=on_step_start,
-                            on_step_complete=on_step_complete,
-                            on_step_failure=on_step_failure,
-                        )
-                except ProviderSelectionError as exc:
-                    # Provider selection is shared suite configuration, so retrying
-                    # it for every Agent cannot produce a different result.
-                    raise SuiteConfigurationError(str(exc)) from exc
-                except Exception as exc:
-                    run_error = exc
-                    break
-                benchmarks.append(benchmark)
+                Queue its trace notifications through this Suite's bus. Factory
+                sessions must return a distinct runner object for every task.
+                """
+                control.check()
+                target = self._trace_sink or getattr(self._runner_factory, "trace_sink", None)
+                sink = QueuedTraceSink(bus, target, identity)
+                
+                runner = session.create(registration, identity, sink) if session is not None else self._benchmark_runner
+                required = ("validate_sdk", "prepare_cases", "run_case")
 
-            item = SuiteAgentResult(
-                agent_id=registration.agent_id,
-                benchmarks=tuple(benchmarks),
-                requested_case_count=registration.case_count,
-                error_type=None if run_error is None else type(run_error).__name__,
-                error_message=None if run_error is None else str(run_error),
-            )
+                if any(not callable(getattr(runner, name, None)) for name in required):
+                    raise SuiteConfigurationError("Evaluation runners must implement validate_sdk, prepare_cases and run_case")
+                if session is not None and id(runner) in runners:
+                    raise SuiteConfigurationError("runner_factory must return an independent runner for every task")
+                runners[id(runner)] = runner
+                return runner
 
-            items.append(item)
-            if on_agent_complete is not None:
-                on_agent_complete(item)
-            if not item.passed and not continue_on_error:
-                break
+            def sdk_progress(status, detail=None):
+                """Publish SDK setup status and optional explanatory text."""
+                event = BenchmarkProgress("sdk_check", status, detail=detail, suite_id=suite_id)
+                bus.publish({"event": "progress", **asdict(event)}, on_progress, (event,))
 
-        return BenchmarkSuiteResult(
-            suite_id=suite_id,
-            selected_agent_ids=tuple(agent.agent_id for agent in selected),
-            items=tuple(items),
-        )
+            # Validate each Agent's SDK setup and describe its preparation job.
+            # Creating PreparationJob objects does not generate Cases yet.
+            sdk_progress("started")
+            preparations = []
+            try:
+                mode = None
+                # Create one Case-preparation job for each selected Agent.
+                for index, agent in enumerate(selected):
+                    identity = MappingProxyType(dict(
+                        suite_id=suite_id, job_id=f"agent_{uuid4().hex}", agent_id=agent.agent_id,
+                        registration_index=index, phase="generate", case_index=None, case_id=None))
+
+                    # Create the SDK runner with the Agent's configured Case count.
+                    runner = create_runner(agent, identity)
+                    # Validate credentials and the Agent's evaluation files.
+                    mode = runner.validate_sdk(agent)
+                    # Bundle the Agent, runner, and job identity into the preparation queue.
+                    preparations.append(PreparationJob(agent, runner, identity))
+
+            except Exception as exc:
+                sdk_progress("failed", str(exc))
+                raise SuiteConfigurationError(str(exc)) from exc
+            sdk_progress("succeeded", f"Provider mode: {mode}")
+
+            # Notify the CLI after all Agent preparation jobs have been queued.
+            for job in preparations:
+                bus.publish({**job.identity, "event": "agent_queued", "status": "queued",
+                             "requested_case_count": job.registration.case_count})
+
+            def create_case_job(preparation: PreparationJob, case: PreparedCase, identity) -> CaseJob:
+                """Bind a prepared Case and job identity to its own task runner."""
+                runner = create_runner(preparation.registration, identity)
+                runner.validate_sdk(preparation.registration)
+                return CaseJob(preparation.registration, runner, case, identity)
+
+            # Actual worker scheduling begins here: prepare each Agent's Cases,
+            # then execute ready Cases within the shared worker limit.
+            # Submit preparation jobs to the worker pool.
+            items = CaseScheduler(
+                preparations, 
+                create_case_job=create_case_job, 
+                workers=workers,
+                control=control, bus=bus, callbacks=callbacks, continue_on_error=continue_on_error,
+                retry_policy=retry_policy or self.retry_policy, seeds=resume_state, retain_case=retain_case,
+            ).run()
+            
+            return BenchmarkSuiteResult(suite_id, tuple(agent.agent_id for agent in selected), items)
+        except BaseException as exc:
+            # Retain any partial outcomes already attached by the scheduler.
+            active_error = exc
+            if not hasattr(exc, "partial_items"):
+                exc.partial_items = items
+            control.cancel()
+            raise
+        finally:
+            # Close Suite resources; preserve the execution error if cleanup
+            # also fails. Always release the lock so this instance can run again.
+            try:
+                if session is not None:
+                    try:
+                        session.close()
+                    except BaseException as cleanup_error:
+                        try:
+                            bus.publish({"event": "suite_cleanup_failed", "suite_id": suite_id,
+                                         "error": {"type": type(cleanup_error).__name__, "message": str(cleanup_error)}})
+                        except BaseException:
+                            pass
+                        if active_error is not None:
+                            active_error.cleanup_error = cleanup_error
+                        else:
+                            cleanup_error.partial_items = items
+                            raise
+            finally:
+                self._active_control = None
+                self._run_lock.release()
 
     @staticmethod
-    def _validate_selection(
-        registrations: tuple[AgentRegistration, ...],
-    ) -> None:
+    def _validate_selection(registrations):
         if not registrations:
             raise ValueError("A benchmark suite requires at least one Agent")
-
-        agent_ids = tuple(agent.agent_id for agent in registrations)
-        if len(set(agent_ids)) != len(agent_ids):
+        ids = tuple(agent.agent_id for agent in registrations)
+        if len(set(ids)) != len(ids):
             raise ValueError("A benchmark suite cannot contain duplicate Agent IDs")
-
-
-def _error_detail(exc: Exception) -> str:
-    message = str(exc).strip()
-    return type(exc).__name__ if not message else f"{type(exc).__name__}: {message}"
+        if any(type(agent.case_count) is not int or agent.case_count < 1 for agent in registrations):
+            raise ValueError("Agent case_count must be a positive integer")

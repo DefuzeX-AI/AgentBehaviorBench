@@ -22,6 +22,7 @@ from .constants import (
     ANSI_MAGENTA,
     ANSI_RED,
     ANSI_RESET,
+    ANSI_YELLOW,
 )
 
 PANEL_WIDTH = AGENT_SEPARATOR_WIDTH
@@ -34,20 +35,16 @@ def confirm_agents(
     *,
     input_fn: Callable[[str], str] = input,
     output_fn: Callable[[str], None] = print,
-    sleep_fn: Callable[[float], None] = time.sleep,
-    reveal_delay: float = AGENT_REVEAL_DELAY_SECONDS,
 ) -> bool:
     """Print detected agents and return whether execution was confirmed."""
 
     print_agents(
         agents,
         output_fn,
-        sleep_fn=sleep_fn,
-        reveal_delay=reveal_delay,
     )
     try:
         confirmed = request_confirmation(input_fn, output_fn)
-    except (EOFError, KeyboardInterrupt):
+    except (EOFError, KeyboardInterrupt, OSError, RuntimeError):
         output_fn("\nCancelled.")
         return False
 
@@ -70,9 +67,6 @@ def confirm_agents(
 def print_agents(
     agents: tuple[AgentRegistration, ...],
     output_fn: Callable[[str], None],
-    *,
-    sleep_fn: Callable[[float], None] = time.sleep,
-    reveal_delay: float = AGENT_REVEAL_DELAY_SECONDS,
 ) -> None:
     """Print the detected agent list."""
 
@@ -86,7 +80,7 @@ def print_agents(
     )
     output_fn(panel_line(""))
     for index, agent in enumerate(agents, start=1):
-        sleep_fn(reveal_delay)
+        time.sleep(AGENT_REVEAL_DELAY_SECONDS)
         marker = f"{ANSI_MAGENTA}{index:02d}{ANSI_RESET}"
         status = (
             f"{ANSI_GREEN}{agent.status.upper()}{ANSI_RESET}"
@@ -104,7 +98,7 @@ def print_agents(
         if index < len(agents):
             output_fn(panel_line("    " + "." * 64))
     if agents:
-        sleep_fn(reveal_delay)
+        time.sleep(AGENT_REVEAL_DELAY_SECONDS)
     output_fn(panel_rule("", ANSI_CYAN))
 
 
@@ -133,30 +127,40 @@ def print_agent_start(
 def print_agent_complete(
     item: SuiteAgentResult, output_fn: Callable[[str], None]
 ) -> None:
+    for case in item.case_results:
+        artifacts = case.artifacts or {}
+        report = artifacts.get('received_report')
+        if report and not report.get('host_accepted'):
+            output_fn(f"Judge retained | Case {case.case_index + 1}: {report['status']} | "
+                      f"Host rejected | {artifacts.get('directory', '')}/{report['path']}")
+    color = ANSI_GREEN if item.passed else ANSI_YELLOW if item.status in {"cancelled", "skipped"} else ANSI_RED
+    status = f"{color}{'PASS' if item.passed else item.status.upper()}{ANSI_RESET}"
     if item.error_type is not None and item.completed_case_count == 0:
         output_fn(
-            f"Result: {ANSI_RED}FAILED{ANSI_RESET} | "
+            f"Result: {status} | "
             f"{item.error_type}: {item.error_message}"
         )
         return
 
-    status = (
-        f"{ANSI_GREEN}PASS{ANSI_RESET}"
-        if item.passed
-        else f"{ANSI_RED}FAIL{ANSI_RESET}"
-    )
     detail = (
         f"Result: {status} | "
         f"cases={item.completed_case_count}/{item.requested_case_count}"
     )
     if item.error_type is not None:
-        detail += f" | stopped={item.error_type}: {item.error_message}"
+        detail += f" | error={item.error_type}: {item.error_message}"
     output_fn(detail)
 
 
 def print_suite_summary(
     result: BenchmarkSuiteResult, output_fn: Callable[[str], None]
 ) -> None:
+    from collections import Counter
+    cases = [case for item in result.items for case in item.case_results]
+    completed = sum(case.execution_status == 'completed' for case in cases)
+    planned = sum(item.requested_case_count for item in result.items)
+    verdicts = Counter(case.judge_status for case in cases if case.judge_status is not None)
+    output_fn(f"\nCase execution: {completed}/{planned} completed | Judge: "
+              + (', '.join(f'{status}={count}' for status, count in sorted(verdicts.items())) or 'no report'))
     output_fn(
         "\nSuite complete: "
         f"{result.passed_count} passed, "
@@ -164,6 +168,14 @@ def print_suite_summary(
         f"{result.skipped_count} skipped, "
         f"{result.selected_count} selected."
     )
+
+
+def case_event_status(event):
+    """Describe execution and Judge separately while retaining legacy exit policy."""
+    case = event.get('case_result')
+    status = getattr(case, 'execution_status', None) or event.get('status', 'running')
+    verdict = getattr(case, 'judge_status', None)
+    return f'{status} | judge={verdict}' if verdict is not None else status
 
 
 def print_viewer_footer(
@@ -196,7 +208,7 @@ def request_viewer_action(
     while True:
         try:
             answer = input_fn("Viewer action? [r rerun/q quit]: ").strip().lower()
-        except (EOFError, KeyboardInterrupt):
+        except (EOFError, KeyboardInterrupt, OSError, RuntimeError):
             output_fn("\nViewer stopped.")
             return "quit"
         if answer in {"q", "quit", "exit", ""}:

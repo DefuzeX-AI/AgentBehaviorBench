@@ -1,6 +1,6 @@
-# ABB Trace — Vite + React
+# ABB Viewer — Vite + React + Redux
 
-最简 Vite + React trace 页面，替代旧静态结果查看器。
+本地 Suite 多 Case 总览和独立 Run 的评测、OTel、交互详情。
 
 ```sh
 cd web
@@ -24,11 +24,32 @@ npm run dev
 
 任务接口由 `server/runs.js` 提供，Vite 开发和 preview 模式均支持，无需另开 Python 服务。
 只允许本地同源 GET，限定读取 `results/observe/` 中的 trace，拒绝路径越界，单次最多 20 MB。
-手动导入文件不上传；不自动轮询，文件更新后点击刷新。本版不提供图形化 span 树。
+手动导入文件不上传；本地运行产物每秒同步。OTel 支持执行图和调用树，载荷按需加载。
 
 原 Python `view` 入口保留，改为提供 `web/dist` 构建产物，并自动加载绑定运行的
-原始事件（不再显示旧评测仪表盘）。使用前先 `npm run build`；未构建时页面返回明确提示。
-Python 绑定运行模式保持单运行展示；侧边栏用于 Vite dev/preview 模式。
+原始事件。使用前先 `npm run build`；未构建时页面返回明确提示。
+绑定 Suite 时默认展示所有 Agent 的全部 Case，可同时展开多个 Case。
+
+## Suite 与恢复
+
+Suite 页面读取 Python 提供的统一快照。Redux 管理快照 revision、筛选、展开位置、
+历史 Attempt 选择和恢复命令；执行状态与 Judge 判决分别显示。
+详情严格使用该 Attempt 的 `artifact_run_id`，不会通过 Agent 名称猜测运行目录。
+断线时保留已有内容，恢复连接后同步；已选历史 Attempt 不自动切换到最新执行。
+
+受控会话提供“继续未完成”和按 Case 恢复。只读历史记录隐藏恢复操作。
+命令携带服务提供的控制 token 和幂等 command ID；网络响应不明确时重发原 ID。
+导出的当前报告包含全部 Case 和尝试历史，不包含会话控制凭据。
+
+开发时对照正在运行的 Python Viewer：
+
+```sh
+ABB_VIEWER_BACKEND=http://127.0.0.1:<viewer-port> ABB_SUITE_ID=<suite-id> npm run dev
+```
+
+这两个值必须同时提供。Vite 将 `/api` 代理给该本地 Viewer，注入准确的 Suite API 路径；
+恢复规则只由 Python 实现。未设置时仍使用独立 Run 的只读本地目录 API。
+不要用这两个开发环境变量生成要分发的构建，生产页面由 Python 绑定 Suite。
 
 ```sh
 npm test
