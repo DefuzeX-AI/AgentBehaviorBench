@@ -159,8 +159,12 @@ def print_suite_summary(
     completed = sum(case.execution_status == 'completed' for case in cases)
     planned = sum(item.requested_case_count for item in result.items)
     verdicts = Counter(case.judge_status for case in cases if case.judge_status is not None)
-    output_fn(f"\nCase execution: {completed}/{planned} completed | Judge: "
-              + (', '.join(f'{status}={count}' for status, count in sorted(verdicts.items())) or 'no report'))
+    rejected = sum(case.judge_status is not None and not getattr(case, 'judge_accepted', True)
+                   for case in cases)
+    judge = ', '.join(f'{status}={count}' for status, count in sorted(verdicts.items())) or 'no report'
+    if rejected:
+        judge += f' ({rejected} host rejected)'
+    output_fn(f"\nCase execution: {completed}/{planned} completed | Judge: {judge}")
     output_fn(
         "\nSuite complete: "
         f"{result.passed_count} passed, "
@@ -175,7 +179,10 @@ def case_event_status(event):
     case = event.get('case_result')
     status = getattr(case, 'execution_status', None) or event.get('status', 'running')
     verdict = getattr(case, 'judge_status', None)
-    return f'{status} | judge={verdict}' if verdict is not None else status
+    if verdict is None:
+        return status
+    retained = '' if getattr(case, 'judge_accepted', True) else ' (host rejected)'
+    return f'{status} | judge={verdict}{retained}'
 
 
 def print_viewer_footer(
@@ -241,7 +248,8 @@ def panel_line(text: str) -> str:
 
 
 def display_path(path: Path) -> str:
-    repo_root = Path(__file__).resolve().parents[2]
+    # presentation.py -> terminal_ui -> cli -> agentbench -> repository root
+    repo_root = Path(__file__).resolve().parents[3]
     try:
         return str(path.relative_to(repo_root))
     except ValueError:

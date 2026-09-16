@@ -65,6 +65,10 @@ class InterceptionTraceState:
         self._last_event = time.monotonic()
         self._failed = False
         self._persistence_error: Exception | None = None
+        # The first event that rejected the evidence, and request order for the
+        # first unfinished call: an operator needs a call to look up, not counts.
+        self._first_rejection: str | None = None
+        self._request_order: list[str] = []
 
     def fail(self, error: Exception | None = None) -> None:
         """A failed trace write must never count as a completed observation."""
@@ -94,10 +98,14 @@ class InterceptionTraceState:
                     self._terminated.add(call_id)
                 else:
                     self._failed = True
+                    self._note_rejection(event, call_id, self._errors[call_id])
             if event.data.get("truncated"):
                 self._failed = True
+                self._note_rejection(event, call_id, 'truncated')
             self._last_event = time.monotonic()
             if event.event == "llm_request":
+                if call_id not in self._requests:
+                    self._request_order.append(call_id)
                 self._requests.add(call_id)
             elif event.event == "llm_response":
                 self._responses.add(call_id)
@@ -109,17 +117,38 @@ class InterceptionTraceState:
                 self._completed.append(call_id)
             self._condition.notify_all()
 
+    def _note_rejection(self, event: TraceEvent, call_id: str, reason: str) -> None:
+        if self._first_rejection is not None:
+            return
+        host, path = event.data.get('source_host'), event.data.get('source_path')
+        location = ' '.join(str(part)[:200] for part in (host, path) if isinstance(part, str) and part)
+        self._first_rejection = (f'{call_id[:64]} {event.event} {reason[:64]}'
+                                 + (f' {location}' if location else ''))
+
     def diagnostic(self) -> str:
-        """Return bounded classifications/counts, never exception text or argv."""
+        """Return bounded classifications/counts, never exception text or argv.
+
+        The first rejecting event and the first unfinished call are named by call
+        ID, event, error code and source host/path -- the fields to look up in the
+        network trace -- so a rejection can be traced without reading every event.
+        """
         with self._condition:
             unfinished = self._requests - self._responses - self._terminated
             known = {'egress_denied', 'authentication_failed', 'request_preparation_failed',
                      'upstream_error', 'response_conversion_failed', 'stream_processing_failed',
                      'transport_error'}
             codes = sorted({code if code in known else 'unclassified' for code in self._errors.values()})
-            return (f'requests={len(self._requests)}, responses={len(self._responses)}, '
+            text = (f'requests={len(self._requests)}, responses={len(self._responses)}, '
                     f'observed_failures={len(self._terminated)}, unfinished={len(unfinished)}, '
                     f'errors={",".join(codes) or "none"}, capture_rejected={self._failed}')
+            if self._first_rejection is not None:
+                text += f', first_rejection={self._first_rejection}'
+            first_unfinished = next((call for call in self._request_order if call in unfinished), None)
+            if first_unfinished is not None:
+                text += f', first_unfinished={first_unfinished[:64]}'
+            if self._persistence_error is not None and self._first_rejection is None:
+                text += ', first_rejection=trace persistence failure'
+            return text
 
     def checkpoint(self) -> int:
         with self._condition:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
@@ -84,8 +85,24 @@ class CaseResult:
 
     @property
     def judge_status(self) -> str | None:
+        """The verdict received for this Case, whether or not the host accepted it.
+
+        A verdict received and billed before host validation rejected the run is
+        retained in ``artifacts['received_report']``; counting only accepted
+        reports summarised such a Case as "no report" beside the line naming it.
+        Pass/fail and exit codes still come from accepted reports only.
+        """
         report = self.benchmark.report if self.benchmark is not None else None
-        return getattr(report, "status", None)
+        if report is not None:
+            return getattr(report, "status", None)
+        retained = (self.artifacts or {}).get("received_report")
+        status = retained.get("status") if isinstance(retained, Mapping) else None
+        return status if isinstance(status, str) else None
+
+    @property
+    def judge_accepted(self) -> bool:
+        """Whether the verdict belongs to a run the host accepted."""
+        return self.benchmark is not None and self.benchmark.report is not None
 
     def __post_init__(self) -> None:
         if type(self.case_index) is not int or self.case_index < 0:
