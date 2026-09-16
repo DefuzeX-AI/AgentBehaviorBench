@@ -2,9 +2,31 @@
 
 本地 Suite 多 Case 总览和独立 Run 的评测、OTel、交互详情。
 
+## 首次安装与普通查看
+
+宿主机需要 Node.js 20.x 至少 20.19，或 22.12+，以及 npm；版本依据
+`package-lock.json` 中的 Vite。Python 安装不会安装网页依赖或生成 `dist/`。
+
 ```sh
 cd web
-npm install
+npm ci
+npm run build
+cd ..
+# 使用评测或离线示例打印的真实路径。
+agentbench view results/suites/<suite-id>/events.json
+```
+
+普通 `view` 由 Python 提供 `web/dist` 和结果 API，不需要启动 npm 开发服务器。
+首次 clone 或前端修改后需要构建；headless 评测使用 `--no-view` 可跳过 Node 和构建。
+保持 viewer 命令运行，并打开终端打印的完整 URL。`dist/index.html` 不是独立报告，
+直接双击或单独发送它无法获得完整评测页面。
+
+## 前端开发
+
+完成 npm ci 后：
+
+```sh
+cd web
 npm run dev
 ```
 
@@ -26,8 +48,8 @@ npm run dev
 只允许本地同源 GET，限定读取 `results/observe/` 中的 trace，拒绝路径越界，单次最多 20 MB。
 手动导入文件不上传；本地运行产物每秒同步。OTel 支持执行图和调用树，载荷按需加载。
 
-原 Python `view` 入口保留，改为提供 `web/dist` 构建产物，并自动加载绑定运行的
-原始事件。使用前先 `npm run build`；未构建时页面返回明确提示。
+Python `view` 提供 `web/dist` 构建产物，并自动加载绑定运行的
+原始事件。未构建或资源不完整时，CLI 预检查退出并给出构建命令。
 绑定 Suite 时默认展示所有 Agent 的全部 Case，可同时展开多个 Case。
 
 ## Suite 与恢复
@@ -39,7 +61,9 @@ Suite 页面读取 Python 提供的统一快照。Redux 管理快照 revision、
 
 受控会话提供“继续未完成”和按 Case 恢复。只读历史记录隐藏恢复操作。
 命令携带服务提供的控制 token 和幂等 command ID；网络响应不明确时重发原 ID。
-导出的当前报告包含全部 Case 和尝试历史，不包含会话控制凭据。
+导出的当前报告是 JSON 快照，包含全部 Case 和尝试历史，不包含会话控制凭据。
+它不打包每个引用的 trace，也不生成独立 HTML；分享完整产物见
+[结果与故障排查](../docs/Troubleshooting.md#share-a-report)（英文）。
 
 开发时对照正在运行的 Python Viewer：
 
@@ -57,4 +81,5 @@ npm run build
 npm run preview
 ```
 
-Node.js 需满足 Vite 7 要求（20.19+ 或 22.12+）。
+完整安装步骤见 [主 README](../README.md)（英文）和
+[中文操作指南](../docs/Guide.zh-CN.md)。
