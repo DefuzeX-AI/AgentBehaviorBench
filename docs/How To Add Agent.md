@@ -1,6 +1,6 @@
 # Add an Agent
 
-English | [Français](otherLanguages/How%20To%20Add%20Agent.fr.md) | [日本語](otherLanguages/How%20To%20Add%20Agent.ja.md) | [简体中文](otherLanguages/How%20To%20Add%20Agent.zh-CN.md) | [繁體中文](otherLanguages/How%20To%20Add%20Agent.zh-TW.md) | [한국어](otherLanguages/How%20To%20Add%20Agent.ko.md)
+English | [Français](otherLanguages/How%20To%20Add%20Agent.fr.md) | [日本語](otherLanguages/How%20To%20Add%20Agent.ja.md) | [中文](otherLanguages/How%20To%20Add%20Agent.zh-CN.md) | [한국어](otherLanguages/How%20To%20Add%20Agent.ko.md)
 
 Follow this order: **prepare the environment → run the add command → review the
 files it creates**. A user or coding assistant can follow the same workflow.

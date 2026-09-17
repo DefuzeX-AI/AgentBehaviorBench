@@ -1,6 +1,6 @@
 # 添加 Agent
 
-[English](../How%20To%20Add%20Agent.md) | [Français](How%20To%20Add%20Agent.fr.md) | [日本語](How%20To%20Add%20Agent.ja.md) | 简体中文 | [繁體中文](How%20To%20Add%20Agent.zh-TW.md) | [한국어](How%20To%20Add%20Agent.ko.md)
+[English](../How%20To%20Add%20Agent.md) | [Français](How%20To%20Add%20Agent.fr.md) | [日本語](How%20To%20Add%20Agent.ja.md) | 中文 | [한국어](How%20To%20Add%20Agent.ko.md)
 
 按 **环境配置 → 执行添加命令 → 了解生成文件** 的顺序操作。用户或 coding agent
 都可以使用同一流程。除非命令切换了目录，均在 ABB 仓库根目录执行。

@@ -63,6 +63,8 @@ def _add(args: Namespace) -> int:
         result = download_agent(args.repository, args.agents_dir)
     print(f"Agent directory: {result.directory}", file=sys.stderr)
     print(f"Source revision: {result.revision}", file=sys.stderr)
+    for warning in result.warnings:
+        print(f"Warning: {warning}", file=sys.stderr)
     print("Files relative to agent/ (source downloaded; benchmark configuration pending):",
           file=sys.stderr)
     print(json.dumps(result.files, ensure_ascii=False, indent=2))

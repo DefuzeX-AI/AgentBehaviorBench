@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 import tempfile
 from collections.abc import Mapping
 from dataclasses import fields, is_dataclass
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 
 
@@ -25,17 +27,73 @@ def json_value(value):
     return {"type": type(value).__name__, "value": str(value)}
 
 
+REDACTED = "[REDACTED]"
+# At or above this length a value is replaced wherever it appears; shorter
+# harvested values only as a whole token, so they cannot rewrite identifiers.
+_SUBSTRING_SECRET_LENGTH = 16
+# A field is a credential when its last word says so ("access_token",
+# "credentials", "x-api-key"), not when a word merely occurs in it: "max_tokens",
+# "api_key_source" and "secret_env_keys" carry counts, provenance and names.
+_SECRET_FIELD_WORDS = frozenset({"token", "secret", "password", "passwd", "passphrase", "credential",
+                                 "credentials", "authorization", "bearer", "apikey", "cookie"})
+_KEY_QUALIFIERS = frozenset({"api", "private", "access", "secret", "signing", "encryption", "auth", "session",
+                             "client"})
+
+
+def environment_secrets(environ=None) -> tuple[str, ...]:
+    """Harvest actual credential fields, without guessing secret strength.
+
+    This is the single harvesting rule. Selecting on the variable name alone
+    swept in settings such as GOG_KEYRING_BACKEND=file, and the value "file"
+    then rewrote every artifact: a traceback's ``is_file()`` became
+    ``is_[REDACTED]()`` in the one diagnostic that explained a failure.
+    """
+    values = os.environ if environ is None else environ
+    secrets = []
+    for key, value in values.items():
+        if not isinstance(key, str) or not isinstance(value, str):
+            continue
+        if value and is_secret_field(key):
+            secrets.append(value)
+    return tuple(secrets)
+
+
+def is_secret_field(key) -> bool:
+    """Whether a mapping key names a credential, after normalizing its spelling."""
+    words = [word for word in re.split(r"[^a-z0-9]+", re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", str(key)).lower())
+             if word]
+    if words and words[-1] in {"value", "val", "hash"}:
+        words = words[:-1]  # "secret_value", "api_key_value": the credential itself
+    if not words:
+        return False
+    if words[-1] in _SECRET_FIELD_WORDS:
+        return True
+    return words[-1] == "key" and len(words) > 1 and words[-2] in _KEY_QUALIFIERS
+
+
+@lru_cache(maxsize=64)
+def _secret_patterns(secrets: tuple[str, ...]):
+    long_values = sorted({secret for secret in secrets if len(secret) >= _SUBSTRING_SECRET_LENGTH}, key=len,
+                         reverse=True)
+    short_values = sorted({secret for secret in secrets if 0 < len(secret) < _SUBSTRING_SECRET_LENGTH}, key=len,
+                          reverse=True)
+    long_pattern = re.compile("|".join(map(re.escape, long_values))) if long_values else None
+    short_pattern = (re.compile(r"(?<![A-Za-z0-9_])(?:" + "|".join(map(re.escape, short_values)) + r")(?![A-Za-z0-9_])")
+                     if short_values else None)
+    return long_pattern, short_pattern
+
+
 def redact(value, secrets=()):
     if isinstance(value, dict):
-        return {k: "[REDACTED]" if any(x in k.lower() for x in
-                ("api_key", "authorization", "secret", "password", "access_token"))
-                else redact(v, secrets) for k, v in value.items()}
+        return {k: REDACTED if is_secret_field(k) else redact(v, secrets) for k, v in value.items()}
     if isinstance(value, list):
         return [redact(v, secrets) for v in value]
-    if isinstance(value, str):
-        for secret in secrets:
-            if secret:
-                value = value.replace(secret, "[REDACTED]")
+    if isinstance(value, str) and secrets:
+        long_pattern, short_pattern = _secret_patterns(tuple(secret for secret in secrets if secret))
+        if long_pattern is not None:
+            value = long_pattern.sub(REDACTED, value)
+        if short_pattern is not None:
+            value = short_pattern.sub(REDACTED, value)
     return value
 
 
@@ -61,9 +119,7 @@ class TraceStore:
         # Authoritative invocation identity, shared by every event in this store.
         self.context = dict(context or {})
         self._lock = threading.Lock()
-        environment = os.environ if environ is None else environ
-        self._secrets = tuple(v for k, v in environment.items()
-                              if any(x in k.upper() for x in ("KEY", "TOKEN", "SECRET", "PASSWORD")))
+        self._secrets = environment_secrets(environ)
 
     def record(self, event: str, **data):
         row = {"schema": "abb.observe.event.v1", "run_id": self.run_id,

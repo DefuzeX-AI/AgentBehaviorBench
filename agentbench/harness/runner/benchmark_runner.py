@@ -366,9 +366,8 @@ class BenchmarkRunner:
 
 
 def _error_message(exc: Exception) -> str:
-    from agentbench.observe.store import redact
-    secrets = tuple(v for k, v in os.environ.items() if any(x in k.upper() for x in ("KEY", "TOKEN", "SECRET", "PASSWORD")))
-    return redact(str(exc), secrets)
+    from agentbench.observe.store import environment_secrets, redact
+    return redact(str(exc), environment_secrets())
 
 
 def _error_detail(exc: Exception) -> str:

@@ -1,8 +1,18 @@
 """LangChain callbacks: real execution IDs and parent IDs, no fabricated spans."""
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.messages import ToolMessage
-from langgraph.errors import GraphBubbleUp
 from .correlation import current_span
+
+# LangGraph control flow that bubbles through callbacks is not an error. This runs
+# inside the Agent's own environment, so accept the LangGraph the Agent pins: current
+# releases raise GraphBubbleUp; older ones (0.1 to 0.2.40 measured) only GraphInterrupt.
+try:
+    from langgraph.errors import GraphBubbleUp as GRAPH_CONTROL_FLOW
+except ImportError:
+    try:
+        from langgraph.errors import GraphInterrupt as GRAPH_CONTROL_FLOW
+    except ImportError:
+        GRAPH_CONTROL_FLOW = ()
 
 
 class TraceCallback(BaseCallbackHandler):
@@ -28,7 +38,7 @@ class TraceCallback(BaseCallbackHandler):
 
     def _error(self, error, run_id, **kwargs):
         current_span.set(str(kwargs["parent_run_id"]) if kwargs.get("parent_run_id") else None)
-        if isinstance(error, GraphBubbleUp):
+        if isinstance(error, GRAPH_CONTROL_FLOW):
             self.store.record("span_control", span_id=str(run_id), control=type(error).__name__)
             return
         self.store.record("span_error", span_id=str(run_id), error=str(error))

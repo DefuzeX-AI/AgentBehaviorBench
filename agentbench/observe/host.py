@@ -21,9 +21,8 @@ class HostObservation:
         self._save()
 
     def _save(self):
-        import os
-        secrets = tuple(v for k, v in os.environ.items() if any(x in k.upper() for x in ('KEY', 'TOKEN', 'SECRET', 'PASSWORD')))
-        atomic_json(self.directory / 'run.json', redact(json_value(self.metadata), secrets))
+        from .store import environment_secrets
+        atomic_json(self.directory / 'run.json', redact(json_value(self.metadata), environment_secrets()))
 
     async def invoke(self, running, test_input, config):
         self.step += 1

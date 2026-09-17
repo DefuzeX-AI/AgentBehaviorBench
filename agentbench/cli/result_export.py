@@ -27,9 +27,8 @@ PROGRESS_BATCH_MAX_EVENTS = 256
 
 
 def _environment_secrets(environ=None) -> tuple[str, ...]:
-    values = os.environ if environ is None else environ
-    return tuple(value for key, value in values.items()
-                 if value and any(token in key.upper() for token in ("KEY", "TOKEN", "SECRET", "PASSWORD")))
+    from agentbench.observe.store import environment_secrets
+    return environment_secrets(environ)
 
 
 @dataclass

@@ -256,7 +256,9 @@ class ModelInterceptorAddon:
             flow.response = http.Response.make(200, b"", {"content-type": "application/grpc",
                 "grpc-status": str(status_code(status)), "grpc-message": quote(str(redact(message, self.secrets)))})
         else:
-            flow.response = http.Response.make(status, json_bytes({"error": {"code": status, "message": redact(message, self.secrets)}}),
+            flow.response = http.Response.make(status, json_bytes(_error_envelope(
+                code, status, redact(message, self.secrets),
+                upstream_status=flow.metadata.get("upstream_status", status))),
                                                {"content-type": "application/json"})
 
     def error(self, flow):
@@ -265,6 +267,16 @@ class ModelInterceptorAddon:
             capture.close()
         if "defuzex_call_id" in flow.metadata:
             self._emit_error(flow, str(flow.error), code=ErrorCode.TRANSPORT_ERROR)
+        # A transparent proxy must not turn an upstream transport failure into a
+        # response. Left alone, mitmproxy answers the client with its own HTML 502
+        # page (a response assigned in this hook is not sent), which a client can
+        # only read as a malformed reply: the KUMA SDK classifies it as a
+        # non-retryable invalid_response, and one dropped status poll ends a paid
+        # run. Killing the flow closes the client connection without a response,
+        # so the client sees the same transport failure a direct connection would
+        # and applies its own retry policy.
+        if flow.killable:
+            flow.kill()
 
     def _route(self, flow):
         explicit = next((r for r in self.config.routes if self.policy.matches(r, flow.request)), None)
@@ -280,3 +292,24 @@ class ModelInterceptorAddon:
 
 def _model(payload):
     return payload.get("model") if isinstance(payload, dict) else None
+
+
+# Upstream answers that describe a passing condition rather than a decision.
+_RETRYABLE_UPSTREAM_STATUSES = frozenset({408, 425, 429})
+
+
+def _error_envelope(code, status, message, *, upstream_status=None):
+    """Error body in the shape clients parse: string code and an explicit retry flag.
+
+    A client reads ``code`` only when it is a string and treats a missing
+    ``retryable`` as False. Policy, authentication, request preparation and
+    response conversion failures are decisions and stay non-retryable; an
+    upstream error is retryable only when its own status says the condition passes.
+    """
+    # A local 502 can also describe an error carried in a successful HTTP body;
+    # it is not evidence that the actual upstream reported a transient failure.
+    source_status = status if upstream_status is None else upstream_status
+    retryable = code == ErrorCode.UPSTREAM_ERROR and (
+        source_status in _RETRYABLE_UPSTREAM_STATUSES or source_status >= 500)
+    return {"error": {"code": ErrorCode(code).value, "status": status,
+                      "message": message, "retryable": retryable}}

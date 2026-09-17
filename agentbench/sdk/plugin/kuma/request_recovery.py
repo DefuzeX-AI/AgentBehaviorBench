@@ -1,11 +1,69 @@
 """Public SDK request recovery; never recreate a paid Run or replay the Agent."""
+import errno
+import os
+import stat
+from pathlib import Path
+
 from .configuration import api_key, request_options
 from .diagnostics import read_diagnostic
+
+
+def ledger_access_error(repo_path, client_request_id=None):
+    """Return a PermissionError naming an unreadable ledger path, owner and mode.
+
+    The SDK stores request records owner-only and reports any read failure as an
+    unreadable record, which is also what corruption looks like. A record written
+    by a different uid is a permission problem with a known remedy, so name it
+    before the SDK is asked to read it. Absent ledgers stay the SDK's to report.
+    """
+    directory = Path(repo_path) / '.kuma' / 'requests'
+    try:
+        if not stat.S_ISDIR(directory.lstat().st_mode):
+            return None
+        names = os.listdir(directory)
+        if client_request_id is not None:
+            candidates = [directory / f'{client_request_id}.json']
+        else:
+            candidates = [directory / name for name in sorted(names)
+                          if name.startswith('kreq_') and name.endswith('.json')]
+    except FileNotFoundError:
+        return None
+    except PermissionError:
+        return _ledger_permission_error(directory)
+    for path in candidates:
+        try:
+            mode = path.lstat().st_mode
+            if stat.S_ISLNK(mode):
+                continue
+            if stat.S_ISDIR(mode):
+                os.listdir(path)
+            else:
+                path.open('rb').close()
+        except FileNotFoundError:
+            continue
+        except PermissionError:
+            return _ledger_permission_error(path)
+    return None
+
+
+def _ledger_permission_error(path):
+    getuid = getattr(os, 'getuid', None)
+    reader = f'host uid {getuid()}' if getuid is not None else 'this host user'
+    try:
+        info = path.stat()
+        owner = f'owned by uid {info.st_uid} with mode {info.st_mode & 0o777:04o}'
+    except OSError:
+        owner = 'owner unknown'
+    return PermissionError(
+        errno.EACCES, f'SDK request ledger is not readable by {reader} ({owner}); '
+        'the original records must be readable by the host user before recovery', str(path))
 
 
 def inspect_requests(repo_path, client_request_id=None):
     """Read non-secret SDK request records from the original repository ledger."""
     from kuma import list_requests, show_request
+    if (error := ledger_access_error(repo_path, client_request_id)) is not None:
+        raise error
     if client_request_id is not None:
         return show_request(client_request_id, repo_path=repo_path).to_dict()
     return [record.to_dict() for record in list_requests(repo_path)]
@@ -39,6 +97,8 @@ def recover_request(repo_path, client_request_id, *, environ, base_url,
             if expected is not None and getattr(record, key) != expected:
                 raise ValueError(f'Recovery {key} does not match the original request')
 
+    if (error := ledger_access_error(repo_path, client_request_id)) is not None:
+        raise error
     check(show_request(client_request_id, repo_path=repo_path))
     credential, _ = api_key(environ)
     record = resume_request(client_request_id, repo_path=repo_path, api_key=credential,
