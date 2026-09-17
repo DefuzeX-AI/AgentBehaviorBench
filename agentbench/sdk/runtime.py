@@ -130,8 +130,13 @@ class SuiteRunnerFactory:
             self.control.check()
         identity = {**dict(job_context or {}), 'suite_id': self.suite_id,
                     'agent_id': registration.agent_id}
+        plan = self.factory.plan
+        max_steps = getattr(registration, 'max_steps', None)
+        if max_steps is not None:
+            # Explicit SDK/CLI options override the per-Agent registry default.
+            plan = EvaluationPlan(plan.selection, {'max_steps': max_steps, **plan.options})
         return build_evaluation_runner(
-            self.factory.plan, model=self.factory.model,
+            plan, model=self.factory.model,
             trace_sink=self.factory.trace_sink if trace_sink is None else trace_sink,
             trace_max_bytes=self.factory.trace_max_bytes, environ=self.factory.environ,
             control=self.control,

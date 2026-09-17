@@ -187,7 +187,8 @@ class BenchmarkRunner:
     ) -> BenchmarkResult:
         """Create a Run using sdk=..., or execute an already-created SDKRun.
 
-        A supplied SDK receives repo_path plus sdk_options unchanged. It owns
+        A supplied SDK receives repo_path and the registry step limit, with
+        explicit sdk_options taking precedence. It owns
         credentials, providers, validation and judging. No DefuzeX settings are
         added to that path. Use SuiteRunner for directory-discovered adapters;
         this lower-level runner requires an SDK object or an existing SDKRun.
@@ -214,7 +215,8 @@ class BenchmarkRunner:
                     on_step_failure=on_step_failure,
                 )
         mode = self.validate_sdk(registration)
-        kwargs = {"repo_path": registration.path, **self._sdk_options}
+        defaults = {} if registration.max_steps is None else {"max_steps": registration.max_steps}
+        kwargs = {"repo_path": registration.path, **defaults, **self._sdk_options}
         return await self._execute(
             registration,
             create_run=lambda: self._sdk.create_run(**kwargs),

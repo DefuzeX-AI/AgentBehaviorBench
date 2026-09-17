@@ -1,0 +1,54 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "multi-agent-cad"
+display_name = "33 Multi-Agent-CAD (hand-written configuration)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+repository = "https://github.com/Pan-Chera/Multi-Agent-CAD"
+revision = "f31a2f65aa1b1e16fa6c45f1d642142fb696db28"
+downloaded_on = "2026-09-16"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 1500
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+# Generated CAD scripts, STEP/STL files and aider state are written below the working directory.
+workdir = "/tmp"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+config = "abb-langgraph.json"
+graph_id = "agent"
+input_key = "message"
+output_key = "answer"
+binding = "bridge.py:create_graph"
+
+[llm_interception]
+required = true
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "dashscope"
+agent_env = "DASHSCOPE_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "dashscope-chat"
+host_patterns = ["token-plan.cn-beijing.maas.aliyuncs.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/compatible-mode/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "dashscope"

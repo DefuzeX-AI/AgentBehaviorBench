@@ -42,7 +42,8 @@ def unit(tmp_path):
     return root
 
 
-def test_worker_passes_requirement_contents_to_real_sdk(unit, tmp_path, monkeypatch):
+@pytest.mark.parametrize('step_options', [{}, {'max_steps': None}, {'max_steps': 1}])
+def test_worker_passes_requirement_contents_to_real_sdk(unit, tmp_path, monkeypatch, step_options):
     import kuma
 
     create_run = kuma.create_run
@@ -56,16 +57,23 @@ def test_worker_passes_requirement_contents_to_real_sdk(unit, tmp_path, monkeypa
     def offline_create(**options):
         assert options['agent_profile_path'] == unit / 'requirement.md'
         assert options['allow_local'] is False
+        if step_options.get('max_steps') is None:
+            assert 'max_steps' not in options
+        else:
+            assert options['max_steps'] == step_options['max_steps']
         # Exercise real SDK parsing on the host without changing production's
         # container requirement or invoking either official remote Provider.
         options['allow_local'] = True
+        # The SDK requires an explicit limit for this custom offline Provider.
+        # The assertions above check the unmodified production call first.
+        options.setdefault('max_steps', 1)
         return create_run(**options, case_provider=cases,
                           judge_provider=lambda context: {'status': 'pass', 'issues': []})
 
     monkeypatch.setattr(kuma, 'create_run', offline_create)
     monkeypatch.setenv('KUMA_API_KEY', 'offline-not-sent')
     output = tmp_path / 'output'
-    code = asyncio.run(execute(unit, output, {'mode': 'generate', 'count': 1, 'max_steps': 1}))
+    code = asyncio.run(execute(unit, output, {'mode': 'generate', 'count': 1, **step_options}))
     error = output / 'error.json'
     assert code == 0, error.read_text() if error.exists() else 'generation failed'
     assert len(observed) == 1
