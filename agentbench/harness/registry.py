@@ -24,6 +24,7 @@ class AgentRegistration:
     source: str
     case_count: int = 1
     requirement_path: Path | None = None
+    max_steps: int | None = None
 
 
 class AgentRegistry:
@@ -123,6 +124,7 @@ def _parse_agent(item: dict[str, object], repo_root: Path) -> AgentRegistration:
         source=str(item.get("source", "")),
         case_count=_positive_integer(item, "case", default=1),
         requirement_path=requirement_path,
+        max_steps=_positive_integer(item, "step", default=1) if "step" in item else None,
     )
 
 

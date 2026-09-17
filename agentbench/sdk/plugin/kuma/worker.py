@@ -62,14 +62,14 @@ async def execute(root, output, settings=None, sdk_repo=None):
         # Assemble SDK options for the repository, step limit, credentials,
         # trace evidence, and request timing.
         options = dict(repo_path=repository,
-                       max_steps=settings.get('max_steps'), 
                        allow_local=False, track_files=False, 
                        save_local=True,
 
                        api_key=credential, trace_evidence=capture,
                        **request_options(settings.get('sdk_request_options')))
+        if settings.get('max_steps') is not None:
+            options['max_steps'] = settings['max_steps']
 
-        
         if settings.get('mode') == 'generate':
             # Generation mode creates and saves Cases from the Agent Profile
             # without invoking the Agent.
