@@ -1,0 +1,54 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "langgraph-fullstack-python"
+display_name = "146 langgraph-fullstack-python (hand-written configuration)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+repository = "https://github.com/langchain-ai/langgraph-fullstack-python"
+revision = "64c7af2aaddf3037e233f83b61fda621d5cd86cb"
+downloaded_on = "2026-09-16"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 300
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+# /opt/agent is read-only in the container; /tmp is writable.
+workdir = "/tmp"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+config = "abb-langgraph.json"
+graph_id = "agent"
+input_key = "message"
+output_key = "answer"
+binding = "bridge.py:create_graph"
+
+[llm_interception]
+required = true
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "anthropic"
+agent_env = "ANTHROPIC_API_KEY"
+auth_plugin = "anthropic-api-key"
+
+[[llm_interception.routes]]
+id = "anthropic-messages"
+host_patterns = ["api.anthropic.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/messages"]
+protocol_plugin = "anthropic-messages"
+credential = "anthropic"
