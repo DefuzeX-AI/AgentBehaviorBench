@@ -81,6 +81,9 @@ def source_digest(root):
 
 def registration_record(agent):
     value = json_value(agent)
+    # Keep legacy Suite provenance unchanged when no step limit was configured.
+    if agent.max_steps is None:
+        value.pop('max_steps', None)
     value['path'] = str(agent.path.resolve())
     value['requirement_path'] = None if agent.requirement_path is None else str(agent.requirement_path.resolve())
     value['source_sha256'] = source_digest(agent.path)
@@ -119,7 +122,8 @@ def registrations_from_plan(plan):
     return tuple(AgentRegistration(value['agent_id'], Path(value['path']), value['enabled'],
                                    value['status'], value['framework'], value['source'],
                                    value['case_count'], None if value.get('requirement_path') is None
-                                   else Path(value['requirement_path'])) for value in plan['agents'])
+                                   else Path(value['requirement_path']),
+                                   max_steps=value.get('max_steps')) for value in plan['agents'])
 
 
 def validate_provenance(plan, registrations, configuration, *, secrets=()):

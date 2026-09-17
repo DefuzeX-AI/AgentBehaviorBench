@@ -1,0 +1,66 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "ai-hedge-fund-crypto"
+display_name = "50 ai-hedge-fund-crypto (hand-written configuration)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+repository = "https://github.com/51bitquant/ai-hedge-fund-crypto"
+revision = "c6750e0041cb2e528856864783585427c45cc34d"
+downloaded_on = "2026-09-16"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+# settings load ./config.yaml and the data provider caches klines relative to the working directory.
+workdir = "/tmp"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+config = "abb-langgraph.json"
+graph_id = "agent"
+input_key = "message"
+output_key = "answer"
+binding = "bridge.py:create_graph"
+
+[llm_interception]
+required = true
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
+
+[[llm_interception.tool_routes]]
+host_patterns = ["api.binance.com"]
+ports = [443]
+methods = ["GET"]
+path_patterns = ["/api/v3/ping", "/api/v3/time", "/api/v3/klines", "/api/v3/exchangeInfo"]
+
+[[llm_interception.tool_routes]]
+host_patterns = ["fapi.binance.com"]
+ports = [443]
+methods = ["GET"]
+path_patterns = ["/fapi/v1/ping", "/fapi/v1/klines"]
