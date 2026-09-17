@@ -1,0 +1,24 @@
+user: eval-example
+
+metadata:
+  name: tablegpt eval
+  llm:
+    name: qwen2.5-7b-instruct
+    temperature: 0.1
+    top_p: 0.3
+
+datasets:
+  - name: /datasets/tablegpt-eval-normal.json
+
+evaluatee_class: "agent_eval.tablegpt_evaluatee.TablegptEvaluatee"
+
+evaluator:
+  openai_api_base: http://localhost:8080/v1
+  openai_api_key: nothing
+  model_name: qwen2.5-72b-instruct
+  temperature: 0.1
+  top_p: 0.3
+  max_tokens: 1024
+
+max_concurrency: 1
+num_repetitions: 1
