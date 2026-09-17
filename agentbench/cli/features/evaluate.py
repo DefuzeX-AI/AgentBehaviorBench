@@ -34,7 +34,7 @@ def configure_parser(parser):
     parser.add_argument('--output', type=Path, help='Override the SDK output option')
     parser.add_argument('--timeout', type=float, help='Override the SDK timeout option (seconds)')
     parser.add_argument('--cases', type=int, help='Number of independent Cases (default: Registry case count)')
-    parser.add_argument('--max-steps', type=int, help='SDK upper bound on dialogue steps per Case')
+    parser.add_argument('--max-steps', type=int, help='Override Registry step: SDK upper bound on dialogue steps per Case')
 
 
 def execute(args):

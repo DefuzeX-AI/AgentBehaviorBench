@@ -92,6 +92,28 @@ plugin = Adapter()
 """
 
 
+@pytest.mark.parametrize('options', [{}, {'max_steps': 4}])
+def test_registry_step_is_per_agent_and_explicit_options_win(adapter_directory, options):
+    from agentbench.runtime.contracts.execution import RunControl
+    from agentbench.sdk.runtime import build_evaluation_runner_factory
+
+    add_adapter(adapter_directory)
+    factory = build_evaluation_runner_factory(
+        evaluation_plan(options=options), model=None, trace_sink=None,
+        trace_max_bytes=1024, environ={},
+    )
+    session = factory.open_suite('step-suite', RunControl())
+    try:
+        for limit in (1, 3, None):
+            agent = SimpleNamespace(agent_id=f'agent-{limit}', max_steps=limit)
+            runner = session.create(agent, {})
+            expected = {} if limit is None else {'max_steps': limit}
+            assert dict(runner.options) == {**expected, **options}
+        assert dict(factory.plan.options) == options
+    finally:
+        session.close()
+
+
 @pytest.fixture
 def adapter_directory(tmp_path, monkeypatch):
     """Isolate real package imports without adding SDKs to the production tree."""
