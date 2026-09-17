@@ -1,0 +1,60 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "curiosity"
+display_name = "120 curiosity (hand-written configuration)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+repository = "https://github.com/jank/curiosity"
+revision = "41c91954788f04b15332d2b86e265c5433fa4813"
+downloaded_on = "2026-09-16"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+secret_env_keys = ["TAVILY_API_KEY"]
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+# chat_agent opens its SqliteSaver at data/curiosity.db; the binding creates data/ under the working directory.
+workdir = "/tmp"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+config = "abb-langgraph.json"
+graph_id = "agent"
+input_key = "message"
+output_key = "answer"
+binding = "bridge.py:create_graph"
+
+[llm_interception]
+required = true
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
+
+[[llm_interception.tool_routes]]
+host_patterns = ["api.tavily.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/search", "/extract"]

@@ -196,11 +196,23 @@ agentbench evaluate react-agent --cases 1 --no-view
 
 The single-Case example asks for confirmation, then runs Case generation, Agent
 execution, evidence capture and Judge. One Case can contain multiple ordered
-inputs. `--max-steps` can bound the SDK's input execution, but truncating a scenario
-may affect whether Judge has sufficient evidence.
+inputs. Set an optional positive integer `step` after `case` in each Agent's
+`resources/registry.toml` entry to bound the number of inputs per Case:
 
-`resources/registry.toml` is authoritative for IDs, `enabled`, `status` and `case`
-counts. The source units currently present are ReAct (Tavily search) and Company
+```toml
+case = 1
+step = 1
+```
+
+`step` is an upper bound, not an exact count or a limit on the Agent's internal
+tool calls. If omitted, ABB does not pass `max_steps` to the SDK. Explicit
+`--max-steps` or `--sdk-options` values override the registry setting. This applies
+to new runs; resuming or reusing a Suite retains its saved settings and Cases.
+Existing Cases are not truncated to a smaller step limit.
+
+`resources/registry.toml` is authoritative for IDs, `enabled`, `status`, `case`
+counts and optional `step` limits. The source units currently present are ReAct
+(Tavily search) and Company
 Research (company research); both declare Tavily access. Do not infer readiness
 or enabled state from an old README or campaign report.
 

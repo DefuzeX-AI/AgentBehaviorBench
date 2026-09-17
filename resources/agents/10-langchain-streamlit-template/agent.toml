@@ -1,0 +1,54 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "langchain-streamlit-template"
+display_name = "82 langchain-streamlit-template (hand-written configuration)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+repository = "https://github.com/hwchase17/langchain-streamlit-template"
+revision = "3c676a670d1f69bcc4c76b692126db1922101d5f"
+downloaded_on = "2026-09-16"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 600
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+# /opt/agent is read-only in the container; /tmp is writable.
+workdir = "/tmp"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+config = "abb-langgraph.json"
+graph_id = "agent"
+input_key = "message"
+output_key = "answer"
+binding = "bridge.py:create_graph"
+
+[llm_interception]
+required = true
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
