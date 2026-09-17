@@ -31,11 +31,11 @@ from agentbench.runtime.interception import (
     InterceptorImageProvider,
     ModelTargetProvider,
     NullTraceSink,
-    OpenRouterProvider,
     RunningModelInterceptor,
     TraceEvent,
     TraceSink,
     get_trust_plugin,
+    resolve_model_provider,
 )
 
 from .image_builder import DockerImageBuilder
@@ -108,7 +108,7 @@ class DockerRuntime:
             interceptor_image_provider
             or default_interceptor_image_provider(self._images, self._environ)
         )
-        self._model_provider = model_provider or OpenRouterProvider()
+        self._model_provider = model_provider or resolve_model_provider(environ=self._environ)
         self._trace_sink = trace_sink or NullTraceSink()
         self._trace_max_bytes = trace_max_bytes
         self.artifact_root = artifact_root
@@ -285,6 +285,7 @@ class DockerRuntime:
             if invocation is not None:
                 # Mount the host input directory and writable artifact directory for the worker.
                 inputs, outputs = invocation
+                _share_input_mount(inputs)
                 command.extend(("--mount", _bind_mount(inputs, "/run/abb-input")))
                 # All other filesystem locations retain the existing read-only policy.
                 command.extend(("--mount", f"type=bind,source={outputs},target=/run/abb-output"))
@@ -703,6 +704,26 @@ class DockerRuntime:
 
 def _bind_mount(source: Path, target: str) -> str:
     return f"type=bind,source={source.resolve()},target={target},readonly"
+
+
+def _share_input_mount(directory: Path) -> None:
+    """Let the container user read the input directory it is given.
+
+    Input files are written by host helpers that create owner-only files (atomic
+    JSON writes are 0600). The image's own non-root user can have a different uid,
+    so owner-only settings can stop the worker before it can do anything.
+    Keep the image identity and share only the explicit read-only input mount.
+    Access control for these files is the private run directory that contains the
+    mount source, not the mode of a file deliberately handed to the container.
+    """
+    root = Path(directory)
+    if root.is_symlink() or not root.is_dir():
+        raise DockerRuntimeError(f"Invocation input must be a real directory: {root}")
+    for path in (root, *root.rglob("*")):
+        if path.is_symlink():
+            raise DockerRuntimeError(f"Invocation input must not contain symlinks: {path}")
+        mode = path.stat().st_mode
+        path.chmod(mode | (0o055 if path.is_dir() else 0o044))
 
 
 def _writable_bind_mount(source: Path, target: str) -> str:

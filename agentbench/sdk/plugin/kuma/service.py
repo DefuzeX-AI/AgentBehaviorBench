@@ -12,6 +12,7 @@ from agentbench.runtime.contracts.execution import (
 from agentbench.runtime.interception import TraceEvent
 from agentbench.observe.store import TraceStore, json_value, redact
 from agentbench.sdk.common.artifacts import Artifacts
+from .configuration import SDK_REPOSITORY, backend_url
 from .image import evaluation_agent
 from agentbench.runtime.docker.worker_build import _ignore
 
@@ -22,8 +23,8 @@ class EvaluationPolicy:
 
     def run_arguments(self):
         return (*DockerPolicy().run_arguments(), '--mount',
-                f'type=bind,source={self.state.parent},target=/opt/agent/agent,readonly', '--mount',
-                f'type=bind,source={self.state},target=/opt/agent/agent/.kuma')
+                f'type=bind,source={self.state.parent},target={SDK_REPOSITORY},readonly', '--mount',
+                f'type=bind,source={self.state},target={SDK_REPOSITORY}/.kuma')
 
 
 def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max_bytes=262144,
@@ -163,7 +164,8 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
         control.check()
 
         # The container worker calls create_run/save_case for Case preparation.
-        with evaluation_agent(agent, control=control, deadline=preparation) as descriptor:
+        with evaluation_agent(agent, control=control, deadline=preparation,
+                              backend=backend_url(environ)) as descriptor:
             # SDK requires repo and its ledger on the same filesystem. Mount the
             # actual staged Agent source read-only, with only its .kuma writable.
             repository = directory / 'sdk-repo'

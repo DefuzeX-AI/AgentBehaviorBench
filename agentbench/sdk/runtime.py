@@ -11,7 +11,7 @@ from agentbench.harness import AgentRunner, BenchmarkRunner
 from agentbench.harness.errors import ProviderSelectionError
 from agentbench.runtime import RuntimeFactory
 from agentbench.runtime.docker import DockerRuntime
-from agentbench.runtime.interception import OpenRouterProvider
+from agentbench.runtime.interception import resolve_model_provider
 
 from .contracts import EvaluationRunner, EvaluationSDKPlugin, SDKRunnerContext
 from .plugins import EvaluationPlan, plugin_execution
@@ -49,10 +49,14 @@ def build_evaluation_runner(
                 context=context,
                 options=plan.options,
             )
-        except ModuleNotFoundError as exc:
+        except ImportError as exc:
+            # ModuleNotFoundError is only "no such module"; an import of a name the
+            # module lacks, or a partially installed package, is its parent class.
+            cause = (f"missing module {exc.name!r}" if isinstance(exc, ModuleNotFoundError)
+                     else f"import failed: {exc}")
             raise ProviderSelectionError(
                 f"Could not create SDK {plan.selection.reference.name!r} runner: "
-                f"missing module {exc.name!r}. Check the adapter's dependencies."
+                f"{cause}. Check the adapter's dependencies."
             ) from exc
         if not all(callable(getattr(runner, method, None))
                    for method in ('validate_sdk', 'prepare_cases', 'run_case')):
@@ -66,13 +70,14 @@ def build_evaluation_runner(
         raise ProviderSelectionError(
             "A plain create_run SDK can only execute in the host process"
         )
+    model_provider = resolve_model_provider(model=model, environ=context.environ)
     runtime_factory = RuntimeFactory(
         docker_builder=lambda: DockerRuntime(
             environ=context.environ,
             control=control,
             build_coordinator=build_coordinator,
             identity=job_context,
-            model_provider=OpenRouterProvider(model=model),
+            model_provider=model_provider,
             trace_sink=trace_sink,  # type: ignore[arg-type]
             trace_max_bytes=trace_max_bytes,
         )

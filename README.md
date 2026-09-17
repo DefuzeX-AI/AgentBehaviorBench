@@ -163,7 +163,7 @@ existence does not prove the chosen model or endpoint is usable. `observe` is a
 useful native-input check before paying for Case generation; its model/tool calls
 can still be billed.
 
-The CLI loads the checkout's `.env`. Exported shell variables take precedence,
+The CLI loads the project root's `.env`. Exported shell variables take precedence,
 including an exported empty value; `--env-file PATH` selects a different file.
 `--model MODEL` overrides the Agent model for that command. Python library callers
 supply their environment explicitly. `.env` is not copied wholesale into Agent
@@ -267,6 +267,21 @@ Plain `add` downloads source. `-b` generates and validates integration files one
 a time; `-c` runs certification. Downloaded does not mean configured, and generated
 does not mean executable. Framework support and external services must be checked
 before committing to a full run. Current automatic configuration supports LangGraph.
+
+## Installed projects and plugins
+
+An installed `agentbench` uses the working directory as its project. In a source
+checkout it keeps using the checkout root. `ABB_PROJECT_ROOT` overrides either
+choice for the default registry, `.env`, results and cache paths. A wheel does
+not include the viewer: build `web/` in a checkout and point `ABB_WEB_ROOT` at its
+`web/dist` directory.
+
+`ABB_MODEL_PROVIDER` selects the host model target provider (default `openrouter`).
+External packages can register a factory accepting `model=` under
+`defuzex_agentbench.model_providers`; framework adapters use
+`defuzex_agentbench.adapters`. Install the adapter and its dependencies in every
+runtime that loads it, including the Agent image. Entry-point registration alone
+does not add automatic onboarding support for a framework.
 
 ## CLI and repository layout
 

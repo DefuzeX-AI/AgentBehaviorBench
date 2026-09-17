@@ -4,11 +4,16 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 
-def load_whitelist(path: Path) -> list[dict]:
-    """Load URL/method entries; only a trailing /* may match multiple paths."""
+def load_whitelist(path: Path, extra_entries=()) -> list[dict]:
+    """Load URL/method entries; only a trailing /* may match multiple paths.
+
+    ``extra_entries`` use the same shape and validation and follow the file's
+    entries; they carry routes that depend on run configuration.
+    """
     entries = json.loads(path.read_text(encoding='utf-8'))
     if not isinstance(entries, list):
         raise ValueError(f'{path}: whitelist must be a JSON array')
+    entries = [*entries, *extra_entries]
     routes = []
     for index, entry in enumerate(entries):
         label = f'{path}: whitelist entry {index + 1}'
@@ -45,12 +50,12 @@ def load_whitelist(path: Path) -> list[dict]:
     return routes
 
 
-def whitelist_toml(path: Path) -> str:
+def whitelist_toml(path: Path, extra_entries=()) -> str:
     """Serialize whitelist routes for appending to an evaluation manifest."""
     return ''.join(
         '\n[[llm_interception.tool_routes]]\n' + ''.join(
             f'{key} = {json.dumps(value, ensure_ascii=False)}\n'
             for key, value in route.items()
         )
-        for route in load_whitelist(path)
+        for route in load_whitelist(path, extra_entries)
     )

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from importlib.metadata import entry_points
 from pathlib import Path
 
 from .base import AgentAdapter, AgentDescriptor
@@ -10,6 +11,7 @@ from .langgraph import LangGraphAdapter
 
 
 AdapterBuilder = Callable[[Path], AgentAdapter]
+ADAPTER_ENTRY_POINT_GROUP = "defuzex_agentbench.adapters"
 
 
 class AdapterFactoryError(RuntimeError):
@@ -24,9 +26,15 @@ class AdapterFactory:
     """Registry-backed factory for framework adapter strategies."""
 
     def __init__(
-        self, builders: Mapping[str, AdapterBuilder] | None = None
+        self, builders: Mapping[str, AdapterBuilder] | None = None,
+        *, entry_point_group: str | None = None,
     ) -> None:
         self._builders: dict[str, AdapterBuilder] = {}
+        # Frameworks absent from ``builders`` are looked up lazily in this
+        # entry-point group, so an adapter package needs no edit to ABB. Built-ins
+        # stay registered in code: the evaluation container runs this package from
+        # source, without the distribution metadata entry points come from.
+        self._entry_point_group = entry_point_group
         for framework, builder in (builders or {}).items():
             self.register(framework, builder)
 
@@ -44,13 +52,12 @@ class AdapterFactory:
 
     def create(self, agent: AgentDescriptor) -> AgentAdapter:
         framework = _normalize_framework(agent.framework)
-        try:
-            builder = self._builders[framework]
-        except KeyError as exc:
+        builder = self._builders.get(framework) or self._entry_point_builder(framework)
+        if builder is None:
             supported = ", ".join(self.frameworks()) or "none"
             raise UnsupportedAdapterError(
                 f"Unsupported agent framework {agent.framework!r}; supported: {supported}"
-            ) from exc
+            )
 
         adapter = builder(agent.path)
         if not isinstance(adapter, AgentAdapter):
@@ -60,7 +67,25 @@ class AdapterFactory:
         return adapter
 
     def frameworks(self) -> tuple[str, ...]:
-        return tuple(sorted(self._builders))
+        names = set(self._builders)
+        if self._entry_point_group is not None:
+            names.update(_normalize_framework(entry.name)
+                         for entry in entry_points(group=self._entry_point_group))
+        return tuple(sorted(names))
+
+    def _entry_point_builder(self, framework: str) -> AdapterBuilder | None:
+        if self._entry_point_group is None:
+            return None
+        for entry in entry_points(group=self._entry_point_group):
+            if _normalize_framework(entry.name) == framework:
+                loaded = entry.load()
+                # An adapter class exposes from_agent_dir; a plain builder is used as is.
+                builder = getattr(loaded, "from_agent_dir", loaded)
+                if not callable(builder):
+                    raise AdapterFactoryError(f"Entry point for {framework!r} is not an adapter builder")
+                self.register(framework, builder)
+                return builder
+        return None
 
 
 def _normalize_framework(framework: str) -> str:
@@ -69,9 +94,9 @@ def _normalize_framework(framework: str) -> str:
     return framework.strip().lower()
 
 
-# Right now we only have one adapter
 DEFAULT_ADAPTER_FACTORY = AdapterFactory(
-    {"langgraph": LangGraphAdapter.from_agent_dir}
+    {"langgraph": LangGraphAdapter.from_agent_dir},
+    entry_point_group=ADAPTER_ENTRY_POINT_GROUP,
 )
 
 

@@ -55,3 +55,21 @@ def test_each_readme_language_has_matching_onboarding_and_return_links():
     for guide in guides:
         expected = {other.resolve() for other in guides if other != guide}
         assert expected <= local_targets(guide), f'Incomplete language navigation: {guide.name}'
+
+
+def test_readme_heading_links_name_existing_headings():
+    root = Path(__file__).resolve().parents[1]
+    documents = [root / 'README.md', *root.glob('docs/otherLanguages/README.*.md')]
+    for document in documents:
+        for link in re.findall(r'\]\(([^)]+)\)', document.read_text()):
+            target = urlsplit(link)
+            if target.scheme or target.netloc or not target.fragment:
+                continue
+            destination = document.parent / unquote(target.path) if target.path else document
+            if destination.suffix != '.md':
+                continue
+            content = re.sub(r'```.*?```', '', destination.read_text(), flags=re.DOTALL)
+            headings = re.findall(r'^#{1,6}\s+(.+?)\s*$', content, flags=re.MULTILINE)
+            anchors = {re.sub(r'[^\w\- ]', '', heading.lower()).replace(' ', '-')
+                       for heading in headings}
+            assert unquote(target.fragment) in anchors, f'{document.name} -> {link}'

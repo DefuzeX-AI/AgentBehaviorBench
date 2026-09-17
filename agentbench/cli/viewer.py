@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Callable
 from html import escape
 import threading
@@ -12,9 +13,14 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import quote, unquote, urlparse, parse_qs
 
+from agentbench.project import project_root
+
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
-WEB_ROOT = Path(__file__).resolve().parents[2] / "web" / "dist"
+# Built viewer assets: ABB_WEB_ROOT, else web/dist of the project (a checkout, or
+# the working directory of an installed CLI; see agentbench.project).
+WEB_ROOT = (Path(os.environ["ABB_WEB_ROOT"]).expanduser().resolve() if os.environ.get("ABB_WEB_ROOT", "").strip()
+            else project_root() / "web" / "dist")
 
 
 class ViewerUnavailable(OSError):
@@ -35,6 +41,13 @@ def require_viewer_assets():
                 break
     if missing:
         import shlex
+        if not (WEB_ROOT.parent / 'package.json').is_file():
+            # Nothing to build here: an installed package ships no web/, and neither
+            # does a project directory outside the checkout.
+            raise ViewerUnavailable(
+                f'Trace UI not found at {WEB_ROOT}, and {WEB_ROOT.parent} has no viewer sources to build. '
+                'Build web/ in an AgentBehaviorBench checkout (npm ci && npm run build) '
+                'and set ABB_WEB_ROOT to that web/dist')
         raise ViewerUnavailable(f'Trace UI not built or incomplete. Run: cd {shlex.quote(str(WEB_ROOT.parent))} && npm ci && npm run build')
 
 
@@ -195,11 +208,13 @@ def build_viewer_handler(
 
             suite_path = _suite_view_path(expected_suite_id)
             if parsed.path.rstrip("/") == suite_path.rstrip("/"):
-                index = WEB_ROOT / "index.html"
-                if not index.is_file():
-                    self.send_error(HTTPStatus.SERVICE_UNAVAILABLE,
-                                    "Trace UI not built. Run npm install and npm run build in web/.")
+                try:
+                    require_viewer_assets()
+                except ViewerUnavailable as exc:
+                    # The same wording as `agentbench view`; paths go in the body, not the status line.
+                    self.send_error(HTTPStatus.SERVICE_UNAVAILABLE, explain=str(exc))
                     return
+                index = WEB_ROOT / "index.html"
                 html = index.read_text(encoding="utf-8")
                 if suite_view:
                     html = html.replace("<head>", f'<head><meta name="abb-result-api" content="{escape(result_api_path, quote=True)}">', 1)

@@ -33,7 +33,7 @@ def build_parser() -> ArgumentParser:
 
 def cli(argv: Sequence[str] | None = None) -> int:
     """Parse command-line arguments and dispatch a registered feature."""
-    
+    _line_buffer_console()
     args_list = list(sys.argv[1:] if argv is None else argv)
     
     args = build_parser().parse_args(_normalize_argv(args_list))
@@ -98,6 +98,22 @@ def main(
             environ=environ,
         )
     )
+
+
+def _line_buffer_console() -> None:
+    """Deliver each progress line when it is written, terminal or not.
+
+    Progress goes through print(). Python block-buffers stdout when it is a file
+    or a pipe, so a redirected run showed nothing for minutes and a working run
+    looked exactly like a hung one.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(line_buffering=True)
+            except (OSError, ValueError):
+                pass  # A detached or non-text stream keeps its own buffering.
 
 
 def _normalize_argv(args: list[str]) -> list[str]:

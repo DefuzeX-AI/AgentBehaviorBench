@@ -21,12 +21,12 @@ from agentbench.cli.terminal_ui import LLMActivity
 from agentbench.cli.trace_runtime import build_trace_suite_runner
 from agentbench.harness import ProviderSelectionError
 from agentbench.harness.registry import load_registry
+from agentbench.project import project_root
 from agentbench.runtime.interception import DEFAULT_TRACE_MAX_BYTES
 from .base import CommandFeature
 
-DEFAULT_REGISTRY_PATH = (
-    Path(__file__).resolve().parents[3] / "resources" / "registry.toml"
-)
+# A checkout keeps its bundled registry; an installed CLI uses the project it runs in.
+DEFAULT_REGISTRY_PATH = project_root() / "resources" / "registry.toml"
 
 
 def configure_parser(parser: ArgumentParser) -> None:

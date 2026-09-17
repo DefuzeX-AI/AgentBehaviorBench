@@ -9,9 +9,18 @@ from agentbench.sdk.contracts import PreparationFailure, PreparedCaseBatch
 from agentbench.observe.store import redact
 
 from .case_files import collection_artifact, prepare_artifact
-from .diagnostics import collect_artifacts, evaluation_failure, read_diagnostic
+from .diagnostics import collect_artifacts, evaluation_failure, read_diagnostic, unreadable_reason
 from .generation import SCHEMA, selected_indices, validate_collection, validate_entries
 from .generation_failures import SHARED_GENERATION_BLOCKS
+
+
+def _case_files(directory):
+    """Name saved Case files even when their content cannot be read."""
+    try:
+        names = sorted(path.name for path in (directory / 'evaluation/cases').glob('*.json'))
+    except OSError:
+        return 'unknown'
+    return ', '.join(names) or 'none'
 
 
 def prepare_batch(runner, registration, *, evaluator, case_indices=None,
@@ -73,6 +82,16 @@ def prepare_batch(runner, registration, *, evaluator, case_indices=None,
             files.save('evaluation/case-collection.json', collection)
         else:
             collection = read_diagnostic(directory, 'evaluation/case-collection.json')
+            if not collection:
+                # An unreadable collection is not a failed generation: the Cases may
+                # already be generated and billed. Say so instead of discarding them.
+                # The artifact detail appended by evaluation_failure names the file,
+                # its owner and its mode.
+                if unreadable_reason(directory, 'evaluation/case-collection.json') is not None:
+                    raise evaluation_failure(
+                        directory, 'Case batch was written but the host cannot read it; '
+                        f'generated Case files on disk: {_case_files(directory)}',
+                        environ=runner.environ)
             if not allow_partial:
                 if read_diagnostic(directory, 'run.json').get('status') != 'succeeded':
                     raise evaluation_failure(directory, 'Case batch generation failed', environ=runner.environ)
@@ -193,9 +212,13 @@ def _failure(index, item, artifacts, fallback=None, secrets=()):
             'reason': 'Original Case generation request failed; an explicit request may generate this missing slot'}
     if request:
         artifacts['generation_request'] = request
+    message = item.get('error_message') or item.get('message') or str(fallback or 'Case generation failed')
+    if code in ('network_error', 'network_timeout') and artifacts.get('sdk_base_url'):
+        # An unreachable Backend is usually a configuration question; say which one.
+        message = f"{message} (KUMA backend: {artifacts['sdk_base_url']})"
     return PreparationFailure(
         index, item.get('error_type') or item.get('type') or type(fallback).__name__,
-        redact(item.get('error_message') or item.get('message') or str(fallback or 'Case generation failed'), secrets),
+        redact(message, secrets),
         phase=item.get('phase') or 'case_generation', code=item.get('code'),
         retryable=item.get('retryable'), client_request_id=item.get('client_request_id'),
         request_id=item.get('request_id'), artifacts=artifacts)
