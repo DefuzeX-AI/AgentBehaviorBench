@@ -1,0 +1,76 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "agruai-company-research-agent"
+display_name = "170 agruai/company-research-agent (hand-written configuration)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+repository = "https://github.com/agruai/company-research-agent"
+revision = "bf299b7a44299ea9a5c8fe4aa600671034015c48"
+downloaded_on = "2026-09-16"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 1200
+secret_env_keys = ["TAVILY_API_KEY"]
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+# /opt/agent is read-only in the container; /tmp is writable.
+workdir = "/tmp"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+config = "abb-langgraph.json"
+graph_id = "agent"
+input_key = "message"
+output_key = "answer"
+binding = "bridge.py:create_graph"
+
+[llm_interception]
+required = true
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
+
+[[llm_interception.tool_routes]]
+host_patterns = ["api.tavily.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/search", "/extract"]
+
+# The agruai fork also has a Gemini node (checks os.environ["GEMINI_API_KEY"]); the credential supplies
+# that env var and the route sends its generativelanguage calls through the interceptor to GLM.
+[[llm_interception.credentials]]
+id = "gemini"
+agent_env = "GEMINI_API_KEY"
+auth_plugin = "google-api-key"
+
+[[llm_interception.routes]]
+id = "gemini-content"
+host_patterns = ["generativelanguage.googleapis.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1beta/models/*:generateContent*", "/v1beta/models/*:streamGenerateContent*", "/v1/models/*:generateContent*"]
+protocol_plugin = "gemini-content"
+credential = "gemini"
