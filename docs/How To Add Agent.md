@@ -81,19 +81,32 @@ execution does not require Node or `web/dist`.
 
 ## 2. Run the add command
 
-Replace the URL with the Agent's GitHub repository. Use the repository URL itself,
-not a file or `/tree/branch` URL:
+`SOURCE` can be the Agent's HTTPS GitHub repository or an absolute local directory.
+For GitHub, use the repository URL itself, not a file or `/tree/branch` URL:
 
 ```bash
 agentbench agent add https://github.com/owner/repository -b -c
 ```
+
+To import a local Agent, pass its absolute directory path:
+
+```bash
+agentbench agent add /absolute/path/to/local-agent -b -c
+```
+
+On PowerShell, a Windows path such as
+`agentbench agent add C:\work\local-agent -b -c` is accepted. ABB copies the
+directory into the numbered unit's `agent/` directory and omits `.git` metadata.
+It records a SHA-256 content digest as the local snapshot's revision. Relative
+paths are rejected, and later `-b`/`-c` calls with the same canonical path reuse
+the imported unit rather than recopying changed source over integration work.
 
 - `-b`: generate and validate the integration files, then register the Agent as
   `adapting`. It does not mean “build the Docker image.”
 - `-c`: build/run the configured Agent through certification. Successful execution
   of its configured Cases promotes it to `ready`; Judge findings can still exist.
 
-ABB downloads source, plans the integration, saves each validated file, and then
+ABB imports source, plans the integration, saves each validated file, and then
 asks for certification confirmation. Configuration generation and certification
 can call paid services. Current automatic configuration supports **LangGraph**;
 other frameworks need adapter support before this flow can run them.
@@ -104,10 +117,10 @@ To generate the files and inspect them before certification, omit `-c`:
 agentbench agent add https://github.com/owner/repository -b
 ```
 
-Without either flag, `agentbench agent add URL` only downloads source and lists
+Without either flag, `agentbench agent add SOURCE` only imports source and lists
 setup files; it does not generate configuration or register a runnable Agent.
-The downloader records the default branch's revision; there is currently no
-`--revision` option.
+GitHub imports record the default branch revision; local imports record the copied
+content digest. There is currently no `--revision` option.
 
 Useful options:
 
@@ -128,12 +141,12 @@ before changing budgets, timeouts or retries.
 ## 3. Understand the files
 
 The Agent unit is placed under `resources/agents/NN-name/`. The command generates
-integration files around the downloaded source; you do not need to create all of
+integration files around the imported source; you do not need to create all of
 these by hand before running it.
 
 ```text
 resources/agents/NN-name/
-├── agent/                   # Downloaded upstream source
+├── agent/                   # Imported upstream or local source snapshot
 ├── agent.toml               # ABB execution configuration
 ├── bindings/                # Boundary between ABB and the native Agent
 ├── Dockerfile               # Agent image build instructions
@@ -144,7 +157,7 @@ resources/agents/NN-name/
 
 ### `agent/` — the Agent's own source
 
-The downloaded repository lives here. Its graph, reasoning and tools remain the
+The imported source snapshot lives here. Its graph, reasoning and tools remain the
 real implementation. Put ABB integration files outside this directory so that
 adapting an Agent does not silently replace its behavior.
 
@@ -200,8 +213,8 @@ support. Native mapping remains in `agent.toml` and the binding.
 flag, `adapting`/`ready` state and `case` count. Final generation registers adapting;
 certification controls promotion. `run` selects enabled ready Agents.
 
-The downloader also creates **`source-manifest.json` automatically** to record the
-repository and revision for download reuse. It is an internal ABB record, not a
+The importer also creates **`source-manifest.json` automatically** to record the
+GitHub URL or canonical local path and its revision for reuse. It is an internal ABB record, not a
 KUMA-required file or a document the user must prepare. Leave generated records
 in place when continuing the add workflow.
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -10,6 +11,7 @@ import pytest
 
 from agentbench.cli.main import cli
 from agentbench.onboarding.discovery import discover_files
+from agentbench.onboarding.resume import download_or_reuse
 from agentbench.onboarding.source import AgentDownloadError, download_agent
 
 
@@ -81,6 +83,152 @@ def test_default_destination_follows_cli_registry_location(repository, tmp_path,
     assert cli(["agent", "add", URL]) == 0
     assert (registry.parent / "agents/01-my-agent/agent/langgraph.json").is_file()
     assert json.loads(capsys.readouterr().out)
+
+
+def test_cli_copies_absolute_local_directory_into_numbered_unit(tmp_path, capsys):
+    local = tmp_path / "Local Agent"
+    write(local, "README.md", "local source\n")
+    write(local, "langgraph.json", json.dumps({"graphs": {"agent": "./graph.py:graph"}}))
+    write(local, "graph.py", "graph = object()\n")
+    write(local, "notes.txt", "copied too\n")
+    write(local, ".git/config", "must not be copied\n")
+    root = tmp_path / "project/resources/agents"
+
+    assert cli(["agent", "add", str(local.resolve()), "--agents-dir", str(root)]) == 0
+
+    output = capsys.readouterr()
+    assert json.loads(output.out) == ["README.md", "graph.py", "langgraph.json"]
+    unit = root / "01-local-agent"
+    assert (unit / "agent/notes.txt").read_text() == "copied too\n"
+    assert not (unit / "agent/.git").exists()
+    metadata = json.loads((unit / "source-manifest.json").read_text())
+    assert metadata["repository"] == str(local.resolve())
+    assert metadata["source_type"] == "local-directory"
+    assert metadata["revision"].startswith("sha256:")
+    assert len(metadata["revision"].removeprefix("sha256:")) == 64
+    assert "Local source copied" in output.err
+    assert not list(root.glob(".agent-add-*"))
+
+
+def test_local_source_reuse_matches_its_canonical_absolute_path(tmp_path):
+    local = tmp_path / "local-agent"
+    write(local, "README.md", "original\n")
+    root = tmp_path / "agents"
+    first = download_agent(str(local.resolve()), root)
+    write(local, "README.md", "changed after import\n")
+
+    reused = download_or_reuse(str(local.resolve()), root)
+
+    assert reused.directory == first.directory
+    assert (reused.directory / "agent/README.md").read_text() == "original\n"
+    assert reused.revision == first.revision
+
+
+def test_local_source_reuse_does_not_require_the_original_after_import(tmp_path):
+    local = tmp_path / "local-agent"
+    write(local, "README.md")
+    root = tmp_path / "agents"
+    first = download_agent(str(local.resolve()), root)
+    original_identifier = first.repository
+    shutil.rmtree(local)
+
+    reused = download_or_reuse(original_identifier, root)
+
+    assert reused.directory == first.directory
+
+
+def test_cli_local_source_enters_the_existing_build_workflow(tmp_path, monkeypatch, capsys):
+    from agentbench.onboarding import workflow
+
+    local = tmp_path / "local-agent"
+    write(local, "README.md")
+    root = tmp_path / "agents"
+    observed = []
+
+    def configure(source, args, *, output_fn):
+        observed.append((source, args.build, args.certify))
+        output_fn("build workflow reached")
+        return 17
+
+    monkeypatch.setattr(workflow, "configure_download", configure)
+
+    assert cli(["agent", "add", str(local.resolve()), "--agents-dir", str(root), "-b"]) == 17
+    source, build, certify = observed[0]
+    assert source.directory == root / "01-local-agent"
+    assert source.source_type == "local-directory"
+    assert build is True and certify is False
+    assert "build workflow reached" in capsys.readouterr().err
+
+
+def test_duplicate_local_add_does_not_overwrite_imported_source(tmp_path, capsys):
+    local = tmp_path / "local-agent"
+    write(local, "README.md", "original\n")
+    root = tmp_path / "agents"
+    result = download_agent(str(local.resolve()), root)
+    write(result.directory, "agent/README.md", "integration edit\n")
+
+    assert cli(["agent", "add", str(local.resolve()), "--agents-dir", str(root)]) == 2
+
+    assert "already exists" in capsys.readouterr().err
+    assert (result.directory / "agent/README.md").read_text() == "integration edit\n"
+
+
+def test_same_named_local_directories_receive_distinct_unit_names(tmp_path):
+    first = tmp_path / "one/shared/local-agent"
+    second = tmp_path / "two/shared/local-agent"
+    third = tmp_path / "three/shared/local-agent"
+    for index, path in enumerate((first, second, third), 1):
+        write(path, "README.md", str(index))
+    root = tmp_path / "agents"
+
+    imported = [download_agent(str(path.resolve()), root) for path in (first, second, third)]
+
+    assert imported[0].directory.name == "01-local-agent"
+    assert imported[1].directory.name == "02-shared-local-agent"
+    assert imported[2].directory.name.startswith("03-shared-local-agent-")
+    assert len({item.directory.name for item in imported}) == 3
+
+
+def test_local_source_must_be_an_absolute_directory(tmp_path, monkeypatch):
+    local = tmp_path / "local-agent"
+    local.mkdir()
+    file_source = write(tmp_path, "agent.py")
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(AgentDownloadError, match="absolute directory"):
+        download_agent("local-agent", tmp_path / "agents")
+    with pytest.raises(AgentDownloadError, match="not a directory"):
+        download_agent(str(file_source.resolve()), tmp_path / "agents")
+    with pytest.raises(AgentDownloadError, match="does not exist"):
+        download_agent(str((tmp_path / "missing").resolve()), tmp_path / "agents")
+
+
+def test_local_source_cannot_contain_agents_destination(tmp_path):
+    local = tmp_path / "local-agent"
+    local.mkdir()
+    root = local / "resources/agents"
+
+    with pytest.raises(AgentDownloadError, match="inside the local source"):
+        download_agent(str(local.resolve()), root)
+
+    assert not root.exists()
+
+
+def test_interrupted_local_copy_cleans_staging(tmp_path, monkeypatch):
+    local = tmp_path / "local-agent"
+    write(local, "README.md")
+    root = tmp_path / "agents"
+
+    def fail_copy(_source, target, **_kwargs):
+        write(Path(target), "partial.txt")
+        raise OSError("copy interrupted")
+
+    monkeypatch.setattr("agentbench.onboarding.source.shutil.copytree", fail_copy)
+
+    with pytest.raises(OSError, match="copy interrupted"):
+        download_agent(str(local.resolve()), root)
+
+    assert list(root.iterdir()) == []
 
 
 def test_duplicate_add_does_not_overwrite_download(repository, tmp_path, capsys):

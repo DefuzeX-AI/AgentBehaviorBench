@@ -1,4 +1,4 @@
-"""Copy download facts from local records, never from model output."""
+"""Copy imported source facts from local records, never from model output."""
 
 from datetime import date
 import json
@@ -9,10 +9,11 @@ from ..openrouter_provider.context import safe_file
 
 
 def source_metadata(source):
-    """Read download metadata; older units may keep it in their existing manifest.
+    """Read import metadata; older units may keep it in their existing manifest.
 
-    URL and revision must agree with the selected DownloadedAgent. Missing dates
-    are omitted rather than replaced by today's date. No input file is modified.
+    Source identifier and revision must agree with the selected DownloadedAgent.
+    Missing dates are omitted rather than replaced by today's date. No input file
+    is modified.
     """
     data = {"repository": source.repository, "revision": source.revision}
     for name in ("source-manifest.json", "agent.toml"):

@@ -71,17 +71,28 @@ cd ..
 
 ## 2. 执行添加命令
 
-把 URL 换成 Agent 的 GitHub 仓库地址，不使用文件或 `/tree/branch` 页面地址：
+`SOURCE` 可以是 Agent 的 HTTPS GitHub 仓库地址，也可以是本地绝对目录。GitHub
+地址必须指向仓库本身，不使用文件或 `/tree/branch` 页面地址：
 
 ```bash
 agentbench agent add https://github.com/owner/repository -b -c
 ```
 
+本地 Agent 使用绝对路径：
+
+```powershell
+agentbench agent add C:\work\local-agent -b -c
+```
+
+ABB 会把该目录复制到编号单元的 `agent/` 目录，并排除 `.git` 元数据。本地快照的
+revision 是内容的 SHA-256 摘要。相对路径会被拒绝；之后用同一个规范化绝对路径执行
+`-b`/`-c` 时会复用已导入单元，不会用源目录的新内容覆盖已有接入工作。
+
 - `-b`：生成并验证接入文件，将 Agent 登记为 `adapting`，不代表立即构建 Docker 镜像。
 - `-c`：通过认证流程构建并运行 Agent。配置的 Case 执行验收成功后变为 `ready`；
   Judge 仍可能报告行为问题。
 
-ABB 会下载源码、规划接入、逐文件保存验证结果，再询问是否进行认证。生成和认证可能
+ABB 会导入源码、规划接入、逐文件保存验证结果，再询问是否进行认证。生成和认证可能
 产生费用。目前自动配置支持 **LangGraph**；其他框架需要先有相应适配器支持。
 
 想先检查生成文件，去掉 `-c`：
@@ -90,8 +101,9 @@ ABB 会下载源码、规划接入、逐文件保存验证结果，再询问是�
 agentbench agent add https://github.com/owner/repository -b
 ```
 
-两个参数都不加时，`agentbench agent add URL` 只下载并列出配置文件，不生成接入配置，
-也不注册可运行的 Agent。下载器记录默认分支的 revision，目前没有 `--revision` 参数。
+两个参数都不加时，`agentbench agent add SOURCE` 只导入并列出配置文件，不生成接入配置，
+也不注册可运行的 Agent。GitHub 源记录默认分支 revision，本地源记录复制内容摘要；
+目前没有 `--revision` 参数。
 
 | 参数 | 用途 |
 | --- | --- |
@@ -108,12 +120,12 @@ agentbench agent add https://github.com/owner/repository -b
 
 ## 3. 了解每个文件的用途
 
-Agent 单元位于 `resources/agents/NN-name/`。命令在下载的源码外围生成接入文件，
+Agent 单元位于 `resources/agents/NN-name/`。命令在导入的源码外围生成接入文件，
 不需要在运行命令前手写齐全。
 
 ```text
 resources/agents/NN-name/
-├── agent/                   # Downloaded upstream source
+├── agent/                   # 导入的上游或本地源码快照
 ├── agent.toml               # ABB execution configuration
 ├── bindings/                # Boundary between ABB and the native Agent
 ├── Dockerfile               # Agent image build instructions
@@ -124,7 +136,7 @@ resources/agents/NN-name/
 
 ### `agent/` — Agent 自身源码
 
-保存下载的上游仓库。真实图、推理和工具仍在这里实现。ABB 接入文件放在目录外，
+保存导入的上游或本地源码快照。真实图、推理和工具仍在这里实现。ABB 接入文件放在目录外，
 避免接入时悄悄替换原 Agent 的行为。
 
 ### `agent.toml` — ABB 如何启动和调用 Agent
@@ -169,7 +181,8 @@ Behaviors 三个章节；策略组从当前 SDK 目录选取。
 `resources/registry.toml` 位于单元之外，保存路径、启用状态、adapting/ready 和 `case`
 数量。生成完成登记 adapting，认证控制晋升，`run` 选择启用且 ready 的 Agent。
 
-下载器还会**自动创建 `source-manifest.json`**，记录仓库和 revision 以复用下载。
+导入器还会**自动创建 `source-manifest.json`**，记录 GitHub URL 或规范化本地路径及
+revision，以便复用导入结果。
 它是 ABB 内部记录，不是 KUMA 要求的文件，也不需要用户准备。继续添加流程时保留它。
 
 生成记录位于 `cache/onboarding/<unit-name>-<path-digest>/`：build-state.json 跟踪

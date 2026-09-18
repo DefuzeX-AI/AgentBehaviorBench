@@ -76,17 +76,28 @@ cd ..
 
 ## 2. 追加コマンドを実行する
 
-URL を Agent の GitHub リポジトリに置き換えます。ファイルや /tree/branch の URL は使いません。
+`SOURCE` には Agent の HTTPS GitHub リポジトリ、またはローカルの絶対ディレクトリを指定できます。
+GitHub の場合、ファイルや /tree/branch ではなくリポジトリ URL を使います。
 
 ```bash
 agentbench agent add https://github.com/owner/repository -b -c
 ```
 
+ローカル Agent の例：
+
+```bash
+agentbench agent add /absolute/path/to/local-agent -b -c
+```
+
+ABB はディレクトリを番号付きユニットの `agent/` にコピーし、`.git` メタデータを除外します。
+コピー内容の SHA-256 ダイジェストを revision として記録します。相対パスは拒否され、同じ正規化済み
+絶対パスを再度指定すると、既存の統合作業を上書きせずインポート済みユニットを再利用します。
+
 - `-b`：接続設定を生成・検証し、adapting として登録します。Docker イメージの即時ビルドではありません。
 - `-c`：認証フローで Agent をビルド・実行します。設定された Case の実行確認が成功すると ready になります。
   Judge が行動上の問題を報告する場合もあります。
 
-ABB はソースを取得し、接続を計画し、各ファイルを検証・保存してから認証の確認を求めます。
+ABB はソースをインポートし、接続を計画し、各ファイルを検証・保存してから認証の確認を求めます。
 生成と認証には料金が発生する場合があります。自動設定は現在 **LangGraph** をサポートします。
 他のフレームワークには対応アダプターが必要です。
 
@@ -96,9 +107,9 @@ ABB はソースを取得し、接続を計画し、各ファイルを検証・�
 agentbench agent add https://github.com/owner/repository -b
 ```
 
-両方のフラグを省略した agentbench agent add URL はダウンロードと設定ファイル一覧の出力のみで、
+両方のフラグを省略した agentbench agent add SOURCE はインポートと設定ファイル一覧の出力のみで、
 接続設定の生成や実行可能 Agent の登録はしません。デフォルトブランチの revision を記録します。
-現在 --revision オプションはありません。
+ローカルソースではコピー内容のダイジェストを記録します。現在 --revision オプションはありません。
 
 | オプション | 用途 |
 | --- | --- |
@@ -120,7 +131,7 @@ Agent 単位のディレクトリは `resources/agents/NN-name/` です。取得
 
 ```text
 resources/agents/NN-name/
-├── agent/                   # Downloaded upstream source
+├── agent/                   # インポートした上流またはローカルのソーススナップショット
 ├── agent.toml               # ABB execution configuration
 ├── bindings/                # Boundary between ABB and the native Agent
 ├── Dockerfile               # Agent image build instructions

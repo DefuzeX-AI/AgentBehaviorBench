@@ -9,7 +9,7 @@ This file guides contributors and coding assistants. User setup belongs in
 | Location | Responsibility |
 | --- | --- |
 | `agentbench/cli/features/` | CLI arguments and command dispatch through `CommandFeature` and `FEATURES`. |
-| `agentbench/onboarding/` | Source download, discovery, reuse and optional configuration/certification workflow. |
+| `agentbench/onboarding/` | Source import, discovery, reuse and optional configuration/certification workflow. |
 | `agentbench/onboarding/build_agent_env/` | Planning, per-file generation, validation, persistence and registration. |
 | `agentbench/adapter/` | Framework loading and native input/output invocation. |
 | `agentbench/harness/` | Agent registry, suite scheduling, Case concurrency, recovery and results. |
@@ -29,12 +29,13 @@ Check nearby code and module documentation before changing an interface.
 
 ```text
 agentbench agent add REPOSITORY [-b] [-c]
-    download/reuse source -> discover evidence
+    import/reuse source -> discover evidence
     -b: SDK context -> plan -> generate/validate/save each file -> register
     -c: invoke the certification workflow
 ```
 
-Plain `add` downloads source and reports discovered files. `-b` generates integration
+Plain `add` imports a GitHub repository or absolute local directory and reports
+discovered files. `-b` generates integration
 configuration; Docker construction and execution belong to certification/runtime.
 `-c` can also use manually prepared configuration.
 

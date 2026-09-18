@@ -153,8 +153,8 @@ These commands need different services:
 | Action | Docker | KUMA key | OpenRouter key + model | Agent tool keys |
 | --- | --- | --- | --- | --- |
 | CLI help, SDK discovery, offline demo, saved-result viewer | No | No | No | No |
-| `agent add URL` (download only) | No | No | No | No |
-| `agent add URL -b` with KUMA | No | Yes, for strategy catalog | Yes, structured-output build model | Not executed during generation |
+| `agent add SOURCE` (import only) | No | No | No | No |
+| `agent add SOURCE -b` with KUMA | No | Yes, for strategy catalog | Yes, structured-output build model | Not executed during generation |
 | `observe` a Docker Agent | Yes | No | Yes | As declared by that Agent |
 | `evaluate`, `run`, `certify` with KUMA and Docker Agents | Yes | Yes | Yes | As declared by that Agent |
 
@@ -273,10 +273,14 @@ Use its language selector for the French, Japanese, Chinese and Korean editions.
 agentbench agent add https://github.com/owner/repository
 agentbench agent add https://github.com/owner/repository -b
 agentbench agent add https://github.com/owner/repository -b -c
+agentbench agent add /absolute/path/to/local-agent -b
 ```
 
-Plain `add` downloads source. `-b` generates and validates integration files one at
-a time; `-c` runs certification. Downloaded does not mean configured, and generated
+`SOURCE` may be an HTTPS GitHub repository URL or an absolute local directory.
+Local source is copied into the numbered unit's `agent/` directory, with `.git`
+metadata omitted, and receives a content-digest revision. Relative paths are
+rejected. Plain `add` imports source. `-b` generates and validates integration files one at
+a time; `-c` runs certification. Imported does not mean configured, and generated
 does not mean executable. Framework support and external services must be checked
 before committing to a full run. Current automatic configuration supports LangGraph.
 

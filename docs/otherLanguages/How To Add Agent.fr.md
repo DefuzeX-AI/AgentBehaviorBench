@@ -81,18 +81,29 @@ qui ne nécessite ni Node ni web/dist.
 
 ## 2. Lancer la commande d’ajout
 
-Remplacez l’URL par celle du dépôt GitHub de l’Agent, pas une URL de fichier ou /tree/branch :
+`SOURCE` peut être le dépôt GitHub HTTPS de l’Agent ou un répertoire local absolu.
+Pour GitHub, utilisez le dépôt lui-même, pas une URL de fichier ou /tree/branch :
 
 ```bash
 agentbench agent add https://github.com/owner/repository -b -c
 ```
+
+Pour une source locale :
+
+```bash
+agentbench agent add /chemin/absolu/vers/local-agent -b -c
+```
+
+ABB copie le répertoire dans `agent/`, omet les métadonnées `.git` et enregistre
+une empreinte SHA-256 comme révision. Les chemins relatifs sont refusés. Les appels
+ultérieurs avec le même chemin canonique réutilisent l’unité importée.
 
 - `-b` : génère et valide les fichiers d’intégration, puis enregistre l’Agent comme
   adapting. Cela ne signifie pas « construire immédiatement l’image Docker ».
 - `-c` : construit/exécute l’Agent via la certification. La réussite de l’exécution
   des Cases configurés permet le passage à ready ; le Judge peut néanmoins signaler des problèmes.
 
-ABB télécharge les sources, planifie l’intégration, sauvegarde chaque fichier validé,
+ABB importe les sources, planifie l’intégration, sauvegarde chaque fichier validé,
 puis demande confirmation pour la certification. Génération et certification peuvent
 être facturées. La configuration automatique prend actuellement en charge **LangGraph** ;
 les autres frameworks nécessitent d’abord un adaptateur compatible.
@@ -103,10 +114,10 @@ Pour examiner les fichiers avant la certification, omettez -c :
 agentbench agent add https://github.com/owner/repository -b
 ```
 
-Sans ces deux options, agentbench agent add URL télécharge et liste seulement les
+Sans ces deux options, agentbench agent add SOURCE importe et liste seulement les
 fichiers de configuration, sans générer d’intégration ni enregistrer d’Agent exécutable.
-Le téléchargeur conserve la révision de la branche par défaut ; il n’existe pas encore
-d’option --revision.
+GitHub conserve la révision de la branche par défaut ; une source locale conserve
+l’empreinte du contenu copié. Il n’existe pas encore d’option --revision.
 
 | Option | Utilité |
 | --- | --- |
@@ -125,11 +136,11 @@ avant de modifier budgets, délais ou tentatives.
 ## 3. Comprendre les fichiers
 
 L’unité Agent se trouve sous `resources/agents/NN-name/`. La commande génère les
-fichiers d’intégration autour du code téléchargé ; inutile de tous les écrire à la main avant.
+fichiers d’intégration autour du code importé ; inutile de tous les écrire à la main avant.
 
 ```text
 resources/agents/NN-name/
-├── agent/                   # Downloaded upstream source
+├── agent/                   # Instantané de source amont ou locale importée
 ├── agent.toml               # ABB execution configuration
 ├── bindings/                # Boundary between ABB and the native Agent
 ├── Dockerfile               # Agent image build instructions
@@ -140,7 +151,7 @@ resources/agents/NN-name/
 
 ### `agent/` — le code de l’Agent
 
-Ce répertoire contient le dépôt téléchargé, son graphe, son raisonnement et ses
+Ce répertoire contient l’instantané importé, son graphe, son raisonnement et ses
 outils réels. Gardez l’intégration ABB à l’extérieur pour ne pas remplacer discrètement
 le comportement d’origine.
 
@@ -195,8 +206,8 @@ en charge distante. Les mappings natifs restent dans agent.toml et le binding.
 et nombre case. La génération enregistre adapting, la certification contrôle la promotion,
 et run choisit les Agents activés et ready.
 
-Le téléchargeur crée aussi **source-manifest.json automatiquement**, avec dépôt et révision
-pour réutiliser le téléchargement. C’est un enregistrement interne ABB, pas un fichier
+L’importateur crée aussi **source-manifest.json automatiquement**, avec l’URL GitHub ou
+le chemin local canonique et sa révision pour réutiliser l’import. C’est un enregistrement interne ABB, pas un fichier
 exigé par KUMA ni à préparer par l’utilisateur. Conservez-le pour poursuivre le parcours.
 
 Les traces de génération sont dans `cache/onboarding/<unit-name>-<path-digest>/`.

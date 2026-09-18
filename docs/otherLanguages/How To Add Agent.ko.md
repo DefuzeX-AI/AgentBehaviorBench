@@ -74,17 +74,28 @@ cd ..
 
 ## 2. 추가 명령 실행
 
-URL을 Agent의 GitHub 저장소 주소로 바꾸세요. 파일이나 /tree/branch 페이지 주소는 사용하지 않습니다.
+`SOURCE`에는 Agent의 HTTPS GitHub 저장소 또는 로컬 절대 디렉터리를 지정할 수 있습니다.
+GitHub의 경우 파일이나 /tree/branch가 아닌 저장소 URL을 사용하세요.
 
 ```bash
 agentbench agent add https://github.com/owner/repository -b -c
 ```
 
+로컬 Agent 예시:
+
+```bash
+agentbench agent add /absolute/path/to/local-agent -b -c
+```
+
+ABB는 디렉터리를 번호가 지정된 유닛의 `agent/`로 복사하고 `.git` 메타데이터를 제외합니다.
+복사된 내용의 SHA-256 다이제스트를 revision으로 기록합니다. 상대 경로는 거부되며 같은 정규화된
+절대 경로를 다시 사용하면 기존 통합 작업을 덮어쓰지 않고 가져온 유닛을 재사용합니다.
+
 - `-b`: 통합 파일을 생성하고 검증한 뒤 adapting으로 등록합니다. Docker 이미지를 즉시 빌드한다는 뜻은 아닙니다.
 - `-c`: 인증 절차로 Agent를 빌드하고 실행합니다. 설정된 Case의 실행 검증이 성공하면 ready가 되며,
   Judge는 여전히 행동 문제를 보고할 수 있습니다.
 
-ABB는 소스를 다운로드하고 통합을 계획하며 파일별 검증 결과를 저장한 후 인증 여부를 묻습니다.
+ABB는 소스를 가져오고 통합을 계획하며 파일별 검증 결과를 저장한 후 인증 여부를 묻습니다.
 생성과 인증에는 요금이 발생할 수 있습니다. 현재 자동 설정은 **LangGraph**를 지원하며 다른 프레임워크는
 해당 어댑터 지원이 먼저 필요합니다.
 
@@ -94,9 +105,9 @@ ABB는 소스를 다운로드하고 통합을 계획하며 파일별 검증 결�
 agentbench agent add https://github.com/owner/repository -b
 ```
 
-두 옵션을 모두 생략한 agentbench agent add URL은 다운로드와 설정 파일 목록 출력만 수행합니다.
-통합 설정을 생성하거나 실행 가능한 Agent를 등록하지 않습니다. 다운로더는 기본 브랜치의 revision을
-기록하며 현재 --revision 옵션은 없습니다.
+두 옵션을 모두 생략한 agentbench agent add SOURCE는 가져오기와 설정 파일 목록 출력만 수행합니다.
+통합 설정을 생성하거나 실행 가능한 Agent를 등록하지 않습니다. GitHub 소스는 기본 브랜치 revision을,
+로컬 소스는 복사된 내용의 다이제스트를 기록합니다. 현재 --revision 옵션은 없습니다.
 
 | 옵션 | 용도 |
 | --- | --- |
@@ -113,12 +124,12 @@ OPENROUTER_MODEL입니다. 예산, 제한 시간, 재시도를 바꾸기 전에
 
 ## 3. 파일별 역할 확인
 
-Agent 단위는 `resources/agents/NN-name/`에 위치합니다. 다운로드한 소스 주변에 통합 파일이 생성되므로
+Agent 단위는 `resources/agents/NN-name/`에 위치합니다. 가져온 소스 주변에 통합 파일이 생성되므로
 명령을 실행하기 전에 모든 파일을 직접 만들 필요는 없습니다.
 
 ```text
 resources/agents/NN-name/
-├── agent/                   # Downloaded upstream source
+├── agent/                   # 가져온 업스트림 또는 로컬 소스 스냅샷
 ├── agent.toml               # ABB execution configuration
 ├── bindings/                # Boundary between ABB and the native Agent
 ├── Dockerfile               # Agent image build instructions
@@ -129,7 +140,7 @@ resources/agents/NN-name/
 
 ### `agent/` — Agent 자체 소스
 
-다운로드한 원본 저장소가 들어 있습니다. 실제 그래프, 추론과 도구 구현은 여기에 유지합니다.
+가져온 업스트림 또는 로컬 소스 스냅샷이 들어 있습니다. 실제 그래프, 추론과 도구 구현은 여기에 유지합니다.
 ABB 통합 파일을 바깥에 두어 통합 과정에서 원래 동작을 몰래 대체하지 않도록 합니다.
 
 ### `agent.toml` — ABB의 시작 및 호출 설정
