@@ -161,6 +161,16 @@ def test_listing_is_sorted_relative_to_package_and_does_not_import(
     assert "agentbench.sdk.plugin.alpha" not in sys.modules
 
 
+def test_adapter_reserved_for_selection_by_name_leaves_the_other_implicit(adapter_directory):
+    add_adapter(adapter_directory)
+    add_adapter(adapter_directory, "beta", source=MINIMAL_PLUGIN + "plugin.implicit_selection = False\n")
+    assert evaluation_plan().selection.reference.name == "alpha"
+    assert resolve_sdk("beta").reference.name == "beta"
+    add_adapter(adapter_directory, "gamma")
+    with pytest.raises(ProviderSelectionError, match="Multiple SDK adapters found: alpha, beta, gamma"):
+        resolve_sdk()
+
+
 def test_adding_directory_changes_availability_without_registration(adapter_directory):
     add_adapter(adapter_directory)
     assert resolve_sdk().reference.name == "alpha"

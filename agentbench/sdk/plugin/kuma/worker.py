@@ -16,9 +16,12 @@ from .compatibility import run_case
 from agentbench.runtime.agentcontainer.session import AgentSession
 
 
-async def execute(root, output, settings=None, sdk_repo=None):
+async def execute(root, output, settings=None, sdk_repo=None, *, providers=None):
     # sdk_repo is the SDK repository/ledger root, mounted apart from the Agent tree
     # so the image's own /opt/agent/agent stays visible; in place when omitted.
+    # providers, when given, replaces the official Case and Judge with local SDK
+    # providers: it supplies name, max_steps, case_options(index) and
+    # judge_provider(output). The Backend is then never called, so no credential.
     repository = Path(sdk_repo) if sdk_repo is not None else root / 'agent'
     # Enter the in-container evaluation flow. root is the Agent directory,
     # output stores artifacts, and settings contains the job configuration.
@@ -50,11 +53,13 @@ async def execute(root, output, settings=None, sdk_repo=None):
         # and memory, so no per-Agent input contract is required.
         configure_trust()
         # Save process, SDK, and initial state metadata for progress inspection.
-        credential, credential_source = api_key(os.environ)
-        files.save('process.json', {'pid': os.getpid(), 'container': platform.node(), 'mode': 'official',
+        credential, credential_source = (None, None) if providers is not None else api_key(os.environ)
+        files.save('process.json', {'pid': os.getpid(), 'container': platform.node(),
+                   'mode': 'official' if providers is None else providers.name,
                    'sdk': 'kuma', 'sdk_version': version('kuma-defuzex'), 'agent_id': manifest['agent_id'],
                    # The Backend this SDK process actually calls; recovery reuses it.
-                   'sdk_base_url': (os.environ.get('KUMA_BASE_URL') or '').strip().rstrip('/') or DEFAULT_BASE_URL,
+                   'sdk_base_url': None if providers is not None else (
+                       (os.environ.get('KUMA_BASE_URL') or '').strip().rstrip('/') or DEFAULT_BASE_URL),
                    'api_key_source': credential_source,
                    'source': manifest.get('source'), 'repo': str(repository)})
         files.save('manifest.json', {'phase': 'case_generation', 'judge': 'pending'})
@@ -74,12 +79,19 @@ async def execute(root, output, settings=None, sdk_repo=None):
             # Generation mode creates and saves Cases from the Agent Profile
             # without invoking the Agent.
             from .generation import generate_collection
-            # The registered requirement.md is the SDK Agent Profile. Reusing a
-            # saved Case rejects a profile, so supply it only during generation.
+            if providers is None:
+                # The registered requirement.md is the SDK Agent Profile. Reusing a
+                # saved Case rejects a profile, so supply it only during generation.
+                generation = dict(options=dict(options, agent_profile_path=root / 'requirement.md'))
+            else:
+                # A custom Case provider needs an explicit step ceiling and reads
+                # no Agent Profile; its content varies per slot.
+                generation = dict(options={'max_steps': providers.max_steps, **options},
+                                  case_options=providers.case_options)
             collection = generate_collection(
                 create_run, count=settings['count'], files=files, repo=repository,
                 case_indices=settings.get('case_indices'), allow_partial=settings.get('allow_partial', False),
-                options=dict(options, agent_profile_path=root / 'requirement.md'))
+                **generation)
             complete = not collection['failures'] and not collection['unattempted_indices']
             files.save('manifest.json', {'phase': 'batch_generated' if complete else 'batch_partial',
                                         'count': len(collection['cases']),
@@ -94,7 +106,9 @@ async def execute(root, output, settings=None, sdk_repo=None):
         # The SDK reuses a Case only from a saved artifact file inside the Run repository,
         # and rejects a Profile or strategy alongside it: the Case is already decided.
         # Create the SDK Run from the saved Case without generating another one.
-        run = create_run(case_path=settings['case_artifact'], **options)
+        # A saved Case accepts a Judge provider; only a Case provider conflicts with it.
+        judge = {} if providers is None else {'judge_provider': providers.judge_provider(output)}
+        run = create_run(case_path=settings['case_artifact'], **options, **judge)
 
 
         # Current SDK has no public Case accessor. Keep this version-sensitive
@@ -196,8 +210,9 @@ def _ownership(path):
     return f' (file owner uid {info.st_uid} gid {info.st_gid}, mode {info.st_mode & 0o777:04o})'
 
 
-def main():
+def main(providers=None):
     # Parse Agent, artifact, and job-settings paths at the container entrypoint.
+    # Another plugin's worker module reuses this entrypoint with its own providers.
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--agent-root', type=Path, default=Path('/opt/agent'))
     parser.add_argument('--output', type=Path, default=Path('/run/abb-output'))
@@ -215,7 +230,8 @@ def main():
         return 1
     # Run the asynchronous flow and propagate its exit code.
     try:
-        return asyncio.run(execute(args.agent_root, args.output, settings, sdk_repo=args.sdk_repo))
+        local = {} if providers is None else {'providers': providers}
+        return asyncio.run(execute(args.agent_root, args.output, settings, sdk_repo=args.sdk_repo, **local))
     except ImportError as exc:
         # The SDK and trace tooling are imported before execute() can record an
         # error. A missing module here usually means the image's `python` is not

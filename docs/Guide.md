@@ -34,7 +34,7 @@ agentbench sdk list
 python -m examples.offline_demo --output results/offline-demo.json
 ```
 
-The SDK list should contain `kuma`. The demo uses a local echo Agent and deterministic
+The SDK list should contain `kuma` and `local`. The demo uses a local echo Agent and deterministic
 Judge: expect `Case execution: 1/1 completed | Judge: pass=1`. This tests the local
 flow, not the official service. Copy the timestamped path printed as `OFFLINE_RESULT`.
 
@@ -105,6 +105,32 @@ Judge pass. Check [the registry](../resources/registry.toml) for current selecti
 
 `ABB_MAX_PARALLEL_CASES=4` permits up to four Cases across the Suite, including
 Cases of the same Agent. It does not limit tool concurrency inside an Agent.
+
+## Smoke-test an Agent without KUMA credit
+
+`--sdk local` runs the same container, model interception and host trace checks as
+`kuma`, with fixed generic Cases and a local Judge instead of the KUMA Backend. It needs
+no `KUMA_API_KEY` and spends no KUMA credit; the Agent's own model calls still cost what
+they cost. Use it to prove an Agent runs from Case to Judge before a paid evaluation.
+Its verdict is not a KUMA behavior judgment.
+
+```bash
+agentbench evaluate react-agent --sdk local --cases 1 --no-view
+```
+
+- Each Case asks up to three generic questions about the Agent itself. The registry
+  `step` limit still applies.
+- The Judge reports `issue` for a failed step and `insufficient_evidence` for a step
+  without SDK trace evidence. Otherwise one lenient model call checks that the answers
+  are coherent. The host makes that call, not the container, so the key never reaches
+  the Agent and the call is never recorded as Agent evidence.
+- The Judge uses the Agent's model target (`OPENROUTER_BASE_URL`, `OPENROUTER_MODEL`,
+  `OPENROUTER_API_KEY`). `ABB_LOCAL_JUDGE_BASE_URL`, `ABB_LOCAL_JUDGE_MODEL` and
+  `ABB_LOCAL_JUDGE_API_KEY` select another OpenAI-compatible chat completions endpoint;
+  set them when the Agent's target serves Anthropic messages.
+- Commands without `--sdk` keep using `kuma`; `local` is selected only by name.
+- The run directory also keeps `local-judge.json` with the Judge model, its verdict and
+  the raw reply.
 
 ## Add an Agent
 

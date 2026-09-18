@@ -38,8 +38,10 @@ def resolve_sdk(spec: str | None = None) -> SDKSelection:
 
     Args:
         spec: Directory name, matched case-insensitively after trimming
-            whitespace. If omitted, exactly one adapter must be discovered.
-            Import strings and installed package entry points are not accepted.
+            whitespace. If omitted, the sole discovered adapter is selected;
+            among several, the only one not declaring
+            ``implicit_selection = False``. Import strings and installed
+            package entry points are not accepted.
 
     Returns:
         The selected plugin instance and its directory-derived identity.
@@ -62,12 +64,17 @@ def resolve_sdk(spec: str | None = None) -> SDKSelection:
 
     choices = ", ".join(reference.name for reference in references)
     if requested is None:
-        if len(references) != 1:
+        candidates = references
+        if len(candidates) > 1:
+            # An adapter reserved for selection by name never makes the choice ambiguous.
+            candidates = [item for item in references
+                          if getattr(load_sdk(item), "implicit_selection", True) is not False]
+        if len(candidates) != 1:
             raise ProviderSelectionError(
                 f"Multiple SDK adapters found: {choices}. Select one with --sdk NAME "
                 "or resolve_sdk(NAME) in Python."
             )
-        reference = references[0]
+        reference = candidates[0]
     else:
         reference = next(
             (
@@ -125,7 +132,8 @@ def evaluation_plan(
     """Build a normalized evaluation plan for CLI and Python callers.
 
     At most one SDK source may be supplied. Without an explicit source, the
-    sole directory-discovered adapter is selected; there is no named default.
+    sole directory-discovered adapter is selected, disregarding adapters that
+    declare ``implicit_selection = False``; there is no named default.
     All parameters are keyword-only.
 
     Args:

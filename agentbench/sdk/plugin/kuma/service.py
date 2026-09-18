@@ -33,7 +33,7 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
              build_coordinator=None, job_context=None, identity=None,
              runtime_services=None, expected_case_id=None, expected_content_sha256=None,
              sdk_request_options=None, generation_indices=None, partial_generation=False,
-             safe_case_replay=False):
+             safe_case_replay=False, require_credentials=True, overlay=None):
     """
     
     Run the Kuma worker in Docker and return its host artifact directory.
@@ -51,7 +51,8 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
             resolve(), so a plain string must be converted by the caller.
         environ: Environment-variable mapping used for Docker configuration and
             artifact redaction. Must contain a nonempty KUMA_API_KEY or
-            DEFUZEX_API_KEY. This function does not load a .env file itself.
+            DEFUZEX_API_KEY unless require_credentials is False. This function
+            does not load a .env file itself.
         timeout: Seconds to wait for the started Agent container (default 2400).
             This is not an overall deadline: preparation and cleanup have
             separate runtime limits.
@@ -99,6 +100,10 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
         expected_content_sha256: Expected digest of normalized Case content for
             execution mode. Forwarded to the worker alongside expected_case_id;
             this is a content digest, not the saved artifact file's byte digest.
+        require_credentials: False for a plugin whose SDK providers never call
+            the KUMA Backend; no API key is then required.
+        overlay: Optional keyword arguments for ``evaluation_agent``, replacing
+            the default overlay that admits the configured KUMA Backend.
 
     Returns:
         pathlib.Path: Absolute directory for this invocation, containing
@@ -125,7 +130,7 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
     control.check()
     limits = runtime_services.limits if runtime_services is not None else RuntimeLimits()
     preparation = Deadline.after(limits.preparation_seconds)
-    if not (environ.get('KUMA_API_KEY') or environ.get('DEFUZEX_API_KEY')):
+    if require_credentials and not (environ.get('KUMA_API_KEY') or environ.get('DEFUZEX_API_KEY')):
         raise ValueError('KUMA_API_KEY or DEFUZEX_API_KEY is required')
 
     # Create the artifact directory for this task.
@@ -164,8 +169,9 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
         control.check()
 
         # The container worker calls create_run/save_case for Case preparation.
+        overlay_options = dict(backend=backend_url(environ)) if overlay is None else dict(overlay)
         with evaluation_agent(agent, control=control, deadline=preparation,
-                              backend=backend_url(environ)) as descriptor:
+                              **overlay_options) as descriptor:
             # SDK requires repo and its ledger on the same filesystem. Mount the
             # actual staged Agent source read-only, with only its .kuma writable.
             repository = directory / 'sdk-repo'
