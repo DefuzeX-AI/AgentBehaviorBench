@@ -38,7 +38,9 @@ class JudgeModel:
     base_url: str
     model: str
     api_key: str = field(repr=False)
-    timeout: float = 120.0
+    # Three attempts plus backoff must end before the container stops waiting
+    # (LocalJudge.timeout), so a slow model is reported as such, not as silence.
+    timeout: float = 90.0
 
 
 def judge_model(environ):
