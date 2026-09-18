@@ -18,6 +18,17 @@ from agentbench.onboarding.source import AgentDownloadError, download_agent
 URL = "https://github.com/example/my-agent"
 
 
+def test_cli_explains_reversed_agent_add_command(capsys):
+    with pytest.raises(SystemExit) as raised:
+        cli(["add", "agent", r"C:\agent-source"])
+
+    assert raised.value.code == 2
+    error = capsys.readouterr().err
+    assert "'add' is not a top-level command" in error
+    assert "Correct command: agentbench agent add SOURCE" in error
+    assert "agentbench agent add --help" in error
+
+
 def write(root: Path, name: str, content: str = "fixture\n") -> Path:
     path = root / name
     path.parent.mkdir(parents=True, exist_ok=True)

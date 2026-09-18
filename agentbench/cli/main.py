@@ -35,8 +35,16 @@ def cli(argv: Sequence[str] | None = None) -> int:
     """Parse command-line arguments and dispatch a registered feature."""
     _line_buffer_console()
     args_list = list(sys.argv[1:] if argv is None else argv)
-    
-    args = build_parser().parse_args(_normalize_argv(args_list))
+
+    parser = build_parser()
+    normalized = _normalize_argv(args_list)
+    if normalized[:2] == ["add", "agent"]:
+        parser.error(
+            "'add' is not a top-level command; it belongs to the 'agent' command group.\n"
+            "Correct command: agentbench agent add SOURCE\n"
+            "For command options, run: agentbench agent add --help"
+        )
+    args = parser.parse_args(normalized)
     handler = _command_handler(args)
     return handler(args)
 
