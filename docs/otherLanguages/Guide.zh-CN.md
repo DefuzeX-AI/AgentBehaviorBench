@@ -41,7 +41,7 @@ agentbench sdk list
 python -m examples.offline_demo --output results/offline-demo.json
 ```
 
-SDK 列表应出现 `kuma`。离线示例无需 Docker、API key 或模型调用，预期显示
+SDK 列表应出现 `kuma` 和 `local`。离线示例无需 Docker、API key 或模型调用，预期显示
 `Case execution: 1/1 completed | Judge: pass=1`。这验证本地流程，不代表正式服务通过。
 记录 `OFFLINE_RESULT=` 后的真实路径：程序会给输出文件加时间戳。
 
@@ -116,6 +116,28 @@ agentbench run --yes --no-view --output results/benchmark.json
 
 `ready` 只代表接入已认证，不代表每个 Case 都能通过 Judge。注册表是当前 Agent 名称、
 数量、启用状态和 Case 数的依据。不要按旧 README 中的 Agent 列表推断。
+
+## 不花 KUMA credit 的冒烟测试
+
+`--sdk local` 与 `kuma` 使用同一套容器、模型拦截和宿主机 trace 校验，只是 Case 换成
+固定的通用问题、Judge 在本地运行，不经过 KUMA Backend。它不需要 `KUMA_API_KEY`，
+也不消耗 KUMA credit；Agent 自己的模型调用照常计费。适合在付费评测前确认 Agent 能从
+出题一路跑到出判决。它的判决不是 KUMA 的行为评估。
+
+```bash
+agentbench evaluate react-agent --sdk local --cases 1 --no-view
+```
+
+- 每个 Case 最多问三个关于 Agent 自身的通用问题，注册表的 `step` 上限仍然生效。
+- 某一步失败判 `issue`，某一步没有 SDK trace 证据判 `insufficient_evidence`；否则用
+  一次宽松的模型调用检查回答是否连贯。这次调用由宿主机发出，不经过容器，所以 key
+  不会进入 Agent 容器，这次调用也不会被记成 Agent 的证据。
+- Judge 默认使用 Agent 的模型目标（`OPENROUTER_BASE_URL`、`OPENROUTER_MODEL`、
+  `OPENROUTER_API_KEY`）。`ABB_LOCAL_JUDGE_BASE_URL`、`ABB_LOCAL_JUDGE_MODEL`、
+  `ABB_LOCAL_JUDGE_API_KEY` 可以改用其他 OpenAI 兼容的 chat completions 端点；
+  Agent 的模型目标是 Anthropic messages 协议时必须设置。
+- 不写 `--sdk` 的命令仍然使用 `kuma`；`local` 只能按名字选择。
+- 运行目录里除常规产物外还有 `local-judge.json`，记录 Judge 模型、判决和原始回复。
 
 ## 添加 Agent
 

@@ -58,8 +58,8 @@ async def execute(root, output, settings=None, sdk_repo=None, *, providers=None)
                    'mode': 'official' if providers is None else providers.name,
                    'sdk': 'kuma', 'sdk_version': version('kuma-defuzex'), 'agent_id': manifest['agent_id'],
                    # The Backend this SDK process actually calls; recovery reuses it.
-                   'sdk_base_url': None if providers is not None else
-                   (os.environ.get('KUMA_BASE_URL') or '').strip().rstrip('/') or DEFAULT_BASE_URL,
+                   'sdk_base_url': None if providers is not None else (
+                       (os.environ.get('KUMA_BASE_URL') or '').strip().rstrip('/') or DEFAULT_BASE_URL),
                    'api_key_source': credential_source,
                    'source': manifest.get('source'), 'repo': str(repository)})
         files.save('manifest.json', {'phase': 'case_generation', 'judge': 'pending'})
