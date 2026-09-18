@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
-from argparse import ArgumentParser, Namespace
+from argparse import Action, ArgumentError, ArgumentParser, Namespace, RawDescriptionHelpFormatter, SUPPRESS
 from pathlib import Path
 
 from agentbench.onboarding.source import download_agent
@@ -14,13 +14,44 @@ from .run import DEFAULT_REGISTRY_PATH
 from agentbench.cli.sdk import configure_sdk_parser
 
 
+class _RejectDirectoryFlag(Action):
+    """Explain the obsolete-looking directory flag at the relevant command level."""
+
+    def __init__(self, option_strings, dest, **kwargs):
+        super().__init__(option_strings, dest, nargs=0, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        raise ArgumentError(
+            self,
+            "-d is not required. Absolute local directories are detected from SOURCE. "
+            "Use 'agentbench agent add SOURCE'. To change the copy destination, use "
+            "'--agents-dir DIRECTORY'.",
+        )
+
+
 def configure_parser(parser: ArgumentParser) -> None:
     commands = parser.add_subparsers(dest="agent_command", required=True)
-    add = commands.add_parser("add", help="Import an Agent and list files for onboarding.")
+    add = commands.add_parser(
+        "add",
+        help="Import an Agent and list files for onboarding.",
+        description=(
+            "Import an Agent from GitHub or an absolute local directory.\n"
+            "Local directories are detected automatically; do not use -d."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  agentbench agent add https://github.com/org/agent\n"
+            "  agentbench agent add C:\\path\\to\\agent\n"
+            "  agentbench agent add C:\\path\\to\\agent --agents-dir DIRECTORY"
+        ),
+        formatter_class=RawDescriptionHelpFormatter,
+    )
     add.add_argument("repository", metavar="SOURCE",
                      help="HTTPS GitHub repository URL or absolute local directory.")
-    add.add_argument("--agents-dir", type=Path, default=DEFAULT_REGISTRY_PATH.parent / "agents",
+    add.add_argument("--agents-dir", metavar="DIRECTORY", type=Path,
+                     default=DEFAULT_REGISTRY_PATH.parent / "agents",
                      help="Parent of numbered Agent folders (default: resources/agents).")
+    add.add_argument("-d", action=_RejectDirectoryFlag, help=SUPPRESS)
     add.add_argument("-b", "--build", action="store_true", help="Generate, validate and save files one at a time; resume valid files.")
     add.add_argument("-c", "--certify", action="store_true", help="Run existing certification using generated or manual files.")
     add.add_argument("--registry", type=Path, default=DEFAULT_REGISTRY_PATH)

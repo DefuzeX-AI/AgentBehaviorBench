@@ -29,6 +29,28 @@ def test_cli_explains_reversed_agent_add_command(capsys):
     assert "agentbench agent add --help" in error
 
 
+def test_cli_explains_that_local_directories_do_not_need_d_flag(capsys):
+    with pytest.raises(SystemExit) as raised:
+        cli(["agent", "add", r"C:\agent-source", "-d"])
+
+    assert raised.value.code == 2
+    error = capsys.readouterr().err
+    assert "-d is not required" in error
+    assert "agentbench agent add SOURCE" in error
+    assert "--agents-dir DIRECTORY" in error
+
+
+def test_agent_add_help_explains_local_sources_and_destination(capsys):
+    with pytest.raises(SystemExit) as raised:
+        cli(["agent", "add", "--help"])
+
+    assert raised.value.code == 0
+    help_text = capsys.readouterr().out
+    assert "Local directories are detected automatically; do not use -d" in help_text
+    assert "agentbench agent add C:\\path\\to\\agent" in help_text
+    assert "--agents-dir DIRECTORY" in help_text
+
+
 def write(root: Path, name: str, content: str = "fixture\n") -> Path:
     path = root / name
     path.parent.mkdir(parents=True, exist_ok=True)
