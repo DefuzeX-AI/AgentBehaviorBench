@@ -35,6 +35,9 @@ class Report:
 class KumaContainerRunner:
     """Prepare immutable Case slots or execute one explicitly selected Case."""
 
+    # Reported as the run's provider mode; a plugin reusing this runner renames it.
+    provider_mode = 'official-container'
+
     def __init__(self, *, environ=None, options=None, trace_sink=None, trace_max_bytes=262144,
                  control=None, build_coordinator=None, job_context=None,
                  runtime_services=None):
@@ -88,7 +91,11 @@ class KumaContainerRunner:
             raise ProviderSelectionError(str(exc)) from exc
         if not (registration.path / 'requirement.md').is_file():
             raise ProviderSelectionError('Missing Agent evaluation file: requirement.md')
-        return 'official-container'
+        return self.provider_mode
+
+    def _evaluate(self, registration, **options):
+        """Run one generation or execution container; a subclass may reconfigure it."""
+        return evaluate(registration, **options)
 
     def recovery_capabilities(self, registration) -> RunnerRecoveryCapabilities:
         """Combine public request recovery with an explicit Agent replay promise."""
@@ -97,7 +104,7 @@ class KumaContainerRunner:
 
     def prepare_cases(self, registration, *, on_progress=None) -> tuple[PreparedCase, ...]:
         """Legacy API: require the complete imported/generated selection."""
-        return prepare_batch(self, registration, evaluator=evaluate,
+        return prepare_batch(self, registration, evaluator=self._evaluate,
                              on_progress=on_progress, allow_partial=False).cases
 
     def prepare_case_batch(self, registration, *, case_indices=None,
@@ -108,7 +115,7 @@ class KumaContainerRunner:
         collection imports remain strict; other generated slots can survive a
         single generation failure. This method never retries a failed request.
         """
-        return prepare_batch(self, registration, evaluator=evaluate,
+        return prepare_batch(self, registration, evaluator=self._evaluate,
                              case_indices=case_indices, on_progress=on_progress)
 
     def recover_case(self, registration, case: PreparedCase, *, previous_result,
@@ -143,7 +150,7 @@ class KumaContainerRunner:
             raise ValueError('Prepared SDK Case artifact was modified after preparation')
         identity = self._identity(registration, phase='execute', case_index=case.case_index,
                                   case_id=case.case_id)
-        directory = evaluate(
+        directory = self._evaluate(
             registration, output=self.output, environ=self.environ,
             timeout=self.timeout, max_steps=self.max_steps, case_artifact=case.artifact_path,
             safe_case_replay=self.recovery_capabilities(registration).safe_case_replay,
@@ -154,7 +161,7 @@ class KumaContainerRunner:
                 registration, on_progress, path, identity, 'Live artifacts available'))
         try:
             self.control.check()
-            result = read_result(directory, registration.agent_id)
+            result = read_result(directory, registration.agent_id, provider_mode=self.provider_mode)
             executed = json.loads((directory / 'evaluation/case.json').read_text())
             if executed['case_id'] != case.case_id:
                 raise RuntimeError('Executed Case does not match the prepared Case ID')
@@ -184,7 +191,7 @@ class KumaContainerRunner:
             raise
 
 
-def read_result(directory, agent_id, *, recovered_report=None):
+def read_result(directory, agent_id, *, recovered_report=None, provider_mode='official-container'):
     """Validate persisted artifacts or a recovered report before publishing it.
 
     A recovered candidate still requires original host trace acceptance, cleanup,
@@ -245,4 +252,4 @@ def read_result(directory, agent_id, *, recovered_report=None):
                         tuple(report.get('evidence_gaps', [])), report['report_id'], report['run_id'],
                         {**report.get('extensions', {}), 'abb_artifact_directory': str(directory)})
     return BenchmarkResult(agent_id, 'container-' + 'sdk', summary['run_id'], 'report_ready',
-                           normalized, tuple(steps), len(steps), 'official-container')
+                           normalized, tuple(steps), len(steps), provider_mode)

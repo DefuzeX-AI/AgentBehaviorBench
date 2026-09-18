@@ -27,8 +27,13 @@ SDK_INSTALL = (
 )
 
 
+SDK_ENVIRONMENT = ('KUMA_API_KEY', 'DEFUZEX_API_KEY', 'KUMA_BASE_URL')
+
+
 @contextmanager
-def evaluation_agent(agent, *, control=None, deadline=None, backend=DEFAULT_BASE_URL):
+def evaluation_agent(agent, *, control=None, deadline=None, backend=DEFAULT_BASE_URL,
+                     worker_package=__package__, sdk_environment=SDK_ENVIRONMENT,
+                     require_profile=True):
     """Stage an Agent and install the adapter's pinned PyPI SDK in its image.
 
     The host does not need an SDK checkout or installation. Dependencies belong
@@ -36,6 +41,12 @@ def evaluation_agent(agent, *, control=None, deadline=None, backend=DEFAULT_BASE
     The Agent source and its original Dockerfile remain unchanged. ``backend`` is
     the normalized KUMA Backend URL; the container receives KUMA_BASE_URL and its
     egress admits exactly that Backend.
+
+    A plugin running the same SDK with local providers reuses this overlay:
+    ``backend`` None admits no Backend egress, ``worker_package`` names the
+    package whose ``worker`` module the container runs, ``sdk_environment``
+    lists the host variables forwarded to it, and ``require_profile`` False
+    copies ``requirement.md`` only when the Agent has one.
     """
     requirements = Path(__file__).with_name('requirements.txt')
     def check():
@@ -75,13 +86,15 @@ def evaluation_agent(agent, *, control=None, deadline=None, backend=DEFAULT_BASE
             raise ValueError('Evaluation build must not contain symlinks')
         source = (root / 'agent.toml').read_text()
         source, count = re.subn(r'(?m)^argv = .*$',
-                               f'argv = ["python", "-m", "{__package__}.worker"]', source)
+                               f'argv = ["python", "-m", "{worker_package}.worker"]', source)
         if count != 1:
             raise ValueError('Expected one explicit launch.argv')
-        source = extend_runtime_environment(source, ('KUMA_API_KEY', 'DEFUZEX_API_KEY', 'KUMA_BASE_URL'))
-        source += whitelist_toml(Path(__file__).with_name('whitelist.json'), (
+        if sdk_environment:
+            source = extend_runtime_environment(source, tuple(sdk_environment))
+        backend_routes = () if backend is None else (
             {'url': backend, 'methods': ['GET', 'POST']},
-            {'url': backend + '/sdk/*', 'methods': ['GET', 'POST']}))
+            {'url': backend + '/sdk/*', 'methods': ['GET', 'POST']})
+        source += whitelist_toml(Path(__file__).with_name('whitelist.json'), backend_routes)
         (root / 'agent.toml').write_text(source)
         dockerfile = root / 'Dockerfile'
         original = dockerfile.read_text()
@@ -92,9 +105,10 @@ def evaluation_agent(agent, *, control=None, deadline=None, backend=DEFAULT_BASE
         # do not need to create an otherwise empty directory for Docker COPY.
         evaluation_copy = ('COPY evaluation/ /opt/agent/evaluation/\n'
                            if (root / 'evaluation').is_dir() else '')
+        profile_copy = ('COPY requirement.md /opt/agent/requirement.md\n'
+                        if require_profile or (root / 'requirement.md').is_file() else '')
         dockerfile.write_text(original + '\nUSER root\nCOPY .abb-sdk/ /opt/abb-sdk/\n'
-                             + SDK_INSTALL +
-                             'COPY requirement.md /opt/agent/requirement.md\n'
+                             + SDK_INSTALL + profile_copy
                              + evaluation_copy + 'USER ' + users[-1] + '\n')
         check()
         yield SimpleNamespace(path=root, agent_id=agent.agent_id, framework=agent.framework)

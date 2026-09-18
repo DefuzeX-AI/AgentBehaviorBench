@@ -30,13 +30,16 @@ def selected_indices(count, case_indices=None):
 
 
 def generate_collection(create_run, *, count, options, files, repo,
-                        case_indices=None, allow_partial=False):
+                        case_indices=None, allow_partial=False, case_options=None):
     """Save each requested slot once, preserving successes across later failures.
 
     ``count`` is the total registered count, while ``case_indices`` selects the
     original slots to generate. In partial mode a failed slot is recorded and
     ordinary errors allow other slots to proceed; no failed request is retried.
     Legacy callers retain exception propagation and complete-count validation.
+    ``case_options`` optionally maps a slot index to extra ``create_run`` options,
+    for a Case provider whose content depends on the slot: slots must not repeat
+    content, and the SDK gives a provider no slot of its own.
     """
     indices = selected_indices(count, case_indices)
     repo = Path(repo)
@@ -48,7 +51,8 @@ def generate_collection(create_run, *, count, options, files, repo,
         collection['active_case_index'] = index
         files.save('case-collection.json', collection)
         try:
-            entry = _generate_case(create_run, options, files, index)
+            slot_options = options if case_options is None else {**options, **case_options(index)}
+            entry = _generate_case(create_run, slot_options, files, index)
             validate_entries([*collection['cases'], entry], count=count)
             collection['cases'].append(entry)
         except Exception as exc:

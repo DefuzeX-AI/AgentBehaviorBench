@@ -55,6 +55,8 @@ def _show_sdk(args: Namespace) -> int:
     print(f"Source: {reference.source}")
     print(f"Object: {reference.object_ref}")
     print(f"Execution: {plugin_execution(selection.value)}")
+    implicit = getattr(selection.value, "implicit_selection", True) is not False
+    print(f"Selected without --sdk: {'when it is the only such adapter' if implicit else 'never'}")
     return 0
 
 

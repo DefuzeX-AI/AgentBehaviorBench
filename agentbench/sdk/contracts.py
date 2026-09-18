@@ -244,6 +244,8 @@ class EvaluationSDKPlugin(Protocol):
     Export an instance as ``plugin`` from ``sdk/plugin/<name>/plugin.py``. The directory
     supplies its name; no duplicate registration or name field is required.
     Importing the entry module must not start work or require SDK dependencies.
+    An optional ``implicit_selection = False`` makes the adapter selectable only
+    by name, so it never makes an omitted ``--sdk`` ambiguous.
     """
 
     execution: Literal["container", "local"]
