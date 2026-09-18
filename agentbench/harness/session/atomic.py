@@ -4,6 +4,27 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import time
+
+
+_WINDOWS = os.name == 'nt'
+_WINDOWS_REPLACE_ERRORS = {5, 32, 33}  # access denied, sharing violation, lock violation
+_REPLACE_ATTEMPTS = 8
+
+
+def _replace(temporary: Path, path: Path) -> None:
+    """Replace a file after brief Windows reader locks have cleared."""
+    for attempt in range(_REPLACE_ATTEMPTS):
+        try:
+            os.replace(temporary, path)
+            return
+        except PermissionError as exc:
+            retryable = (_WINDOWS
+                         and getattr(exc, 'winerror', None) in _WINDOWS_REPLACE_ERRORS
+                         and attempt + 1 < _REPLACE_ATTEMPTS)
+            if not retryable:
+                raise
+            time.sleep(min(0.01 * (2 ** attempt), 0.2))
 
 
 def atomic_bytes(path: Path, content: bytes) -> None:
@@ -17,7 +38,7 @@ def atomic_bytes(path: Path, content: bytes) -> None:
             stream.write(content)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, path)
+        _replace(temporary, path)
         if os.name != 'nt':
             descriptor = os.open(path.parent, os.O_RDONLY)
             try:
