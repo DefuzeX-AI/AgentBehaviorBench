@@ -5,7 +5,7 @@ import { actions } from './store.js';
 import { countCases, executionLabels, normalizeCases } from './model.js';
 import { filterCases, latestTimestamp, sortCases } from './tableModel.js';
 import CaseStatus, { JudgeBadge } from './CaseStatus.jsx';
-import SuiteControls, { RetryButton } from './SuiteControls.jsx';
+import SuiteControls, { ExportReportButton, RetryButton } from './SuiteControls.jsx';
 import './suite.css';
 
 const { Text, Title } = Typography;
@@ -50,7 +50,7 @@ export default function SuiteOverview({ onCaseSelect }) {
   return <section className="suite-overview" aria-label="Suite overview">
     <div className="suite-heading"><div><Text className="suite-eyebrow">SUITE OVERVIEW</Text><Title level={2}>All Cases</Title>
       <Text type="secondary">{agents.length} Agents, {cases.length} Cases{snapshot.effective_workers != null ? `, ${snapshot.effective_workers} active workers` : ''}</Text></div>
-      <Text className={error ? 'suite-connection disconnected' : 'suite-connection'} role="status">{error ? 'Sync disconnected, showing retained data' : `Synced ${updated || 'connecting'}`}</Text></div>
+      <Space className="suite-heading-actions" wrap><Text className={error ? 'suite-connection disconnected' : 'suite-connection'} role="status">{error ? 'Sync disconnected, showing retained data' : `Synced ${updated || 'connecting'}`}</Text><ExportReportButton /></Space></div>
 
     {error && <Alert type="warning" showIcon message="Live sync is temporarily unavailable" description="The latest saved Suite data remains visible. The viewer will retry automatically." />}
 
@@ -68,7 +68,7 @@ export default function SuiteOverview({ onCaseSelect }) {
       </div>
     </div>
 
-    <div className="suite-report-line"><span>Judge reports <strong>{counts.reports}/{cases.length}</strong></span><span>Host accepted <strong>{counts.accepted}</strong></span><Text type="secondary">An issue verdict is a behavioral finding, not an execution failure.</Text></div>
+    <div className="suite-report-line"><span>Judge reports <strong>{counts.reports}/{cases.length}</strong></span><span>Host accepted <strong>{counts.accepted}</strong></span></div>
     <SuiteControls cases={cases} />
 
     <div className="suite-table-heading"><div><Title level={3}>Cases</Title><Text type="secondary">Select a row to inspect the complete Case record.</Text></div><Text type="secondary">Showing {visible.length} of {cases.length}</Text></div>
