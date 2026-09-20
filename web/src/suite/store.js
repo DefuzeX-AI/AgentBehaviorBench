@@ -3,7 +3,9 @@ import { normalizeCases, currentAttempt } from './model.js';
 
 const initialState = {
   endpoint: null, snapshot: null, error: '', updated: null,
-  expanded: {}, selectedAttempts: {}, filters: { agent: '', status: '', attention: false }, command: null,
+  selectedCaseKey: null, selectedAttempts: {}, detailTab: 'overview',
+  filters: { query: '', agents: [], statuses: [], judges: [], attention: false, retried: false },
+  table: { page: 1, pageSize: 10, field: 'case', order: 'ascend' }, command: null,
 };
 
 const suiteSlice = createSlice({
@@ -30,23 +32,38 @@ const suiteSlice = createSlice({
         if (old.can_resume !== snapshot.can_resume) state.snapshot.can_resume = snapshot.can_resume;
         if (JSON.stringify(old.commands) !== JSON.stringify(snapshot.commands)) state.snapshot.commands = snapshot.commands;
       }
-      // Keep an explicitly opened historical attempt selected across live updates.
+      // Keep an explicitly selected historical attempt across live updates.
       for (const item of normalizeCases(snapshot)) {
-        if (state.expanded[item.key] && !state.selectedAttempts[item.key]) {
+        if (state.selectedCaseKey === item.key && !state.selectedAttempts[item.key]) {
           state.selectedAttempts[item.key] = currentAttempt(item)?.attempt_id || null;
         }
+      }
+      if (state.selectedCaseKey && !normalizeCases(snapshot).some(item => item.key === state.selectedCaseKey)) {
+        state.selectedCaseKey = null;
+        state.detailTab = 'overview';
       }
       const commands = Array.isArray(snapshot.commands) ? snapshot.commands : Object.values(snapshot.commands || {});
       const received = commands.find(command => command.command_id === state.command?.command_id);
       if (received && state.command) state.command = { ...state.command, ...received };
     },
     connectionFailed(state, { payload }) { state.error = payload; },
-    caseToggled(state, { payload: item }) {
-      state.expanded[item.key] = !state.expanded[item.key];
-      if (state.expanded[item.key] && !state.selectedAttempts[item.key]) state.selectedAttempts[item.key] = currentAttempt(item)?.attempt_id || null;
+    suiteSelected(state) { state.selectedCaseKey = null; state.detailTab = 'overview'; },
+    caseSelected(state, { payload: item }) {
+      state.selectedCaseKey = item.key;
+      state.detailTab = 'overview';
+      if (!state.selectedAttempts[item.key]) state.selectedAttempts[item.key] = currentAttempt(item)?.attempt_id || null;
     },
+    detailTabChanged(state, { payload }) { state.detailTab = payload; },
     attemptSelected(state, { payload }) { state.selectedAttempts[payload.key] = payload.attempt_id; },
-    filterChanged(state, { payload }) { state.filters = { ...state.filters, ...payload }; },
+    filterChanged(state, { payload }) {
+      state.filters = { ...state.filters, ...payload };
+      state.table.page = 1;
+    },
+    filtersReset(state) {
+      state.filters = initialState.filters;
+      state.table.page = 1;
+    },
+    tableChanged(state, { payload }) { state.table = { ...state.table, ...payload }; },
     commandStarted(state, { payload }) { state.command = { ...payload, status: 'sending', error: '' }; },
     commandFinished(state, { payload }) {
       if (state.command?.command_id === payload.command_id) state.command = { ...state.command, ...payload };

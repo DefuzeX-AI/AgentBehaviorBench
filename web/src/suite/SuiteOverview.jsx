@@ -1,48 +1,92 @@
-import { Fragment, useMemo } from 'react';
+import { useMemo } from 'react';
+import { Alert, Button, Input, Progress, Select, Space, Statistic, Switch, Table, Typography } from 'antd';
 import { useDispatch, useSelector } from 'react-redux';
 import { actions } from './store.js';
-import { countCases, executionLabels, needsAttention, normalizeCases } from './model.js';
+import { countCases, executionLabels, normalizeCases } from './model.js';
+import { filterCases, latestTimestamp, sortCases } from './tableModel.js';
 import CaseStatus, { JudgeBadge } from './CaseStatus.jsx';
-import AttemptDetails from './AttemptDetails.jsx';
 import SuiteControls, { RetryButton } from './SuiteControls.jsx';
 import './suite.css';
 
-export default function SuiteOverview() {
+const { Text, Title } = Typography;
+
+function Metric({ value, label, tone }) {
+  return <div className={`suite-metric suite-metric-${tone || 'neutral'}`}>
+    <Statistic value={value} title={label} />
+  </div>;
+}
+
+export default function SuiteOverview({ onCaseSelect }) {
   const dispatch = useDispatch();
-  const { snapshot, error, updated, expanded, filters } = useSelector(state => state.suite);
+  const { snapshot, error, updated, filters, table } = useSelector(state => state.suite);
   const cases = useMemo(() => normalizeCases(snapshot), [snapshot]);
   const counts = useMemo(() => countCases(cases), [cases]);
-  const agents = [...new Set(cases.map(item => item.agent_id))];
-  const visible = cases.filter(item => (!filters.agent || item.agent_id === filters.agent)
-    && (!filters.status || item.execution_status === filters.status)
-    && (!filters.attention || needsAttention(item.execution_status)));
+  const visible = useMemo(() => sortCases(filterCases(cases, filters), table.field, table.order), [cases, filters, table.field, table.order]);
+  const agents = useMemo(() => [...new Set(cases.map(item => item.agent_id))].sort(), [cases]);
+  const statuses = useMemo(() => [...new Set(cases.map(item => item.execution_status))].sort(), [cases]);
+  const judges = useMemo(() => [...new Set(cases.map(item => item.judge_status || 'not_received'))].sort(), [cases]);
   const setFilter = value => dispatch(actions.filterChanged(value));
+  const completion = cases.length ? Math.round((counts.completed / cases.length) * 100) : 0;
+  const judgeCoverage = cases.length ? Math.round((counts.reports / cases.length) * 100) : 0;
+
   if (!snapshot) return <section className="empty"><h2>{error ? 'Suite temporarily unavailable' : 'Loading Suite'}</h2><p>{error || 'All planned Cases will appear here.'}</p></section>;
-  return <section className="suite-overview" aria-label="Suite Case overview">
-    <div className="suite-heading"><div><h2>All Cases</h2><p>{agents.length} Agents · {cases.length} Cases{snapshot.effective_workers != null ? ` · concurrency ${snapshot.effective_workers}` : ''}</p></div>
-      <span className={`suite-connection ${error ? 'disconnected' : ''}`} role="status">{error ? 'Sync disconnected · showing last data' : `Synced ${updated || 'connecting'}`}</span></div>
-    <div className="suite-metrics" aria-label="Case statistics">
-      {[[counts.completed, 'Completed'], [counts.running, 'Running'], [counts.retry_wait, 'Retry pending'], [counts.attention, 'Needs attention'], [counts.queued, 'Queued / pending generation']].map(([value, label]) => <div key={label}><strong>{value}</strong><span>{label}</span></div>)}
+
+  const sortOrder = field => table.field === field ? table.order : null;
+  const columns = [
+    { title: 'Agent / Case', key: 'case', sorter: true, sortOrder: sortOrder('case'), width: 260,
+      render: (_, item) => <div className="suite-case-cell"><strong>{item.agent_id}</strong><span>Case {item.case_index + 1}</span><Text type="secondary" ellipsis={{ tooltip: item.case_id }}>{item.case_id || 'Case ID pending'}</Text></div> },
+    { title: 'Execution', key: 'status', sorter: true, sortOrder: sortOrder('status'), width: 230,
+      render: (_, item) => <CaseStatus item={item} /> },
+    { title: 'Judge', key: 'judge', sorter: true, sortOrder: sortOrder('judge'), width: 150,
+      render: (_, item) => <div className="suite-judge-cell"><JudgeBadge status={item.judge_status} />{(item.host_accepted === false || item.host_acceptance === 'rejected') && <Text type="danger">Rejected by host</Text>}</div> },
+    { title: 'Attempts', key: 'attempts', sorter: true, sortOrder: sortOrder('attempts'), width: 120,
+      render: (_, item) => <div className="suite-attempt-count"><strong>{item.attempts.length}</strong><Text type="secondary">{item.retry_count > 0 ? `${item.retry_count} retries` : 'executions'}</Text></div> },
+    { title: 'Last activity', key: 'updated', sorter: true, sortOrder: sortOrder('updated'), width: 170,
+      render: (_, item) => latestTimestamp(item) ? new Date(latestTimestamp(item)).toLocaleString() : <Text type="secondary">Not recorded</Text> },
+    { title: '', key: 'actions', fixed: 'right', width: 150,
+      render: (_, item) => <Space onClick={event => event.stopPropagation()}><Button size="small" type="primary" ghost onClick={() => onCaseSelect(item)}>Open</Button><RetryButton item={item} /></Space> },
+  ];
+
+  return <section className="suite-overview" aria-label="Suite overview">
+    <div className="suite-heading"><div><Text className="suite-eyebrow">SUITE OVERVIEW</Text><Title level={2}>All Cases</Title>
+      <Text type="secondary">{agents.length} Agents, {cases.length} Cases{snapshot.effective_workers != null ? `, ${snapshot.effective_workers} active workers` : ''}</Text></div>
+      <Text className={error ? 'suite-connection disconnected' : 'suite-connection'} role="status">{error ? 'Sync disconnected, showing retained data' : `Synced ${updated || 'connecting'}`}</Text></div>
+
+    {error && <Alert type="warning" showIcon message="Live sync is temporarily unavailable" description="The latest saved Suite data remains visible. The viewer will retry automatically." />}
+
+    <div className="suite-visuals">
+      <div className="suite-metrics" aria-label="Case statistics">
+        <Metric value={counts.completed} label="Completed" tone="complete" />
+        <Metric value={counts.running} label="Running" tone="active" />
+        <Metric value={counts.retry_wait} label="Retry pending" tone="warning" />
+        <Metric value={counts.attention} label="Needs attention" tone="danger" />
+        <Metric value={counts.queued} label="Queued" />
+      </div>
+      <div className="suite-progress-panel" aria-label="Suite completion charts">
+        <div><Progress type="dashboard" percent={completion} size={108} strokeColor="#2f6d51" /><span>Execution complete</span></div>
+        <div><Progress type="dashboard" percent={judgeCoverage} size={108} strokeColor="#55796a" /><span>Judge coverage</span></div>
+      </div>
     </div>
-    <p className="suite-report-count">Judge reports: <strong>{counts.reports} / {cases.length}</strong> · host-accepted: {counts.accepted}. An issue verdict reports a behavioral finding, not an execution failure.</p>
+
+    <div className="suite-report-line"><span>Judge reports <strong>{counts.reports}/{cases.length}</strong></span><span>Host accepted <strong>{counts.accepted}</strong></span><Text type="secondary">An issue verdict is a behavioral finding, not an execution failure.</Text></div>
     <SuiteControls cases={cases} />
+
+    <div className="suite-table-heading"><div><Title level={3}>Cases</Title><Text type="secondary">Select a row to inspect the complete Case record.</Text></div><Text type="secondary">Showing {visible.length} of {cases.length}</Text></div>
     <div className="suite-filters" aria-label="Filter Cases">
-      <label><span className="sr-only">Filter Agent</span><select value={filters.agent} onChange={event => setFilter({ agent: event.target.value })}><option value="">All Agents</option>{agents.map(agent => <option key={agent}>{agent}</option>)}</select></label>
-      <label><span className="sr-only">Filter execution status</span><select value={filters.status} onChange={event => setFilter({ status: event.target.value })}><option value="">All execution states</option>{[...new Set(cases.map(item => item.execution_status))].map(status => <option key={status} value={status}>{executionLabels[status] || status}</option>)}</select></label>
-      <label className="suite-checkbox"><input type="checkbox" checked={filters.attention} onChange={event => setFilter({ attention: event.target.checked })} />Needs attention only</label>
-      <span className="suite-muted">Showing {visible.length} of {cases.length} Cases</span>
+      <Input.Search allowClear value={filters.query} placeholder="Search Agent, Case ID, status, or error" onChange={event => setFilter({ query: event.target.value })} />
+      <Select mode="multiple" maxTagCount="responsive" allowClear value={filters.agents} options={agents.map(value => ({ value, label: value }))} placeholder="All Agents" onChange={value => setFilter({ agents: value })} />
+      <Select mode="multiple" maxTagCount="responsive" allowClear value={filters.statuses} options={statuses.map(value => ({ value, label: executionLabels[value] || value }))} placeholder="All execution states" onChange={value => setFilter({ statuses: value })} />
+      <Select mode="multiple" maxTagCount="responsive" allowClear value={filters.judges} options={judges.map(value => ({ value, label: value === 'not_received' ? 'Judge not received' : value }))} placeholder="All Judge results" onChange={value => setFilter({ judges: value })} />
+      <label className="suite-switch"><Switch size="small" checked={filters.attention} onChange={value => setFilter({ attention: value })} /><span>Needs attention</span></label>
+      <label className="suite-switch"><Switch size="small" checked={filters.retried} onChange={value => setFilter({ retried: value })} /><span>Retried</span></label>
+      <Button onClick={() => dispatch(actions.filtersReset())}>Reset</Button>
     </div>
-    <div className="suite-table-wrap"><table className="suite-table"><thead><tr><th>Agent / Case</th><th>Execution status</th><th>Judge</th><th>Attempts</th><th>Actions</th></tr></thead><tbody>
-      {visible.map(item => <Fragment key={item.key}>
-        <tr className={expanded[item.key] ? 'suite-row-expanded' : ''}>
-          <th scope="row"><strong>{item.agent_id}</strong><span>Case {item.case_index + 1}</span>{item.case_id && <small title={item.case_id}>{item.case_id}</small>}</th>
-          <td><CaseStatus item={item} /></td><td><JudgeBadge status={item.judge_status} />{(item.host_accepted === false || item.host_acceptance === 'rejected') && <small className="suite-error-text">Rejected by host</small>}</td>
-          <td>{item.attempts.length}<small>{item.retry_count > 0 ? `${item.retry_count} retries` : 'executions'}</small></td>
-          <td><div className="suite-row-actions"><button aria-expanded={Boolean(expanded[item.key])} aria-label={`${expanded[item.key] ? 'Collapse' : 'View'} ${item.agent_id} Case ${item.case_index + 1}`} onClick={() => dispatch(actions.caseToggled(item))}>{expanded[item.key] ? 'Collapse' : 'View'}</button><RetryButton item={item} /></div></td>
-        </tr>
-        {expanded[item.key] && <tr className="suite-detail-row"><td colSpan={5}><AttemptDetails item={item} /></td></tr>}
-      </Fragment>)}
-      {!visible.length && <tr><td colSpan={5} className="suite-no-cases">{cases.length ? 'No Cases match the current filters.' : 'Waiting for the Suite test plan.'}</td></tr>}
-    </tbody></table></div>
+
+    <Table className="suite-table" rowKey="key" columns={columns} dataSource={visible} size="middle" scroll={{ x: 1080 }}
+      onRow={item => ({ onClick: () => onCaseSelect(item), onKeyDown: event => { if (event.key === 'Enter' || event.key === ' ') onCaseSelect(item); }, tabIndex: 0 })}
+      onChange={(pagination, _tableFilters, sorter) => dispatch(actions.tableChanged({ page: pagination.current, pageSize: pagination.pageSize,
+        field: sorter.columnKey || table.field, order: sorter.order || table.order }))}
+      pagination={{ current: table.page, pageSize: table.pageSize, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: total => `${total} Cases` }}
+      locale={{ emptyText: cases.length ? 'No Cases match the current filters.' : 'Waiting for the Suite test plan.' }} />
   </section>;
 }
