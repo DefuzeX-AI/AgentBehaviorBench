@@ -51,7 +51,8 @@ class FileExporter(SpanExporter):
         # Publish a real in-progress span snapshot; the ended export replaces it by ID.
         self.export([span], live=True)
 
-    def event(self, span, event, value):
+    def event(self, span, event, value, *, span_event=True):
+        """Persist full event data; optionally index a lifecycle event on the span."""
         directory = self.directory / 'otel-payloads'
         directory.mkdir(exist_ok=True)
         name = f'{span.context.span_id:016x}-events.jsonl'
@@ -61,7 +62,8 @@ class FileExporter(SpanExporter):
                    'event': event, 'data': value}
             stream.write(json.dumps(redact(json_value(row), self.secrets), ensure_ascii=False) + '\n')
         span.set_attribute('abb.events_ref', f'otel-payloads/{name}')
-        span.add_event(event)
+        if span_event:
+            span.add_event(event)
 
     def shutdown(self):
         with self.lock:

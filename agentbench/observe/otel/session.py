@@ -100,7 +100,8 @@ class OtelSession:
             elif event in ('native_event', 'tool_outcome'):
                 span = self.spans.get(data.get('span_id')) or self.root
                 if span:
-                    self.exporter.event(span, data.get('name', event), data)
+                    self.exporter.event(span, data.get('name', event), data,
+                                        span_event=data.get('span_event', True))
 
     def close(self):
         with self.lock:

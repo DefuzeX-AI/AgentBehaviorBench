@@ -18,7 +18,11 @@ class ACPObserver:
 
     def on_acp_event(self, name, data):
         self.events.record(name, **data)
-        self.store.record('native_event', name='acp.' + name, payload=data)
+        # Stream chunks and tool updates remain in full local payloads. Tool
+        # lifecycle/content gets its own spans below; duplicating every update
+        # on the root span exhausts bounded OTel/SDK event buffers.
+        self.store.record('native_event', name='acp.' + name, payload=data,
+                          span_event=name != 'session_update')
         if name in ('initialize', 'session', 'prompt_completed', 'failure'):
             self.summary[name] = data
         if name == 'stderr_truncated':
