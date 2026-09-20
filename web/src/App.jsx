@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { eventIdentity, parseTrace, sortEvents } from './trace.js';
 import RunSidebar from './RunSidebar.jsx';
 import SuiteSidebar from './navigation/SuiteSidebar.jsx';
+import { readSuiteRoute, writeSuiteRoute } from './navigation/suiteRoute.js';
 import TraceView from './otel/TraceView.jsx';
 import EvaluationView from './evaluation/EvaluationView.jsx';
 import CaseDetailsPage from './cases/CaseDetailsPage.jsx';
@@ -18,16 +19,6 @@ const FlowPrototype = lazy(() => import('./flow-prototype/FlowPrototype.jsx'));
 const PAGE_SIZE = 100;
 const MAX_BYTES = 20 * 1024 * 1024;
 
-function setSuiteHash(item, tab = 'overview') {
-  const params = new URLSearchParams();
-  if (item) {
-    params.set('agent', item.agent_id);
-    params.set('case', String(item.case_index));
-    params.set('tab', tab);
-  }
-  history.replaceState(null, '', `${location.pathname}${location.search}${params.size ? `#${params}` : ''}`);
-}
-
 function BoundSuiteApp({ endpoint }) {
   const dispatch = useDispatch();
   const { selectedCaseKey, detailTab } = useSelector(state => state.suite);
@@ -38,23 +29,26 @@ function BoundSuiteApp({ endpoint }) {
   const hydrated = useRef(false);
 
   useEffect(() => {
-    if (!suite.data || hydrated.current) return;
-    hydrated.current = true;
-    const params = new URLSearchParams(location.hash.slice(1));
-    const requested = cases.find(item => item.agent_id === params.get('agent') && item.case_index === Number(params.get('case')));
-    if (requested) {
-      dispatch(actions.caseSelected(requested));
-      const tab = params.get('tab');
-      if (['overview', 'conversation', 'tools', 'judge', 'trace', 'json'].includes(tab)) dispatch(actions.detailTabChanged(tab));
+    if (!suite.data) return undefined;
+    function applyLocation() {
+      const route = readSuiteRoute(cases);
+      if (route.item) {
+        dispatch(actions.caseSelected(route.item));
+        dispatch(actions.detailTabChanged(route.tab));
+      } else dispatch(actions.suiteSelected());
+      window.scrollTo({ top: 0, behavior: 'instant' });
     }
+    if (!hydrated.current) { hydrated.current = true; applyLocation(); }
+    window.addEventListener('popstate', applyLocation);
+    return () => window.removeEventListener('popstate', applyLocation);
   }, [cases, dispatch, suite.data]);
 
   useEffect(() => {
-    if (hydrated.current) setSuiteHash(selectedCase, detailTab);
+    if (hydrated.current && selectedCase) writeSuiteRoute(selectedCase, detailTab, 'replace');
   }, [selectedCase, detailTab]);
 
-  const selectCase = item => { dispatch(actions.caseSelected(item)); window.scrollTo({ top: 0, behavior: 'instant' }); };
-  const selectSuite = () => { dispatch(actions.suiteSelected()); window.scrollTo({ top: 0, behavior: 'instant' }); };
+  const selectCase = item => { writeSuiteRoute(item, 'overview', 'push'); dispatch(actions.caseSelected(item)); window.scrollTo({ top: 0, behavior: 'instant' }); };
+  const selectSuite = () => { writeSuiteRoute(null, 'overview', 'push'); dispatch(actions.suiteSelected()); window.scrollTo({ top: 0, behavior: 'instant' }); };
   return <div className="workspace suite-workspace">
     <SuiteSidebar snapshot={suite.data} selectedCaseKey={selectedCaseKey} busy={!suite.data && !suite.error} error={suite.error}
       onSuiteSelect={selectSuite} onCaseSelect={selectCase} onRefresh={() => setRevision(value => value + 1)} />

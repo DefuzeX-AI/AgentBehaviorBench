@@ -33,8 +33,8 @@ export default function SuiteOverview({ onCaseSelect }) {
 
   const sortOrder = field => table.field === field ? table.order : null;
   const columns = [
-    { title: 'Agent / Case', key: 'case', sorter: true, sortOrder: sortOrder('case'), width: 260,
-      render: (_, item) => <div className="suite-case-cell"><strong>{item.agent_id}</strong><span>Case {item.case_index + 1}</span><Text type="secondary" ellipsis={{ tooltip: item.case_id }}>{item.case_id || 'Case ID pending'}</Text></div> },
+    { title: 'Agent / Case', key: 'case', sorter: true, sortOrder: sortOrder('case'), width: 230,
+      render: (_, item) => <div className="suite-case-cell"><strong>{item.agent_id}</strong><span>Case {item.case_index + 1}</span></div> },
     { title: 'Execution', key: 'status', sorter: true, sortOrder: sortOrder('status'), width: 230,
       render: (_, item) => <CaseStatus item={item} /> },
     { title: 'Judge', key: 'judge', sorter: true, sortOrder: sortOrder('judge'), width: 150,
@@ -43,9 +43,9 @@ export default function SuiteOverview({ onCaseSelect }) {
       render: (_, item) => <div className="suite-attempt-count"><strong>{item.attempts.length}</strong><Text type="secondary">{item.retry_count > 0 ? `${item.retry_count} retries` : 'executions'}</Text></div> },
     { title: 'Last activity', key: 'updated', sorter: true, sortOrder: sortOrder('updated'), width: 170,
       render: (_, item) => latestTimestamp(item) ? new Date(latestTimestamp(item)).toLocaleString() : <Text type="secondary">Not recorded</Text> },
-    { title: '', key: 'actions', fixed: 'right', width: 150,
-      render: (_, item) => <Space onClick={event => event.stopPropagation()}><Button size="small" type="primary" ghost onClick={() => onCaseSelect(item)}>Open</Button><RetryButton item={item} /></Space> },
   ];
+  if (cases.some(item => item.can_retry)) columns.push({ title: 'Recovery', key: 'recovery', fixed: 'right', width: 130,
+    render: (_, item) => <Space onClick={event => event.stopPropagation()}><RetryButton item={item} /></Space> });
 
   return <section className="suite-overview" aria-label="Suite overview">
     <div className="suite-heading"><div><Text className="suite-eyebrow">SUITE OVERVIEW</Text><Title level={2}>All Cases</Title>
@@ -82,7 +82,7 @@ export default function SuiteOverview({ onCaseSelect }) {
       <Button onClick={() => dispatch(actions.filtersReset())}>Reset</Button>
     </div>
 
-    <Table className="suite-table" rowKey="key" columns={columns} dataSource={visible} size="middle" scroll={{ x: 1080 }}
+    <Table className="suite-table" rowKey="key" columns={columns} dataSource={visible} size="middle" scroll={{ x: 900 }}
       onRow={item => ({ onClick: () => onCaseSelect(item), onKeyDown: event => { if (event.key === 'Enter' || event.key === ' ') onCaseSelect(item); }, tabIndex: 0 })}
       onChange={(pagination, _tableFilters, sorter) => dispatch(actions.tableChanged({ page: pagination.current, pageSize: pagination.pageSize,
         field: sorter.columnKey || table.field, order: sorter.order || table.order }))}
