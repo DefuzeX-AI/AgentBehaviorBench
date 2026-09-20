@@ -14,6 +14,7 @@ def prepare_service_config(interception, *, agent_id, max_trace_bytes, secret_di
     data = {'agent_id': agent_id, 'max_trace_bytes': max_trace_bytes,
             'mode': interception.mode, 'credentials': [],
             'observation_headers': dict(interception.observation_headers),
+            'observation_tool_purposes': dict(interception.observation_tool_purposes),
             'routes': [_route_data(r) for r in interception.routes],
             'tool_routes': [asdict(r) for r in interception.tool_routes],
             'token_counting': dict(interception.token_counting)}

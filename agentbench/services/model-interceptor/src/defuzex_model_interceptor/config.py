@@ -67,6 +67,7 @@ class ServiceConfig:
     token_counting: Mapping[str, object] = field(default_factory=dict)
     mode: str = 'replace'
     observation_headers: Mapping[str, str] = field(default_factory=dict)
+    observation_tool_purposes: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
 
     @classmethod
     def load(cls, path: str | Path) -> "ServiceConfig":
@@ -91,6 +92,7 @@ class ServiceConfig:
         return cls(
             mode=mode,
             observation_headers=_observation_headers(raw.get("observation_headers", {})),
+            observation_tool_purposes=_observation_tool_purposes(raw.get("observation_tool_purposes", {})),
             agent_id=_string(raw, "agent_id"),
             max_trace_bytes=max_bytes,
             target=_target(raw.get("target")) if mode == 'replace' else None,
@@ -223,3 +225,19 @@ def _observation_headers(value):
                 or re.search(r'auth|cookie|secret|token|key|password', name, re.I)):
             raise ServiceConfigurationError('Observation headers must be non-credential metadata')
     return dict(value)
+
+
+def _observation_tool_purposes(value):
+    if not isinstance(value, dict) or len(value) > 8:
+        raise ServiceConfigurationError('Invalid observation tool purposes')
+    result = {}
+    for purpose, names in value.items():
+        if (not isinstance(purpose, str) or not re.fullmatch(r'[a-z][a-z0-9_]{0,31}', purpose)
+                or not isinstance(names, list) or not 1 <= len(names) <= 16
+                or any(not isinstance(name, str) or not name or len(name) > 128 for name in names)):
+            raise ServiceConfigurationError('Invalid observation tool purpose rule')
+        signature = tuple(sorted(set(names)))
+        if signature in result.values():
+            raise ServiceConfigurationError('Ambiguous observation tool purpose rules')
+        result[purpose] = signature
+    return result

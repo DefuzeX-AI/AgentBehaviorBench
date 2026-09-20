@@ -66,6 +66,7 @@ export default function RawRunView({ run, revision }) {
         <span>Case known: {facets.correlation.model.case_identified}/{facets.correlation.model.requests}</span>
         <span>Input known: {facets.correlation.model.input_identified}/{facets.correlation.model.requests}</span>
         <span>Framework links: {facets.correlation.model.framework_linked}/{facets.correlation.model.requests}</span>
+        <span>Model purposes: {Object.entries(facets.correlation.model_purposes || {}).map(([name, count]) => `${name}: ${count}`).join(', ')}</span>
         <span>Emitted tool links: {facets.correlation.model.emitted_tool_links}</span>
       </div>}
       <Space className="interaction-presets" wrap>

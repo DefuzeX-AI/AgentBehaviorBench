@@ -71,6 +71,7 @@ class InterceptionConfig:
     token_counting: Mapping[str, object] = field(default_factory=dict)
     mode: str = 'replace'
     observation_headers: Mapping[str, str] = field(default_factory=dict)
+    observation_tool_purposes: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
 
     @classmethod
     def from_agent_dir(cls, agent_root: str | Path) -> "InterceptionConfig | None":
@@ -115,6 +116,7 @@ class InterceptionConfig:
         return cls(
             mode=mode,
             observation_headers=_observation_headers(section.get("observation_headers", {})),
+            observation_tool_purposes=_observation_tool_purposes(section.get("observation_tool_purposes", {})),
             required=_boolean(section, "required", default=True),
             trust_plugin=_required_string(section, "trust_plugin"),
             environment=MappingProxyType(environment),
@@ -299,3 +301,19 @@ def _observation_headers(value):
                 or re.search(r'auth|cookie|secret|token|key|password', name, re.I)):
             raise InterceptionConfigurationError('Observation headers must be non-credential metadata')
     return dict(value)
+
+
+def _observation_tool_purposes(value):
+    if not isinstance(value, dict) or len(value) > 8:
+        raise InterceptionConfigurationError('Invalid observation tool purposes')
+    result = {}
+    for purpose, names in value.items():
+        if (not isinstance(purpose, str) or not re.fullmatch(r'[a-z][a-z0-9_]{0,31}', purpose)
+                or not isinstance(names, list) or not 1 <= len(names) <= 16
+                or any(not isinstance(name, str) or not name or len(name) > 128 for name in names)):
+            raise InterceptionConfigurationError('Invalid observation tool purpose rule')
+        signature = tuple(sorted(set(names)))
+        if signature in result.values():
+            raise InterceptionConfigurationError('Ambiguous observation tool purpose rules')
+        result[purpose] = signature
+    return result

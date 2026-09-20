@@ -20,6 +20,8 @@ def test_manifest_infers_behavior_and_host_only_replaces_when_needed(tmp_path,fr
 framework="{framework}"
 [llm_interception]
 trust_plugin="pem-env"
+[llm_interception.observation_tool_purposes]
+session_title=["submit_session_title"]
 [[llm_interception.credentials]]
 id="native"
 agent_env="NATIVE_KEY"
@@ -42,6 +44,7 @@ credential="native"
     data,env=prepare_service_config(config,agent_id='a',max_trace_bytes=4096,secret_dir=tmp_path,
         secret_resolver=resolver,environ={'NATIVE_KEY':'real-native-secret'},model_provider=provider)
     assert data['mode']==mode
+    assert data['observation_tool_purposes']=={'session_title': ('submit_session_title',)}
     if mode=='observe':
         provider.resolve.assert_not_called();resolver.require.assert_not_called()
         assert env=={'NATIVE_KEY':'real-native-secret'}

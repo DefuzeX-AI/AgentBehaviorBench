@@ -57,6 +57,12 @@ in the execution environment. Absence does not prevent BYOK model execution.
 The native title/review behavior stays enabled; a 401 remains an optional-service
 failure, never a synthesized pass. No model API key is substituted for this token.
 
+`llm_interception.observation_tool_purposes` can label a model operation when its
+declared tool names exactly match a configured set. MiniMax's exclusive
+`submit_session_title` tool identifies `session_title`; the evidence is recorded
+as `declared_tool_set`. This labels purpose only and never establishes Input or
+turn ownership. Prompt text cannot supply this classification.
+
 `llm_interception.observation_headers` can retain explicitly named non-credential
 native session/turn/request metadata without modifying the original headers.
 These are observations, not authorization or ABB Case/Input identities. MiniMax

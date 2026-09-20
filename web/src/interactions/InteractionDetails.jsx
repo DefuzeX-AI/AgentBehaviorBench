@@ -87,6 +87,7 @@ export default function InteractionDetails({ run, id, revision, live, onNavigate
       { key: 'time', label: 'Start time', children: d.timestamp || 'Not recorded' },
       { key: 'basis', label: 'Time basis', children: d.time_basis === 'file_mtime' ? 'File modification time (not an exact event time)' : 'Collection timestamp' },
       { key: 'id', label: 'Call / Span', children: <code>{d.call_id || d.framework_span_id || 'Not recorded'}</code> },
+      { key: 'purpose', label: 'Purpose', children: [d.purpose, d.purpose_evidence].filter(Boolean).join(' · ') || 'Unknown' },
       { key: 'session', label: 'Native session', children: d.native_session_id || 'Unknown' },
       { key: 'case', label: 'Case', children: d.case_id || 'Unknown' },
       { key: 'input', label: 'Input', children: d.input_id || 'Unlinked' },

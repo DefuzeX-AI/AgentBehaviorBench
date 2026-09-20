@@ -23,12 +23,15 @@ The synthetic packaging Agent now registers its observe-mode adapter for the
 duration of each test. Unknown frameworks remain rejected in production, and
 the builder raises if a host-only check accidentally instantiates an Agent.
 
-## Remaining
+## Delivery status
 
-D02–D04: identity projection, tool relationships, native turn/purpose attribution.
-D05–D08: shared workspace, SDK file evidence, retained files, Case prerequisites.
-D09: optional native review authentication.
-D10–D11: real acceptance matrix and certification.
+D01, D02, D04–D07 and D10 are implemented and validated. D03 now links successful
+foreground calls to exact Inputs; failed attempts and background calls retain
+only the scope actually observed. D08 enforces workspace provenance, with the
+unstructured Case prerequisite limitation below. D09 supports the native optional
+credential, but that credential is absent in this environment. D11 results and
+the unfinished recovery check are recorded below. Work is closed at the user's
+requested stopping point; these remaining limitations are not marked as passes.
 
 ## D02 — Preserve request identity
 
@@ -161,3 +164,56 @@ Framework LLM spans remain unavailable rather than being fabricated.
 Readiness retains the existing technical certification semantics. It does not
 claim that optional title review is authenticated, that every generated Case is
 well-formed, or that an unrelated service_busy judgment became a pass.
+
+## D04 — Declared background purpose
+
+The native title operation declares only `submit_session_title`. Observe mode
+now labels this exact configured tool set as `session_title`, retaining
+`declared_tool_set` as evidence. Extra tools or prompt text cannot establish the
+classification. Viewer shows purpose separately from session/Input ownership;
+the request and response bytes remain unchanged. This does not retroactively
+label historical network records or assign title calls to the current Input.
+
+Validation: 18 targeted Python tests, 14 interceptor tests, 40 frontend tests and
+production frontend build. The real delayed-title acceptance below independently
+verifies the native tool and session behavior; the final purpose-only metadata
+addition was validated with interceptor regressions, not another paid run.
+
+## D11 — Acceptance matrix and remaining recovery check
+
+- Four concurrent official Cases, each with three actual Inputs:
+  `suite_ab0bab3a196249aa92a5c502992dbeeb`. Four distinct containers and native
+  sessions, all four execution intervals overlapped for 13.74 seconds. All 12
+  Inputs completed with complete file evidence, host trace validation and
+  cleanup. Three Judges passed; one returned terminal `ServiceBusyError`
+  (`retryable=false`). It remains a Judge failure, not a fourth pass.
+- Real native process against a loopback model with Docker `--network none`:
+  401 and 429 retain native retries and finish as `TimeoutError`; injected
+  timeout finishes as `TimeoutError`; cancellation as `CancelledError`.
+  All child processes are cleaned. Reproduce with
+  `tests/acp_fixtures/minimax_native_faults.py` in a staged MiniMax image.
+- Real native delayed title crosses into the second foreground turn. Two
+  foreground responses link to distinct native turns; the title retains the
+  shared native session and is never assigned to the second Input. Reproduce
+  with `tests/acp_fixtures/minimax_delayed_title.py` in the same offline image.
+- Real LangGraph regression using the local SDK Case/Judge:
+  `suite_7793c73c7bba45ec860da22744a8c5b7`, run
+  `e09de91cf2bb4167b84000994dafd798`: three Inputs, Judge pass, host trace and
+  cleanup succeeded. This is distinct from official Backend acceptance.
+- Official Judge timeout exercise:
+  `suite_50c9326aa85d4891bb467b042232fac6`, run
+  `0b6da3daa17e4ecd88ac0263c09d0ff8`. Three Inputs executed and submitted;
+  a one-second operation wait left SDK request
+  `kreq_6e7dd59adbad69666d032b623dfccef9` pending. Resume correctly rejected a
+  changed runtime source fingerprint because local code was edited during the
+  exercise. No provenance was rewritten and no Agent was replayed. Successful
+  recovery of that real request remains unverified at this stopping point.
+
+## Repository closeout
+
+Checked both original Agent units `15-claude-agent-acp` and `16-minimax-code`,
+including their source trees: neither contains a nested `.git` file/directory.
+Their `.gitignore` files are not Git metadata and are retained. Imported source
+continues to be local/ignored under the existing unit policy. This delivery
+contains this task's remediation changes; unrelated local Agent 15 onboarding
+and Viewer navigation edits are left intact in the original checkout.

@@ -46,3 +46,18 @@ def test_explicit_record_identity_can_link_input(tmp_path):
     assert row['input_id'] == 'step-1'
     assert row['association_status'] == 'input_exact'
     assert row['link_evidence'] == 'record_input_id'
+
+
+def test_title_purpose_preserves_session_only_ownership(tmp_path):
+    write_run(tmp_path)
+    path = tmp_path / 'network.jsonl'
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    rows[0]['data'].update(native_session_id='native-1', native_purpose='session_title',
+                           purpose_evidence='declared_tool_set')
+    path.write_text('\n'.join(json.dumps(row) for row in rows))
+    result = interactions(tmp_path, {'kinds': 'chat'})
+    row, = result['items']
+    assert row['purpose'] == 'session_title'
+    assert row['purpose_evidence'] == 'declared_tool_set'
+    assert row['association_status'] == 'session_only'
+    assert row['input_id'] is None

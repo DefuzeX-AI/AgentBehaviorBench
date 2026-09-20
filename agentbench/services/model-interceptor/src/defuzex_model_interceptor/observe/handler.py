@@ -49,8 +49,24 @@ class ObserveInterceptor(CommonInterceptor):
         else:
             flow.metadata.update(abb_tool=True, purpose=tool.purpose, required=tool.required)
             name = 'tool_request'
+        body = self._body(request)
+        if protocol and not auxiliary:
+            payload = body.get('payload')
+            declared = payload.get('tools') if isinstance(payload, dict) else None
+            names = []
+            for item in declared if isinstance(declared, list) else []:
+                function = item.get('function', {}) if isinstance(item, dict) else {}
+                tool_name = item.get('name') if isinstance(item, dict) else None
+                if not tool_name and isinstance(function, dict):
+                    tool_name = function.get('name')
+                names.append(tool_name)
+            if names and all(isinstance(n, str) and n for n in names):
+                signature = tuple(sorted(set(names)))
+                for purpose, expected in self.config.observation_tool_purposes.items():
+                    if signature == tuple(sorted(expected)):
+                        flow.metadata['observation_purpose'] = purpose
         fields = self._tool_fields(flow) if flow.metadata.get('abb_tool') else self._fields(flow)
-        events.emit(name, **fields, **self._body(request), source='native')
+        events.emit(name, **fields, **body, source='native')
 
     def responseheaders(self, flow):
         if flow.response is None or 'defuzex_call_id' not in flow.metadata:
@@ -117,6 +133,9 @@ class ObserveInterceptor(CommonInterceptor):
             value = flow.request.headers.get(header)
             if value and len(value) <= 256 and all(ord(c) >= 32 for c in value):
                 fields[label] = redact(value, self.secrets)
+        if flow.metadata.get('observation_purpose'):
+            fields['native_purpose'] = flow.metadata['observation_purpose']
+            fields['purpose_evidence'] = 'declared_tool_set'
         return fields
 
     def _error(self, flow, message, status, *, code):

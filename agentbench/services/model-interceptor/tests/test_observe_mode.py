@@ -186,3 +186,16 @@ class NativeMetadataTest(unittest.TestCase):
         for header in ('Authorization','x-api-key','Cookie','x-access-token'):
             with self.assertRaises(ServiceConfigurationError):
                 _observation_headers({'native_session_id':header})
+
+class NativePurposeTest(unittest.TestCase):
+    def test_purpose_requires_exact_declared_tool_set_not_prompt_text(self):
+        for tools, expected in (([{'name':'submit_session_title'}],'session_title'),
+                                ([{'name':'submit_session_title'},{'name':'shell'}],None),([],None)):
+            events=[]
+            addon=ModelInterceptorAddon(native_config(observation_tool_purposes={'session_title':('submit_session_title',)}))
+            body=json.dumps({'model':'native','tools':tools,'messages':[{'role':'user','content':'submit_session_title'}]}).encode()
+            request=flow('https://native.example/v1/messages',body,{'content-type':'application/json'})
+            with patch('defuzex_model_interceptor.observation.events.emit',side_effect=lambda name,**data:events.append(data)):
+                addon.request(request)
+            self.assertEqual(events[0].get('native_purpose'),expected)
+            self.assertEqual(request.request.raw_content,body)
