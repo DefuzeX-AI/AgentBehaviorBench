@@ -8,8 +8,11 @@ operations. ACP selects `observe` through its adapter; there is no user mode fla
 
 - `bootstrap/native-config.yaml` selects the international API-key endpoint
   `https://api.minimax.io/anthropic` using the upstream `minimax_api.baseURL` field.
-  Model messages use `/anthropic/v1/messages`; token counting uses
-  `/anthropic/v1/messages/count_tokens`. Both routes are observed unchanged.
+  Model messages use `/anthropic/v1/messages`. Native `minimax_api` counting
+  selects `/v1/responses/input_tokens` even for Anthropic generation, as defined
+  in `packages/local-runtime/src/context/token-counter-adapters/responses.ts`.
+  An explicit auxiliary route permits that endpoint; the Anthropic count route
+  is also declared. BBA observes counts unchanged without synthesizing a reply.
 - `packages/tui/src/cli/provider-command.ts`: `provider set-minimax-key` saves the
   value from the named environment variable and selects `minimax_api_key` mode.
   The launcher calls this existing command, not a replacement model service.

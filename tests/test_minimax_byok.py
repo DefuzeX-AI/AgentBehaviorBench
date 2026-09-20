@@ -86,3 +86,14 @@ def test_global_unit_observes_only_declared_native_model_endpoints():
 def test_manifest_requires_real_key_before_container_start():
     with pytest.raises(MissingSecretError, match='MINIMAX_API_KEY'):
         AgentContainerConfig.from_agent_dir(UNIT, secret_resolver=EnvironmentSecretResolver({}), environ={})
+
+
+def test_native_responses_count_route_is_auxiliary_and_narrow():
+    config = InterceptionConfig.from_agent_dir(UNIT)
+    matches = [r for r in config.routes if r.matches(host='api.minimax.io', port=443,
+        method='POST', path='/v1/responses/input_tokens')]
+    assert len(matches) == 1
+    assert matches[0].protocol_plugin == 'openai-input-tokens'
+    assert not matches[0].matches(host='api.minimax.io', port=443, method='POST', path='/v1/responses')
+    assert not matches[0].matches(host='api.minimax.io', port=443, method='GET', path='/v1/responses/input_tokens')
+    assert config.mode == 'observe' and not config.token_counting

@@ -525,3 +525,27 @@ check passed with the international endpoint and a fixture credential. Artifacts
 `cache/acp-acceptance/minimax-global-tests.log` and
 `cache/acp-acceptance/minimax-global-handshake.json`. This does not establish that
 a real key is valid or that a paid model request/complete benchmark succeeds.
+
+### First live global smoke: billing block and count-route correction (2026-09-20)
+
+The user requested chat, file movement, code writing and code execution before
+benchmark generation/judging. A direct 64-token-limit API probe returned HTTP 402,
+`insufficient balance (1008)`. The runtime key matched the current .env value.
+The real BBA chat run is
+`results/minimax-basic-smoke/7c1e14c897e84c04806747329e96eb7a`.
+ACP initialize and session creation succeeded; models.dev returned 200. All seven
+native generation attempts returned the same 402. Native title review returned
+401. No chat output was produced, so file movement, code writing and execution
+were not attempted; no Case generation or Judge call was started.
+
+The trace also exposed a separate BBA omission: the native minimax_api counter
+uses `/v1/responses/input_tokens`, despite generation using Anthropic Messages.
+Upstream `token-counter-adapters/responses.ts` explicitly selects this behavior.
+Added only that POST/443 route on api.minimax.io, using the existing
+`openai-input-tokens` auxiliary protocol. Counting remains native and observe-only.
+15 focused tests and pinned-KUMA static validation passed. No paid rerun was made
+after the route fix while billing remained blocked. Registry readiness is unchanged.
+
+Before continuing, confirm the key's billing account and purchased resource:
+MiniMax documents separate pay-as-you-go API Keys and Token Plan Subscription Keys.
+A recharge confirmation alone does not establish quota for this particular key.

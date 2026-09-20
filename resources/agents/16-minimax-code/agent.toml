@@ -64,3 +64,12 @@ ports = [443]
 methods = ["POST"]
 path_patterns = ["/anthropic/v1/messages/count_tokens"]
 protocol_plugin = "anthropic-count-tokens"
+
+# The native minimax_api counter uses Responses even for Anthropic generation.
+[[llm_interception.routes]]
+id = "minimax-native-responses-count"
+host_patterns = ["api.minimax.io"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/responses/input_tokens"]
+protocol_plugin = "openai-input-tokens"
