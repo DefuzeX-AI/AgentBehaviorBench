@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import fnmatch
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
@@ -69,6 +70,7 @@ class InterceptionConfig:
     tool_routes: tuple[ToolRouteConfig, ...] = ()
     token_counting: Mapping[str, object] = field(default_factory=dict)
     mode: str = 'replace'
+    observation_headers: Mapping[str, str] = field(default_factory=dict)
 
     @classmethod
     def from_agent_dir(cls, agent_root: str | Path) -> "InterceptionConfig | None":
@@ -112,6 +114,7 @@ class InterceptionConfig:
             raise InterceptionConfigurationError(str(exc)) from exc
         return cls(
             mode=mode,
+            observation_headers=_observation_headers(section.get("observation_headers", {})),
             required=_boolean(section, "required", default=True),
             trust_plugin=_required_string(section, "trust_plugin"),
             environment=MappingProxyType(environment),
@@ -286,3 +289,13 @@ def _require_unique(values: object, label: str) -> None:
     items = tuple(values)  # type: ignore[arg-type]
     if len(set(items)) != len(items):
         raise InterceptionConfigurationError(f"Interception {label} values must be unique")
+
+
+def _observation_headers(value):
+    if not isinstance(value, dict) or set(value) - {'native_session_id', 'native_turn_id', 'native_request_id', 'native_purpose'}:
+        raise InterceptionConfigurationError('Invalid observation header labels')
+    for name in value.values():
+        if (not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9-]{1,128}', name)
+                or re.search(r'auth|cookie|secret|token|key|password', name, re.I)):
+            raise InterceptionConfigurationError('Observation headers must be non-credential metadata')
+    return dict(value)

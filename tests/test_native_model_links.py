@@ -54,3 +54,12 @@ def test_pinned_native_reader_exports_only_ids(tmp_path, monkeypatch):
     assert calls[0]['native_response_id']=='msg-a'
     assert 'private body' not in str(calls)
     assert module.read_calls('another-session')==[]
+
+
+def test_observation_headers_do_not_accept_credentials_or_authoritative_ids():
+    import pytest
+    from agentbench.runtime.interception.config import _observation_headers
+    assert _observation_headers({'native_session_id':'X-Mavis-Session-Id'})
+    for value in ({'case_id':'X-Case'}, {'native_session_id':'Authorization'},
+                  {'native_session_id':'X-Api-Key'}, {'native_session_id':'Cookie'}):
+        with pytest.raises(ValueError):_observation_headers(value)

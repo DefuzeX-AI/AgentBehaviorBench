@@ -168,3 +168,21 @@ class NativeObserveTest(unittest.TestCase):
         self.assertEqual(other.request.host,'target.example')
         self.assertEqual(native.request.host,'native.example')
         self.assertEqual([e['mode'] for e in self.events if e['event']=='llm_request'],['observe','replace'])
+
+class NativeMetadataTest(unittest.TestCase):
+    def test_session_header_is_observed_without_mutating_native_request(self):
+        events = []
+        addon = ModelInterceptorAddon(native_config(observation_headers={'native_session_id':'X-Mavis-Session-Id'}))
+        request = flow('https://native.example/v1/messages', b'{"model":"native","messages":[]}',
+                       {'content-type':'application/json','X-Mavis-Session-Id':'native-session'})
+        headers = list(request.request.headers.items())
+        with patch('defuzex_model_interceptor.observation.events.emit', side_effect=lambda name, **data:events.append(data)):
+            addon.request(request)
+        self.assertEqual(events[0]['native_session_id'],'native-session')
+        self.assertEqual(list(request.request.headers.items()),headers)
+
+    def test_credentials_cannot_be_selected_as_metadata(self):
+        from defuzex_model_interceptor.config import _observation_headers, ServiceConfigurationError
+        for header in ('Authorization','x-api-key','Cookie','x-access-token'):
+            with self.assertRaises(ServiceConfigurationError):
+                _observation_headers({'native_session_id':header})

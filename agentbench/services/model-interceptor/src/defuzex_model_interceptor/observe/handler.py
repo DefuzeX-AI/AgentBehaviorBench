@@ -113,6 +113,10 @@ class ObserveInterceptor(CommonInterceptor):
     def _fields(self, flow):
         fields = super()._fields(flow)
         fields['path'] = flow.request.path.split('?', 1)[0]
+        for label, header in self.config.observation_headers.items():
+            value = flow.request.headers.get(header)
+            if value and len(value) <= 256 and all(ord(c) >= 32 for c in value):
+                fields[label] = redact(value, self.secrets)
         return fields
 
     def _error(self, flow, message, status, *, code):

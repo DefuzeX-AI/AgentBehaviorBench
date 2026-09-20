@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
@@ -65,6 +66,7 @@ class ServiceConfig:
     tool_routes: tuple[ToolRoute, ...] = ()
     token_counting: Mapping[str, object] = field(default_factory=dict)
     mode: str = 'replace'
+    observation_headers: Mapping[str, str] = field(default_factory=dict)
 
     @classmethod
     def load(cls, path: str | Path) -> "ServiceConfig":
@@ -88,6 +90,7 @@ class ServiceConfig:
             raise ServiceConfigurationError("max_trace_bytes must be at least 1024")
         return cls(
             mode=mode,
+            observation_headers=_observation_headers(raw.get("observation_headers", {})),
             agent_id=_string(raw, "agent_id"),
             max_trace_bytes=max_bytes,
             target=_target(raw.get("target")) if mode == 'replace' else None,
@@ -210,3 +213,13 @@ def _integers(data: dict[str, object], key: str) -> tuple[int, ...]:
     ):
         raise ServiceConfigurationError(f"{key} must be a non-empty integer list")
     return tuple(value)
+
+
+def _observation_headers(value):
+    if not isinstance(value, dict) or set(value) - {'native_session_id', 'native_turn_id', 'native_request_id', 'native_purpose'}:
+        raise ServiceConfigurationError('Invalid observation header labels')
+    for name in value.values():
+        if (not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9-]{1,128}', name)
+                or re.search(r'auth|cookie|secret|token|key|password', name, re.I)):
+            raise ServiceConfigurationError('Observation headers must be non-credential metadata')
+    return dict(value)

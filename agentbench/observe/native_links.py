@@ -28,7 +28,8 @@ def link_native_calls(rows, contexts):
     for row in wire:
         matches = [(owner, call) for owner, call in native
                    if call.get('native_response_id') in ids[row['id']]
-                   and owner.get('case_id') == row.get('case_id')]
+                   and owner.get('case_id') == row.get('case_id')
+                   and (not row.get('native_session_id') or call.get('native_session_id') == row['native_session_id'])]
         if not matches:
             continue
         unique_wire = sum(bool(ids[row['id']] & ids[other['id']]) and other.get('case_id') == row.get('case_id') for other in wire)

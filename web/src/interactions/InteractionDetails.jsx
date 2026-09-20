@@ -80,12 +80,14 @@ export default function InteractionDetails({ run, id, revision, live, onNavigate
     { key: 'raw', label: `Raw records (${d.record_count})`, children: <OriginalRecords endpoint={endpoint} revision={revision} live={live} /> },
   ];
   return <div className="interaction-detail">
+    {d.optional_operation && d.status === 'failed' && <Alert type="warning" title="Optional service operation failed" description="This is separate from the main model request status. The original HTTP failure remains in the evidence." />}
     {d.completeness === 'legacy_address_only' && <Alert type="warning" title="The legacy record contains only an address" description="Without a call_id, request body, or response body, the complete network interaction cannot be reconstructed. Rebuild the runtime image before collecting new records." />}
     {d.completeness === 'missing_response' && <Alert type="info" title="No response has been recorded yet" description="The call may still be running, or collection may have ended before it completed." />}
     <Descriptions size="small" column={2} items={[
       { key: 'time', label: 'Start time', children: d.timestamp || 'Not recorded' },
       { key: 'basis', label: 'Time basis', children: d.time_basis === 'file_mtime' ? 'File modification time (not an exact event time)' : 'Collection timestamp' },
       { key: 'id', label: 'Call / Span', children: <code>{d.call_id || d.framework_span_id || 'Not recorded'}</code> },
+      { key: 'session', label: 'Native session', children: d.native_session_id || 'Unknown' },
       { key: 'case', label: 'Case', children: d.case_id || 'Unknown' },
       { key: 'input', label: 'Input', children: d.input_id || 'Unlinked' },
       { key: 'association', label: 'Association', children: d.association_status || d.link_evidence || 'Unknown' },

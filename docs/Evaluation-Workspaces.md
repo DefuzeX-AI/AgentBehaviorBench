@@ -49,3 +49,17 @@ content have explicit statuses. The raw writable workspace is temporary and is
 removed after the container closes; only the separate `.kuma` recovery ledger
 and sanitized evidence remain. Temporary workspace and ledger must use the same
 Docker host filesystem share because KUMA rejects ledger mount/device escapes.
+
+MiniMax's optional content-review service uses managed-login credentials, separate
+from its model API key. `runtime.optional_secret_env_keys = ["MAVIS_ACCESS_TOKEN"]`
+forwards the native service's supported access token only when explicitly present
+in the execution environment. Absence does not prevent BYOK model execution.
+The native title/review behavior stays enabled; a 401 remains an optional-service
+failure, never a synthesized pass. No model API key is substituted for this token.
+
+`llm_interception.observation_headers` can retain explicitly named non-credential
+native session/turn/request metadata without modifying the original headers.
+These are observations, not authorization or ABB Case/Input identities. MiniMax
+uses its existing `X-Mavis-Session-Id`; unmatched background traffic can therefore
+remain session-only. Exact Input assignment still requires a validated native
+response ID or emitted tool relation.

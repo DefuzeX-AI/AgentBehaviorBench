@@ -27,6 +27,7 @@ execution = "oneshot"
 timeout_sec = 600
 env_keys = ["MINIMAX_DATA_DIR", "MCODE_DISABLE_TELEMETRY", "DO_NOT_TRACK", "MAVIS_REGION"]
 secret_env_keys = ["MINIMAX_API_KEY"]
+optional_secret_env_keys = ["MAVIS_ACCESS_TOKEN"]
 
 [build]
 context = "."
@@ -50,6 +51,9 @@ required = true
 trust_plugin = "pem-env"
 network_config = "network/rules.toml"
 tool_routes = []
+
+[llm_interception.observation_headers]
+native_session_id = "X-Mavis-Session-Id"
 
 [llm_interception.environment]
 MAVIS_REGION = "en"

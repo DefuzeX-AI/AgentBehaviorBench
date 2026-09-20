@@ -126,3 +126,21 @@ coverage to those calls still needs a native observer contract or new revision.
 
 Native-evidence validation: 34 Python tests and 40 frontend tests passed;
 production build passed, plus the real three-turn pure-text run above.
+
+## D04/D09 — Native session metadata and optional authentication
+
+Observe mode can capture explicitly configured non-credential native metadata
+headers without changing their bytes. MiniMax's existing X-Mavis-Session-Id
+retains session scope for background calls; it does not assign a current Input.
+Viewer marks optional HTTP failures separately from main model execution.
+
+Source confirms content review reads a managed accessToken or MAVIS_ACCESS_TOKEN,
+not MINIMAX_API_KEY. Added optional declared secret forwarding for that supported
+native variable. The current environment does not contain this credential, so a
+successful review cannot be claimed. Original review/title behavior remains on;
+the 401 is retained. This is an external authentication requirement, not a model
+routing failure.
+
+Validation: 34 Python tests, 13 dependency-complete interceptor tests and 40
+frontend tests passed; frontend production build passed. Native headers,
+401/429/503 responses and streamed bytes remain unchanged in interceptor tests.

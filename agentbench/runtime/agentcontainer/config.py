@@ -56,6 +56,10 @@ class AgentContainerConfig:
         for key in _string_list(runtime, "secret_env_keys"):
             environment[key] = secret_resolver.require(key)
 
+        for key in _string_list(runtime, 'optional_secret_env_keys'):
+            if values.get(key):
+                environment[key] = secret_resolver.require(key)
+
         timeout = runtime.get("timeout_sec", 60)
         if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0:
             raise ContainerConfigurationError("runtime.timeout_sec must be positive")
