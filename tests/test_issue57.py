@@ -145,7 +145,7 @@ def test_unknown_framework_lists_entry_point_frameworks(monkeypatch, tmp_path):
 def test_built_in_adapter_survives_without_distribution_metadata(monkeypatch):
     # The evaluation container runs ABB from source, where no entry points exist.
     _install(monkeypatch, adapter_factory, adapter_factory.ADAPTER_ENTRY_POINT_GROUP)
-    assert adapter_factory.DEFAULT_ADAPTER_FACTORY.frameworks() == ('langgraph',)
+    assert adapter_factory.DEFAULT_ADAPTER_FACTORY.frameworks() == ('acp', 'langgraph')
 
 
 def test_distribution_declares_both_groups_for_the_built_ins():

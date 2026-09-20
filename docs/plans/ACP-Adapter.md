@@ -358,3 +358,20 @@ These results do not establish ACP, MiniMax, Judge or mixed-suite acceptance.
 - Filesystem/terminal capabilities, ACP onboarding, live evidence, real Agent
   certification and paid mixed-suite acceptance remain pending. No real ACP Agent
   has been marked ready, and no paid Cases have been consumed by these tests.
+
+### M2 implementation checkpoint
+
+ACP filesystem and all terminal callbacks now run inside the Case workspace.
+Terminals drain bounded output, preserve UTF-8 boundaries, and are released with
+process groups on close. Session permission policy selects allow-once only when
+advertised, otherwise denies. Startup notifications are buffered until the returned
+session ID is verified. ACP evidence is saved in `acp-events.jsonl` and
+`acp-summary.json`; real tool start/update/end notifications project live OTel
+spans. Unobserved inputs/results are omitted, not invented. Internal model spans
+are not claimed by the protocol observer.
+
+Validation: 55 ACP/protocol/OTel/adapter regression checks passed; 7 viewer tests
+passed with loopback permission. An exploratory sweep of all issue tests encountered
+missing historical Agent fixtures and sandbox socket restrictions; it is not a
+passing full-suite claim. Updated the built-in adapter discovery assertion to
+include the newly registered ACP adapter. Real Agent certification remains pending.

@@ -60,9 +60,15 @@ class OtelSession:
                     span.set_attribute('gen_ai.tool.type', 'function')
                     if isinstance(data.get('tool_call_id'), str):
                         span.set_attribute('gen_ai.tool.call.id', data['tool_call_id'])
-                    self._tool_content(span, 'arguments', data.get('input'))
+                    if 'input' in data:
+                        self._tool_content(span, 'arguments', data['input'])
                 self.exporter.payload(span, 'input', data.get('input'))
                 self.exporter.payload(span, 'metadata', data.get('metadata'))
+            elif event == 'span_update':
+                span = self.spans.get(data['span_id'])
+                if span is not None and 'input' in data:
+                    self._tool_content(span, 'arguments', data['input'])
+                    self.exporter.payload(span, 'input', data['input'])
             elif event in ('span_end', 'span_error', 'span_control'):
                 span = self.spans.pop(data['span_id'], None)
                 if span is None:
@@ -71,7 +77,12 @@ class OtelSession:
                 label = 'error' if event == 'span_error' else 'output'
                 self.exporter.payload(span, label, data.get(label))
                 if event == 'span_end' and span.attributes.get('abb.kind') == 'tool':
-                    self._tool_content(span, 'result', data.get('output'))
+                    if 'output' in data:
+                        self._tool_content(span, 'result', data['output'])
+                    else:
+                        span.set_attribute('abb.tool_result_omission', 'not_observed')
+                    if 'gen_ai.tool.call.arguments' not in span.attributes:
+                        span.set_attribute('abb.tool_arguments_omission', 'not_observed')
                     if isinstance(data.get('tool_call_id'), str):
                         span.set_attribute('gen_ai.tool.call.id', data['tool_call_id'])
                     if data.get('tool_status') == 'error':

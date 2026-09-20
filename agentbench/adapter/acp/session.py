@@ -3,7 +3,7 @@ import asyncio
 import codecs
 import os
 from acp import PROTOCOL_VERSION, connect_to_agent, text_block
-from acp.schema import ClientCapabilities, Implementation
+from acp.schema import ClientCapabilities, FileSystemCapabilities, Implementation
 from .client import ACPClient, plain
 from .errors import ACPError
 from .process import child_environment, terminate_group
@@ -32,7 +32,8 @@ class ACPSession:
         self.drain_task = asyncio.create_task(self.drain_stderr())
         self.conn = connect_to_agent(self.client, self.process.stdin, self.process.stdout)
         initialized = await self.conn.initialize(
-            protocol_version=PROTOCOL_VERSION, client_capabilities=ClientCapabilities(),
+            protocol_version=PROTOCOL_VERSION, client_capabilities=ClientCapabilities(
+                fs=FileSystemCapabilities(read_text_file=True, write_text_file=True), terminal=True),
             client_info=Implementation(name='agentbench', version='0.1.0'))
         if initialized.protocol_version != PROTOCOL_VERSION:
             raise ACPError('Unsupported ACP protocol version', phase='initialize')
@@ -44,7 +45,7 @@ class ACPSession:
                 raise ACPError('Configured authentication method is not advertised', code='auth_required')
             await self.conn.authenticate(method_id=self.config.auth_method)
         session = await self.conn.new_session(cwd=self.config.cwd, mcp_servers=[])
-        self.client.session_id = session.session_id
+        await self.client.bind_session(session.session_id)
         self.info['session'] = plain(session)
         self.emit('session', self.info['session'])
 
@@ -110,7 +111,10 @@ class ACPSession:
                         pass
             finally:
                 try:
-                    await terminate_group(self.process, self.config.cleanup_timeout)
+                    try:
+                        await terminate_group(self.process, self.config.cleanup_timeout)
+                    finally:
+                        await self.client.terminals.close()
                 finally:
                     if self.conn:
                         try:
