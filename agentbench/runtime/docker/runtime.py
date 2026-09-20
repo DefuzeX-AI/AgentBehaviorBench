@@ -97,7 +97,9 @@ class DockerRuntime:
             self._environ
         )
         self._policy = policy or DockerPolicy()
-        self._interceptor_policy = interceptor_policy or InterceptorPolicy()
+        self._interceptor_policy = (
+            interceptor_policy or InterceptorPolicy.from_environment(self._environ)
+        )
         self._images = DockerImageBuilder(
             executable, coordinator=build_coordinator or BuildCoordinator(),
             control=self.control, command_runner=self._commands,
