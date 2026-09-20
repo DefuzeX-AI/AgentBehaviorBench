@@ -32,7 +32,8 @@ def load_protocols() -> dict[str, ProtocolPlugin]:
         ANTHROPIC_MESSAGES_PROTOCOL.name: ANTHROPIC_MESSAGES_PROTOCOL,
         GEMINI_CONTENT_PROTOCOL.name: GEMINI_CONTENT_PROTOCOL,
     }
-    for name in ("gemini-grpc", "ollama-chat", "ollama-generate", "openai-completions", "openai-embeddings"):
+    for name in ("gemini-grpc", "ollama-chat", "ollama-generate", "openai-completions", "openai-embeddings",
+                 "openai-input-tokens", "anthropic-count-tokens"):
         plugins[name] = JSON_HTTP_PROTOCOL
     return _load(PROTOCOL_GROUP, plugins)
 
@@ -77,10 +78,13 @@ def load_wires():
     from model.ollama import OllamaWire
     from model.google.gemini import GeminiWire
     from model.native import NativeJsonWire
+    from model.auxiliary import TokenCountWire
     registry = {
         "openai-chat": lambda: NativeJsonWire("/chat/completions"),
         "openai-responses": lambda: NativeJsonWire("/responses", "response.completed"),
         "anthropic-messages": lambda: NativeJsonWire("/messages", "message_stop"),
+        "openai-input-tokens": lambda: TokenCountWire("/responses/input_tokens", "bearer-token"),
+        "anthropic-count-tokens": lambda: TokenCountWire("/messages/count_tokens", "anthropic-api-key"),
         "openai-completions": lambda: NativeJsonWire("/completions"),
         "openai-embeddings": lambda: NativeJsonWire("/embeddings"),
         "gemini-content": GeminiWire,

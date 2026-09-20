@@ -152,3 +152,67 @@ cached content or provider-specific controls. Unsupported fields fail closed.
 The target is configurable OpenRouter, not a hard-coded DeepSeek model.
 32 original-client cases and separate fault checks are available in
 `tests/acceptance/interception`; see `docs/interception/acceptance.md`.
+
+## Agent-owned network extensions
+
+An Agent can opt in with `network_config = "network/rules.toml"` under
+`[llm_interception]`. The path must resolve inside its outer unit (including
+symlink resolution). The versioned file supplies `tool_routes` and `token_counting`;
+existing inline routes, including evaluation SDK routes, are preserved. There is
+no automatic import of executable code from an Agent checkout.
+
+```toml
+schema_version = "abb.network.v1"
+[token_counting]
+mode = "local_estimate"
+[token_counting.models]
+"openai/gpt-4.1-mini" = "o200k_base"
+
+[[tool_routes]]
+host_patterns = ["native-service.example"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/review"]
+purpose = "content_safety"
+required = true
+```
+
+The host mounts normalized configuration to the existing service. Ensure the Agent
+Dockerfile copies the referenced configuration into the worker as well. No changes
+to imported source or ACP session code are needed. New native URLs are configuration;
+new counting wire formats belong in `token_counting/protocols/`; counting algorithms
+belong in `token_counting/counters.py`. Existing route matching/authentication is the
+dispatcher, so no second routing registry or Agent-name conditionals are introduced.
+
+Counting endpoints authenticate the per-run credential before any local response.
+`local_estimate` uses an explicit mapping for the actual model selected by BBA, not
+the original source model alias. The deterministic `structured-json-bpe-v1` algorithm
+encodes the input envelope (including system text, tools, tool results and message
+structure). It is approximate, not provider prompt rendering or an upper bound.
+Model usage and billing remain untouched. The bundled tokenizers are loaded at
+image build time. Unsupported models, media or server-held context return 404;
+invalid requests return 400; oversized inputs return 413. Native fallback remains
+visible, not disguised as a zero count. Without opt-in, auxiliary requests retain
+the real upstream response/status, including unsupported endpoint responses.
+
+`model_auxiliary_request/response/error` do not satisfy a generation checkpoint.
+The host drains them before acceptance. Responses record origin, algorithm version,
+target/source models, encoding and request digest. Ordinary model evidence and
+unknown-request/authentication failures keep their existing strict policy.
+
+Tool purposes `metadata` and `content_safety` supplement `tool` and `evaluation`.
+Requests and full responses remain observable. Optional metadata HTTP failures do
+not invalidate model capture. `required=true` requires every observed operation to
+have a successful HTTP response; failure is reported separately from capture loss.
+A successful HTTP response containing a native rejection is preserved, not changed
+to an allow verdict. The native Agent determines how that decision affects its task.
+A failed required operation remains a failed acceptance even if a later retry works.
+
+Offline service regression command (built image already contains the dependencies):
+
+```bash
+docker build -t abb-interceptor-test agentbench/services/model-interceptor
+docker run --rm --network=none --entrypoint python \
+  -v "$PWD/agentbench/services/model-interceptor/tests:/tests:ro" -w /tests \
+  abb-interceptor-test -m unittest discover -v
+```

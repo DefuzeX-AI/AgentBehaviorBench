@@ -90,6 +90,9 @@ class Terminals:
         terminal = self.get(identifier)
         try:
             await terminate_group(terminal.process, self.config.cleanup_timeout)
+            result = await self.output(identifier)
+            self.emit('terminal_released', {'terminal_id': identifier,
+                **result.model_dump(mode='json', by_alias=True, exclude_none=True)})
         finally:
             terminal.drain.cancel()
             await asyncio.gather(terminal.drain, return_exceptions=True)

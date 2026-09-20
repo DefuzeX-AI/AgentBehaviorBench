@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import fnmatch
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
 from typing import Mapping
@@ -56,6 +56,7 @@ class ToolRouteConfig:
     methods: tuple[str, ...]
     path_patterns: tuple[str, ...]
     purpose: str = 'tool'
+    required: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +67,7 @@ class InterceptionConfig:
     credentials: tuple[CredentialConfig, ...]
     routes: tuple[RouteConfig, ...]
     tool_routes: tuple[ToolRouteConfig, ...] = ()
+    token_counting: Mapping[str, object] = field(default_factory=dict)
 
     @classmethod
     def from_agent_dir(cls, agent_root: str | Path) -> "InterceptionConfig | None":
@@ -99,13 +101,20 @@ class InterceptionConfig:
                 f"Interception environment cannot override credential variables: {names}"
             )
 
+        from .network_rules import load_network_rules
+        try:
+            network = load_network_rules(root, section.get('network_config'))
+        except (ValueError, OSError) as exc:
+            raise InterceptionConfigurationError(str(exc)) from exc
         return cls(
             required=_boolean(section, "required", default=True),
             trust_plugin=_required_string(section, "trust_plugin"),
             environment=MappingProxyType(environment),
             credentials=credentials,
             routes=routes,
-            tool_routes=_tool_routes(section.get("tool_routes", [])),
+            tool_routes=(_tool_routes(section.get("tool_routes", []))
+                         + _tool_routes(network.get('tool_routes', []))),
+            token_counting=network.get('token_counting', {}),
         )
 
 
@@ -117,14 +126,15 @@ def _tool_routes(value: object) -> tuple[ToolRouteConfig, ...]:
         if not isinstance(raw, dict):
             raise InterceptionConfigurationError("Every tool route must be a table")
         purpose = raw.get('purpose', 'tool')
-        if purpose not in ('tool', 'evaluation'):
-            raise InterceptionConfigurationError('Tool route purpose must be tool or evaluation')
+        if purpose not in ('tool', 'evaluation', 'metadata', 'content_safety'):
+            raise InterceptionConfigurationError('Unknown tool route purpose')
         result.append(ToolRouteConfig(
             host_patterns=_patterns(raw, "host_patterns", host=True),
             ports=_ports(raw.get("ports", [443])),
             methods=tuple(v.upper() for v in _string_list(raw, "methods")),
             path_patterns=_patterns(raw, "path_patterns", host=False),
             purpose=purpose,
+            required=_boolean(raw, 'required', default=False),
         ))
     return tuple(result)
 

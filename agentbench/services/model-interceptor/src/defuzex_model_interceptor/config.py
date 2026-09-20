@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
 from typing import Mapping
@@ -43,6 +43,7 @@ class ToolRoute:
     methods: tuple[str, ...]
     path_patterns: tuple[str, ...]
     purpose: str = 'tool'
+    required: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +63,7 @@ class ServiceConfig:
     credentials: tuple[Credential, ...]
     routes: tuple[Route, ...]
     tool_routes: tuple[ToolRoute, ...] = ()
+    token_counting: Mapping[str, object] = field(default_factory=dict)
 
     @classmethod
     def load(cls, path: str | Path) -> "ServiceConfig":
@@ -86,6 +88,7 @@ class ServiceConfig:
             credentials=credentials,
             routes=routes,
             tool_routes=_tool_routes(raw.get("tool_routes", [])),
+            token_counting=_object(raw.get('token_counting', {}), 'token_counting'),
         )
 
 
@@ -150,10 +153,13 @@ def _tool_routes(value: object) -> tuple[ToolRoute, ...]:
         if any(not 1 <= p <= 65535 for p in ports):
             raise ServiceConfigurationError("Invalid tool port")
         purpose = data.get('purpose', 'tool')
-        if purpose not in ('tool', 'evaluation'):
-            raise ServiceConfigurationError('Tool route purpose must be tool or evaluation')
+        if purpose not in ('tool', 'evaluation', 'metadata', 'content_safety'):
+            raise ServiceConfigurationError('Unknown tool route purpose')
+        required = data.get('required', False)
+        if not isinstance(required, bool):
+            raise ServiceConfigurationError('Tool route required must be a boolean')
         result.append(ToolRoute(tuple(h.lower().rstrip(".") for h in hosts), ports,
-                                tuple(m.upper() for m in _strings(data, "methods")), paths, purpose))
+                                tuple(m.upper() for m in _strings(data, "methods")), paths, purpose, required))
     return tuple(result)
 
 

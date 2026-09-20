@@ -23,6 +23,8 @@ class ModelInterceptorAddon:
         self.secrets = tuple(v for c in config.credentials for v in (c.token, c.secret))
         self._validate_plugins()
         self.automatic = AutomaticModelRouter(load_wires(), config.credentials, self.authentication)
+        from ..token_counting.service import TokenCountingService
+        self.token_counter = TokenCountingService(config.token_counting, config.target.model)
 
     def running(self):
         emit("interceptor_ready", agent_id=self.config.agent_id)
@@ -48,7 +50,7 @@ class ModelInterceptorAddon:
             # transparent destination IP/SNI supplied by the caller.
             flow.request.host = flow.request.pretty_host.rstrip(".").lower()
             tool = next(r for r in self.config.tool_routes if self.policy.matches(r, flow.request))
-            flow.metadata.update(abb_tool=True, purpose=tool.purpose)
+            flow.metadata.update(abb_tool=True, purpose=tool.purpose, required=tool.required)
             emit('tool_request', **self._tool_fields(flow), **self._body(flow.request))
             return
         if route is None:
@@ -67,6 +69,10 @@ class ModelInterceptorAddon:
                 authentication.authorize_request(outbound, temporary_token=credential.token, upstream_secret=credential.secret)
             else:
                 authentication.authorize(outbound.headers, temporary_token=credential.token, upstream_secret=credential.secret)
+            reply = self.token_counter.handle(route.protocol_plugin, source_body)
+            if reply is not None:
+                self._local_count(flow, reply)
+                return
             prepared = self.targets[self.config.target.target_plugin].prepare_request(
                 outbound, route=route, target=self.config.target)
         except InterceptorAuthenticationError as exc:
@@ -78,7 +84,8 @@ class ModelInterceptorAddon:
         flow.request = outbound
         flow.metadata.update(wire=prepared.wire, defuzex_provider=prepared.provider_id,
                              defuzex_target_model=prepared.target_model, chunk_index=0)
-        emit("llm_request", **self._fields(flow), source_model=prepared.source_model, model=prepared.target_model,
+        emit("model_auxiliary_request" if getattr(prepared.wire, 'auxiliary', False) else "llm_request",
+             **self._fields(flow), source_model=prepared.source_model, model=prepared.target_model,
              source_payload=redact(prepared.source_payload, self.secrets), payload=redact(prepared.payload, self.secrets),
              source_raw_body=None if flow.metadata["source_grpc"] else redact(source_body.decode("utf-8", errors="replace"), self.secrets),
              source_transport="grpc" if flow.metadata["source_grpc"] else "http",
@@ -87,6 +94,8 @@ class ModelInterceptorAddon:
     def responseheaders(self, flow):
         wire = flow.metadata.get("wire")
         if wire is None or flow.response is None:
+            return
+        if getattr(wire, 'auxiliary', False):
             return
         ct = flow.response.headers.get("content-type", "")
         flow.metadata.update(upstream_content_type=ct, upstream_status=flow.response.status_code)
@@ -144,6 +153,10 @@ class ModelInterceptorAddon:
         wire = flow.metadata.get("wire")
         if wire is None or flow.response is None or flow.metadata.get("defuzex_stream_emitted"):
             return
+        if getattr(wire, 'auxiliary', False):
+            emit('model_auxiliary_response', **self._fields(flow), status=flow.response.status_code,
+                 **self._body(flow.response))
+            return
         content = flow.response.content or b""
         status = flow.metadata.get("upstream_status", flow.response.status_code)
         flow.metadata["upstream_status"] = status
@@ -184,7 +197,18 @@ class ModelInterceptorAddon:
         # Query strings can carry credentials; retain the path and parsed body.
         fields['path'] = flow.request.path.split('?', 1)[0]
         fields['purpose'] = flow.metadata.get('purpose', 'tool')
+        fields['required'] = flow.metadata.get('required', False)
         return fields
+
+    def _local_count(self, flow, reply):
+        """Reply locally only after authentication; never install real credentials."""
+        emit('model_auxiliary_request', **self._fields(flow), operation='token_count',
+             source='local_estimate', request_sha256=reply.evidence['request_sha256'],
+             **self._body(flow.request))
+        flow.response = http.Response.make(reply.status, json_bytes(reply.body),
+            {'content-type': 'application/json', 'x-abb-token-count-source': 'local_estimate'})
+        emit('model_auxiliary_response', **self._fields(flow), operation='token_count',
+             status=reply.status, **reply.evidence, **self._body(flow.response))
 
     def _body(self, message):
         content = message.content or b''
@@ -246,7 +270,9 @@ class ModelInterceptorAddon:
         fields.update(failure_fields(failure, self.secrets))
         fields.update(agent_id=self.config.agent_id,
                       framework_span_id=metadata.get("framework_span_id"))
-        emit("tool_error" if tool else "llm_error", **redact(fields, self.secrets))
+        name = ('model_auxiliary_error' if getattr(metadata.get('wire'), 'auxiliary', False)
+                else 'tool_error' if tool else 'llm_error')
+        emit(name, **redact(fields, self.secrets))
 
     def _error(self, flow, message, status, *, code):
         self._emit_error(flow, message, code=code, local_status=status)

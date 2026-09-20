@@ -416,10 +416,11 @@ class DockerRuntime:
                             "headers": dict(target.headers),
                         },
                         "credentials": credentials,
+                        "token_counting": dict(interception.token_counting),
                         "tool_routes": [
                             {"host_patterns": list(route.host_patterns), "ports": list(route.ports),
                              "methods": list(route.methods), "path_patterns": list(route.path_patterns),
-                             "purpose": route.purpose}
+                             "purpose": route.purpose, "required": route.required}
                             for route in interception.tool_routes
                         ],
                         "routes": [
@@ -554,6 +555,8 @@ class DockerRuntime:
                     "Agent invocation trace was not accepted: " + trace_state.diagnostic()
                 )
             if not trace_state.wait_for_idle(control=self.control):
+                if trace_state.operation_failure:
+                    raise DockerRuntimeError('Required Agent network operation failed: ' + trace_state.diagnostic())
                 raise DockerRuntimeError("Model trace is incomplete: " + trace_state.diagnostic())
 
         return require_trace

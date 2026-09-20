@@ -415,3 +415,35 @@ preservation check when replacing that empty declaration, with multiline/quoted-
 regressions. Separated SDK `runtime.worker_env_keys` from Agent-declared `env_keys`,
 so ACP children receive native configuration without inheriting SDK credentials.
 The worker still receives required SDK keys. Focused regression: 37 passed, 1 skipped.
+
+### Native network adaptation checkpoint (2026-09-20)
+
+Implemented declarative outer `network/rules.toml`, referenced by the Agent manifest.
+The host validates containment and egress rules and passes data into the existing
+model-interceptor; no imported Agent code is loaded as a privileged service plugin.
+Counting protocol adapters share a versioned local BPE estimation service. Explicit
+model/encoding mappings refer to the actual BBA target. Models/media/state that the
+estimator cannot handle receive an unsupported response for native fallback.
+Authentication precedes local handling; estimates have separate provenance and do
+not replace generation usage or satisfy model-evidence checkpoints. Native metadata
+and content-review routes retain actual request/response bodies and decisions.
+Required native operation failures are distinguished from lost/incomplete capture.
+
+Real MiniMax smoke: `results/acp-smoke/94646a37c70e407d9d5d4519e69d7b56`.
+Three generation pairs completed; two local counts returned 3217 and 11171; native
+catalog descriptor/CDN both returned 200. The scene-205 session-title review
+returned genuine upstream 401 (`token is required`). Local native login credential
+was absent. Do not mark ready or claim the full native workflow/certification passes.
+No further paid rerun is useful until that credential or an explicitly supported
+native configuration changes. The imported MiniMax source is checked by file hashes
+before/after adaptation, with 4184 source files in the baseline.
+
+Final network regression selection: **128 host/ACP/onboarding/SDK-staging tests
+passed**, plus **25 interceptor tests passed** in its dependency image with
+`--network=none`. The complete imported-source hash comparison passed. These checks
+validate the adaptation; the native 401 still blocks full certification.
+
+Isolated onboarding validation also stages the contained network file. The actual
+MiniMax unit passes static validation using the pinned KUMA parser. The native
+login token is declared in `secret_env_keys`, so missing auth now fails during
+setup, before consuming a model call.

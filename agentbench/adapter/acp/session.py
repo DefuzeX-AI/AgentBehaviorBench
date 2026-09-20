@@ -68,12 +68,14 @@ class ACPSession:
         self.busy = True
         self.callbacks = callbacks
         self.client.parts, self.client.output_bytes, self.client.error = [], 0, None
+        started = asyncio.get_running_loop().time()
         try:
             if self.conn is None:
                 await asyncio.wait_for(self.start(), min(self.config.handshake_timeout, self.config.timeout))
             self.emit('prompt_started', {'session_id': self.client.session_id, 'input': text})
             response = await asyncio.wait_for(self.conn.prompt(
-                session_id=self.client.session_id, prompt=[text_block(text)]), self.config.timeout)
+                session_id=self.client.session_id, prompt=[text_block(text)]),
+                max(0.001, self.config.timeout - (asyncio.get_running_loop().time() - started)))
             if self.client.error:
                 raise self.client.error
             if self.drain_task.done() and self.drain_task.exception():
