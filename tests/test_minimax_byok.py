@@ -78,7 +78,17 @@ def test_global_unit_observes_only_declared_native_model_endpoints():
     for path in ('/anthropic/v1/messages', '/anthropic/v1/messages/count_tokens'):
         assert any(r.matches(host='api.minimax.io', port=443, method='POST', path=path) for r in config.routes)
     assert not any('api.minimax.cn' in r.host_patterns for r in config.routes)
-    assert {h for r in config.tool_routes for h in r.host_patterns} == {'models.dev', 'agent.minimax.io'}
+    assert {h for r in config.tool_routes for h in r.host_patterns} == {
+        'models.dev', 'agent.minimax.io', 'agent.minimaxi.com',
+    }
+    assert any(
+        r.host_patterns == ('agent.minimaxi.com',)
+        and r.ports == (443,)
+        and r.methods == ('POST',)
+        and r.path_patterns == ('/mavis/api/v1/content',)
+        and r.required is False
+        for r in config.tool_routes
+    )
     assert not any(r.matches(host='agent.minimax.io', port=443, method='POST',
                              path='/mavis/api/v1/llm/v1/messages') for r in config.routes)
 
