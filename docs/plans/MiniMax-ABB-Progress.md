@@ -144,3 +144,20 @@ routing failure.
 Validation: 34 Python tests, 13 dependency-complete interceptor tests and 40
 frontend tests passed; frontend production build passed. Native headers,
 401/429/503 responses and streamed bytes remain unchanged in interceptor tests.
+
+## D10 — Formal certification
+
+Ran the existing `certify` command against the unchanged saved official Case,
+with the complete current integration and three actual Inputs. Certification
+succeeded and changed the registry from adapting to ready; no manual status edit.
+
+Suite `suite_1ac5a8288e4648dda9ca48d1ce73b74e`; run
+`2efc33d7689845fe8368ed415206b38f`. Judge received/pass, files complete, host
+trace validation and cleanup succeeded. All 8 model requests have paired replies,
+Case identity and native session identity. All 6 successful main-agent requests
+have exact Input links; the 2 background requests retain session-only identity.
+Framework LLM spans remain unavailable rather than being fabricated.
+
+Readiness retains the existing technical certification semantics. It does not
+claim that optional title review is authenticated, that every generated Case is
+well-formed, or that an unrelated service_busy judgment became a pass.
