@@ -137,6 +137,8 @@ def _resolve_inside(root: Path, value: str) -> Path:
 
 def docker_structure(root: Path, manifest):
     """Validate build paths and launch without resolving environment or secrets."""
+    from agentbench.sdk.common.workspace import workspace_policy
+    workspace_policy(manifest)
     if manifest_runtime_type(manifest) != "docker":
         raise ContainerConfigurationError("Expected Docker runtime")
     build = _required_table(manifest, "build")

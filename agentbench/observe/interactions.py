@@ -49,12 +49,15 @@ def _data(record):
 
 def _files(root):
     names = {'network.jsonl', 'evaluation/sdk.jsonl', 'evaluation/case.json',
-             'evaluation/judge/report.json', 'evaluation/manifest.json'}
+             'evaluation/judge/report.json', 'evaluation/manifest.json',
+             'evaluation/workspace-artifacts.json', 'evaluation/workspace.json'}
     for pattern in ('evaluation/inputs/[0-9][0-9][0-9][0-9]', 'invocation-*/output'):
         for folder in root.glob(pattern):
             for name in ('framework.jsonl', 'input.json', 'mapped-input.json', 'request.json',
-                         'result.json', 'submission.json'):
+                         'result.json', 'submission.json', 'file-evidence.json'):
                 names.add(str((folder / name).relative_to(root)))
+    for path in (root / 'evaluation/workspace-files').glob('*.json'):
+        names.add(str(path.relative_to(root)))
     files = []
     for name in sorted(names):
         candidate = root / name
@@ -254,11 +257,20 @@ class InteractionIndex:
         labels = {'case.json': ('case', 'SDK Case'), 'input.json': ('case', 'SDK Input'),
                   'mapped-input.json': ('input', 'Input passed to the Agent'), 'request.json': ('input', 'Agent invocation'),
                   'result.json': ('output', 'Agent output'), 'submission.json': ('submission', 'SDK submission'),
-                  'report.json': ('judge', 'Judge report')}
+                  'report.json': ('judge', 'Judge report'),
+                  'file-evidence.json': ('files', 'SDK file changes and diff'),
+                  'workspace-artifacts.json': ('files', 'Final changed-file exports'),
+                  'workspace.json': ('files', 'Initial workspace contract')}
         for name, artifact in self.artifacts.items():
-            if Path(name).name not in labels:
+            if name.startswith('evaluation/workspace-files/'):
+                kind, title = 'files', 'Exported file ' + Path(name).stem[:12]
+                listing = self.artifacts.get('evaluation/workspace-artifacts.json', {}).get('value') or {}
+                title = next((item['path'] for item in listing.get('files', [])
+                              if 'evaluation/' + item.get('artifact', '') == name), title)
+            elif Path(name).name in labels:
+                kind, title = labels[Path(name).name]
+            else:
                 continue
-            kind, title = labels[Path(name).name]
             identifier = _id('artifact:' + name)
             context = self.contexts.get(name.rsplit('/', 1)[0])
             identity = artifact['value'] if isinstance(artifact['value'], dict) else {}

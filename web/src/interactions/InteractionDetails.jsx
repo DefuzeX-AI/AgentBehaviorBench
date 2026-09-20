@@ -42,7 +42,13 @@ export default function InteractionDetails({ run, id, revision, live, onNavigate
         {!d.response?.client_payload && <p>The upstream response is shown here; a separate client conversion result was not recorded.</p>}
         {!reply.parsed && <JsonValue value={d.response?.payload} label="Response (unrecognized protocol)" />}
         {reply.usage && <JsonValue value={reply.usage} label="Token / Usage" />}</>
-        : d.artifact_file ? <JsonValue label={d.artifact_file} value={d.artifact} />
+        : d.artifact_file ? <>
+          {d.artifact?.file_evidence && <><h3>File changes</h3>
+            <Tag color={d.artifact.file_evidence.complete ? 'green' : 'orange'}>{d.artifact.file_evidence.complete ? 'Complete' : 'Partial'}</Tag>
+            {d.artifact.file_evidence.changes.map((file, i) => <section key={i}><h4>{file.change_type} · {file.path}</h4>
+              {file.diff ? <pre>{file.diff}</pre> : <p>{file.reason || 'No text diff supplied'}</p>}</section>)}</>}
+          {typeof d.artifact?.content === 'string' && <pre>{d.artifact.content}</pre>}
+          <JsonValue label={d.artifact_file} value={d.artifact} /></>
         : <><JsonValue label="Input / request" value={d.request?.payload ?? d.request?.input ?? d.request} />
           <JsonValue label="Output / response" value={d.response?.payload ?? d.response?.output ?? d.response} /></>}
     </> },

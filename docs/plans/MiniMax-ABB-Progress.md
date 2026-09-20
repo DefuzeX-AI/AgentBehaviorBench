@@ -56,3 +56,37 @@ remains the separate B3 deliverable; purpose remains unknown without evidence.
 Viewer and terminal review expose these counts independently.
 
 Validation: 25 Python tests, 40 frontend tests and production build.
+
+## D05–D08 — Workspace contract and SDK file evidence
+
+- Explicit workspace and file-evidence policy is shared by runtime, manifest
+  validation, programmatic onboarding and SDK capability discovery.
+- Generation and execution use identical empty/fixture workspace definitions;
+  each attempt has a private writable directory, shared only across its turns.
+- PreparedCase now carries an environment SHA-256 through Suite retention and
+  recovery. Missing or changed environment provenance rejects execution before
+  Agent invocation; original signed Case bytes remain unchanged.
+- SDK tracking and diff upload are enabled for MiniMax's actual cwd. Per-step
+  file evidence and final bounded changed text files remain after cleanup.
+- Viewer Files / Diff exposes file statuses, unified diffs, final text and search.
+- SDK snapshots enforce path/size boundaries; exported text additionally passes
+  SDK sensitive scanning and ABB's known runtime credential check.
+
+Real official acceptance: `suite_d9b0517ce40f454a82c9fa26d67e01e0`, artifact run
+`f2b3eec4fa9f481bb1e098aef2236435`, 3 actual Inputs, Judge pass, cleanup succeeded.
+All three file snapshots/diffs complete. First step created input.txt, output.txt
+and process.py with diffs; later steps made no changes. All three final files
+exported. Fresh Backend capabilities included file_diff; intercepted Judge
+multipart logs contained file_diff bodies and unified diff text (not merely
+local evidence). The original records stay under results/observe/.
+
+Validation: 80 Python tests passed, 2 optional tests skipped; frontend 40 passed
+and production build. Additional Suite/Case/recovery tests exercise the new
+prepared environment field. Python 3.10 grammar checked across agentbench.
+The real container run caught and resolved filesystem-share and Suite-retention
+issues not visible in isolated unit tests.
+
+D08 limitation: matching initial state is enforced, but the pinned official Case
+contract has no structured required-file declaration. An arbitrary natural-language
+Case can still request a missing prerequisite; this cannot be certified by regex.
+See [workspace documentation](../Evaluation-Workspaces.md).

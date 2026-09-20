@@ -36,7 +36,7 @@ def render_manifest(facts, *, source, agent_id, options=None):
     manifest = {
         "schema_version": "defuzex-bench.agent.v2", "agent_id": agent_id,
         "display_name": facts["display_name"], "framework": facts["framework"],
-        "evaluation": {"replay_safe": False}, "source": source_metadata(source),
+        "evaluation": {**deepcopy(options.evaluation or {}), "replay_safe": False}, "source": source_metadata(source),
         "runtime": {"type": "docker", "execution": "oneshot", "timeout_sec": options.timeout_sec},
         "build": {"context": ".", "dockerfile": "Dockerfile"},
         "launch": {"argv": ["python", "-m", "agentbench.runtime.agentcontainer.worker"],

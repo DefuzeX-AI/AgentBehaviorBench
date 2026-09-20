@@ -63,3 +63,17 @@ def test_missing_key_is_reported_before_a_catalog_request(monkeypatch):
     monkeypatch.setattr(kuma, "KumaClient", lambda **kwargs: pytest.fail("unexpected client"))
     with pytest.raises(ValueError, match="KUMA_API_KEY or DEFUZEX_API_KEY"):
         fetch(environ={}, timeout=3)
+
+
+def test_declared_file_policy_enables_official_casegen_capability(monkeypatch):
+    import kuma
+    from kuma.repository.strategy_groups import validate_strategy_group_catalog
+    class Client:
+        def __init__(self, **kwargs): pass
+        def strategy_group_catalog(self):
+            return validate_strategy_group_catalog(context()['strategy_group_catalog'])
+    monkeypatch.setattr(kuma, 'KumaClient', Client)
+    result = fetch(environ={'KUMA_API_KEY':'test-only'}, timeout=3, evaluation={
+        'workspace': {'path':'/home/agent/workspace','initial_state':'empty'},
+        'file_evidence': {'track_files':True,'upload_diff':True}})
+    assert 'file_change' in result['available_evidence_capabilities']

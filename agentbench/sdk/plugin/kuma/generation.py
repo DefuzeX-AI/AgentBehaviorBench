@@ -30,7 +30,7 @@ def selected_indices(count, case_indices=None):
 
 
 def generate_collection(create_run, *, count, options, files, repo,
-                        case_indices=None, allow_partial=False, case_options=None):
+                        case_indices=None, allow_partial=False, case_options=None, workspace=None):
     """Save each requested slot once, preserving successes across later failures.
 
     ``count`` is the total registered count, while ``case_indices`` selects the
@@ -53,6 +53,8 @@ def generate_collection(create_run, *, count, options, files, repo,
         try:
             slot_options = options if case_options is None else {**options, **case_options(index)}
             entry = _generate_case(create_run, slot_options, files, index)
+            if workspace is not None:
+                entry['workspace'] = workspace
             validate_entries([*collection['cases'], entry], count=count)
             collection['cases'].append(entry)
         except Exception as exc:

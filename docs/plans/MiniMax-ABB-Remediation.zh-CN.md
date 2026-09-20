@@ -1,6 +1,6 @@
 # MiniMax → ABB 缺陷清单与解决方案
 
-状态：设计草案，供审阅；尚未实施。日期：2026-09-20。
+状态：用户已同意实施；逐项进度见 MiniMax-ABB-Progress.md。日期：2026-09-20。
 
 范围：当前 MiniMax Agent unit、ACP adapter、透明网络观测、KUMA 文件/Trace 证据、Viewer 索引、认证流程。以下列出本次检查已发现的全部问题，不代表未检查路径不存在其他缺陷。
 

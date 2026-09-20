@@ -120,7 +120,7 @@ def prepared_from_json(value):
     path = value.get('artifact_path')
     return PreparedCase(value['case_index'], value.get('case_id'),
                         None if path is None else Path(path), value.get('content_sha256'),
-                        value.get('artifact_sha256'))
+                        value.get('artifact_sha256'), value.get('environment_sha256'))
 
 
 def event_to_json(event):

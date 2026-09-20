@@ -24,6 +24,8 @@ def retain_prepared(directory, agent_id, case, existing=None):
         saved = prepared_from_json(existing)
         if (saved.case_id, saved.content_sha256) != (case.case_id, case.content_sha256):
             raise SuiteProvenanceError('A logical Case cannot be replaced with different generated content')
+        if saved.environment_sha256 != case.environment_sha256:
+            raise SuiteProvenanceError('A logical Case cannot change its initial environment')
         if case.artifact_path is not None:
             actual = hashlib.sha256(case.artifact_path.read_bytes()).hexdigest()
             if actual != saved.artifact_sha256:

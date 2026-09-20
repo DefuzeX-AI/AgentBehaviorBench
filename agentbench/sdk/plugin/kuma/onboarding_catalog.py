@@ -3,7 +3,7 @@
 from .configuration import api_key
 
 
-def fetch(*, environ, timeout):
+def fetch(*, environ, timeout, evaluation=None):
     """Return the full official catalog and the worker's intrinsic capabilities.
 
     Inputs are the explicit BBA environment snapshot and HTTP timeout in seconds.
@@ -24,10 +24,12 @@ def fetch(*, environ, timeout):
     except Exception:
         raise ValueError("Could not refresh the KUMA Strategy Group catalog; check the SDK credential, "
                          "service URL and connection, then retry -b. No saved catalog was substituted.") from None
-    # worker.execute configures trace_evidence and disables repository tracking.
+    # Runtime and onboarding share the same explicit evidence policy.
     # These are SDK evidence capabilities, not a claim that every tool is traced.
+    from agentbench.sdk.common.workspace import workspace_policy
+    policy = workspace_policy({'evaluation': evaluation or {}})
     capabilities = derive_casegen_evidence_capabilities(
-        track_files=False, trace_evidence_configured=True)
+        track_files=policy.track_files, trace_evidence_configured=True)
     return {"strategy_group_catalog": catalog.to_dict(),
             "available_evidence_capabilities": list(capabilities)}
 

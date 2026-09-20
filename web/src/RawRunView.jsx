@@ -5,12 +5,12 @@ import useLiveJson from './useLiveJson.js';
 import InteractionDetails from './interactions/InteractionDetails.jsx';
 import './interactions/interactions.css';
 
-const labels = { chat: 'Chat', tool: 'Tool execution', tool_call: 'Tool call',
+const labels = { files: 'Files / Diff', chat: 'Chat', tool: 'Tool execution', tool_call: 'Tool call',
   callback: 'Framework callback', http: 'HTTP', sdk: 'SDK evaluation', case: 'Case generation',
   input: 'Input', output: 'Output', submission: 'Submission', judge: 'Judge', event: 'Other event' };
-const colors = { chat: 'blue', tool: 'orange', tool_call: 'gold', callback: 'purple', http: 'default', sdk: 'cyan', case: 'geekblue', input: 'cyan', output: 'green', submission: 'volcano', judge: 'green' };
+const colors = { files: 'green', chat: 'blue', tool: 'orange', tool_call: 'gold', callback: 'purple', http: 'default', sdk: 'cyan', case: 'geekblue', input: 'cyan', output: 'green', submission: 'volcano', judge: 'green' };
 const states = { complete: 'Completed', failed: 'Failed', pending: 'Waiting for response', recorded: 'Recorded', unknown: 'Insufficient information' };
-const primary = ['chat', 'tool', 'http', 'sdk', 'case', 'input', 'output', 'submission', 'judge'];
+const primary = ['chat', 'tool', 'http', 'sdk', 'case', 'input', 'output', 'submission', 'judge', 'files'];
 
 function Page({ url, revision, live, page, size, onPage, onSelect, onFacets }) {
   const { data, error } = useLiveJson(url, revision, live);
@@ -70,7 +70,7 @@ export default function RawRunView({ run, revision }) {
       </div>}
       <Space className="interaction-presets" wrap>
         <Button size="small" onClick={() => { setKinds(primary); setPage(1); }}>Primary interactions</Button>
-        {['chat', 'tool', 'http', 'sdk', 'submission'].map(kind => <Button size="small" key={kind}
+        {['chat', 'tool', 'http', 'sdk', 'submission', 'files'].map(kind => <Button size="small" key={kind}
           type={kinds.length === 1 && kinds[0] === kind ? 'primary' : 'default'}
           onClick={() => { setKinds([kind]); setPage(1); }}>{labels[kind]} · {facets?.kinds?.[kind] || 0}</Button>)}
       </Space>

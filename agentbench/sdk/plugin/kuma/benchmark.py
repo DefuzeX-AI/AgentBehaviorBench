@@ -157,6 +157,7 @@ class KumaContainerRunner:
             timeout=self.timeout, max_steps=self.max_steps, case_artifact=case.artifact_path,
             safe_case_replay=self.recovery_capabilities(registration).safe_case_replay,
             expected_case_id=case.case_id, expected_content_sha256=case.content_sha256,
+            expected_environment_sha256=case.environment_sha256,
             trace_sink=self.trace_sink, trace_max_bytes=self.trace_max_bytes,
             **self._runtime_options(identity),
             on_artifacts_ready=lambda path: self._artifacts_ready(
