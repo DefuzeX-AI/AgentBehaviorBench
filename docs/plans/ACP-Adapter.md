@@ -340,3 +340,21 @@ Only the prerequisite filesystem change has passed tests so far: 30 related test
 and one real offline ReAct-container test, covering native non-root HOME writes,
 SQLite, a 65 MiB temporary cache and direct execution of a temporary script.
 These results do not establish ACP, MiniMax, Judge or mixed-suite acceptance.
+
+### Implementation checkpoint: protocol lifecycle
+
+- `f9ed87f`: extracted LangGraph onboarding rules and assets into a dedicated
+  strategy package; 179 onboarding regression tests passed unchanged in behavior.
+- ACP stdio adapter added using `agent-client-protocol==0.12.1`, with lazy SDK
+  import, a stable owned event loop, Case-owned session, bounded output, explicit
+  auth selection and process-group cleanup. Real offline subprocess tests cover
+  sync/async callers, session reuse/isolation, concurrent prompt rejection,
+  disconnect, malformed output, timeout, cancellation, descendant cleanup,
+  rejected authentication, limits, stderr pressure and input mapping.
+- Focused configuration/protocol and existing onboarding/session/concurrency/SDK
+  regression selection: 278 passed, 2 opt-in tests skipped. An existing serial SDK
+  fixture failed with the user's concurrency setting of 3; this also reproduced
+  on baseline `472af04`. Its test now explicitly selects one worker.
+- Filesystem/terminal capabilities, ACP onboarding, live evidence, real Agent
+  certification and paid mixed-suite acceptance remain pending. No real ACP Agent
+  has been marked ready, and no paid Cases have been consumed by these tests.

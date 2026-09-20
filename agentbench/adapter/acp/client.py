@@ -1,0 +1,57 @@
+"""ACP callbacks with bounded reply accumulation and explicit permission decisions."""
+from acp import RequestError
+from acp.schema import RequestPermissionResponse, AllowedOutcome, DeniedOutcome
+from .errors import ACPError
+
+
+def plain(value):
+    return value.model_dump(mode='json', by_alias=True, exclude_none=True) if hasattr(value, 'model_dump') else value
+
+
+class ACPClient:
+    def __init__(self, config, emit):
+        self.config, self.emit = config, emit
+        self.session_id = None
+        self.parts = []
+        self.output_bytes = 0
+        self.error = None
+
+    def on_connect(self, conn):
+        self.conn = conn
+
+    def check_session(self, session_id):
+        if session_id != self.session_id:
+            raise RequestError.invalid_params({'message': 'Session does not belong to this Case'})
+
+    async def session_update(self, session_id, update, **kwargs):
+        try:
+            self.check_session(session_id)
+            event = plain(update)
+            self.emit('session_update', {'session_id': session_id, 'update': event})
+            if event.get('sessionUpdate') == 'agent_message_chunk':
+                content = event.get('content', {})
+                if content.get('type') == 'text':
+                    text = content['text']
+                    self.output_bytes += len(text.encode('utf-8'))
+                    if self.output_bytes > self.config.max_output_bytes:
+                        raise ACPError('ACP reply exceeds configured output limit', code='output_limit')
+                    self.parts.append(text)
+        except Exception as exc:
+            # Notification errors must fail the invocation, not disappear in SDK logs.
+            self.error = exc
+
+    async def request_permission(self, session_id, tool_call, options, **kwargs):
+        self.check_session(session_id)
+        selected = next((item for item in options if item.kind == 'allow_once'), None)
+        outcome = (AllowedOutcome(outcome='selected', option_id=selected.option_id)
+                   if self.config.permission_policy == 'allow_once' and selected else
+                   DeniedOutcome(outcome='cancelled'))
+        self.emit('permission', {'session_id': session_id, 'tool_call': plain(tool_call),
+                                'options': [plain(x) for x in options], 'outcome': plain(outcome)})
+        return RequestPermissionResponse(outcome=outcome)
+
+    async def ext_method(self, method, params):
+        raise RequestError.method_not_found(method)
+
+    async def ext_notification(self, method, params):
+        self.emit('extension', {'method': method, 'params': params})

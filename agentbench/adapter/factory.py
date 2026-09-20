@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .base import AgentAdapter, AgentDescriptor
 from .langgraph import LangGraphAdapter
+from .acp import ACPAdapter
 
 
 AdapterBuilder = Callable[[Path], AgentAdapter]
@@ -95,7 +96,7 @@ def _normalize_framework(framework: str) -> str:
 
 
 DEFAULT_ADAPTER_FACTORY = AdapterFactory(
-    {"langgraph": LangGraphAdapter.from_agent_dir},
+    {"langgraph": LangGraphAdapter.from_agent_dir, "acp": ACPAdapter.from_agent_dir},
     entry_point_group=ADAPTER_ENTRY_POINT_GROUP,
 )
 
