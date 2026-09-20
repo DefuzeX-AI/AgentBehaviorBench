@@ -1,11 +1,5 @@
-"""Generate each planned binding independently after agent.toml is saved."""
-from pathlib import Path
-from ..common.models import FileStep
-from .validation import validate_binding
-
+"""Dispatch adapter-owned binding steps."""
+from ..frameworks.registry import strategy
 
 def steps(plan):
-    assets = Path(__file__).parent / "assets"
-    prompt = "\n\n".join(path.read_text() for path in
-                         [assets / "prompt.md", *sorted(assets.glob("example-*.md"))])
-    return [FileStep(name, prompt, validate_binding) for name in plan["bindings"]]
+    return strategy(plan.get("framework", "langgraph")).binding_steps(plan)

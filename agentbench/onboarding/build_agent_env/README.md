@@ -26,15 +26,16 @@ fails or the user presses Ctrl-C. Certification remains a separate `-c` action.
 | `openrouter_provider/` | HTTP requests, bounded source collection, secret handling, model/request settings and single-file response schema. |
 | `common/` | Per-file execution, atomic writes, checkpoints, registry updates and final validation. |
 
-Each builder keeps its English prompt under its own `assets/`. SDK-specific
+Framework-specific builders keep their prompts, schemas and examples under
+`frameworks/<name>/assets/`. Shared builders retain their own `assets/`. SDK-specific
 profile rules still come from the selected SDK plugin; they are not reimplemented
 in the generic builder.
 
 `framework` is inferred from the source, not assigned a universal default.
 Requests include `framework_requirements` from the intersection of registered
-runtime adapters and explicit onboarding support in `build_toml/frameworks.py`.
+runtime adapters and explicit onboarding support in `frameworks/registry.py`.
 Currently that intersection contains only LangGraph. Its field instructions live
-in `build_toml/assets/adapter-langgraph.md`, separate from the general TOML prompt.
+in `frameworks/langgraph/assets/manifest/adapter-langgraph.md`, separate from the general TOML prompt.
 New frameworks require an actual runtime adapter, static configuration validation
 and matching generation instructions; adding a name alone does not implement
 support. Non-file-based adapters also need the entrypoint validation flow extended.
@@ -107,7 +108,7 @@ KUMA's Run preflight still enforces the service's current selection rules.
 
 ## Binding contract
 
-Every complete plan includes an outer `bindings/*.py` file. The generated manifest
+Every complete LangGraph plan includes an outer `bindings/*.py` file. The generated manifest
 selects its synchronous zero-argument factory; a compatible native graph needs only
 a forwarding factory returning it. Other Agents need source-backed input/output
 adaptation and their full public lifecycle. Upstream `agent/` files stay unchanged.

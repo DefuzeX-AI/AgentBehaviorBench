@@ -48,7 +48,10 @@ configuration; Docker construction and execution belong to certification/runtime
 - Keep each builder's prompts, examples and schemas with that builder. Prompts
   must explain the actual format and give usable examples, not assume the model
   knows BBA's interfaces. The existing binding builder is named `build_blinding/`.
-- Every complete generated plan includes an outer Python binding. Its exported
+- Keep framework-specific planning, rendering, validation and assets under
+  `onboarding/build_agent_env/frameworks/<name>/`. Shared builders own orchestration,
+  persistence and SDK policy; do not mix protocol-specific branches into them.
+- Every complete generated LangGraph plan includes an outer Python binding. Its exported
   factory is synchronous and callable without arguments. The returned object
   exposes `invoke()` and may expose `ainvoke()`. Preserve native inputs, outputs,
   configuration, errors and resource cleanup; do not substitute a demo Agent.

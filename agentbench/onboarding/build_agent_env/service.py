@@ -95,7 +95,7 @@ def _build(session, registry_path):
         session.sdk_context = load_sdk_context(session)
         checkpoint = Checkpoint(session)
         session.plan = prepare_plan(session, checkpoint)
-        steps = [manifest_step(), *binding_steps(session.plan), *docker_steps(),
+        steps = [manifest_step(session.plan.get("framework", "langgraph")), *binding_steps(session.plan), *docker_steps(),
                  *requirement_steps(session.plan)]
         for index, step in enumerate(steps, 1):
             run_step(step, session, checkpoint, index, len(steps))

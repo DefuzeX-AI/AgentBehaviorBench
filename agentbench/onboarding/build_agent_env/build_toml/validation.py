@@ -5,12 +5,11 @@ import tempfile
 from pathlib import Path
 
 from .frameworks import config_reader
+from ..frameworks.registry import strategy
 from .environment import CREDENTIAL_NAME
 from agentbench.runtime.agentcontainer.config import AgentContainerConfig, execution_strategy, tomllib
 from agentbench.runtime.interception.config import InterceptionConfig
 from ..common.errors import BuildError
-from ..common.paths import file_path
-from ..openrouter_provider.context import safe_file
 
 
 class _PlaceholderSecrets:
@@ -36,39 +35,21 @@ def validate_manifest(content, session):
     adapter = manifest.get("adapter")
     if not isinstance(adapter, dict):
         raise BuildError("agent.toml needs an [adapter] table")
-    binding = adapter.get("binding")
-    if not isinstance(binding, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*\.py:[A-Za-z_][A-Za-z0-9_]*", binding):
-        raise BuildError("Onboarding requires adapter.binding='filename.py:factory' relative to outer bindings/; "
-                         "the selected synchronous factory must be callable without arguments")
-    config_name = adapter.get("config", "")
-    source = session.source.directory / "agent"
-    config_path = safe_file(source, config_name) if isinstance(config_name, str) else None
-    if config_path is None:
-        raise BuildError("adapter.config must reference an existing file inside agent/")
+    selected = strategy(manifest.get("framework"))
+    config_name, config_path = selected.validate_manifest(manifest, session)
     build = manifest.get("build", {})
     if not isinstance(build, dict) or build.get("context") != "." or build.get("dockerfile") != "Dockerfile":
         raise BuildError("Use build.context='.' and build.dockerfile='Dockerfile'")
     with tempfile.TemporaryDirectory(prefix="agent-manifest-check-") as directory:
         root = Path(directory)
         (root / "agent.toml").write_text(content)
-        target = root / "agent" / config_name
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(config_path.read_text())
+        selected.stage_validation(root, config_name, config_path)
         (root / "Dockerfile").write_text("FROM scratch\n")
         parsed = read_config(root)
         AgentContainerConfig.from_agent_dir(root, secret_resolver=_PlaceholderSecrets(), environ={})
         execution_strategy(root)
         interception = InterceptionConfig.from_agent_dir(root)
-    filename, separator, attribute = parsed.binding.rpartition(":")
-    if not separator or not attribute:
-        raise BuildError("The selected file-based adapter entrypoint must use file.py:attribute")
-    name = "bindings/" + filename
-    file_path(name)
-    planned = session.plan.get("bindings", [])
-    if planned and name not in planned:
-        raise BuildError("Manifest binding must select a file in plan.bindings")
-    if not planned and safe_file(session.source.directory, name) is None:
-        raise BuildError("Manifest binding must reference a planned or existing binding file")
+    selected.validate_selection(parsed, session)
     validate_credentials(manifest.get("runtime", {}), interception)
 
 

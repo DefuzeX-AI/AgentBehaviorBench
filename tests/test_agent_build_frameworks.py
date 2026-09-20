@@ -3,7 +3,7 @@
 import pytest
 
 from agentbench.adapter.factory import AdapterFactory
-from agentbench.onboarding.build_agent_env.build_toml import frameworks
+from agentbench.onboarding.build_agent_env.frameworks import registry as frameworks
 from agentbench.onboarding.build_agent_env.common.errors import BuildError
 from tests.agent_build_fixtures import source, plan, Client, FILES, build
 

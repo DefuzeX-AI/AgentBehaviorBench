@@ -2,7 +2,8 @@
 from pathlib import Path
 from ..common.models import FileStep
 from .validation import validate_manifest
-from .rendering import render_manifest, SCHEMA
+from .rendering import render_manifest
+from ..frameworks.registry import strategy
 from .protocols import protocol_catalog
 from .tool_routes import network_evidence, complete_routes
 
@@ -19,10 +20,11 @@ def render_response(response, session):
                            options=session.manifest_options)
 
 
-def step():
+def step(framework="langgraph"):
     assets = Path(__file__).parent / "assets"
-    prompt = "\n\n".join((assets / name).read_text() for name in ("prompt.md", "client-transports.md"))
+    selected = strategy(framework)
+    prompt = (selected.assets / "manifest/prompt.md").read_text() + "\n\n" + (assets / "client-transports.md").read_text()
     return FileStep("agent.toml", prompt,
-                    validate_manifest, response_schema=SCHEMA, render=render_response,
+                    validate_manifest, response_schema=selected.manifest_schema, render=render_response,
                     request_data={"response_kind": "configuration_facts",
                                   "protocol_catalog": protocol_catalog()})
