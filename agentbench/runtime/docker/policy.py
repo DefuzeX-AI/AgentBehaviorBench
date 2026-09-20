@@ -10,16 +10,16 @@ class DockerPolicy:
     cpus: float = 1.0
     memory: str = "1g"
     pids_limit: int = 128
-    tmpfs_size: str = "64m"
+    # Capacity limit, not a reservation; tmpfs usage also counts toward memory.
+    tmpfs_size: str = "1g"
 
     def run_arguments(self) -> tuple[str, ...]:
         return (
-            "--read-only",
             "--cap-drop=ALL",
             "--security-opt=no-new-privileges",
             f"--pids-limit={self.pids_limit}",
             f"--memory={self.memory}",
             f"--cpus={self.cpus}",
-            f"--tmpfs=/tmp:rw,noexec,nosuid,size={self.tmpfs_size}",
+            f"--tmpfs=/tmp:rw,exec,nosuid,nodev,size={self.tmpfs_size},mode=1777",
             f"--tmpfs=/run/agentbench-tools:rw,exec,nosuid,nodev,size={self.tmpfs_size},mode=1777",
         )

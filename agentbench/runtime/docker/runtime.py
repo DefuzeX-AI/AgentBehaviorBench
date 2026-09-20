@@ -287,7 +287,7 @@ class DockerRuntime:
                 inputs, outputs = invocation
                 _share_input_mount(inputs)
                 command.extend(("--mount", _bind_mount(inputs, "/run/abb-input")))
-                # All other filesystem locations retain the existing read-only policy.
+                # Persist artifacts separately from the container's writable layer.
                 command.extend(("--mount", f"type=bind,source={outputs},target=/run/abb-output"))
             # Disable Python bytecode caches and flush logs promptly.
             agent_environment.update(
