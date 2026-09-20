@@ -20,8 +20,10 @@ operations. ACP selects `observe` through its adapter; there is no user mode fla
   the international runtime reads `https://models.dev/api.json` directly.
   Its metadata rule permits only that path, without the CN descriptor/CDN routes.
 - `packages/local-runtime/src/content-safety/api-base.ts`: international production
-  review uses `agent.minimax.io`; only the existing `/mavis/api/v1/content` path
-  is permitted.
+  review starts at `agent.minimax.io`. The service can return an HTTP 307 redirect
+  to `agent.minimaxi.com`, so both hosts permit only the same exact
+  `/mavis/api/v1/content` POST path. The second route preserves the redirect's
+  observable response instead of trusting a general cross-domain redirect.
 - `packages/local-runtime/src/content-safety/api.ts`: review sends the original
   `content_text` and `scene`. Responses, including rejection and HTTP 401, reach
   the Agent unchanged. The Agent owns fallback behavior. This route is optional
