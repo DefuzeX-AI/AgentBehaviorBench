@@ -15,6 +15,7 @@ from .loader import InvokableGraph, LangGraphLoadError, load_graph
 
 
 class LangGraphAdapter:
+    network_mode = 'replace'
     def __init__(self, config: LangGraphAdapterConfig) -> None:
         """Keep config and lazy graph state."""
         self.config = config

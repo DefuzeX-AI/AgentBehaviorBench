@@ -59,36 +59,42 @@ class Target:
 class ServiceConfig:
     agent_id: str
     max_trace_bytes: int
-    target: Target
+    target: Target | None
     credentials: tuple[Credential, ...]
     routes: tuple[Route, ...]
     tool_routes: tuple[ToolRoute, ...] = ()
     token_counting: Mapping[str, object] = field(default_factory=dict)
+    mode: str = 'replace'
 
     @classmethod
     def load(cls, path: str | Path) -> "ServiceConfig":
         raw = json.loads(Path(path).read_text(encoding="utf-8"))
         if not isinstance(raw, dict):
             raise ServiceConfigurationError("Interceptor configuration must be an object")
-        credentials = tuple(_credential(item) for item in _list(raw, "credentials"))
+        mode = raw.get('mode', 'replace')
+        if mode not in ('observe', 'replace'):
+            raise ServiceConfigurationError('Unknown internal interception mode')
+        credentials = (() if mode == 'observe' else
+                       tuple(_credential(item) for item in _list(raw, "credentials")))
         route_data = raw.get("routes", [])
         if not isinstance(route_data, list):
             raise ServiceConfigurationError("routes must be a list")
-        routes = tuple(_route(item) for item in route_data)
+        routes = tuple(_route(item, require_credentials=mode == 'replace') for item in route_data)
         ids = {item.credential_id for item in credentials}
-        if any(route.credential_id not in ids for route in routes):
+        if mode == 'replace' and any(route.credential_id not in ids for route in routes):
             raise ServiceConfigurationError("Route references an unknown credential")
         max_bytes = raw.get("max_trace_bytes")
         if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes < 1024:
             raise ServiceConfigurationError("max_trace_bytes must be at least 1024")
         return cls(
+            mode=mode,
             agent_id=_string(raw, "agent_id"),
             max_trace_bytes=max_bytes,
-            target=_target(raw.get("target")),
+            target=_target(raw.get("target")) if mode == 'replace' else None,
             credentials=credentials,
             routes=routes,
             tool_routes=_tool_routes(raw.get("tool_routes", [])),
-            token_counting=_object(raw.get('token_counting', {}), 'token_counting'),
+            token_counting=_object(raw.get('token_counting', {}), 'token_counting') if mode == 'replace' else {},
         )
 
 
@@ -102,7 +108,7 @@ def _credential(value: object) -> Credential:
     )
 
 
-def _route(value: object) -> Route:
+def _route(value: object, *, require_credentials=True) -> Route:
     data = _object(value, "route")
     return Route(
         route_id=_string(data, "id"),
@@ -111,7 +117,7 @@ def _route(value: object) -> Route:
         methods=tuple(item.upper() for item in _strings(data, "methods")),
         path_patterns=_strings(data, "path_patterns"),
         protocol_plugin=_string(data, "protocol_plugin"),
-        credential_id=_string(data, "credential"),
+        credential_id=_string(data, "credential") if require_credentials else '',
     )
 
 

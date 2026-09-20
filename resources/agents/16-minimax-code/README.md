@@ -16,15 +16,23 @@ outer Dockerfile directly without BBA's injected runtime directory.
 
 The non-root user owns `/home/agent` and `/home/agent/workspace`. Case containers
 isolate workspace, native session and local configuration. Tools requesting ACP
-permission may receive allow-once; permanent grants are never selected. The outer `network/rules.toml` declares native catalog and content-review
-endpoints plus local token-count compatibility. Arbitrary external tool endpoints
-remain blocked; see [network adaptation](network/README.md). The profile selects Coding Maintenance from the
-live KUMA catalog, with self-contained local tasks and one initial input.
+permission may receive allow-once; permanent grants are never selected.
 
-The Agent receives an intercepted surrogate model key; real OpenRouter and KUMA
-keys remain controlled by BBA. The native content-review service also requires `MAVIS_ACCESS_TOKEN` in the local
-`.env`; an OpenRouter model key does not replace that login credential. Missing
-native credentials fail before execution. Configure the host model using BBA's existing
-`--model` / `OPENROUTER_MODEL`. This deployment is adapting until real Case, Agent,
-Judge and host evidence acceptance all complete; image construction and handshake
-alone do not certify it.
+ACP uses BBA's native observation path. The native command selects its own model,
+endpoint and authentication. BBA records redacted traffic without substituting a
+model key or providing local token-count replies. `--model` / `OPENROUTER_MODEL`
+do not select this Agent's model. The outer `network/rules.toml` scopes catalog
+and content-review access; unknown destinations remain blocked. See
+[network adaptation](network/README.md).
+
+A usable native MiniMax login still needs to be provisioned inside the isolated
+runtime. The optional `MAVIS_ACCESS_TOKEN` declaration forwards an existing value
+unchanged for native operations that read it; it is not a substitute for the
+CLI's complete managed-login flow. An OpenRouter key cannot authenticate MiniMax.
+BBA no longer rejects startup merely because this optional variable is absent.
+The native Agent decides whether it can proceed, and native failures are recorded.
+
+The profile selects Coding Maintenance from the KUMA catalog, with self-contained
+local tasks and one initial input. Image construction, handshake and proxy tests
+do not certify this deployment; native Case, Agent, Judge and host evidence
+acceptance must complete before changing the registry to `ready`.

@@ -110,10 +110,13 @@ def test_factory_without_resolve_is_rejected(monkeypatch):
         resolve_model_provider('broken', environ={})
 
 
-def test_docker_runtime_constructs_the_selected_provider(monkeypatch):
+def test_docker_runtime_defers_replacement_provider_until_needed(monkeypatch):
     _install(monkeypatch, providers, MODEL_PROVIDER_ENTRY_POINT_GROUP, fixture='FixtureProvider')
     runtime = DockerRuntime(environ={'ABB_MODEL_PROVIDER': 'fixture'})
-    assert runtime._model_provider == FixtureProvider()
+    assert runtime._model_provider is None
+    from agentbench.runtime.interception.providers import DeferredModelTargetProvider
+    assert DeferredModelTargetProvider('chosen').resolve(runtime._environ).model == 'chosen'
+    assert DeferredModelTargetProvider().resolve(runtime._environ).provider_id == 'fixture'
 
 
 def test_kuma_configuration_check_rejects_an_unknown_provider_before_any_case(tmp_path, monkeypatch):

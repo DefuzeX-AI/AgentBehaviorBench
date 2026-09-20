@@ -7,6 +7,7 @@ from .config import ACPConfig
 
 
 class ACPAdapter:
+    network_mode = 'observe'
     build_requirements = Path(__file__).with_name('requirements.txt')
 
     def __init__(self, config):

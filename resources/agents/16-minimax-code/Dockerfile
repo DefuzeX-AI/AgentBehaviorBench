@@ -13,6 +13,6 @@ RUN cd agent && pnpm install --frozen-lockfile && pnpm build \
     && useradd --create-home --uid 10001 agent \
     && mkdir -p /home/agent/workspace && chown -R agent:agent /home/agent
 COPY .abb-runtime/ /opt/abb-runtime/
-COPY agent.toml launch_acp.py ./
+COPY agent.toml ./
 COPY network/ ./network/
 USER agent

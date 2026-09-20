@@ -94,6 +94,9 @@ class InterceptionTraceState:
         if not isinstance(call_id, str) or not call_id:
             return
         with self._condition:
+            if event.event == 'observation_error':
+                self._failed = True
+                self._note_rejection(event, call_id, 'capture_failed')
             if event.event == 'tool_request' and event.data.get('required') is True:
                 self._required_pending.add(call_id)
             elif event.event in ('tool_response', 'tool_error') and call_id in self._required_pending:

@@ -17,7 +17,7 @@ from test_auto_routing import config, flow, grpc_flow
 class RoutingEdgesTest(unittest.TestCase):
     def setUp(self):
         self.events = []
-        capture = patch("defuzex_model_interceptor.proxy.addon.emit",
+        capture = patch("defuzex_model_interceptor.observation.events.emit",
                         side_effect=lambda event, **data: self.events.append({"event": event, **data}))
         capture.start()
         self.addCleanup(capture.stop)
@@ -91,7 +91,7 @@ class RoutingEdgesTest(unittest.TestCase):
             return wire
         factories = {**load_wires(), "custom-wire": custom_factory}
         with patch("defuzex_model_interceptor.registry.load_wires", return_value=factories), \
-             patch("defuzex_model_interceptor.proxy.addon.load_wires", return_value=factories):
+             patch("defuzex_model_interceptor.replace.handler.load_wires", return_value=factories):
             addon = ModelInterceptorAddon(config())
         request = flow("https://custom.example/custom/infer", b'{"model":"old","messages":[]}',
                        {"content-type": "application/json", "authorization": "Bearer openai-run-token"})
@@ -101,7 +101,7 @@ class RoutingEdgesTest(unittest.TestCase):
 
     def test_equally_specific_protocols_fail_with_ambiguity_not_arbitrary_selection(self):
         factories = {**load_wires(), "duplicate-chat": lambda: NativeJsonWire("/chat/completions")}
-        with patch("defuzex_model_interceptor.proxy.addon.load_wires", return_value=factories):
+        with patch("defuzex_model_interceptor.replace.handler.load_wires", return_value=factories):
             addon = ModelInterceptorAddon(config())
         request = flow("https://custom.example/v1/chat/completions", b'{}',
                        {"content-type": "application/json", "authorization": "Bearer openai-run-token"})

@@ -118,6 +118,16 @@ def resolve_model_provider(
 
 
 @dataclass(frozen=True, slots=True)
+class DeferredModelTargetProvider:
+    """Resolve an optional replacement provider only when a runtime uses it."""
+
+    model: str | None = None
+
+    def resolve(self, environ: Mapping[str, str]) -> ModelTargetConfig:
+        return resolve_model_provider(model=self.model, environ=environ).resolve(environ)
+
+
+@dataclass(frozen=True, slots=True)
 class StaticModelTargetProvider:
     """Supply an already validated target, primarily for deployments and tests."""
 

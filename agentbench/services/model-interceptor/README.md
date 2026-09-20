@@ -1,19 +1,29 @@
 # DefuzeX Model Interceptor
 
-This standalone Linux container transparently intercepts model HTTP traffic for
-one AgentBench Docker Agent. It owns netfilter and TLS termination; the Agent
-container shares its network namespace but cannot access upstream credentials.
+This standalone Linux container handles model HTTP traffic for one AgentBench
+Docker Agent. It owns netfilter and TLS termination; the Agent shares its network
+namespace. Adapter registration selects the behavior without a user mode switch:
 
-Matched OpenAI Chat Completions, OpenAI Responses, and Anthropic Messages
-requests retain their source protocol skin while the target plugin rewrites the
-upstream URL, model, and authentication for OpenRouter. Streaming responses are
-relayed immediately and recorded completely. The legacy `max_trace_bytes`
-setting is now an in-memory spool threshold, not a capture limit: larger streams
-spill to temporary storage. No request or response body is cut to fit this value.
-Storage/resource failures fail visibly instead of claiming a complete trace.
+- **ACP / observe:** preserve native URL, model, credentials, payload and response.
+  The Agent receives its declared native credentials. The service needs no
+  replacement provider or secret. Token counting also stays native.
+- **LangGraph / replace:** retain existing protocol recognition and credential
+  substitution. The target plugin selects the OpenRouter URL, model and upstream
+  key; the Agent receives an isolated temporary key.
+
+Both paths enforce explicit egress policy and redact recorded evidence. Observe
+requires a declared model or tool destination; recognizing a familiar model API
+path alone does not authorize arbitrary hosts. Native HTTP failures and SSE error
+frames remain unchanged. Connection failures stay connection failures. Recording
+failures reject evidence without replacing the native response. SDK Case generation
+and Judge configuration remain separate from the Agent's network behavior.
+
+Streaming responses are relayed immediately and recorded completely. The legacy
+`max_trace_bytes` setting is an in-memory spool threshold, not a capture limit:
+larger streams spill to temporary storage. Storage failures fail visibly.
 
 Events retain decoded `payload` and complete `raw_body` text (including SSE
-termination and usage events). Requests also retain `source_raw_body` before
+termination and usage events). Replacement requests also retain `source_raw_body` before
 protocol/model rewriting. Known credentials are still redacted. Existing truncated
 logs cannot be restored; a new run is required to collect missing network data.
 Final event serialization still materializes the complete body in memory; this
@@ -33,11 +43,14 @@ src/
 │   ├── contracts.py            # Adapter interfaces and exchanged data
 │   ├── registry.py             # Compose built-ins and load installed plugins
 │   ├── proxy/
-│   │   ├── addon.py            # mitmproxy request/response lifecycle
+│   │   ├── addon.py            # Select the adapter-owned behavior
+│   │   ├── common.py           # Shared fields, redaction and local errors
 │   │   ├── loader.py           # mitmproxy script entry point
 │   │   └── netfilter.py        # Linux namespace routing rules
-    │   ├── routing/automatic.py    # Adapter-owned model request recognition
-    │   ├── routing/policy.py       # Explicit route and tool egress matching
+│   ├── observe/handler.py      # Native forwarding and evidence capture
+│   ├── replace/handler.py      # Provider/auth/protocol replacement
+│   ├── routing/automatic.py    # Adapter-owned model request recognition
+│   ├── routing/policy.py       # Explicit route and tool egress matching
 │   ├── targets/openrouter.py  # Upstream URL, model and request preparation
 │   ├── security/
 │   │   ├── auth.py             # Shared bearer and isolated-network auth

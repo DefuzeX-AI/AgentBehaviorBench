@@ -21,3 +21,9 @@ File and terminal callbacks run in the workspace. JSON-RPC stdout must stay clea
 logs belong on stderr. Native internal LLM spans are not provided by ACP. Tool
 notifications and protocol activity are evidence; model interception remains a
 separate existing runtime service with precise protocol and endpoint rules.
+
+ACP always uses native observe mode, selected by the registered adapter. Do not
+add a mode switch or configure surrogate model credentials. Native model keys
+remain real runtime secrets; declare verified native model endpoints. Preserve
+native CLI model/login settings, token counting and tool-loading behavior. BBA
+observes and redacts traffic without replacing providers or response formats.

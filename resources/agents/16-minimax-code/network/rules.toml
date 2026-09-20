@@ -1,14 +1,5 @@
 schema_version = "abb.network.v1"
 
-# This estimate is for the actual BBA target, not MiniMax's native model alias.
-# Unlisted models/media get an explicit unsupported response and native fallback.
-[token_counting]
-mode = "local_estimate"
-max_input_bytes = 2000000
-[token_counting.models]
-"openai/gpt-4.1-mini" = "o200k_base"
-"openai/gpt-4.1" = "o200k_base"
-
 # Native model catalog descriptor; returned CDN locations are separately scoped.
 [[tool_routes]]
 host_patterns = ["agent.minimax.cn"]
@@ -25,11 +16,11 @@ path_patterns = ["/public/models-dev/catalog/*/api.json"]
 purpose = "metadata"
 
 # Preserve the original review and response, including scene and rejection.
-# No mock allow verdict; every observed request must finish without HTTP error.
+# Preserve the native failure or rejection; the Agent owns its fallback behavior.
 [[tool_routes]]
 host_patterns = ["agent.minimax.cn"]
 ports = [443]
 methods = ["POST"]
 path_patterns = ["/mavis/api/v1/content"]
 purpose = "content_safety"
-required = true
+required = false

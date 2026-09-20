@@ -17,7 +17,7 @@ BODY = {'model': 'native-alias', 'input': [{'role': 'user', 'content': 'Hello ä½
 class LocalCountingTest(unittest.TestCase):
     def setUp(self):
         self.events = []
-        p = patch('defuzex_model_interceptor.proxy.addon.emit',
+        p = patch('defuzex_model_interceptor.observation.events.emit',
                   side_effect=lambda name, **data: self.events.append({'event': name, **data}))
         p.start()
         self.addCleanup(p.stop)
@@ -130,7 +130,7 @@ class NativeNetworkTest(unittest.TestCase):
                 addon = ModelInterceptorAddon(replace(config(), tool_routes=(route,)))
                 request = flow('https://native.example/review', b'{"scene":205,"content_text":"title"}',
                                {'content-type': 'application/json'})
-                with patch('defuzex_model_interceptor.proxy.addon.emit',
+                with patch('defuzex_model_interceptor.observation.events.emit',
                            side_effect=lambda name, **data: events.append({'event': name, **data})):
                     addon.request(request)
                     self.assertIsNone(request.response)
@@ -148,7 +148,7 @@ class NativeNetworkTest(unittest.TestCase):
         from defuzex_model_interceptor.config import ToolRoute
         route = ToolRoute(('native.example',), (443,), ('POST',), ('/review',), 'content_safety')
         addon = ModelInterceptorAddon(replace(config(), tool_routes=(route,)))
-        with patch('defuzex_model_interceptor.proxy.addon.emit'):
+        with patch('defuzex_model_interceptor.observation.events.emit'):
             request = flow('https://native.example/private', b'{}', {'content-type': 'application/json'})
             addon.request(request)
         self.assertEqual(request.response.status_code, 403)

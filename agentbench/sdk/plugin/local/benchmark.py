@@ -1,6 +1,7 @@
 """KUMA's container executor with local providers: no Backend and no KUMA credential."""
 from agentbench.harness.errors import ProviderSelectionError
 from agentbench.runtime.interception import resolve_model_provider
+from agentbench.adapter.factory import DEFAULT_ADAPTER_FACTORY
 from agentbench.sdk.contracts import RunnerRecoveryCapabilities
 from agentbench.sdk.plugin.kuma.benchmark import KumaContainerRunner
 from agentbench.sdk.plugin.kuma.service import evaluate
@@ -18,8 +19,9 @@ class LocalContainerRunner(KumaContainerRunner):
 
     def validate_sdk(self, registration):
         try:
-            # Both models must resolve before an image is built: the Agent's and the Judge's.
-            resolve_model_provider(environ=self.environ)
+            # The Judge still needs its own model, even when observing a native Agent.
+            if DEFAULT_ADAPTER_FACTORY.network_mode(getattr(registration, 'framework', 'langgraph')) == 'replace':
+                resolve_model_provider(environ=self.environ)
             judge_model(self.environ)
         except ValueError as exc:
             raise ProviderSelectionError(str(exc)) from exc

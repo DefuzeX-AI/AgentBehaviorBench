@@ -70,9 +70,11 @@ def validate_credentials(runtime, interception):
     if interception:
         copied = set(runtime.get("secret_env_keys", [])).intersection(
             credential.agent_env for credential in interception.credentials)
-        if copied:
+        if copied and interception.mode == 'replace':
             problems.append("Remove intercepted model credentials from secret_env_keys: " + ", ".join(sorted(copied)))
-        if runtime.get("secret_env_keys") and not interception.tool_routes:
+        tool_secrets = set(runtime.get('secret_env_keys', [])) - {
+            credential.agent_env for credential in interception.credentials}
+        if tool_secrets and not interception.tool_routes:
             problems.append("Declare actual tool_routes for tool credentials, or return needs_input for unknown endpoints")
     if problems:
         raise BuildError("; ".join(problems))

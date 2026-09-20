@@ -81,6 +81,17 @@ class AdapterFactory:
         owner = getattr(builder, '__self__', builder)
         return getattr(owner, 'build_requirements', None)
 
+    def network_mode(self, framework: str) -> str:
+        """Read adapter-owned network behavior without constructing an Agent."""
+        key = _normalize_framework(framework)
+        builder = self._builders.get(key) or self._entry_point_builder(key)
+        if builder is None:
+            raise UnsupportedAdapterError(f'Unsupported agent framework {framework!r}')
+        mode = getattr(getattr(builder, '__self__', builder), 'network_mode', 'replace')
+        if mode not in ('observe', 'replace'):
+            raise AdapterFactoryError('Adapter network_mode must be observe or replace')
+        return mode
+
     def _entry_point_builder(self, framework: str) -> AdapterBuilder | None:
         if self._entry_point_group is None:
             return None

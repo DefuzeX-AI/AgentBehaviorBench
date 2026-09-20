@@ -68,6 +68,7 @@ class InterceptionConfig:
     routes: tuple[RouteConfig, ...]
     tool_routes: tuple[ToolRouteConfig, ...] = ()
     token_counting: Mapping[str, object] = field(default_factory=dict)
+    mode: str = 'replace'
 
     @classmethod
     def from_agent_dir(cls, agent_root: str | Path) -> "InterceptionConfig | None":
@@ -86,9 +87,12 @@ class InterceptionConfig:
                 "Manifest field [llm_interception] must be a table"
             )
 
+        from agentbench.adapter.factory import DEFAULT_ADAPTER_FACTORY
+        mode = DEFAULT_ADAPTER_FACTORY.network_mode(manifest.get('framework', 'langgraph'))
         environment = _string_mapping(section.get("environment", {}), "environment")
-        credentials = _credentials(section.get("credentials"))
-        routes = _routes(section.get("routes", []), credentials)
+        credentials = (() if mode == 'observe' and not section.get('credentials')
+                       else _credentials(section.get("credentials")))
+        routes = _routes(section.get("routes", []), credentials, require_credentials=mode == 'replace')
         agent_envs = [item.agent_env for item in credentials]
         if len(set(agent_envs)) != len(agent_envs):
             raise InterceptionConfigurationError(
@@ -107,6 +111,7 @@ class InterceptionConfig:
         except (ValueError, OSError) as exc:
             raise InterceptionConfigurationError(str(exc)) from exc
         return cls(
+            mode=mode,
             required=_boolean(section, "required", default=True),
             trust_plugin=_required_string(section, "trust_plugin"),
             environment=MappingProxyType(environment),
@@ -114,7 +119,7 @@ class InterceptionConfig:
             routes=routes,
             tool_routes=(_tool_routes(section.get("tool_routes", []))
                          + _tool_routes(network.get('tool_routes', []))),
-            token_counting=network.get('token_counting', {}),
+            token_counting=network.get('token_counting', {}) if mode == 'replace' else {},
         )
 
 
@@ -162,7 +167,7 @@ def _credentials(value: object) -> tuple[CredentialConfig, ...]:
 
 
 def _routes(
-    value: object, credentials: tuple[CredentialConfig, ...]
+    value: object, credentials: tuple[CredentialConfig, ...], *, require_credentials=True,
 ) -> tuple[RouteConfig, ...]:
     if not isinstance(value, list):
         raise InterceptionConfigurationError(
@@ -174,8 +179,8 @@ def _routes(
     for raw in value:
         if not isinstance(raw, dict):
             raise InterceptionConfigurationError("Every interception route must be a table")
-        credential_id = _required_string(raw, "credential")
-        if credential_id not in credential_ids:
+        credential_id = _required_string(raw, "credential") if require_credentials else raw.get('credential', '')
+        if require_credentials and credential_id not in credential_ids:
             raise InterceptionConfigurationError(
                 f"Interception route references unknown credential: {credential_id}"
             )

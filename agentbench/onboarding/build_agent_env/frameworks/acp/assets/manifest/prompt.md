@@ -7,9 +7,11 @@ are null. Return framework="acp". Do not emit TOML, a Python binding, graph conf
 or an in_process adapter. Identity, launch, source metadata and SDK settings are
 assembled by BBA. Include no credentials or guessed command switches.
 
-Follow framework_requirements.acp. Model protocol/endpoint comes from the actual
-CLI client; OpenRouter routing does not change its incoming wire protocol. Keep
-intercepted model agent_env separate from external tool secret_env_keys. Only
+Follow framework_requirements.acp. Native observation preserves the actual CLI's
+model, endpoint and authentication; do not configure an OpenRouter replacement.
+Declare native model credential variable names in models.agent_env so BBA retains
+them as runtime secrets. Never invent a dummy key or assume a model API key also
+authenticates the CLI's vendor login. Only
 list tool_routes supported by source evidence. Runtime env_keys declare required
 nonsecret CLI configuration. Native text input normally has input_fields=[];
 structured input_key must match a declared string field. Unknown authentication,

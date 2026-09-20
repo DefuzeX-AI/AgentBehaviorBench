@@ -44,7 +44,7 @@ def grpc_flow(method="GenerateContent"):
 class AutomaticModelRoutingTest(unittest.TestCase):
     def setUp(self):
         self.events = []
-        patched = patch("defuzex_model_interceptor.proxy.addon.emit",
+        patched = patch("defuzex_model_interceptor.observation.events.emit",
                         side_effect=lambda event, **data: self.events.append({"event": event, **data}))
         patched.start()
         self.addCleanup(patched.stop)

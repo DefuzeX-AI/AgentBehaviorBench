@@ -5,15 +5,19 @@ import re
 CREDENTIAL_NAME = re.compile(r"(?:API_KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)", re.I)
 
 
-def runtime_environment(env_keys, secret_env_keys, interception):
-    """Return disjoint runtime lists, excluding interceptor-owned credentials.
+def runtime_environment(env_keys, secret_env_keys, interception, *, network_mode='replace'):
+    """Return disjoint runtime lists according to adapter credential ownership.
 
-    Protocol expansion establishes model credential ownership. Explicit tool
+    Replacement excludes interceptor-owned model secrets; observation retains
+    native model secrets in the Agent runtime. Explicit tool
     secrets and credential-shaped ordinary names use the runtime secret resolver.
     Only variable names are handled; no environment values are read or invented.
     Inputs remain unchanged so the original model response can be audited.
     """
-    model_names = {item["agent_env"] for item in interception["credentials"]} if interception else set()
+    declared_models = {item["agent_env"] for item in interception["credentials"]} if interception else set()
+    if network_mode == 'observe':
+        secret_env_keys = [*secret_env_keys, *sorted(declared_models)]
+    model_names = declared_models if network_mode == 'replace' else set()
     secrets = dict.fromkeys(name for name in secret_env_keys if name not in model_names)
     for name in env_keys:
         if name not in model_names and CREDENTIAL_NAME.search(name):

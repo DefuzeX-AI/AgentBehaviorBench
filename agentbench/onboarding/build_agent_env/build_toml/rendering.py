@@ -43,7 +43,9 @@ def render_manifest(facts, *, source, agent_id, options=None):
                    "workdir": "/opt/agent"}, "adapter": adapter,
     }
     interception = interception_for(facts["models"], facts["tool_routes"])
-    manifest["runtime"].update(runtime_environment(facts["env_keys"], facts["secret_env_keys"], interception))
+    from agentbench.adapter.factory import DEFAULT_ADAPTER_FACTORY
+    manifest["runtime"].update(runtime_environment(facts["env_keys"], facts["secret_env_keys"], interception,
+        network_mode=DEFAULT_ADAPTER_FACTORY.network_mode(facts['framework'])))
     if options.observe:
         fields = facts["input_fields"]
         if len({item["name"] for item in fields}) != len(fields):

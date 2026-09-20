@@ -17,7 +17,6 @@ type = "docker"
 execution = "oneshot"
 timeout_sec = 600
 env_keys = ["MINIMAX_DATA_DIR", "MCODE_DISABLE_TELEMETRY", "DO_NOT_TRACK"]
-secret_env_keys = ["MAVIS_ACCESS_TOKEN"]
 
 [build]
 context = "."
@@ -30,7 +29,7 @@ workdir = "/opt/agent"
 [adapter]
 type = "acp"
 transport = "stdio"
-command = ["python", "/opt/agent/launch_acp.py"]
+command = ["node", "/opt/agent/agent/dist/cli.js", "acp"]
 cwd = "/home/agent/workspace"
 permission_policy = "allow_once"
 
@@ -41,15 +40,22 @@ network_config = "network/rules.toml"
 tool_routes = []
 
 [[llm_interception.credentials]]
-id = "openai"
-agent_env = "OPENAI_API_KEY"
+id = "native-login"
+agent_env = "MAVIS_ACCESS_TOKEN"
 auth_plugin = "bearer-token"
 
 [[llm_interception.routes]]
-id = "openai-chat"
-host_patterns = ["api.openai.com"]
+id = "minimax-native-messages"
+host_patterns = ["agent.minimax.cn"]
 ports = [443]
 methods = ["POST"]
-path_patterns = ["/v1/chat/completions"]
-protocol_plugin = "openai-chat"
-credential = "openai"
+path_patterns = ["/mavis/api/v1/llm/v1/messages", "/mavis/api/v1/llm/v1/v1/messages"]
+protocol_plugin = "anthropic-messages"
+
+[[llm_interception.routes]]
+id = "minimax-native-count"
+host_patterns = ["agent.minimax.cn"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/mavis/api/v1/llm/v1/messages/count_tokens", "/mavis/api/v1/llm/v1/v1/messages/count_tokens"]
+protocol_plugin = "anthropic-count-tokens"

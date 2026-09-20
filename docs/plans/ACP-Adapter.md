@@ -447,3 +447,37 @@ Isolated onboarding validation also stages the contained network file. The actua
 MiniMax unit passes static validation using the pinned KUMA parser. The native
 login token is declared in `secret_env_keys`, so missing auth now fails during
 setup, before consuming a model call.
+
+### Native observation by framework (2026-09-20)
+
+This decision supersedes the replacement deployment and mandatory title-review
+credential described above. Adapter registration now selects ACP `observe` and
+LangGraph `replace`; no public configuration or CLI mode switch was added.
+
+- `services/model-interceptor/.../observe/` forwards authorized native model,
+  count, metadata and safety operations without provider/auth/body conversion.
+  JSON, gzip and SSE evidence is decoded/redacted on copies. Real 401/429 responses
+  survive unchanged; transport loss remains a connection failure, and capture
+  loss rejects evidence separately.
+- `.../replace/` contains the existing substitution/wire conversion flow. Shared
+  proxy fields, policy, redaction and evidence remain outside both directories.
+- Runtime prepares target credentials only for replacement. ACP onboarding keeps
+  native model secrets in the Agent runtime. SDK preflight skips unused Agent
+  replacement providers, while the local Judge retains its own model requirements.
+- MiniMax launches its original CLI directly. The old launcher that wrote a BBA
+  model/provider into native settings was removed. Native catalog/review scopes
+  remain explicit; title review is optional for host evidence acceptance, and its
+  actual failures stay visible. An optional MAVIS_ACCESS_TOKEN is forwarded only
+  if present; it does not establish a complete native managed-login session.
+
+Validation: **121 host tests passed**, **37 service tests passed**. Service tests
+include real mitmdump forwarding to a loopback HTTP service in an offline Docker
+container, native HTTP/SSE/credential preservation, gzip evidence, failed capture,
+unknown-host denial and replacement regressions. The actual MiniMax unit passes
+static validation with the pinned KUMA parser; all 4184 baseline source hashes
+are unchanged. Logs: `cache/acp-acceptance/observe-host-final.log` and
+`cache/acp-acceptance/observe-service-final.log`.
+
+No real native benchmark or Judge acceptance was performed for this change.
+The service tests need no external model keys; native credentials/login still
+need to be provisioned for an end-to-end MiniMax or Claude certification.

@@ -18,7 +18,8 @@ class AutomaticModelRouter:
         self.credentials = credentials
         self.authentication = authentication
 
-    def resolve(self, request):
+    def recognize(self, request):
+        """Identify a wire format without treating recognition as authorization."""
         matches = [(name, signature) for name, signature in self.signatures if signature.matches(request)]
         if not matches:
             return None
@@ -26,7 +27,13 @@ class AutomaticModelRouter:
         matches = [(name, signature) for name, signature in matches if signature.specificity(request) == score]
         if len(matches) != 1:
             raise TargetRoutingError("Ambiguous model protocol: " + ", ".join(name for name, _ in matches))
-        protocol, signature = matches[0]
+        return matches[0]
+
+    def resolve(self, request):
+        recognized = self.recognize(request)
+        if recognized is None:
+            return None
+        protocol, signature = recognized
         credentials = []
         for credential in self.credentials:
             if credential.auth_plugin != signature.auth_plugin:
