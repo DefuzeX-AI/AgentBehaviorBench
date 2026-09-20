@@ -13,8 +13,17 @@ applies, and tmpfs allocations count toward the container memory limit.
 
 Implement `ACPAdapter` alongside `LangGraphAdapter`, using the existing Case
 scheduler, Docker runtime, AgentSession, SDK plugins, evidence pipeline and viewer.
-MiniMax Code is the first real integration. A second independent ACP implementation
-must demonstrate that the adapter is not specific to MiniMax.
+The two real ACP integrations are MiniMax Code and Claude Code, selected by the
+user. Claude Code connects through `agentclientprotocol/claude-agent-acp`, which
+uses the official Claude Agent SDK; it is not assumed to expose a native
+`claude acp` command. Both must use the same ABB adapter without vendor branches.
+
+At each integration milestone, clone its source into the Agent unit's `agent/`
+directory and record the revision. Use `MiniMax-AI/minimax-code` for MiniMax and
+`agentclientprotocol/claude-agent-acp` for the Claude ACP bridge. For Claude, also
+record the installed Claude Agent SDK and runtime versions: cloning the bridge
+is not equivalent to obtaining the complete Claude Code runtime source. Keep
+outer Docker/configuration/profile files beside the source and pin tested releases.
 
 This document describes planned contracts. Configuration examples are not runnable
 until their milestone passes acceptance. Do not mark a registry entry `ready`
@@ -206,7 +215,7 @@ the fork. Record skipped or blocked real acceptance separately from passing test
 | M1: Protocol lifecycle | Config, adapter registration, process/session management | Real offline stdio fixture verifies handshake, ordered chunks, session reuse, Case isolation, invalid config, failed auth, malformed output, stderr pressure, disconnect, timeout, cancellation and bounded cleanup; sync and async paths work |
 | M2: Tools and evidence | Permission/file/terminal callbacks, observer, artifacts | Fixture performs real container file reads/writes and terminal execution; allow/deny are explicit; tools merge partial events correctly; OTel captures actual input/output; failure retains partial evidence; no surviving processes or cross-attempt state |
 | M3: Onboarding and MiniMax | Adapter-specific builder rules, pinned MiniMax unit and workspace setup | Static validation and container handshake pass, then real existing certify/evaluate flow captures saved Case, Agent output, model traffic, OTel evidence, SDK submission, Judge report and host acceptance |
-| M4: Generic integration and UI | Second independent ACP Agent, viewer projections | Second Agent works through configuration/unit setup without vendor branches in shared adapter; viewer displays real multi-Case attempts, evidence gaps and temporary failure/retry states; LangGraph regression checks pass |
+| M4: Claude Code and UI | Claude ACP bridge unit, pinned SDK/runtime dependencies, viewer projections | Claude Code works through configuration/unit setup without vendor branches in shared adapter; viewer displays real multi-Case attempts, evidence gaps and temporary failure/retry states; LangGraph regression checks pass |
 | M5: Concurrency and recovery | Mixed-suite acceptance artifacts | Five consecutive clean mixed suites meet the matrix below; separate fault-injection runs prove partial persistence, cancellation, retry eligibility and Judge-only recovery |
 
 ### Real acceptance matrix
@@ -216,9 +225,10 @@ the fork. Record skipped or blocked real acceptance separately from passing test
    greeting alone cannot validate coding-Agent integration.
 2. MiniMax four Cases: verify distinct session IDs, overlapping execution when
    workers allow it, isolated workspaces/data stores and four retained results.
-3. Second ACP Agent: independently verify its command, auth, capabilities and
-   evidence with at least one real Case before running mixed suites.
-4. Final clean runs: use MiniMax, the second ACP Agent and an existing LangGraph
+3. Claude Code: independently verify its bridge command, auth, capabilities and
+   evidence with at least one real Case before running mixed suites. Validate
+   the selected bridge release's permission callbacks and process cleanup.
+4. Final clean runs: use MiniMax Code, Claude Code and an existing LangGraph
    Agent. Run five suites with per-Agent Case counts `3, 4, 5, 3, 5` respectively
    (60 Case executions). Require all Cases to complete execution, evidence capture,
    submission, report collection and host acceptance with no infrastructure error.
@@ -269,6 +279,9 @@ ACP entrypoint or official wrapper and completing its acceptance gates.
 - [ACP session setup](https://agentclientprotocol.com/protocol/v1/session-setup).
 - [MiniMax Code](https://github.com/MiniMax-AI/minimax-code), particularly
   `packages/tui/src/acp/` and `packages/tui/src/cli/run-acp-command.ts`.
+- [Claude Agent ACP bridge](https://github.com/agentclientprotocol/claude-agent-acp):
+  the ACP integration built on the official Claude Agent SDK. Select the tested
+  published package at integration time rather than copying a preview command.
 
 ## Current verification record
 
