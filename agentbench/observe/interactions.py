@@ -100,16 +100,6 @@ def _matches(value, target, path='$'):
     return []
 
 
-def _field_values(value, name):
-    value = decoded(value)
-    if isinstance(value, dict):
-        found = {value[name]} if isinstance(value.get(name), str) else set()
-        return found.union(*(_field_values(v, name) for v in value.values()))
-    if isinstance(value, list):
-        return set().union(*(_field_values(v, name) for v in value))
-    return set()
-
-
 class InteractionIndex:
     def __init__(self, root, files):
         self.root = root
@@ -219,12 +209,11 @@ class InteractionIndex:
                     folder = next(iter(folders)); evidence = 'framework_span_id'
             context = self.contexts.get(folder)
             if context is None:
-                input_ids = _field_values(request, 'input_id')
-                case_ids = _field_values(request, 'case_id')
-                candidates = [c for c in self.contexts.values() if c['input_id'] in input_ids
-                              and (not case_ids or c['case_id'] in case_ids)]
+                input_id, case_id = request.get('input_id'), request.get('case_id')
+                candidates = [c for c in self.contexts.values() if input_id and c['input_id'] == input_id
+                              and (not case_id or c['case_id'] == case_id)]
                 if len(candidates) == 1:
-                    context = candidates[0]; folder = context['folder']; evidence = 'payload_input_id'
+                    context = candidates[0]; folder = context['folder']; evidence = 'record_input_id'
             started = (req or first)['raw'].get('timestamp')
             ended = res['raw'].get('timestamp') if res else None
             duration = response.get('latency_ms')
@@ -240,7 +229,9 @@ class InteractionIndex:
                 'timestamp': started, 'time_basis': 'recorded', 'ended': ended, 'duration_ms': duration,
                 'status': status, 'record_count': len(group), 'chunk_count': events.count('llm_chunk'),
                 'input_id': context.get('input_id') if context else None,
-                'case_id': context.get('case_id') if context else None,
+                'case_id': context.get('case_id') if context else request.get('case_id'),
+                'attempt_id': request.get('attempt_id'),
+                'association_status': 'input_exact' if context else 'case_only' if request.get('case_id') else 'unknown',
                 'link_evidence': evidence if context else None, 'completeness': complete,
                 'call_id': request.get('call_id'), 'framework_span_id': span_id or request.get('span_id'),
                 'parent_span_id': request.get('parent_span_id'), 'invocation_id': request.get('invocation_id'),
@@ -322,10 +313,15 @@ class InteractionIndex:
         needle = arg('q').casefold()
         start, end = stamp(arg('start')), stamp(arg('end'))
         rows = []
+        case_ids = {c['case_id'] for c in self.contexts.values() if c['input_id'] == arg('input_id')}
+        unassigned = lambda r: (r['kind'] in ('chat', 'http') and not r.get('input_id')
+                                and (not arg('input_id') or r.get('case_id') in case_ids))
         for row in self.rows:
             if kinds and not kinds.intersection(row['tags']): continue
             if arg('status') and row['status'] != arg('status'): continue
-            if arg('input_id') and row.get('input_id') != arg('input_id'): continue
+            if arg('input_scope') == 'unassigned':
+                if not unassigned(row): continue
+            elif arg('input_id') and row.get('input_id') != arg('input_id'): continue
             at = stamp(row['timestamp'])
             if start is not None and (at is None or at < start): continue
             if end is not None and (at is None or at > end): continue
@@ -335,6 +331,7 @@ class InteractionIndex:
             rows.append(row)
         return {'items': [self.public(r) for r in rows[(page-1)*size:page*size]], 'total': len(rows),
                 'page': page, 'page_size': size, 'revision': self.revision,
+                'unassigned_request_count': sum(unassigned(r) for r in self.rows),
                 'total_interactions': len(self.rows), 'total_records': self.total_records,
                 'kinds': dict(Counter(r['kind'] for r in self.rows)),
                 'inputs': [{'input_id': c['input_id'], 'case_id': c['case_id']} for c in self.contexts.values()],

@@ -29,3 +29,14 @@ D02–D04: identity projection, tool relationships, native turn/purpose attribut
 D05–D08: shared workspace, SDK file evidence, retained files, Case prerequisites.
 D09: optional native review authentication.
 D10–D11: real acceptance matrix and certification.
+
+## D02 — Preserve request identity
+
+Viewer preserves Case and attempt IDs even when the Input is unknown. Only
+record-envelope Input IDs can establish an explicit match; arbitrary prompt
+payload fields cannot. Input filtering exposes a separate unassigned-request
+list and count instead of implying that absent links mean absent traffic.
+
+Validation: 19 Python tests, 40 frontend tests, production frontend build.
+Read-only reindex of the historical run retains the Case on all six model
+requests. No historical network evidence was modified.

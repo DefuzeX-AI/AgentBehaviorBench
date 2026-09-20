@@ -27,7 +27,7 @@ function Page({ url, revision, live, page, size, onPage, onSelect, onFacets }) {
     { title: 'Interaction', dataIndex: 'title', render: (title, row) => <div className="call-title"><Space size={[0, 4]} wrap>{row.tags.map(tag => <Tag key={tag} color={colors[tag]}>{labels[tag] || tag}</Tag>)}</Space>
       <Button type="link" className="call-open" onClick={() => onSelect(row.id)}>{title}</Button>
       <small>{row.chunk_count ? `${row.chunk_count} streaming chunks · ` : ''}{row.record_count} raw records{row.completeness === 'legacy_address_only' ? ' · legacy record contains only an address' : ''}</small></div> },
-    { title: 'Input link', dataIndex: 'input_id', width: 145, render: (value, row) => <div><code>{value || 'Not linked'}</code><small className="cell-note">{row.link_evidence === 'framework_span_id' ? 'Span ID matched' : row.link_evidence === 'payload_input_id' ? 'Input ID matched' : row.link_evidence ? 'Same Input directory' : 'No explicit ID evidence'}</small></div> },
+    { title: 'Input link', dataIndex: 'input_id', width: 145, render: (value, row) => <div><code>{value || 'Not linked'}</code><small className="cell-note">{row.link_evidence === 'framework_span_id' ? 'Span ID matched' : row.link_evidence === 'record_input_id' ? 'Input ID matched' : row.link_evidence ? 'Same Input directory' : row.case_id ? 'Case known · Input unknown' : 'No explicit ID evidence'}</small></div> },
     { title: 'Duration', dataIndex: 'duration_ms', width: 90, render: value => value == null ? '—' : value < 1000 ? `${value.toFixed(0)} ms` : `${(value / 1000).toFixed(2)} s` },
     { title: 'Status', dataIndex: 'status', width: 108, render: value => <Tag color={value === 'failed' ? 'red' : value === 'complete' ? 'green' : 'default'}>{states[value] || value}</Tag> },
   ];
@@ -47,9 +47,10 @@ function Page({ url, revision, live, page, size, onPage, onSelect, onFacets }) {
 export default function RawRunView({ run, revision }) {
   const [page, setPage] = useState(1), [size, setSize] = useState(20), [live, setLive] = useState(true);
   const [kinds, setKinds] = useState(primary), [query, setQuery] = useState(''), [input, setInput] = useState('');
+  const [inputScope, setInputScope] = useState('');
   const [status, setStatus] = useState(''), [dates, setDates] = useState(null), [selected, setSelected] = useState(null);
   const [facets, setFacets] = useState(null), [refresh, setRefresh] = useState(0);
-  const params = new URLSearchParams({ page, page_size: size, kinds: kinds.join(','), q: query, input_id: input, status });
+  const params = new URLSearchParams({ page, page_size: size, kinds: kinds.join(','), q: query, input_id: input, input_scope: inputScope, status });
   if (dates?.[0]) params.set('start', dates[0].toISOString());
   if (dates?.[1]) params.set('end', dates[1].toISOString());
   const url = `/api/observe/runs/${run}/interactions?${params}`;
@@ -70,13 +71,17 @@ export default function RawRunView({ run, revision }) {
         <Input.Search allowClear placeholder="Search messages, JSON, tools, or IDs" onSearch={reset(setQuery)} aria-label="Search interactions" />
         <Select mode="multiple" allowClear value={kinds} onChange={reset(setKinds)} maxTagCount="responsive" placeholder="All interaction types" aria-label="Interaction type"
           options={[...new Set([...Object.keys(facets?.kinds || {}), ...primary, 'callback', 'tool_call'])].map(value => ({ value, label: labels[value] || value }))} />
-        <Select allowClear value={input || undefined} onChange={reset(v => setInput(v || ''))} placeholder="All Inputs" aria-label="Select Input"
+        <Select allowClear value={input || undefined} onChange={reset(v => { setInput(v || ''); setInputScope(''); })} placeholder="All Inputs" aria-label="Select Input"
           options={(facets?.inputs || []).filter(i => i.input_id).map(i => ({ value: i.input_id, label: i.input_id }))} />
         <Select allowClear value={status || undefined} onChange={reset(v => setStatus(v || ''))} placeholder="All statuses" aria-label="Interaction status"
           options={Object.entries(states).map(([value, label]) => ({ value, label }))} />
         <DatePicker.RangePicker showTime onChange={reset(setDates)} placeholder={['Start time', 'End time']} />
         <Button onClick={() => { setKinds([]); setPage(1); }}>Include all callbacks</Button>
       </div>
+      {input && facets?.unassigned_request_count > 0 && <Alert type="warning"
+        title={`${facets.unassigned_request_count} requests in this Case have no confirmed Input`}
+        description={inputScope ? 'Showing requests whose Input is unknown.' : 'These requests are outside the selected Input results.'}
+        action={<Button onClick={() => { setInputScope(inputScope ? '' : 'unassigned'); setPage(1); }}>{inputScope ? 'Show selected Input' : 'Show unassigned requests'}</Button>} />}
       <Page key={`${url}:${refresh}`} url={url} revision={revision} live={live} page={page} size={size} onFacets={setFacets}
         onPage={(p, s) => { setPage(size === s ? p : 1); setSize(s); }} onSelect={setSelected} />
       <Drawer className="interaction-drawer" title="Interaction details" open={Boolean(selected)} size="large" onClose={() => setSelected(null)} destroyOnHidden>

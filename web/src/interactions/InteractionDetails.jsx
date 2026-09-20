@@ -54,7 +54,7 @@ export default function InteractionDetails({ run, id, revision, live, onNavigate
       {d.response?.raw_body != null && <JsonValue label="Complete raw response / SSE" value={d.response.raw_body} />}
     </> },
     { key: 'flow', label: 'Case data flow', children: context ? <>
-      <Alert type="info" title={`Link evidence: ${d.link_evidence === 'framework_span_id' ? "the network record's framework_span_id matches this Input callback ID" : d.link_evidence === 'payload_input_id' ? 'a unique input_id / case_id match in the record' : 'the artifact directory for the same Input'}`} />
+      <Alert type="info" title={`Link evidence: ${d.link_evidence === 'framework_span_id' ? "the network record's framework_span_id matches this Input callback ID" : d.link_evidence === 'record_input_id' ? 'a unique input_id / case_id match in the record envelope' : 'the artifact directory for the same Input'}`} />
       <p>This confirms only that the records are linked. The field matches below separately show whether content entered the model request.</p>
       {d.input_matches.length ? <Alert type="success" title="Found the complete Input value in the request actually sent" description={d.input_matches.map(m => <div key={m.path}><code>{m.path}</code> · {m.method === 'exact_value' ? 'exact value match' : 'contains the complete original text'}</div>)} />
         : <Alert type="warning" title="No complete Input value match found" description="The input may have been transformed, used only in part, or omitted from the captured request. This alone does not prove an omission." />}
@@ -79,7 +79,9 @@ export default function InteractionDetails({ run, id, revision, live, onNavigate
       { key: 'time', label: 'Start time', children: d.timestamp || 'Not recorded' },
       { key: 'basis', label: 'Time basis', children: d.time_basis === 'file_mtime' ? 'File modification time (not an exact event time)' : 'Collection timestamp' },
       { key: 'id', label: 'Call / Span', children: <code>{d.call_id || d.framework_span_id || 'Not recorded'}</code> },
+      { key: 'case', label: 'Case', children: d.case_id || 'Unknown' },
       { key: 'input', label: 'Input', children: d.input_id || 'Unlinked' },
+      { key: 'association', label: 'Association', children: d.association_status || d.link_evidence || 'Unknown' },
     ]} />
     <Tabs items={tabs} destroyOnHidden />
   </div>;
