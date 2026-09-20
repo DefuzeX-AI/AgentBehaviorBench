@@ -40,3 +40,19 @@ list and count instead of implying that absent links mean absent traffic.
 Validation: 19 Python tests, 40 frontend tests, production frontend build.
 Read-only reindex of the historical run retains the Case on all six model
 requests. No historical network evidence was modified.
+
+## D03/B2 and D04 — Emitted tools and separate coverage
+
+Protocol response positions establish explicit emitted-tool relations. Request
+history and nested arguments cannot supply IDs. Repeated emissions, duplicate
+tool IDs and cross-Case matches are rejected or marked ambiguous. Relationships
+never populate framework_span_id. The containing artifact run bounds the index;
+available Case, attempt and native session identities further constrain matches.
+
+Historical read-only reindex: 6/6 model HTTP pairs and Case IDs; 3/6 model
+requests assigned through 4 exact emitted tools; 0/6 framework links. Three
+other HTTP requests have independent coverage. Pure-text/background association
+remains the separate B3 deliverable; purpose remains unknown without evidence.
+Viewer and terminal review expose these counts independently.
+
+Validation: 25 Python tests, 40 frontend tests and production build.

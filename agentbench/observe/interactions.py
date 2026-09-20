@@ -11,6 +11,7 @@ import threading
 from collections import Counter, OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
+from .tool_links import link_tools
 
 _CACHE = OrderedDict()
 _LOCK = threading.Lock()
@@ -162,15 +163,6 @@ class InteractionIndex:
             identifier = _id(key)
             self.groups.setdefault(identifier, []).append(record)
 
-        # Only recorded framework IDs establish causality; no timestamp fallback.
-        wire = [r for r in records if r['raw'].get('event') in ('llm_request', 'tool_request')
-                and _data(r).get('purpose') != 'evaluation']
-        linked = sum(any(r['raw'].get('event') == 'span_start' for r in spans.get(_data(call).get('framework_span_id'), [])) for call in wire)
-        self.correlation = {'requests': len(wire), 'linked': linked, 'uncorrelated': len(wire) - linked,
-                            'status': 'captured' if wire else 'no_requests_observed'}
-        if len(wire) > linked:
-            self.warnings.append(f'{len(wire) - linked}/{len(wire)} captured requests have no matching framework span; correlation coverage is incomplete.')
-
         for identifier, group in self.groups.items():
             group.sort(key=lambda r: (_time_order(r['raw'].get('timestamp')), r['file'], r['line']))
             first = group[0]; data = first['raw'].get('data') or {}
@@ -235,9 +227,29 @@ class InteractionIndex:
                 'link_evidence': evidence if context else None, 'completeness': complete,
                 'call_id': request.get('call_id'), 'framework_span_id': span_id or request.get('span_id'),
                 'parent_span_id': request.get('parent_span_id'), 'invocation_id': request.get('invocation_id'),
+                'native_session_id': request.get('native_session_id'),
+                'tool_call_id': request.get('tool_call_id'), 'purpose': request.get('purpose', 'unknown'),
                 'artifact_directory': folder if context else None,
                 'destination': request.get('host'), '_context': folder if context else None,
                 '_request': req or (first if not res else None), '_response': res, '_callbacks': related})
+
+        link_tools(self.rows, self.contexts)
+        def coverage(rows):
+            return {'requests': len(rows),
+                'paired': sum(r['completeness'] == 'complete' for r in rows),
+                'case_identified': sum(bool(r.get('case_id')) for r in rows),
+                'input_identified': sum(bool(r.get('input_id')) for r in rows),
+                'framework_linked': sum(bool(r['_callbacks']) for r in rows),
+                'emitted_tool_links': sum(link['status'] == 'exact' for r in rows for link in r.get('tool_relations', []))}
+        chats = [r for r in self.rows if r['kind'] == 'chat']
+        wire = [r for r in self.rows if r['kind'] in ('chat', 'http') and r.get('call_id')]
+        linked = sum(bool(r['_callbacks']) for r in wire)
+        self.correlation = {'requests': len(wire), 'linked': linked, 'uncorrelated': len(wire) - linked,
+            'status': 'captured' if wire else 'no_requests_observed', 'model': coverage(chats),
+            'http': coverage([r for r in wire if r['kind'] == 'http']),
+            'model_purposes': dict(Counter(r['purpose'] for r in chats))}
+        if chats and self.correlation['model']['input_identified'] < len(chats):
+            self.warnings.append(f"{len(chats) - self.correlation['model']['input_identified']}/{len(chats)} model requests have no confirmed Input; Case identity and HTTP pairing are reported separately.")
 
         labels = {'case.json': ('case', 'SDK Case'), 'input.json': ('case', 'SDK Input'),
                   'mapped-input.json': ('input', 'Input passed to the Agent'), 'request.json': ('input', 'Agent invocation'),

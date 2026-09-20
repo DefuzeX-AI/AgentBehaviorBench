@@ -55,5 +55,12 @@ def render_review(directory: Path):
         span = call.get("framework_span_id")
         lines.append(f"  {call_id} {call.get('source_model')} → {call.get('model')} "
                      f"span={span if span in spans else 'uncorrelated'}")
+    from .interactions import interactions
+    coverage = interactions(directory, {})['correlation']
+    for kind in ('model', 'http'):
+        counts = coverage[kind]
+        lines.append(f"{kind}: requests={counts['requests']} paired={counts['paired']} "
+                     f"case={counts['case_identified']} input={counts['input_identified']} "
+                     f"framework_links={counts['framework_linked']} emitted_tools={counts['emitted_tool_links']}")
     lines.append(f"Artifacts: {directory.resolve()}")
     return "\n".join(lines)

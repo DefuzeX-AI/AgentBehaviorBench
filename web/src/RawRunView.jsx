@@ -27,7 +27,7 @@ function Page({ url, revision, live, page, size, onPage, onSelect, onFacets }) {
     { title: 'Interaction', dataIndex: 'title', render: (title, row) => <div className="call-title"><Space size={[0, 4]} wrap>{row.tags.map(tag => <Tag key={tag} color={colors[tag]}>{labels[tag] || tag}</Tag>)}</Space>
       <Button type="link" className="call-open" onClick={() => onSelect(row.id)}>{title}</Button>
       <small>{row.chunk_count ? `${row.chunk_count} streaming chunks · ` : ''}{row.record_count} raw records{row.completeness === 'legacy_address_only' ? ' · legacy record contains only an address' : ''}</small></div> },
-    { title: 'Input link', dataIndex: 'input_id', width: 145, render: (value, row) => <div><code>{value || 'Not linked'}</code><small className="cell-note">{row.link_evidence === 'framework_span_id' ? 'Span ID matched' : row.link_evidence === 'record_input_id' ? 'Input ID matched' : row.link_evidence ? 'Same Input directory' : row.case_id ? 'Case known · Input unknown' : 'No explicit ID evidence'}</small></div> },
+    { title: 'Input link', dataIndex: 'input_id', width: 145, render: (value, row) => <div><code>{value || 'Not linked'}</code><small className="cell-note">{row.link_evidence === 'framework_span_id' ? 'Span ID matched' : row.link_evidence === 'record_input_id' ? 'Input ID matched' : row.link_evidence === 'emitted_tool_id' ? 'Emitted tool ID matched' : row.link_evidence ? 'Same Input directory' : row.case_id ? 'Case known · Input unknown' : 'No explicit ID evidence'}</small></div> },
     { title: 'Duration', dataIndex: 'duration_ms', width: 90, render: value => value == null ? '—' : value < 1000 ? `${value.toFixed(0)} ms` : `${(value / 1000).toFixed(2)} s` },
     { title: 'Status', dataIndex: 'status', width: 108, render: value => <Tag color={value === 'failed' ? 'red' : value === 'complete' ? 'green' : 'default'}>{states[value] || value}</Tag> },
   ];
@@ -61,6 +61,13 @@ export default function RawRunView({ run, revision }) {
         <Space><span>Check for updates</span><Switch checked={live} onChange={setLive} aria-label="Check for live updates" /><Button onClick={() => setRefresh(r => r + 1)}>Refresh</Button></Space></div>
       <div className="interaction-counts"><span>{facets?.total_interactions ?? '—'} interactions</span><span>from {facets?.total_records ?? '—'} raw events</span>
         <span>Local timezone · chronological order · streaming chunks grouped by call_id</span></div>
+      {facets?.correlation?.model && <div className="interaction-counts">
+        <span>Model HTTP paired: {facets.correlation.model.paired}/{facets.correlation.model.requests}</span>
+        <span>Case known: {facets.correlation.model.case_identified}/{facets.correlation.model.requests}</span>
+        <span>Input known: {facets.correlation.model.input_identified}/{facets.correlation.model.requests}</span>
+        <span>Framework links: {facets.correlation.model.framework_linked}/{facets.correlation.model.requests}</span>
+        <span>Emitted tool links: {facets.correlation.model.emitted_tool_links}</span>
+      </div>}
       <Space className="interaction-presets" wrap>
         <Button size="small" onClick={() => { setKinds(primary); setPage(1); }}>Primary interactions</Button>
         {['chat', 'tool', 'http', 'sdk', 'submission'].map(kind => <Button size="small" key={kind}
