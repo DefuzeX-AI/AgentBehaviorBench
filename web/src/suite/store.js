@@ -5,7 +5,7 @@ const initialState = {
   endpoint: null, snapshot: null, error: '', updated: null,
   selectedCaseKey: null, selectedAttempts: {}, detailTab: 'overview',
   filters: { query: '', agents: [], statuses: [], judges: [], attention: false, retried: false },
-  table: { page: 1, pageSize: 10, field: 'case', order: 'ascend' }, command: null,
+  table: { page: 1, pageSize: 10, field: 'case', order: 'ascend', view: 'table' }, command: null,
 };
 
 const suiteSlice = createSlice({

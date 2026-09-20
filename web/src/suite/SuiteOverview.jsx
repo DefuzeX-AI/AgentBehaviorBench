@@ -1,11 +1,14 @@
-import { useMemo } from 'react';
-import { Alert, Button, Input, Progress, Select, Space, Statistic, Switch, Table, Typography } from 'antd';
+import { useMemo, useRef } from 'react';
+import { AppstoreOutlined, TableOutlined } from '@ant-design/icons';
+import { Alert, Button, Input, Progress, Segmented, Select, Space, Statistic, Switch, Table, Tooltip, Typography } from 'antd';
 import { useDispatch, useSelector } from 'react-redux';
 import { actions } from './store.js';
 import { countCases, executionLabels, normalizeCases } from './model.js';
 import { filterCases, latestTimestamp, sortCases } from './tableModel.js';
 import CaseStatus, { JudgeBadge } from './CaseStatus.jsx';
 import SuiteControls, { ExportReportButton, RetryButton } from './SuiteControls.jsx';
+import AgentSummaryCards from './AgentSummaryCards.jsx';
+import CaseCardGrid from './CaseCardGrid.jsx';
 import './suite.css';
 
 const { Text, Title } = Typography;
@@ -18,6 +21,7 @@ function Metric({ value, label, tone }) {
 
 export default function SuiteOverview({ onCaseSelect }) {
   const dispatch = useDispatch();
+  const casesSection = useRef(null);
   const { snapshot, error, updated, filters, table } = useSelector(state => state.suite);
   const cases = useMemo(() => normalizeCases(snapshot), [snapshot]);
   const counts = useMemo(() => countCases(cases), [cases]);
@@ -28,6 +32,10 @@ export default function SuiteOverview({ onCaseSelect }) {
   const setFilter = value => dispatch(actions.filterChanged(value));
   const completion = cases.length ? Math.round((counts.completed / cases.length) * 100) : 0;
   const judgeCoverage = cases.length ? Math.round((counts.reports / cases.length) * 100) : 0;
+  function filterAgent(agentId) {
+    setFilter({ agents: [agentId] });
+    casesSection.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   if (!snapshot) return <section className="empty"><h2>{error ? 'Suite temporarily unavailable' : 'Loading Suite'}</h2><p>{error || 'All planned Cases will appear here.'}</p></section>;
 
@@ -70,8 +78,11 @@ export default function SuiteOverview({ onCaseSelect }) {
 
     <div className="suite-report-line"><span>Judge reports <strong>{counts.reports}/{cases.length}</strong></span><span>Host accepted <strong>{counts.accepted}</strong></span></div>
     <SuiteControls cases={cases} />
+    <AgentSummaryCards cases={cases} jobs={snapshot.jobs || []} onFilter={filterAgent} />
 
-    <div className="suite-table-heading"><div><Title level={3}>Cases</Title><Text type="secondary">Select a row to inspect the complete Case record.</Text></div><Text type="secondary">Showing {visible.length} of {cases.length}</Text></div>
+    <div className="suite-table-heading" ref={casesSection}><div><Title level={3}>Cases</Title><Text type="secondary">Select a result to inspect the complete Case record.</Text></div>
+      <Space><Text type="secondary">Showing {visible.length} of {cases.length}</Text><Segmented className="case-view-toggle" value={table.view} onChange={view => dispatch(actions.tableChanged({ view }))}
+        options={[{ value: 'table', label: <Tooltip title="Table view"><TableOutlined aria-label="Table view" /></Tooltip> }, { value: 'grid', label: <Tooltip title="Card view"><AppstoreOutlined aria-label="Card view" /></Tooltip> }]} /></Space></div>
     <div className="suite-filters" aria-label="Filter Cases">
       <Input.Search allowClear value={filters.query} placeholder="Search Agent, Case ID, status, or error" onChange={event => setFilter({ query: event.target.value })} />
       <Select mode="multiple" maxTagCount="responsive" allowClear value={filters.agents} options={agents.map(value => ({ value, label: value }))} placeholder="All Agents" onChange={value => setFilter({ agents: value })} />
@@ -82,11 +93,12 @@ export default function SuiteOverview({ onCaseSelect }) {
       <Button onClick={() => dispatch(actions.filtersReset())}>Reset</Button>
     </div>
 
-    <Table className="suite-table" rowKey="key" columns={columns} dataSource={visible} size="middle" scroll={{ x: 900 }}
+    {table.view === 'grid' ? <CaseCardGrid cases={visible} page={table.page} pageSize={table.pageSize} onSelect={onCaseSelect}
+      onPage={(page, pageSize) => dispatch(actions.tableChanged({ page: table.pageSize === pageSize ? page : 1, pageSize }))} /> : <Table className="suite-table" rowKey="key" columns={columns} dataSource={visible} size="middle" scroll={{ x: 900 }}
       onRow={item => ({ onClick: () => onCaseSelect(item), onKeyDown: event => { if (event.key === 'Enter' || event.key === ' ') onCaseSelect(item); }, tabIndex: 0 })}
       onChange={(pagination, _tableFilters, sorter) => dispatch(actions.tableChanged({ page: pagination.current, pageSize: pagination.pageSize,
         field: sorter.columnKey || table.field, order: sorter.order || table.order }))}
       pagination={{ current: table.page, pageSize: table.pageSize, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: total => `${total} Cases` }}
-      locale={{ emptyText: cases.length ? 'No Cases match the current filters.' : 'Waiting for the Suite test plan.' }} />
+      locale={{ emptyText: cases.length ? 'No Cases match the current filters.' : 'Waiting for the Suite test plan.' }} />}
   </section>;
 }
