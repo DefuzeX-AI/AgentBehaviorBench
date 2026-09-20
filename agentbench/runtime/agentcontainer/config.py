@@ -48,7 +48,9 @@ class AgentContainerConfig:
 
         values = os.environ if environ is None else environ
         environment: dict[str, str] = {}
-        for key in _string_list(runtime, "env_keys"):
+        # Worker control-plane keys are forwarded to the container, but are not
+        # Agent-declared env_keys and are never inherited by an ACP subprocess.
+        for key in (*_string_list(runtime, "env_keys"), *_string_list(runtime, "worker_env_keys")):
             if key in values:
                 environment[key] = values[key]
         for key in _string_list(runtime, "secret_env_keys"):

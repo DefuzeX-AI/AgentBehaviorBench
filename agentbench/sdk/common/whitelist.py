@@ -1,5 +1,11 @@
 """Read SDK URL whitelists and render evaluation routes for agent.toml."""
 import json
+import re
+from copy import deepcopy
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -59,3 +65,37 @@ def whitelist_toml(path: Path, extra_entries=()) -> str:
         )
         for route in load_whitelist(path, extra_entries)
     )
+
+
+def append_whitelist(source: str, path: Path, extra_entries=()) -> str:
+    """Append evaluation routes, including manifests with an explicit empty array.
+
+    TOML forbids appending array-of-table entries to a previously assigned array.
+    Remove only the empty declaration whose full parsed document matches the
+    expected semantic change; preserve comments and all unrelated settings.
+    """
+    original = tomllib.loads(source)
+    interception = original.get('llm_interception', {})
+    if interception.get('tool_routes') == []:
+        expected = deepcopy(original)
+        del expected['llm_interception']['tool_routes']
+        cleaned = None
+        for start in re.finditer(r'''(?m)^[ \t]*(?:tool_routes|"tool_routes"|'tool_routes')\s*=''', source):
+            for end in re.finditer(r'\n|\Z', source[start.end():]):
+                boundary = start.end() + end.end()
+                candidate = source[:start.start()] + source[boundary:]
+                try:
+                    matches = tomllib.loads(candidate) == expected
+                except tomllib.TOMLDecodeError:
+                    matches = False
+                if matches:
+                    cleaned = candidate
+                    break
+            if cleaned is not None:
+                break
+        if cleaned is None:
+            raise ValueError('Cannot safely extend empty llm_interception.tool_routes')
+        source = cleaned
+    result = source + whitelist_toml(path, extra_entries)
+    tomllib.loads(result)
+    return result

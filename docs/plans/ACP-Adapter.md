@@ -404,3 +404,14 @@ until their complete configuration is validated.
 
 Final M3 regression rerun after fixture correction: **236 passed, 1 skipped** across
 onboarding, manifests, source-link/import rules, KUMA image staging and concurrency.
+
+### Real-source build findings
+
+Both official source builds completed under Node 24 with upstream lockfiles.
+Claude's documentation link is materialized only in the private build snapshot.
+The generated no-tool manifest exposed an existing KUMA overlay TOML bug: appending
+array-of-table routes after `tool_routes=[]` is invalid TOML. Added a semantic
+preservation check when replacing that empty declaration, with multiline/quoted-key
+regressions. Separated SDK `runtime.worker_env_keys` from Agent-declared `env_keys`,
+so ACP children receive native configuration without inheriting SDK credentials.
+The worker still receives required SDK keys. Focused regression: 37 passed, 1 skipped.

@@ -7,7 +7,7 @@ import tempfile
 from types import SimpleNamespace
 from agentbench.runtime.docker.worker_build import _ignore
 from agentbench.runtime.docker.source_links import materialize_file_links
-from agentbench.sdk.common.whitelist import whitelist_toml
+from agentbench.sdk.common.whitelist import append_whitelist
 from .configuration import DEFAULT_BASE_URL
 from .manifest import extend_runtime_environment
 
@@ -92,11 +92,11 @@ def evaluation_agent(agent, *, control=None, deadline=None, backend=DEFAULT_BASE
         if count != 1:
             raise ValueError('Expected one explicit launch.argv')
         if sdk_environment:
-            source = extend_runtime_environment(source, tuple(sdk_environment))
+            source = extend_runtime_environment(source, tuple(sdk_environment), field='worker_env_keys')
         backend_routes = () if backend is None else (
             {'url': backend, 'methods': ['GET', 'POST']},
             {'url': backend + '/sdk/*', 'methods': ['GET', 'POST']})
-        source += whitelist_toml(Path(__file__).with_name('whitelist.json'), backend_routes)
+        source = append_whitelist(source, Path(__file__).with_name('whitelist.json'), backend_routes)
         (root / 'agent.toml').write_text(source)
         dockerfile = root / 'Dockerfile'
         original = dockerfile.read_text()
