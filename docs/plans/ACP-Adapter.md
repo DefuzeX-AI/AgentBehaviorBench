@@ -153,6 +153,57 @@ Update planning schemas, prompts, validators, dependency instructions and AGENTS
 to express these adapter-specific requirements. Continue using the existing
 add/build/certify flow and SDK-owned Agent Profile/strategy catalog.
 
+### Separate onboarding packages by adapter
+
+User requirement: LangGraph and ACP onboarding must live in separate packages so
+that their planning, prompts and validation can be debugged independently. Do not
+scatter `if framework == ...` branches across shared builders.
+
+```text
+agentbench/onboarding/build_agent_env/
+  service.py                  # Shared resumable build orchestration
+  common/                     # Checkpoints, writes, redaction and common validation
+  frameworks/
+    base.py                   # Small onboarding strategy contract
+    registry.py               # Explicit strategy lookup
+    langgraph/
+      planning.py             # Graph selection and required Python bindings
+      manifest.py             # LangGraph adapter fields and rendering
+      validation.py           # Graph/entrypoint/binding validation
+      bindings.py             # Framework-specific binding generation steps
+      assets/                 # LangGraph schemas, prompts and examples
+    acp/
+      planning.py             # Command, installation and protocol requirements
+      manifest.py             # ACP adapter fields and rendering
+      validation.py           # Command/cwd/input/capability configuration
+      assets/                 # ACP schemas, prompts and examples
+  planning/                   # Shared request/repair/cache execution
+  build_toml/                 # Common manifest envelope and TOML encoding
+  build_blinding/             # Reusable file-generation machinery where needed
+  build_dockerfile/           # Shared container build constraints and validation
+  build_requirement/          # SDK-owned profile generation workflow
+```
+
+Each strategy supplies its planning assets/validation, adapter manifest fields,
+additional file steps and final adapter validation. Keep identity, credentials,
+network policy, persistence, registration and SDK profile ownership in their
+existing shared layers. ACP need not implement a binding stage. Shared planners
+must select the strategy from validated source evidence or an explicit selection
+before using its schema; ambiguous discovery produces an actionable diagnostic.
+
+First extract existing LangGraph rules without changing generated behavior; run
+the current onboarding regressions, then add ACP support through the same contract.
+Replace the current `build_toml/frameworks.py` implementation with delegation or
+migrate its callers; do not retain competing framework registries. Version cached
+plans by selected adapter and planning-contract version, revalidate reusable files
+and preserve manual edits. Include adapter, stage and file in diagnostic records.
+
+Onboarding acceptance must independently cover LangGraph and ACP, plus shared
+checkpoint recovery. LangGraph still requires its valid graph/binding; ACP accepts
+a command without graph fields; switching adapters cannot reuse an incompatible
+cached plan. Only introduce Docker/profile strategy hooks where actual divergent
+requirements exist; do not duplicate the complete onboarding pipeline.
+
 ## Writable state and resources
 
 Separate the installed Agent source from the project it is asked to modify.
