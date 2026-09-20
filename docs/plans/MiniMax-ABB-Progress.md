@@ -90,3 +90,12 @@ D08 limitation: matching initial state is enforced, but the pinned official Case
 contract has no structured required-file declaration. An arbitrary natural-language
 Case can still request a missing prerequisite; this cannot be certified by regex.
 See [workspace documentation](../Evaluation-Workspaces.md).
+
+## Verification follow-up — Suite recovery fixtures
+
+The extended 92-case recovery check initially had five failures: three stale
+resource-policy assertions reproduced on the unchanged original checkout, and
+two mocked descriptors missing the manifest now read by workspace validation.
+Updated the bundled-resource assertions to the actual conservative replay policy
+and completed the mock manifests. No production replay permission changed.
+The resulting Suite/Case/recovery set passes all 91 tests.

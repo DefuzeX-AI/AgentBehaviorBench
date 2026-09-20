@@ -72,7 +72,7 @@ async def execute(root, output, settings=None, sdk_repo=None, *, providers=None)
         # Assemble SDK options for the repository, step limit, credentials,
         # trace evidence, and request timing.
         options = dict(repo_path=repository,
-                       allow_local=False, track_files=workspace.track_files, upload_diff=workspace.upload_diff, 
+                       allow_local=False, track_files=workspace.track_files, upload_diff=workspace.upload_diff,
                        save_local=True,
 
                        api_key=credential, trace_evidence=capture,
