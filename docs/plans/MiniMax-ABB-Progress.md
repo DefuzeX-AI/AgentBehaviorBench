@@ -15,6 +15,14 @@ Each completed change is validated and pushed independently to the fork's main.
   `fixture` is not registered with the adapter factory. The same failure was
   reproduced in the original checkout before this change; repair it separately.
 
+Validation: 26 passed, 1 optional container test skipped. Pushed as `67501f8`.
+
+## Verification baseline — KUMA packaging fixture
+
+The synthetic packaging Agent now registers its observe-mode adapter for the
+duration of each test. Unknown frameworks remain rejected in production, and
+the builder raises if a host-only check accidentally instantiates an Agent.
+
 ## Remaining
 
 D02–D04: identity projection, tool relationships, native turn/purpose attribution.

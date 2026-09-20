@@ -31,7 +31,12 @@ from agentbench.sdk.common.case_identity import case_content_sha256
 
 
 @pytest.fixture
-def echo_agent(tmp_path):
+def echo_agent(tmp_path, monkeypatch):
+    from agentbench.adapter.factory import DEFAULT_ADAPTER_FACTORY
+    def fixture_builder(_):
+        raise AssertionError('Host packaging/preflight must not instantiate an Agent')
+    fixture_builder.network_mode = 'observe'
+    monkeypatch.setitem(DEFAULT_ADAPTER_FACTORY._builders, 'fixture', fixture_builder)
     root = tmp_path / 'echo-agent'
     (root / 'agent').mkdir(parents=True)
     (root / 'agent' / 'main.py').write_text('print("echo")\n')
