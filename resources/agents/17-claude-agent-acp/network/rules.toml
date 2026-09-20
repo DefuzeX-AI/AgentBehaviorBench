@@ -1,0 +1,13 @@
+schema_version = "abb.network.v1"
+
+# Claude Code's local filesystem and terminal tools require no network routes.
+# Nonessential telemetry and updater traffic are disabled in the image.
+
+# The Claude SDK probes a custom Anthropic base URL before sending messages.
+[[tool_routes]]
+host_patterns = ["z.duxiaoman-int.com"]
+ports = [443]
+methods = ["HEAD"]
+path_patterns = ["/coding/api/hello"]
+purpose = "metadata"
+required = false

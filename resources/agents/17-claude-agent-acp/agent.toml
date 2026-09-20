@@ -1,0 +1,72 @@
+# Hand-written from the pinned bridge's native ACP and Claude Agent SDK contracts.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "claude-agent-acp"
+display_name = "Claude Code (ACP, Codex provider)"
+framework = "acp"
+
+[evaluation]
+replay_safe = false
+
+[evaluation.workspace]
+path = "/home/agent/workspace"
+initial_state = "empty"
+
+[evaluation.file_evidence]
+track_files = true
+upload_diff = true
+export_changed_files = true
+
+[source]
+repository = "https://github.com/agentclientprotocol/claude-agent-acp"
+revision = "d421f56a6c43cde16d9a7531d08a750a5ef2f04a"
+downloaded_on = "2026-09-20"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+env_keys = ["CODEX_API_BASE_URL", "CODEX_MODEL"]
+secret_env_keys = ["CODEX_API_KEY"]
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "acp"
+transport = "stdio"
+command = ["python", "/opt/agent/bootstrap/launch.py"]
+handshake_timeout = 120
+cwd = "/home/agent/workspace"
+permission_policy = "allow_once"
+
+[llm_interception]
+required = true
+trust_plugin = "pem-env"
+network_config = "network/rules.toml"
+tool_routes = []
+
+[[llm_interception.credentials]]
+id = "codex-api-key"
+agent_env = "CODEX_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "codex-anthropic-messages"
+host_patterns = ["z.duxiaoman-int.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/coding/v1/messages"]
+protocol_plugin = "anthropic-messages"
+
+[[llm_interception.routes]]
+id = "codex-anthropic-count"
+host_patterns = ["z.duxiaoman-int.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/coding/v1/messages/count_tokens"]
+protocol_plugin = "anthropic-count-tokens"
