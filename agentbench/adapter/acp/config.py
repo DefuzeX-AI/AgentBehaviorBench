@@ -21,6 +21,7 @@ class ACPConfig:
     cleanup_timeout: float = 3
     max_output_bytes: int = 8 * 1024 * 1024
     auth_method: str | None = None
+    evidence_reader: str | None = None
 
     @classmethod
     def from_agent_dir(cls, root):
@@ -29,7 +30,7 @@ class ACPConfig:
         adapter = manifest.get('adapter', {})
         allowed = {'type', 'transport', 'command', 'cwd', 'env_keys', 'input_key',
                    'permission_policy', 'handshake_timeout', 'cleanup_timeout',
-                   'max_output_bytes', 'auth_method'}
+                   'max_output_bytes', 'auth_method', 'evidence_reader'}
         if not isinstance(adapter, dict) or adapter.get('type') != 'acp':
             raise ValueError('ACP requires adapter.type="acp"')
         if set(adapter) - allowed:
@@ -48,6 +49,8 @@ class ACPConfig:
         for key in ('input_key', 'auth_method'):
             if key in adapter and (not isinstance(adapter[key], str) or not adapter[key].strip()):
                 raise ValueError(f'ACP {key} must be a non-empty string')
+        from .evidence import validate_reader
+        validate_reader(adapter.get('evidence_reader'))
         maximum = adapter.get('max_output_bytes', 8 * 1024 * 1024)
         if type(maximum) is not int or not 1024 <= maximum <= 32 * 1024 * 1024:
             raise ValueError('ACP max_output_bytes must be between 1024 and 33554432')
@@ -64,7 +67,7 @@ class ACPConfig:
                    _seconds(runtime.get('timeout_sec', 2400), 'runtime.timeout_sec'),
                    _seconds(adapter.get('handshake_timeout', 30), 'handshake_timeout'),
                    _seconds(adapter.get('cleanup_timeout', 3), 'cleanup_timeout'),
-                   maximum, adapter.get('auth_method'))
+                   maximum, adapter.get('auth_method'), adapter.get('evidence_reader'))
 
     def text_input(self, value):
         if self.input_key is not None:

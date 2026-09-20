@@ -18,12 +18,16 @@ class ACPSession:
         self.busy = self.closed = False
         self.info = {}
         self._close_lock = asyncio.Lock()
+        self.native_calls = set()
+        self.evidence_reader = None
 
     def emit(self, name, data):
         for callback in self.callbacks:
             callback.on_acp_event(name, data)
 
     async def start(self):
+        from .evidence import load_reader
+        self.evidence_reader = load_reader(self.config)
         self.process = await asyncio.create_subprocess_exec(
             *self.config.command, cwd=self.config.cwd, env=child_environment(self.config),
             stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
@@ -80,6 +84,7 @@ class ACPSession:
                 raise self.client.error
             if self.drain_task.done() and self.drain_task.exception():
                 raise self.drain_task.exception()
+            self.read_native_evidence()
             self.emit('prompt_completed', plain(response))
             stop = response.stop_reason
             if stop == 'cancelled':
@@ -98,6 +103,28 @@ class ACPSession:
         finally:
             self.callbacks = []
             self.busy = False
+
+    def read_native_evidence(self):
+        if self.evidence_reader is None:
+            return
+        try:
+            calls = self.evidence_reader(self.client.session_id)
+            if not isinstance(calls, list) or len(calls) > 10000:
+                raise ValueError('Invalid native evidence collection')
+            current = 0
+            for call in calls:
+                key = (call['native_session_id'], call['native_call_id'])
+                if key in self.native_calls:
+                    continue
+                if key[0] != self.client.session_id:
+                    raise ValueError('Native evidence belongs to another session')
+                self.emit('native_model_call', call)
+                self.native_calls.add(key)
+                current += 1
+            self.emit('native_evidence_status', {'status': 'captured' if current else 'no_new_calls',
+                                               'new_calls': current})
+        except Exception as exc:
+            self.emit('native_evidence_status', {'status': 'failed', 'error_type': type(exc).__name__})
 
     async def close(self):
         async with self._close_lock:

@@ -27,3 +27,10 @@ add a mode switch or configure surrogate model credentials. Native model keys
 remain real runtime secrets; declare verified native model endpoints. Preserve
 native CLI model/login settings, token counting and tool-loading behavior. BBA
 observes and redacts traffic without replacing providers or response formats.
+
+An optional `evidence_reader = "bootstrap/native_evidence.py:read_calls"` can
+read an Agent's documented native capture after ACP prompt completion. Use only
+an existing, reviewed outer file; do not invent a hook based on log timestamps.
+The callable accepts the native session ID and returns a bounded list of native
+call metadata. The adapter deduplicates session/call IDs and records reader
+failures separately. It does not change ACP input or provider traffic.

@@ -12,6 +12,7 @@ from collections import Counter, OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
 from .tool_links import link_tools
+from .native_links import link_native_calls
 
 _CACHE = OrderedDict()
 _LOCK = threading.Lock()
@@ -237,6 +238,7 @@ class InteractionIndex:
                 '_request': req or (first if not res else None), '_response': res, '_callbacks': related})
 
         link_tools(self.rows, self.contexts)
+        link_native_calls(self.rows, self.contexts)
         def coverage(rows):
             return {'requests': len(rows),
                 'paired': sum(r['completeness'] == 'complete' for r in rows),

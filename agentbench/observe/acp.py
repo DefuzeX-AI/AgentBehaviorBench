@@ -18,6 +18,8 @@ class ACPObserver:
 
     def on_acp_event(self, name, data):
         self.events.record(name, **data)
+        if name == 'native_model_call':
+            self.store.record('native_model_call', **data, span_event=False)
         # Stream chunks and tool updates remain in full local payloads. Tool
         # lifecycle/content gets its own spans below; duplicating every update
         # on the root span exhausts bounded OTel/SDK event buffers.

@@ -99,3 +99,30 @@ two mocked descriptors missing the manifest now read by workspace validation.
 Updated the bundled-resource assertions to the actual conservative replay policy
 and completed the mock manifests. No production replay permission changed.
 The resulting Suite/Case/recovery set passes all 91 tests.
+
+## D03/B3 — Native successful-call evidence
+
+The pinned source does have a supported TUI opt-in:
+`MAVIS_TUI_LLM_CONTEXT_INSPECTOR=1`. Enabled it in the outer bootstrap. An explicit
+ACP evidence_reader hook reads native captures after their documented drain at
+prompt completion, exporting only IDs/statuses, never profile contents or model
+payloads. Imported MiniMax source is unchanged.
+
+Native provider response IDs join network responses to native session/turn/call
+IDs and the owning ABB Input. Duplicate IDs or conflicting owners stay ambiguous;
+no timestamp, request-history matching or fabricated framework span is used.
+
+Real pure-text acceptance (local Case/Judge plugin, real MiniMax):
+`suite_d6a3efce77cc4166b67de5075d8d6b5d`, artifact run
+`0fd128e3784448b8981e9a34ddf2849d`. All three actual turns retained one session,
+three distinct native turns and exact response-ID links; zero emitted tools.
+The local Judge passed. The separate official file-evidence acceptance remains
+the proof for official Backend/Judge integration.
+
+Native limitation: this inspector explicitly records only successful `agent`
+logical calls; it discards failed attempts and excludes title/auxiliary calls.
+Two background model calls in this run remain unassigned, as required. Extending
+coverage to those calls still needs a native observer contract or new revision.
+
+Native-evidence validation: 34 Python tests and 40 frontend tests passed;
+production build passed, plus the real three-turn pure-text run above.

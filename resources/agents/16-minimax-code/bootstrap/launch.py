@@ -29,7 +29,7 @@ def prepare(unit, environ):
     base = Path(environ['MINIMAX_DATA_DIR'])
     base.mkdir(parents=True, exist_ok=True)
     profile = Path(tempfile.mkdtemp(prefix='abb-byok-', dir=base))
-    env = {**environ, KEY_ENV: key, 'MINIMAX_DATA_DIR': str(profile), 'MAVIS_DATA_DIR': str(profile)}
+    env = {**environ, 'MAVIS_TUI_LLM_CONTEXT_INSPECTOR': '1', KEY_ENV: key, 'MINIMAX_DATA_DIR': str(profile), 'MAVIS_DATA_DIR': str(profile)}
     cli = ['node', str(unit / 'agent/dist/cli.js')]
     try:
         config = profile / 'config.yaml'
