@@ -4,6 +4,7 @@ These history/state/extension semantics belong to KUMA, not the SDK contract.
 """
 from agentbench.sdk.common.artifacts import Artifacts, plain
 from agentbench.observe.store import TraceStore
+from agentbench.observe.result import sanitize_result
 
 
 async def drive_run(run, invoke, directory, *, provider, repo_path=None):
@@ -49,6 +50,9 @@ async def drive_run(run, invoke, directory, *, provider, repo_path=None):
                          artifact=f'{relative}/mapped-input.json')
             summary['phase'] = 'execution'
             result = await invoke(payload, directory / relative, provider)
+            # Artifacts.save sanitizes only its serialized copy. The same safe
+            # value must cross the SDK submission boundary, including custom callers.
+            result, _ = sanitize_result(result, files.secrets)
             files.save(f'{relative}/result.json', result)
             trace.record('agent_returned', input_id=item.input_id, case_id=run.case_id,
                          artifact=f'{relative}/result.json')

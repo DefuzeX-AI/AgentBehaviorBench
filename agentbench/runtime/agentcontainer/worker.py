@@ -8,7 +8,8 @@ import os
 import sys
 from pathlib import Path
 
-from agentbench.observe.store import TraceStore, atomic_json
+from agentbench.observe.store import TraceStore, atomic_json, environment_secrets
+from agentbench.observe.result import sanitize_result
 from agentbench.observe.correlation import model_correlation
 from agentbench.runtime.interception import InterceptionConfig
 from .session import AgentSession
@@ -103,6 +104,8 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None, ses
                 await session.aclose()
             except Exception as exc:
                 result.update(status="failed", error_type=type(exc).__name__, error=str(exc))
+        result, receipt = sanitize_result(result, environment_secrets())
+        atomic_json(output / "result-redaction.json", receipt)
         atomic_json(output / "result.json", result)
         if hasattr(store, 'close'):
             store.close()
