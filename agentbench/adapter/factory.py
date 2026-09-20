@@ -74,6 +74,13 @@ class AdapterFactory:
                          for entry in entry_points(group=self._entry_point_group))
         return tuple(sorted(names))
 
+    def build_requirements(self, framework: str) -> Path | None:
+        """Optional adapter-owned dependency file; never instantiate an Agent."""
+        key = _normalize_framework(framework)
+        builder = self._builders.get(key) or self._entry_point_builder(key)
+        owner = getattr(builder, '__self__', builder)
+        return getattr(owner, 'build_requirements', None)
+
     def _entry_point_builder(self, framework: str) -> AdapterBuilder | None:
         if self._entry_point_group is None:
             return None

@@ -22,7 +22,9 @@ FILE_PATTERNS = (
     "readme*", ".env*example*", ".env*sample*", ".env*template*",
     ".python-version", "runtime.txt", ".nvmrc", ".tool-versions",
     # Non-Python build inputs: a Node front end or MCP server, a Go or Rust component, make targets.
-    "package.json", "go.mod", "cargo.toml", "makefile",
+    "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "yarn.lock",
+    "*acp*.ts", "cli.ts", "index.ts", "tsconfig*.json",
+    "go.mod", "cargo.toml", "makefile",
     "application.py", "app.py", "main.py", "__main__.py",
 )
 

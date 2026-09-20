@@ -123,3 +123,20 @@ missing a binding produce a conflict with the file preserved; they are not silen
 rewritten. Correct that file or deliberately remove the obsolete generated files
 before retrying. The general runtime can still load older direct-graph integrations;
 this stricter contract belongs to Agent onboarding.
+
+## Framework strategies
+
+`frameworks/langgraph/` owns Python binding plans, graph manifest fields and
+validation. `frameworks/acp/` owns stdio command plans, ACP fields and validation;
+it creates no Python binding or graph descriptor. Each has its own planning and
+manifest prompts/schemas. Shared planning requests an explicit framework and then
+validates against the selected strategy. Checkpoints fingerprint strategy assets
+and the shared dispatch contract. Framework changes cannot reuse an incompatible
+manifest. Node package entrypoints and relative JS/TS imports are collected as
+bounded source evidence without executing them.
+
+An ACP image provides its native CLI, a writable HOME/workspace and Python worker.
+The generic worker overlay installs registered adapter requirements into the
+worker's interpreter. SDK plugin dependencies remain owned by their SDK overlay.
+Source snapshots materialize contained regular-file symlinks; external, broken,
+cyclic and directory links are rejected. The imported source is not modified.

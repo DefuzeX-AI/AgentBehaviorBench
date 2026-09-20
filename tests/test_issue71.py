@@ -147,8 +147,8 @@ def test_symlinks_are_reported_at_download_time(tmp_path, github, capsys):
 
     added = download_agent(FIRST, tmp_path / "agents")
 
-    assert added.warnings == ("1 symlink(s) kept; the Docker build context refuses symlinks, "
-                              "so replace or remove them before building: .claude/skills",)
+    assert added.warnings == ("1 symlink(s) kept; build snapshots materialize in-tree file links; "
+                              "directory, external or broken links need review: .claude/skills",)
     assert "submodules" not in json.loads((added.directory / "source-manifest.json").read_text())
 
 

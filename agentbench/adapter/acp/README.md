@@ -7,8 +7,10 @@ interpreter; copying ABB source into an image does not install dependencies.
 
 Current implementation: stdio handshake, optional explicit authentication,
 Case-owned sessions, text inputs, streamed text output, permission decisions,
-error/stop handling and bounded process-group cleanup. Filesystem and terminal
-capabilities are not yet advertised. This is not a certified production Agent unit.
+error/stop handling, workspace file callbacks, bounded terminal output and
+process-group cleanup. Tool notifications project live OTel spans and retain raw
+ACP evidence; missing fields stay missing. This is not itself a certified Agent
+unit. The generic worker build overlay installs the adapter requirements file.
 
 ```toml
 [adapter]

@@ -6,6 +6,7 @@ import shutil
 import tempfile
 from types import SimpleNamespace
 from agentbench.runtime.docker.worker_build import _ignore
+from agentbench.runtime.docker.source_links import materialize_file_links
 from agentbench.sdk.common.whitelist import whitelist_toml
 from .configuration import DEFAULT_BASE_URL
 from .manifest import extend_runtime_environment
@@ -69,6 +70,7 @@ def evaluation_agent(agent, *, control=None, deadline=None, backend=DEFAULT_BASE
         root = Path(temporary) / 'agent-unit'
         shutil.copytree(agent.path, root, ignore=_ignore, symlinks=True,
                         copy_function=checked_copy)
+        materialize_file_links(root, check)
         if any(p.is_symlink() for p in root.rglob('*')):
             raise ValueError('Agent source must not contain symlinks')
         # SDK atomically updates .gitignore unless this rule already exists.

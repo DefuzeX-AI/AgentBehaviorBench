@@ -375,3 +375,32 @@ passed with loopback permission. An exploratory sweep of all issue tests encount
 missing historical Agent fixtures and sandbox socket restrictions; it is not a
 passing full-suite claim. Updated the built-in adapter discovery assertion to
 include the newly registered ACP adapter. Real Agent certification remains pending.
+
+### M3 implementation checkpoint
+
+ACP now has its own onboarding package, strict plan/manifest schemas, prompts and
+validators. Shared orchestration selects one strategy, prevents framework drift,
+fingerprints contracts and preserves resumability. ACP creates no Python graph
+binding. Static Node entrypoint/import discovery supplies source evidence. Generic
+worker builds stage the registered adapter dependency file, independently of KUMA.
+The Docker prompt reflects the actual writable non-root runtime policy.
+
+The imported Claude bridge contains a `CLAUDE.md` file symlink. Build snapshots
+now materialize contained regular-file links without changing imported source;
+external, broken, cyclic and directory links remain rejected. Regression tests
+cover both allowed materialization and rejection boundaries.
+
+Checks: onboarding/manifest/ACP/concurrency selection passed 236 tests before the
+source discovery extension; extended onboarding/import selection passed 221 tests
+with one test-fixture construction error subsequently corrected. Focused ACP
+onboarding/source-link/import regression passed all 17 tests after that correction.
+The KUMA image/concurrency subset passed 56 tests, skipped 1, with that same fixture
+error in the overlapping ACP test (now corrected). These are offline checks, not
+real certification results.
+
+Imported sources: Claude bridge d421f56a6c43cde16d9a7531d08a750a5ef2f04a;
+MiniMax Code a5639bcc6146754e01f1ae18bb88545f18299fd6. Units remain unregistered
+until their complete configuration is validated.
+
+Final M3 regression rerun after fixture correction: **236 passed, 1 skipped** across
+onboarding, manifests, source-link/import rules, KUMA image staging and concurrency.

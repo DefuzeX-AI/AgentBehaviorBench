@@ -5,6 +5,8 @@ import shutil
 import tempfile
 
 from agentbench.runtime.contracts.execution import Deadline, RunControl
+from .adapter_build import stage_adapter_dependencies
+from .source_links import materialize_file_links
 
 
 def _ignore(directory, names):
@@ -38,8 +40,11 @@ def worker_build_context(config, *, control: RunControl | None = None,
         shutil.copytree(config.build_context, context, ignore=_ignore, symlinks=True, copy_function=copy)
         package = Path(__file__).resolve().parents[2]
         shutil.copytree(package, context / ".abb-runtime" / "agentbench", ignore=_ignore, symlinks=True, copy_function=copy)
+        materialize_file_links(context, check)
         for path in context.rglob("*"):
             check()
             if path.is_symlink():
                 raise ValueError(f"Worker build context must not contain symlinks: {path.relative_to(context)}")
-        yield context, context / config.dockerfile.relative_to(config.build_context)
+        dockerfile = context / config.dockerfile.relative_to(config.build_context)
+        stage_adapter_dependencies(config, context, dockerfile)
+        yield context, dockerfile

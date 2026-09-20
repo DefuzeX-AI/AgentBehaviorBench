@@ -1,11 +1,14 @@
 """Sync and async callers share one owned event loop for persistent ACP resources."""
 import asyncio
 import threading
+from pathlib import Path
 from agentbench.adapter.base import AdapterInvocation
 from .config import ACPConfig
 
 
 class ACPAdapter:
+    build_requirements = Path(__file__).with_name('requirements.txt')
+
     def __init__(self, config):
         self.config = config
         self._loop = self._thread = self._session = None

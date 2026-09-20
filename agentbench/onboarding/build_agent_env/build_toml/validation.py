@@ -36,6 +36,9 @@ def validate_manifest(content, session):
     if not isinstance(adapter, dict):
         raise BuildError("agent.toml needs an [adapter] table")
     selected = strategy(manifest.get("framework"))
+    planned_framework = session.plan.get("framework")
+    if planned_framework is not None and planned_framework != selected.name:
+        raise BuildError("Manifest framework differs from the validated plan")
     config_name, config_path = selected.validate_manifest(manifest, session)
     build = manifest.get("build", {})
     if not isinstance(build, dict) or build.get("context") != "." or build.get("dockerfile") != "Dockerfile":

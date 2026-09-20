@@ -11,6 +11,7 @@ from ...source import DownloadedAgent
 from .privacy import redact
 from .settings import BuildSettings
 from .lock_context import read_lock_excerpt
+from .javascript_context import references
 
 
 def safe_file(root: Path, name: str) -> Path | None:
@@ -91,6 +92,8 @@ def collect_context(source: DownloadedAgent, settings: BuildSettings,
         files.append(entry)
         if path.suffix == ".py" and not truncated:
             queue[0:0] = _imports(root, path, original_content)
+        elif not truncated:
+            queue[0:0] = references(root, path, original_content)
     return {"repository": source.repository, "revision": source.revision,
             "source_root": "agent/", "file_paths_relative_to": "agent/",
             "files": files, "omitted": omitted, "content_bytes": used}
@@ -99,7 +102,7 @@ def collect_context(source: DownloadedAgent, settings: BuildSettings,
 def _priority(name: str) -> tuple:
     path = Path(name)
     name = path.name.lower()
-    rank = (0 if "langgraph" in name else 1 if path.suffix == ".py" else
+    rank = (0 if "langgraph" in name or "acp" in name else 1 if path.suffix in {".py", ".ts"} else
             2 if path.suffix.lower() == ".lock" or name.startswith("requirements") or name in
             {"pyproject.toml", "setup.cfg", ".python-version", "runtime.txt"} else
             4 if name.startswith("readme.") and name not in {"readme.md", "readme.rst", "readme.txt"} else 3)

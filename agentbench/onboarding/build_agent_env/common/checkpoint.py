@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from pathlib import Path
 from dataclasses import asdict
 
 from .writer import confined, save_json
@@ -23,7 +24,8 @@ class Checkpoint:
             "sdk": session.sdk.onboarding_requirements(),
             "sdk_context": session.sdk_context,
             "framework_requirements": framework_requirements(),
-            "manifest_generation": "structured-facts-v1",
+            "manifest_generation": "framework-strategies-v2",
+            "planning_dispatch": digest((Path(__file__).parents[1] / "planning/assets/response.schema.json").read_text()),
             "tool_catalog": digest(CATALOG.read_text()),
             "planning_contract": {name: {"version": item.version, "assets": {
                 str(path.relative_to(item.assets)): digest(path.read_text())
