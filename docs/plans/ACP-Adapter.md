@@ -549,3 +549,34 @@ after the route fix while billing remained blocked. Registry readiness is unchan
 Before continuing, confirm the key's billing account and purchased resource:
 MiniMax documents separate pay-as-you-go API Keys and Token Plan Subscription Keys.
 A recharge confirmation alone does not establish quota for this particular key.
+
+### Live native chat and local tools accepted (2026-09-20)
+
+After the user supplied a Subscription Key for the purchased credits, the direct
+MiniMax-M3 probe returned HTTP 200 and `API_OK`. No additional runtime or imported
+MiniMax source changes were needed for this acceptance run.
+
+Two real Docker/ACP `agentbench observe` runs completed successfully:
+
+- Chat: `results/minimax-basic-smoke/bb0dd155ebb143d3af9a78fc320de8fb` returned
+  exactly `CHAT_OK`.
+- Local tools: `results/minimax-basic-smoke/87e9dd58c47e49e39b1734f9af8cd0d3`
+  recorded 11 completed native tool calls. Tool outputs confirm that
+  `inbox/note.txt` was moved to `outbox/note.txt`, the source was absent and both
+  content hashes matched. The Agent wrote and read back `add.py`, then actually
+  executed it with Python 3.11.2. Its two assertions passed, stdout contained
+  `CODE_RUN_OK 5`, and the shell captured Python exit status 0.
+
+Verification used completed ACP tool records, not only the final Agent response.
+The tool run retains `smoke-checks.json`, raw ACP events, framework events, OTEL
+spans and network evidence. All 13 model responses and both native token-count
+responses in that run returned HTTP 200. Traffic remained in observe mode using
+the original MiniMax endpoint, model and credentials.
+
+Known limits: optional native content review still returned HTTP 401. The chat
+run recorded one catalog client disconnect; other catalog requests succeeded.
+Neither prevented these smoke checks. Container workspace files were not
+exported; their tool inputs and observed outputs remain in the traces. This
+milestone covers chat and local tool execution only, not Case generation, Judge
+acceptance, multi-turn memory or full certification. Registry readiness is
+unchanged.
