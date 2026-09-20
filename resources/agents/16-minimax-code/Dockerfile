@@ -15,4 +15,5 @@ RUN cd agent && pnpm install --frozen-lockfile && pnpm build \
 COPY .abb-runtime/ /opt/abb-runtime/
 COPY agent.toml ./
 COPY network/ ./network/
+COPY bootstrap/ ./bootstrap/
 USER agent

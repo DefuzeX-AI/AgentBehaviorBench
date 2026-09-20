@@ -55,7 +55,7 @@ class ACPConfig:
         keys = (*_strings(adapter.get('env_keys', []), 'env_keys'),
                 *_strings(runtime.get('env_keys', []), 'runtime.env_keys'),
                 *_strings(runtime.get('secret_env_keys', []), 'runtime.secret_env_keys'))
-        # The runtime injects surrogate credentials for intercepted model routes.
+        # Observe mode forwards declared native credentials to the ACP process.
         interception = manifest.get('llm_interception', {})
         keys += tuple(item['agent_env'] for item in interception.get('credentials', [])
                       if isinstance(item, dict) and isinstance(item.get('agent_env'), str))

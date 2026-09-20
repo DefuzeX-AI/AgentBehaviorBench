@@ -481,3 +481,25 @@ are unchanged. Logs: `cache/acp-acceptance/observe-host-final.log` and
 No real native benchmark or Judge acceptance was performed for this change.
 The service tests need no external model keys; native credentials/login still
 need to be provisioned for an end-to-end MiniMax or Claude certification.
+
+### MiniMax CN native API-key bootstrap (2026-09-20)
+
+The user selected the CN API platform. The outer MiniMax unit now requires
+`MINIMAX_API_KEY` and calls the pinned upstream CLI's
+`provider set-minimax-key --api-key-env MINIMAX_API_KEY`. A nonsecret native YAML
+template chooses `https://api.minimax.cn/anthropic` and `minimax/MiniMax-M3`.
+Each ACP process gets a fresh mode-0700 profile with a mode-0600 config file;
+setup output is captured before exec'ing the original ACP command. Native setup
+failure prevents ACP startup, redacts the key and removes the failed profile.
+No native source or shared service behavior changed. Model egress permits only
+the CN messages/count endpoints; the previous managed-login model route is gone.
+The BBA `observe` policy remains in effect.
+
+Validation: 24 focused tests passed; actual staged Docker image build passed;
+static onboarding with the pinned KUMA parser passed; 4184 source hashes are
+unchanged. An offline container using a deliberately invalid fixture key saved
+native configuration, selected API-key mode and completed initialize/session-new.
+The reusable check is `tests/acp_fixtures/minimax_byok_handshake.py`; output is in
+`cache/acp-acceptance/minimax-byok-handshake.json`. It explicitly reports that no
+model request or key-validity check was performed. `.env` has no MINIMAX_API_KEY,
+so real MiniMax authentication, model output and Judge acceptance remain pending.

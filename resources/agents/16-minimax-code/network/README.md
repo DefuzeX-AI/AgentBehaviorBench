@@ -6,13 +6,13 @@ operations. ACP selects `observe` through its adapter; there is no user mode fla
 
 ## Source contracts
 
-- `packages/config/src/config.ts`: the CN production managed preset uses
-  `https://agent.minimax.cn/mavis/api/v1/llm/v1`. Model messages are forwarded
-  unchanged, including native authentication and model selection.
-- `packages/local-runtime/src/context/token-counter-adapters/messages.ts`:
-  token counting appends `/v1/messages/count_tokens` to the model base URL.
-  Explicit count routes cover this form and a base normalized to one `/v1`.
-  Requests and responses remain native; BBA does not synthesize counts in observe.
+- `bootstrap/native-config.yaml` selects the CN API-key endpoint
+  `https://api.minimax.cn/anthropic` using the upstream `minimax_api.baseURL` field.
+  Model messages use `/anthropic/v1/messages`; token counting uses
+  `/anthropic/v1/messages/count_tokens`. Both routes are observed unchanged.
+- `packages/tui/src/cli/provider-command.ts`: `provider set-minimax-key` saves the
+  value from the named environment variable and selects `minimax_api_key` mode.
+  The launcher calls this existing command, not a replacement model service.
 - `packages/local-runtime-v2/src/service/model-system/catalog/provider-presets/`:
   the CN descriptor resolves a versioned catalog on `filecdn.minimax.chat`.
   Both requests have independently scoped rules.
@@ -30,11 +30,12 @@ counts and substituted OpenRouter model describe the old implementation, not
 native observation acceptance. Its scene-205 title review returned HTTP 401,
 `token is required`. No successful review was synthesized.
 
-`MAVIS_ACCESS_TOKEN`, when supplied, is forwarded unchanged. It is no longer a
-mandatory preflight secret merely because title review may read it. Current
-upstream managed authentication also uses runtime auth context; supplying that
-one variable alone is not proof of a working native login. The unit stays
-`adapting` until a real native certification is retained.
+The deployment now requires `MINIMAX_API_KEY` before execution. It does not
+forward MAVIS_ACCESS_TOKEN or select the managed-login model route. The native
+CLI writes the API key into a fresh private Case profile. Catalog and title-review
+routes remain scoped and observable; a failed optional account operation is not
+reported as a successful review. API authentication and complete certification
+remain unverified until a real key is supplied and an actual Case completes.
 
 ## Updating upstream
 

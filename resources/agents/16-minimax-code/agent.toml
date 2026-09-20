@@ -16,7 +16,8 @@ downloaded_on = "2026-09-20"
 type = "docker"
 execution = "oneshot"
 timeout_sec = 600
-env_keys = ["MINIMAX_DATA_DIR", "MCODE_DISABLE_TELEMETRY", "DO_NOT_TRACK"]
+env_keys = ["MINIMAX_DATA_DIR", "MCODE_DISABLE_TELEMETRY", "DO_NOT_TRACK", "MAVIS_REGION"]
+secret_env_keys = ["MINIMAX_API_KEY"]
 
 [build]
 context = "."
@@ -29,7 +30,8 @@ workdir = "/opt/agent"
 [adapter]
 type = "acp"
 transport = "stdio"
-command = ["node", "/opt/agent/agent/dist/cli.js", "acp"]
+command = ["python", "/opt/agent/bootstrap/launch.py"]
+handshake_timeout = 90
 cwd = "/home/agent/workspace"
 permission_policy = "allow_once"
 
@@ -39,23 +41,26 @@ trust_plugin = "pem-env"
 network_config = "network/rules.toml"
 tool_routes = []
 
+[llm_interception.environment]
+MAVIS_REGION = "cn"
+
 [[llm_interception.credentials]]
-id = "native-login"
-agent_env = "MAVIS_ACCESS_TOKEN"
-auth_plugin = "bearer-token"
+id = "minimax-api-key"
+agent_env = "MINIMAX_API_KEY"
+auth_plugin = "anthropic-api-key"
 
 [[llm_interception.routes]]
 id = "minimax-native-messages"
-host_patterns = ["agent.minimax.cn"]
+host_patterns = ["api.minimax.cn"]
 ports = [443]
 methods = ["POST"]
-path_patterns = ["/mavis/api/v1/llm/v1/messages", "/mavis/api/v1/llm/v1/v1/messages"]
+path_patterns = ["/anthropic/v1/messages"]
 protocol_plugin = "anthropic-messages"
 
 [[llm_interception.routes]]
 id = "minimax-native-count"
-host_patterns = ["agent.minimax.cn"]
+host_patterns = ["api.minimax.cn"]
 ports = [443]
 methods = ["POST"]
-path_patterns = ["/mavis/api/v1/llm/v1/messages/count_tokens", "/mavis/api/v1/llm/v1/v1/messages/count_tokens"]
+path_patterns = ["/anthropic/v1/messages/count_tokens"]
 protocol_plugin = "anthropic-count-tokens"
