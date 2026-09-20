@@ -25,10 +25,11 @@ do not select this Agent's model. The outer `network/rules.toml` scopes catalog
 and content-review access; unknown destinations remain blocked. See
 [network adaptation](network/README.md).
 
-This unit uses the CN MiniMax API-key mode. Put `MINIMAX_API_KEY` in the host
-`.env`. The runtime requires it before starting the container, then forwards the
+This unit uses the international MiniMax API-key mode. Put `MINIMAX_API_KEY` in the host
+`.env`. Create the key through the [international console](https://platform.minimax.io/console/access).
+The runtime requires it before starting the container, then forwards the
 real key unchanged. `bootstrap/native-config.yaml` selects
-`https://api.minimax.cn/anthropic` and the native `minimax/MiniMax-M3` model.
+`https://api.minimax.io/anthropic` and the native `minimax/MiniMax-M3` model.
 `bootstrap/launch.py` creates a private profile and calls the upstream CLI's
 `provider set-minimax-key --api-key-env MINIMAX_API_KEY` before exec'ing ACP.
 Setup output cannot contaminate JSON-RPC stdout. No key is baked into the image,
@@ -50,7 +51,7 @@ repository root):
 
 ```bash
 docker run --rm --network=none -i \
-  -e MINIMAX_API_KEY=offline-fixture-not-a-real-key -e MAVIS_REGION=cn \
+  -e MINIMAX_API_KEY=offline-fixture-not-a-real-key -e MAVIS_REGION=en \
   abb-acp-acceptance/minimax-code:source python - \
   < tests/acp_fixtures/minimax_byok_handshake.py
 ```

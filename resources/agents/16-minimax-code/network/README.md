@@ -6,16 +6,19 @@ operations. ACP selects `observe` through its adapter; there is no user mode fla
 
 ## Source contracts
 
-- `bootstrap/native-config.yaml` selects the CN API-key endpoint
-  `https://api.minimax.cn/anthropic` using the upstream `minimax_api.baseURL` field.
+- `bootstrap/native-config.yaml` selects the international API-key endpoint
+  `https://api.minimax.io/anthropic` using the upstream `minimax_api.baseURL` field.
   Model messages use `/anthropic/v1/messages`; token counting uses
   `/anthropic/v1/messages/count_tokens`. Both routes are observed unchanged.
 - `packages/tui/src/cli/provider-command.ts`: `provider set-minimax-key` saves the
   value from the named environment variable and selects `minimax_api_key` mode.
   The launcher calls this existing command, not a replacement model service.
 - `packages/local-runtime-v2/src/service/model-system/catalog/provider-presets/`:
-  the CN descriptor resolves a versioned catalog on `filecdn.minimax.chat`.
-  Both requests have independently scoped rules.
+  the international runtime reads `https://models.dev/api.json` directly.
+  Its metadata rule permits only that path, without the CN descriptor/CDN routes.
+- `packages/local-runtime/src/content-safety/api-base.ts`: international production
+  review uses `agent.minimax.io`; only the existing `/mavis/api/v1/content` path
+  is permitted.
 - `packages/local-runtime/src/content-safety/api.ts`: review sends the original
   `content_text` and `scene`. Responses, including rejection and HTTP 401, reach
   the Agent unchanged. The Agent owns fallback behavior. This route is optional

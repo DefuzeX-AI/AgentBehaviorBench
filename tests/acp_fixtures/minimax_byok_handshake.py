@@ -15,12 +15,12 @@ async def main():
         assert len(profiles) == 1, 'Expected an isolated native profile'
         config = yaml.safe_load(profiles[0].read_text())
         assert config['minimax_api']['apiKey'] == os.environ['MINIMAX_API_KEY']
-        assert config['minimax_api']['baseURL'] == 'https://api.minimax.cn/anthropic'
+        assert config['minimax_api']['baseURL'] == 'https://api.minimax.io/anthropic'
         assert config['minimaxModelSource'] == 'minimax_api_key'
         assert config['defaultModel'] == 'minimax/MiniMax-M3'
         assert profiles[0].stat().st_mode & 0o777 == 0o600
         assert session.client.session_id
-        print(json.dumps({'status':'offline_acp_session_created', 'region':'cn',
+        print(json.dumps({'status':'offline_acp_session_created', 'region':'en',
             'mode':'native_api_key', 'model':config['defaultModel'],
             'base_url':config['minimax_api']['baseURL'], 'private_key_file':True,
             'model_request_performed':False, 'credential_validity_verified':False}))

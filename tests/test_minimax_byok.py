@@ -70,13 +70,16 @@ def test_missing_key_fails_before_startup(launcher, fixture_unit, monkeypatch):
     native.assert_not_called()
 
 
-def test_cn_unit_observes_only_declared_native_model_endpoints():
+def test_global_unit_observes_only_declared_native_model_endpoints():
     config = InterceptionConfig.from_agent_dir(UNIT)
     assert config.mode == 'observe'
+    assert config.environment['MAVIS_REGION'] == 'en'
     assert [c.agent_env for c in config.credentials] == ['MINIMAX_API_KEY']
     for path in ('/anthropic/v1/messages', '/anthropic/v1/messages/count_tokens'):
-        assert any(r.matches(host='api.minimax.cn', port=443, method='POST', path=path) for r in config.routes)
-    assert not any(r.matches(host='agent.minimax.cn', port=443, method='POST',
+        assert any(r.matches(host='api.minimax.io', port=443, method='POST', path=path) for r in config.routes)
+    assert not any('api.minimax.cn' in r.host_patterns for r in config.routes)
+    assert {h for r in config.tool_routes for h in r.host_patterns} == {'models.dev', 'agent.minimax.io'}
+    assert not any(r.matches(host='agent.minimax.io', port=443, method='POST',
                              path='/mavis/api/v1/llm/v1/messages') for r in config.routes)
 
 

@@ -503,3 +503,25 @@ The reusable check is `tests/acp_fixtures/minimax_byok_handshake.py`; output is 
 `cache/acp-acceptance/minimax-byok-handshake.json`. It explicitly reports that no
 model request or key-validity check was performed. `.env` has no MINIMAX_API_KEY,
 so real MiniMax authentication, model output and Judge acceptance remain pending.
+
+### Switch the API-key deployment to the international platform (2026-09-20)
+
+The user switched from CN to the international platform. Current configuration
+now selects `MAVIS_REGION=en` and `https://api.minimax.io/anthropic`, retaining
+MiniMax-M3 and native observation. Model/count routes use api.minimax.io.
+Following upstream region selection, catalog access now permits only
+`https://models.dev/api.json`; optional native review uses agent.minimax.io.
+The CN descriptor/CDN rules were removed. Bootstrap and shared service code did
+not need changes.
+
+The official prerequisites page links login at
+https://platform.minimax.io/login?source=platform_docs and API-key creation at
+https://platform.minimax.io/console/access (redirect target of the older
+user-center/basic-information/interface-key link).
+
+Validation: 24 focused tests passed, pinned-SDK static validation passed, and the
+updated staged image built successfully. The offline native CLI/ACP session
+check passed with the international endpoint and a fixture credential. Artifacts:
+`cache/acp-acceptance/minimax-global-tests.log` and
+`cache/acp-acceptance/minimax-global-handshake.json`. This does not establish that
+a real key is valid or that a paid model request/complete benchmark succeeds.
