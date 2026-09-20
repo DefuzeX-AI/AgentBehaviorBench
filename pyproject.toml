@@ -15,6 +15,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+acp = ["agent-client-protocol==0.12.1"]
 otel = ["opentelemetry-sdk>=1.30,<2"]
 
 [project.scripts]
@@ -27,6 +28,7 @@ pem-env = "agentbench.runtime.interception.plugins:PemEnvironmentTrust"
 openrouter = "agentbench.runtime.interception.providers:OpenRouterProvider"
 
 [project.entry-points."defuzex_agentbench.adapters"]
+acp = "agentbench.adapter.acp:ACPAdapter"
 langgraph = "agentbench.adapter.langgraph:LangGraphAdapter"
 
 [tool.setuptools.packages.find]
@@ -34,6 +36,8 @@ where = ["."]
 include = ["agentbench*"]
 
 [tool.setuptools.package-data]
+"agentbench.onboarding.build_agent_env.frameworks.acp" = ["assets/**/*.md", "assets/**/*.json"]
+"agentbench.onboarding.build_agent_env.frameworks.langgraph" = ["assets/**/*.md", "assets/**/*.json"]
 "agentbench.onboarding.build_agent_env.openrouter_provider" = ["assets/*.toml", "assets/*.md", "assets/*.json"]
 "agentbench.onboarding.build_agent_env.planning" = ["assets/*.md", "assets/*.json"]
 "agentbench.onboarding.build_agent_env.build_toml" = ["assets/*.md", "assets/*.json"]

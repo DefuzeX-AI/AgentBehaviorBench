@@ -4,9 +4,10 @@ These history/state/extension semantics belong to KUMA, not the SDK contract.
 """
 from agentbench.sdk.common.artifacts import Artifacts, plain
 from agentbench.observe.store import TraceStore
+from agentbench.observe.result import sanitize_result
 
 
-async def drive_run(run, invoke, directory, *, provider, repo_path=None):
+async def drive_run(run, invoke, directory, *, provider, repo_path=None, file_evidence_required=False):
     """Deliver current Inputs sequentially; leave context entirely to the Agent.
 
     Args:
@@ -28,7 +29,7 @@ async def drive_run(run, invoke, directory, *, provider, repo_path=None):
     trace = TraceStore(directory / 'sdk.jsonl', run.run_id, source='sdk')
     summary = {'run_id': run.run_id, 'case_id': run.case_id, 'phase': 'input',
                'execution': 'pending', 'otel': 'pending', 'submission': 'pending',
-               'judge': 'pending', 'evidence': 'pending', 'steps': []}
+               'judge': 'pending', 'evidence': 'pending', 'files': 'pending' if file_evidence_required else 'disabled', 'steps': []}
     try:
         while True:
             summary['phase'] = 'input'
@@ -49,6 +50,9 @@ async def drive_run(run, invoke, directory, *, provider, repo_path=None):
                          artifact=f'{relative}/mapped-input.json')
             summary['phase'] = 'execution'
             result = await invoke(payload, directory / relative, provider)
+            # Artifacts.save sanitizes only its serialized copy. The same safe
+            # value must cross the SDK submission boundary, including custom callers.
+            result, _ = sanitize_result(result, files.secrets)
             files.save(f'{relative}/result.json', result)
             trace.record('agent_returned', input_id=item.input_id, case_id=run.case_id,
                          artifact=f'{relative}/result.json')
@@ -84,6 +88,18 @@ async def drive_run(run, invoke, directory, *, provider, repo_path=None):
                     summary['submission'] = 'committed'
                     files.save(f'{relative}/submission.json', committed[0].submission)
                     submission = plain(committed[0].submission)
+                    files.save(f'{relative}/file-evidence.json', {
+                        'file_evidence': submission.get('file_evidence'),
+                        'capture_status': {key: value for key, value in submission.get('capture_status', {}).items()
+                                           if key in ('file_snapshot', 'file_diff', 'sensitive_scan')},
+                        'runtime_evidence': submission.get('extensions', {}).get('runtime_evidence')})
+                    if file_evidence_required:
+                        captures = submission.get('capture_status', {})
+                        states = [captures.get(key, {}).get('status') for key in ('file_snapshot', 'file_diff')]
+                        current = ('missing' if not submission.get('file_evidence') or any(s not in ('complete', 'partial') for s in states)
+                                   else 'partial' if 'partial' in states else 'complete')
+                        summary['files'] = ('missing' if 'missing' in (summary['files'], current)
+                                            else 'partial' if 'partial' in (summary['files'], current) else current)
                     step['submission_status'] = submission['status']
                     step['capture_status'] = submission.get('capture_status', {})
                     trace.record('submission_committed', input_id=item.input_id, case_id=run.case_id,

@@ -42,11 +42,18 @@ export default function InteractionDetails({ run, id, revision, live, onNavigate
         {!d.response?.client_payload && <p>The upstream response is shown here; a separate client conversion result was not recorded.</p>}
         {!reply.parsed && <JsonValue value={d.response?.payload} label="Response (unrecognized protocol)" />}
         {reply.usage && <JsonValue value={reply.usage} label="Token / Usage" />}</>
-        : d.artifact_file ? <JsonValue label={d.artifact_file} value={d.artifact} />
+        : d.artifact_file ? <>
+          {d.artifact?.file_evidence && <><h3>File changes</h3>
+            <Tag color={d.artifact.file_evidence.complete ? 'green' : 'orange'}>{d.artifact.file_evidence.complete ? 'Complete' : 'Partial'}</Tag>
+            {d.artifact.file_evidence.changes.map((file, i) => <section key={i}><h4>{file.change_type} · {file.path}</h4>
+              {file.diff ? <pre>{file.diff}</pre> : <p>{file.reason || 'No text diff supplied'}</p>}</section>)}</>}
+          {typeof d.artifact?.content === 'string' && <pre>{d.artifact.content}</pre>}
+          <JsonValue label={d.artifact_file} value={d.artifact} /></>
         : <><JsonValue label="Input / request" value={d.request?.payload ?? d.request?.input ?? d.request} />
           <JsonValue label="Output / response" value={d.response?.payload ?? d.response?.output ?? d.response} /></>}
     </> },
     { key: 'request', label: 'Request and response JSON', children: <>
+      <JsonValue label="Emitted tool relationships" value={d.tool_relations} />
       <JsonValue label="Original Agent request (before conversion)" value={d.request?.source_payload} />
       <JsonValue label="Request actually sent" value={d.request?.payload ?? d.request} />
       <JsonValue label="Upstream response" value={d.response?.payload ?? d.response} />
@@ -54,7 +61,7 @@ export default function InteractionDetails({ run, id, revision, live, onNavigate
       {d.response?.raw_body != null && <JsonValue label="Complete raw response / SSE" value={d.response.raw_body} />}
     </> },
     { key: 'flow', label: 'Case data flow', children: context ? <>
-      <Alert type="info" title={`Link evidence: ${d.link_evidence === 'framework_span_id' ? "the network record's framework_span_id matches this Input callback ID" : d.link_evidence === 'payload_input_id' ? 'a unique input_id / case_id match in the record' : 'the artifact directory for the same Input'}`} />
+      <Alert type="info" title={`Link evidence: ${d.link_evidence === 'framework_span_id' ? "the network record's framework_span_id matches this Input callback ID" : d.link_evidence === 'record_input_id' ? 'a unique input_id / case_id match in the record envelope' : d.link_evidence === 'native_response_id' ? 'native inspector response ID matches this Input and network response' : d.link_evidence === 'emitted_tool_id' ? 'new response tool IDs match this Input’s recorded tool calls' : 'the artifact directory for the same Input'}`} />
       <p>This confirms only that the records are linked. The field matches below separately show whether content entered the model request.</p>
       {d.input_matches.length ? <Alert type="success" title="Found the complete Input value in the request actually sent" description={d.input_matches.map(m => <div key={m.path}><code>{m.path}</code> · {m.method === 'exact_value' ? 'exact value match' : 'contains the complete original text'}</div>)} />
         : <Alert type="warning" title="No complete Input value match found" description="The input may have been transformed, used only in part, or omitted from the captured request. This alone does not prove an omission." />}
@@ -73,13 +80,18 @@ export default function InteractionDetails({ run, id, revision, live, onNavigate
     { key: 'raw', label: `Raw records (${d.record_count})`, children: <OriginalRecords endpoint={endpoint} revision={revision} live={live} /> },
   ];
   return <div className="interaction-detail">
+    {d.optional_operation && d.status === 'failed' && <Alert type="warning" title="Optional service operation failed" description="This is separate from the main model request status. The original HTTP failure remains in the evidence." />}
     {d.completeness === 'legacy_address_only' && <Alert type="warning" title="The legacy record contains only an address" description="Without a call_id, request body, or response body, the complete network interaction cannot be reconstructed. Rebuild the runtime image before collecting new records." />}
     {d.completeness === 'missing_response' && <Alert type="info" title="No response has been recorded yet" description="The call may still be running, or collection may have ended before it completed." />}
     <Descriptions size="small" column={2} items={[
       { key: 'time', label: 'Start time', children: d.timestamp || 'Not recorded' },
       { key: 'basis', label: 'Time basis', children: d.time_basis === 'file_mtime' ? 'File modification time (not an exact event time)' : 'Collection timestamp' },
       { key: 'id', label: 'Call / Span', children: <code>{d.call_id || d.framework_span_id || 'Not recorded'}</code> },
+      { key: 'purpose', label: 'Purpose', children: [d.purpose, d.purpose_evidence].filter(Boolean).join(' · ') || 'Unknown' },
+      { key: 'session', label: 'Native session', children: d.native_session_id || 'Unknown' },
+      { key: 'case', label: 'Case', children: d.case_id || 'Unknown' },
       { key: 'input', label: 'Input', children: d.input_id || 'Unlinked' },
+      { key: 'association', label: 'Association', children: d.association_status || d.link_evidence || 'Unknown' },
     ]} />
     <Tabs items={tabs} destroyOnHidden />
   </div>;

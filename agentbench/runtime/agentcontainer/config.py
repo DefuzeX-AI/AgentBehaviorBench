@@ -48,11 +48,17 @@ class AgentContainerConfig:
 
         values = os.environ if environ is None else environ
         environment: dict[str, str] = {}
-        for key in _string_list(runtime, "env_keys"):
+        # Worker control-plane keys are forwarded to the container, but are not
+        # Agent-declared env_keys and are never inherited by an ACP subprocess.
+        for key in (*_string_list(runtime, "env_keys"), *_string_list(runtime, "worker_env_keys")):
             if key in values:
                 environment[key] = values[key]
         for key in _string_list(runtime, "secret_env_keys"):
             environment[key] = secret_resolver.require(key)
+
+        for key in _string_list(runtime, 'optional_secret_env_keys'):
+            if values.get(key):
+                environment[key] = secret_resolver.require(key)
 
         timeout = runtime.get("timeout_sec", 60)
         if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0:
@@ -135,6 +141,8 @@ def _resolve_inside(root: Path, value: str) -> Path:
 
 def docker_structure(root: Path, manifest):
     """Validate build paths and launch without resolving environment or secrets."""
+    from agentbench.sdk.common.workspace import workspace_policy
+    workspace_policy(manifest)
     if manifest_runtime_type(manifest) != "docker":
         raise ContainerConfigurationError("Expected Docker runtime")
     build = _required_table(manifest, "build")

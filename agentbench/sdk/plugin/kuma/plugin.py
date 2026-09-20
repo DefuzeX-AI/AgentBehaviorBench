@@ -27,6 +27,10 @@ class KumaEvaluationSDK:
         from .onboarding_catalog import fetch
         return fetch(environ=environ, timeout=timeout)
 
+    def configured_onboarding_context(self, *, environ, timeout, evaluation):
+        from .onboarding_catalog import fetch
+        return fetch(environ=environ, timeout=timeout, evaluation=evaluation)
+
     def validate_onboarding_context(self, directory, *, context):
         from .onboarding_catalog import validate_selection
         validate_selection(directory, context=context)

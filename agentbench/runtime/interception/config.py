@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import fnmatch
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
 from typing import Mapping
@@ -56,6 +57,7 @@ class ToolRouteConfig:
     methods: tuple[str, ...]
     path_patterns: tuple[str, ...]
     purpose: str = 'tool'
+    required: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +68,10 @@ class InterceptionConfig:
     credentials: tuple[CredentialConfig, ...]
     routes: tuple[RouteConfig, ...]
     tool_routes: tuple[ToolRouteConfig, ...] = ()
+    token_counting: Mapping[str, object] = field(default_factory=dict)
+    mode: str = 'replace'
+    observation_headers: Mapping[str, str] = field(default_factory=dict)
+    observation_tool_purposes: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
 
     @classmethod
     def from_agent_dir(cls, agent_root: str | Path) -> "InterceptionConfig | None":
@@ -84,9 +90,12 @@ class InterceptionConfig:
                 "Manifest field [llm_interception] must be a table"
             )
 
+        from agentbench.adapter.factory import DEFAULT_ADAPTER_FACTORY
+        mode = DEFAULT_ADAPTER_FACTORY.network_mode(manifest.get('framework', 'langgraph'))
         environment = _string_mapping(section.get("environment", {}), "environment")
-        credentials = _credentials(section.get("credentials"))
-        routes = _routes(section.get("routes", []), credentials)
+        credentials = (() if mode == 'observe' and not section.get('credentials')
+                       else _credentials(section.get("credentials")))
+        routes = _routes(section.get("routes", []), credentials, require_credentials=mode == 'replace')
         agent_envs = [item.agent_env for item in credentials]
         if len(set(agent_envs)) != len(agent_envs):
             raise InterceptionConfigurationError(
@@ -99,13 +108,23 @@ class InterceptionConfig:
                 f"Interception environment cannot override credential variables: {names}"
             )
 
+        from .network_rules import load_network_rules
+        try:
+            network = load_network_rules(root, section.get('network_config'))
+        except (ValueError, OSError) as exc:
+            raise InterceptionConfigurationError(str(exc)) from exc
         return cls(
+            mode=mode,
+            observation_headers=_observation_headers(section.get("observation_headers", {})),
+            observation_tool_purposes=_observation_tool_purposes(section.get("observation_tool_purposes", {})),
             required=_boolean(section, "required", default=True),
             trust_plugin=_required_string(section, "trust_plugin"),
             environment=MappingProxyType(environment),
             credentials=credentials,
             routes=routes,
-            tool_routes=_tool_routes(section.get("tool_routes", [])),
+            tool_routes=(_tool_routes(section.get("tool_routes", []))
+                         + _tool_routes(network.get('tool_routes', []))),
+            token_counting=network.get('token_counting', {}) if mode == 'replace' else {},
         )
 
 
@@ -117,14 +136,15 @@ def _tool_routes(value: object) -> tuple[ToolRouteConfig, ...]:
         if not isinstance(raw, dict):
             raise InterceptionConfigurationError("Every tool route must be a table")
         purpose = raw.get('purpose', 'tool')
-        if purpose not in ('tool', 'evaluation'):
-            raise InterceptionConfigurationError('Tool route purpose must be tool or evaluation')
+        if purpose not in ('tool', 'evaluation', 'metadata', 'content_safety'):
+            raise InterceptionConfigurationError('Unknown tool route purpose')
         result.append(ToolRouteConfig(
             host_patterns=_patterns(raw, "host_patterns", host=True),
             ports=_ports(raw.get("ports", [443])),
             methods=tuple(v.upper() for v in _string_list(raw, "methods")),
             path_patterns=_patterns(raw, "path_patterns", host=False),
             purpose=purpose,
+            required=_boolean(raw, 'required', default=False),
         ))
     return tuple(result)
 
@@ -152,7 +172,7 @@ def _credentials(value: object) -> tuple[CredentialConfig, ...]:
 
 
 def _routes(
-    value: object, credentials: tuple[CredentialConfig, ...]
+    value: object, credentials: tuple[CredentialConfig, ...], *, require_credentials=True,
 ) -> tuple[RouteConfig, ...]:
     if not isinstance(value, list):
         raise InterceptionConfigurationError(
@@ -164,8 +184,8 @@ def _routes(
     for raw in value:
         if not isinstance(raw, dict):
             raise InterceptionConfigurationError("Every interception route must be a table")
-        credential_id = _required_string(raw, "credential")
-        if credential_id not in credential_ids:
+        credential_id = _required_string(raw, "credential") if require_credentials else raw.get('credential', '')
+        if require_credentials and credential_id not in credential_ids:
             raise InterceptionConfigurationError(
                 f"Interception route references unknown credential: {credential_id}"
             )
@@ -271,3 +291,29 @@ def _require_unique(values: object, label: str) -> None:
     items = tuple(values)  # type: ignore[arg-type]
     if len(set(items)) != len(items):
         raise InterceptionConfigurationError(f"Interception {label} values must be unique")
+
+
+def _observation_headers(value):
+    if not isinstance(value, dict) or set(value) - {'native_session_id', 'native_turn_id', 'native_request_id', 'native_purpose'}:
+        raise InterceptionConfigurationError('Invalid observation header labels')
+    for name in value.values():
+        if (not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9-]{1,128}', name)
+                or re.search(r'auth|cookie|secret|token|key|password', name, re.I)):
+            raise InterceptionConfigurationError('Observation headers must be non-credential metadata')
+    return dict(value)
+
+
+def _observation_tool_purposes(value):
+    if not isinstance(value, dict) or len(value) > 8:
+        raise InterceptionConfigurationError('Invalid observation tool purposes')
+    result = {}
+    for purpose, names in value.items():
+        if (not isinstance(purpose, str) or not re.fullmatch(r'[a-z][a-z0-9_]{0,31}', purpose)
+                or not isinstance(names, list) or not 1 <= len(names) <= 16
+                or any(not isinstance(name, str) or not name or len(name) > 128 for name in names)):
+            raise InterceptionConfigurationError('Invalid observation tool purpose rule')
+        signature = tuple(sorted(set(names)))
+        if signature in result.values():
+            raise InterceptionConfigurationError('Ambiguous observation tool purpose rules')
+        result[purpose] = signature
+    return result

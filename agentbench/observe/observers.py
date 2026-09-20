@@ -23,3 +23,11 @@ def _langchain(store):
 
 DEFAULT_OBSERVERS = ObserverFactory()
 DEFAULT_OBSERVERS.register("langgraph", _langchain)
+
+
+def _acp(store):
+    from .acp import ACPObserver
+    return ACPObserver(store)
+
+
+DEFAULT_OBSERVERS.register("acp", _acp)

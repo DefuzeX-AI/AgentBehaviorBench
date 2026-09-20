@@ -2,19 +2,18 @@
 
 from copy import deepcopy
 import json
-from pathlib import Path
 
 from jsonschema import Draft202012Validator
 
 from .encoding import encode_manifest
 from .environment import runtime_environment
-from .frameworks import config_reader
+from ..frameworks.registry import strategy
 from .options import ManifestOptions
 from .protocols import interception_for
 from .provenance import source_metadata
 from ..common.errors import BuildError
 
-SCHEMA = Path(__file__).parent / "assets/analysis.schema.json"
+SCHEMA = strategy("langgraph").manifest_schema
 
 
 def render_manifest(facts, *, source, agent_id, options=None):
@@ -25,27 +24,28 @@ def render_manifest(facts, *, source, agent_id, options=None):
     replay safety are program-owned. Optional context comes only from the caller.
     Existing Agent files are never changed by this function.
     """
-    schema = json.loads(SCHEMA.read_text())["properties"]["facts"]["anyOf"][0]
+    selected = strategy(facts.get("framework"))
+    schema = json.loads(selected.manifest_schema.read_text())["properties"]["facts"]["anyOf"][0]
     error = next(Draft202012Validator(schema).iter_errors(facts), None)
     if error:
         raise BuildError(f"Invalid manifest facts at {error.json_path}: {error.message}")
     options = options or ManifestOptions()
-    config_reader(facts["framework"])
-    adapter = {"type": facts["framework"], "mode": "in_process",
-               **{key: value for key, value in facts["adapter"].items() if value is not None}}
+    adapter = selected.render_adapter(facts["adapter"])
     if options.adapter_context:
         adapter["context"] = deepcopy(options.adapter_context)
     manifest = {
         "schema_version": "defuzex-bench.agent.v2", "agent_id": agent_id,
         "display_name": facts["display_name"], "framework": facts["framework"],
-        "evaluation": {"replay_safe": False}, "source": source_metadata(source),
+        "evaluation": {**deepcopy(options.evaluation or {}), "replay_safe": False}, "source": source_metadata(source),
         "runtime": {"type": "docker", "execution": "oneshot", "timeout_sec": options.timeout_sec},
         "build": {"context": ".", "dockerfile": "Dockerfile"},
         "launch": {"argv": ["python", "-m", "agentbench.runtime.agentcontainer.worker"],
                    "workdir": "/opt/agent"}, "adapter": adapter,
     }
     interception = interception_for(facts["models"], facts["tool_routes"])
-    manifest["runtime"].update(runtime_environment(facts["env_keys"], facts["secret_env_keys"], interception))
+    from agentbench.adapter.factory import DEFAULT_ADAPTER_FACTORY
+    manifest["runtime"].update(runtime_environment(facts["env_keys"], facts["secret_env_keys"], interception,
+        network_mode=DEFAULT_ADAPTER_FACTORY.network_mode(facts['framework'])))
     if options.observe:
         fields = facts["input_fields"]
         if len({item["name"] for item in fields}) != len(fields):

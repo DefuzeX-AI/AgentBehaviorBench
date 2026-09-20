@@ -183,14 +183,14 @@ def test_unresolved_judge_and_failed_cleanup_block_agent_replay():
     assert classify_failure({**artifacts, 'host_trace_validation': 'failed'})['action'] == 'blocked'
 
 
-@pytest.mark.parametrize('agent_id', ['react-agent', 'trading-agents', 'gpt-researcher'])
-def test_audited_readonly_resources_explicitly_declare_replay_safety(agent_id):
+@pytest.mark.parametrize('agent_id', ['react-agent', 'company-research-agent'])
+def test_bundled_agents_keep_conservative_replay_policy(agent_id):
     from pathlib import Path
     from agentbench.harness.registry import load_registry
     root = Path(__file__).resolve().parents[1]
     agent = load_registry(root / 'resources/registry.toml').find(agent_id, enabled_only=False)
     runner = KumaContainerRunner(environ={'KUMA_API_KEY': 'offline'})
-    assert runner.recovery_capabilities(agent).safe_case_replay is True
+    assert runner.recovery_capabilities(agent).safe_case_replay is False
 
 
 @pytest.mark.parametrize('trace_rejected', [False, True])
@@ -200,6 +200,7 @@ def test_judge_only_failure_still_records_host_trace_validation(tmp_path, monkey
     root = tmp_path / 'agent'
     (root / 'agent').mkdir(parents=True)
     (root / 'agent/main.py').write_text('pass')
+    (root / 'agent.toml').write_text('agent_id = "agent"\n')
     agent = SimpleNamespace(path=root, agent_id='agent')
     checks = []
 

@@ -26,15 +26,16 @@ fails or the user presses Ctrl-C. Certification remains a separate `-c` action.
 | `openrouter_provider/` | HTTP requests, bounded source collection, secret handling, model/request settings and single-file response schema. |
 | `common/` | Per-file execution, atomic writes, checkpoints, registry updates and final validation. |
 
-Each builder keeps its English prompt under its own `assets/`. SDK-specific
+Framework-specific builders keep their prompts, schemas and examples under
+`frameworks/<name>/assets/`. Shared builders retain their own `assets/`. SDK-specific
 profile rules still come from the selected SDK plugin; they are not reimplemented
 in the generic builder.
 
 `framework` is inferred from the source, not assigned a universal default.
 Requests include `framework_requirements` from the intersection of registered
-runtime adapters and explicit onboarding support in `build_toml/frameworks.py`.
+runtime adapters and explicit onboarding support in `frameworks/registry.py`.
 Currently that intersection contains only LangGraph. Its field instructions live
-in `build_toml/assets/adapter-langgraph.md`, separate from the general TOML prompt.
+in `frameworks/langgraph/assets/manifest/adapter-langgraph.md`, separate from the general TOML prompt.
 New frameworks require an actual runtime adapter, static configuration validation
 and matching generation instructions; adding a name alone does not implement
 support. Non-file-based adapters also need the entrypoint validation flow extended.
@@ -107,7 +108,7 @@ KUMA's Run preflight still enforces the service's current selection rules.
 
 ## Binding contract
 
-Every complete plan includes an outer `bindings/*.py` file. The generated manifest
+Every complete LangGraph plan includes an outer `bindings/*.py` file. The generated manifest
 selects its synchronous zero-argument factory; a compatible native graph needs only
 a forwarding factory returning it. Other Agents need source-backed input/output
 adaptation and their full public lifecycle. Upstream `agent/` files stay unchanged.
@@ -122,3 +123,20 @@ missing a binding produce a conflict with the file preserved; they are not silen
 rewritten. Correct that file or deliberately remove the obsolete generated files
 before retrying. The general runtime can still load older direct-graph integrations;
 this stricter contract belongs to Agent onboarding.
+
+## Framework strategies
+
+`frameworks/langgraph/` owns Python binding plans, graph manifest fields and
+validation. `frameworks/acp/` owns stdio command plans, ACP fields and validation;
+it creates no Python binding or graph descriptor. Each has its own planning and
+manifest prompts/schemas. Shared planning requests an explicit framework and then
+validates against the selected strategy. Checkpoints fingerprint strategy assets
+and the shared dispatch contract. Framework changes cannot reuse an incompatible
+manifest. Node package entrypoints and relative JS/TS imports are collected as
+bounded source evidence without executing them.
+
+An ACP image provides its native CLI, a writable HOME/workspace and Python worker.
+The generic worker overlay installs registered adapter requirements into the
+worker's interpreter. SDK plugin dependencies remain owned by their SDK overlay.
+Source snapshots materialize contained regular-file symlinks; external, broken,
+cyclic and directory links are rejected. The imported source is not modified.

@@ -137,7 +137,7 @@ def test_blocked_request_envelope_is_a_non_retryable_decision_in_the_client_shap
     config = _config((ToolRoute(("kuma.test",), (443,), ("GET",), ("/api/agentdefuze/*",)),))
     flow = SimpleNamespace(request=http.Request.make("GET", "https://elsewhere.test/collect", b"", {}),
                            response=None, metadata={})
-    with patch("defuzex_model_interceptor.proxy.addon.emit"):
+    with patch("defuzex_model_interceptor.observation.events.emit"):
         ModelInterceptorAddon(config).request(flow)
     assert flow.response.status_code == 403
     assert json.loads(flow.response.content) == {"error": {
@@ -169,7 +169,7 @@ def test_transport_failure_hook_records_the_error_and_kills_the_flow():
                               defuzex_source_host="kuma.test")
     transport.error = mitm_flow.Error("[Errno 110] Connect call failed")
     events = []
-    with patch("defuzex_model_interceptor.proxy.addon.emit",
+    with patch("defuzex_model_interceptor.observation.events.emit",
                side_effect=lambda event, **data: events.append((event, data))):
         ModelInterceptorAddon(_config()).error(transport)
     assert [(event, data["error_code"]) for event, data in events] == [("tool_error", "transport_error")]
@@ -191,7 +191,7 @@ def test_error_in_success_body_does_not_inherit_retryability_from_synthetic_502(
                   'defuzex_call_id': 'call_application_error', 'defuzex_route': 'chat',
                   'defuzex_resolved_route': SimpleNamespace(protocol_plugin='json-http'),
                   'defuzex_started': time.monotonic()})
-    with patch('defuzex_model_interceptor.proxy.addon.emit'):
+    with patch('defuzex_model_interceptor.observation.events.emit'):
         ModelInterceptorAddon(_config()).response(flow)
     assert flow.response.status_code == 502
     assert json.loads(flow.response.content)['error']['code'] == 'upstream_error'

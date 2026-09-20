@@ -445,6 +445,9 @@ for reference in discover_sdks():
 def test_discovered_adapter_runs_real_agent_and_exports_case_output_judge(
     adapter_directory, tmp_path, monkeypatch
 ):
+    # This fixture SDK is serial; the user's project concurrency must not select
+    # parallel execution for an adapter that does not advertise that capability.
+    monkeypatch.setenv("ABB_MAX_PARALLEL_CASES", "1")
     from agentbench.cli.sessions import fresh
     monkeypatch.setattr(fresh, 'PROJECT_ROOT', tmp_path)
     from agentbench.cli.execution import run_benchmark_session

@@ -2,12 +2,12 @@
 
 import hashlib
 import json
-from dataclasses import asdict
 from pathlib import Path
+from dataclasses import asdict
 
 from .writer import confined, save_json
 from .errors import BuildError
-from ..build_toml.frameworks import framework_requirements
+from ..frameworks.registry import framework_requirements, STRATEGIES
 from ..build_toml.options import ManifestOptions
 from ..build_toml.tool_routes import CATALOG
 
@@ -24,11 +24,13 @@ class Checkpoint:
             "sdk": session.sdk.onboarding_requirements(),
             "sdk_context": session.sdk_context,
             "framework_requirements": framework_requirements(),
-            "manifest_generation": "structured-facts-v1",
+            "manifest_generation": "framework-strategies-v2",
+            "planning_dispatch": digest((Path(__file__).parents[1] / "planning/assets/response.schema.json").read_text()),
             "tool_catalog": digest(CATALOG.read_text()),
-            "planning_contract": {
-                name: digest((Path(__file__).parents[1] / "planning/assets" / name).read_text())
-                for name in ("prompt.md", "response.schema.json")},
+            "planning_contract": {name: {"version": item.version, "assets": {
+                str(path.relative_to(item.assets)): digest(path.read_text())
+                for path in sorted(item.assets.rglob("*")) if path.is_file()}}
+                for name, item in STRATEGIES.items()},
             "deployment_options": asdict(session.manifest_options or ManifestOptions()),
         }, sort_keys=True, ensure_ascii=False))
         self.data = {"schema_version": "abb.agent-build.v2", "fingerprint": fingerprint,

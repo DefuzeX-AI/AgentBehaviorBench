@@ -44,8 +44,13 @@ async def execute(root, output, settings=None, sdk_repo=None, *, providers=None)
     # Read the in-container Agent manifest for its ID and framework.
     with (root / 'agent.toml').open('rb') as stream:
         manifest = tomllib.load(stream)
+    from agentbench.sdk.common.workspace import workspace_policy
+    workspace = workspace_policy(manifest)
+    if workspace.path:
+        repository = Path(workspace.path)
     # Create the reusable Agent session before the SDK Run exists.
     run = None
+    exporter = None
     agent_session = AgentSession()
     settings = dict(settings or {})
     try:
@@ -67,7 +72,7 @@ async def execute(root, output, settings=None, sdk_repo=None, *, providers=None)
         # Assemble SDK options for the repository, step limit, credentials,
         # trace evidence, and request timing.
         options = dict(repo_path=repository,
-                       allow_local=False, track_files=False, 
+                       allow_local=False, track_files=workspace.track_files, upload_diff=workspace.upload_diff,
                        save_local=True,
 
                        api_key=credential, trace_evidence=capture,
@@ -90,6 +95,7 @@ async def execute(root, output, settings=None, sdk_repo=None, *, providers=None)
                                   case_options=providers.case_options)
             collection = generate_collection(
                 create_run, count=settings['count'], files=files, repo=repository,
+                workspace=settings.get('workspace'),
                 case_indices=settings.get('case_indices'), allow_partial=settings.get('allow_partial', False),
                 **generation)
             complete = not collection['failures'] and not collection['unattempted_indices']
@@ -110,6 +116,10 @@ async def execute(root, output, settings=None, sdk_repo=None, *, providers=None)
         judge = {} if providers is None else {'judge_provider': providers.judge_provider(output)}
         run = create_run(case_path=settings['case_artifact'], **options, **judge)
 
+
+        if workspace.export_changed_files:
+            from .file_artifacts import ChangedFileExporter
+            exporter = ChangedFileExporter(repository, files)
 
         # Current SDK has no public Case accessor. Keep this version-sensitive
         # snapshot in the KUMA boundary; never manufacture an official Case ID.
@@ -149,12 +159,14 @@ async def execute(root, output, settings=None, sdk_repo=None, *, providers=None)
             return json.loads((folder / 'result.json').read_text())
         # Drive the Case by receiving inputs, invoking the Agent, submitting
         # outputs, and collecting the Judge report.
-        summary = await drive_run(run, invoke, output, provider=provider, repo_path=repository)
+        summary = await drive_run(run, invoke, output, provider=provider, repo_path=repository,
+                                  file_evidence_required=workspace.track_files)
         # The worker exit code checks execution and evidence completeness,
         # independently of whether the Judge verdict is pass.
         return 0 if (summary['judge'] == 'received' and summary['otel'] == 'complete'
                      and summary['evidence'] == 'captured'
-                     and summary['execution'] == 'succeeded') else 1
+                     and summary['execution'] == 'succeeded'
+                     and summary['files'] in ('disabled', 'complete', 'partial')) else 1
     except Exception as exc:
         # Persist error details and return exit code 1 to the host.
         files.save('error.json', {'phase': 'case_generation' if run is None else 'evaluation',
@@ -168,6 +180,11 @@ async def execute(root, output, settings=None, sdk_repo=None, *, providers=None)
             await agent_session.aclose()
         finally:
             files.save('session.json', agent_session.snapshot())
+            if exporter is not None:
+                try:
+                    exporter.finish()
+                except Exception as exc:
+                    files.save('workspace-artifacts.json', {'status': 'failed', 'error_type': type(exc).__name__})
             # Cancel an unfinished SDK Run that is still waiting for input or submission.
             if run is not None and run.state in ('ready', 'input_delivered'):
                 run.cancel()

@@ -16,7 +16,7 @@ def test_agent_containers_preserve_the_image_user():
     # Agent images and can make their private files unreadable.
     arguments = DockerPolicy().run_arguments()
     assert not any(argument.startswith('--user') for argument in arguments)
-    assert {'--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges'} <= set(arguments)
+    assert {'--cap-drop=ALL', '--security-opt=no-new-privileges'} <= set(arguments)
 
 
 def test_owner_only_settings_become_readable_by_another_container_uid(tmp_path):

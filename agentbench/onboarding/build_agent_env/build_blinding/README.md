@@ -1,14 +1,14 @@
 # Writing a BBA binding by hand
 
-Read [the interface guide](assets/prompt.md), then choose a complete example:
+Read [the interface guide](../frameworks/langgraph/assets/bindings/prompt.md), then choose a complete example:
 
-1. [Direct graph export](assets/example-01-direct.md): a minimal forwarding factory.
-2. [Async graph with input conversion](assets/example-02-async.md): Article Explainer.
-3. [Full public task lifecycle](assets/example-03-native.md): TradingAgents.
-4. [Application and resource lifecycle](assets/example-04-resources.md): Waku.
+1. [Direct graph export](../frameworks/langgraph/assets/bindings/example-01-direct.md): a minimal forwarding factory.
+2. [Async graph with input conversion](../frameworks/langgraph/assets/bindings/example-02-async.md): Article Explainer.
+3. [Full public task lifecycle](../frameworks/langgraph/assets/bindings/example-03-native.md): TradingAgents.
+4. [Application and resource lifecycle](../frameworks/langgraph/assets/bindings/example-04-resources.md): Waku.
 
 These are also the actual model instructions: `service.py` appends all four example
-documents to `assets/prompt.md` for each requested binding. The package includes
+documents to `../frameworks/langgraph/assets/bindings/prompt.md` for each requested binding. The package includes
 these Markdown assets. Examples are snapshots, not imports of installed Agents.
 Their source paths are reference labels, not evidence for an unrelated target.
 

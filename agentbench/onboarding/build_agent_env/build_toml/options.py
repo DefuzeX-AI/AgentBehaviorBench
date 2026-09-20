@@ -13,8 +13,12 @@ class ManifestOptions:
     timeout_sec: float = 300
     observe: bool = False
     adapter_context: dict | None = None
+    evaluation: dict | None = None
 
     def __post_init__(self):
+        if self.evaluation is not None:
+            from agentbench.sdk.common.workspace import workspace_policy
+            workspace_policy({'evaluation': self.evaluation})
         if (isinstance(self.timeout_sec, bool) or not isinstance(self.timeout_sec, (int, float))
                 or not math.isfinite(self.timeout_sec) or self.timeout_sec <= 0):
             raise BuildError("Agent timeout must be a finite positive number")

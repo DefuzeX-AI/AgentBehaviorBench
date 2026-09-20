@@ -1,8 +1,8 @@
 # Program-generated agent.toml
 
 The model extracts configuration facts; it no longer writes TOML. The strict
-`assets/analysis.schema.json` rejects raw content and program-owned policy fields.
-The model instructions and full response example are in `assets/prompt.md`.
+`../frameworks/langgraph/assets/manifest/analysis.schema.json` rejects raw content and program-owned policy fields.
+The model instructions and full response example are in `../frameworks/langgraph/assets/manifest/prompt.md`.
 
 ```text
 Collected source + adapter contract + protocol catalog

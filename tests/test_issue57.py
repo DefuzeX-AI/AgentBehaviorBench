@@ -110,10 +110,13 @@ def test_factory_without_resolve_is_rejected(monkeypatch):
         resolve_model_provider('broken', environ={})
 
 
-def test_docker_runtime_constructs_the_selected_provider(monkeypatch):
+def test_docker_runtime_defers_replacement_provider_until_needed(monkeypatch):
     _install(monkeypatch, providers, MODEL_PROVIDER_ENTRY_POINT_GROUP, fixture='FixtureProvider')
     runtime = DockerRuntime(environ={'ABB_MODEL_PROVIDER': 'fixture'})
-    assert runtime._model_provider == FixtureProvider()
+    assert runtime._model_provider is None
+    from agentbench.runtime.interception.providers import DeferredModelTargetProvider
+    assert DeferredModelTargetProvider('chosen').resolve(runtime._environ).model == 'chosen'
+    assert DeferredModelTargetProvider().resolve(runtime._environ).provider_id == 'fixture'
 
 
 def test_kuma_configuration_check_rejects_an_unknown_provider_before_any_case(tmp_path, monkeypatch):
@@ -145,7 +148,7 @@ def test_unknown_framework_lists_entry_point_frameworks(monkeypatch, tmp_path):
 def test_built_in_adapter_survives_without_distribution_metadata(monkeypatch):
     # The evaluation container runs ABB from source, where no entry points exist.
     _install(monkeypatch, adapter_factory, adapter_factory.ADAPTER_ENTRY_POINT_GROUP)
-    assert adapter_factory.DEFAULT_ADAPTER_FACTORY.frameworks() == ('langgraph',)
+    assert adapter_factory.DEFAULT_ADAPTER_FACTORY.frameworks() == ('acp', 'langgraph')
 
 
 def test_distribution_declares_both_groups_for_the_built_ins():

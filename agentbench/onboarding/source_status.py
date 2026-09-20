@@ -23,5 +23,5 @@ def _symlink_warning(source: Path) -> list[str]:
     if not links:
         return []
     shown = ", ".join(sorted(links)[:5]) + (f" and {len(links) - 5} more" if len(links) > 5 else "")
-    return [f"{len(links)} symlink(s) kept; the Docker build context refuses symlinks, "
-            f"so replace or remove them before building: {shown}"]
+    return [f"{len(links)} symlink(s) kept; build snapshots materialize in-tree file links; "
+            f"directory, external or broken links need review: {shown}"]

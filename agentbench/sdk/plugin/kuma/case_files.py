@@ -42,7 +42,9 @@ def prepare_artifact(directory, entry, index, control):
         raise ValueError('Saved SDK Case content does not match its collection entry')
     path, digest = freeze_artifact(
         source, directory / 'evaluation/prepared-cases' / f'case-{index + 1:04d}.json', control)
-    return PreparedCase(index, entry['case_id'], path, entry['content_sha256'], digest)
+    from agentbench.sdk.common.workspace import workspace_digest
+    environment = workspace_digest(entry['workspace']) if entry.get('workspace') is not None else None
+    return PreparedCase(index, entry['case_id'], path, entry['content_sha256'], digest, environment)
 
 
 def freeze_artifact(source: Path, target: Path, control: RunControl) -> tuple[Path, str]:

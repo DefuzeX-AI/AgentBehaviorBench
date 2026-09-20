@@ -1,19 +1,29 @@
 # DefuzeX Model Interceptor
 
-This standalone Linux container transparently intercepts model HTTP traffic for
-one AgentBench Docker Agent. It owns netfilter and TLS termination; the Agent
-container shares its network namespace but cannot access upstream credentials.
+This standalone Linux container handles model HTTP traffic for one AgentBench
+Docker Agent. It owns netfilter and TLS termination; the Agent shares its network
+namespace. Adapter registration selects the behavior without a user mode switch:
 
-Matched OpenAI Chat Completions, OpenAI Responses, and Anthropic Messages
-requests retain their source protocol skin while the target plugin rewrites the
-upstream URL, model, and authentication for OpenRouter. Streaming responses are
-relayed immediately and recorded completely. The legacy `max_trace_bytes`
-setting is now an in-memory spool threshold, not a capture limit: larger streams
-spill to temporary storage. No request or response body is cut to fit this value.
-Storage/resource failures fail visibly instead of claiming a complete trace.
+- **ACP / observe:** preserve native URL, model, credentials, payload and response.
+  The Agent receives its declared native credentials. The service needs no
+  replacement provider or secret. Token counting also stays native.
+- **LangGraph / replace:** retain existing protocol recognition and credential
+  substitution. The target plugin selects the OpenRouter URL, model and upstream
+  key; the Agent receives an isolated temporary key.
+
+Both paths enforce explicit egress policy and redact recorded evidence. Observe
+requires a declared model or tool destination; recognizing a familiar model API
+path alone does not authorize arbitrary hosts. Native HTTP failures and SSE error
+frames remain unchanged. Connection failures stay connection failures. Recording
+failures reject evidence without replacing the native response. SDK Case generation
+and Judge configuration remain separate from the Agent's network behavior.
+
+Streaming responses are relayed immediately and recorded completely. The legacy
+`max_trace_bytes` setting is an in-memory spool threshold, not a capture limit:
+larger streams spill to temporary storage. Storage failures fail visibly.
 
 Events retain decoded `payload` and complete `raw_body` text (including SSE
-termination and usage events). Requests also retain `source_raw_body` before
+termination and usage events). Replacement requests also retain `source_raw_body` before
 protocol/model rewriting. Known credentials are still redacted. Existing truncated
 logs cannot be restored; a new run is required to collect missing network data.
 Final event serialization still materializes the complete body in memory; this
@@ -33,11 +43,14 @@ src/
 │   ├── contracts.py            # Adapter interfaces and exchanged data
 │   ├── registry.py             # Compose built-ins and load installed plugins
 │   ├── proxy/
-│   │   ├── addon.py            # mitmproxy request/response lifecycle
+│   │   ├── addon.py            # Select the adapter-owned behavior
+│   │   ├── common.py           # Shared fields, redaction and local errors
 │   │   ├── loader.py           # mitmproxy script entry point
 │   │   └── netfilter.py        # Linux namespace routing rules
-    │   ├── routing/automatic.py    # Adapter-owned model request recognition
-    │   ├── routing/policy.py       # Explicit route and tool egress matching
+│   ├── observe/handler.py      # Native forwarding and evidence capture
+│   ├── replace/handler.py      # Provider/auth/protocol replacement
+│   ├── routing/automatic.py    # Adapter-owned model request recognition
+│   ├── routing/policy.py       # Explicit route and tool egress matching
 │   ├── targets/openrouter.py  # Upstream URL, model and request preparation
 │   ├── security/
 │   │   ├── auth.py             # Shared bearer and isolated-network auth
@@ -152,3 +165,67 @@ cached content or provider-specific controls. Unsupported fields fail closed.
 The target is configurable OpenRouter, not a hard-coded DeepSeek model.
 32 original-client cases and separate fault checks are available in
 `tests/acceptance/interception`; see `docs/interception/acceptance.md`.
+
+## Agent-owned network extensions
+
+An Agent can opt in with `network_config = "network/rules.toml"` under
+`[llm_interception]`. The path must resolve inside its outer unit (including
+symlink resolution). The versioned file supplies `tool_routes` and `token_counting`;
+existing inline routes, including evaluation SDK routes, are preserved. There is
+no automatic import of executable code from an Agent checkout.
+
+```toml
+schema_version = "abb.network.v1"
+[token_counting]
+mode = "local_estimate"
+[token_counting.models]
+"openai/gpt-4.1-mini" = "o200k_base"
+
+[[tool_routes]]
+host_patterns = ["native-service.example"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/review"]
+purpose = "content_safety"
+required = true
+```
+
+The host mounts normalized configuration to the existing service. Ensure the Agent
+Dockerfile copies the referenced configuration into the worker as well. No changes
+to imported source or ACP session code are needed. New native URLs are configuration;
+new counting wire formats belong in `token_counting/protocols/`; counting algorithms
+belong in `token_counting/counters.py`. Existing route matching/authentication is the
+dispatcher, so no second routing registry or Agent-name conditionals are introduced.
+
+Counting endpoints authenticate the per-run credential before any local response.
+`local_estimate` uses an explicit mapping for the actual model selected by BBA, not
+the original source model alias. The deterministic `structured-json-bpe-v1` algorithm
+encodes the input envelope (including system text, tools, tool results and message
+structure). It is approximate, not provider prompt rendering or an upper bound.
+Model usage and billing remain untouched. The bundled tokenizers are loaded at
+image build time. Unsupported models, media or server-held context return 404;
+invalid requests return 400; oversized inputs return 413. Native fallback remains
+visible, not disguised as a zero count. Without opt-in, auxiliary requests retain
+the real upstream response/status, including unsupported endpoint responses.
+
+`model_auxiliary_request/response/error` do not satisfy a generation checkpoint.
+The host drains them before acceptance. Responses record origin, algorithm version,
+target/source models, encoding and request digest. Ordinary model evidence and
+unknown-request/authentication failures keep their existing strict policy.
+
+Tool purposes `metadata` and `content_safety` supplement `tool` and `evaluation`.
+Requests and full responses remain observable. Optional metadata HTTP failures do
+not invalidate model capture. `required=true` requires every observed operation to
+have a successful HTTP response; failure is reported separately from capture loss.
+A successful HTTP response containing a native rejection is preserved, not changed
+to an allow verdict. The native Agent determines how that decision affects its task.
+A failed required operation remains a failed acceptance even if a later retry works.
+
+Offline service regression command (built image already contains the dependencies):
+
+```bash
+docker build -t abb-interceptor-test agentbench/services/model-interceptor
+docker run --rm --network=none --entrypoint python \
+  -v "$PWD/agentbench/services/model-interceptor/tests:/tests:ro" -w /tests \
+  abb-interceptor-test -m unittest discover -v
+```

@@ -14,7 +14,7 @@ from tests.agent_build_fixtures import source, plan, Client, build
 from tests.test_agent_build_client import client, response
 
 ROOT = Path(__file__).resolve().parents[1] / "agentbench/onboarding/build_agent_env"
-SCHEMAS = ["planning/assets/response.schema.json", "build_toml/assets/analysis.schema.json",
+SCHEMAS = ["frameworks/langgraph/assets/planning/response.schema.json", "frameworks/langgraph/assets/manifest/analysis.schema.json",
            "openrouter_provider/assets/file-response.schema.json"]
 
 

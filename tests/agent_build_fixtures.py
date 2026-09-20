@@ -86,7 +86,7 @@ def source(tmp_path, monkeypatch):
 
 @pytest.fixture
 def plan():
-    return {"status": "complete", "summary": "Echo integration", "evidence": ["src/pkg/graph.py"],
+    return {"framework": "langgraph", "status": "complete", "summary": "Echo integration", "evidence": ["src/pkg/graph.py"],
             "missing_information": [], "bindings": ["bindings/bridge.py"], "needs_input_schema": False}
 
 

@@ -10,6 +10,7 @@ from agentbench.harness.progress import emit_progress
 from agentbench.harness.result import BenchmarkResult, BenchmarkStepResult
 from agentbench.runtime.contracts.execution import RunControl
 from agentbench.runtime.interception import resolve_model_provider
+from agentbench.adapter.factory import DEFAULT_ADAPTER_FACTORY
 from agentbench.sdk.common.artifacts import Artifacts
 from agentbench.sdk.contracts import PreparedCase, PreparedCaseBatch, RunnerRecoveryCapabilities
 from agentbench.sdk.common.case_identity import case_content_sha256
@@ -85,8 +86,9 @@ class KumaContainerRunner:
         try:
             api_key(self.environ)
             backend_url(self.environ)
-            # An unknown ABB_MODEL_PROVIDER fails here, before a Case is paid for.
-            resolve_model_provider(environ=self.environ)
+            # Only replacement depends on a BBA-selected Agent model provider.
+            if DEFAULT_ADAPTER_FACTORY.network_mode(getattr(registration, 'framework', 'langgraph')) == 'replace':
+                resolve_model_provider(environ=self.environ)
         except ValueError as exc:
             raise ProviderSelectionError(str(exc)) from exc
         if not (registration.path / 'requirement.md').is_file():
@@ -155,6 +157,7 @@ class KumaContainerRunner:
             timeout=self.timeout, max_steps=self.max_steps, case_artifact=case.artifact_path,
             safe_case_replay=self.recovery_capabilities(registration).safe_case_replay,
             expected_case_id=case.case_id, expected_content_sha256=case.content_sha256,
+            expected_environment_sha256=case.environment_sha256,
             trace_sink=self.trace_sink, trace_max_bytes=self.trace_max_bytes,
             **self._runtime_options(identity),
             on_artifacts_ready=lambda path: self._artifacts_ready(

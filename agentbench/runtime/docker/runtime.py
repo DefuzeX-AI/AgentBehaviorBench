@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import math
 import os
-import secrets
 import shutil
 import subprocess
 import tempfile
@@ -108,7 +107,7 @@ class DockerRuntime:
             interceptor_image_provider
             or default_interceptor_image_provider(self._images, self._environ)
         )
-        self._model_provider = model_provider or resolve_model_provider(environ=self._environ)
+        self._model_provider = model_provider
         self._trace_sink = trace_sink or NullTraceSink()
         self._trace_max_bytes = trace_max_bytes
         self.artifact_root = artifact_root
@@ -133,9 +132,9 @@ class DockerRuntime:
             environ=self._environ,
         )
         interception = InterceptionConfig.from_agent_dir(agent.path)
-        if interception is not None:
+        if interception is not None and interception.mode == 'replace':
             # Validate the model service and credentials before enabling interception.
-            target = self._model_provider.resolve(self._environ)
+            target = (self._model_provider or resolve_model_provider(environ=self._environ)).resolve(self._environ)
             self._secret_resolver.require(target.credential_env)
         if invocation is not None:
             # Jobs with input/output directories use the staged worker build context.
@@ -287,7 +286,7 @@ class DockerRuntime:
                 inputs, outputs = invocation
                 _share_input_mount(inputs)
                 command.extend(("--mount", _bind_mount(inputs, "/run/abb-input")))
-                # All other filesystem locations retain the existing read-only policy.
+                # Persist artifacts separately from the container's writable layer.
                 command.extend(("--mount", f"type=bind,source={outputs},target=/run/abb-output"))
             # Disable Python bytecode caches and flush logs promptly.
             agent_environment.update(
@@ -382,63 +381,12 @@ class DockerRuntime:
         trace_reader = None
         try:
             ca_dir.mkdir()
-            token_environment: dict[str, str] = {}
-            credentials: list[dict[str, object]] = []
-            target = self._model_provider.resolve(self._environ)
-            upstream_secret = self._secret_resolver.require(target.credential_env)
-            target_secret_file = secret_dir / "target.secret"
-            target_secret_file.write_text(upstream_secret, encoding="utf-8")
-
-            for credential in interception.credentials:
-                token = secrets.token_urlsafe(32)
-                token_file = secret_dir / f"{credential.credential_id}.token"
-                token_file.write_text(token, encoding="utf-8")
-                token_environment[credential.agent_env] = token
-                credentials.append(
-                    {
-                        "id": credential.credential_id,
-                        "auth_plugin": credential.auth_plugin,
-                        "token_file": f"/run/secrets/{token_file.name}",
-                        "secret_file": "/run/secrets/target.secret",
-                    }
-                )
-
-            config_file.write_text(
-                json.dumps(
-                    {
-                        "agent_id": agent_id,
-                        "max_trace_bytes": self._trace_max_bytes,
-                        "target": {
-                            "provider_id": target.provider_id,
-                            "target_plugin": target.target_plugin,
-                            "base_url": target.base_url,
-                            "model": target.model,
-                            "headers": dict(target.headers),
-                        },
-                        "credentials": credentials,
-                        "tool_routes": [
-                            {"host_patterns": list(route.host_patterns), "ports": list(route.ports),
-                             "methods": list(route.methods), "path_patterns": list(route.path_patterns),
-                             "purpose": route.purpose}
-                            for route in interception.tool_routes
-                        ],
-                        "routes": [
-                            {
-                                "id": route.route_id,
-                                "host_patterns": list(route.host_patterns),
-                                "ports": list(route.ports),
-                                "methods": list(route.methods),
-                                "path_patterns": list(route.path_patterns),
-                                "protocol_plugin": route.protocol_plugin,
-                                "credential": route.credential_id,
-                            }
-                            for route in interception.routes
-                        ],
-                    },
-                    ensure_ascii=False,
-                ),
-                encoding="utf-8",
-            )
+            from agentbench.runtime.interception.service_config import prepare_service_config
+            service_data, token_environment = prepare_service_config(
+                interception, agent_id=agent_id, max_trace_bytes=self._trace_max_bytes,
+                secret_dir=secret_dir, secret_resolver=self._secret_resolver,
+                environ=self._environ, model_provider=self._model_provider)
+            config_file.write_text(json.dumps(service_data, ensure_ascii=False), encoding='utf-8')
 
             command = [
                 "run",
@@ -554,6 +502,8 @@ class DockerRuntime:
                     "Agent invocation trace was not accepted: " + trace_state.diagnostic()
                 )
             if not trace_state.wait_for_idle(control=self.control):
+                if trace_state.operation_failure:
+                    raise DockerRuntimeError('Required Agent network operation failed: ' + trace_state.diagnostic())
                 raise DockerRuntimeError("Model trace is incomplete: " + trace_state.diagnostic())
 
         return require_trace

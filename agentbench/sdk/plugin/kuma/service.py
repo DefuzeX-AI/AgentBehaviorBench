@@ -1,6 +1,7 @@
 """Host orchestration using the existing Docker runtime and network isolation."""
 import json
 import shutil
+import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 from uuid import uuid4
@@ -13,18 +14,22 @@ from agentbench.runtime.interception import TraceEvent
 from agentbench.observe.store import TraceStore, json_value, redact
 from agentbench.sdk.common.artifacts import Artifacts
 from .configuration import SDK_REPOSITORY, backend_url
+from agentbench.sdk.common.workspace import workspace_policy, prepare_workspace, workspace_digest
+from agentbench.runtime.agentcontainer.config import tomllib
 from .image import evaluation_agent
 from agentbench.runtime.docker.worker_build import _ignore
 
 
 class EvaluationPolicy:
-    def __init__(self, state):
+    def __init__(self, state, *, repository=None, target=SDK_REPOSITORY, writable=False):
         self.state = state.resolve()
+        self.repository = (repository or state.parent).resolve()
+        self.target, self.writable = target, writable
 
     def run_arguments(self):
         return (*DockerPolicy().run_arguments(), '--mount',
-                f'type=bind,source={self.state.parent},target={SDK_REPOSITORY},readonly', '--mount',
-                f'type=bind,source={self.state},target={SDK_REPOSITORY}/.kuma')
+                f'type=bind,source={self.repository},target={self.target}' + ('' if self.writable else ',readonly'), '--mount',
+                f'type=bind,source={self.state},target={self.target}/.kuma')
 
 
 def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max_bytes=262144,
@@ -33,6 +38,7 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
              build_coordinator=None, job_context=None, identity=None,
              runtime_services=None, expected_case_id=None, expected_content_sha256=None,
              sdk_request_options=None, generation_indices=None, partial_generation=False,
+             expected_environment_sha256=None,
              safe_case_replay=False, require_credentials=True, overlay=None):
     """
     
@@ -162,6 +168,7 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
               'safe_case_replay': safe_case_replay is True}
     files.save('run.json', status)
     session = None
+    workspace_temp = None
     primary_error = None
     try:
         if on_artifacts_ready is not None:
@@ -185,9 +192,31 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
                         outgoing.write(chunk)
                 shutil.copystat(source, target)
                 return target
-            shutil.copytree(descriptor.path / 'agent', repository, ignore=_ignore,
-                            copy_function=checked_copy)
-            state = repository / '.kuma'; state.mkdir(mode=0o777); state.chmod(0o777)
+            policy = workspace_policy(tomllib.loads((descriptor.path / 'agent.toml').read_text()))
+            target = policy.path or SDK_REPOSITORY
+            ledger_root = repository
+            if policy.path:
+                ledger_root.mkdir()
+                workspace_temp = tempfile.TemporaryDirectory(prefix='.abb-workspace-', dir=directory.parent)
+                repository = Path(workspace_temp.name)
+                contract = prepare_workspace(descriptor.path, repository, policy)
+                repository.chmod(0o777)
+                for item in repository.rglob('*'):
+                    item.chmod(0o777 if item.is_dir() else (item.stat().st_mode & 0o111) | 0o666)
+                files.save('evaluation/workspace.json', contract)
+                settings_path = directory / 'request/evaluation.json'
+                settings = json.loads(settings_path.read_text())
+                settings['workspace'] = contract
+                files.save('request/evaluation.json', settings)
+                if case_artifact is not None:
+                    if expected_environment_sha256 is None:
+                        raise ValueError('Saved Case has no workspace contract; generate new Cases for this workspace')
+                    if expected_environment_sha256 != workspace_digest(contract):
+                        raise ValueError('Saved Case workspace differs; no Agent steps were executed')
+            else:
+                shutil.copytree(descriptor.path / 'agent', repository, ignore=_ignore,
+                                copy_function=checked_copy)
+            state = ledger_root / '.kuma'; state.mkdir(mode=0o777); state.chmod(0o777)
             if case_artifact is not None:
                 shutil.copyfile(case_artifact, state / Path(case_artifact).name)
             store = TraceStore(directory / 'network.jsonl', directory.name,
@@ -201,7 +230,7 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
                         data.update(redact({**identity, 'artifact_directory': str(directory)}, files.secrets))
                         trace_sink.emit(TraceEvent(event.event, data))
             runtime_options = dict(
-                environ=environ, policy=EvaluationPolicy(state), trace_sink=Sink(),
+                environ=environ, policy=EvaluationPolicy(state, repository=repository, target=target, writable=bool(policy.path)), trace_sink=Sink(),
                 trace_max_bytes=trace_max_bytes, control=control, identity=identity,
                 run_id=directory.name, artifact_root=directory,
             )
@@ -270,6 +299,8 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
                 except (OSError, ValueError, AttributeError):
                     pass  # Preserve the original container/validation outcome.
             files.save('run.json', status)
+            if workspace_temp is not None:
+                workspace_temp.cleanup()
     return directory
 
 

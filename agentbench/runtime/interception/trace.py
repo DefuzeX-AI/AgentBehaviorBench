@@ -69,6 +69,9 @@ class InterceptionTraceState:
         # first unfinished call: an operator needs a call to look up, not counts.
         self._first_rejection: str | None = None
         self._request_order: list[str] = []
+        self._auxiliary_pending: set[str] = set()
+        self._required_pending: set[str] = set()
+        self._operation_failure: str | None = None
 
     def fail(self, error: Exception | None = None) -> None:
         """A failed trace write must never count as a completed observation."""
@@ -91,6 +94,20 @@ class InterceptionTraceState:
         if not isinstance(call_id, str) or not call_id:
             return
         with self._condition:
+            if event.event == 'observation_error':
+                self._failed = True
+                self._note_rejection(event, call_id, 'capture_failed')
+            if event.event == 'tool_request' and event.data.get('required') is True:
+                self._required_pending.add(call_id)
+            elif event.event in ('tool_response', 'tool_error') and call_id in self._required_pending:
+                self._required_pending.discard(call_id)
+                status = event.data.get('status')
+                if event.event == 'tool_error' or not isinstance(status, int) or status >= 400:
+                    self._operation_failure = f'{call_id[:64]} required network operation failed'
+            if event.event == 'model_auxiliary_request':
+                self._auxiliary_pending.add(call_id)
+            elif event.event in ('model_auxiliary_response', 'model_auxiliary_error'):
+                self._auxiliary_pending.discard(call_id)
             if event.event == "llm_error":
                 code = event.data.get('error_code')
                 self._errors[call_id] = code if isinstance(code, str) else 'unclassified'
@@ -146,6 +163,12 @@ class InterceptionTraceState:
             first_unfinished = next((call for call in self._request_order if call in unfinished), None)
             if first_unfinished is not None:
                 text += f', first_unfinished={first_unfinished[:64]}'
+            if self._auxiliary_pending:
+                text += f', auxiliary_pending={len(self._auxiliary_pending)}'
+            if self._required_pending:
+                text += f', required_pending={len(self._required_pending)}'
+            if self._operation_failure:
+                text += f', operation_failure={self._operation_failure}'
             if self._persistence_error is not None and self._first_rejection is None:
                 text += ', first_rejection=trace persistence failure'
             return text
@@ -153,6 +176,12 @@ class InterceptionTraceState:
     def checkpoint(self) -> int:
         with self._condition:
             return len(self._completed)
+
+    @property
+    def operation_failure(self) -> str | None:
+        """A required native operation failed, independently of capture validity."""
+        with self._condition:
+            return self._operation_failure
 
     def wait_for_completion_after(self, checkpoint: int, timeout: float,
                                   control: RunControl | None = None) -> bool:
@@ -182,10 +211,11 @@ class InterceptionTraceState:
                 self.check_persistence()
                 if control is not None:
                     control.check()
-                if self._failed:
+                if self._failed or self._operation_failure:
                     return False
                 idle_for = time.monotonic() - self._last_event
-                if idle_for >= quiet and self._requests <= self._responses | self._terminated:
+                if (idle_for >= quiet and not self._auxiliary_pending and not self._required_pending
+                        and self._requests <= self._responses | self._terminated):
                     return True
                 self._condition.wait(timeout=min(0.05, max(0, deadline - time.monotonic())))
         return False

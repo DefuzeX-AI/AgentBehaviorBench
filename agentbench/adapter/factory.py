@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .base import AgentAdapter, AgentDescriptor
 from .langgraph import LangGraphAdapter
+from .acp import ACPAdapter
 
 
 AdapterBuilder = Callable[[Path], AgentAdapter]
@@ -73,6 +74,24 @@ class AdapterFactory:
                          for entry in entry_points(group=self._entry_point_group))
         return tuple(sorted(names))
 
+    def build_requirements(self, framework: str) -> Path | None:
+        """Optional adapter-owned dependency file; never instantiate an Agent."""
+        key = _normalize_framework(framework)
+        builder = self._builders.get(key) or self._entry_point_builder(key)
+        owner = getattr(builder, '__self__', builder)
+        return getattr(owner, 'build_requirements', None)
+
+    def network_mode(self, framework: str) -> str:
+        """Read adapter-owned network behavior without constructing an Agent."""
+        key = _normalize_framework(framework)
+        builder = self._builders.get(key) or self._entry_point_builder(key)
+        if builder is None:
+            raise UnsupportedAdapterError(f'Unsupported agent framework {framework!r}')
+        mode = getattr(getattr(builder, '__self__', builder), 'network_mode', 'replace')
+        if mode not in ('observe', 'replace'):
+            raise AdapterFactoryError('Adapter network_mode must be observe or replace')
+        return mode
+
     def _entry_point_builder(self, framework: str) -> AdapterBuilder | None:
         if self._entry_point_group is None:
             return None
@@ -95,7 +114,7 @@ def _normalize_framework(framework: str) -> str:
 
 
 DEFAULT_ADAPTER_FACTORY = AdapterFactory(
-    {"langgraph": LangGraphAdapter.from_agent_dir},
+    {"langgraph": LangGraphAdapter.from_agent_dir, "acp": ACPAdapter.from_agent_dir},
     entry_point_group=ADAPTER_ENTRY_POINT_GROUP,
 )
 

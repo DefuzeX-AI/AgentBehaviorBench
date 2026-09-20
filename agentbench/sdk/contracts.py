@@ -111,6 +111,7 @@ class PreparedCase:
     artifact_path: Path | None = None
     content_sha256: str | None = None
     artifact_sha256: str | None = None
+    environment_sha256: str | None = None
 
     def __post_init__(self) -> None:
         if type(self.case_index) is not int or self.case_index < 0:
@@ -121,7 +122,7 @@ class PreparedCase:
             raise TypeError('artifact_path must be a pathlib.Path when provided')
         if self.artifact_path is not None and not self.artifact_path.is_absolute():
             raise ValueError('artifact_path must be absolute when provided')
-        for name in ('content_sha256', 'artifact_sha256'):
+        for name in ('content_sha256', 'artifact_sha256', 'environment_sha256'):
             digest = getattr(self, name)
             if digest is not None and (
                 not isinstance(digest, str) or len(digest) != 64

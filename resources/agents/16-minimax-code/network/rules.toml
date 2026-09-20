@@ -1,0 +1,19 @@
+schema_version = "abb.network.v1"
+
+# The upstream international runtime reads the models.dev catalog directly.
+[[tool_routes]]
+host_patterns = ["models.dev"]
+ports = [443]
+methods = ["GET"]
+path_patterns = ["/api.json"]
+purpose = "metadata"
+
+# Keep the original international review operation and verdict observable.
+# The Agent owns fallback behavior when its optional title review fails.
+[[tool_routes]]
+host_patterns = ["agent.minimax.io"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/mavis/api/v1/content"]
+purpose = "content_safety"
+required = false

@@ -21,7 +21,7 @@ unit/                       <- build.context = "."
   Dockerfile                <- the file you generate
   agent.toml
   agent/                    <- original repository
-  bindings/                 <- required; already saved in completed_files
+  bindings/                 <- LangGraph only; saved in completed_files
   requirement.md            <- generated separately
   evaluation/               <- optional SDK schemas/fixtures
   .abb-runtime/agentbench/   <- injected by BBA when building
@@ -102,11 +102,11 @@ when the deployment requires offline runtime; ensure the final user can read
 the assets. Do not copy another Agent's provider, model, retriever or feature flags.
 System packages must be justified by actual source/dependency requirements.
 
-The current runtime uses a read-only root filesystem and configured writable
-mounts. Creating/chowning a directory in the image does not make it writable at
-runtime. Match the binding's declared storage strategy and runtime policy; /tmp
-is bounded temporary storage, not a place for arbitrarily large models. Do not
-change Docker security policy or claim writable mounts from Dockerfile alone.
+The current Docker policy permits root-filesystem writes by the non-root image
+user and provides a bounded executable /tmp. Set a real writable HOME and workspace
+owned by that user. Do not grant privileged mode or invent host mounts. Native
+permissions still apply: a writable filesystem does not make root-owned paths
+writable by the Agent.
 
 The SDK overlay appends USER root, installs its own PyPI requirements using
 `python -m pip`, copies requirement.md and optional evaluation/, then restores
@@ -137,3 +137,12 @@ Replace explanatory values with real evidence and complete file content. For
 needs_input, retain path="Dockerfile", use empty content and concrete questions
 in missing_information. Do not claim the image builds or the Agent runs without
 actual verification; this request only generates a file.
+
+## ACP containers
+
+When adapter.type is acp, follow framework_requirements.acp and the saved command.
+Install the verified CLI and its Node/runtime dependencies; no bindings directory
+is required. Keep the Python worker and pip available. Generic BBA worker staging
+installs the registered adapter requirements into that interpreter. Create and
+chown adapter.cwd and HOME for the final USER. Build-time dependencies and network
+access are separate from runtime model/tool endpoint interception.

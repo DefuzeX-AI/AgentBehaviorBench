@@ -8,7 +8,8 @@ import os
 import sys
 from pathlib import Path
 
-from agentbench.observe.store import TraceStore, atomic_json
+from agentbench.observe.store import TraceStore, atomic_json, environment_secrets
+from agentbench.observe.result import sanitize_result
 from agentbench.observe.correlation import model_correlation
 from agentbench.runtime.interception import InterceptionConfig
 from .session import AgentSession
@@ -18,9 +19,20 @@ def configure_trust():
     """Keep public CA roots for non-model HTTPS (e.g. real search)."""
     ca = os.environ.get("SSL_CERT_FILE")
     if ca and Path(ca).is_file():
-        import certifi
+        import ssl
+        try:
+            import certifi
+        except ModuleNotFoundError:
+            # Node ACP images need not install Python HTTP clients. OpenSSL's
+            # compiled-in path avoids the SSL_CERT_FILE override being merged
+            # with itself instead of the system's public roots.
+            roots = ssl.get_default_verify_paths().openssl_cafile
+        else:
+            roots = certifi.where()
+        if not roots or not Path(roots).is_file():
+            raise RuntimeError('Worker needs system CA certificates or certifi for model interception')
         bundle = Path("/tmp/abb-ca-bundle.pem")
-        bundle.write_bytes(Path(certifi.where()).read_bytes() + b"\n" + Path(ca).read_bytes())
+        bundle.write_bytes(Path(roots).read_bytes() + b"\n" + Path(ca).read_bytes())
         for key in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "GRPC_DEFAULT_SSL_ROOTS_FILE_PATH"):
             os.environ[key] = str(bundle)
 
@@ -92,6 +104,8 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None, ses
                 await session.aclose()
             except Exception as exc:
                 result.update(status="failed", error_type=type(exc).__name__, error=str(exc))
+        result, receipt = sanitize_result(result, environment_secrets())
+        atomic_json(output / "result-redaction.json", receipt)
         atomic_json(output / "result.json", result)
         if hasattr(store, 'close'):
             store.close()

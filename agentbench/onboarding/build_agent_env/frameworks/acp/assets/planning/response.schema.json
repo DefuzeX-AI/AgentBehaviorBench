@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "summary",
+    "evidence",
+    "missing_information",
+    "bindings",
+    "needs_input_schema",
+    "framework"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "needs_input",
+        "unsupported"
+      ]
+    },
+    "summary": {
+      "type": "string"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "missing_information": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "bindings": {
+      "type": "array",
+      "maxItems": 0,
+      "items": {
+        "type": "string"
+      }
+    },
+    "needs_input_schema": {
+      "type": "boolean",
+      "description": "Whether the selected SDK requires a separate JSON Schema for this structured input. A Python TypedDict alone does not satisfy an SDK requirement for a JSON Schema file."
+    },
+    "framework": {
+      "type": "string",
+      "const": "acp"
+    }
+  }
+}

@@ -11,6 +11,8 @@ import threading
 from collections import Counter, OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
+from .tool_links import link_tools
+from .native_links import link_native_calls
 
 _CACHE = OrderedDict()
 _LOCK = threading.Lock()
@@ -48,12 +50,15 @@ def _data(record):
 
 def _files(root):
     names = {'network.jsonl', 'evaluation/sdk.jsonl', 'evaluation/case.json',
-             'evaluation/judge/report.json', 'evaluation/manifest.json'}
+             'evaluation/judge/report.json', 'evaluation/manifest.json',
+             'evaluation/workspace-artifacts.json', 'evaluation/workspace.json'}
     for pattern in ('evaluation/inputs/[0-9][0-9][0-9][0-9]', 'invocation-*/output'):
         for folder in root.glob(pattern):
             for name in ('framework.jsonl', 'input.json', 'mapped-input.json', 'request.json',
-                         'result.json', 'submission.json'):
+                         'result.json', 'submission.json', 'file-evidence.json'):
                 names.add(str((folder / name).relative_to(root)))
+    for path in (root / 'evaluation/workspace-files').glob('*.json'):
+        names.add(str(path.relative_to(root)))
     files = []
     for name in sorted(names):
         candidate = root / name
@@ -98,16 +103,6 @@ def _matches(value, target, path='$'):
     if isinstance(value, list):
         return [hit for i, item in enumerate(value) for hit in _matches(item, target, f'{path}[{i}]')]
     return []
-
-
-def _field_values(value, name):
-    value = decoded(value)
-    if isinstance(value, dict):
-        found = {value[name]} if isinstance(value.get(name), str) else set()
-        return found.union(*(_field_values(v, name) for v in value.values()))
-    if isinstance(value, list):
-        return set().union(*(_field_values(v, name) for v in value))
-    return set()
 
 
 class InteractionIndex:
@@ -172,15 +167,6 @@ class InteractionIndex:
             identifier = _id(key)
             self.groups.setdefault(identifier, []).append(record)
 
-        # Only recorded framework IDs establish causality; no timestamp fallback.
-        wire = [r for r in records if r['raw'].get('event') in ('llm_request', 'tool_request')
-                and _data(r).get('purpose') != 'evaluation']
-        linked = sum(any(r['raw'].get('event') == 'span_start' for r in spans.get(_data(call).get('framework_span_id'), [])) for call in wire)
-        self.correlation = {'requests': len(wire), 'linked': linked, 'uncorrelated': len(wire) - linked,
-                            'status': 'captured' if wire else 'no_requests_observed'}
-        if len(wire) > linked:
-            self.warnings.append(f'{len(wire) - linked}/{len(wire)} captured requests have no matching framework span; correlation coverage is incomplete.')
-
         for identifier, group in self.groups.items():
             group.sort(key=lambda r: (_time_order(r['raw'].get('timestamp')), r['file'], r['line']))
             first = group[0]; data = first['raw'].get('data') or {}
@@ -219,12 +205,11 @@ class InteractionIndex:
                     folder = next(iter(folders)); evidence = 'framework_span_id'
             context = self.contexts.get(folder)
             if context is None:
-                input_ids = _field_values(request, 'input_id')
-                case_ids = _field_values(request, 'case_id')
-                candidates = [c for c in self.contexts.values() if c['input_id'] in input_ids
-                              and (not case_ids or c['case_id'] in case_ids)]
+                input_id, case_id = request.get('input_id'), request.get('case_id')
+                candidates = [c for c in self.contexts.values() if input_id and c['input_id'] == input_id
+                              and (not case_id or c['case_id'] == case_id)]
                 if len(candidates) == 1:
-                    context = candidates[0]; folder = context['folder']; evidence = 'payload_input_id'
+                    context = candidates[0]; folder = context['folder']; evidence = 'record_input_id'
             started = (req or first)['raw'].get('timestamp')
             ended = res['raw'].get('timestamp') if res else None
             duration = response.get('latency_ms')
@@ -240,22 +225,59 @@ class InteractionIndex:
                 'timestamp': started, 'time_basis': 'recorded', 'ended': ended, 'duration_ms': duration,
                 'status': status, 'record_count': len(group), 'chunk_count': events.count('llm_chunk'),
                 'input_id': context.get('input_id') if context else None,
-                'case_id': context.get('case_id') if context else None,
+                'case_id': context.get('case_id') if context else request.get('case_id'),
+                'attempt_id': request.get('attempt_id'),
+                'association_status': 'input_exact' if context else 'session_only' if request.get('native_session_id') else 'case_only' if request.get('case_id') else 'unknown',
                 'link_evidence': evidence if context else None, 'completeness': complete,
                 'call_id': request.get('call_id'), 'framework_span_id': span_id or request.get('span_id'),
                 'parent_span_id': request.get('parent_span_id'), 'invocation_id': request.get('invocation_id'),
+                'native_session_id': request.get('native_session_id'),
+                'tool_call_id': request.get('tool_call_id'), 'purpose': request.get('native_purpose') or request.get('purpose', 'unknown'),
+                'purpose_evidence': request.get('purpose_evidence'),
+                'required': request.get('required'),
+                'optional_operation': kind == 'http' and request.get('required') is False,
                 'artifact_directory': folder if context else None,
                 'destination': request.get('host'), '_context': folder if context else None,
                 '_request': req or (first if not res else None), '_response': res, '_callbacks': related})
 
+        link_tools(self.rows, self.contexts)
+        link_native_calls(self.rows, self.contexts)
+        def coverage(rows):
+            return {'requests': len(rows),
+                'paired': sum(r['completeness'] == 'complete' for r in rows),
+                'case_identified': sum(bool(r.get('case_id')) for r in rows),
+                'session_identified': sum(bool(r.get('native_session_id')) for r in rows),
+                'optional_failures': sum(r.get('optional_operation', False) and r['status'] == 'failed' for r in rows),
+                'input_identified': sum(bool(r.get('input_id')) for r in rows),
+                'framework_linked': sum(bool(r['_callbacks']) for r in rows),
+                'emitted_tool_links': sum(link['status'] == 'exact' for r in rows for link in r.get('tool_relations', []))}
+        chats = [r for r in self.rows if r['kind'] == 'chat']
+        wire = [r for r in self.rows if r['kind'] in ('chat', 'http') and r.get('call_id')]
+        linked = sum(bool(r['_callbacks']) for r in wire)
+        self.correlation = {'requests': len(wire), 'linked': linked, 'uncorrelated': len(wire) - linked,
+            'status': 'captured' if wire else 'no_requests_observed', 'model': coverage(chats),
+            'http': coverage([r for r in wire if r['kind'] == 'http']),
+            'model_purposes': dict(Counter(r['purpose'] for r in chats))}
+        if chats and self.correlation['model']['input_identified'] < len(chats):
+            self.warnings.append(f"{len(chats) - self.correlation['model']['input_identified']}/{len(chats)} model requests have no confirmed Input; Case identity and HTTP pairing are reported separately.")
+
         labels = {'case.json': ('case', 'SDK Case'), 'input.json': ('case', 'SDK Input'),
                   'mapped-input.json': ('input', 'Input passed to the Agent'), 'request.json': ('input', 'Agent invocation'),
                   'result.json': ('output', 'Agent output'), 'submission.json': ('submission', 'SDK submission'),
-                  'report.json': ('judge', 'Judge report')}
+                  'report.json': ('judge', 'Judge report'),
+                  'file-evidence.json': ('files', 'SDK file changes and diff'),
+                  'workspace-artifacts.json': ('files', 'Final changed-file exports'),
+                  'workspace.json': ('files', 'Initial workspace contract')}
         for name, artifact in self.artifacts.items():
-            if Path(name).name not in labels:
+            if name.startswith('evaluation/workspace-files/'):
+                kind, title = 'files', 'Exported file ' + Path(name).stem[:12]
+                listing = self.artifacts.get('evaluation/workspace-artifacts.json', {}).get('value') or {}
+                title = next((item['path'] for item in listing.get('files', [])
+                              if 'evaluation/' + item.get('artifact', '') == name), title)
+            elif Path(name).name in labels:
+                kind, title = labels[Path(name).name]
+            else:
                 continue
-            kind, title = labels[Path(name).name]
             identifier = _id('artifact:' + name)
             context = self.contexts.get(name.rsplit('/', 1)[0])
             identity = artifact['value'] if isinstance(artifact['value'], dict) else {}
@@ -322,10 +344,15 @@ class InteractionIndex:
         needle = arg('q').casefold()
         start, end = stamp(arg('start')), stamp(arg('end'))
         rows = []
+        case_ids = {c['case_id'] for c in self.contexts.values() if c['input_id'] == arg('input_id')}
+        unassigned = lambda r: (r['kind'] in ('chat', 'http') and not r.get('input_id')
+                                and (not arg('input_id') or r.get('case_id') in case_ids))
         for row in self.rows:
             if kinds and not kinds.intersection(row['tags']): continue
             if arg('status') and row['status'] != arg('status'): continue
-            if arg('input_id') and row.get('input_id') != arg('input_id'): continue
+            if arg('input_scope') == 'unassigned':
+                if not unassigned(row): continue
+            elif arg('input_id') and row.get('input_id') != arg('input_id'): continue
             at = stamp(row['timestamp'])
             if start is not None and (at is None or at < start): continue
             if end is not None and (at is None or at > end): continue
@@ -335,6 +362,7 @@ class InteractionIndex:
             rows.append(row)
         return {'items': [self.public(r) for r in rows[(page-1)*size:page*size]], 'total': len(rows),
                 'page': page, 'page_size': size, 'revision': self.revision,
+                'unassigned_request_count': sum(unassigned(r) for r in self.rows),
                 'total_interactions': len(self.rows), 'total_records': self.total_records,
                 'kinds': dict(Counter(r['kind'] for r in self.rows)),
                 'inputs': [{'input_id': c['input_id'], 'case_id': c['case_id']} for c in self.contexts.values()],
