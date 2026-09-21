@@ -100,7 +100,14 @@ def _parse_agent(item: dict[str, object], repo_root: Path) -> AgentRegistration:
     source_path = (agent_path / "agent").resolve()
     if not source_path.is_relative_to(agent_path):
         raise ValueError(f"Agent source escapes agent directory: {source_path}")
-    if not source_path.is_dir():
+    from agentbench.runtime.source.config import source_spec, InstallSource
+    acquisition = source_spec(manifest)
+    if acquisition is not None and manifest.get('build', {}).get('context') != '.':
+        raise ValueError('Source preparation currently requires build.context="."')
+    if isinstance(acquisition, InstallSource):
+        from agentbench.runtime.source.installation import installation_files
+        installation_files(agent_path)
+    if not source_path.is_dir() and acquisition is None:
         raise FileNotFoundError(f"Agent source directory does not exist: {source_path}")
 
     from agentbench.runtime.agentcontainer.config import manifest_runtime_type, docker_structure

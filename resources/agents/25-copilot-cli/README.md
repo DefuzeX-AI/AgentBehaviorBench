@@ -76,3 +76,7 @@ Copilot appears to close the streaming connection itself once the final chunk ha
 arrived. These calls are not background title or summary requests, and there is no
 switch to change this behavior. A single-step run (certification) produced no such
 error.
+
+## Installation inputs
+
+Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.

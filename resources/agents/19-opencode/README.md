@@ -76,7 +76,7 @@ undeclared egress:
   `npm install @opencode-ai/plugin` in each config directory unless that directory
   already has `node_modules` and a `package.json`/`package-lock.json` pair that
   declares and locks the package. There is no switch for this. The launcher copies
-  the pinned `agent/package*.json` into the config dir and symlinks `node_modules`
+  the pinned `install/package*.json` into the config dir and symlinks `node_modules`
   to the image's installed tree, so the check passes and `registry.npmjs.org` is
   never contacted.
 - `OPENCODE_DISABLE_AUTOUPDATE=1`, `autoupdate: false`: no release check.
@@ -103,3 +103,7 @@ When the one-shot worker closes ACP, the long-lived `GET /global/event` SSE stre
 through the interceptor is cut and recorded as one `tool_error`
 (`transport_error`, incomplete chunked read). The route is `required = false` and
 the host accepts the trace.
+
+## Installation inputs
+
+Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.

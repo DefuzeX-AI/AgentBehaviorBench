@@ -109,3 +109,7 @@ disconnected` on `/config`, `/agent`, `/global/event`).
 Kilo ships a bubblewrap-based command sandbox. It is off by default and this unit
 leaves it off: bubblewrap needs user namespaces, which the container
 (`--cap-drop=ALL`, `no-new-privileges`) does not grant.
+
+## Installation inputs
+
+Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.

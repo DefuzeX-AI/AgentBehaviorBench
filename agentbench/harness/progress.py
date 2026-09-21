@@ -8,6 +8,7 @@ from typing import Literal
 
 
 ProgressStage = Literal[
+    "source_preparation",
     "sdk_check",
     "agent_start",
     "case_generation",

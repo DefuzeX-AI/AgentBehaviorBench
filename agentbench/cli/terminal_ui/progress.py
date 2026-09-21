@@ -47,6 +47,12 @@ class ProgressPrinter:
         )
 
     def __call__(self, event: BenchmarkProgress) -> None:
+        if event.stage == 'source_preparation':
+            marker, color = {'started': ('RUNNING', ANSI_YELLOW),
+                             'succeeded': ('OK', ANSI_GREEN),
+                             'failed': ('FAILED', ANSI_RED)}[event.status]
+            self._output_fn(f'[{event.agent_id}] {event.detail} .... {color}{marker}{ANSI_RESET}')
+            return
         if self._live_cases is not None and event.stage != "sdk_check":
             self._live_cases.on_progress(event)
             return

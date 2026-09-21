@@ -22,7 +22,7 @@ changing environment variables alone does not broaden container egress.
 
 ## What is pinned
 
-- `agent/requirements.txt` is a fully resolved, hash-locked lock of `openhands==1.16.0`
+- `install/requirements.txt` is a fully resolved, hash-locked lock of `openhands==1.16.0`
   for CPython 3.12 on x86_64 Linux, generated with
   `uv pip compile --generate-hashes` (the command is recorded in the file header).
   The image installs it with `pip --require-hashes --no-deps` into its own venv
@@ -69,3 +69,7 @@ For every Case `bootstrap/launch.py` validates the three variables, creates a di
   events; short Cases never reach it. There is no background title generation in ACP mode.
 - The default agent spec requests `reasoning_effort: high`; LiteLLM drops parameters the
   endpoint does not accept (`drop_params: true`).
+
+## Installation inputs
+
+Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.

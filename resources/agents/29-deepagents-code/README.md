@@ -21,9 +21,9 @@ changing environment variables alone does not broaden container egress.
 
 ## Installation
 
-`agent/requirements.txt` is a fully pinned, `--require-hashes` lock of the
+`install/requirements.txt` is a fully pinned, `--require-hashes` lock of the
 `deepagents-code==0.1.72` closure (including `deepagents==0.7.15` and
-`deepagents-acp==0.0.12`) for CPython 3.12, generated from `agent/requirements.in`
+`deepagents-acp==0.0.12`) for CPython 3.12, generated from `install/requirements.in`
 with `uv pip compile --generate-hashes`. Upstream requires Python >= 3.12, so the
 image is based on `python:3.12-bookworm` (the `node:24-bookworm` image ships 3.11).
 The agent lives in its own venv `/opt/agent-venv`; ABB's runtime dependencies stay
@@ -81,3 +81,7 @@ fails and would be recorded as denied egress.
   the text is complete and the one-shot worker then closes the agent while the
   HTTP stream is being torn down. The response text is already delivered and host
   trace validation still succeeds.
+
+## Installation inputs
+
+Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.

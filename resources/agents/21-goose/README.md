@@ -21,7 +21,7 @@ changing environment variables alone does not broaden container egress.
 
 ## Distribution
 
-`agent/distribution.json` pins
+`install/distribution.json` pins
 `goose-x86_64-unknown-linux-gnu.tar.bz2` from the `v1.51.0` GitHub release by
 sha256 (`de5bf71c…e367e2`). The same digest is listed for that platform in the ACP
 registry entry (`agentclientprotocol/registry`, `goose/agent.json`, version
@@ -82,3 +82,7 @@ unchanged. File reads/writes continue to use ACP `fs/*` delegation.
 - Goose keeps per-Case request logs under `~/.local/state/goose/logs` in the
   disposable `HOME`; they contain prompts but not the credential and are discarded
   with the container.
+
+## Installation inputs
+
+Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.

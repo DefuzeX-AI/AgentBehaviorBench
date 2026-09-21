@@ -44,3 +44,7 @@ by whichever unprivileged uid the runtime chooses and isolates Cases. The settin
 Qwen Code can still abandon an in-flight streaming request on its own and retry
 it; the interceptor records those as native `Client disconnected` transport errors.
 They are not required calls and do not affect host acceptance.
+
+## Installation inputs
+
+Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.

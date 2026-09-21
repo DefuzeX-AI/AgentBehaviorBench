@@ -74,3 +74,7 @@ The launcher also sets:
 
 Pi does not run a sandbox of its own, so no sandbox switch is needed under the
 container's `--cap-drop=ALL` limits. pi-acp discards the child's stderr.
+
+## Installation inputs
+
+Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.
