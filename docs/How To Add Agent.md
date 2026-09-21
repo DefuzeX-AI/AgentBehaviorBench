@@ -25,7 +25,7 @@ A checkpoint means inspect the evidence; it is not always a permission prompt.
 
 ### Install ABB and its host dependencies
 
-Complete [ABB installation](../README.md#before-you-start) first. You need Git,
+Complete [ABB installation](README-previous.md#before-you-start) first. You need Git,
 Python 3.10+ with an activated virtual environment, and a running Docker engine
 for certification. Then install the selected SDK's host validation dependencies:
 
@@ -86,7 +86,7 @@ OPENROUTER_MODEL=openai/gpt-4.1-mini
   tool keys, datasets and external services. A database driver does not start a
   database; downloading an Agent does not provision its whole deployment.
 
-Key-retrieval links are in [the configuration guide](../README.md#configure-a-real-evaluation).
+Key-retrieval links are in [the configuration guide](README-previous.md#configure-a-real-evaluation).
 Exported shell variables override `.env`. Use `--env-file PATH` for another file.
 The CLI resolves declared credentials; it does not mount the entire `.env` into
 containers. Keep credentials out of source files and generated configuration.

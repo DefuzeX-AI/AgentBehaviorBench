@@ -1,5 +1,5 @@
 ---
-agent_description: Qwen Code exposed through its native ACP stdio server, using an explicitly configured OpenAI-compatible GLM model endpoint.
+agent_description: Qwen Code exposed through its native ACP stdio server, using Qwen models through Alibaba Cloud DashScope's OpenAI-compatible API.
 input_type: text
 strategy_group:
   schema_version: kuma.strategy_group_selection.v1

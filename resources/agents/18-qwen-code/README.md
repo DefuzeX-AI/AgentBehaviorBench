@@ -5,23 +5,31 @@ release `0.24.2` (tag `v0.24.2`, commit `1026c4a5`) from npm and runs its built-
 ACP server (`qwen --acp`). ABB invokes it over ACP stdio and keeps each Case in a
 separate empty workspace. No upstream source is vendored or modified.
 
-The acceptance profile uses Zhipu GLM's OpenAI-compatible coding endpoint.
-Supply these variables only at runtime:
+This deployment uses Qwen models through the standard Alibaba Cloud DashScope
+API in China (Beijing). Get an API key from [Alibaba Cloud Bailian](https://bailian.console.aliyun.com/).
+Set these variables in the repository's `.env`:
 
-- `GLM_API_BASE_URL`: the OpenAI-style base URL, e.g.
-  `https://open.bigmodel.cn/api/coding/paas/v4`.
-- `GLM_MODEL`: the exact provider model ID, such as `glm-5.1`.
-- `GLM_API_KEY`: the Bearer credential. It is never written into this unit.
+```dotenv
+DASHSCOPE_API_KEY=
+QWEN_API_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+QWEN_MODEL=qwen3-coder-plus
+```
 
-`bootstrap/launch.py` validates the three variables and starts
-`qwen --acp --auth-type openai --model $GLM_MODEL`, passing the credential and base
-URL through Qwen Code's native `OPENAI_API_KEY` / `OPENAI_BASE_URL` environment
-variables rather than command-line arguments.
+Only `DASHSCOPE_API_KEY` is required. The launcher uses the URL and model above
+when their variables are absent or empty. The model must be available to your
+account. This is the standard API endpoint, not the separate Coding Plan endpoint.
 
-The interception manifest admits only the tested route:
-`POST https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`.
-A different OpenAI-compatible provider needs an explicit reviewed route update;
-changing environment variables alone does not broaden container egress.
+`bootstrap/launch.py` starts `qwen --acp --auth-type openai --model $QWEN_MODEL`,
+mapping the settings to Qwen Code's native `OPENAI_API_KEY`, `OPENAI_BASE_URL`
+and `OPENAI_MODEL`. Here `openai` denotes the compatible protocol; the provider
+is DashScope and the model is Qwen. Credentials are passed through the environment,
+never command-line arguments. GLM credentials are not used by this unit.
+
+The interception manifest admits:
+`POST https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions`.
+International regions and Coding Plan require matching credentials, endpoint and
+interception route changes; changing environment variables alone does not broaden
+egress. See [Qwen Code authentication](https://qwenlm.github.io/qwen-code-docs/en/users/configuration/auth/).
 
 ## Launcher behavior
 

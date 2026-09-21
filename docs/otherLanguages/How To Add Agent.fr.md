@@ -90,7 +90,7 @@ OPENROUTER_MODEL=openai/gpt-4.1-mini
   un Agent ne déploie pas tous ses services.
 
 Les liens pour obtenir les clés figurent dans le
-[guide de configuration (anglais)](../../README.md#configure-a-real-evaluation).
+[guide de configuration (anglais)](../README-previous.md#configure-a-real-evaluation).
 Les variables exportées par le shell priment sur .env ; --env-file PATH choisit un
 autre fichier. ABB résout les identifiants déclarés et ne monte pas le fichier .env
 entier dans les conteneurs. Ne placez pas de secrets dans le code ou les fichiers générés.

@@ -13,7 +13,7 @@ Use a source checkout with an editable installation; the standalone wheel does
 not include all Agent resources and built viewer assets. Install Git, Python 3.10+
 with pip/venv, and Docker accessible to your user for Docker Agent execution.
 The offline demo needs no Docker. Platform instructions are in
-[README](../README.md#before-you-start).
+[detailed reference](README-previous.md#before-you-start).
 
 The viewer build requires npm and Node.js 20.19+ on 20.x, or 22.12+, as specified
 by the locked Vite dependency. Python serves the built viewer; installing Python
@@ -68,7 +68,7 @@ TAVILY_API_KEY=
 ABB_MAX_PARALLEL_CASES=1
 ```
 
-See [credential links and the command/service matrix](../README.md#configure-a-real-evaluation).
+See [credential links and the command/service matrix](README-previous.md#configure-a-real-evaluation).
 Nonempty `KUMA_API_KEY` takes precedence over ABB's `DEFUZEX_API_KEY` alias.
 `OPENROUTER_MODEL` is a required model slug, not a key; the example is not a runtime
 fallback. Tavily is required only by Agents using its search tool.

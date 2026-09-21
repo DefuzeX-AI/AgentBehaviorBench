@@ -1,4 +1,4 @@
-"""Map an OpenAI-compatible GLM profile onto Qwen Code's native ACP server."""
+"""Map a DashScope Qwen profile onto Qwen Code's native ACP server."""
 from __future__ import annotations
 
 import json
@@ -9,9 +9,9 @@ import tempfile
 from urllib.parse import urlsplit
 
 
-KEY_ENV = "GLM_API_KEY"
-BASE_URL_ENV = "GLM_API_BASE_URL"
-MODEL_ENV = "GLM_MODEL"
+KEY_ENV = "DASHSCOPE_API_KEY"
+BASE_URL_ENV = "QWEN_API_BASE_URL"
+MODEL_ENV = "QWEN_MODEL"
 SETTINGS = {
     "privacy": {"usageStatisticsEnabled": False},
     "telemetry": {"enabled": False},
@@ -25,14 +25,10 @@ SETTINGS = {
 def prepare(environ: dict[str, str]) -> tuple[list[str], dict[str, str]]:
     """Return the Qwen Code ACP command and environment without persisting secrets."""
     key = environ.get(KEY_ENV, "").strip()
-    base_url = environ.get(BASE_URL_ENV, "").strip().rstrip("/")
-    model = environ.get(MODEL_ENV, "").strip()
+    base_url = (environ.get(BASE_URL_ENV, "").strip() or "https://dashscope.aliyuncs.com/compatible-mode/v1").rstrip("/")
+    model = environ.get(MODEL_ENV, "").strip() or "qwen3-coder-plus"
     if not key:
         raise ValueError(f"{KEY_ENV} is required")
-    if not base_url:
-        raise ValueError(f"{BASE_URL_ENV} is required")
-    if not model:
-        raise ValueError(f"{MODEL_ENV} is required")
     parsed = urlsplit(base_url)
     if parsed.scheme != "https" or not parsed.hostname or parsed.query or parsed.fragment:
         raise ValueError(f"{BASE_URL_ENV} must be an HTTPS URL without query or fragment")

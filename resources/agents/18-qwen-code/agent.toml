@@ -1,7 +1,7 @@
 # Hand-written from the pinned Qwen Code CLI's native ACP and OpenAI-compatible provider contracts.
 schema_version = "defuzex-bench.agent.v2"
 agent_id = "qwen-code"
-display_name = "Qwen Code (ACP, GLM provider)"
+display_name = "Qwen Code (ACP, Qwen via DashScope)"
 framework = "acp"
 
 [evaluation]
@@ -26,8 +26,8 @@ downloaded_on = "2026-09-21"
 type = "docker"
 execution = "oneshot"
 timeout_sec = 900
-env_keys = ["GLM_API_BASE_URL", "GLM_MODEL"]
-secret_env_keys = ["GLM_API_KEY"]
+env_keys = ["QWEN_API_BASE_URL", "QWEN_MODEL"]
+secret_env_keys = ["DASHSCOPE_API_KEY"]
 
 [build]
 context = "."
@@ -52,14 +52,14 @@ network_config = "network/rules.toml"
 tool_routes = []
 
 [[llm_interception.credentials]]
-id = "glm-api-key"
-agent_env = "GLM_API_KEY"
+id = "dashscope-api-key"
+agent_env = "DASHSCOPE_API_KEY"
 auth_plugin = "bearer-token"
 
 [[llm_interception.routes]]
-id = "glm-openai-chat"
-host_patterns = ["open.bigmodel.cn"]
+id = "dashscope-openai-chat"
+host_patterns = ["dashscope.aliyuncs.com"]
 ports = [443]
 methods = ["POST"]
-path_patterns = ["/api/coding/paas/v4/chat/completions"]
+path_patterns = ["/compatible-mode/v1/chat/completions"]
 protocol_plugin = "openai-chat"
