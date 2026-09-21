@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
+import { Tag } from 'antd';
 import { errorText, executionLabels, isComplete, needsAttention, phaseLabels } from './model.js';
 
 export function ExecutionBadge({ status }) {
-  const tone = isComplete(status) ? 'complete' : status === 'retry_wait' ? 'waiting' : needsAttention(status) ? 'attention' : 'active';
-  return <span className={`suite-badge suite-badge-${tone}`}>{executionLabels[status] || status}</span>;
+  const color = isComplete(status) ? 'success' : status === 'retry_wait' ? 'warning' : needsAttention(status) ? 'error' : 'processing';
+  return <Tag color={color}>{executionLabels[status] || status}</Tag>;
 }
 
 export function JudgeBadge({ status }) {
-  if (!status) return <span className="suite-muted">Not received</span>;
-  return <span className={`suite-badge suite-badge-${status === 'pass' ? 'complete' : status === 'issue' || status === 'insufficient_evidence' ? 'waiting' : 'active'}`}>{status}</span>;
+  if (!status) return <Tag>Not received</Tag>;
+  const color = status === 'pass' ? 'success' : status === 'issue' || status === 'insufficient_evidence' ? 'warning' : 'processing';
+  return <Tag color={color}>{status}</Tag>;
 }
 
 function RetryTime({ at }) {
