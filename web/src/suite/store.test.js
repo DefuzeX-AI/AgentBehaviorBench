@@ -22,22 +22,38 @@ test('all planned slots count once; Judge issue is separate from execution error
   assert.deepEqual(countCases(cases), { completed: 1, running: 0, retry_wait: 1, attention: 0, queued: 1, reports: 1, accepted: 0 });
 });
 
-test('retry transition keeps historical attempt and several cases expanded', () => {
+test('retry transition keeps the selected Case and historical attempt', () => {
   const store = createSuiteStore();
   receive(store, snapshot(1));
   const cases = normalizeCases(store.getState().suite.snapshot);
-  cases.slice(0, 2).forEach(item => store.dispatch(actions.caseToggled(item)));
+  store.dispatch(actions.caseSelected(cases[1]));
   receive(store, snapshot(2, { execution_status: 'retrying', active_attempt_id: 'try-2', attempts: [
     { attempt_id: 'try-1', artifact_run_id: 'old-run', status: 'failed' },
     { attempt_id: 'try-2', artifact_run_id: 'new-run', status: 'running' },
   ] }));
   const state = store.getState().suite;
-  assert.equal(Object.values(state.expanded).filter(Boolean).length, 2);
+  assert.equal(state.selectedCaseKey, cases[1].key);
   assert.equal(state.selectedAttempts[cases[1].key], 'try-1');
   assert.equal(normalizeCases(state.snapshot)[1].attempts.length, 2);
   assert.equal(normalizeCases(state.snapshot).length, 3);
   store.dispatch(actions.attemptSelected({ key: cases[1].key, attempt_id: 'try-2' }));
   assert.equal(store.getState().suite.selectedAttempts[cases[1].key], 'try-2');
+  store.dispatch(actions.suiteSelected());
+  assert.equal(store.getState().suite.selectedCaseKey, null);
+});
+
+test('filters and table preferences are independent of Case selection', () => {
+  const store = createSuiteStore();
+  receive(store, snapshot(1));
+  const item = normalizeCases(store.getState().suite.snapshot)[0];
+  store.dispatch(actions.filterChanged({ query: 'alpha', agents: ['alpha'] }));
+  store.dispatch(actions.tableChanged({ field: 'attempts', order: 'descend', page: 2 }));
+  store.dispatch(actions.caseSelected(item));
+  assert.equal(store.getState().suite.filters.query, 'alpha');
+  assert.equal(store.getState().suite.table.field, 'attempts');
+  store.dispatch(actions.filtersReset());
+  assert.equal(store.getState().suite.filters.query, '');
+  assert.equal(store.getState().suite.table.page, 1);
 });
 
 test('disconnection and out-of-order snapshots cannot erase completed results', () => {

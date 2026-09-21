@@ -44,9 +44,10 @@ function Page({ url, revision, live, page, size, onPage, onSelect, onFacets }) {
   </>;
 }
 
-export default function RawRunView({ run, revision }) {
+export default function RawRunView({ run, revision, initialKinds = primary, title = 'Interaction timeline',
+  description = 'Trace data from Case generation through models, tools, and submission using recorded times and IDs.' }) {
   const [page, setPage] = useState(1), [size, setSize] = useState(20), [live, setLive] = useState(true);
-  const [kinds, setKinds] = useState(primary), [query, setQuery] = useState(''), [input, setInput] = useState('');
+  const [kinds, setKinds] = useState(() => initialKinds), [query, setQuery] = useState(''), [input, setInput] = useState('');
   const [inputScope, setInputScope] = useState('');
   const [status, setStatus] = useState(''), [dates, setDates] = useState(null), [selected, setSelected] = useState(null);
   const [facets, setFacets] = useState(null), [refresh, setRefresh] = useState(0);
@@ -57,7 +58,7 @@ export default function RawRunView({ run, revision }) {
   const reset = setter => value => { setter(value); setPage(1); };
   return <ConfigProvider locale={zhCN} theme={{ token: { colorPrimary: '#244d3d', borderRadius: 6, fontSize: 13 }, components: { Table: { cellPaddingBlock: 12 } } }}>
     <section className="interaction-timeline">
-      <div className="interaction-heading"><div><h2>Interaction timeline</h2><p>Trace data from Case generation through models, tools, and submission using recorded times and IDs.</p></div>
+      <div className="interaction-heading"><div><h2>{title}</h2><p>{description}</p></div>
         <Space><span>Check for updates</span><Switch checked={live} onChange={setLive} aria-label="Check for live updates" /><Button onClick={() => setRefresh(r => r + 1)}>Refresh</Button></Space></div>
       <div className="interaction-counts"><span>{facets?.total_interactions ?? '—'} interactions</span><span>from {facets?.total_records ?? '—'} raw events</span>
         <span>Local timezone · chronological order · streaming chunks grouped by call_id</span></div>
