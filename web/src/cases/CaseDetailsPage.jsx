@@ -15,7 +15,7 @@ import './cases.css';
 
 const { Text, Title } = Typography;
 
-export default function CaseDetailsPage({ item, revision, onBack }) {
+export default function CaseDetailsPage({ item, revision, onBack, onAgentSelect }) {
   const dispatch = useDispatch();
   const selectedId = useSelector(state => state.suite.selectedAttempts[item.key]);
   const detailTab = useSelector(state => state.suite.detailTab);
@@ -25,6 +25,8 @@ export default function CaseDetailsPage({ item, revision, onBack }) {
   const rejected = attempt?.host_accepted === false || attempt?.host_acceptance === false || attempt?.host_acceptance === 'rejected';
   const report = evaluation.data?.judge || reportOf(attempt) || reportOf(item);
   const artifactLoading = Boolean(artifact && !evaluation.data && !evaluation.error);
+  const failures = (evaluation.data?.inputs || []).filter(input => input.result?.status === 'failed').flatMap(input => input.failures || []);
+  const failure = failures.find(value => value.category !== 'tool_error') || failures[0];
   const loading = <Skeleton active paragraph={{ rows: 6 }} />;
   const tabs = [
     { key: 'overview', label: 'Overview', children: <CaseOverview item={item} attempt={attempt} data={evaluation.data} error={evaluation.error} /> },
@@ -36,7 +38,7 @@ export default function CaseDetailsPage({ item, revision, onBack }) {
   ];
 
   return <section className="case-details" aria-label={`${item.agent_id} Case ${item.case_index + 1}`}>
-    <Breadcrumb items={[{ title: <Button type="link" className="case-back" onClick={onBack}>Suite overview</Button> }, { title: item.agent_id }, { title: `Case ${item.case_index + 1}` }]} />
+    <Breadcrumb items={[{ title: <Button type="link" className="case-back" onClick={onBack}>Suite overview</Button> }, { title: <Button type="link" onClick={() => onAgentSelect(item.agent_id)}>{item.agent_id}</Button> }, { title: `Case ${item.case_index + 1}` }]} />
     <div className="case-header"><div><Text className="case-eyebrow">{item.agent_id}</Text><Title level={1}>Case {item.case_index + 1}</Title>
       <Text copyable type="secondary">{item.case_id || 'Case ID pending'}</Text></div>
       <Space wrap><ExecutionBadge status={attempt ? executionStatus(attempt) : item.execution_status} /><JudgeBadge status={attempt?.judge_status || report?.status || item.judge_status} />{rejected && <Tag color="error">Host rejected</Tag>}<RetryButton item={item} /></Space></div>
@@ -45,7 +47,13 @@ export default function CaseDetailsPage({ item, revision, onBack }) {
       options={item.attempts.map(value => ({ value: value.attempt_id, label: `Attempt ${value.attempt_number}${value.attempt_id === item.active_attempt_id ? ' (current)' : ''}` }))} placeholder="Execution has not started" /></label>
       {artifact && <Text type="secondary">Artifact run <Text copyable code>{artifact}</Text></Text>}</div>
 
-    {attempt?.error && <Alert type="error" showIcon message="This attempt failed" description={errorText(attempt.error)} />}
+    {attempt?.error && <Alert type="error" showIcon message={failure?.summary || 'This attempt failed'} description={failure ? <>
+      <p>{failure.message}</p>
+      <details><summary>Technical details</summary>
+        <p>{errorText(attempt.error)}</p>
+        {failures.map(value => <p key={value.source}><strong>{value.tool}</strong>: {value.message}<br /><Text type="secondary">Evidence: {value.source}</Text></p>)}
+      </details>
+    </> : errorText(attempt.error)} />}
     {!artifact && <Alert type="info" showIcon message="Execution artifacts are not available yet" description={attempt ? 'This attempt has no viewable artifact directory. Saved Suite state remains available below.' : 'Case execution has not started.'} />}
 
     <Tabs className="case-tabs" activeKey={detailTab} onChange={value => dispatch(actions.detailTabChanged(value))}

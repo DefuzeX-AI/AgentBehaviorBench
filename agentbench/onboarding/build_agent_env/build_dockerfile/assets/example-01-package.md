@@ -6,7 +6,7 @@ The source package declares its dependencies. Bindings are copied because this
 unit has them; omit that COPY when the target does not. Data Enrichment and
 TradingAgents use a similar package-install pattern, with their own constraints.
 
-Reference: `resources/agents/02-react-agent/Dockerfile`.
+Reference: `resources/agents/03-react-agent/Dockerfile`.
 
 ```dockerfile
 # Outer ABB image; install the pinned upstream checkout without editing it.

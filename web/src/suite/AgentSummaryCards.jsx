@@ -6,7 +6,7 @@ const { Text, Title } = Typography;
 const colors = ['#137a5d', '#c76722', '#3d70c9', '#7357a6', '#a24e65', '#46747a'];
 const colorFor = value => colors[[...value].reduce((sum, char) => sum + char.charCodeAt(0), 0) % colors.length];
 
-export default function AgentSummaryCards({ cases, jobs, onFilter }) {
+export default function AgentSummaryCards({ cases, jobs, onSelect }) {
   const agents = agentSummaries(cases, jobs);
   return <section className="agent-summary-section" aria-label="Agents in Suite">
     <div className="suite-section-label"><Text>AGENTS IN SUITE</Text><Tag>{agents.length} {agents.length === 1 ? 'Agent' : 'Agents'}</Tag></div>
@@ -17,7 +17,7 @@ export default function AgentSummaryCards({ cases, jobs, onFilter }) {
       <div className="agent-card-progress"><div><Text type="secondary">{agent.total} {agent.total === 1 ? 'Case' : 'Cases'}</Text><Text type="secondary">{agent.completed}/{agent.total} done</Text></div>
         <Progress percent={agent.completion_rate} showInfo={false} strokeColor="#2f8f68" trailColor="#e2e7e3" size="small" /></div>
       <div className="agent-card-footer"><Text type="secondary"><ClockCircleOutlined /> {formatDuration(agent.average_duration_ms)}</Text>
-        <Button type="link" onClick={() => onFilter(agent.agent_id)}>Filter Cases <ArrowRightOutlined /></Button></div>
+        <Button type="link" onClick={() => onSelect(agent.agent_id)}>View Agent <ArrowRightOutlined /></Button></div>
     </article>)}</div>
   </section>;
 }

@@ -13,6 +13,22 @@ function snapshot(revision, updates = {}) {
 }
 const receive = (store, value) => store.dispatch(actions.snapshotReceived({ snapshot: value, updated: 'now' }));
 
+test('Suite Agent Case navigation preserves filters and supports returning to each level', () => {
+  const store = createSuiteStore();
+  receive(store, snapshot(1));
+  store.dispatch(actions.filterChanged({ query: 'saved' }));
+  store.dispatch(actions.agentSelected('alpha'));
+  assert.equal(store.getState().suite.selectedCaseKey, null);
+  assert.equal(store.getState().suite.selectedAgentId, 'alpha');
+  store.dispatch(actions.caseSelected(normalizeCases(snapshot(1))[0]));
+  assert.ok(store.getState().suite.selectedCaseKey);
+  store.dispatch(actions.agentSelected('alpha'));
+  assert.equal(store.getState().suite.selectedCaseKey, null);
+  store.dispatch(actions.suiteSelected());
+  assert.equal(store.getState().suite.selectedAgentId, null);
+  assert.equal(store.getState().suite.filters.query, 'saved');
+});
+
 test('all planned slots count once; Judge issue is separate from execution error', () => {
   const cases = normalizeCases(snapshot(1));
   assert.equal(cases.length, 3);

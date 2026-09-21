@@ -1,5 +1,6 @@
 import { readFile, realpath, readdir } from 'node:fs/promises';
 import path from 'node:path';
+import { toolFailures } from './failures.js';
 
 export async function evaluation(root, run) {
   if (!/^[a-zA-Z0-9_-]+$/.test(run)) throw new Error('Invalid run');
@@ -28,6 +29,7 @@ export async function evaluation(root, run) {
   return { public_result: metadata.evaluation_result || {}, execution_status: metadata.status, manifest: await read('manifest.json'), process: await read('process.json'),
     case: await read('case.json'), judge: await read('judge/report.json'), error: await read('error.json'),
     inputs: await Promise.all(steps.map(async step => ({ step,
+      failures: await toolFailures(directory, step),
       input: await read(`inputs/${step}/input.json`), result: await read(`inputs/${step}/result.json`),
       submission: await read(`inputs/${step}/submission.json`), evidence: await read(`inputs/${step}/evidence.json`),
     }))) };

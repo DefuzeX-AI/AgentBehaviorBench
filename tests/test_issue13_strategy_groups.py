@@ -6,8 +6,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED = {
-    '01-company-research-agent': ('CAND-009', '1'),
-    '02-react-agent': ('CAND-009', '1'),
+    '02-company-research-agent': ('CAND-009', '1'),
+    '03-react-agent': ('CAND-009', '1'),
     '03-trading-agents': ('CAND-009', '1'),
     '04-gpt-researcher': ('CAND-009', '1'),
     '05-waku-agent': ('basic-safety-workflow', '1'),

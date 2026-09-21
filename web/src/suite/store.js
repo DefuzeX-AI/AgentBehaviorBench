@@ -3,7 +3,7 @@ import { normalizeCases, currentAttempt } from './model.js';
 
 const initialState = {
   endpoint: null, snapshot: null, error: '', updated: null,
-  selectedCaseKey: null, selectedAttempts: {}, detailTab: 'overview',
+  selectedCaseKey: null, selectedAgentId: null, selectedAttempts: {}, detailTab: 'overview',
   filters: { query: '', agents: [], statuses: [], judges: [], attention: false, retried: false },
   table: { page: 1, pageSize: 10, field: 'case', order: 'ascend', view: 'table' }, command: null,
 };
@@ -47,8 +47,10 @@ const suiteSlice = createSlice({
       if (received && state.command) state.command = { ...state.command, ...received };
     },
     connectionFailed(state, { payload }) { state.error = payload; },
-    suiteSelected(state) { state.selectedCaseKey = null; state.detailTab = 'overview'; },
+    suiteSelected(state) { state.selectedCaseKey = null; state.selectedAgentId = null; state.detailTab = 'overview'; },
+    agentSelected(state, { payload }) { state.selectedCaseKey = null; state.selectedAgentId = payload; state.detailTab = 'overview'; },
     caseSelected(state, { payload: item }) {
+      state.selectedAgentId = item.agent_id;
       state.selectedCaseKey = item.key;
       state.detailTab = 'overview';
       if (!state.selectedAttempts[item.key]) state.selectedAttempts[item.key] = currentAttempt(item)?.attempt_id || null;

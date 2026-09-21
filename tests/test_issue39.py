@@ -37,7 +37,7 @@ def test_new_agents_load_with_explicit_routes_without_input_contract(unit):
     assert not (path/'evaluation/input-contract.json').exists()
 
 
-@pytest.mark.parametrize('unit', ['02-react-agent', '03-trading-agents', '04-gpt-researcher'])
+@pytest.mark.parametrize('unit', ['03-react-agent', '03-trading-agents', '04-gpt-researcher'])
 def test_registered_profile_passes_real_pypi_create_run_before_paid_generation(tmp_path, unit):
     """Validate actual profile prose via the public SDK with a local Case Provider."""
     from kuma import create_run
@@ -87,13 +87,13 @@ def test_react_native_checkpoint_remembers_without_replaying_inputs_and_isolates
                         if name == 'react_agent' or name.startswith('react_agent.')}
     for name in original_modules:
         monkeypatch.delitem(sys.modules, name)
-    monkeypatch.syspath_prepend(str(ROOT/'resources/agents/02-react-agent/agent/src'))
+    monkeypatch.syspath_prepend(str(ROOT/'resources/agents/03-react-agent/agent/src'))
     monkeypatch.setitem(sys.modules, 'react_agent.tools', SimpleNamespace(TOOLS=[search]))
     monkeypatch.setitem(sys.modules, 'react_agent.utils', SimpleNamespace(
         load_chat_model=lambda _: Model(), get_message_text=lambda message: message.content))
     try:
         importlib.import_module('react_agent.graph')
-        module = binding('02-react-agent', 'react.py')
+        module = binding('03-react-agent', 'react.py')
         first, other = module.create_graph(), module.create_graph()
         config = {'configurable': {'thread_id': 'case-session'}}
         async def execute():

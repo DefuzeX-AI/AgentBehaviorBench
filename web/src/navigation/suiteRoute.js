@@ -1,9 +1,10 @@
 export const CASE_TABS = ['overview', 'conversation', 'tools', 'judge', 'trace', 'json'];
 
-export function readSuiteRoute(cases, hash = window.location.hash) {
+export function readSuiteRoute(cases, hash = window.location.hash, agentIds = cases.map(item => item.agent_id)) {
   const params = new URLSearchParams(hash.replace(/^#/, ''));
   const caseValue = params.get('case');
-  if (caseValue == null) return { item: null, tab: 'overview' };
+  if (caseValue == null) return agentIds.includes(params.get('agent'))
+    ? { item: null, agent: params.get('agent'), tab: 'overview' } : { item: null, tab: 'overview' };
   const caseIndex = Number(caseValue);
   const item = cases.find(candidate => candidate.agent_id === params.get('agent') && candidate.case_index === caseIndex) || null;
   if (!item) return { item: null, tab: 'overview' };
@@ -15,8 +16,10 @@ export function suiteRouteHref(item, tab = 'overview', locationValue = window.lo
   const params = new URLSearchParams();
   if (item) {
     params.set('agent', item.agent_id);
-    params.set('case', String(item.case_index));
-    params.set('tab', CASE_TABS.includes(tab) ? tab : 'overview');
+    if (item.case_index != null) {
+      params.set('case', String(item.case_index));
+      params.set('tab', CASE_TABS.includes(tab) ? tab : 'overview');
+    }
   }
   return `${locationValue.pathname}${locationValue.search}${params.size ? `#${params}` : ''}`;
 }

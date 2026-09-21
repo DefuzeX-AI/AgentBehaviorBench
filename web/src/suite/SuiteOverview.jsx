@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { AppstoreOutlined, TableOutlined } from '@ant-design/icons';
 import { Alert, Button, Input, Progress, Segmented, Select, Space, Statistic, Switch, Table, Tooltip, Typography } from 'antd';
 import { useDispatch, useSelector } from 'react-redux';
@@ -19,9 +19,8 @@ function Metric({ value, label, tone }) {
   </div>;
 }
 
-export default function SuiteOverview({ onCaseSelect }) {
+export default function SuiteOverview({ onCaseSelect, onAgentSelect }) {
   const dispatch = useDispatch();
-  const casesSection = useRef(null);
   const { snapshot, error, updated, filters, table } = useSelector(state => state.suite);
   const cases = useMemo(() => normalizeCases(snapshot), [snapshot]);
   const counts = useMemo(() => countCases(cases), [cases]);
@@ -32,17 +31,14 @@ export default function SuiteOverview({ onCaseSelect }) {
   const setFilter = value => dispatch(actions.filterChanged(value));
   const completion = cases.length ? Math.round((counts.completed / cases.length) * 100) : 0;
   const judgeCoverage = cases.length ? Math.round((counts.reports / cases.length) * 100) : 0;
-  function filterAgent(agentId) {
-    setFilter({ agents: [agentId] });
-    casesSection.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
+
 
   if (!snapshot) return <section className="empty"><h2>{error ? 'Suite temporarily unavailable' : 'Loading Suite'}</h2><p>{error || 'All planned Cases will appear here.'}</p></section>;
 
   const sortOrder = field => table.field === field ? table.order : null;
   const columns = [
     { title: 'Agent / Case', key: 'case', sorter: true, sortOrder: sortOrder('case'), width: 230,
-      render: (_, item) => <div className="suite-case-cell"><strong>{item.agent_id}</strong><span>Case {item.case_index + 1}</span></div> },
+      render: (_, item) => <div className="suite-case-cell"><Button type="link" onClick={event => { event.stopPropagation(); onAgentSelect(item.agent_id); }}>{item.agent_id}</Button><span>Case {item.case_index + 1}</span></div> },
     { title: 'Execution', key: 'status', sorter: true, sortOrder: sortOrder('status'), width: 230,
       render: (_, item) => <CaseStatus item={item} /> },
     { title: 'Judge', key: 'judge', sorter: true, sortOrder: sortOrder('judge'), width: 150,
@@ -78,9 +74,9 @@ export default function SuiteOverview({ onCaseSelect }) {
 
     <div className="suite-report-line"><span>Judge reports <strong>{counts.reports}/{cases.length}</strong></span><span>Host accepted <strong>{counts.accepted}</strong></span></div>
     <SuiteControls cases={cases} />
-    <AgentSummaryCards cases={cases} jobs={snapshot.jobs || []} onFilter={filterAgent} />
+    <AgentSummaryCards cases={cases} jobs={snapshot.jobs || []} onSelect={onAgentSelect} />
 
-    <div className="suite-table-heading" ref={casesSection}><div><Title level={3}>Cases</Title><Text type="secondary">Select a result to inspect the complete Case record.</Text></div>
+    <div className="suite-table-heading"><div><Title level={3}>Cases</Title><Text type="secondary">Select a result to inspect the complete Case record.</Text></div>
       <Space><Text type="secondary">Showing {visible.length} of {cases.length}</Text><Segmented className="case-view-toggle" value={table.view} onChange={view => dispatch(actions.tableChanged({ view }))}
         options={[{ value: 'table', label: <Tooltip title="Table view"><TableOutlined aria-label="Table view" /></Tooltip> }, { value: 'grid', label: <Tooltip title="Card view"><AppstoreOutlined aria-label="Card view" /></Tooltip> }]} /></Space></div>
     <div className="suite-filters" aria-label="Filter Cases">

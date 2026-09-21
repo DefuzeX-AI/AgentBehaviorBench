@@ -24,7 +24,7 @@ def test_preflight_still_requires_sdk_requirement(tmp_path):
 def test_registered_units_no_longer_require_an_identity_marker():
     root = Path(__file__).resolve().parents[1]/'resources/agents'
     assert not list(root.glob('*/evaluation/input-contract.json'))
-    for name in ('01-company-research-agent', '02-react-agent', '03-trading-agents', '04-gpt-researcher'):
+    for name in ('02-company-research-agent', '03-react-agent', '03-trading-agents', '04-gpt-researcher'):
         assert not (root / name / 'evaluation').exists()
     # Schemas and useful fixtures survive removal of the obsolete marker.
     assert (root / '05-waku-agent/evaluation/smoke-input.json').is_file()
