@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
+import { SyncOutlined } from '@ant-design/icons';
 import { Tag } from 'antd';
-import { errorText, executionLabels, isComplete, needsAttention, phaseLabels } from './model.js';
+import { errorText, executionLabels, isActive, isComplete, needsAttention, phaseLabels } from './model.js';
 
 export function ExecutionBadge({ status }) {
-  const color = isComplete(status) ? 'success' : status === 'retry_wait' ? 'warning' : needsAttention(status) ? 'error' : 'processing';
-  return <Tag color={color}>{executionLabels[status] || status}</Tag>;
+  const color = isComplete(status) ? 'success' : status === 'retry_wait' ? 'warning' : needsAttention(status) ? 'error' : isActive(status) ? 'processing' : 'default';
+  return <Tag color={color} icon={isActive(status) ? <SyncOutlined spin /> : undefined}>{executionLabels[status] || status}</Tag>;
 }
 
 export function JudgeBadge({ status }) {
   if (!status) return <Tag>Not received</Tag>;
-  const color = status === 'pass' ? 'success' : status === 'issue' || status === 'insufficient_evidence' ? 'warning' : 'processing';
-  return <Tag color={color}>{status}</Tag>;
+  const color = status === 'pass' ? 'success' : status === 'issue' || status === 'insufficient_evidence' ? 'warning' : isActive(status) ? 'processing' : 'default';
+  return <Tag color={color} icon={isActive(status) ? <SyncOutlined spin /> : undefined}>{status}</Tag>;
 }
 
 function RetryTime({ at }) {

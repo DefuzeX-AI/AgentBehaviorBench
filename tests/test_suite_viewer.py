@@ -70,6 +70,15 @@ def test_attempt_catalog_rejects_foreign_suite_artifact(store, tmp_path):
     assert SuiteRunCatalogAPI(store.path).route('/api/observe/runs', {})['runs'] == []
 
 
+def test_agent_profile_endpoint_is_bound_to_suite(store, monkeypatch):
+    from agentbench.observe import agent_profile
+    monkeypatch.setattr(agent_profile, 'agent_profile', lambda root, agent_id: {'agent_id': agent_id})
+    with serving(store.path) as base:
+        endpoint = base + '/api/suites/suite_view/result/agents/'
+        assert request(endpoint + 'alpha') == (200, {'agent_id': 'alpha'})
+        assert request(endpoint + 'foreign')[0] == 404
+
+
 @contextmanager
 def serving(path):
     server = viewer.create_viewer_server(path, port=0)

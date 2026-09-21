@@ -9,8 +9,9 @@ import {
 } from '@ant-design/icons';
 import { Button, Input, Skeleton, Tag, Tooltip, Typography } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
-import { needsAttention, normalizeCases } from '../suite/model.js';
+import { isActive, needsAttention, normalizeCases } from '../suite/model.js';
 import { caseNavigationTitle, compactIdentity, suiteNavigationSummary } from './sidebarModel.js';
+import { ExecutionBadge } from '../suite/CaseStatus.jsx';
 import './navigation.css';
 
 const judgeColor = status => status === 'pass' ? 'success'
@@ -22,12 +23,12 @@ function Chevron({ expanded }) {
 
 function CaseItem({ item, selected, onSelect }) {
   const status = item.judge_status || (needsAttention(item.execution_status) ? item.execution_status : null);
-  return <button type="button" className={`suite-nav-case${selected ? ' selected' : ''}`} onClick={() => onSelect(item)}>
+  return <button type="button" className={`suite-nav-case${isActive(item.execution_status) ? ' is-running' : ''}${selected ? ' selected' : ''}`} onClick={() => onSelect(item)}>
     <span className="suite-nav-case-copy" title={caseNavigationTitle(item)}>
       <strong>{caseNavigationTitle(item)}</strong>
       <small title={item.case_id}>{compactIdentity(item.case_id, 16, 0)}</small>
     </span>
-    {status && <Tag color={item.judge_status ? judgeColor(status) : 'error'}>{status}</Tag>}
+    {isActive(item.execution_status) ? <ExecutionBadge status={item.execution_status} /> : status && <Tag color={item.judge_status ? judgeColor(status) : 'error'}>{status}</Tag>}
   </button>;
 }
 

@@ -16,6 +16,19 @@ class LocalEvaluationSDK:
     """
 
     execution = "container"
+
+    def version_info(self):
+        return {'name': 'local', 'version': '0.0.1', 'latest_version': None}
+
+    def strategy_selection(self, directory):
+        # Local execution consumes the same KUMA Agent Profile format.
+        from ..kuma.strategy_checks import selection
+        return selection(directory)
+
+    def strategy_checker(self, *, environ, timeout):
+        from .strategy_checks import LocalStrategyChecker
+        return LocalStrategyChecker()
+
     # Selected only by `--sdk local`; an omitted --sdk keeps meaning `kuma`.
     implicit_selection = False
     concurrency_capabilities = RunnerConcurrencyCapabilities(

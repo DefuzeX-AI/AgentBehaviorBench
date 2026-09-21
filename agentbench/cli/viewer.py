@@ -189,6 +189,19 @@ def build_viewer_handler(
                     self._send_json(payload)
                 return
             result_api_path = _suite_result_api_path(expected_suite_id)
+            if suite_view and parsed.path.startswith(result_api_path + '/agents/'):
+                from agentbench.observe.agent_profile import agent_profile
+                agent_id = unquote(parsed.path[len(result_api_path + '/agents/'):])
+                try:
+                    snapshot = parse_result_log(result_log)
+                    if agent_id not in {job['agent_id'] for job in snapshot.get('jobs', [])}:
+                        raise ValueError('Agent outside Suite')
+                    payload = agent_profile(project_root(), agent_id)
+                except (OSError, ValueError, KeyError, StopIteration):
+                    self._send_json({'error': 'Local Agent profile unavailable'}, status=HTTPStatus.NOT_FOUND)
+                else:
+                    self._send_json(payload)
+                return
             if parsed.path == result_api_path:
                 try:
                     payload = controlled_snapshot(parse_result_log(result_log), result_log)

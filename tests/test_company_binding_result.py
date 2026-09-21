@@ -24,7 +24,7 @@ def binding(monkeypatch):
     graph.Graph = Graph
     monkeypatch.setitem(sys.modules, "backend", backend)
     monkeypatch.setitem(sys.modules, "backend.graph", graph)
-    path = Path(__file__).resolve().parents[1] / "resources/agents/01-company-research-agent/bindings/bridge.py"
+    path = Path(__file__).resolve().parents[1] / "resources/agents/02-company-research-agent/bindings/bridge.py"
     spec = importlib.util.spec_from_file_location("company_binding_test", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

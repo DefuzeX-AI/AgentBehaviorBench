@@ -36,12 +36,14 @@ def confirm_agents(
     *,
     input_fn: Callable[[str], str] = input,
     output_fn: Callable[[str], None] = print,
+    strategy_checks=None,
 ) -> bool:
     """Print detected agents and return whether execution was confirmed."""
 
     print_agents(
         agents,
         output_fn,
+        strategy_checks=strategy_checks,
     )
     try:
         confirmed = request_confirmation(input_fn, output_fn)
@@ -53,21 +55,30 @@ def confirm_agents(
         output_fn("Cancelled.")
         return False
 
-    output_fn("")
-    output_fn(panel_rule("RUN QUEUED", ANSI_GREEN))
-    output_fn(
-        panel_line(
-            f"{ANSI_GREEN}OK{ANSI_RESET}  {len(agents)} benchmark agent(s) selected"
-        )
-    )
-    output_fn(panel_line("Next stage: evaluation SDK configuration check"))
-    output_fn(panel_rule("", ANSI_GREEN))
     return True
+
+
+def print_run_queued(agent_count, suite_id, viewer_url, workers, configured_workers, output_fn):
+    """Render the queue once its Suite and optional viewer are available."""
+    rows = [f'{ANSI_GREEN}OK{ANSI_RESET}  {agent_count} benchmark agent(s) selected',
+            'Next stage: evaluation SDK configuration check',
+            f'Suite ID: {suite_id}']
+    if viewer_url:
+        rows.append(f'View: {viewer_url}')
+    rows.append(f'Case workers: {workers} (configured: {configured_workers})')
+    inner = max(PANEL_INNER_WIDTH, *(visible_width(row) + 2 for row in rows))
+    title = ' RUN QUEUED '
+    output_fn('')
+    output_fn(f'{ANSI_GREEN}+{title}{"-" * (inner - len(title))}+{ANSI_RESET}')
+    for row in rows:
+        output_fn(f'{ANSI_GREEN}|{ANSI_RESET} {row}{" " * (inner - visible_width(row) - 1)}{ANSI_GREEN}|{ANSI_RESET}')
+    output_fn(f'{ANSI_GREEN}+{"-" * inner}+{ANSI_RESET}')
 
 
 def print_agents(
     agents: tuple[AgentRegistration, ...],
     output_fn: Callable[[str], None],
+    strategy_checks=None,
 ) -> None:
     """Print the detected agent list."""
 
@@ -79,6 +90,12 @@ def print_agents(
             f"{len(agents)} ready for selection"
         )
     )
+    sdk_info = getattr(strategy_checks, 'sdk_info', None)
+    if sdk_info:
+        sdk_label = f"sdk: {sdk_info['name']} {sdk_info['version']}"
+        if sdk_info.get('latest_version'):
+            sdk_label += f" {ANSI_YELLOW}(Update available: {sdk_info['latest_version']}){ANSI_RESET}"
+        output_fn(panel_line(sdk_label))
     output_fn(panel_line(""))
     for index, agent in enumerate(agents, start=1):
         time.sleep(AGENT_REVEAL_DELAY_SECONDS)
@@ -95,6 +112,21 @@ def print_agents(
                 f"    status: {status}    cases: {agent.case_count}"
             )
         )
+        if strategy_checks is not None:
+            check = strategy_checks.get(agent.agent_id, {})
+            state = check.get('status', 'unverified')
+            color = ANSI_GREEN if state == 'valid' else ANSI_RED if state == 'invalid' else ANSI_YELLOW
+            identity = check.get('id') or (
+                'not declared' if check.get('reason') == 'No explicit selection; SDK default applies.'
+                else 'unavailable'
+            )
+            if check.get('version'):
+                identity += '@' + check['version']
+            output_fn(panel_line(f"    strategy: {color}{identity} (strategy {state}){ANSI_RESET}"))
+            if check.get('display_name'):
+                output_fn(panel_line('    ' + check['display_name']))
+            if check.get('reason'):
+                output_fn(panel_line(color + '    ' + check['reason'] + ANSI_RESET))
         output_fn(panel_line(f"    path: {display_path(agent.path)}"))
         if index < len(agents):
             output_fn(panel_line("    " + "." * 64))
@@ -147,6 +179,12 @@ def print_agent_complete(
         f"Result: {status} | "
         f"cases={item.completed_case_count}/{item.requested_case_count}"
     )
+    from collections import Counter
+    verdicts = Counter(case.judge_status for case in item.case_results if case.judge_status is not None)
+    if verdicts:
+        detail += ' | Judge: ' + ', '.join(
+            name if len(item.case_results) == 1 else f'{name}={count}'
+            for name, count in sorted(verdicts.items()))
     if item.error_type is not None:
         detail += f" | error={item.error_type}: {item.error_message}"
     output_fn(detail)
@@ -221,7 +259,6 @@ def request_viewer_action(
     input_fn: Callable[[str], str],
     output_fn: Callable[[str], None],
 ) -> str:
-    output_fn(f"Viewer is running at {viewer_url}. Result log: {result_log_path}")
     while True:
         try:
             answer = input_fn("Viewer action? [r rerun/q quit]: ").strip().lower()

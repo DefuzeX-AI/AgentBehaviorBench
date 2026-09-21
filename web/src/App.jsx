@@ -11,6 +11,7 @@ import CaseDetailsPage from './cases/CaseDetailsPage.jsx';
 import useLiveJson from './useLiveJson.js';
 import useSuiteLive from './suite/useSuiteLive.js';
 import SuiteOverview from './suite/SuiteOverview.jsx';
+import AgentDetailsPage from './agents/AgentDetailsPage.jsx';
 import { actions } from './suite/store.js';
 import { normalizeCases } from './suite/model.js';
 
@@ -21,7 +22,7 @@ const MAX_BYTES = 20 * 1024 * 1024;
 
 function BoundSuiteApp({ endpoint }) {
   const dispatch = useDispatch();
-  const { selectedCaseKey, detailTab } = useSelector(state => state.suite);
+  const { selectedCaseKey, selectedAgentId, detailTab } = useSelector(state => state.suite);
   const [revision, setRevision] = useState(0);
   const suite = useSuiteLive(endpoint, revision);
   const cases = useMemo(() => normalizeCases(suite.data), [suite.data]);
@@ -31,11 +32,12 @@ function BoundSuiteApp({ endpoint }) {
   useEffect(() => {
     if (!suite.data) return undefined;
     function applyLocation() {
-      const route = readSuiteRoute(cases);
+      const route = readSuiteRoute(cases, window.location.hash, (suite.data.jobs || []).map(job => job.agent_id));
       if (route.item) {
         dispatch(actions.caseSelected(route.item));
         dispatch(actions.detailTabChanged(route.tab));
-      } else dispatch(actions.suiteSelected());
+      } else if (route.agent) dispatch(actions.agentSelected(route.agent));
+      else dispatch(actions.suiteSelected());
       window.scrollTo({ top: 0, behavior: 'instant' });
     }
     if (!hydrated.current) { hydrated.current = true; applyLocation(); }
@@ -48,6 +50,7 @@ function BoundSuiteApp({ endpoint }) {
   }, [selectedCase, detailTab]);
 
   const selectCase = item => { writeSuiteRoute(item, 'overview', 'push'); dispatch(actions.caseSelected(item)); window.scrollTo({ top: 0, behavior: 'instant' }); };
+  const selectAgent = id => { writeSuiteRoute({ agent_id: id }, 'overview', 'push'); dispatch(actions.agentSelected(id)); window.scrollTo({ top: 0, behavior: 'instant' }); };
   const selectSuite = () => { writeSuiteRoute(null, 'overview', 'push'); dispatch(actions.suiteSelected()); window.scrollTo({ top: 0, behavior: 'instant' }); };
   return <div className="workspace suite-workspace">
     <SuiteSidebar snapshot={suite.data} selectedCaseKey={selectedCaseKey} busy={!suite.data && !suite.error} error={suite.error}
@@ -55,7 +58,9 @@ function BoundSuiteApp({ endpoint }) {
     <main className="suite-main">
       <header className="suite-shell-header"><div><div className="brand">AGENT BEHAVIOR BENCH</div><span>{suite.data?.suite_id || 'Loading Suite'}</span></div>
         <span className="suite-live-dot"><i />Live result</span></header>
-      {selectedCase ? <CaseDetailsPage item={selectedCase} revision={revision} onBack={selectSuite} /> : <SuiteOverview onCaseSelect={selectCase} />}
+      {selectedCase ? <CaseDetailsPage item={selectedCase} revision={revision} onBack={selectSuite} onAgentSelect={selectAgent} />
+        : selectedAgentId ? <AgentDetailsPage key={selectedAgentId} agentId={selectedAgentId} endpoint={endpoint} snapshot={suite.data} cases={cases} onBack={selectSuite} onCaseSelect={selectCase} />
+          : <SuiteOverview onCaseSelect={selectCase} onAgentSelect={selectAgent} />}
       <footer>ABB / OBSERVE <span>{suite.data?.capabilities?.can_control ? 'Local Suite, execution and recovery progress sync automatically' : 'Local read-only Suite'}</span></footer>
     </main>
   </div>;

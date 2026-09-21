@@ -19,9 +19,9 @@ from agentbench.harness.result import BenchmarkSuiteResult
 
 from .terminal_ui.presentation import (
     agent_view_url,
-    format_case_event,
     print_agent_complete,
     print_agent_start,
+    print_run_queued,
     print_suite_summary,
     print_viewer_footer,
 )
@@ -107,6 +107,8 @@ def run_benchmark_once(
     result_log: ResultLogWriter | None = None
     viewer: RunningViewer | None = None
     activity = llm_activity or LLMActivity(output_fn)
+    activity.compact = True
+    activity.case_counts = {agent.agent_id: agent.case_count for agent in agents}
     progress_printer = None
     live_cases: LiveCases | None = None
     primary_error = None
@@ -153,13 +155,8 @@ def run_benchmark_once(
                         controller.close()
                         controller = None
                     output_fn(f'Live viewer unavailable: {exc}. Results will still be saved.')
-            output_fn(f"Suite ID: {suite_id}")
-            output_fn(f"Result artifact started: {result_log.path}")
-            if viewer is not None:
-                output_fn(f"View: {viewer.url}")
-
-
-        output_fn(f"Case workers: {effective_workers} (configured: {parallelism})")
+        print_run_queued(len(agents), suite_id, viewer.url if viewer else None,
+                         effective_workers, parallelism, output_fn)
         activity.set_concurrent(concurrent)
         if concurrent and output_fn is builtin_print and sys.stdout.isatty():
             live_cases = LiveCases({agent.agent_id: agent.case_count for agent in agents}, effective_workers)
@@ -186,8 +183,10 @@ def run_benchmark_once(
                 result_log.append_event(event)
             if live_cases is not None and event.get("event") in {"case_prepared", "case_started", "case_completed"}:
                 live_cases.on_event(event)
-            elif event.get("event") in {"case_started", "case_completed"}:
-                output_fn(format_case_event(event))
+            elif event.get('event') == 'case_started':
+                activity.show_case_status(event.get('agent_id'), event.get('case_index'), 'Running Agent')
+            elif event.get('event') == 'case_completed' and not concurrent:
+                activity.close()
 
         def on_tick() -> None:
             if result_log is not None:
@@ -196,6 +195,12 @@ def run_benchmark_once(
                 live_cases.flush()
 
         # step 2: run suite
+        def on_agent_complete(item):
+            if not concurrent:
+                activity.close()
+            _handle_agent_complete(item, terminal_output, None if viewer is None else viewer.url,
+                                   concurrent=concurrent)
+
         recovery_options = {}
         if result_log is not None and hasattr(result_log, 'store'):
             recovery_options['retain_case'] = result_log.store.retain_case
@@ -205,8 +210,7 @@ def run_benchmark_once(
             # Render the start of an Agent run.
             on_agent_start=lambda agent, index, total: print_agent_start(agent, index, total, terminal_output),
             # Render the completion of an Agent run.
-            on_agent_complete=lambda item: _handle_agent_complete(
-                item, terminal_output, None if viewer is None else viewer.url, concurrent=concurrent),
+            on_agent_complete=on_agent_complete,
             on_progress=progress_printer,
             on_event=on_event,
             on_tick=on_tick if result_log is not None or live_cases is not None else None,

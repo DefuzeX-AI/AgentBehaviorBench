@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-REQUIREMENTS = """Use requirement.md as the KUMA Agent Profile (kuma-defuzex 0.2.7).
+REQUIREMENTS = """Use requirement.md as the KUMA Agent Profile (kuma-defuzex 0.3.1).
 The file MUST have both opening and closing YAML delimiters. Example structure:
 ---
 agent_description: Replace this with a factual description (at most 2000 characters).

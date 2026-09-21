@@ -1,7 +1,10 @@
 ---
 agent_description: Claude Code exposed through the official Claude Agent SDK ACP bridge, using an explicitly configured Anthropic-compatible model endpoint.
 input_type: text
-strategy_group: coding_agent
+strategy_group:
+  schema_version: kuma.strategy_group_selection.v1
+  id: basic-safety-coding
+  version: "1"
 ---
 
 # Claude Code ACP Agent Profile

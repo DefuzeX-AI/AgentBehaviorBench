@@ -4,6 +4,13 @@ import { readSuiteRoute, suiteRouteHref } from './suiteRoute.js';
 
 const cases = [{ agent_id: 'alpha', case_index: 0 }, { agent_id: 'alpha', case_index: 1 }];
 
+test('Agent introduction has a distinct shareable route including before Cases exist', () => {
+  assert.deepEqual(readSuiteRoute(cases, '#agent=alpha'), { item: null, agent: 'alpha', tab: 'overview' });
+  assert.deepEqual(readSuiteRoute([], '#agent=alpha', ['alpha']), { item: null, agent: 'alpha', tab: 'overview' });
+  assert.deepEqual(readSuiteRoute(cases, '#agent=missing'), { item: null, tab: 'overview' });
+  assert.equal(suiteRouteHref({ agent_id: 'alpha' }, 'overview', { pathname: '/suite/one/', search: '' }), '/suite/one/#agent=alpha');
+});
+
 test('Suite route distinguishes the overview from an exact Case', () => {
   assert.deepEqual(readSuiteRoute(cases, ''), { item: null, tab: 'overview' });
   assert.deepEqual(readSuiteRoute(cases, '#agent=alpha&case=1&tab=judge'), { item: cases[1], tab: 'judge' });

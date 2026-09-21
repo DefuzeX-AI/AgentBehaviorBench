@@ -1,13 +1,10 @@
 # minimax-code ACP deployment
 
 Source: https://github.com/MiniMax-AI/minimax-code at `a5639bcc6146754e01f1ae18bb88545f18299fd6`.
-The imported checkout is local and ignored by the parent repository; recover it
-inside this directory with:
-
-```bash
-git clone https://github.com/MiniMax-AI/minimax-code agent
-git -C agent checkout a5639bcc6146754e01f1ae18bb88545f18299fd6
-```
+`[source] method = "git"` enables automatic source preparation before SDK startup
+for run, evaluate and certify. ABB downloads the pinned revision into the ignored
+`agent/` directory when missing and restores missing managed files on later runs.
+Existing modified files are not overwritten.
 
 `agent.toml` selects the outer bootstrap, which execs the native stdio command. The Dockerfile builds the pinned
 source with its upstream package lock. Generic BBA staging installs the ACP Python

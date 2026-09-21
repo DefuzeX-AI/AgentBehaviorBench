@@ -1,12 +1,14 @@
 import { Collapse, Empty, Tag, Typography } from 'antd';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { CheckCircleOutlined, CloseCircleOutlined, SyncOutlined } from '@ant-design/icons';
+import ReadableContent from './ReadableContent.jsx';
 
 const { Text } = Typography;
 
-function content(value) {
-  if (typeof value === 'string') return value;
-  return value == null ? '' : JSON.stringify(value, null, 2);
+function StepStatus({ status }) {
+  if (status === 'succeeded' || status === 'completed') return <Tag icon={<CheckCircleOutlined />} color="success">Succeeded</Tag>;
+  if (status === 'failed' || status === 'error') return <Tag icon={<CloseCircleOutlined />} color="error">Failed</Tag>;
+  if (status === 'running') return <Tag icon={<SyncOutlined spin />} color="processing">Running</Tag>;
+  return <Tag>{status || 'Recorded'}</Tag>;
 }
 
 export default function CaseConversation({ inputs = [] }) {
@@ -15,10 +17,10 @@ export default function CaseConversation({ inputs = [] }) {
     const input = step.input || step.request || {};
     const result = step.result || step.submission || {};
     const inputId = input.input_id || result.input_id || `step-${index + 1}`;
-    return { key: inputId, label: <span className="conversation-step-label"><strong>Step {index + 1}</strong><Text type="secondary">{inputId}</Text><Tag color={result.status === 'succeeded' || result.status === 'completed' ? 'success' : 'default'}>{result.status || 'Recorded'}</Tag></span>,
+    return { key: inputId, label: <span className="conversation-step-label"><strong>Step {index + 1}</strong><Text type="secondary">{inputId}</Text><StepStatus status={result.status} /></span>,
       children: <div className="conversation-pair">
-        <article><Text className="case-eyebrow">INPUT</Text><ReactMarkdown remarkPlugins={[remarkGfm]}>{content(input.payload ?? input.prompt ?? input)}</ReactMarkdown></article>
-        <article><Text className="case-eyebrow">AGENT OUTPUT</Text>{result.output ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{content(result.output)}</ReactMarkdown> : <Text type="secondary">No Agent output was recorded for this step.</Text>}</article>
+        <article><Text className="case-eyebrow">INPUT</Text><ReadableContent value={input.payload ?? input.prompt ?? input} /></article>
+        <article><Text className="case-eyebrow">AGENT OUTPUT</Text>{Object.hasOwn(result, 'output') ? <ReadableContent value={result.output} /> : <Text type="secondary">No Agent output was recorded for this step.</Text>}</article>
       </div> };
   });
   return <Collapse className="conversation-collapse" defaultActiveKey={[items[0].key]} items={items} />;

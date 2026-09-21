@@ -6,7 +6,7 @@ explicit /opt/agent/agent import root to the current Company Dockerfile, making
 `from backend.graph import Graph` work independently of incidental sys.path state.
 Do not run pip install ./agent just because other examples do.
 
-Reference: `resources/agents/01-company-research-agent/Dockerfile`.
+Reference: `resources/agents/02-company-research-agent/Dockerfile`.
 
 ```dockerfile
 # ABB backend image. Launch is configured separately in agent.toml.
