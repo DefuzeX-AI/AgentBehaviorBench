@@ -1,0 +1,107 @@
+import type { ContentGenerator } from '../contentGenerator.js';
+import type { Config } from '../../config/config.js';
+import { type OpenAICompatibleProvider } from './provider/index.js';
+import type {
+  EmbedContentParameters,
+  EmbedContentResponse,
+  GenerateContentParameters,
+  GenerateContentResponse,
+} from '@google/genai';
+import type { PipelineConfig } from './types.js';
+import { ContentGenerationPipeline } from './pipeline.js';
+import { EnhancedErrorHandler } from './errorHandler.js';
+import type { ContentGeneratorConfig } from '../contentGenerator.js';
+import { isAbortError } from '../../utils/errors.js';
+import { createDebugLogger } from '../../utils/debugLogger.js';
+import { redactProxyError } from '../../utils/runtimeFetchOptions.js';
+import { extractTextFromContents } from '../../utils/extract-text-from-contents.js';
+
+const debugLogger = createDebugLogger('OPENAI');
+
+export class OpenAIContentGenerator implements ContentGenerator {
+  protected pipeline: ContentGenerationPipeline;
+
+  constructor(
+    contentGeneratorConfig: ContentGeneratorConfig,
+    cliConfig: Config,
+    provider: OpenAICompatibleProvider,
+  ) {
+    // Create pipeline configuration
+    const pipelineConfig: PipelineConfig = {
+      cliConfig,
+      provider,
+      contentGeneratorConfig,
+      errorHandler: new EnhancedErrorHandler(
+        (error: unknown, request: GenerateContentParameters) =>
+          this.shouldSuppressErrorLogging(error, request),
+      ),
+    };
+
+    this.pipeline = new ContentGenerationPipeline(pipelineConfig);
+  }
+
+  /**
+   * Hook for subclasses to customize error handling behavior
+   * @param error The error that occurred
+   * @param request The original request
+   * @returns true if error logging should be suppressed, false otherwise
+   */
+  protected shouldSuppressErrorLogging(
+    error: unknown,
+    request: GenerateContentParameters,
+  ): boolean {
+    // Only suppress error logging for user-initiated cancellations.
+    // We check that BOTH:
+    // 1. The error is an AbortError
+    // 2. AND our abort signal was explicitly aborted (user-initiated)
+    //
+    // This ensures we don't suppress network-related abort errors that
+    // the user should be aware of.
+    if (isAbortError(error) && request.config?.abortSignal?.aborted) {
+      return true;
+    }
+
+    return false;
+  }
+
+  async generateContent(
+    request: GenerateContentParameters,
+    userPromptId: string,
+  ): Promise<GenerateContentResponse> {
+    return this.pipeline.execute(request, userPromptId);
+  }
+
+  async generateContentStream(
+    request: GenerateContentParameters,
+    userPromptId: string,
+  ): Promise<AsyncGenerator<GenerateContentResponse>> {
+    return this.pipeline.executeStream(request, userPromptId);
+  }
+
+  async embedContent(
+    request: EmbedContentParameters,
+  ): Promise<EmbedContentResponse> {
+    const text = extractTextFromContents(request.contents);
+
+    try {
+      const embedding = await this.pipeline.client.embeddings.create({
+        model: 'text-embedding-ada-002', // Default embedding model
+        input: text,
+      });
+
+      return {
+        embeddings: [
+          {
+            values: embedding.data[0].embedding,
+          },
+        ],
+      };
+    } catch (error) {
+      const redactedError = redactProxyError(error);
+      debugLogger.error('OpenAI API Embedding Error:', redactedError);
+      throw new Error(
+        `OpenAI API error: ${redactedError instanceof Error ? redactedError.message : String(redactedError)}`,
+      );
+    }
+  }
+}

@@ -1,0 +1,616 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import {
+  IdeDiffAcceptedNotificationSchema,
+  IdeDiffClosedNotificationSchema,
+} from '@qwen-code/qwen-code-core';
+import { type JSONRPCNotification } from '@modelcontextprotocol/sdk/types.js';
+import * as path from 'node:path';
+import * as vscode from 'vscode';
+import { DIFF_SCHEME } from './extension.js';
+import {
+  findLeftGroupOfChatWebview,
+  findRightGroupOfChatWebview,
+} from './utils/editorGroupUtils.js';
+import { resolveWorkspacePath } from './utils/file-path.js';
+
+export class DiffContentProvider implements vscode.TextDocumentContentProvider {
+  private content = new Map<string, string>();
+  private onDidChangeEmitter = new vscode.EventEmitter<vscode.Uri>();
+
+  get onDidChange(): vscode.Event<vscode.Uri> {
+    return this.onDidChangeEmitter.event;
+  }
+
+  provideTextDocumentContent(uri: vscode.Uri): string {
+    return this.content.get(uri.toString()) ?? '';
+  }
+
+  setContent(uri: vscode.Uri, content: string): void {
+    this.content.set(uri.toString(), content);
+    this.onDidChangeEmitter.fire(uri);
+  }
+
+  deleteContent(uri: vscode.Uri): void {
+    this.content.delete(uri.toString());
+  }
+
+  getContent(uri: vscode.Uri): string | undefined {
+    return this.content.get(uri.toString());
+  }
+}
+
+/** Options controlling how a diff editor is opened. */
+export interface ShowDiffOptions {
+  /**
+   * Open the right-hand (proposed) side as read-only. Use this when the
+   * approval flow cannot round-trip user edits: the approving daemon tool
+   * applies its own proposed content, so an editable right side would
+   * silently discard anything the user typed (e.g. web-shell permission
+   * diffs opened while IDE mode is off).
+   */
+  readOnly?: boolean;
+  /** WebShell permission request represented by this native diff. */
+  permissionRequestId?: string;
+}
+
+// Information about a diff view that is currently open.
+interface DiffInfo {
+  // The path exactly as the caller supplied it, byte for byte. The CLI keys
+  // its pending openDiff promises by the string it sent, so this is what has to
+  // go back out in the accepted/closed notifications. Must never be normalized
+  // or resolved, or the echo stops matching the CLI's key for any path that
+  // wasn't already in normalized form.
+  originalFilePath: string;
+  // The same file resolved against the workspace. Everything that has to match
+  // a path — closing, deduping, focusing, active-editor tracking — compares
+  // this, so a caller may open with one form and close with the other.
+  resolvedFilePath: string;
+  oldContent: string;
+  newContent: string;
+  leftDocUri: vscode.Uri;
+  rightDocUri: vscode.Uri;
+  permissionRequestId?: string;
+  /**
+   * Whether the right-hand side was opened read-only. Reuse must match on
+   * this too: refocusing a writable twin for a read-only approval (or vice
+   * versa) would hand one flow the other flow's edit semantics.
+   */
+  readOnly: boolean;
+}
+
+/**
+ * Manages the state and lifecycle of diff views within the IDE.
+ */
+export class DiffManager {
+  private readonly onDidChangeEmitter =
+    new vscode.EventEmitter<JSONRPCNotification>();
+  readonly onDidChange = this.onDidChangeEmitter.event;
+
+  private readonly onDidClosePermissionDiffEmitter = new vscode.EventEmitter<{
+    permissionRequestId: string;
+  }>();
+  /**
+   * Fires when a diff opened for a pending permission is closed without a vote.
+   *
+   * `onDidChange` carries `ide/diffClosed` to IDE-mode MCP transports, which no
+   * web-shell host is; a chat surface that opened the diff itself would
+   * otherwise never learn the user closed it, and would keep waiting for a
+   * decision on an edit the user can no longer see (#10557). `qwen.diff.accept`
+   * and `qwen.diff.cancel` do not reach here for a request-bound diff — they
+   * route the vote through `respondToPendingPermission` instead — and
+   * `closeDiffEditor` drops the entry before the tab closes, so a close the
+   * chat surface asked for does not echo back as a dismissal.
+   */
+  readonly onDidClosePermissionDiff =
+    this.onDidClosePermissionDiffEmitter.event;
+  private diffDocuments = new Map<string, DiffInfo>();
+  private readonly subscriptions: vscode.Disposable[] = [];
+  // Dedupe: remember recent showDiff calls keyed by (file+content)
+  private recentlyShown = new Map<string, number>();
+  private pendingDelayTimers = new Map<string, NodeJS.Timeout>();
+  private static readonly DEDUPE_WINDOW_MS = 1500;
+  // Optional hooks from extension to influence diff behavior
+  // - shouldDelay: when true, we defer opening diffs briefly (e.g., while a permission drawer is open)
+  // - shouldSuppress: when true, we skip opening diffs entirely (e.g., in auto/yolo mode)
+  private shouldDelay?: () => boolean;
+  private shouldSuppress?: () => boolean;
+  // Timed suppression window (e.g. immediately after permission allow)
+  private suppressUntil: number | null = null;
+
+  private getTargetViewColumn(
+    leftDocUri?: vscode.Uri,
+    rightDocUri?: vscode.Uri,
+  ): vscode.ViewColumn {
+    if (leftDocUri && rightDocUri) {
+      const leftUri = leftDocUri.toString();
+      const rightUri = rightDocUri.toString();
+      for (const group of vscode.window.tabGroups.all) {
+        const containsDiff = group.tabs.some((tab) => {
+          const input = tab.input as
+            | {
+                original?: vscode.Uri;
+                modified?: vscode.Uri;
+              }
+            | undefined;
+          return (
+            input?.original?.toString() === leftUri &&
+            input?.modified?.toString() === rightUri
+          );
+        });
+        if (containsDiff) {
+          return group.viewColumn;
+        }
+      }
+    }
+
+    return (
+      findLeftGroupOfChatWebview() ??
+      findRightGroupOfChatWebview() ??
+      vscode.window.activeTextEditor?.viewColumn ??
+      vscode.ViewColumn.Active
+    );
+  }
+
+  constructor(
+    private readonly log: (message: string) => void,
+    private readonly diffContentProvider: DiffContentProvider,
+    shouldDelay?: () => boolean,
+    shouldSuppress?: () => boolean,
+  ) {
+    this.shouldDelay = shouldDelay;
+    this.shouldSuppress = shouldSuppress;
+    this.subscriptions.push(
+      vscode.window.onDidChangeActiveTextEditor((editor) => {
+        this.onActiveEditorChange(editor);
+      }),
+    );
+    this.onActiveEditorChange(vscode.window.activeTextEditor);
+  }
+
+  dispose() {
+    for (const subscription of this.subscriptions) {
+      subscription.dispose();
+    }
+    this.onDidClosePermissionDiffEmitter.dispose();
+  }
+
+  /**
+   * Checks if a diff view already exists for the given file path and content
+   * @param filePath Path to the file being diffed
+   * @param oldContent The original content (left side)
+   * @param newContent The modified content (right side)
+   * @param readOnly Writability the requester needs; only diffs with the
+   * same writability are reusable
+   * @returns True if a diff view with the same content already exists, false otherwise
+   */
+  private hasExistingDiff(
+    filePath: string,
+    oldContent: string,
+    newContent: string,
+    readOnly: boolean,
+    permissionRequestId?: string,
+  ): boolean {
+    for (const diffInfo of this.diffDocuments.values()) {
+      if (
+        diffInfo.resolvedFilePath === filePath &&
+        diffInfo.oldContent === oldContent &&
+        diffInfo.newContent === newContent &&
+        diffInfo.readOnly === readOnly &&
+        diffInfo.permissionRequestId === permissionRequestId
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Finds an existing diff view for the given file path and focuses it
+   * @param filePath Path to the file being diffed
+   * @param readOnly Only diffs opened with the same writability are eligible
+   * @returns True if an existing diff view was found and focused, false otherwise
+   */
+  private async focusExistingDiff(
+    filePath: string,
+    readOnly: boolean,
+    permissionRequestId?: string,
+  ): Promise<boolean> {
+    const resolvedPath = resolveWorkspacePath(path.normalize(filePath));
+    for (const [, diffInfo] of this.diffDocuments.entries()) {
+      if (
+        diffInfo.resolvedFilePath === resolvedPath &&
+        diffInfo.readOnly === readOnly &&
+        diffInfo.permissionRequestId === permissionRequestId
+      ) {
+        const rightDocUri = diffInfo.rightDocUri;
+        const leftDocUri = diffInfo.leftDocUri;
+
+        const diffTitle = `${path.basename(filePath)} (Before ↔ After)`;
+
+        try {
+          await vscode.commands.executeCommand(
+            'vscode.diff',
+            leftDocUri,
+            rightDocUri,
+            diffTitle,
+            {
+              viewColumn: this.getTargetViewColumn(leftDocUri, rightDocUri),
+              preview: false,
+              preserveFocus: true,
+            },
+          );
+          return true;
+        } catch (error) {
+          this.log(`Failed to focus existing diff: ${error}`);
+          return false;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Creates and shows a new diff view.
+   * - Overload 1: showDiff(filePath, newContent)
+   * - Overload 2: showDiff(filePath, oldContent, newContent)
+   * If only newContent is provided, the old content will be read from the
+   * filesystem (empty string when file does not exist).
+   */
+  async showDiff(
+    filePath: string,
+    newContent: string,
+    options?: ShowDiffOptions,
+  ): Promise<void>;
+  async showDiff(
+    filePath: string,
+    oldContent: string,
+    newContent: string,
+    options?: ShowDiffOptions,
+  ): Promise<void>;
+  async showDiff(
+    filePath: string,
+    a: string,
+    b?: string | ShowDiffOptions,
+    options?: ShowDiffOptions,
+  ): Promise<void> {
+    const normalizedPath = path.normalize(filePath);
+    const resolvedPath = resolveWorkspacePath(normalizedPath);
+    const haveOld = typeof b === 'string';
+    const resolvedOptions = haveOld ? options : b;
+    const readOnly = resolvedOptions?.readOnly === true;
+    const oldContent = haveOld
+      ? a
+      : await this.readOldContentFromFs(resolvedPath);
+    const newContent = haveOld ? (b as string) : a;
+    const key = this.makeKey(resolvedPath, oldContent, newContent);
+
+    // Check if a diff view with the same content, writability, and permission
+    // owner already exists. A read-only approval must never be deduped onto a
+    // writable diff, and two permission requests must not share a diff.
+    if (
+      this.hasExistingDiff(
+        resolvedPath,
+        oldContent,
+        newContent,
+        readOnly,
+        resolvedOptions?.permissionRequestId,
+      )
+    ) {
+      const last = this.recentlyShown.get(key) || 0;
+      const now = Date.now();
+      if (now - last < DiffManager.DEDUPE_WINDOW_MS) {
+        // Within dedupe window: ignore the duplicate request entirely
+        this.log(
+          `Duplicate showDiff suppressed for ${filePath} (within ${DiffManager.DEDUPE_WINDOW_MS}ms)`,
+        );
+        return;
+      }
+      // Outside the dedupe window: softly focus the existing diff
+      await this.focusExistingDiff(
+        resolvedPath,
+        readOnly,
+        resolvedOptions?.permissionRequestId,
+      );
+      this.recentlyShown.set(key, now);
+      return;
+    }
+    // Left side: old content using qwen-diff scheme
+    // Use Uri.file() to properly handle Windows paths (e.g., C:\Users\...)
+    // then change the scheme to our custom diff scheme
+    const leftDocUri = vscode.Uri.file(resolvedPath).with({
+      scheme: DIFF_SCHEME,
+      query: `old&rand=${Math.random()}`,
+    });
+    this.diffContentProvider.setContent(leftDocUri, oldContent);
+
+    // Right side: new content using qwen-diff scheme
+    const rightDocUri = vscode.Uri.file(resolvedPath).with({
+      scheme: DIFF_SCHEME,
+      query: `new&rand=${Math.random()}`,
+    });
+    this.diffContentProvider.setContent(rightDocUri, newContent);
+
+    this.addDiffDocument(rightDocUri, {
+      originalFilePath: filePath,
+      resolvedFilePath: resolvedPath,
+      oldContent,
+      newContent,
+      leftDocUri,
+      rightDocUri,
+      readOnly,
+      permissionRequestId: resolvedOptions?.permissionRequestId,
+    });
+
+    const diffTitle = `${path.basename(resolvedPath)} (Before ↔ After)`;
+    await vscode.commands.executeCommand(
+      'setContext',
+      'qwen.diff.isVisible',
+      true,
+    );
+
+    // Prefer opening the diff in the group to the left of the chat webview.
+    // When that isn't available (e.g. chat is in the leftmost group), try the
+    // group to the right so we reuse existing layout. Sidebar chat has no
+    // editor group, so fall back to the active group rather than creating one.
+    const targetViewColumn = this.getTargetViewColumn();
+
+    await vscode.commands.executeCommand(
+      'vscode.diff',
+      leftDocUri,
+      rightDocUri,
+      diffTitle,
+      {
+        viewColumn: targetViewColumn,
+        preview: false,
+        preserveFocus: true,
+      },
+    );
+    // The writeable-in-session flag exists so users can adjust the proposed
+    // content before accepting; that only round-trips when an IDE-mode
+    // resolver consumes the edited text. Read-only callers (web-shell
+    // permission approvals) would silently lose edits, so keep them locked.
+    if (!readOnly) {
+      await vscode.commands.executeCommand(
+        'workbench.action.files.setActiveEditorWriteableInSession',
+      );
+    }
+
+    this.recentlyShown.set(key, Date.now());
+  }
+
+  /**
+   * Closes an open diff view for a specific file.
+   */
+  async closeDiff(
+    filePath: string,
+    suppressNotification = false,
+    permissionRequestId?: string,
+  ) {
+    const normalizedPath = path.normalize(filePath);
+    const resolvedPath = resolveWorkspacePath(normalizedPath);
+    // DiffManager is a per-window singleton shared by every surface and
+    // session, so two entries can legitimately share a resolvedFilePath: a
+    // webview permission-preview diff and a CLI session's proposed edit on
+    // the same file, with different content. Matching on resolvedFilePath
+    // alone and taking the first insertion-order hit can close the wrong
+    // caller's diff and hand its content back to a different session, which
+    // the tool scheduler then writes out as that session's "user edit". Prefer
+    // the entry whose originalFilePath is the same form the caller used; only
+    // fall back to the first resolvedFilePath match (preserving the existing
+    // cross-form close guarantee) when nothing matches the exact form.
+    let openDiff: DiffInfo | undefined;
+    let fallbackDiff: DiffInfo | undefined;
+    for (const [, diffInfo] of this.diffDocuments.entries()) {
+      if (
+        diffInfo.resolvedFilePath === resolvedPath &&
+        (permissionRequestId === undefined ||
+          diffInfo.permissionRequestId === permissionRequestId)
+      ) {
+        if (path.normalize(diffInfo.originalFilePath) === normalizedPath) {
+          openDiff = diffInfo;
+          break;
+        }
+        fallbackDiff ??= diffInfo;
+      }
+    }
+    openDiff ??= fallbackDiff;
+
+    if (openDiff) {
+      const uriToClose = openDiff.rightDocUri;
+      const rightDoc = await vscode.workspace.openTextDocument(uriToClose);
+      const modifiedContent = rightDoc.getText();
+      await this.closeDiffEditor(uriToClose);
+      // An id-less close matches by path alone: that caller does not know an
+      // approval owns this diff, so it cannot tell the surface holding the
+      // request. Fire the dismissal here, because closeDiffEditor already
+      // dropped the entry and the onDidCloseTextDocument -> cancelDiff hop that
+      // follows finds nothing (#10557 through a second door: an IDE-mode CLI
+      // closing the tab leaves the shell locked on a diff that is gone). A
+      // caller that passed the id *is* that surface and has cleared its own
+      // state, so its close must not echo back.
+      if (permissionRequestId === undefined && openDiff.permissionRequestId) {
+        this.onDidClosePermissionDiffEmitter.fire({
+          permissionRequestId: openDiff.permissionRequestId,
+        });
+      }
+      if (!suppressNotification) {
+        this.onDidChangeEmitter.fire(
+          IdeDiffClosedNotificationSchema.parse({
+            jsonrpc: '2.0',
+            method: 'ide/diffClosed',
+            params: {
+              // Echo the path the diff was opened with, not the one we were
+              // asked to close: the CLI keys its pending promise by the former
+              // and the two can now legitimately differ in form.
+              filePath: openDiff.originalFilePath,
+              content: modifiedContent,
+            },
+          }),
+        );
+      }
+      return modifiedContent;
+    }
+    return;
+  }
+
+  /**
+   * User accepts the changes in a diff view. Does not apply changes.
+   */
+  async acceptDiff(rightDocUri: vscode.Uri) {
+    const diffInfo = this.diffDocuments.get(rightDocUri.toString());
+    if (!diffInfo) {
+      this.log(`No diff info found for ${rightDocUri.toString()}`);
+      return;
+    }
+
+    const rightDoc = await vscode.workspace.openTextDocument(rightDocUri);
+    const modifiedContent = rightDoc.getText();
+    await this.closeDiffEditor(rightDocUri);
+
+    this.onDidChangeEmitter.fire(
+      IdeDiffAcceptedNotificationSchema.parse({
+        jsonrpc: '2.0',
+        method: 'ide/diffAccepted',
+        params: {
+          filePath: diffInfo.originalFilePath,
+          content: modifiedContent,
+        },
+      }),
+    );
+  }
+
+  getPermissionRequestId(rightDocUri: vscode.Uri): string | undefined {
+    return this.diffDocuments.get(rightDocUri.toString())?.permissionRequestId;
+  }
+
+  hasDiff(rightDocUri: vscode.Uri): boolean {
+    return this.diffDocuments.has(rightDocUri.toString());
+  }
+
+  /**
+   * Called when a user cancels a diff view.
+   */
+  async cancelDiff(rightDocUri: vscode.Uri) {
+    const diffInfo = this.diffDocuments.get(rightDocUri.toString());
+    if (!diffInfo) {
+      this.log(`No diff info found for ${rightDocUri.toString()}`);
+      // Even if we don't have diff info, we should still close the editor.
+      await this.closeDiffEditor(rightDocUri);
+      return;
+    }
+
+    const rightDoc = await vscode.workspace.openTextDocument(rightDocUri);
+    const modifiedContent = rightDoc.getText();
+    await this.closeDiffEditor(rightDocUri);
+
+    this.onDidChangeEmitter.fire(
+      IdeDiffClosedNotificationSchema.parse({
+        jsonrpc: '2.0',
+        method: 'ide/diffClosed',
+        params: {
+          filePath: diffInfo.originalFilePath,
+          content: modifiedContent,
+        },
+      }),
+    );
+
+    if (diffInfo.permissionRequestId) {
+      this.onDidClosePermissionDiffEmitter.fire({
+        permissionRequestId: diffInfo.permissionRequestId,
+      });
+    }
+  }
+
+  private async onActiveEditorChange(editor: vscode.TextEditor | undefined) {
+    let isVisible = false;
+    if (editor) {
+      isVisible = this.diffDocuments.has(editor.document.uri.toString());
+      if (!isVisible) {
+        for (const document of this.diffDocuments.values()) {
+          if (document.resolvedFilePath === editor.document.uri.fsPath) {
+            isVisible = true;
+            break;
+          }
+        }
+      }
+    }
+    await vscode.commands.executeCommand(
+      'setContext',
+      'qwen.diff.isVisible',
+      isVisible,
+    );
+  }
+
+  private addDiffDocument(uri: vscode.Uri, diffInfo: DiffInfo) {
+    this.diffDocuments.set(uri.toString(), diffInfo);
+  }
+
+  private async closeDiffEditor(rightDocUri: vscode.Uri) {
+    const diffInfo = this.diffDocuments.get(rightDocUri.toString());
+    await vscode.commands.executeCommand(
+      'setContext',
+      'qwen.diff.isVisible',
+      false,
+    );
+
+    if (diffInfo) {
+      this.diffDocuments.delete(rightDocUri.toString());
+      this.diffContentProvider.deleteContent(rightDocUri);
+    }
+
+    // Find and close the tab corresponding to the diff view
+    for (const tabGroup of vscode.window.tabGroups.all) {
+      for (const tab of tabGroup.tabs) {
+        const input = tab.input as {
+          modified?: vscode.Uri;
+          original?: vscode.Uri;
+        };
+        if (input && input.modified?.toString() === rightDocUri.toString()) {
+          await vscode.window.tabGroups.close(tab);
+          return;
+        }
+      }
+    }
+  }
+
+  /** Close all open qwen-diff editors */
+  async closeAll(): Promise<void> {
+    // Collect keys first to avoid iterator invalidation while closing
+    const uris = Array.from(this.diffDocuments.keys()).map((k) =>
+      vscode.Uri.parse(k),
+    );
+    for (const uri of uris) {
+      try {
+        await this.closeDiffEditor(uri);
+      } catch (err) {
+        this.log(`Failed to close diff editor: ${err}`);
+      }
+    }
+  }
+
+  // Read the current content of file from the workspace; return empty string if not found
+  private async readOldContentFromFs(filePath: string): Promise<string> {
+    try {
+      const fileUri = vscode.Uri.file(filePath);
+      const document = await vscode.workspace.openTextDocument(fileUri);
+      return document.getText();
+    } catch {
+      return '';
+    }
+  }
+
+  private makeKey(filePath: string, oldContent: string, newContent: string) {
+    // Simple stable key; content could be large but kept transiently
+    return `${filePath}\u241F${oldContent}\u241F${newContent}`;
+  }
+
+  /** Temporarily suppress opening diffs for a short duration. */
+  suppressFor(durationMs: number): void {
+    this.suppressUntil = Date.now() + Math.max(0, durationMs);
+  }
+}

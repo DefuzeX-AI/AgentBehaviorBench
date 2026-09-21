@@ -1,0 +1,953 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+// ============================================================================
+// Configuration & Models
+// ============================================================================
+
+// Core configuration
+export * from './config/config.js';
+export { Storage } from './config/storage.js';
+
+// Permission system
+export * from './permissions/index.js';
+
+// Model configuration
+export {
+  DEFAULT_QWEN_MODEL,
+  DEFAULT_QWEN_FLASH_MODEL,
+  DEFAULT_QWEN_EMBEDDING_MODEL,
+  MAINLINE_CODER_MODEL,
+} from './config/models.js';
+export {
+  type AvailableModel,
+  type ModelWireApi,
+  type ModelCapabilities,
+  type ModelConfig as ProviderModelConfig,
+  type ModelConfigCliInput,
+  type ModelConfigResolutionResult,
+  type ModelConfigSettingsInput,
+  type ModelConfigSourcesInput,
+  type ModelConfigValidationResult,
+  ModelRegistry,
+  isImageGenerationCapable,
+  modelRegistryKey,
+  resolveProviderProtocol,
+  resolveModelProtocol,
+  tryResolveModelProtocol,
+  validateModelProvidersConfig,
+  resolveModelSelectionAuthType,
+  type ModelGenerationConfig,
+  ModelsConfig,
+  type ModelsConfigOptions,
+  type ModelProvidersConfig,
+  type ProviderProtocolConfig,
+  type ModelSwitchMetadata,
+  MODEL_GENERATION_CONFIG_FIELDS,
+  type OnModelChangeCallback,
+  QWEN_OAUTH_MODELS,
+  resolveModelConfig,
+  type ResolvedModelConfig,
+  validateModelConfig,
+  VERTEX_ADC_HINT,
+} from './models/index.js';
+
+// Output formatting
+export * from './output/json-formatter.js';
+export * from './output/types.js';
+
+// ============================================================================
+// Core Engine
+// ============================================================================
+
+export * from './core/client.js';
+export * from './core/contentGenerator.js';
+export {
+  getRuntimeContentGenerator,
+  runWithRuntimeContentGenerator,
+  type RuntimeContentGeneratorView,
+  runOutsideAgentContext,
+} from './agents/runtime/agent-context.js';
+export * from './core/reasoning-effort.js';
+export { isOpenRouterHostname } from './core/openaiContentGenerator/provider/openrouter.js';
+export * from './core/coreToolScheduler.js';
+export * from './core/permissionFlow.js';
+export * from './core/permission-helpers.js';
+/** @internal */
+export {
+  type PlanModeShellDecision,
+  evaluatePlanModeShellPolicy,
+  validatePlanModeShellContext,
+  decoratePlanModeShellConfirmation,
+  validatePlanModeShellApproval,
+} from './core/plan-mode-shell-policy.js';
+/** @internal */
+export {
+  PLAN_MODE_ENTRY_SIBLING_SKIP_MESSAGE,
+  findPlanModeEntryBatchBoundaryIndex,
+} from './core/plan-mode-entry-policy.js';
+export * from './core/llm-chat.js';
+export * from './core/llm-request.js';
+export * from './core/inlineMediaLimit.js';
+export * from './core/insightProtocol.js';
+export * from './core/logger.js';
+export * from './core/message-display-dispatcher.js';
+export * from './core/nonInteractiveToolExecutor.js';
+export * from './core/prompts.js';
+export * from './core/output-styles.js';
+export * from './core/output-style-files.js';
+export * from './core/session-recovery.js';
+export { buildSessionHistoryFromConversation } from './services/session-api-history.js';
+export * from './core/ask-user-question-restore.js';
+export * from './core/tokenLimits.js';
+export * from './core/tool-call-preparation.js';
+export * from './core/toolCallIdUtils.js';
+export * from './core/tool-invocation-guard.js';
+export * from './core/turn.js';
+export * from './core/turn-interruption.js';
+
+// ============================================================================
+// Tools
+// ============================================================================
+
+// Tool names and registry
+export * from './tools/tool-names.js';
+export * from './tools/tool-error.js';
+export * from './tools/tool-registry.js';
+export * from './tools/tools.js';
+
+// Individual tools — MCP/SDK infrastructure only (tool classes are lazy-loaded)
+export * from './tools/mcp-client.js';
+export * from './tools/mcp-client-manager.js';
+// Shared MCP resource content formatter (used by the `@` injection path and
+// the read_mcp_resource tool).
+export * from './tools/mcp-resource-content.js';
+export { runWithTimeout } from './tools/mcp-discovery-timeout.js';
+// pool primitives consumed by acpAgent (daemon
+// pool construction) and downstream daemon status routes.
+export {
+  McpTransportPool,
+  type DrainResult,
+  type McpPoolSnapshot,
+  type McpTransportPoolOptions,
+} from './tools/mcp-transport-pool.js';
+export {
+  POOLED_TRANSPORTS_DEFAULT,
+  connectionIdOf,
+  mcpTransportOf,
+  parseConnectionId,
+  type McpTransportKind,
+  type PoolKey,
+} from './tools/mcp-pool-key.js';
+export type { ConnectionId, PoolEvent } from './tools/mcp-pool-events.js';
+export { WorkspaceMcpBudget } from './tools/mcp-workspace-budget.js';
+export * from './tools/mcp-tool.js';
+export * from './tools/read-file.js';
+export * from './tools/ripGrep.js';
+export * from './tools/sdk-control-client-transport.js';
+export * from './tools/client-mcp-registrar.js';
+export * from './tools/modifiable-tool.js';
+
+// Selective re-exports of types/utilities from tool files (avoids loading full tool modules)
+export {
+  buildSkillLlmContent,
+  applySkillAllowedTools,
+  // `applySkillHooks` is deliberately not exported: it is the one entry point
+  // whose caller must apply the folder-trust gate itself, and skipping that
+  // gate is how #11067 happened. Callers outside this module use
+  // `applySkillSideEffects`, which applies the gate for them.
+  applySkillSideEffects,
+  canApplySkillSideEffects,
+} from './tools/skill-utils.js';
+export { atomicWriteFile } from './utils/atomicFileWrite.js';
+export { nextFireTime, parseCron } from './utils/cronParser.js';
+export { isWsl } from './utils/terminal-env.js';
+export {
+  isUnverifiableIdentityError,
+  openNoFollow,
+  openSyncNoFollow,
+  UNVERIFIABLE_IDENTITY_CODE,
+} from './utils/no-follow-open.js';
+export * from './services/session-organization-service.js';
+
+// Backward-compatible type re-exports for tool classes removed from eager loading.
+// These preserve TypeScript type compatibility for downstream consumers.
+// Note: runtime value imports (e.g. `new EditTool(...)`) must use the direct
+// module path (e.g. `@qwen-code/qwen-code-core/dist/tools/edit.js`) as these
+// classes are now lazy-loaded and are not exported as values from the package root.
+export type { EditTool, EditToolParams } from './tools/edit.js';
+export type {
+  ExitPlanModeTool,
+  ExitPlanModeParams,
+} from './tools/exitPlanMode.js';
+export type {
+  EnterPlanModeTool,
+  EnterPlanModeParams,
+} from './tools/enterPlanMode.js';
+export type {
+  SyntheticOutputTool,
+  StructuredOutputParams,
+} from './tools/syntheticOutput.js';
+export type { GlobTool, GlobToolParams, GlobPath } from './tools/glob.js';
+export type { GrepTool, GrepToolParams } from './tools/grep.js';
+export type { LSTool, LSToolParams, FileEntry } from './tools/ls.js';
+export type { LspTool, LspToolParams, LspOperation } from './tools/lsp.js';
+export type {
+  ReadMcpResourceTool,
+  ReadMcpResourceToolParams,
+} from './tools/read-mcp-resource.js';
+export type {
+  ShellTool,
+  ShellToolParams,
+  ShellToolInvocation,
+} from './tools/shell.js';
+export type { SkillTool, SkillParams } from './tools/skill.js';
+export type { AgentTool, AgentParams } from './tools/agent/agent.js';
+export { FORK_SUBAGENT_TYPE } from './tools/agent/fork-subagent.js';
+export type {
+  WorkflowTool,
+  WorkflowParams,
+  WorkflowToolResult,
+} from './tools/workflow/workflow.js';
+export type {
+  TodoWriteTool,
+  TodoItem,
+  TodoWriteParams,
+} from './tools/todoWrite.js';
+export type { WebFetchTool, WebFetchToolParams } from './tools/web-fetch.js';
+export type {
+  WebSearchTool,
+  WebSearchToolParams,
+  WebSearchSettings,
+} from './tools/web-search.js';
+export {
+  DEFAULT_WEB_SEARCH_MAX_PER_SESSION,
+  DEFAULT_WEB_SEARCH_TIMEOUT_MS,
+  MAX_WEB_SEARCH_MAX_PER_SESSION,
+  MAX_WEB_SEARCH_TIMEOUT_MS,
+} from './tools/web-search.js';
+export type { WriteFileTool, WriteFileToolParams } from './tools/write-file.js';
+// Exported for the cross-package contract test in packages/cli (see the
+// function's own doc comment) — the daemon's file-read route must resolve the
+// workspacePath this produces.
+export {
+  buildRecordArtifactReminder,
+  buildWorkspaceArtifactMetadata,
+} from './tools/write-file.js';
+export {
+  resolveBoundWorkspaceRoot,
+  toCanonicalWorkspaceArtifactPath,
+} from './utils/workspace-artifact-path.js';
+export {
+  MAX_DIRECTORY_ARTIFACT_DEPTH,
+  MAX_DIRECTORY_ARTIFACT_FILES,
+  OFFICE_DOCUMENT_EXTENSIONS,
+  collectRecordableWorkspaceFiles,
+  isOfficeDocumentExtension,
+  pathHasSkippedDirectoryComponent,
+  shouldSkipDirectoryArtifactName,
+  stripWorktreeArtifactPrefix,
+} from './utils/workspace-artifact-directory.js';
+export type {
+  ArtifactTool,
+  ArtifactToolParams,
+} from './tools/artifact/artifact-tool.js';
+export {
+  deleteArtifactSnapshot,
+  readArtifactSnapshot,
+  retainArtifactSnapshot,
+} from './tools/artifact/artifact-snapshots.js';
+export {
+  RecordArtifactTool,
+  isRecordableDerivedChild,
+} from './tools/record-artifact.js';
+export type { RecordArtifactParams } from './tools/record-artifact.js';
+export {
+  ReportFindingsTool,
+  FINDING_SEVERITIES,
+  FINDING_CONFIDENCES,
+  FINDING_OUTCOMES,
+  FINDING_SOURCES,
+  FINDING_DIRECTIONS,
+  FINDING_BASELINES,
+  REPORT_FINDINGS_LEVELS,
+  compressFindingSummary,
+} from './tools/report-findings.js';
+export type {
+  ReportFindingsParams,
+  ReportFindingsFindingParams,
+  FindingSeverity,
+  FindingConfidence,
+  FindingOutcome,
+  FindingSource,
+  FindingDirection,
+  FindingBaseline,
+  ReportFindingsLevel,
+} from './tools/report-findings.js';
+export { CreateSubSessionTool } from './tools/create-sub-session.js';
+export type {
+  ArtifactPublisher,
+  PublishArtifactInput,
+  PublishedArtifact,
+} from './tools/artifact/publisher.js';
+export type { CronCreateTool, CronCreateParams } from './tools/cron-create.js';
+export type {
+  CurrentSessionScheduledTaskCreateRequest,
+  CurrentSessionScheduledTaskCreateResult,
+  CurrentSessionScheduledTaskCreator,
+} from './config/config.js';
+export type { CronListTool, CronListParams } from './tools/cron-list.js';
+export type { CronDeleteTool, CronDeleteParams } from './tools/cron-delete.js';
+export {
+  DEFERRED_TOOL_CALL_CANCELLATION_PREFIX,
+  DEFERRED_TOOL_CALL_REFUSAL_PREFIX,
+  resolveDeferredToolCall,
+} from './tools/tool-call.js';
+export type {
+  DeferredToolCallResolution,
+  ToolCallTool,
+  ToolCallParams,
+} from './tools/tool-call.js';
+export type { ToolSearchTool, ToolSearchParams } from './tools/tool-search.js';
+export type {
+  TeamPlanApprovalTool,
+  TeamPlanApprovalParams,
+} from './tools/team-plan-approval.js';
+
+// ============================================================================
+// Providers
+// ============================================================================
+
+export * from './providers/index.js';
+
+// ============================================================================
+// Services
+// ============================================================================
+
+export {
+  computeThresholds,
+  type CompactionThresholds,
+} from './services/chatCompressionService.js';
+export { estimateContextTextTokens } from './services/tokenEstimation.js';
+export {
+  resolveSlimmingConfig,
+  type ResolvedSlimmingConfig,
+} from './services/compactionInputSlimming.js';
+export { isClearedMediaPlaceholder } from './services/microcompaction/microcompact.js';
+export {
+  isApiUserPrompt,
+  findApiRewindCutPoint,
+  countApiUserPrompts,
+  type ApiUserPromptOptions,
+} from './services/api-user-prompt.js';
+export * from './services/chatRecordingService.js';
+export * from './services/branch-points.js';
+export * from './services/cronScheduler.js';
+export type {
+  CronTaskDelivery,
+  DurableCronTask,
+  CronTaskRun,
+  CronRunSessionOutcome,
+} from './services/cronTasksFile.js';
+export {
+  readCronTasks,
+  cronTaskSessionDeletionId,
+  updateCronTasks,
+  removeCronTasks,
+  getCronFilePath,
+  generateCronTaskId,
+  appendCronRun,
+  annotateCronRunSession,
+  taskHasLegacyCondition,
+  MAX_TASK_RUNS,
+  MAX_CRON_TASK_ROUTING_ID_LENGTH,
+  isValidCronTaskRoutingId,
+  MAX_CHANNEL_DELIVERY_NAME_LENGTH,
+  MAX_CHANNEL_DELIVERY_TARGET_ID_LENGTH,
+} from './services/cronTasksFile.js';
+export * from './services/fileDiscoveryService.js';
+export * from './services/fileHistoryService.js';
+export * from './services/fileReadCache.js';
+export * from './services/fileSystemService.js';
+export * from './services/tool-write-origin.js';
+export {
+  decodeBufferWithEncodingInfo,
+  encodeTextFileContent,
+} from './services/sync-file-encoding.js';
+export {
+  CursorNotAtLineBoundaryError,
+  LargeNonUtf8TextError,
+  TextScanBudgetExceededError,
+} from './utils/read-text-range.js';
+export type { ReadTextRangeResult } from './utils/read-text-range.js';
+export { isUtf8CompatibleEncoding } from './utils/encoding.js';
+export * from './services/gitWorktreeService.js';
+export {
+  DEFAULT_MAX_TOOL_CALLS_PER_TURN,
+  GLOBAL_DUPLICATE_THRESHOLD,
+  getToolCallRepeatKey,
+  shouldHaltOnTurnToolCallCap,
+} from './services/loopDetectionService.js';
+export * from './services/visionBridge/vision-bridge-service.js';
+export * from './services/visionBridge/tool-result-vision-bridge.js';
+export * from './services/visionBridge/image-part-utils.js';
+export * from './services/visionBridge/image-capability.js';
+export * from './services/sessionRecap.js';
+export * from './services/session-artifact-persistence.js';
+export * from './services/session-reference-service.js';
+export * from './ipc/inbound-gate.js';
+export * from './ipc/peer-admission.js';
+export * from './ipc/peer-controllers.js';
+export * from './ipc/peer-directory.js';
+export * from './ipc/peer-drop-reports.js';
+export * from './ipc/peer-envelope.js';
+export * from './ipc/peer-frames.js';
+export * from './ipc/peer-routing.js';
+export * from './ipc/peer-send.js';
+export * from './ipc/socket-path.js';
+export * from './ipc/uds-client.js';
+export * from './ipc/uds-inbox.js';
+export * from './services/session-registry.js';
+export * from './services/sessionService.js';
+export {
+  collectSessionTurnState,
+  computeInitialTurnFromHistory,
+} from './services/session-turn-state.js';
+export * from './services/session-writer-lease.js';
+export {
+  decodeSessionTranscriptCursor,
+  decodeSessionTranscriptSnapshot,
+  encodeSessionTranscriptCursor,
+  encodeSessionTranscriptSnapshot,
+  findBoundaryAtOrBefore,
+  InvalidSessionTranscriptCursorError,
+  InvalidSessionTranscriptTurnAnchorError,
+  isReplayTurnStartType,
+  SESSION_TRANSCRIPT_CURSOR_VERSION,
+  SESSION_TRANSCRIPT_DEFAULT_LIMIT,
+  SESSION_TRANSCRIPT_MAX_EXPANDED_PAGE_BYTES,
+  SESSION_TRANSCRIPT_MAX_INDEX_BYTES,
+  SESSION_TRANSCRIPT_MAX_LIMIT,
+  SESSION_TRANSCRIPT_MAX_PAGE_BYTES,
+  SESSION_TRANSCRIPT_TURN_INDEX_VERSION,
+  SessionTranscriptCursorCodec,
+  SessionTranscriptReader,
+  SessionTranscriptPageTooLargeError,
+  SessionTranscriptSnapshotUnavailableError,
+  SessionTranscriptTooLargeError,
+} from './services/session-transcript-reader.js';
+export type {
+  SelectiveSessionRestoreOptions,
+  SessionLiveRestoreProjection,
+  SessionRestoreProjection,
+  SessionRestoreReplayPage,
+  SessionRestoreReplaySelection,
+  SessionRuntimeResumeState,
+  SessionTranscriptCursorState,
+  SessionTranscriptNavigationTurn,
+  SessionTranscriptNavigationTurnKind,
+  SessionTranscriptReadPageOptions,
+  SessionTranscriptReadTurnIndexOptions,
+  SessionTranscriptRecordPage,
+  SessionTranscriptSnapshotState,
+  SessionTranscriptTurnIndexPage,
+} from './services/session-transcript-reader.js';
+export * from './utils/conversation-chain.js';
+export * from './utils/transcript-records.js';
+export * from './utils/conversation-branches.js';
+export * from './services/sessionTitle.js';
+export * from './services/sleepInhibitor.js';
+// Named exports keep @internal test helpers out of the barrel.
+export {
+  apiResponseEventToTokenUsageRecord,
+  exportTokenUsageSummary,
+  formatTokenUsageSummaryAsCsv,
+  formatTokenUsageSummaryAsJson,
+  getTokenUsageFilePath,
+  queryTokenUsage,
+  recordTokenUsageFromApiResponse,
+  recordTokenUsageFromApiResponseBestEffort,
+} from './services/tokenUsageService.js';
+export type {
+  TokenUsageExportFormat,
+  TokenUsageExportOptions,
+  TokenUsageGroupSummary,
+  TokenUsagePeriod,
+  TokenUsageQuery,
+  TokenUsageRecord,
+  TokenUsageSummary,
+  TokenUsageTotals,
+} from './services/tokenUsageService.js';
+export * from './services/worktreeSessionService.js';
+export * from './services/session-pr-service.js';
+export {
+  stripTerminalControlSequences,
+  stripDisplayControlChars,
+  truncateNotificationLabel,
+  TERMINAL_OSC_REGEX,
+  TERMINAL_CSI_REGEX,
+  TERMINAL_SHIFT_DCS_REGEX,
+  NOTIFICATION_LABEL_MAX_LENGTH,
+} from './utils/terminalSafe.js';
+export { escapeXml } from './utils/xml.js';
+export * from './services/shellExecutionService.js';
+export * from './services/monitorRegistry.js';
+export * from './services/backgroundShellRegistry.js';
+export * from './agents/background-notification-queue.js';
+export * from './services/web-terminal-registry.js';
+export * from './agents/workflow-run-registry.js';
+export * from './agents/workflow-correlation.js';
+export * from './agents/workflow-snapshot.js';
+export * from './agents/workflow-checkpoint.js';
+export { WorkflowJournalUnavailableError } from './agents/runtime/workflow-runner.js';
+export {
+  listSavedWorkflows,
+  resolveSavedWorkflowScript,
+  saveWorkflowScript,
+  validateWorkflowName,
+  getSavedWorkflowDirs,
+  WORKFLOW_NAME_PATTERN,
+  EXTENSION_WORKFLOW_NAME_PATTERN,
+  qualifyExtensionWorkflowName,
+  parseExtensionWorkflowName,
+  isWorkflowRunId,
+  type SavedWorkflowEntry,
+  type SavedWorkflowScope,
+  type SavedWorkflowSource,
+  type ResolvedSavedWorkflow,
+  type WorkflowSaveResult,
+} from './agents/runtime/workflow-saved.js';
+export {
+  loadExtensionWorkflows,
+  MAX_EXTENSION_WORKFLOW_SCRIPT_BYTES,
+  type ExtensionWorkflowDefinition,
+} from './agents/runtime/workflow-extension.js';
+export {
+  extractAndStripMeta,
+  type WorkflowMeta,
+} from './agents/runtime/workflow-sandbox.js';
+export * from './agents/runtime/workflow-size.js';
+export * from './agents/runtime/workflow-script-shape.js';
+export * from './services/toolUseSummary.js';
+export * from './services/usageHistoryService.js';
+export * from './services/usage-dashboard-service.js';
+export * from './utils/bareMode.js';
+export * from './utils/safe-mode.js';
+export * from './utils/sanitize-child-env.js';
+export { isUnusableScriptEntry } from './services/shellContextEnv.js';
+export * from './utils/toolResultDisplayCompaction.js';
+
+// ============================================================================
+// Managed Auto-Memory
+// ============================================================================
+
+// MemoryManager is the single public API for all memory operations.
+// Production code: config.getMemoryManager().method(...)
+// Tests: new MemoryManager()
+export * from './memory/manager.js';
+
+// Foundational utilities (paths, storage scaffold, type definitions, constants)
+// that are legitimately needed by UI code (MemoryDialog, commands, etc.)
+export * from './memory/types.js';
+export * from './memory/paths.js';
+export * from './memory/store.js';
+export * from './utils/memory-constants.js';
+export * from './memory/channel-memory-document.js';
+export * from './memory/channel-memory.js';
+export * from './memory/remember.js';
+export * from './memory/refresh.js';
+export * from './memory/dream.js';
+export * from './memory/learn-skill-agent.js';
+// Issue : write helper for hierarchical context files,
+// re-exported so the `qwen serve` daemon can mutate workspace memory
+// via `POST /workspace/memory` without depending on internal paths.
+export * from './memory/writeContextFile.js';
+
+// ============================================================================
+// IDE Support
+// ============================================================================
+
+export * from './ide/ide-client.js';
+export * from './ide/ideContext.js';
+export * from './ide/ide-installer.js';
+export {
+  detectIdeFromEnv,
+  IDE_DEFINITIONS,
+  type IdeInfo,
+} from './ide/detect-ide.js';
+export * from './ide/constants.js';
+export * from './ide/types.js';
+
+// ============================================================================
+// LSP Support
+// ============================================================================
+
+export * from './lsp/constants.js';
+export * from './lsp/configHash.js';
+export * from './lsp/LspConfigLoader.js';
+export * from './lsp/LspConnectionFactory.js';
+export * from './lsp/LspResponseNormalizer.js';
+export * from './lsp/lsp-server-manager.js';
+export * from './lsp/NativeLspClient.js';
+export * from './lsp/native-lsp-service.js';
+export * from './lsp/types.js';
+
+// ============================================================================
+// MCP (Model Context Protocol)
+// ============================================================================
+
+export {
+  MCPOAuthProvider,
+  OAUTH_AUTH_URL_EVENT,
+  OAUTH_DISPLAY_MESSAGE_EVENT,
+} from './mcp/oauth-provider.js';
+export type {
+  MCPOAuthConfig,
+  OAuthDisplayMessage,
+  OAuthDisplayPayload,
+} from './mcp/oauth-provider.js';
+export { MCPOAuthTokenStorage } from './mcp/oauth-token-storage.js';
+export { KeychainTokenStorage } from './mcp/token-storage/keychain-token-storage.js';
+export type {
+  OAuthCredentials,
+  OAuthToken,
+} from './mcp/token-storage/types.js';
+export { OAuthUtils } from './mcp/oauth-utils.js';
+export type {
+  OAuthAuthorizationServerMetadata,
+  OAuthProtectedResourceMetadata,
+} from './mcp/oauth-utils.js';
+export { hashMcpServerConfig } from './mcp/configHash.js';
+
+// ============================================================================
+// Telemetry
+// ============================================================================
+
+export { QwenLogger } from './telemetry/qwen-logger/qwen-logger.js';
+export * from './telemetry/index.js';
+export {
+  logAuth,
+  logExtensionDisable,
+  logExtensionEnable,
+  logIdeConnection,
+  logLoopDetected,
+  logRepeatedToolFailureGuard,
+  logModelSlashCommand,
+  logPromptSuggestion,
+  logSpeculation,
+  logWorkflowKeyword,
+  logWorkflowRun,
+  logWorkflowSizeWarning,
+} from './telemetry/loggers.js';
+export {
+  AuthEvent,
+  ExtensionDisableEvent,
+  ExtensionEnableEvent,
+  ExtensionInstallEvent,
+  ExtensionUninstallEvent,
+  IdeConnectionEvent,
+  IdeConnectionType,
+  LoopDetectedEvent,
+  LoopType,
+  RepeatedToolFailureGuardEvent,
+  ModelSlashCommandEvent,
+  PromptSuggestionEvent,
+  SpeculationEvent,
+  WorkflowKeywordEvent,
+  WorkflowRunEvent,
+  WorkflowSizeWarningEvent,
+} from './telemetry/types.js';
+
+// ============================================================================
+// Extensions, Skills, Subagents & Agents
+// ============================================================================
+
+export * from './extension/index.js';
+export * from './prompts/mcp-prompts.js';
+export * from './skills/index.js';
+export * from './skills/bundled/loop/loop-task-file.js';
+export * from './skills/bundled/loop/loop-tick-resolver.js';
+export * from './subagents/index.js';
+export * from './agents/index.js';
+
+// ============================================================================
+// Follow-up Suggestions
+// ============================================================================
+
+export * from './followup/index.js';
+
+// ============================================================================
+// Utilities
+// ============================================================================
+
+export * from './utils/atomicFileWrite.js';
+export * from './utils/browser.js';
+export * from './utils/bundlePaths.js';
+export * from './utils/configResolver.js';
+export * from './utils/debugLogger.js';
+export * from './utils/editor.js';
+export * from './core/environmentContext.js';
+export * from './utils/env.js';
+export * from './utils/errorParsing.js';
+export * from './utils/errors.js';
+export * from './utils/file-identity.js';
+export * from './utils/fileUtils.js';
+export * from './utils/filesearch/fileSearch.js';
+export * as crawlCache from './utils/filesearch/crawlCache.js';
+export {
+  Ignore,
+  loadIgnoreRules,
+  type LoadIgnoreRulesOptions,
+} from './utils/filesearch/ignore.js';
+export * from './utils/formatters.js';
+export * from './utils/generateContentResponseUtilities.js';
+export * from './utils/getFolderStructure.js';
+export * from './utils/git-branches.js';
+export * from './utils/gitDiff.js';
+export * from './utils/gitDirect.js';
+export * from './utils/git-ignore.js';
+export * from './utils/gitIgnoreParser.js';
+export * from './utils/gitUtils.js';
+export * from './utils/github-prs.js';
+export * from './utils/github-pr-issues.js';
+export * from './utils/ignorePatterns.js';
+export * from './utils/invocation-context.js';
+export * from './utils/conversations-runtime-marker.js';
+export {
+  DEFAULT_QWEN_CUSTOM_IGNORE_FILE_NAMES,
+  QwenIgnoreParser,
+} from './utils/qwenIgnoreParser.js';
+export type { QwenIgnoreFilter } from './utils/qwenIgnoreParser.js';
+export * from './utils/jsonl-utils.js';
+export * from './utils/memoryDiagnostics.js';
+export * from './tools/tool-result-retention.js';
+export * from './memory/memoryDiscovery.js';
+export * from './utils/modelId.js';
+export * from './utils/runtimeDiagnostics.js';
+export { ConditionalRulesRegistry } from './config/rulesDiscovery.js';
+export type { RuleFile } from './config/rulesDiscovery.js';
+export {
+  OpenAILogger,
+  openaiLogger,
+  resolveOpenAILogDir,
+} from './utils/openaiLogger.js';
+export * from './utils/osc8.js';
+export * from './utils/partUtils.js';
+export * from './utils/sessionStorageUtils.js';
+export * from './utils/pathReader.js';
+export * from './utils/paths.js';
+export * from './utils/projectSummary.js';
+export * from './utils/promptIdContext.js';
+export * from './utils/background-turn-context.js';
+export * from './tools/tool-result-boundary-diagnostics.js';
+export * from './utils/proxyUtils.js';
+export * from './utils/quotaErrorDetection.js';
+export * from './utils/rateLimit.js';
+export * from './tools/readManyFiles.js';
+export * from './utils/request-tokenizer/supportedImageFormats.js';
+export { TextTokenizer } from './utils/request-tokenizer/textTokenizer.js';
+export * from './utils/retry.js';
+export * from './utils/ripgrepUtils.js';
+export {
+  detectRuntime,
+  getOrCreateSharedDispatcher,
+  isTlsVerificationDisabled,
+  preloadRuntimeFetchModule,
+  redactProxyCredentials,
+} from './utils/runtimeFetchOptions.js';
+export * from './utils/process-liveness.js';
+export * from './utils/runtimeStatus.js';
+export * from './utils/schemaValidator.js';
+export * from './utils/sessionIdContext.js';
+export * from './utils/secure-browser-launcher.js';
+export { initParser as initShellAstParser } from './utils/shellAstParser.js';
+export * from './utils/shell-utils.js';
+export * from './utils/subagentGenerator.js';
+export * from './utils/symlink.js';
+export * from './utils/systemEncoding.js';
+export * from './utils/terminalSerializer.js';
+export * from './utils/textUtils.js';
+export * from './utils/thoughtUtils.js';
+export * from './utils/toml-to-markdown-converter.js';
+export * from './tools/tool-utils.js';
+export { finalizeToolResponses } from './tools/tool-response-finalizer.js';
+export * from './utils/workspaceContext.js';
+export { parse, stringify } from './utils/yaml-parser.js';
+export * from './utils/btwUtils.js';
+export * from './agents/forkedAgent.js';
+export * from './utils/sideQuery.js';
+
+// ============================================================================
+// OAuth & Authentication
+// ============================================================================
+
+export * from './qwen/qwenOAuth2.js';
+
+// ============================================================================
+// Message Bus Types
+// ============================================================================
+
+export {
+  MessageBusType,
+  type HookExecutionRequest,
+  type HookExecutionResponse,
+} from './confirmation-bus/types.js';
+export { MessageBus } from './confirmation-bus/message-bus.js';
+
+// ============================================================================
+// Testing Utilities
+// ============================================================================
+
+export { makeFakeConfig } from './test-utils/config.js';
+export * from './test-utils/index.js';
+export {
+  extractCodeModeImageContent,
+  getToolCallRuntime,
+  runWithoutToolCallRuntime,
+  runWithToolCallRuntime,
+  type CodeModeImageContent,
+  type CodeModeToolResult,
+  type ToolCallRuntimeContext,
+} from './code-mode/tool-call-runtime.js';
+export {
+  getToolExposure,
+  isCodeModeToolCallAllowed,
+  ToolMode,
+  type ToolExposure,
+} from './tools/code-mode.js';
+
+// ============================================================================
+// Hooks
+// ============================================================================
+
+export * from './hooks/types.js';
+export {
+  HookSystem,
+  HookRegistry,
+  createInstructionsLoadedCallback,
+  hookEventSupportsMatcher,
+} from './hooks/index.js';
+export type { HookRegistryEntry, SessionHookEntry } from './hooks/index.js';
+export { buildHooksListing } from './hooks/hooks-listing.js';
+export type {
+  HooksListing,
+  HooksListingDisabledReason,
+  HooksListingOrigin,
+  HooksListingRow,
+} from './hooks/hooks-listing.js';
+export {
+  DEFAULT_STOP_HOOK_BLOCK_CAP,
+  STOP_HOOK_BLOCK_CAP_ENV,
+  normalizeStopHookBlockingCap,
+  resolveStopHookBlockingCap,
+  formatStopHookBlockingCapWarning,
+} from './hooks/stopHookCap.js';
+export type { StopFailureErrorType } from './hooks/types.js';
+export {
+  HOOK_EVENT_DISPLAY,
+  hookEventDisplay,
+} from './hooks/hook-event-display.js';
+export type { HookEventDisplayMeta } from './hooks/hook-event-display.js';
+export {
+  DEFAULT_COMMAND_HOOK_TIMEOUT_SECONDS,
+  DEFAULT_HTTP_HOOK_TIMEOUT_SECONDS,
+  DEFAULT_PROMPT_HOOK_TIMEOUT_SECONDS,
+  DEFAULT_FUNCTION_HOOK_TIMEOUT_MS,
+  describeHookTimeout,
+  isLegacyMillisecondHookTimeout,
+  resolveCommandHookTimeoutMs,
+} from './hooks/hook-timeout.js';
+export type {
+  HookTimeoutDescription,
+  HookTimeoutSource,
+} from './hooks/hook-timeout.js';
+export { buildContextUsage } from './hooks/context-usage.js';
+export {
+  USER_PROMPT_SUBMIT_CONTEXT_OPEN_TAG,
+  USER_PROMPT_SUBMIT_CONTEXT_CLOSE_TAG,
+  isUserPromptSubmitContextPartText,
+  stripTrailingUserPromptSubmitContextPart,
+} from './hooks/user-prompt-submit-context.js';
+export { wrapUserPromptSubmitContext } from './utils/transcript-records.js';
+
+// ============================================================================
+// Goals (/goal command runtime)
+// ============================================================================
+
+export * from './goals/index.js';
+
+// Export hook triggers for all hook events
+export {
+  fireNotificationHook,
+  firePermissionRequestHook,
+  firePreToolUseHook,
+  firePostToolUseHook,
+  firePostToolUseFailureHook,
+  firePostToolBatchHook,
+  type NotificationHookResult,
+  type PermissionRequestHookResult,
+  type PreToolUseHookResult,
+  type PostToolUseHookResult,
+  type PostToolUseFailureHookResult,
+  type PostToolBatchHookResult,
+  generateToolUseId,
+} from './core/toolHookTriggers.js';
+
+// ============================================================================
+// Startup profiler — cross-package event sink (first-screen perf observability)
+// ============================================================================
+
+export {
+  setStartupEventSink,
+  recordStartupEvent,
+  type StartupEventSink,
+  type StartupEventAttrs,
+} from './utils/startupEventSink.js';
+
+// ============================================================================
+// Omni multimodal experiment — upload-based media delivery
+// ============================================================================
+
+export {
+  isOmniDeliveryActive,
+  processMediaForOmniDelivery,
+  readMediaViaOmniDelivery,
+  parseHttpUrlRef,
+  downloadMediaUrl,
+  effectiveMaxDownloadFileBytes,
+  recognizeMediaFile,
+  formatDisclosureText,
+  formatOmissionText,
+  buildAdditionalMediaParts,
+  buildTranscriptParts,
+  OmniObjectStore,
+  OmniDeliveryError,
+  OmniDownloadError,
+  OmniTransportGuardError,
+  type OmniModality,
+  type OmniMediaDelivery,
+  type OmniAdditionalMediaDelivery,
+  type OmniAdditionalMediaPart,
+  type OmniTokenEstimate,
+  type DownloadedMedia,
+} from './omni/index.js';
+export { processToolResultOmniMedia } from './omni/tool-result-media.js';
+export {
+  resolveMediaPolicyModelAccess,
+  isMediaPolicyToolHiddenFromModel,
+  evaluateMediaPolicyToolCall,
+  type MediaPolicyConfigView,
+  type MediaPolicyCallGateResult,
+  type ResolvedMediaPolicyModelAccess,
+} from './omni/policy/model-access.js';
+export type {
+  OmniPolicyToolSettings,
+  OmniPolicyToolModelAccessSettings,
+  OmniPolicyToolsSettings,
+} from './omni/policy/types.js';
+export * from './services/session-sources.js';
+export { RecordSourceTool } from './tools/record-source.js';
+export { resolveReviewWorkflowConcurrency } from './agents/runtime/review-workflow.js';

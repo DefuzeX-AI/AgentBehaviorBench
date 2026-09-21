@@ -1,0 +1,142 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { execSync } from 'node:child_process';
+import {
+  existsSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { join, resolve } from 'node:path';
+
+// A script to handle versioning and ensure all related changes are in a single, atomic commit.
+
+function run(command) {
+  console.log(`> ${command}`);
+  execSync(command, { stdio: 'inherit' });
+}
+
+function readJson(filePath) {
+  return JSON.parse(readFileSync(filePath, 'utf-8'));
+}
+
+function writeJson(filePath, data) {
+  writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n');
+}
+
+// 1. Get the version from the command line arguments.
+const versionType = process.argv[2];
+if (!versionType) {
+  console.error('Error: No version specified.');
+  console.error(
+    'Usage: npm run version <version> (e.g., 1.2.3 or patch|minor|major|prerelease)',
+  );
+  process.exit(1);
+}
+
+// 2. Bump the version in the root and all workspace package.json files.
+// --no-workspaces-update stops npm from reifying node_modules after each bump:
+// the tree is pnpm's, and an npm reify would silently rewrite it into npm's own
+// layout. pnpm-lock.yaml needs no refresh either: .pnpmfile.mjs rewrites every
+// internal dependency to workspace:*, so a version bump leaves it unchanged.
+run(
+  `npm version ${versionType} --no-git-tag-version --allow-same-version --no-workspaces-update`,
+);
+
+// 3. Get all workspaces and filter out the one we don't want to version.
+// We intend to maintain sdk, mobile-mcp, node-repl, and qwen-live versions
+// independently.
+const workspacesToExclude = [
+  '@qwen-code/sdk',
+  '@qwen-code/mobile-mcp',
+  '@qwen-code/node-repl-mcp',
+  '@qwen-code/qwen-live',
+];
+const workspaceNames = JSON.parse(
+  execSync('npm pkg get name --workspaces --json').toString(),
+);
+const allWorkspaces = Object.keys(workspaceNames);
+const workspacesToVersion = allWorkspaces.filter(
+  (wsName) => !workspacesToExclude.includes(wsName),
+);
+
+for (const workspaceName of workspacesToVersion) {
+  run(
+    `npm version ${versionType} --workspace ${workspaceName} --no-git-tag-version --allow-same-version --no-workspaces-update`,
+  );
+}
+
+// 4. Get the new version number from the root package.json
+const rootPackageJsonPath = resolve(process.cwd(), 'package.json');
+const newVersion = readJson(rootPackageJsonPath).version;
+
+// 5. Keep the published Mem0 Extension manifest aligned with its package.
+const mem0ManifestPath = resolve(
+  process.cwd(),
+  'integrations/external-context-mem0/qwen-extension.json',
+);
+const mem0Manifest = readJson(mem0ManifestPath);
+mem0Manifest.version = newVersion;
+writeJson(mem0ManifestPath, mem0Manifest);
+run(
+  'npx prettier --experimental-cli --write integrations/external-context-mem0/qwen-extension.json',
+);
+
+// 6. Update the sandboxImageUri in the root package.json
+const rootPackageJson = readJson(rootPackageJsonPath);
+if (rootPackageJson.config?.sandboxImageUri) {
+  rootPackageJson.config.sandboxImageUri =
+    rootPackageJson.config.sandboxImageUri.replace(/:.*$/, `:${newVersion}`);
+  console.log(`Updated sandboxImageUri in root to use version ${newVersion}`);
+  writeJson(rootPackageJsonPath, rootPackageJson);
+}
+
+// 7. Update the sandboxImageUri in the cli package.json
+const cliPackageJsonPath = resolve(process.cwd(), 'packages/cli/package.json');
+const cliPackageJson = readJson(cliPackageJsonPath);
+if (cliPackageJson.config?.sandboxImageUri) {
+  cliPackageJson.config.sandboxImageUri =
+    cliPackageJson.config.sandboxImageUri.replace(/:.*$/, `:${newVersion}`);
+  console.log(
+    `Updated sandboxImageUri in cli package to use version ${newVersion}`,
+  );
+  writeJson(cliPackageJsonPath, cliPackageJson);
+}
+
+// 8. Pin channel adapters' semver dependency on @qwen-code/channel-base to
+// the exact new version. A caret range like ^0.21.0 does not match a
+// prerelease bump (e.g. 0.21.1-preview.0), so npm would replace the workspace
+// link with the stale registry package and the release build would compile
+// against outdated types.
+const channelsDir = resolve(process.cwd(), 'packages/channels');
+for (const entry of readdirSync(channelsDir)) {
+  const pkgPath = join(channelsDir, entry, 'package.json');
+  if (!existsSync(pkgPath)) continue;
+  const pkg = readJson(pkgPath);
+  const dep = pkg.dependencies?.['@qwen-code/channel-base'];
+  if (dep && !dep.startsWith('file:')) {
+    pkg.dependencies['@qwen-code/channel-base'] = newVersion;
+    writeJson(pkgPath, pkg);
+    console.log(
+      `Pinned @qwen-code/channel-base to ${newVersion} in ${pkg.name}`,
+    );
+  }
+}
+
+// 9. An npm reify can nest a stale registry copy of channel-base under an
+// adapter while ranges briefly mismatch, where it shadows the workspace link
+// during tsc. Nothing above reifies any more, but a tree an earlier npm install
+// left behind can still carry that directory, so remove it.
+for (const entry of readdirSync(channelsDir)) {
+  rmSync(join(channelsDir, entry, 'node_modules', '@qwen-code'), {
+    recursive: true,
+    force: true,
+  });
+}
+
+console.log(`Successfully bumped versions to v${newVersion}.`);

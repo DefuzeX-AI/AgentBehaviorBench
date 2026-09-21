@@ -1,0 +1,160 @@
+/**
+ * @license
+ * Copyright 2026 Qwen Team
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import type React from 'react';
+import { useEffect, useState } from 'react';
+import { Text } from 'ink';
+import { elapsedActiveTime } from '@qwen-code/qwen-code-core/goals/goal-reducer.js';
+import type { Config } from '@qwen-code/qwen-code-core/config/config.js';
+import type { GoalSnapshotV2 } from '@qwen-code/qwen-code-core/goals/goal-protocol.js';
+import type { GoalRuntime } from '@qwen-code/qwen-code-core/goals/goal-runtime.js';
+import { useConfig } from '../contexts/ConfigContext.js';
+import { theme } from '../semantic-colors.js';
+import { ICON } from '../constants.js';
+import { formatTokenCount } from '../statusLinePresets.js';
+
+const ELAPSED_REFRESH_MS = 1000;
+
+/**
+ * The Goal's spend against the window it is allowed, or nothing.
+ *
+ * A Goal that has not billed a turn yet shows no figures rather than a
+ * reassuring `0/30.0m`: the pill sits in a footer with little room, and a
+ * zero says nothing the status has not already said. A Goal with no budget
+ * shows what it has spent, since that is the whole of what is known.
+ */
+function formatSpend(goal: NonNullable<GoalSnapshotV2['goal']>): string {
+  if (goal.tokensUsed <= 0) return '';
+  const used = formatTokenCount(goal.tokensUsed);
+  return goal.tokenBudget === undefined
+    ? used
+    : `${used}/${formatTokenCount(goal.tokenBudget)}`;
+}
+
+function formatElapsed(ms: number): string {
+  if (ms < 1000) return '';
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
+}
+
+function getRuntime(config: Config): GoalRuntime | null {
+  if (typeof config.getGoalRuntime !== 'function') return null;
+  try {
+    return config.getGoalRuntime();
+  } catch {
+    return null;
+  }
+}
+
+export function useFooterGoalState(): GoalSnapshotV2 | undefined {
+  const config = useConfig();
+  const sessionId = config.getSessionId();
+  const runtime = getRuntime(config);
+  const [observed, setObserved] = useState<{
+    runtime: GoalRuntime | null;
+    snapshot?: GoalSnapshotV2;
+  }>(() => ({
+    runtime,
+    snapshot: runtime?.getSnapshot(),
+  }));
+
+  useEffect(() => {
+    if (!runtime) {
+      setObserved({ runtime });
+      return;
+    }
+
+    setObserved({ runtime, snapshot: runtime.getSnapshot() });
+    return runtime.subscribe((snapshot) => {
+      setObserved({ runtime, snapshot });
+    });
+  }, [runtime, sessionId]);
+
+  return observed.runtime === runtime
+    ? observed.snapshot
+    : runtime?.getSnapshot();
+}
+
+export function isLiveGoalSnapshot(
+  snapshot: GoalSnapshotV2 | undefined,
+): boolean {
+  const status = snapshot?.goal?.status;
+  return status !== undefined && status !== 'complete';
+}
+
+function presentation(snapshot: GoalSnapshotV2): {
+  icon: string;
+  label: string;
+  color: string;
+} | null {
+  const goal = snapshot.goal;
+  if (!goal || goal.status === 'complete') return null;
+
+  if (goal.status === 'active') {
+    if (snapshot.activity === 'verifying') {
+      return {
+        icon: ICON.CIRCLE_EMPTY,
+        label: 'checking',
+        color: theme.text.secondary,
+      };
+    }
+    return { icon: ICON.BULLSEYE, label: 'active', color: theme.text.accent };
+  }
+  switch (goal.status) {
+    case 'paused':
+      return { icon: '!', label: 'paused', color: theme.status.warning };
+    case 'blocked':
+      return { icon: ICON.CROSS, label: 'blocked', color: theme.status.error };
+    case 'usage_limited':
+      return {
+        icon: '!',
+        label: 'usage limited',
+        color: theme.status.warning,
+      };
+    default: {
+      const exhaustive: never = goal.status;
+      void exhaustive;
+      return null;
+    }
+  }
+}
+
+export interface GoalPillProps {
+  snapshot: GoalSnapshotV2 | undefined;
+}
+
+export const GoalPill: React.FC<GoalPillProps> = ({ snapshot }) => {
+  const [, setTick] = useState(0);
+  const refreshElapsed = snapshot?.goal?.status === 'active';
+  useEffect(() => {
+    if (!refreshElapsed) return;
+    const interval = setInterval(() => {
+      setTick((tick) => (tick + 1) % 1_000_000);
+    }, ELAPSED_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [refreshElapsed]);
+
+  if (!snapshot) return null;
+  const goal = snapshot.goal;
+  if (!goal) return null;
+  const visible = presentation(snapshot);
+  if (!visible) return null;
+
+  const elapsed = formatElapsed(elapsedActiveTime(goal, Date.now()));
+  const spend = formatSpend(goal);
+  const detail = [elapsed, spend].filter(Boolean).join(' · ');
+  const suffix = detail ? ` (${detail})` : '';
+  return (
+    <Text color={visible.color}>
+      {visible.icon} /goal {visible.label}
+      {suffix}
+    </Text>
+  );
+};

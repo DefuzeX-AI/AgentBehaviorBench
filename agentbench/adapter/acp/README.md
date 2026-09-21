@@ -36,3 +36,15 @@ and `aclose()` release the process group and loop; callers must close the adapte
 execution limits do not become successful results. A lost response is not evidence
 that replay is safe. Protocol callbacks use the local `on_acp_event(name, data)`
 observer seam; callback objects never cross the ACP wire.
+
+An optional `evidence_reader = "bootstrap/native_evidence.py:read_calls"` reads
+documented native evidence after a prompt returns. The default signature is
+`read_calls(session_id)`. A reader may explicitly declare
+`read_calls(session_id, *, prompt_response)` to receive a detached JSON-compatible
+copy of that **same** native ACP response, including `_meta`. This allows a
+reader to select a committed native checkpoint without timing heuristics. The
+adapter does not interpret vendor metadata or change prompts/model traffic.
+Return bounded `native_model_call` records with native session/call/response IDs;
+missing evidence must not be invented. Reader exceptions emit a failed
+`native_evidence_status` without replacing the Agent's answer. Legacy readers
+are still called with only `session_id`.

@@ -1,0 +1,890 @@
+/**
+ * @license
+ * Copyright 2026 Qwen Team
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { createHash } from 'node:crypto';
+import { AuthType } from '../core/contentGenerator.js';
+import {
+  resolveModelProtocol,
+  tryResolveModelProtocol,
+} from '../models/modelRegistry.js';
+import type { ProviderProtocolConfig } from '../models/types.js';
+import { ProviderInstallError } from './install.js';
+import type {
+  ModelSpec,
+  ProviderConfig,
+  ProviderInstallPlan,
+  ProviderInstallState,
+  ProviderModelConfig,
+  ProviderSetupInputs,
+} from './types.js';
+
+// ---------------------------------------------------------------------------
+// Build model configs from a ProviderConfig + user inputs
+// ---------------------------------------------------------------------------
+
+function resolveEnvKey(
+  config: ProviderConfig,
+  inputs: ProviderSetupInputs,
+): string {
+  const protocol = inputs.protocol ?? config.protocol;
+  const key =
+    typeof config.envKey === 'function'
+      ? config.envKey(protocol, inputs.baseUrl)
+      : config.envKey;
+  return config.id === 'custom-openai-compatible' &&
+    inputs.advancedConfig?.purpose
+    ? `${key}_${inputs.advancedConfig.purpose.toUpperCase()}`
+    : key;
+}
+
+function resolveModelNamePrefix(
+  config: ProviderConfig,
+  baseUrl: string,
+): string {
+  return typeof config.modelNamePrefix === 'function'
+    ? config.modelNamePrefix(baseUrl)
+    : config.modelNamePrefix;
+}
+
+export function resolveOwnsModel(
+  config: ProviderConfig,
+): ((model: ProviderModelConfig) => boolean) | undefined {
+  if (config.ownsModel) return config.ownsModel;
+  if (
+    typeof config.envKey !== 'string' ||
+    typeof config.modelNamePrefix !== 'string'
+  ) {
+    return undefined;
+  }
+  const envKey = config.envKey;
+  const prefix = config.modelNamePrefix;
+  if (!prefix) return (model) => model.envKey === envKey;
+  const namePrefix = `[${prefix}] `;
+  return (model) =>
+    model.envKey === envKey &&
+    typeof model.name === 'string' &&
+    model.name.startsWith(namePrefix);
+}
+
+function buildGenerationConfig(
+  spec: Pick<
+    ModelSpec,
+    'enableThinking' | 'thinkingMandatory' | 'contextWindowSize' | 'modalities'
+  >,
+  protocol: AuthType,
+): ProviderModelConfig['generationConfig'] | undefined {
+  const parts: ProviderModelConfig['generationConfig'] = {};
+  let hasAny = false;
+  if (spec.enableThinking) {
+    // Kept in step with buildAdvancedGenerationConfig below, which carries the
+    // rationale for why the Responses wire cannot use extra_body.
+    if (protocol === AuthType.USE_OPENAI_RESPONSES) {
+      parts.reasoning = { effort: 'medium' };
+    } else {
+      parts.extra_body = { enable_thinking: true };
+    }
+    hasAny = true;
+  }
+  if (spec.thinkingMandatory) {
+    parts.thinkingMandatory = true;
+    hasAny = true;
+  }
+  if (spec.contextWindowSize) {
+    parts.contextWindowSize = spec.contextWindowSize;
+    hasAny = true;
+  }
+  if (spec.modalities && Object.values(spec.modalities).some(Boolean)) {
+    parts.modalities = spec.modalities;
+    hasAny = true;
+  }
+  return hasAny ? parts : undefined;
+}
+
+function buildAdvancedGenerationConfig(
+  advCfg: ProviderSetupInputs['advancedConfig'] | undefined,
+  protocol: AuthType,
+): ProviderModelConfig['generationConfig'] | undefined {
+  const cfg: ProviderModelConfig['generationConfig'] = {};
+  let hasAny = false;
+  if (advCfg?.enableThinking) {
+    // `extra_body.enable_thinking` is a DashScope/Qwen-specific wire knob:
+    // sibling wires either translate it (OpenAI Chat, when the baseUrl looks
+    // like DashScope) or silently drop it. The Responses wire does neither —
+    // it forwards extra_body verbatim, so enable_thinking would ship as an
+    // undefined top-level field with no reasoning actually requested. Route
+    // this protocol through the unified reasoning-effort ladder instead.
+    if (protocol === AuthType.USE_OPENAI_RESPONSES) {
+      cfg.reasoning = { effort: 'medium' };
+    } else {
+      cfg.extra_body = { enable_thinking: true };
+    }
+    hasAny = true;
+  }
+  if (advCfg?.multimodal && Object.values(advCfg.multimodal).some(Boolean)) {
+    cfg.modalities = advCfg.multimodal;
+    hasAny = true;
+  }
+  if (advCfg?.contextWindowSize && advCfg.contextWindowSize > 0) {
+    cfg.contextWindowSize = advCfg.contextWindowSize;
+    hasAny = true;
+  }
+  if (advCfg?.maxTokens && advCfg.maxTokens > 0) {
+    cfg.samplingParams = { max_tokens: advCfg.maxTokens };
+    hasAny = true;
+  }
+  return hasAny ? cfg : undefined;
+}
+
+function specToModelConfig(
+  spec: ModelSpec,
+  prefix: string,
+  baseUrl: string,
+  envKey: string,
+  protocol: AuthType,
+): ProviderModelConfig {
+  const genConfig = buildGenerationConfig(spec, protocol);
+  return {
+    id: spec.id,
+    name: prefix ? `[${prefix}] ${spec.id}` : spec.id,
+    ...(spec.description ? { description: spec.description } : {}),
+    ...(spec.capabilities ? { capabilities: spec.capabilities } : {}),
+    baseUrl,
+    envKey,
+    ...(spec.supportsImageGeneration ? { supportsImageGeneration: true } : {}),
+    ...(spec.imageOnly ? { imageOnly: true } : {}),
+    ...(genConfig ? { generationConfig: genConfig } : {}),
+  };
+}
+
+function applyProviderCustomHeaders(
+  models: ProviderModelConfig[],
+  config: ProviderConfig,
+): ProviderModelConfig[] {
+  if (!config.customHeaders) return models;
+  return models.map((model) => {
+    const existing = model.generationConfig ?? {};
+    return {
+      ...model,
+      generationConfig: {
+        ...existing,
+        customHeaders: {
+          ...(config.customHeaders as Record<string, string>),
+          ...(existing.customHeaders as Record<string, string> | undefined),
+        },
+      },
+    };
+  });
+}
+
+function buildModelConfigs(
+  config: ProviderConfig,
+  inputs: ProviderSetupInputs,
+): ProviderModelConfig[] {
+  const envKey = resolveEnvKey(config, inputs);
+  const prefix = resolveModelNamePrefix(config, inputs.baseUrl);
+  const protocol = resolveModelProtocol(
+    inputs.protocol ?? config.protocol,
+    inputs,
+  )!;
+
+  let models: ProviderModelConfig[];
+
+  // Fixed ModelSpec[] (not editable) — use specs directly
+  if (config.models && !config.modelsEditable) {
+    models = config.models.map((spec) =>
+      specToModelConfig(spec, prefix, inputs.baseUrl, envKey, protocol),
+    );
+  } else if (config.models && config.modelsEditable) {
+    // Editable ModelSpec[] — look up per-model metadata for known IDs
+    const specMap = new Map(config.models.map((s) => [s.id.toLowerCase(), s]));
+    models = inputs.modelIds.map((id) => {
+      const spec = specMap.get(id.toLowerCase());
+      if (spec) {
+        return specToModelConfig(
+          { ...spec, id },
+          prefix,
+          inputs.baseUrl,
+          envKey,
+          protocol,
+        );
+      }
+      const genConfig = buildAdvancedGenerationConfig(
+        inputs.advancedConfig,
+        protocol,
+      );
+      return {
+        id,
+        name: prefix ? `[${prefix}] ${id}` : id,
+        baseUrl: inputs.baseUrl,
+        envKey,
+        ...(genConfig ? { generationConfig: genConfig } : {}),
+      };
+    });
+  } else {
+    // No predefined models (custom provider) — use advancedConfig
+    const advCfg = inputs.advancedConfig;
+    const displayName = (id: string) => (prefix ? `[${prefix}] ${id}` : id);
+    models = inputs.modelIds.map((id) => {
+      const genConfig = buildAdvancedGenerationConfig(advCfg, protocol);
+      return {
+        id,
+        name: displayName(id),
+        baseUrl: inputs.baseUrl,
+        envKey,
+        ...(advCfg?.purpose === 'image'
+          ? { supportsImageGeneration: true, imageOnly: true }
+          : advCfg?.purpose === 'voice'
+            ? { voiceOnly: true }
+            : {}),
+        ...(genConfig ? { generationConfig: genConfig } : {}),
+      };
+    });
+  }
+
+  return applyProviderCustomHeaders(models, config);
+}
+
+// ---------------------------------------------------------------------------
+// Version tracking — auto-derived for providers with static model lists
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the provider's metadata key (same as `config.id`).
+ * Only defined for providers with a static `models` list.
+ */
+export function resolveMetadataKey(config: ProviderConfig): string | undefined {
+  if (!config.models) return undefined;
+  // setValue uses dotted-path traversal — a provider id containing '.' would
+  // be split into multiple nested objects (`providerMetadata.foo.bar` →
+  // `providerMetadata.foo.bar = ...` vs `providerMetadata['foo.bar'] = ...`).
+  // Reject early so the bug is loud at registration time rather than
+  // silently corrupting the settings tree at install time.
+  if (config.id.includes('.')) {
+    throw new Error(
+      `Provider id must not contain '.' (would corrupt providerMetadata.${config.id} dotted writes): ${config.id}`,
+    );
+  }
+  return config.id;
+}
+
+/**
+ * Namespace prefix used for all provider metadata in settings.
+ * e.g. `providerMetadata.coding-plan.version`
+ */
+export const PROVIDER_METADATA_NS = 'providerMetadata';
+
+function resolveProviderState(
+  config: ProviderConfig,
+  baseUrl: string,
+  models: ProviderModelConfig[],
+): ProviderInstallState | undefined {
+  const key = resolveMetadataKey(config);
+  if (key) {
+    return {
+      [`${PROVIDER_METADATA_NS}.${key}`]: {
+        version: computeModelListVersion(models),
+        baseUrl,
+      },
+    };
+  }
+  return undefined;
+}
+
+/**
+ * Retire a provider's recorded model-list version: an install whose models
+ * carry an explicit `wireApi` stamp can never be reproduced by the drift check's
+ * template rebuild, so a version left behind by an earlier default-route
+ * install would outlive the route switch and prompt a spurious "update" whose
+ * accept path rebuilds the models unstamped. The `undefined` value deletes
+ * the persisted field (settings adapters treat `undefined` as unset).
+ */
+function retireProviderState(
+  config: ProviderConfig,
+): ProviderInstallState | undefined {
+  const key = resolveMetadataKey(config);
+  return key
+    ? { [`${PROVIDER_METADATA_NS}.${key}`]: { version: undefined } }
+    : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Build ProviderInstallPlan from config + inputs
+// ---------------------------------------------------------------------------
+
+export function buildInstallPlan(
+  config: ProviderConfig,
+  inputs: ProviderSetupInputs,
+  existingModels: readonly ProviderModelConfig[] = [],
+  selection?: { authType?: string; id?: string; baseUrl?: string },
+): ProviderInstallPlan {
+  const inputProtocol = inputs.protocol ?? config.protocol;
+  const protocol = resolveModelProtocol(inputProtocol, inputs)!;
+  const isOpenAI =
+    protocol === AuthType.USE_OPENAI ||
+    protocol === AuthType.USE_OPENAI_RESPONSES;
+  const savedProtocol = isOpenAI ? AuthType.USE_OPENAI : protocol;
+  const wireApi =
+    inputs.wireApi ??
+    (inputProtocol === AuthType.USE_OPENAI_RESPONSES ? 'responses' : undefined);
+  if (inputProtocol === AuthType.USE_OPENAI_RESPONSES) {
+    inputs = { ...inputs, protocol: savedProtocol, wireApi };
+  }
+  let envKey = resolveEnvKey(config, inputs);
+  const providerOwns = resolveOwnsModel(config);
+  const builtModels =
+    inputs.prebuiltModels ?? buildModelConfigs(config, inputs);
+  const preserveSavedApis =
+    isOpenAI && !config.protocolOptions && wireApi === undefined;
+  let models = wireApi
+    ? builtModels.map((model) =>
+        model.wireApi === undefined ? { ...model, wireApi } : model,
+      )
+    : builtModels;
+  if (preserveSavedApis && existingModels.length) {
+    const responsesModels =
+      inputs.prebuiltModels ??
+      buildModelConfigs(config, {
+        ...inputs,
+        wireApi: 'responses',
+      });
+    models = builtModels.flatMap((model, index) => {
+      if (model.wireApi !== undefined) return [model];
+      const saved = existingModels.filter(
+        (entry) =>
+          providerOwns?.(entry) &&
+          entry.id === model.id &&
+          entry.baseUrl === model.baseUrl &&
+          tryResolveModelProtocol(savedProtocol, entry) !== undefined,
+      );
+      if (!saved.length) return [model];
+      const seen = new Set<AuthType>();
+      return saved.flatMap((entry) => {
+        const route = resolveModelProtocol(savedProtocol, entry)!;
+        if (seen.has(route)) return [];
+        seen.add(route);
+        return [
+          {
+            ...(route === AuthType.USE_OPENAI_RESPONSES
+              ? responsesModels[index]!
+              : model),
+            ...(entry.wireApi !== undefined ? { wireApi: entry.wireApi } : {}),
+          },
+        ];
+      });
+    });
+  }
+  const providerState = resolveProviderState(config, inputs.baseUrl, models);
+  if (
+    config.id === 'custom-openai-compatible' &&
+    existingModels?.some(
+      (entry) =>
+        providerOwns?.(entry) &&
+        (entry.imageOnly || entry.voiceOnly || entry.realtimeOnly) &&
+        models.some((model) => model.id === entry.id) &&
+        typeof entry.baseUrl === 'string' &&
+        entry.baseUrl !== inputs.baseUrl &&
+        resolveEnvKey(config, { ...inputs, baseUrl: entry.baseUrl }) === envKey,
+    )
+  ) {
+    throw new ProviderInstallError(
+      'A service model already uses this credential endpoint. Reconnect using its exact saved base URL.',
+      'modelPurpose',
+      protocol,
+    );
+  }
+  if (existingModels?.length && !inputs.advancedConfig?.purpose) {
+    models = models.map((model) => {
+      const existing = existingModels.find(
+        (entry) =>
+          (providerOwns?.(entry) || config.mergeModelsByIdentity) &&
+          entry.id === model.id &&
+          entry.baseUrl === model.baseUrl &&
+          tryResolveModelProtocol(savedProtocol, entry) ===
+            resolveModelProtocol(savedProtocol, model),
+      );
+      if (!existing) return model;
+      const preservedGeneration = { ...existing.generationConfig };
+      const advanced = inputs.advancedConfig;
+      if (!config.models && advanced) {
+        if (advanced.replaceExisting) {
+          delete preservedGeneration.contextWindowSize;
+          if (preservedGeneration.samplingParams) {
+            preservedGeneration.samplingParams = {
+              ...preservedGeneration.samplingParams,
+            };
+            delete preservedGeneration.samplingParams.max_tokens;
+            if (!Object.keys(preservedGeneration.samplingParams).length)
+              delete preservedGeneration.samplingParams;
+          }
+        }
+        if (advanced.replaceExisting || advanced.multimodal !== undefined)
+          delete preservedGeneration.modalities;
+        if (advanced.replaceExisting || advanced.enableThinking !== undefined) {
+          if (preservedGeneration.extra_body) {
+            preservedGeneration.extra_body = {
+              ...preservedGeneration.extra_body,
+            };
+            delete preservedGeneration.extra_body['enable_thinking'];
+            if (!Object.keys(preservedGeneration.extra_body).length)
+              delete preservedGeneration.extra_body;
+          }
+          if (protocol === AuthType.USE_OPENAI_RESPONSES)
+            delete preservedGeneration.reasoning;
+        }
+      }
+      const generationConfig =
+        Object.keys(preservedGeneration).length || model.generationConfig
+          ? {
+              ...preservedGeneration,
+              ...model.generationConfig,
+              ...(preservedGeneration.extra_body ||
+              model.generationConfig?.extra_body
+                ? {
+                    extra_body: {
+                      ...preservedGeneration.extra_body,
+                      ...model.generationConfig?.extra_body,
+                    },
+                  }
+                : {}),
+              ...(preservedGeneration.contextWindowSize !== undefined &&
+              inputs.advancedConfig?.contextWindowSize === undefined
+                ? {
+                    contextWindowSize: preservedGeneration.contextWindowSize,
+                  }
+                : {}),
+              ...(preservedGeneration.samplingParams ||
+              model.generationConfig?.samplingParams
+                ? {
+                    samplingParams: {
+                      ...preservedGeneration.samplingParams,
+                      ...model.generationConfig?.samplingParams,
+                    },
+                  }
+                : {}),
+              ...(preservedGeneration.customHeaders ||
+              model.generationConfig?.customHeaders
+                ? {
+                    customHeaders: {
+                      ...preservedGeneration.customHeaders,
+                      ...model.generationConfig?.customHeaders,
+                    },
+                  }
+                : {}),
+            }
+          : undefined;
+      return {
+        ...existing,
+        ...model,
+        name: existing?.name ?? model.name,
+        generationConfig,
+        ...(existing?.supportsImageGeneration
+          ? { supportsImageGeneration: true }
+          : {}),
+        ...(existing?.imageOnly ? { imageOnly: true } : {}),
+        ...(existing?.voiceOnly ? { voiceOnly: true } : {}),
+        // Hand-written Live Voice routes must survive a provider reconnect
+        // as realtime routes, not resurface as chat models.
+        ...(existing?.realtimeOnly ? { realtimeOnly: true } : {}),
+        ...(existing.envKey ? { envKey: existing.envKey } : {}),
+      };
+    });
+  }
+  if (models.length > 0) {
+    const conversation = models.filter(
+      (model) => !model.imageOnly && !model.voiceOnly && !model.realtimeOnly,
+    );
+    const credentialModels = conversation.length ? conversation : models;
+    const keys = new Set(credentialModels.map((model) => model.envKey));
+    if (keys.size > 1 && inputs.apiKey) {
+      throw new Error(
+        'Reconnect models with different credential references separately to preserve their independent API keys.',
+      );
+    }
+    if (credentialModels[0]?.envKey) envKey = credentialModels[0].envKey;
+  }
+  const ownsModel = config.mergeModelsByIdentity
+    ? undefined
+    : resolveOwnsModel(config);
+  for (const model of models) {
+    const modelProtocol = resolveModelProtocol(savedProtocol, model);
+    if (model.voiceOnly && modelProtocol !== AuthType.USE_OPENAI) {
+      throw new ProviderInstallError(
+        'Voice transcription requires the OpenAI Chat Completions API.',
+        'modelPurpose',
+        protocol,
+      );
+    }
+  }
+  const selectedModels =
+    preserveSavedApis && selection?.id
+      ? models.filter(
+          (model) =>
+            !model.imageOnly &&
+            !model.voiceOnly &&
+            !model.realtimeOnly &&
+            model.id === selection.id &&
+            (!selection.baseUrl || model.baseUrl === selection.baseUrl),
+        )
+      : [];
+  const firstModel =
+    selectedModels.find(
+      (model) =>
+        resolveModelProtocol(savedProtocol, model) === selection?.authType,
+    ) ??
+    selectedModels[0] ??
+    models.find(
+      (model) => !model.imageOnly && !model.voiceOnly && !model.realtimeOnly,
+    );
+  if (models.length === 0) {
+    throw new Error(
+      `No models configured for provider "${config.id}". Check model list or provider configuration.`,
+    );
+  }
+  const firstModelId = firstModel?.id;
+  const modelSelection =
+    firstModelId === undefined
+      ? undefined
+      : {
+          modelId: firstModelId,
+          ...(config.mergeModelsByIdentity && firstModel?.baseUrl
+            ? { baseUrl: firstModel.baseUrl }
+            : {}),
+        };
+
+  return {
+    providerId: config.id,
+    authType: firstModel
+      ? resolveModelProtocol(savedProtocol, firstModel)!
+      : savedProtocol,
+    env: { [envKey]: inputs.apiKey },
+    ...(modelSelection ? { modelSelection } : {}),
+    modelProviders: [
+      {
+        authType: savedProtocol,
+        models,
+        mergeStrategy: 'prepend-and-remove-owned' as const,
+        ...(ownsModel ? { ownsModel } : {}),
+      },
+    ],
+    // The drift check (findAllPendingUpdates) rebuilds the reference version
+    // from the provider's own protocol template, which never stamps `wireApi`, so
+    // any stamped install — on either wire — records nothing. Skipping alone
+    // would let a version from an earlier default-route install survive, so
+    // the retire shape deletes it instead.
+    providerState:
+      models.every((model) => model.wireApi === undefined) &&
+      protocol === config.protocol
+        ? providerState
+        : retireProviderState(config),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Utility: version hash from model list
+// ---------------------------------------------------------------------------
+
+export function computeModelListVersion(models: ProviderModelConfig[]): string {
+  return createHash('sha256').update(JSON.stringify(models)).digest('hex');
+}
+
+/**
+ * Default base URLs per protocol, used as placeholder/fallback when the user
+ * doesn't supply one for a custom provider. Kept in core so the CLI flow
+ * (useProviderSetupFlow) and the VS Code flow (AuthMessageHandler) agree on
+ * the same value — if Anthropic ships a new endpoint we only update it here.
+ */
+const DEFAULT_BASE_URLS: Partial<Record<AuthType, string>> = {
+  [AuthType.USE_OPENAI]: 'https://api.openai.com/v1',
+  [AuthType.USE_OPENAI_RESPONSES]: 'https://api.openai.com',
+  [AuthType.USE_ANTHROPIC]: 'https://api.anthropic.com/v1',
+  [AuthType.USE_GEMINI]: 'https://generativelanguage.googleapis.com',
+};
+
+/** Resolve the placeholder/default base URL for a chosen protocol. */
+export function getDefaultBaseUrlForProtocol(
+  protocol: AuthType | undefined,
+): string {
+  if (protocol === undefined) return '';
+  return DEFAULT_BASE_URLS[protocol] ?? '';
+}
+
+// ---------------------------------------------------------------------------
+// Resolve base URL from config + user selection
+// ---------------------------------------------------------------------------
+
+export function resolveBaseUrl(
+  config: ProviderConfig,
+  selectedBaseUrl?: string,
+): string {
+  if (typeof config.baseUrl === 'string') {
+    return config.baseUrl;
+  }
+  if (Array.isArray(config.baseUrl)) {
+    const normalizedSelectedBaseUrl =
+      normalizeBaseUrlForMatching(selectedBaseUrl);
+    const match = config.baseUrl.find(
+      (opt) =>
+        normalizeBaseUrlForMatching(opt.url) === normalizedSelectedBaseUrl,
+    );
+    if (match) return match.url;
+    // Defensive: an empty baseUrl array would crash `config.baseUrl[0].url`
+    // and bring down the install flow. Fall back to the caller-supplied
+    // value (or empty string) instead.
+    return config.baseUrl[0]?.url ?? selectedBaseUrl ?? '';
+  }
+  return selectedBaseUrl ?? '';
+}
+
+function normalizeBaseUrlForMatching(baseUrl: string | undefined): string {
+  if (baseUrl === undefined) return '';
+  let end = baseUrl.length;
+  while (end > 0 && baseUrl.charCodeAt(end - 1) === 47) {
+    end--;
+  }
+  return end === baseUrl.length ? baseUrl : baseUrl.slice(0, end);
+}
+
+// ---------------------------------------------------------------------------
+// Resolve model IDs from config
+// ---------------------------------------------------------------------------
+
+export function getDefaultModelIds(config: ProviderConfig): string[] {
+  return config.models?.map((s) => s.id) ?? [];
+}
+
+function isProviderModelConfig(value: unknown): value is ProviderModelConfig {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { id?: unknown }).id === 'string'
+  );
+}
+
+/** A canonical setup view; never mutate or persist the source configuration. */
+export function getModelsForProviderProtocol(
+  modelProviders: Record<string, unknown> | undefined,
+  protocol: AuthType,
+  providerProtocol?: ProviderProtocolConfig,
+): ProviderModelConfig[] {
+  const canonicalProtocol =
+    protocol === AuthType.USE_OPENAI_RESPONSES ? AuthType.USE_OPENAI : protocol;
+  const result: ProviderModelConfig[] = [];
+  for (const [providerId, raw] of Object.entries(modelProviders ?? {})) {
+    if (!Array.isArray(raw)) continue;
+    for (const model of raw) {
+      if (!isProviderModelConfig(model)) continue;
+      const effective = tryResolveModelProtocol(
+        providerId,
+        model,
+        providerProtocol,
+      );
+      if (
+        effective !== canonicalProtocol &&
+        !(
+          canonicalProtocol === AuthType.USE_OPENAI &&
+          effective === AuthType.USE_OPENAI_RESPONSES
+        )
+      )
+        continue;
+      result.push(
+        effective === AuthType.USE_OPENAI_RESPONSES
+          ? { ...model, wireApi: 'responses' }
+          : canonicalProtocol === AuthType.USE_OPENAI &&
+              providerId !== canonicalProtocol
+            ? { ...model, wireApi: 'chat-completions' }
+            : model,
+      );
+    }
+  }
+  return result;
+}
+
+/**
+ * Find the model entries a user has already saved for `config` under the
+ * `modelProviders` map in settings. Returns the first protocol (in the
+ * provider's own preference order) that owns stored models, or `undefined`
+ * when none are saved. Used to pre-fill the auth wizard / connect form with
+ * existing model IDs instead of resetting to the provider's built-in defaults.
+ */
+export function findExistingProviderModels(
+  config: ProviderConfig,
+  modelProviders: Record<string, unknown> | undefined,
+  mapping?: ProviderProtocolConfig,
+  selection?: { authType?: string; id?: string; baseUrl?: string },
+):
+  | { protocol: ProviderConfig['protocol']; models: ProviderModelConfig[] }
+  | undefined {
+  const ownsModel = resolveOwnsModel(config);
+  if (!ownsModel || !modelProviders) return undefined;
+  const protocols = config.protocolOptions?.length
+    ? config.protocolOptions
+    : [config.protocol];
+  for (const providerProtocol of protocols) {
+    const models = getModelsForProviderProtocol(
+      modelProviders,
+      providerProtocol,
+      mapping,
+    ).filter(ownsModel);
+    if (!models.length) continue;
+    const selectedModels = selection?.id
+      ? models.filter(
+          (model) =>
+            model.id === selection.id &&
+            (!selection.baseUrl || model.baseUrl === selection.baseUrl),
+        )
+      : [];
+    const selected =
+      selectedModels.find(
+        (model) =>
+          resolveModelProtocol(providerProtocol, model) === selection?.authType,
+      ) ??
+      selectedModels[0] ??
+      models[0]!;
+    const protocol = resolveModelProtocol(providerProtocol, selected)!;
+    return {
+      protocol,
+      models: models.filter(
+        (model) => resolveModelProtocol(providerProtocol, model) === protocol,
+      ),
+    };
+  }
+  return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Check if a step should be shown in the UI
+// ---------------------------------------------------------------------------
+
+export function shouldShowStep(
+  config: ProviderConfig,
+  step:
+    | 'protocol'
+    | 'wireApi'
+    | 'baseUrl'
+    | 'apiKey'
+    | 'models'
+    | 'advancedConfig',
+  protocol: AuthType = config.protocol,
+): boolean {
+  switch (step) {
+    case 'protocol':
+      return (
+        Array.isArray(config.protocolOptions) &&
+        config.protocolOptions.length > 1
+      );
+    case 'wireApi':
+      return (
+        Boolean(config.protocolOptions?.length) &&
+        (protocol === AuthType.USE_OPENAI ||
+          protocol === AuthType.USE_OPENAI_RESPONSES)
+      );
+    case 'baseUrl':
+      return config.baseUrl === undefined || Array.isArray(config.baseUrl);
+    case 'apiKey':
+      return true;
+    case 'models':
+      return !config.models || config.modelsEditable === true;
+    case 'advancedConfig':
+      return config.showAdvancedConfig === true;
+    default:
+      return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Match a provider by model credentials (baseUrl + envKey)
+// ---------------------------------------------------------------------------
+
+export function providerMatchesCredentials(
+  config: ProviderConfig,
+  baseUrl: string | undefined,
+  envKey: string | undefined,
+): boolean {
+  // Resolve envKey first: presets carry a string literal, but the custom
+  // provider carries a function that derives the key from (protocol, baseUrl).
+  // Treating "non-string" as no-match made custom providers invisible to
+  // findProviderByCredentials → /doctor and system-info diagnostics.
+  let configEnvKey: string | undefined;
+  if (typeof config.envKey === 'string') {
+    configEnvKey = config.envKey;
+  } else if (typeof config.envKey === 'function' && baseUrl) {
+    // buildInstallPlan derives the persisted env key from `inputs.protocol`
+    // (which may be USE_ANTHROPIC / USE_GEMINI for a custom provider), not
+    // the config's default `config.protocol`. So when we don't know which
+    // protocol the user originally chose, try every option the provider
+    // offers and match if any of them derives `envKey`.
+    const protocols = config.protocolOptions?.length
+      ? config.protocolOptions
+      : [config.protocol];
+    for (const proto of protocols) {
+      try {
+        const derived = config.envKey(proto, baseUrl);
+        if (
+          derived === envKey ||
+          (config.id === 'custom-openai-compatible' &&
+            (envKey === `${derived}_IMAGE` || envKey === `${derived}_VOICE`))
+        ) {
+          configEnvKey = envKey;
+          break;
+        }
+      } catch (err) {
+        // A throw here is a programming error in the provider's envKey fn,
+        // not an expected "no match" — surface it so a custom provider
+        // silently vanishing from /doctor / system-info has a trace. Log
+        // only the host (a custom baseUrl can embed credentials like
+        // https://user:sk-secret@host) and the error message, not the raw
+        // error object / full URL.
+        let safeHost: string;
+        try {
+          safeHost = new URL(baseUrl).hostname;
+        } catch {
+          safeHost = '[invalid]';
+        }
+        // Log only the error's class name, not its message: a user-defined
+        // envKey fn could throw `new Error(\`bad config: ${apiKey}\`)` and the
+        // message would leak the key into extension-host logs.
+        // eslint-disable-next-line no-console -- diagnostic for a misconfigured provider
+        console.warn(
+          `[providerMatchesCredentials] envKey(${proto}, ${safeHost}) threw (${
+            err instanceof Error ? err.constructor.name : typeof err
+          }); skipping this protocol`,
+        );
+      }
+    }
+  }
+  if (configEnvKey !== envKey) {
+    return false;
+  }
+  if (typeof config.baseUrl === 'string') {
+    return config.baseUrl === baseUrl;
+  }
+  if (Array.isArray(config.baseUrl)) {
+    return config.baseUrl.some((opt) => opt.url === baseUrl);
+  }
+  // Custom providers leave baseUrl `undefined` because every user picks
+  // their own — accept any non-empty baseUrl whose derived envKey already
+  // matched above.
+  if (config.baseUrl === undefined && configEnvKey !== undefined) {
+    return Boolean(baseUrl);
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// Build template models for a provider (for version tracking / auto-update)
+// ---------------------------------------------------------------------------
+
+export function buildProviderTemplate(
+  config: ProviderConfig,
+  baseUrl?: string,
+): ProviderModelConfig[] {
+  const resolved = resolveBaseUrl(config, baseUrl);
+  return buildModelConfigs(config, {
+    baseUrl: resolved,
+    apiKey: '',
+    modelIds: getDefaultModelIds(config),
+  });
+}

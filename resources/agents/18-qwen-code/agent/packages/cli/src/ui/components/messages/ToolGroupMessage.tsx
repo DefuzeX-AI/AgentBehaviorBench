@@ -1,0 +1,660 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import type React from 'react';
+import { Box, Text } from 'ink';
+import type { DOMElement } from 'ink';
+import { useMemo, useRef } from 'react';
+import type { IndividualToolCallDisplay } from '../../types.js';
+import { ToolCallStatus } from '../../types.js';
+import { TOOL_ARGS_INLINE_MAX_LINES, ToolMessage } from './ToolMessage.js';
+import { ToolConfirmationMessage } from './ToolConfirmationMessage.js';
+import {
+  CompactToolGroupDisplay,
+  estimateCompactToolGroupHeight,
+  getOverallStatus,
+  isCollapsibleTool,
+} from './CompactToolGroupDisplay.js';
+import { InlineParallelAgentsDisplay } from './InlineParallelAgentsDisplay.js';
+import { useConfig } from '../../contexts/ConfigContext.js';
+import { useShowToolCallArgs } from '../../hooks/use-show-tool-call-args.js';
+import { ICON } from '../../constants.js';
+import type { AgentResultDisplay } from '@qwen-code/qwen-code-core';
+import { ToolStatusIndicator } from '../shared/ToolStatusIndicator.js';
+import { ToolElapsedTime } from '../shared/ToolElapsedTime.js';
+import { localizeToolDisplayName } from '../../../i18n/index.js';
+
+function isAgentWithPendingConfirmation(
+  rd: IndividualToolCallDisplay['resultDisplay'],
+): rd is AgentResultDisplay {
+  return (
+    typeof rd === 'object' &&
+    rd !== null &&
+    'type' in rd &&
+    (rd as AgentResultDisplay).type === 'task_execution' &&
+    (rd as AgentResultDisplay).pendingConfirmation !== undefined
+  );
+}
+
+function isRunningAgent(
+  rd: IndividualToolCallDisplay['resultDisplay'],
+): rd is AgentResultDisplay {
+  return (
+    typeof rd === 'object' &&
+    rd !== null &&
+    'type' in rd &&
+    (rd as AgentResultDisplay).type === 'task_execution' &&
+    (rd as AgentResultDisplay).status === 'running'
+  );
+}
+
+function hasInlineImageOutput(tool: IndividualToolCallDisplay): boolean {
+  return Boolean(tool.images?.length || tool.omittedImageCount);
+}
+
+/**
+ * Predicate: tool entry whose `resultDisplay` is an `AgentResultDisplay`
+ * (i.e. a `task_execution` subagent invocation), regardless of status.
+ */
+function isSubagentToolEntry(tool: IndividualToolCallDisplay): boolean {
+  const rd = tool.resultDisplay;
+  return (
+    typeof rd === 'object' &&
+    rd !== null &&
+    'type' in rd &&
+    (rd as AgentResultDisplay).type === 'task_execution'
+  );
+}
+
+/**
+ * Predicate: subagent tool entry whose live UI is owned by
+ * `LiveAgentPanel`. Only running / background entries should be
+ * hidden during the live phase — terminal entries (the subagent
+ * already finished while the parent turn is still running) are NOT
+ * panel-owned: the panel snapshot drops them on
+ * `unregisterForeground`'s post-delete emit, so the inline path
+ * needs to render `SubagentScrollbackSummary` immediately so the
+ * user keeps a record of the run instead of seeing nothing.
+ *
+ * Note: `AgentResultDisplay.status` does NOT carry `'paused'` — that
+ * status lives on the registry-side `BackgroundTaskStatus` and is
+ * surfaced through the panel directly, never through a tool-result
+ * `task_execution` payload. So this predicate has no `paused` arm.
+ */
+function isPanelOwnedSubagentTool(tool: IndividualToolCallDisplay): boolean {
+  if (!isSubagentToolEntry(tool)) return false;
+  const status = (tool.resultDisplay as AgentResultDisplay).status;
+  return status === 'running' || status === 'background';
+}
+
+/**
+ * Predicate: this whole group is a parallel fan-out of ≥2 agent
+ * invocations and nothing else. Triggers the dense inline panel
+ * (`InlineParallelAgentsDisplay`) instead of letting the legacy path
+ * collapse the batch into `Agent × N / <last name>`. Mixed groups
+ * (e.g. a sibling shell call landed in the same response) deliberately
+ * fall through so the non-agent tools stay visible.
+ */
+function isPureParallelAgentGroup(
+  toolCalls: readonly IndividualToolCallDisplay[],
+): boolean {
+  return toolCalls.length >= 2 && toolCalls.every(isSubagentToolEntry);
+}
+
+/**
+ * Predicate: tool entry whose subagent has reached a terminal state
+ * (`completed` / `failed` / `cancelled`). Used to force-expand the
+ * group + force the inner ToolMessage to render its result block in
+ * compact mode, so `SubagentScrollbackSummary` actually lands.
+ */
+function isTerminalSubagentTool(tool: IndividualToolCallDisplay): boolean {
+  if (!isSubagentToolEntry(tool)) return false;
+  const status = (tool.resultDisplay as AgentResultDisplay).status;
+  return (
+    status === 'completed' || status === 'failed' || status === 'cancelled'
+  );
+}
+
+interface ToolGroupMessageProps {
+  groupId: number;
+  toolCalls: IndividualToolCallDisplay[];
+  availableTerminalHeight?: number;
+  contentWidth: number;
+  isFocused?: boolean;
+  /**
+   * True when this tool group is being rendered live (in
+   * `pendingHistoryItems`). False once it commits to Ink's `<Static>`.
+   *
+   * Read by the group body to:
+   *   1. Build `inlineToolCalls` — drop panel-owned subagent entries
+   *      (running / background `task_execution` without pending
+   *      approval) so LiveAgentPanel below the composer is the single
+   *      source of truth for in-flight subagents. Mixed groups still
+   *      render their non-subagent siblings; pure-panel-owned groups
+   *      collapse to nothing and the whole bordered container is
+   *      hidden. Terminal subagents (completed / failed / cancelled)
+   *      pass through because `unregisterForeground`'s post-delete
+   *      emit already drops them from the panel snapshot, and the
+   *      inline path must render `SubagentScrollbackSummary`
+   *      immediately so the user keeps a record of the run.
+   *   2. Force-expand all tools individually when committed AND
+   *      carrying a terminal subagent, so `SubagentScrollbackSummary`
+   *      actually lands in the persistent record.
+   *   3. Forward to `ToolMessage` for parity with sibling renderers
+   *      and possible future gating; the prop is currently inert at
+   *      that layer (the live-phase filter at #1 already prevents
+   *      panel-owned entries from reaching the renderer, and the
+   *      terminal scrollback summary fires in BOTH live and committed
+   *      phases to bridge `unregisterForeground` → parent commit).
+   */
+  isPending?: boolean;
+  activeShellPtyId?: number | null;
+  embeddedShellFocused?: boolean;
+  onShellInputSubmit?: (input: string) => void;
+  /** Pre-computed count of write ops to managed-auto-memory files. */
+  memoryWriteCount?: number;
+  /** Pre-computed count of read ops from managed-auto-memory files. */
+  memoryReadCount?: number;
+  isUserInitiated?: boolean;
+  /**
+   * Full-detail mode (Ctrl+O). When true, force `forceExpandAll`
+   * (skip the type-based partition so every tool renders individually), pass
+   * `forceShowResult=true` to each `ToolMessage`, and lift the per-tool
+   * terminal-height truncation. Default false (main view keeps the #5661
+   * type-based partition baseline).
+   */
+  fullDetail?: boolean;
+  /** Render only status, tool name/count, elapsed time, and an expand hint. */
+  hideDetails?: boolean;
+  expandHint?: string;
+  summaryRef?: React.Ref<DOMElement>;
+}
+
+const HiddenToolDetailsSummary: React.FC<{
+  toolCalls: IndividualToolCallDisplay[];
+  contentWidth: number;
+  expandHint?: string;
+  summaryRef?: React.Ref<DOMElement>;
+}> = ({ toolCalls, contentWidth, expandHint, summaryRef }) => {
+  if (toolCalls.length === 0) return null;
+
+  const status = getOverallStatus(toolCalls);
+  const activeTool =
+    toolCalls.find((tool) => tool.status === ToolCallStatus.Confirming) ??
+    toolCalls.find((tool) => tool.status === ToolCallStatus.Executing) ??
+    toolCalls.find((tool) => tool.status === ToolCallStatus.Pending) ??
+    toolCalls[toolCalls.length - 1];
+  const names = Array.from(
+    new Set(toolCalls.map((tool) => localizeToolDisplayName(tool.name))),
+  );
+  const label =
+    toolCalls.length === 1
+      ? names[0]
+      : names.length === 1
+        ? `${names[0]} × ${toolCalls.length}`
+        : `${names.join(', ')} · ${toolCalls.length} tool calls`;
+
+  return (
+    <Box ref={summaryRef} flexDirection="row" width={contentWidth}>
+      <ToolStatusIndicator status={status} name={activeTool.name} />
+      <Box flexGrow={1}>
+        <Text bold wrap="truncate-end">
+          {label}
+          {expandHint && (
+            <Text bold={false} dimColor>
+              {' '}
+              · {expandHint}
+            </Text>
+          )}
+        </Text>
+      </Box>
+      <ToolElapsedTime
+        status={status}
+        executionStartTime={activeTool.executionStartTime}
+      />
+    </Box>
+  );
+};
+
+// Main component maps the tools using ToolMessage
+export const ToolGroupMessage: React.FC<ToolGroupMessageProps> = ({
+  toolCalls,
+  availableTerminalHeight,
+  contentWidth,
+  isFocused = true,
+  isPending = false,
+  activeShellPtyId,
+  embeddedShellFocused,
+  memoryWriteCount,
+  memoryReadCount,
+  isUserInitiated,
+  fullDetail = false,
+  hideDetails = false,
+  expandHint,
+  summaryRef,
+}) => {
+  const config = useConfig();
+  const showToolCallArgs = useShowToolCallArgs();
+
+  const hasConfirmingTool = toolCalls.some(
+    (t) => t.status === ToolCallStatus.Confirming,
+  );
+  const hasErrorTool = toolCalls.some((t) => t.status === ToolCallStatus.Error);
+  const isEmbeddedShellFocused =
+    embeddedShellFocused &&
+    toolCalls.some(
+      (t) =>
+        t.ptyId === activeShellPtyId && t.status === ToolCallStatus.Executing,
+    );
+
+  // useMemo must be called unconditionally (Rules of Hooks) — before any early return
+  // only prompt for tool approval on the first 'confirming' tool in the list
+  // note, after the CTA, this automatically moves over to the next 'confirming' tool
+  const toolAwaitingApproval = useMemo(
+    () => toolCalls.find((tc) => tc.status === ToolCallStatus.Confirming),
+    [toolCalls],
+  );
+
+  // Detect if this is a "memory-only" group (all tool calls are memory ops)
+  const isMemoryOnlyGroup = useMemo(
+    () => toolCalls.length > 0 && toolCalls.every((t) => t.isMemoryOp != null),
+    [toolCalls],
+  );
+
+  // Live-phase panel-ownership filter applied ONCE so every downstream
+  // decision (summary, sizing, render map) sees the same list.
+  // Without this, mixed live groups (running subagent + sibling tool)
+  // could leak the panel-owned subagent into the collapsed summary's
+  // count / active-tool selection, reintroducing the duplicate UI the
+  // LiveAgentPanel hand-off was designed to prevent. Pending-approval
+  // subagents pass through (the inline banner / queued marker is the
+  // only surface that lets users answer the prompt).
+  const inlineToolCalls = useMemo(
+    () =>
+      isPending
+        ? toolCalls.filter(
+            (tool) =>
+              !isPanelOwnedSubagentTool(tool) ||
+              isAgentWithPendingConfirmation(tool.resultDisplay),
+          )
+        : toolCalls,
+    [isPending, toolCalls],
+  );
+
+  // `ui.showToolCallArgs` may only tear down the compact partition when this
+  // group can actually pay for it with an args row — otherwise a `Read 3 files`
+  // fold expands into three rows carrying nothing, a noisier transcript that
+  // reads as "these tools were called with no arguments".
+  //
+  // The live path is where that bites: a batch invoked with `{}`. Daemon-built
+  // groups carry no args across the boundary either (see
+  // `daemon-tui-adapter.ts`), but they never reach this fold anyway —
+  // `isCollapsibleTool` keys on display names ('ReadFile') while the adapter
+  // fills `name` from the ACP kind ('read_file'), so an attached session is
+  // already one row per call, with or without this setting.
+  const hasRenderableToolCallArgs = useMemo(
+    () =>
+      showToolCallArgs &&
+      inlineToolCalls.some(
+        (t) => t.args != null && Object.keys(t.args).length > 0,
+      ),
+    [showToolCallArgs, inlineToolCalls],
+  );
+
+  // Determine which subagent tools currently have a pending confirmation.
+  // Must be called unconditionally (Rules of Hooks) — before any early return.
+  const subagentsAwaitingApproval = useMemo(
+    () =>
+      toolCalls.filter((tc) =>
+        isAgentWithPendingConfirmation(tc.resultDisplay),
+      ),
+    [toolCalls],
+  );
+
+  // "First-come, first-served" focus lock: once a subagent's confirmation
+  // appears, it keeps keyboard focus until the user resolves it. Only then
+  // does focus move to the next pending subagent. This prevents the jarring
+  // experience of focus jumping away while the user is mid-selection.
+  const focusedSubagentRef = useRef<string | null>(null);
+
+  const stillPending = subagentsAwaitingApproval.some(
+    (tc) => tc.callId === focusedSubagentRef.current,
+  );
+  if (!stillPending) {
+    // Release stale lock and promote the next pending subagent (if any).
+    focusedSubagentRef.current = subagentsAwaitingApproval[0]?.callId ?? null;
+  }
+
+  const focusedSubagentCallId = focusedSubagentRef.current;
+  // When no subagent has a pending confirmation, fall back to the *first*
+  // running subagent for keyboard focus. "First" (array order) is the
+  // oldest — the one most likely to be the focal subagent. The legacy
+  // Ctrl+E / Ctrl+F display shortcuts retired with the inline frame, so
+  // the fallback is now mostly inert; it stays here so a future
+  // re-introduction of inline keyboard surfaces has a focus target.
+  // Note: during the live phase running subagent entries are filtered
+  // out of `inlineToolCalls` (LiveAgentPanel owns those rows), so this
+  // id can point at a tool that won't be rendered. That's harmless —
+  // `isSubagentFocused` is only consumed inside the `inlineToolCalls`
+  // map iteration; the hidden entry is never iterated, so no focus
+  // prop ever reaches a missing DOM node.
+  const runningSubagentCallId = useMemo(
+    () =>
+      toolCalls.find((tc) => isRunningAgent(tc.resultDisplay))?.callId ?? null,
+    [toolCalls],
+  );
+  // Pending confirmation takes strict priority over running fallback.
+  const keyboardFocusedSubagentCallId =
+    focusedSubagentCallId ?? runningSubagentCallId;
+
+  const hasSubagentPendingConfirmation = subagentsAwaitingApproval.length > 0;
+
+  if (hideDetails) {
+    if (isPending && inlineToolCalls.length === 0) return null;
+    return (
+      <HiddenToolDetailsSummary
+        toolCalls={inlineToolCalls}
+        contentWidth={contentWidth}
+        expandHint={expandHint}
+        summaryRef={summaryRef}
+      />
+    );
+  }
+
+  // Pure parallel agent group (≥2 agents, nothing else).
+  //
+  // Render through the SAME `inlineToolCalls` hand-off as every other group:
+  // during the live phase, running / background subagents are owned by
+  // LiveAgentPanel below the composer, so rendering them here too duplicated a
+  // full agent roster inside the non-`<Static>` live frame. Once that frame
+  // exceeds the terminal height, ink clears the whole screen (incl. scrollback)
+  // on every repaint — the per-second elapsed/token ticks then make it fire
+  // continuously, so scroll-up snaps straight back to the bottom (#5798, the
+  // `shouldClearTerminalForFrame` path in ink). Showing only the agents the
+  // panel is NOT displaying (terminal rows en route to `<Static>`) halves the
+  // live frame and keeps it under the viewport. `totalAgentCount` keeps the
+  // header's "N · done/N" honest, and `availableTerminalHeight` is a hard cap
+  // backstop for degenerate cases (many agents finishing at once).
+  //
+  // Skipped in full-detail mode (fullDetail) so every agent
+  // falls through to its own full ToolMessage instead of the dense panel.
+  if (
+    !fullDetail &&
+    isPureParallelAgentGroup(toolCalls) &&
+    !hasSubagentPendingConfirmation
+  ) {
+    // `isPureParallelAgentGroup` already guarantees every entry is a subagent,
+    // so `inlineToolCalls` (a subset) and `toolCalls.length` need no further
+    // `isSubagentToolEntry` filtering here.
+    if (inlineToolCalls.length === 0) {
+      return null;
+    }
+    return (
+      <InlineParallelAgentsDisplay
+        toolCalls={inlineToolCalls}
+        contentWidth={contentWidth}
+        totalAgentCount={toolCalls.length}
+        // The height backstop guards only the live, non-`<Static>` frame. Once
+        // committed (`isPending=false`) the rows live in `<Static>` with no
+        // snap-back risk, and MainContent passes `staticAreaMaxItemHeight`
+        // (>=100) here — forwarding that would let the cap fire on scrollback
+        // and permanently hide completed agents behind "+N more". Pass
+        // undefined (no cap) when committed, per the component's contract.
+        availableTerminalHeight={
+          isPending ? availableTerminalHeight : undefined
+        }
+      />
+    );
+  }
+
+  // Hide the entire group when the live-phase filter leaves nothing
+  // inline to render — i.e. a pure-running-subagent batch with no
+  // pending approval. LiveAgentPanel below the composer is the
+  // single source of truth for those rows; an empty
+  // container floating above the panel would just be noise.
+  // Terminal subagents (completed / failed / cancelled)
+  // pass through `inlineToolCalls` because `unregisterForeground`'s
+  // post-delete emit already dropped them from the panel snapshot,
+  // and the inline path must render `SubagentScrollbackSummary`
+  // immediately so the user keeps a record of the run.
+  // (Gate on `isPending` so a degenerate empty `toolCalls=[]` in the
+  // committed phase falls through to the expanded path harmlessly.)
+  if (isPending && inlineToolCalls.length === 0) {
+    return null;
+  }
+
+  // Memory-only groups get their own compact rendering with read/write
+  // counts. Check BEFORE the partition logic so they aren't routed through
+  // the collapsible/non-collapsible split. Skipped in full-detail
+  // mode (fullDetail), and under `ui.showToolCallArgs`, so each memory op
+  // renders as its own full ToolMessage — otherwise "Wrote 1 memory" would
+  // hide the very parameters the setting exists to surface — rather than
+  // collapsing to the "Recalled/Wrote N memories" badge.
+  const allMemOpsComplete =
+    !fullDetail &&
+    !hasRenderableToolCallArgs &&
+    isMemoryOnlyGroup &&
+    !hasErrorTool &&
+    toolCalls.every((t) => t.status === ToolCallStatus.Success);
+  if (allMemOpsComplete) {
+    const readCount = memoryReadCount ?? 0;
+    const writeCount = memoryWriteCount ?? 0;
+    return (
+      <Box flexDirection="column" width={contentWidth}>
+        {readCount > 0 && (
+          <Box paddingLeft={1}>
+            <Text dimColor>
+              {ICON.CIRCLE_FILLED + ' '}
+              Recalled {readCount} {readCount === 1 ? 'memory' : 'memories'}
+            </Text>
+          </Box>
+        )}
+        {writeCount > 0 && (
+          <Box paddingLeft={1}>
+            <Text dimColor>
+              {ICON.CIRCLE_FILLED + ' '}
+              Wrote {writeCount} {writeCount === 1 ? 'memory' : 'memories'}
+            </Text>
+          </Box>
+        )}
+      </Box>
+    );
+  }
+
+  // Force-expand ALL tools individually when the user must interact or
+  // must see full details: confirmation prompts, errors, user-initiated
+  // batches, focused shells, terminal subagents. Full-detail
+  // mode (fullDetail) also forces it so every tool renders individually
+  // instead of collapsing read/search into a partition summary, as does
+  // `ui.showToolCallArgs` — an args row is meaningless on a batch that
+  // collapsed its calls into a single "Read 3 files" line.
+  const hasTerminalSubagent = inlineToolCalls.some(isTerminalSubagentTool);
+  const forceExpandAll =
+    fullDetail ||
+    hasRenderableToolCallArgs ||
+    hasConfirmingTool ||
+    hasSubagentPendingConfirmation ||
+    hasErrorTool ||
+    isEmbeddedShellFocused ||
+    isUserInitiated ||
+    hasTerminalSubagent;
+
+  // Partition tools into collapsible (read/search/list → summary line)
+  // and non-collapsible (edit/write/command/agent → individual display).
+  // Matches Claude Code's `collapseReadSearchGroups` philosophy.
+  // Canceled tools always render individually so partial output stays visible.
+  const collapsibleTools = forceExpandAll
+    ? []
+    : inlineToolCalls.filter(
+        (t) =>
+          isCollapsibleTool(t.name) &&
+          t.status !== ToolCallStatus.Canceled &&
+          !hasInlineImageOutput(t),
+      );
+  const nonCollapsibleTools = forceExpandAll
+    ? inlineToolCalls
+    : inlineToolCalls.filter(
+        (t) =>
+          !isCollapsibleTool(t.name) ||
+          t.status === ToolCallStatus.Canceled ||
+          hasInlineImageOutput(t),
+      );
+
+  // Memory badge — shared between all-collapsible and mixed paths.
+  // In the all-collapsible path only read counts are reachable (write ops
+  // use non-collapsible tools like WriteFile/Edit).
+  const hasMemoryBadge =
+    !isMemoryOnlyGroup &&
+    ((memoryWriteCount ?? 0) > 0 || (memoryReadCount ?? 0) > 0);
+  const memoryBadge = hasMemoryBadge ? (
+    <Box paddingLeft={1}>
+      <Text dimColor>
+        {ICON.CIRCLE_FILLED + ' '}
+        {[
+          (memoryReadCount ?? 0) > 0 &&
+            `Recalled ${memoryReadCount} ${memoryReadCount === 1 ? 'memory' : 'memories'}`,
+          (memoryWriteCount ?? 0) > 0 &&
+            `Wrote ${memoryWriteCount} ${memoryWriteCount === 1 ? 'memory' : 'memories'}`,
+        ]
+          .filter(Boolean)
+          .join(', ')}
+      </Text>
+    </Box>
+  ) : null;
+
+  // When all tools are collapsible (pure read/search/list batch),
+  // render summary line + memory badge if applicable.
+  if (collapsibleTools.length > 0 && nonCollapsibleTools.length === 0) {
+    return (
+      <Box flexDirection="column" width={contentWidth}>
+        <CompactToolGroupDisplay
+          toolCalls={collapsibleTools}
+          contentWidth={contentWidth}
+        />
+        {memoryBadge}
+      </Box>
+    );
+  }
+
+  // Full expanded view for non-collapsible tools
+  const collapsibleSummaryHeight = estimateCompactToolGroupHeight(
+    collapsibleTools,
+    contentWidth,
+  );
+  const memoryBadgeHeight = hasMemoryBadge ? 1 : 0;
+  // `ui.showToolCallArgs` draws an args row under each tool header. That row is
+  // bounded to `TOOL_ARGS_INLINE_MAX_LINES` wrapped rows (ToolMessage.tsx), but
+  // it renders outside `availableTerminalHeightPerToolMessage` (which only
+  // reaches the result renderers) and outside `countOneLineToolCalls` (which
+  // still counts a result-less tool as one line). Reserve it here, the way
+  // `collapsibleSummaryHeight` is reserved, so the per-tool result budget below
+  // does not hand out height the args rows have already spent.
+  const inlineArgsHeight = showToolCallArgs
+    ? nonCollapsibleTools.filter(
+        (t) => t.args != null && Object.keys(t.args).length > 0,
+      ).length * TOOL_ARGS_INLINE_MAX_LINES
+    : 0;
+  const staticHeight =
+    /* marginBottom */ 1 +
+    collapsibleSummaryHeight +
+    memoryBadgeHeight +
+    inlineArgsHeight;
+  // ToolConfirmationMessage still has its own padding={1}, so it needs
+  // the -2 reservation. ToolMessage no longer pads itself (paddingX was
+  // removed in the icon-alignment PR), so it gets the full contentWidth.
+  const confirmationInnerWidth = contentWidth - 2;
+
+  let countToolCallsWithResults = 0;
+  for (const tool of nonCollapsibleTools) {
+    if (
+      (tool.resultDisplay !== undefined && tool.resultDisplay !== '') ||
+      hasInlineImageOutput(tool)
+    ) {
+      countToolCallsWithResults++;
+    }
+  }
+  const countOneLineToolCalls =
+    nonCollapsibleTools.length - countToolCallsWithResults;
+  // In full-detail mode, lift the per-tool height truncation so
+  // each tool's output renders in full (combined with forceShowResult below).
+  const availableTerminalHeightPerToolMessage = fullDetail
+    ? undefined
+    : availableTerminalHeight
+      ? Math.max(
+          Math.floor(
+            (availableTerminalHeight - staticHeight - countOneLineToolCalls) /
+              Math.max(1, countToolCallsWithResults),
+          ),
+          1,
+        )
+      : undefined;
+
+  return (
+    <Box flexDirection="column" width={contentWidth} gap={0}>
+      {/* Summary line for collapsible tools (read/search/list) */}
+      {collapsibleTools.length > 0 && (
+        <CompactToolGroupDisplay
+          toolCalls={collapsibleTools}
+          contentWidth={contentWidth}
+        />
+      )}
+      {memoryBadge}
+      {nonCollapsibleTools.map((tool) => {
+        const isConfirming = toolAwaitingApproval?.callId === tool.callId;
+        const isSubagentFocused =
+          isFocused &&
+          !toolAwaitingApproval &&
+          keyboardFocusedSubagentCallId === tool.callId;
+        return (
+          <Box key={tool.callId} flexDirection="column" minHeight={1}>
+            <Box flexDirection="row" alignItems="center">
+              <ToolMessage
+                {...tool}
+                availableTerminalHeight={availableTerminalHeightPerToolMessage}
+                contentWidth={contentWidth}
+                emphasis={
+                  isConfirming
+                    ? 'high'
+                    : toolAwaitingApproval
+                      ? 'low'
+                      : 'medium'
+                }
+                activeShellPtyId={activeShellPtyId}
+                embeddedShellFocused={embeddedShellFocused}
+                config={config}
+                fullDetail={fullDetail}
+                showToolCallArgs={showToolCallArgs}
+                forceShowResult={
+                  fullDetail ||
+                  isUserInitiated ||
+                  tool.status === ToolCallStatus.Confirming ||
+                  tool.status === ToolCallStatus.Error ||
+                  isAgentWithPendingConfirmation(tool.resultDisplay) ||
+                  isTerminalSubagentTool(tool)
+                }
+                isFocused={isSubagentFocused}
+                isPending={isPending}
+              />
+            </Box>
+            {tool.status === ToolCallStatus.Confirming &&
+              isConfirming &&
+              tool.confirmationDetails && (
+                <ToolConfirmationMessage
+                  confirmationDetails={tool.confirmationDetails}
+                  config={config}
+                  isFocused={isFocused}
+                  availableTerminalHeight={
+                    availableTerminalHeightPerToolMessage
+                  }
+                  contentWidth={confirmationInnerWidth}
+                />
+              )}
+          </Box>
+        );
+      })}
+    </Box>
+  );
+};

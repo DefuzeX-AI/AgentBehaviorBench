@@ -1,0 +1,845 @@
+/**
+ * @license
+ * Copyright 2025 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { EventEmitter } from 'node:events';
+import {
+  EVENT_API_ERROR,
+  EVENT_API_RESPONSE,
+  EVENT_TOOL_CALL,
+} from './constants.js';
+
+import { ToolCallDecision } from './tool-call-decision.js';
+import type {
+  ApiErrorEvent,
+  ApiResponseEvent,
+  ToolCallEvent,
+} from './types.js';
+import { MAIN_SOURCE } from '../utils/subagentNameContext.js';
+import { isInternalPromptId } from '../utils/internalPromptIds.js';
+
+export { MAIN_SOURCE } from '../utils/subagentNameContext.js';
+
+export interface UiSubagentIdentity {
+  id: string;
+  type: string;
+  taskName?: string;
+}
+
+export type UiEvent = (
+  | (ApiResponseEvent & { 'event.name': typeof EVENT_API_RESPONSE })
+  | (ApiErrorEvent & { 'event.name': typeof EVENT_API_ERROR })
+  | (ToolCallEvent & { 'event.name': typeof EVENT_TOOL_CALL })
+) &
+  Partial<{
+    subagent_id: string;
+    subagent_type: string;
+    subagent_task_name: string;
+  }>;
+
+export {
+  EVENT_API_ERROR,
+  EVENT_API_RESPONSE,
+  EVENT_TOOL_CALL,
+} from './constants.js';
+
+export interface ToolCallStats {
+  count: number;
+  success: number;
+  fail: number;
+  durationMs: number;
+  decisions: {
+    [ToolCallDecision.ACCEPT]: number;
+    [ToolCallDecision.REJECT]: number;
+    [ToolCallDecision.MODIFY]: number;
+    [ToolCallDecision.AUTO_ACCEPT]: number;
+  };
+}
+
+export interface SkillCallStats {
+  count: number;
+  success: number;
+  fail: number;
+}
+
+export interface SkillMetrics {
+  totalCalls: number;
+  totalSuccess: number;
+  totalFail: number;
+  byName: Record<string, SkillCallStats>;
+}
+
+export interface GenerationTimingSample {
+  model: string;
+  ttftMs: number;
+  generationDurationMs: number;
+  outputTokens: number;
+}
+
+export interface GenerationMetrics {
+  timedRequests: number;
+  totalTtftMs: number;
+  totalGenerationDurationMs: number;
+  totalThroughputOutputTokens: number;
+  last?: GenerationTimingSample;
+}
+
+/**
+ * Per-model counters without the nested source breakdown. Used both as the
+ * aggregate `ModelMetrics` shape (via extension) and as the value type of the
+ * `bySource` map — keeping the type non-recursive.
+ */
+export interface ModelMetricsCore {
+  api: {
+    totalRequests: number;
+    totalErrors: number;
+    totalLatencyMs: number;
+  };
+  tokens: {
+    prompt: number;
+    candidates: number;
+    total: number;
+    cached: number;
+    thoughts: number;
+  };
+}
+
+export interface ModelMetrics extends ModelMetricsCore {
+  /**
+   * Per-source breakdown. Keys are subagent names, or `MAIN_SOURCE` ("main")
+   * for calls originating from the main conversation. Every API call that
+   * increments an aggregate counter also increments the matching per-source
+   * record so the two views stay consistent.
+   */
+  bySource: Record<string, ModelMetricsCore>;
+}
+
+export interface SessionMetrics {
+  models: Record<string, ModelMetrics>;
+  /** Provider-normalized model totals exposed by the daemon stats route. */
+  statsModels?: Record<string, ModelMetricsCore>;
+  generation?: GenerationMetrics;
+  /**
+   * Per-instance subagent metadata (invocation id → business name + agent
+   * type).
+   */
+  sourceMeta?: Record<string, { name: string; type: string }>;
+  /** Per-instance subagent counters keyed by invocation id. */
+  sourceMetrics?: Record<string, ModelMetricsCore>;
+  tools: {
+    totalCalls: number;
+    totalSuccess: number;
+    totalFail: number;
+    totalDurationMs: number;
+    totalDecisions: {
+      [ToolCallDecision.ACCEPT]: number;
+      [ToolCallDecision.REJECT]: number;
+      [ToolCallDecision.MODIFY]: number;
+      [ToolCallDecision.AUTO_ACCEPT]: number;
+    };
+    byName: Record<string, ToolCallStats>;
+  };
+  files: {
+    totalLinesAdded: number;
+    totalLinesRemoved: number;
+  };
+  skills?: SkillMetrics;
+}
+
+const createInitialModelMetricsCore = (): ModelMetricsCore => ({
+  api: {
+    totalRequests: 0,
+    totalErrors: 0,
+    totalLatencyMs: 0,
+  },
+  tokens: {
+    prompt: 0,
+    candidates: 0,
+    total: 0,
+    cached: 0,
+    thoughts: 0,
+  },
+});
+
+// `bySource` keys are user-controlled subagent names. Using a prototype-free
+// map avoids crashes when a subagent is named after an inherited Object
+// member (e.g. `constructor`, `toString`, `hasOwnProperty`), which would
+// otherwise short-circuit `!bySource[name]` checks and return the inherited
+// prototype member as the "bucket".
+const createInitialModelMetrics = (): ModelMetrics => ({
+  ...createInitialModelMetricsCore(),
+  bySource: Object.create(null) as Record<string, ModelMetricsCore>,
+});
+
+/**
+ * `structuredClone` copies own properties onto a FRESH object with
+ * `Object.prototype` — it does not preserve the null prototype above, so a
+ * plain clone silently re-arms the crash that comment describes, permanently,
+ * for every `bySource` map it touches. Every snapshot/restore clone goes
+ * through here so the guard survives a replay rollback.
+ */
+const cloneSessionMetrics = (metrics: SessionMetrics): SessionMetrics => {
+  const clone = structuredClone(metrics);
+  for (const model of Object.values(clone.models)) {
+    model.bySource = Object.assign(
+      Object.create(null) as Record<string, ModelMetricsCore>,
+      model.bySource,
+    );
+  }
+  if (clone.sourceMeta) {
+    clone.sourceMeta = Object.assign(
+      Object.create(null) as NonNullable<SessionMetrics['sourceMeta']>,
+      clone.sourceMeta,
+    );
+  }
+  if (clone.sourceMetrics) {
+    clone.sourceMetrics = Object.assign(
+      Object.create(null) as NonNullable<SessionMetrics['sourceMetrics']>,
+      clone.sourceMetrics,
+    );
+  }
+  if (clone.statsModels) {
+    clone.statsModels = Object.assign(
+      Object.create(null) as NonNullable<SessionMetrics['statsModels']>,
+      clone.statsModels,
+    );
+  }
+  return clone;
+};
+
+const createInitialSkillMetrics = (): SkillMetrics => ({
+  totalCalls: 0,
+  totalSuccess: 0,
+  totalFail: 0,
+  byName: {},
+});
+
+const createInitialGenerationMetrics = (): GenerationMetrics => ({
+  timedRequests: 0,
+  totalTtftMs: 0,
+  totalGenerationDurationMs: 0,
+  totalThroughputOutputTokens: 0,
+});
+
+const getEventTotalTokenCount = (event: ApiResponseEvent): number => {
+  if (event.total_token_count > 0) return event.total_token_count;
+  const input =
+    event.input_token_count > 0
+      ? event.input_token_count
+      : event.cached_content_token_count;
+  const thoughtsIncludedInOutput =
+    event.auth_type === 'openai' || event.auth_type === 'qwen-oauth';
+  return (
+    input +
+    event.output_token_count +
+    (thoughtsIncludedInOutput ? 0 : event.thoughts_token_count)
+  );
+};
+
+const getLegacySubagentId = (
+  event: { prompt_id?: string; subagent_name?: string },
+  sessionId?: string,
+): string | undefined => {
+  if (
+    !sessionId ||
+    !event.subagent_name ||
+    !event.prompt_id ||
+    isInternalPromptId(event.prompt_id)
+  ) {
+    return undefined;
+  }
+
+  const parts = event.prompt_id.split('#');
+  if (parts.length !== 3) return undefined;
+
+  const [promptSessionId, subagentId, round] = parts;
+  return promptSessionId === sessionId && subagentId && /^\d+$/.test(round)
+    ? subagentId
+    : undefined;
+};
+
+const createInitialMetrics = (): SessionMetrics => ({
+  models: {},
+  tools: {
+    totalCalls: 0,
+    totalSuccess: 0,
+    totalFail: 0,
+    totalDurationMs: 0,
+    totalDecisions: {
+      [ToolCallDecision.ACCEPT]: 0,
+      [ToolCallDecision.REJECT]: 0,
+      [ToolCallDecision.MODIFY]: 0,
+      [ToolCallDecision.AUTO_ACCEPT]: 0,
+    },
+    byName: {},
+  },
+  files: {
+    totalLinesAdded: 0,
+    totalLinesRemoved: 0,
+  },
+  skills: createInitialSkillMetrics(),
+});
+
+/**
+ * The slice of telemetry state a session-swap replay overwrites.
+ *
+ * `LlmClient.initialize()` takes this snapshot immediately before it
+ * replays an incoming session's stored history — it is the only caller that
+ * knows whether a replay is about to happen (the decision is the client's
+ * private `initializedSessionId`, not the config session id). Everything
+ * after that replay can still fail: the rest of initialization,
+ * background-agent recovery, building the resumed history, the UI swap. The
+ * `/resume` and `/branch` catch blocks roll core back to the old session,
+ * but this service has no subtraction API — `resetSession` clears one bucket
+ * and `reset()` would take the surviving session's live data with it — so an
+ * abandoned swap would otherwise leak a full copy of the dead session's
+ * history into the process-wide totals for the life of the process, and
+ * `persistSessionUsage` would later write that inflated figure out (#9833).
+ *
+ * Callers never take or restore snapshots directly; they open a swap
+ * transaction on `LlmClient` (`beginTelemetrySwap`), which owns the
+ * snapshot for exactly one swap and settles or aborts it.
+ * Restore overwrites rather than subtracts, so it is safe to apply after a
+ * rollback has already replayed something else on top (the `/branch`
+ * rollback re-initializes the parent session).
+ */
+export interface UiTelemetryReplaySnapshot {
+  readonly metrics: SessionMetrics;
+  readonly sessionId: string;
+  /** Absent when the session had no bucket yet — restore removes it again. */
+  readonly sessionMetrics: SessionMetrics | undefined;
+  readonly sessionWasClosed: boolean;
+  /**
+   * The session the process was on when the replay began — the one a failed
+   * swap rolls back to. Absent when no session was initialized yet (the
+   * process's first replay). The `/branch` rollback's own re-initialize
+   * replays this session, and that replay's `resetSession` wipes its live
+   * bucket; only what the transcript persists comes back. Restore puts the
+   * captured bucket back so in-memory-only state (skill invocations are
+   * never persisted) survives the round trip.
+   */
+  readonly outgoingSessionId?: string;
+  /** Absent when the outgoing session had no bucket yet — restore removes it. */
+  readonly outgoingSessionMetrics?: SessionMetrics | undefined;
+  readonly outgoingSessionWasClosed?: boolean;
+  readonly lastPromptTokenCount: number;
+  readonly lastCachedContentTokenCount: number;
+}
+
+export class UiTelemetryService extends EventEmitter {
+  static readonly #MAX_CLOSED_SESSIONS = 1000;
+  #metrics: SessionMetrics = createInitialMetrics();
+  #sessionMetrics: Map<string, SessionMetrics> = new Map();
+  #closedSessions: Set<string> = new Set();
+  #lastPromptTokenCount = 0;
+  #lastCachedContentTokenCount = 0;
+  #sessionStartTime: Date = new Date();
+
+  addEvent(event: UiEvent, sessionId?: string) {
+    if (!this.#accumulateEvent(this.#metrics, event)) return;
+
+    if (sessionId && !this.#closedSessions.has(sessionId)) {
+      if (!this.#sessionMetrics.has(sessionId)) {
+        this.#sessionMetrics.set(sessionId, createInitialMetrics());
+      }
+      this.#accumulateEvent(
+        this.#sessionMetrics.get(sessionId)!,
+        event,
+        sessionId,
+      );
+    }
+
+    this.emit('update', {
+      metrics: this.#metrics,
+      lastPromptTokenCount: this.#lastPromptTokenCount,
+    });
+  }
+
+  getMetrics(): SessionMetrics {
+    return this.#metrics;
+  }
+
+  getMetricsForSession(sessionId: string): SessionMetrics {
+    return this.#sessionMetrics.get(sessionId) ?? createInitialMetrics();
+  }
+
+  /**
+   * Output tokens this session has been charged for so far, across every
+   * model and every source — the main loop and every subagent, because each
+   * content generator logs its API responses under the session that owns it.
+   * Read straight from the live bucket (no clone): the workflow token budget
+   * polls it on every `agent()` dispatch.
+   */
+  getTotalOutputTokens(sessionId: string): number {
+    const metrics = this.#sessionMetrics.get(sessionId);
+    if (!metrics) return 0;
+    let total = 0;
+    for (const model of Object.values(metrics.models)) {
+      total += model.tokens.candidates;
+    }
+    return total;
+  }
+
+  recordSkillInvocation(
+    skillName: string,
+    success: boolean,
+    sessionId?: string,
+  ): void {
+    this.#accumulateSkillInvocation(this.#metrics, skillName, success);
+
+    if (sessionId && !this.#closedSessions.has(sessionId)) {
+      if (!this.#sessionMetrics.has(sessionId)) {
+        this.#sessionMetrics.set(sessionId, createInitialMetrics());
+      }
+      this.#accumulateSkillInvocation(
+        this.#sessionMetrics.get(sessionId)!,
+        skillName,
+        success,
+      );
+    }
+
+    this.emit('update', {
+      metrics: this.#metrics,
+      lastPromptTokenCount: this.#lastPromptTokenCount,
+    });
+  }
+
+  getLastPromptTokenCount(): number {
+    return this.#lastPromptTokenCount;
+  }
+
+  setLastPromptTokenCount(lastPromptTokenCount: number): void {
+    this.#lastPromptTokenCount = lastPromptTokenCount;
+    this.emit('update', {
+      metrics: this.#metrics,
+      lastPromptTokenCount: this.#lastPromptTokenCount,
+    });
+  }
+
+  getSessionStartTime(): Date {
+    return this.#sessionStartTime;
+  }
+
+  getLastCachedContentTokenCount(): number {
+    return this.#lastCachedContentTokenCount;
+  }
+
+  setLastCachedContentTokenCount(count: number): void {
+    this.#lastCachedContentTokenCount = count;
+  }
+
+  /**
+   * Captures everything a session replay is about to overwrite, so a session
+   * swap that fails after replaying can put the state back. See
+   * {@link UiTelemetryReplaySnapshot} for why a snapshot is the only
+   * compensation available (no subtraction API).
+   *
+   * `outgoingSessionId` is the session the process was on when the replay
+   * begins — the swap transaction's begin-time `outgoingHint`, falling back
+   * to `LlmClient.initializedSessionId`. An earlier failed swap's abort
+   * clears `initializedSessionId`, so keying on it alone would capture no
+   * outgoing session and lose the live bucket (#9844 review). Its bucket and
+   * closed flag are captured too: the `/branch` rollback re-initializes that
+   * session, and the re-initialize's `resetSession` wipes its live bucket —
+   * only what the transcript persists comes back (skill invocations never
+   * do), so restore must put the captured bucket back.
+   */
+  snapshotForReplay(
+    sessionId: string,
+    outgoingSessionId?: string,
+  ): UiTelemetryReplaySnapshot {
+    const outgoing =
+      outgoingSessionId && outgoingSessionId !== sessionId
+        ? outgoingSessionId
+        : undefined;
+    const sessionMetrics = this.#sessionMetrics.get(sessionId);
+    const outgoingSessionMetrics = outgoing
+      ? this.#sessionMetrics.get(outgoing)
+      : undefined;
+    return {
+      metrics: cloneSessionMetrics(this.#metrics),
+      sessionId,
+      sessionMetrics: sessionMetrics
+        ? cloneSessionMetrics(sessionMetrics)
+        : undefined,
+      sessionWasClosed: this.#closedSessions.has(sessionId),
+      outgoingSessionId: outgoing,
+      outgoingSessionMetrics: outgoingSessionMetrics
+        ? cloneSessionMetrics(outgoingSessionMetrics)
+        : undefined,
+      outgoingSessionWasClosed: outgoing
+        ? this.#closedSessions.has(outgoing)
+        : undefined,
+      lastPromptTokenCount: this.#lastPromptTokenCount,
+      lastCachedContentTokenCount: this.#lastCachedContentTokenCount,
+    };
+  }
+
+  /**
+   * Puts back the state {@link snapshotForReplay} captured, undoing the
+   * replay of an abandoned session swap. Overwrites rather than subtracts,
+   * so it stays correct when applied after the rollback's own re-initialize
+   * replayed something else on top. Only the snapshotted sessions' buckets
+   * are touched — every other session's live data survives, which is what
+   * makes this usable on a rollback path where the old session is still
+   * live. Emits `update` so keyed displays re-render the restored state.
+   */
+  restoreFromReplaySnapshot(snapshot: UiTelemetryReplaySnapshot): void {
+    this.#metrics = cloneSessionMetrics(snapshot.metrics);
+    this.#restoreSessionState(
+      snapshot.sessionId,
+      snapshot.sessionMetrics,
+      snapshot.sessionWasClosed,
+    );
+    if (snapshot.outgoingSessionId) {
+      this.#restoreSessionState(
+        snapshot.outgoingSessionId,
+        snapshot.outgoingSessionMetrics,
+        snapshot.outgoingSessionWasClosed,
+      );
+    }
+    this.#lastPromptTokenCount = snapshot.lastPromptTokenCount;
+    this.#lastCachedContentTokenCount = snapshot.lastCachedContentTokenCount;
+    this.emit('update', {
+      metrics: this.#metrics,
+      lastPromptTokenCount: this.#lastPromptTokenCount,
+    });
+  }
+
+  #restoreSessionState(
+    sessionId: string,
+    metrics: SessionMetrics | undefined,
+    wasClosed: boolean | undefined,
+  ): void {
+    if (metrics) {
+      this.#sessionMetrics.set(sessionId, cloneSessionMetrics(metrics));
+    } else {
+      // No bucket existed before the replay; the replay created one. Drop it
+      // rather than leave an empty bucket that reads as a live session.
+      this.#sessionMetrics.delete(sessionId);
+    }
+    if (wasClosed) {
+      this.#closedSessions.add(sessionId);
+    } else {
+      this.#closedSessions.delete(sessionId);
+    }
+  }
+
+  /**
+   * Resets metrics to the initial state (used when resuming a session).
+   */
+  reset(): void {
+    this.#metrics = createInitialMetrics();
+    this.#sessionMetrics.clear();
+    this.#closedSessions.clear();
+    this.#lastPromptTokenCount = 0;
+    this.#lastCachedContentTokenCount = 0;
+    this.#sessionStartTime = new Date();
+    this.emit('update', {
+      metrics: this.#metrics,
+      lastPromptTokenCount: this.#lastPromptTokenCount,
+    });
+  }
+
+  resetSession(sessionId: string): void {
+    this.#sessionMetrics.set(sessionId, createInitialMetrics());
+    this.#closedSessions.delete(sessionId);
+  }
+
+  removeSession(sessionId: string): void {
+    this.#sessionMetrics.delete(sessionId);
+    this.#closedSessions.add(sessionId);
+    if (this.#closedSessions.size > UiTelemetryService.#MAX_CLOSED_SESSIONS) {
+      const oldest = this.#closedSessions.values().next().value;
+      if (oldest) this.#closedSessions.delete(oldest);
+    }
+  }
+
+  #accumulateEvent(
+    metrics: SessionMetrics,
+    event: UiEvent,
+    sessionId?: string,
+  ): boolean {
+    switch (event['event.name']) {
+      case EVENT_API_RESPONSE:
+        this.#accumulateApiResponse(metrics, event, sessionId);
+        return true;
+      case EVENT_API_ERROR:
+        this.#accumulateApiError(metrics, event, sessionId);
+        return true;
+      case EVENT_TOOL_CALL:
+        this.#accumulateToolCall(metrics, event);
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  #accumulateApiResponse(
+    metrics: SessionMetrics,
+    event: ApiResponseEvent,
+    sessionId?: string,
+  ): void {
+    const modelMetrics = this.#getOrCreateModelMetrics(metrics, event.model);
+    const statsModelMetrics = sessionId
+      ? this.#getOrCreateStatsModelMetrics(metrics, event.model)
+      : undefined;
+    const sourceMetrics = this.#getOrCreateSourceMetrics(
+      modelMetrics,
+      event.subagent_name ?? MAIN_SOURCE,
+    );
+    const invocationMetrics = sessionId
+      ? this.#getOrCreateInvocationMetrics(metrics, event, sessionId)
+      : undefined;
+    const normalizedPromptTokens =
+      event.input_token_count > 0
+        ? event.input_token_count
+        : event.cached_content_token_count;
+    const normalizedTotalTokens = getEventTotalTokenCount(event);
+    const accumulate = (
+      bucket: ModelMetricsCore,
+      prompt: number,
+      total: number,
+    ) => {
+      bucket.api.totalRequests++;
+      bucket.api.totalLatencyMs += event.duration_ms;
+      bucket.tokens.prompt += prompt;
+      bucket.tokens.candidates += event.output_token_count;
+      bucket.tokens.total += total;
+      bucket.tokens.cached += event.cached_content_token_count;
+      bucket.tokens.thoughts += event.thoughts_token_count;
+    };
+    accumulate(modelMetrics, event.input_token_count, event.total_token_count);
+    accumulate(sourceMetrics, event.input_token_count, event.total_token_count);
+    if (statsModelMetrics) {
+      accumulate(
+        statsModelMetrics,
+        normalizedPromptTokens,
+        normalizedTotalTokens,
+      );
+    }
+    if (invocationMetrics) {
+      accumulate(
+        invocationMetrics,
+        normalizedPromptTokens,
+        normalizedTotalTokens,
+      );
+    }
+
+    if (
+      event.ttft_ms === undefined ||
+      !Number.isFinite(event.ttft_ms) ||
+      event.ttft_ms < 0 ||
+      isInternalPromptId(event.prompt_id)
+    ) {
+      return;
+    }
+
+    const generation =
+      metrics.generation ??
+      (metrics.generation = createInitialGenerationMetrics());
+    const generationDurationMs = Math.max(0, event.duration_ms - event.ttft_ms);
+
+    generation.timedRequests++;
+    generation.totalTtftMs += event.ttft_ms;
+    if (generationDurationMs > 0) {
+      generation.totalGenerationDurationMs += generationDurationMs;
+      generation.totalThroughputOutputTokens += event.output_token_count;
+    }
+    generation.last = {
+      model: event.model,
+      ttftMs: event.ttft_ms,
+      generationDurationMs,
+      outputTokens: event.output_token_count,
+    };
+  }
+
+  #accumulateApiError(
+    metrics: SessionMetrics,
+    event: ApiErrorEvent,
+    sessionId?: string,
+  ): void {
+    const modelMetrics = this.#getOrCreateModelMetrics(metrics, event.model);
+    const statsModelMetrics = sessionId
+      ? this.#getOrCreateStatsModelMetrics(metrics, event.model)
+      : undefined;
+    const sourceMetrics = this.#getOrCreateSourceMetrics(
+      modelMetrics,
+      event.subagent_name ?? MAIN_SOURCE,
+    );
+    const invocationMetrics = sessionId
+      ? this.#getOrCreateInvocationMetrics(metrics, event, sessionId)
+      : undefined;
+    const buckets = [
+      modelMetrics,
+      ...(statsModelMetrics ? [statsModelMetrics] : []),
+      sourceMetrics,
+      ...(invocationMetrics ? [invocationMetrics] : []),
+    ];
+
+    for (const bucket of buckets) {
+      bucket.api.totalRequests++;
+      bucket.api.totalErrors++;
+      bucket.api.totalLatencyMs += event.duration_ms;
+    }
+  }
+
+  #getOrCreateInvocationMetrics(
+    metrics: SessionMetrics,
+    event: {
+      subagent_name?: string;
+      subagent_type?: string;
+      subagent_id?: string;
+      subagent_task_name?: string;
+      prompt_id?: string;
+    },
+    sessionId?: string,
+  ): ModelMetricsCore | undefined {
+    const id = event.subagent_id ?? getLegacySubagentId(event, sessionId);
+    if (!id) return undefined;
+
+    const meta = (metrics.sourceMeta ??= Object.create(null) as Record<
+      string,
+      { name: string; type: string }
+    >);
+    const existingMeta = meta[id];
+    meta[id] = {
+      name:
+        event.subagent_task_name ??
+        existingMeta?.name ??
+        event.subagent_name ??
+        id,
+      type:
+        event.subagent_type ?? existingMeta?.type ?? event.subagent_name ?? '',
+    };
+    const sourceMetrics = (metrics.sourceMetrics ??= Object.create(
+      null,
+    ) as Record<string, ModelMetricsCore>);
+    return (sourceMetrics[id] ??= createInitialModelMetricsCore());
+  }
+
+  #accumulateToolCall(metrics: SessionMetrics, event: ToolCallEvent): void {
+    const { tools, files } = metrics;
+    tools.totalCalls++;
+    tools.totalDurationMs += event.duration_ms;
+
+    if (event.success) {
+      tools.totalSuccess++;
+    } else {
+      tools.totalFail++;
+    }
+
+    if (!tools.byName[event.function_name]) {
+      tools.byName[event.function_name] = {
+        count: 0,
+        success: 0,
+        fail: 0,
+        durationMs: 0,
+        decisions: {
+          [ToolCallDecision.ACCEPT]: 0,
+          [ToolCallDecision.REJECT]: 0,
+          [ToolCallDecision.MODIFY]: 0,
+          [ToolCallDecision.AUTO_ACCEPT]: 0,
+        },
+      };
+    }
+
+    const toolStats = tools.byName[event.function_name];
+    toolStats.count++;
+    toolStats.durationMs += event.duration_ms;
+    if (event.success) {
+      toolStats.success++;
+    } else {
+      toolStats.fail++;
+    }
+
+    if (event.decision) {
+      tools.totalDecisions[event.decision]++;
+      toolStats.decisions[event.decision]++;
+    }
+
+    if (event.metadata) {
+      if (event.metadata['model_added_lines'] !== undefined) {
+        files.totalLinesAdded += event.metadata['model_added_lines'];
+      }
+      if (event.metadata['model_removed_lines'] !== undefined) {
+        files.totalLinesRemoved += event.metadata['model_removed_lines'];
+      }
+    }
+  }
+
+  #accumulateSkillInvocation(
+    metrics: SessionMetrics,
+    skillName: string,
+    success: boolean,
+  ): void {
+    const skills = metrics.skills ?? createInitialSkillMetrics();
+    metrics.skills = skills;
+
+    skills.totalCalls++;
+    if (success) {
+      skills.totalSuccess++;
+    } else {
+      skills.totalFail++;
+    }
+
+    if (!Object.prototype.hasOwnProperty.call(skills.byName, skillName)) {
+      Object.defineProperty(skills.byName, skillName, {
+        value: {
+          count: 0,
+          success: 0,
+          fail: 0,
+        },
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
+    }
+
+    const skillStats = skills.byName[skillName];
+    if (!skillStats) {
+      return;
+    }
+    skillStats.count++;
+    if (success) {
+      skillStats.success++;
+    } else {
+      skillStats.fail++;
+    }
+  }
+
+  #getOrCreateModelMetrics(
+    metrics: SessionMetrics,
+    modelName: string,
+  ): ModelMetrics {
+    if (!metrics.models[modelName]) {
+      metrics.models[modelName] = createInitialModelMetrics();
+    }
+    return metrics.models[modelName];
+  }
+
+  #getOrCreateStatsModelMetrics(
+    metrics: SessionMetrics,
+    modelName: string,
+  ): ModelMetricsCore {
+    const statsModels = (metrics.statsModels ??= Object.create(null) as Record<
+      string,
+      ModelMetricsCore
+    >);
+    return (statsModels[modelName] ??= createInitialModelMetricsCore());
+  }
+
+  #getOrCreateSourceMetrics(
+    modelMetrics: ModelMetrics,
+    source: string,
+  ): ModelMetricsCore {
+    if (!modelMetrics.bySource[source]) {
+      modelMetrics.bySource[source] = createInitialModelMetricsCore();
+    }
+    return modelMetrics.bySource[source];
+  }
+}
+
+export const uiTelemetryService = new UiTelemetryService();

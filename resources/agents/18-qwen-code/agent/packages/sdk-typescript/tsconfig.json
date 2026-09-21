@@ -1,0 +1,56 @@
+{
+  "compilerOptions": {
+    /* Language and Environment */
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+
+    /* Emit */
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "removeComments": true,
+    "importHelpers": false,
+
+    /* Interop Constraints */
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+
+    /* Type Checking */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": false,
+
+    /* Completeness */
+    "skipLibCheck": true,
+
+    /* Module Resolution */
+    "resolveJsonModule": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    // The cli bundle pulls these sources in through the cli tsconfig
+    // `@qwen-code/sdk/*` mapping, and mainBuild discovers this file per
+    // importing file (it passes no `tsconfig` option). Without a named entry
+    // here, core subpath imports fall back to the `exports` map and bundle a
+    // packages/core/dist copy next to the packages/core/src copy every
+    // package-root import loads. Mirrors packages/acp-bridge/tsconfig.json.
+    "paths": {
+      "@qwen-code/qwen-code-core/transcriptRecords": [
+        "../core/src/utils/transcript-records.ts"
+      ],
+      "@qwen-code/qwen-code-core/telemetryConstants": [
+        "../core/src/telemetry/constants.ts"
+      ]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "test", ".integration-tests"]
+}

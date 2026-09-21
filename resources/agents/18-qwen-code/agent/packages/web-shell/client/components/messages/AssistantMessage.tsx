@@ -1,0 +1,809 @@
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
+import { LightbulbIcon, ThumbsDownIcon, ThumbsUpIcon } from 'lucide-react';
+import { Markdown } from './Markdown';
+import { TurnSources } from '../sources/TurnSources';
+import {
+  useWebShellCustomization,
+  type WebShellAssistantFeedbackRating,
+  type WebShellAssistantTurnFooterRenderInfo,
+  type WebShellSource,
+} from '../../customization';
+import { useI18n } from '../../i18n';
+import {
+  useTranscriptDocumentExpanded,
+  useTranscriptRenderMode,
+} from '../../transcriptRenderMode';
+import { formatTimestamp } from '../MessageTimestamp';
+import {
+  warnClipboardWriteFailure,
+  writeClipboardText,
+} from '../../utils/clipboard';
+import { useCopiedFlash } from '../../hooks/useCopiedFlash';
+import type { DaemonSessionGenerationEvent } from '@qwen-code/sdk/daemon';
+import { Button } from '../ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import flashStyles from '../MessageLocateFlash.module.css';
+import styles from './AssistantMessage.module.css';
+
+interface AssistantMessageProps {
+  content: string;
+  isStreaming?: boolean;
+  timestamp?: number;
+  onBranchSession?: () => void | Promise<void>;
+  showFooterActions?: boolean;
+  showBranchAction?: boolean;
+  /** Satisfied / not-satisfied marks are only offered when this is set. */
+  showAssistantFeedback?: boolean;
+  assistantFeedbackRating?: WebShellAssistantFeedbackRating;
+  onAssistantFeedbackRate?: (
+    rating: WebShellAssistantFeedbackRating | null,
+  ) => void;
+  isLocateFlashing?: boolean;
+  customFooterInfo?: WebShellAssistantTurnFooterRenderInfo;
+  turnSources?: readonly WebShellSource[];
+  onSourceOpen?: (source: WebShellSource) => void;
+}
+
+export const AssistantMessage = memo(function AssistantMessage({
+  content,
+  isStreaming,
+  timestamp,
+  onBranchSession,
+  showFooterActions = false,
+  showBranchAction = false,
+  showAssistantFeedback = false,
+  assistantFeedbackRating,
+  onAssistantFeedbackRate,
+  isLocateFlashing = false,
+  customFooterInfo,
+  turnSources,
+  onSourceOpen,
+}: AssistantMessageProps) {
+  const { t } = useI18n();
+  const documentMode = useTranscriptRenderMode() === 'document';
+  const { renderAssistantTurnFooter } = useWebShellCustomization();
+  const [copied, flashCopied] = useCopiedFlash();
+  const [branchPending, setBranchPending] = useState(false);
+  const showFooter =
+    !!content &&
+    !isStreaming &&
+    (showFooterActions || (turnSources?.length ?? 0) > 0) &&
+    !documentMode;
+  const customFooter = useMemo(
+    () =>
+      customFooterInfo
+        ? renderAssistantTurnFooter?.(customFooterInfo)
+        : undefined,
+    [customFooterInfo, renderAssistantTurnFooter],
+  );
+  const handleBranch = useCallback(async () => {
+    if (!onBranchSession || branchPending) return;
+    setBranchPending(true);
+    try {
+      await onBranchSession();
+    } catch {
+      // host owns error surfacing
+    } finally {
+      setBranchPending(false);
+    }
+  }, [branchPending, onBranchSession]);
+  const handleCopy = useCallback(() => {
+    void writeClipboardText(content)
+      .then(() => {
+        flashCopied();
+      })
+      .catch(warnClipboardWriteFailure);
+  }, [content, flashCopied]);
+  // Clicking the lit icon clears the mark; clicking the other one switches it.
+  const handleFeedback = useCallback(
+    (
+      rating: WebShellAssistantFeedbackRating,
+      event: ReactMouseEvent<HTMLButtonElement>,
+    ) => {
+      if (!onAssistantFeedbackRate) return;
+      onAssistantFeedbackRate(
+        assistantFeedbackRating === rating ? null : rating,
+      );
+      // A pointer click leaves the button focused, and the row's
+      // `:focus-within` rule would then pin this hover-only row open after the
+      // pointer leaves. Keyboard activation reports detail 0, so it keeps focus
+      // and the row stays reachable from the keyboard.
+      if (event.detail > 0) event.currentTarget.blur();
+    },
+    [assistantFeedbackRating, onAssistantFeedbackRate],
+  );
+  const feedbackButtonClass = useCallback(
+    (rating: WebShellAssistantFeedbackRating) => {
+      const activeClass =
+        rating === 'up'
+          ? styles.feedbackButtonActiveUp
+          : styles.feedbackButtonActiveDown;
+      return `${styles.copyButton} ${styles.feedbackButton}${
+        assistantFeedbackRating === rating ? ` ${activeClass}` : ''
+      }`;
+    },
+    [assistantFeedbackRating],
+  );
+  return (
+    <div className={styles.message}>
+      {content && (
+        <div
+          className={`${styles.content}${
+            isLocateFlashing ? ` ${flashStyles.flash}` : ''
+          }`}
+        >
+          <div className={styles.contentBody}>
+            <Markdown
+              content={content}
+              source="assistant"
+              isStreaming={isStreaming}
+            />
+          </div>
+        </div>
+      )}
+      {customFooter && (
+        <div className={styles.customFooter}>{customFooter}</div>
+      )}
+      {showFooter && (
+        <div className={styles.messageFooter}>
+          {showFooterActions && (
+            <button
+              type="button"
+              className={styles.copyButton}
+              title={t('assistant.copy')}
+              aria-label={t('assistant.copy')}
+              onClick={handleCopy}
+            >
+              {copied ? <CheckIcon /> : <CopyIcon />}
+            </button>
+          )}
+          {showFooterActions && showAssistantFeedback && (
+            <>
+              <button
+                type="button"
+                className={feedbackButtonClass('up')}
+                title={t('assistant.satisfied')}
+                aria-label={t('assistant.satisfied')}
+                aria-pressed={assistantFeedbackRating === 'up'}
+                onClick={(event) => handleFeedback('up', event)}
+              >
+                <ThumbsUpIcon />
+              </button>
+              <button
+                type="button"
+                className={feedbackButtonClass('down')}
+                title={t('assistant.dissatisfied')}
+                aria-label={t('assistant.dissatisfied')}
+                aria-pressed={assistantFeedbackRating === 'down'}
+                onClick={(event) => handleFeedback('down', event)}
+              >
+                <ThumbsDownIcon />
+              </button>
+            </>
+          )}
+          {showFooterActions && showBranchAction && onBranchSession && (
+            <button
+              type="button"
+              className={styles.copyButton}
+              title={t('assistant.branch')}
+              aria-label={t('assistant.branch')}
+              disabled={branchPending}
+              onClick={() => void handleBranch()}
+            >
+              <BranchIcon />
+            </button>
+          )}
+          {turnSources?.length ? (
+            <TurnSources sources={turnSources} onOpen={onSourceOpen} />
+          ) : null}
+          {showFooterActions && timestamp !== undefined && (
+            <span className={styles.footerTime} aria-hidden="true">
+              {formatTimestamp(timestamp)}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+});
+
+function CopyIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d="M5.2 4.4V3.2c0-.7.5-1.2 1.2-1.2h5.4c.7 0 1.2.5 1.2 1.2v5.4c0 .7-.5 1.2-1.2 1.2h-1.2"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.3"
+      />
+      <rect
+        x="3"
+        y="5.2"
+        width="7.8"
+        height="7.8"
+        rx="1.2"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.3"
+      />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d="m3.5 8.3 3 3L12.8 5"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.6"
+      />
+    </svg>
+  );
+}
+
+function BranchIcon() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path
+        d="M5 3.5v5.2c0 2.1 1.7 3.8 3.8 3.8H11"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.35"
+      />
+      <path
+        d="M5 8.2h3.2c1.5 0 2.8-1.2 2.8-2.8V4"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.35"
+      />
+      <circle cx="5" cy="3.5" r="1.5" fill="currentColor" />
+      <circle cx="11" cy="4" r="1.5" fill="currentColor" />
+      <circle cx="11" cy="12.5" r="1.5" fill="currentColor" />
+    </svg>
+  );
+}
+
+interface ThinkingMessageProps {
+  content: string;
+  isStreaming?: boolean;
+  timestamp?: number;
+  isLocateFlashing?: boolean;
+  generateContent?: SessionContentGenerator;
+}
+
+export type SessionContentGenerator = (
+  prompt: string,
+  opts?: { signal?: AbortSignal },
+) => AsyncGenerator<DaemonSessionGenerationEvent>;
+
+interface ThinkingTranslation {
+  text: string;
+  inputTokens?: number;
+  outputTokens?: number;
+}
+
+const thinkingTranslationCache = new Map<string, ThinkingTranslation>();
+const THINKING_TRANSLATION_CACHE_MAX_ENTRIES = 200;
+
+function cacheThinkingTranslation(
+  key: string,
+  translation: ThinkingTranslation,
+): void {
+  thinkingTranslationCache.delete(key);
+  thinkingTranslationCache.set(key, translation);
+  if (thinkingTranslationCache.size <= THINKING_TRANSLATION_CACHE_MAX_ENTRIES) {
+    return;
+  }
+  const oldestKey = thinkingTranslationCache.keys().next().value;
+  if (oldestKey !== undefined) thinkingTranslationCache.delete(oldestKey);
+}
+
+interface ThinkingSummaryHeaderProps {
+  thinkingActive: boolean;
+  thinkingExpanded: boolean;
+  documentMode: boolean;
+  /** Pre-localized running/done label, including the elapsed duration. */
+  summaryText: string;
+  /**
+   * Thought content for the zh-CN translate button. Omitted while streaming —
+   * the button is hidden then — so streamed content growth does not defeat the
+   * summary header's memo boundary.
+   */
+  translateContent?: string;
+  showTranslateButton: boolean;
+  generateContent?: SessionContentGenerator;
+  onToggle: () => void;
+}
+
+/**
+ * Collapsed thinking row: label, elapsed duration, and the streaming shine.
+ * Memoized so streamed thought deltas re-render only the expanded body (or
+ * nothing when collapsed) instead of this header on every chunk.
+ */
+const ThinkingSummaryHeader = memo(function ThinkingSummaryHeader({
+  thinkingActive,
+  thinkingExpanded,
+  documentMode,
+  summaryText,
+  translateContent,
+  showTranslateButton,
+  generateContent,
+  onToggle,
+}: ThinkingSummaryHeaderProps) {
+  const { t } = useI18n();
+  return (
+    <div
+      className={`${styles.thinkingHeader}${
+        thinkingExpanded ? ` ${styles.thinkingHeaderExpanded}` : ''
+      }`}
+      onClick={(event) => {
+        if (
+          !documentMode &&
+          event.currentTarget.contains(event.target as Node)
+        ) {
+          onToggle();
+        }
+      }}
+    >
+      <button
+        type="button"
+        disabled={documentMode}
+        tabIndex={documentMode ? -1 : undefined}
+        className={styles.thinkingSummary}
+        aria-expanded={documentMode ? undefined : thinkingExpanded}
+        title={
+          documentMode
+            ? undefined
+            : thinkingExpanded
+              ? t('thinking.collapse')
+              : t('thinking.expand')
+        }
+      >
+        <span className={styles.thinkingSummaryIcon} aria-hidden="true">
+          <ThinkingDoneIcon />
+        </span>
+        <span
+          className={
+            thinkingActive
+              ? `${styles.thinkingSummaryText} ${styles.thinkingSummaryTextActive}`
+              : styles.thinkingSummaryText
+          }
+        >
+          {summaryText}
+        </span>
+      </button>
+      {showTranslateButton &&
+        translateContent !== undefined &&
+        generateContent && (
+          <ThinkingTranslateButton
+            content={translateContent}
+            generateContent={generateContent}
+            className={styles.translateButton}
+          />
+        )}
+      <span
+        className={
+          thinkingExpanded
+            ? styles.thinkingChevronDown
+            : styles.thinkingChevronRight
+        }
+        aria-hidden="true"
+      />
+    </div>
+  );
+});
+
+export const ThinkingMessage = memo(function ThinkingMessage({
+  content,
+  isStreaming,
+  timestamp,
+  isLocateFlashing = false,
+  generateContent,
+}: ThinkingMessageProps) {
+  const { language, t } = useI18n();
+  const transcriptRenderMode = useTranscriptRenderMode();
+  const documentMode = transcriptRenderMode === 'document';
+  const documentExpanded = useTranscriptDocumentExpanded();
+  const [thinkingExpanded, setThinkingExpanded] = useState(false);
+  const showThinking = documentMode ? documentExpanded : thinkingExpanded;
+  const thinkingActive = isStreaming === true;
+  const startTimeRef = useRef(timestamp ?? Date.now());
+  const sawActiveRef = useRef(thinkingActive);
+  const [now, setNow] = useState(() => Date.now());
+  const [finishedAt, setFinishedAt] = useState<number | null>(null);
+  // `content` grows on every streamed chunk; keying on the boolean instead of
+  // the string keeps the timer effect from tearing down and re-creating the
+  // interval per chunk, while still starting once content first appears.
+  const hasContent = Boolean(content);
+
+  useEffect(() => {
+    if (!hasContent || !thinkingActive) return;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [hasContent, thinkingActive]);
+
+  useEffect(() => {
+    if (!content) return;
+    if (thinkingActive) {
+      sawActiveRef.current = true;
+      setFinishedAt(null);
+      return;
+    }
+    if (sawActiveRef.current && finishedAt === null) {
+      setFinishedAt(Date.now());
+    }
+  }, [content, finishedAt, thinkingActive]);
+
+  const thinkingDurationMs =
+    thinkingActive || finishedAt !== null
+      ? (thinkingActive ? now : finishedAt!) - startTimeRef.current
+      : undefined;
+  const thinkingSummaryKey = getThinkingSummaryKey({
+    isStreaming,
+    durationMs: thinkingDurationMs,
+  });
+  const thinkingDuration =
+    thinkingDurationMs !== undefined
+      ? formatThinkingDuration(thinkingDurationMs)
+      : '';
+
+  const handleToggle = useCallback(() => {
+    if (!documentMode) setThinkingExpanded((v) => !v);
+  }, [documentMode]);
+
+  const summaryText = t(
+    thinkingSummaryKey,
+    thinkingDuration ? { duration: thinkingDuration } : {},
+  );
+
+  return (
+    <div
+      className={`${styles.message}${
+        isLocateFlashing ? ` ${flashStyles.flash}` : ''
+      }`}
+    >
+      {content && (
+        <div className={styles.thinking}>
+          <div className={styles.thinkingBody}>
+            <ThinkingSummaryHeader
+              thinkingActive={thinkingActive}
+              thinkingExpanded={showThinking}
+              documentMode={documentMode}
+              summaryText={summaryText}
+              translateContent={thinkingActive ? undefined : content}
+              showTranslateButton={
+                !documentMode &&
+                language === 'zh-CN' &&
+                !thinkingActive &&
+                generateContent !== undefined
+              }
+              generateContent={generateContent}
+              onToggle={handleToggle}
+            />
+            {showThinking && (
+              <div className={styles.thinkingExpandedClip}>
+                <div className={styles.thinkingExpandedInner}>
+                  <div className={styles.thinkingExpandedWrap}>
+                    <Markdown
+                      content={content}
+                      source="thinking"
+                      isStreaming={isStreaming}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+
+interface ThinkingTranslateButtonProps {
+  content: string;
+  generateContent?: SessionContentGenerator;
+  className?: string;
+  mode?: 'translate' | 'explain-shell';
+}
+
+export function ThinkingTranslateButton({
+  content,
+  generateContent,
+  className,
+  mode = 'translate',
+}: ThinkingTranslateButtonProps) {
+  const { language, t } = useI18n();
+  const [translationOpen, setTranslationOpen] = useState(false);
+  const [translation, setTranslation] = useState<ThinkingTranslation>();
+  const [translationLoading, setTranslationLoading] = useState(false);
+  const [translationThinking, setTranslationThinking] = useState(false);
+  const [translationError, setTranslationError] = useState(false);
+  const translationAbortRef = useRef<AbortController | undefined>(undefined);
+
+  useEffect(
+    () => () => {
+      translationAbortRef.current?.abort();
+    },
+    [],
+  );
+
+  const translate = useCallback(
+    async (force = false) => {
+      if (!generateContent || (translationLoading && !force)) return;
+      const cacheKey = `${mode}:${language}:${content}`;
+      const cached = thinkingTranslationCache.get(cacheKey);
+      if (cached && !force) {
+        cacheThinkingTranslation(cacheKey, cached);
+        setTranslation(cached);
+        return;
+      }
+
+      if (force) thinkingTranslationCache.delete(cacheKey);
+      translationAbortRef.current?.abort();
+      const controller = new AbortController();
+      translationAbortRef.current = controller;
+      setTranslation({ text: '' });
+      setTranslationThinking(false);
+      setTranslationError(false);
+      setTranslationLoading(true);
+      let text = '';
+      let completed = false;
+      try {
+        const targetLanguage =
+          language === 'zh-CN' ? 'Simplified Chinese' : 'English';
+        const prompt =
+          mode === 'explain-shell'
+            ? `Explain the following shell command in ${targetLanguage}. Describe what it does and call out any notable risks. Be concise and output only the explanation.\n\n\`\`\`shell\n${content}\n\`\`\``
+            : `Translate the following model reasoning into ${targetLanguage}. Preserve its meaning and Markdown formatting. Output only the translation.\n\n${content}`;
+        for await (const event of generateContent(prompt, {
+          signal: controller.signal,
+        })) {
+          if (translationAbortRef.current !== controller) return;
+          if (event.type === 'thinking') {
+            setTranslationThinking(true);
+          } else if (event.type === 'delta') {
+            setTranslationThinking(false);
+            text += event.text;
+            setTranslation({ text });
+          } else if (event.type === 'done') {
+            if (!text.trim()) throw new Error('Translation was empty');
+            completed = true;
+            const result = {
+              text,
+              inputTokens: event.inputTokens,
+              outputTokens: event.outputTokens,
+            };
+            cacheThinkingTranslation(cacheKey, result);
+            setTranslation(result);
+          } else if (event.type === 'error') {
+            throw new Error(event.message);
+          }
+        }
+        if (!completed) throw new Error('Translation stream ended early');
+      } catch {
+        if (!controller.signal.aborted) setTranslationError(true);
+      } finally {
+        if (translationAbortRef.current === controller) {
+          translationAbortRef.current = undefined;
+          setTranslationThinking(false);
+          setTranslationLoading(false);
+        }
+      }
+    },
+    [content, generateContent, language, mode, translationLoading],
+  );
+
+  const handleTranslationOpenChange = useCallback(
+    (open: boolean) => {
+      setTranslationOpen(open);
+      if (open) void translate();
+    },
+    [translate],
+  );
+
+  const handleCancelOrCloseTranslation = useCallback(() => {
+    const controller = translationAbortRef.current;
+    translationAbortRef.current = undefined;
+    controller?.abort();
+    setTranslationThinking(false);
+    setTranslationLoading(false);
+    setTranslationOpen(false);
+  }, []);
+
+  return (
+    <Popover open={translationOpen} onOpenChange={handleTranslationOpenChange}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={className}
+          title={t(
+            mode === 'explain-shell'
+              ? 'approval.explain'
+              : 'thinking.translate',
+          )}
+          data-approval-shortcuts-ignore={
+            mode === 'explain-shell' && translationOpen ? '' : undefined
+          }
+          onClick={(event) => event.stopPropagation()}
+        >
+          {mode === 'explain-shell' && <LightbulbIcon aria-hidden="true" />}
+          {t(
+            mode === 'explain-shell'
+              ? 'approval.explain'
+              : 'thinking.translate',
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className={styles.translationPopover}
+        data-approval-shortcuts-ignore={
+          mode === 'explain-shell' ? '' : undefined
+        }
+      >
+        <div className={styles.translationTitle}>
+          {t(
+            mode === 'explain-shell'
+              ? 'approval.explanation'
+              : 'thinking.translation',
+          )}
+        </div>
+        {translationError ? (
+          <div className={styles.translationError}>
+            {t(
+              mode === 'explain-shell'
+                ? 'approval.explanationFailed'
+                : 'thinking.translationFailed',
+            )}
+          </div>
+        ) : translation?.text ? (
+          <div
+            className={`${styles.thinkingExpandedWrap} ${styles.translationContent}`}
+          >
+            <Markdown
+              content={translation.text}
+              source={mode === 'explain-shell' ? 'assistant' : 'thinking'}
+              isStreaming={translationLoading}
+            />
+          </div>
+        ) : (
+          <div className={styles.translationPending}>
+            {t(
+              translationThinking
+                ? mode === 'explain-shell'
+                  ? 'approval.explanationThinking'
+                  : 'thinking.translationThinking'
+                : mode === 'explain-shell'
+                  ? 'approval.explaining'
+                  : 'thinking.translating',
+            )}
+          </div>
+        )}
+        <div className={styles.translationFooter}>
+          <div className={styles.translationUsage}>
+            {!translationLoading && translation?.text && (
+              <>
+                <span>
+                  {t('thinking.inputTokens', {
+                    count: translation.inputTokens ?? '--',
+                  })}
+                </span>
+                <span>
+                  {t('thinking.outputTokens', {
+                    count: translation.outputTokens ?? '--',
+                  })}
+                </span>
+              </>
+            )}
+          </div>
+          <div className={styles.translationActions}>
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              onClick={() => void translate(true)}
+            >
+              {t(
+                mode === 'explain-shell'
+                  ? 'approval.reExplain'
+                  : 'thinking.retranslate',
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              disabled={
+                !translationLoading && !translation?.text && !translationError
+              }
+              onClick={handleCancelOrCloseTranslation}
+            >
+              {t(
+                translationLoading
+                  ? 'thinking.cancelTranslation'
+                  : 'thinking.closeTranslation',
+              )}
+            </Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+export function getThinkingSummaryKey({
+  isStreaming,
+  durationMs,
+}: {
+  isStreaming?: boolean;
+  durationMs?: number;
+}): 'thinking.running' | 'thinking.done' | 'thinking.doneBriefly' {
+  if (isStreaming) return 'thinking.running';
+  return durationMs !== undefined && durationMs < 1_000
+    ? 'thinking.doneBriefly'
+    : 'thinking.done';
+}
+
+export function formatThinkingDuration(ms: number): string {
+  const totalSec = Math.max(1, Math.round(ms / 1000));
+  if (totalSec < 60) return `${totalSec}s`;
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return sec > 0 ? `${min}m ${sec}s` : `${min}m`;
+}
+
+export function ThinkingDoneIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 18 18"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M7.2 15.2h4"
+        stroke="currentColor"
+        strokeWidth="1.45"
+        strokeLinecap="round"
+      />
+      <path
+        d="M6.5 13.1h5.4"
+        stroke="currentColor"
+        strokeWidth="1.45"
+        strokeLinecap="round"
+      />
+      <path
+        d="M9.1 2.8c-3 0-5.1 2.3-5.1 5 0 1.7.8 3.1 2.1 4 .5.4.8.8.8 1.4h4.5c0-.6.3-1 .8-1.4 1.3-.9 2.1-2.3 2.1-4 0-.8-.2-1.6-.6-2.3"
+        stroke="currentColor"
+        strokeWidth="1.45"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M13.2 1.8 14 3.6l1.8.8-1.8.8-.8 1.8-.8-1.8-1.8-.8 1.8-.8.8-1.8Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}

@@ -1,0 +1,5355 @@
+/**
+ * @license
+ * Copyright 2026 Qwen Team
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+// External dependencies
+import type {
+  Content,
+  GenerateContentConfig,
+  GenerateContentResponse,
+  Part,
+  PartListUnion,
+  Tool,
+} from '@google/genai';
+import { createUserContent } from './genai-compat.js';
+import process from 'node:process';
+
+// Config
+import type { Config } from '../config/config.js';
+import { ApprovalMode } from '../config/approval-mode.js';
+import { createDebugLogger } from '../utils/debugLogger.js';
+import { cleanupOldToolResults } from '../utils/toolResultCleanup.js';
+import { Storage } from '../config/storage.js';
+import { recordStartupEvent } from '../utils/startupEventSink.js';
+import {
+  microcompactHistory,
+  type MicrocompactMeta,
+  type MicrocompactOptions,
+} from '../services/microcompaction/microcompact.js';
+import { slimCompactionInput } from '../services/compactionInputSlimming.js';
+import {
+  GOAL_PAUSE_REASON_SESSION_TOKEN_LIMIT,
+  GOAL_PAUSE_REASON_STOP_HOOK_CAP,
+  GOAL_PAUSE_REASON_USER_INTERRUPT,
+  goalPauseReasonForFailure,
+  goalRequiresExactPermit,
+  PAUSED_GOAL_SYSTEM_REMINDER,
+  type GoalTurnPermit,
+} from '../goals/goal-protocol.js';
+import {
+  GoalPersistenceUnavailableError,
+  type GoalRuntime,
+} from '../goals/goal-runtime.js';
+import {
+  applyPendingGoalProposal,
+  formatProposeGoalRecoveryFailed,
+} from '../goals/goal-tools.js';
+import { formatStopHookBlockingCapWarning } from '../hooks/stopHookCap.js';
+import { buildContextUsage } from '../hooks/context-usage.js';
+import { DEFAULT_TOKEN_LIMIT, tokenLimit } from './tokenLimits.js';
+import { createSessionStartProfiler } from './session-start-profiler.js';
+
+const debugLogger = createDebugLogger('CLIENT');
+
+// Core modules
+import {
+  LlmChat,
+  type RepairOrphanedToolUseOptions,
+  userContentPushSnapshotKey,
+} from './llm-chat.js';
+import { restorableAskUserQuestionCallIds } from './ask-user-question-restore.js';
+import { getRecentGitStatus } from '../utils/gitUtils.js';
+import {
+  assembleSystemPrompt,
+  getArenaSystemReminder,
+  getCoreSystemPrompt,
+  getCustomSystemPrompt,
+  getPlanModeSystemReminder,
+  resolveInteractionMode,
+  resolveMainSessionOutputStyle,
+} from './prompts.js';
+import { buildOmniMediaGuidanceSection } from '../omni/media-guidance.js';
+import { getOutputStyleTurnReminder } from './output-styles.js';
+import {
+  CompressionStatus,
+  LlmEventType,
+  Turn,
+  type ChatCompressionInfo,
+  type ServerLlmStreamEvent,
+} from './turn.js';
+
+// Services
+import { LoopDetectionService } from '../services/loopDetectionService.js';
+import { CommitAttributionService } from '../services/commitAttribution.js';
+import type { UserPromptRecordPayload } from '../services/chatRecordingService.js';
+
+// Tools
+import type { RelevantAutoMemoryPromptResult } from '../memory/manager.js';
+import { AUTO_SKILL_THRESHOLD } from '../memory/manager.js';
+import { buildRelevantAutoMemoryPrompt } from '../memory/recall.js';
+import { isManagedMemoryPath } from '../memory/paths.js';
+import { isProjectSkillPath } from '../skills/skill-paths.js';
+import { ToolNames, canonicalToolName } from '../tools/tool-names.js';
+import {
+  DEFERRED_TOOL_CALL_CANCELLATION_PREFIX,
+  DEFERRED_TOOL_CALL_REFUSAL_PREFIX,
+} from '../tools/tool-call.js';
+import { ToolMode } from '../tools/code-mode.js';
+
+// Telemetry
+import {
+  NextSpeakerCheckEvent,
+  logNextSpeakerCheck,
+  logMemoryRecallDelivery,
+  startInteractionSpan,
+  endInteractionSpan,
+  getActiveInteractionSpan,
+  recordInteractionActivity,
+  addAgentInputMessageAttributes,
+  addUserPromptAttributes,
+  AgentOutputMessageCapture,
+  MemoryRecallDeliveryEvent,
+} from '../telemetry/index.js';
+import type {
+  MemoryRecallDeliveryPoint,
+  MemoryRecallDiscardReason,
+} from '../telemetry/types.js';
+import { uiTelemetryService } from '../telemetry/uiTelemetry.js';
+import {
+  extractTurnBudgetDirectiveText,
+  parseTurnBudgetDirective,
+} from './turn-budget.js';
+import type { UiTelemetryReplaySnapshot } from '../telemetry/uiTelemetry.js';
+
+// Forked agent cache
+import {
+  saveCacheSafeParams,
+  clearCacheSafeParams,
+} from '../agents/forkedAgent.js';
+
+// Utilities
+import {
+  formatDateForContext,
+  buildChangedAgentsReminder,
+  buildChangedMcpToolsReminder,
+  buildChangedSkillsReminder,
+  buildMcpServerInstructionsReminderFromEntries,
+  getDirectoryContextString,
+  getInitialChatHistory,
+  getStartupContextLength,
+  wrapSystemReminder,
+  type AgentAvailabilityEntry,
+} from './environmentContext.js';
+import {
+  collectAvailableSkillEntries,
+  type AvailableSkillEntry,
+} from '../tools/skill-utils.js';
+import type { DeferredToolSummary } from '../tools/tool-registry.js';
+import { replayUiTelemetryFromConversation } from '../services/sessionService.js';
+import { buildSessionHistoryFromConversation } from '../services/session-api-history.js';
+import { reportError } from '../utils/errorReporting.js';
+import {
+  getErrorMessage,
+  getErrorType,
+  UnauthorizedError,
+} from '../utils/errors.js';
+import { checkNextSpeaker } from '../utils/nextSpeakerChecker.js';
+import {
+  flatMapTextParts,
+  prependToFirstTextPart,
+} from '../utils/partUtils.js';
+import { promptIdContext } from '../utils/promptIdContext.js';
+import { retryWithBackoff, isUnattendedMode } from '../utils/retry.js';
+import { subagentNameContext } from '../utils/subagentNameContext.js';
+import { escapeSystemReminderTags } from '../utils/xml.js';
+import { ApiRetryEvent } from '../telemetry/types.js';
+import { logApiRetry } from '../telemetry/loggers.js';
+import { shouldUsePlanOnlyReminderInSubagentContext } from '../agents/runtime/subagent-plan-tool-policy.js';
+import { wrapUserPromptSubmitContext } from '../utils/transcript-records.js';
+import {
+  TrustedUserAnswers,
+  type TrustedUserAnswerQuestion,
+  type TrustedUserAnswerSnapshot,
+} from '../permissions/trusted-user-answers.js';
+
+// Hook types and utilities
+import {
+  MessageBusType,
+  type HookExecutionRequest,
+  type HookExecutionResponse,
+} from '../confirmation-bus/types.js';
+import { partToString } from '../utils/partUtils.js';
+import { createHookOutput, SessionStartSource } from '../hooks/types.js';
+import fsPromises from 'node:fs/promises';
+import { MessageDisplayDispatcher } from './message-display-dispatcher.js';
+
+// IDE integration
+import { ideContextStore } from '../ide/ideContext.js';
+import { type File, type IdeContext } from '../ide/types.js';
+import type { StopHookOutput } from '../hooks/types.js';
+import { approvalModeToPermissionMode } from '../hooks/permission-mode.js';
+
+const MAX_TURNS = 100;
+const MAX_RECENT_TOOL_NAMES_FOR_MEMORY = 20;
+const INITIAL_MEMORY_RECALL_WAIT_MS = 100;
+
+export enum SendMessageType {
+  UserQuery = 'userQuery',
+  ToolResult = 'toolResult',
+  /** User input appended at a sampling boundary within the active turn. */
+  Steer = 'steer',
+  Retry = 'retry',
+  Hook = 'hook',
+  /** Cron-fired prompt. Behaves like UserQuery but skips UserPromptSubmit hook. */
+  Cron = 'cron',
+  /** Background agent notification. Display item is added by the drain loop. */
+  Notification = 'notification',
+  /**
+   * A message delivered to the leader from a teammate. Behaves like a
+   * fresh top-level interaction (loop-detector reset + interaction span)
+   * but is not a user prompt — it does not bump commit attribution or get
+   * recorded as a user message.
+   */
+  Teammate = 'teammate',
+  /** Runtime-owned continuation for an active Goal. */
+  Goal = 'goal',
+}
+
+/** Upper bound on prompt ids tracked for an in-flight Stop-hook chain. */
+export const MAX_STOP_HOOK_CHAIN_PROMPT_IDS = 32;
+
+interface StopHookChain {
+  count: number;
+  reasons: string[];
+}
+
+export interface SendMessageOptions {
+  type: SendMessageType;
+  /** User-submitted text captured before prompt expansion. */
+  submittedPrompt?: string;
+  /** A UserQuery running beside an active turn, without replacing its state. */
+  isConcurrentSideQuery?: boolean;
+  /** Returns user input waiting to steer the active turn at a model boundary. */
+  getSteerInput?: (signal: AbortSignal) => Promise<SteerInput | undefined>;
+  /** Steer lease already appended to this request, settled after history push. */
+  steerInput?: SteerInput;
+  /** Display text for notification messages (persisted for session resume). */
+  notificationDisplayText?: string;
+  /** Todo work chain that owns this automatic turn, when it is related. */
+  todoWorkChainId?: string;
+  /** Model override from skill execution. When present, overrides the session model for this turn. */
+  modelOverride?: string;
+  /** Exact runtime permit authorizing this Goal-bound turn. */
+  goalPermit?: GoalTurnPermit;
+  /** Stable key used by the runtime to bind recursive segments to one permit. */
+  goalTurnKey?: string;
+  /** Permit-owned cancellation signal, combined with the caller signal. */
+  goalSignal?: AbortSignal;
+  /** Whether this permit belongs to runtime work or a real-user turn. */
+  goalOrigin?: 'runtime' | 'user';
+  /**
+   * Host-specific reason when this send has to pause an interrupted Goal.
+   * `interruption.failure` carries the error that ended the turn when there
+   * was one, so a host can tell a run that died apart from one that stopped.
+   * `interruption.cause` names a non-error stop with host-specific wording.
+   */
+  getInterruptedGoalPauseReason?: (interruption?: {
+    failure?: string;
+    cause?: 'stop-hook-cap';
+  }) => string;
+  /** Peeks a queued real-user key immediately before a Goal true Stop. */
+  getQueuedGoalTurnKey?: () => string | undefined;
+}
+
+export interface SteerInput {
+  parts: Part[];
+  /** Commits UI/recording side effects after the request accepts the input. */
+  accept: () => void;
+  /** Restores the input when the next model request never accepts it. */
+  restore: () => void;
+}
+
+const EMPTY_RELEVANT_AUTO_MEMORY_RESULT: RelevantAutoMemoryPromptResult = {
+  prompt: '',
+  selectedDocs: [],
+  strategy: 'none',
+};
+
+function wrapIdeContext(contextText: string): string {
+  const safeContextText = escapeSystemReminderTags(contextText);
+  return `<system-reminder>\n${safeContextText}\n</system-reminder>`;
+}
+
+function sameGoalPermit(
+  left: GoalTurnPermit | undefined,
+  right: GoalTurnPermit | undefined,
+): boolean {
+  if (!left || !right) return false;
+  return (
+    left.goalId === right.goalId &&
+    left.revision === right.revision &&
+    left.turnId === right.turnId
+  );
+}
+
+type GoalStateStreamEvent = Extract<
+  ServerLlmStreamEvent,
+  { type: LlmEventType.GoalState }
+>;
+
+/**
+ * Handle for a non-blocking auto-memory recall prefetch.
+ *
+ * Lifecycle:
+ *  1. Created on UserQuery/Cron — the recall promise fires immediately,
+ *     `pendingMemoryPrefetch` is set to this handle.
+ *  2. Consumed at either of two points: a bounded wait just before the
+ *     UserQuery main request, or — if recall remains pending — on the first
+ *     ToolResult turn.
+ *  3. Aborted-and-discarded by every cleanup path (resetChat,
+ *     MaxSessionTurns, etc.) or replaced when a new UserQuery arrives.
+ */
+/**
+ * Publication slot for recall's deterministic result, plus a one-shot
+ * listener for its arrival.
+ */
+type MemoryFastResultBox = {
+  current: RelevantAutoMemoryPromptResult | null;
+  onArrive?: () => void;
+};
+
+type MemoryPrefetchHandle = {
+  promise: Promise<RelevantAutoMemoryPromptResult>;
+  /** Set by promise.finally(). null until the promise settles. */
+  settledAt: number | null;
+  /** Set when the promise resolves, even if the consume point never runs. */
+  result: RelevantAutoMemoryPromptResult | null;
+  /** True after memory has been injected — prevents double-inject. */
+  consumed: boolean;
+  /** True after delivery/discard telemetry has recorded the terminal outcome. */
+  terminalLogged: boolean;
+  firedAt: number;
+  controller: AbortController;
+  /**
+   * Deterministic result published by recall before it blocks on the model
+   * selector. A box rather than a plain field because recall can invoke the
+   * callback before this handle object exists.
+   *
+   * `onArrive` lets the bounded initial wait stop as soon as there is
+   * something to deliver, instead of always spending the whole budget.
+   */
+  fastResultRef: MemoryFastResultBox;
+  /** True after the fast result was injected — prevents double-inject and double-log. */
+  fastDelivered: boolean;
+  /** Paths injected by the fast phase, excluded from the later refined delivery. */
+  fastDeliveredPaths: Set<string>;
+};
+
+/** Tools that can write to the skills directory, used to detect skillsModifiedInSession. */
+const SKILL_WRITE_TOOL_NAMES: ReadonlySet<string> = new Set([
+  ToolNames.WRITE_FILE,
+  ToolNames.EDIT,
+]);
+
+type MainSessionPromptConfig = Pick<
+  Config,
+  | 'getSystemPrompt'
+  | 'getModel'
+  | 'getOutputStyle'
+  | 'getCodeModeOnly'
+  | 'getExperimentalZedIntegration'
+  | 'getInputFormat'
+  | 'isInteractive'
+  | 'isTodoWriteEnabled'
+> &
+  // A project style stops applying the moment the workspace loses trust, so
+  // the resolver reads the live verdict on this path too. Optional, because
+  // the sessionless callers that build this shape by hand have no trust to
+  // report and only ever carry built-in styles.
+  // Optional for the same reason: a hand-built prompt config has no session and
+  // therefore no declared-tool snapshot, which the builder reads as "everything
+  // is declared" (#12032).
+  Partial<Pick<Config, 'isTrustedFolder' | 'getPromptToolSnapshot'>>;
+
+export function getMainSessionBaseSystemPrompt(
+  config: MainSessionPromptConfig,
+): string {
+  const overrideSystemPrompt = config.getSystemPrompt();
+  return overrideSystemPrompt
+    ? getCustomSystemPrompt(overrideSystemPrompt)
+    : getCoreSystemPrompt(
+        undefined,
+        config.getModel(),
+        undefined,
+        resolveInteractionMode(config),
+        // The prompt and the per-turn reminder must agree on which style is
+        // in force, so both read it from the same resolver rather than from
+        // `getOutputStyle()` directly — a prompt override carries no style
+        // section, and a session must not be reminded of one it lacks.
+        resolveMainSessionOutputStyle(config),
+        config.isTodoWriteEnabled(),
+        config.getCodeModeOnly(),
+        { declaredTools: config.getPromptToolSnapshot?.() },
+      );
+}
+
+export class LlmClient {
+  private chat?: LlmChat;
+  private readonly trustedUserAnswers = new TrustedUserAnswers();
+  private initializedSessionId: string | undefined;
+  /**
+   * Open session-swap telemetry transaction, if any. See
+   * {@link beginTelemetrySwap} for the lifetime contract. Holds the undo for
+   * the replay the current swap's `initialize()` performed, armed by
+   * {@link armTelemetrySwapUndo} inside the replay branches.
+   */
+  private telemetrySwap?: {
+    /**
+     * The session the process was on when the transaction opened — the one
+     * a failed swap rolls back to. Captured at open time because
+     * `initializedSessionId` is unreliable by arm time: an earlier failed
+     * swap's abort clears it, and the next swap would then snapshot no
+     * outgoing bucket at all (#9844 review).
+     */
+    outgoingHint: string;
+    undo?: { sessionId: string; snapshot: UiTelemetryReplaySnapshot };
+  };
+  private sessionTurnCount = 0;
+  /**
+   * In-flight Stop-hook chains keyed by prompt id. An entry means the last
+   * Stop check blocked: `has()` supplies `stop_hook_active`, and the same
+   * record owns its count and reasons without a concurrent side query
+   * resetting or advancing another prompt's chain.
+   *
+   * Kept on the client, keyed by prompt id, because a hook-forced
+   * continuation that calls a tool comes back through a fresh top-level
+   * sendMessageStream call from the caller. That re-entry must reuse the
+   * same `prompt_id` to be recognised. Any send that starts an interaction
+   * (user query, retry, cron, notification, teammate, goal turn) clears its
+   * own id: new input arrived, so the next Stop is not hook-forced. A caller
+   * that re-mints the prompt id for the re-entry (the teammate turn in
+   * headless mode) therefore starts fresh by design. Entries are also
+   * cleared when the stop is allowed, the blocking cap is hit, steer input
+   * replaces the turn, or the send exits abnormally.
+   *
+   * Bounded and LRU-ordered: a continuation whose tool result never returns
+   * leaves its id behind until eviction.
+   */
+  private readonly stopHookChains = new Map<string, StopHookChain>();
+  private toolCallCount = 0;
+  private skillsModifiedInSession = false;
+  private cachedGitStatus: string | null | undefined;
+  private readonly surfacedRelevantAutoMemoryPaths = new Set<string>();
+  private shutdownRequested = false;
+  private readonly settledSteerInputs = new WeakSet<SteerInput>();
+  private readonly interactionStartTypeByOwner = new WeakMap<
+    object,
+    SendMessageType
+  >();
+
+  private readonly loopDetector: LoopDetectionService;
+  private lastPromptId: string | undefined = undefined;
+  private activeTodoWorkChainPromptId: string | undefined;
+  private readonly activeAutomaticTodoWorkChainPromptIds = new Set<string>();
+  private lastSentIdeContext: IdeContext | undefined;
+  private forceFullIdeContext = true;
+  private recentCompletedToolNames: string[] = [];
+  private pendingMemoryPrefetch: MemoryPrefetchHandle | undefined;
+  private lastSessionStartContext: string | undefined;
+  private lastSessionStartSource: SessionStartSource | undefined;
+  private announcedDeferredToolNames = new Set<string>();
+  // MCP-only subset the model has actually seen via startup or delta reminders.
+  // `announcedDeferredToolNames` is broader and exists for deferred tool-search
+  // dedup; MCP add/remove deltas need this narrower model-visible set.
+  private announcedMcpToolNames = new Set<string>();
+  // MCP tools eagerly revealed by the incomplete-bridge fallback below.
+  // `rememberAnnouncedDeferredTools` re-seeds `announcedMcpToolNames` from the
+  // reminder list — which is `undefined` in that state — so without this set a
+  // later disconnect of an eagerly revealed tool would never be announced.
+  private eagerlyRevealedMcpToolNames = new Set<string>();
+  private pendingAddedMcpTools = new Map<string, DeferredToolSummary>();
+  private pendingRemovedMcpToolNames = new Set<string>();
+  private announcedMcpServerInstructions = new Map<string, string>();
+  private pendingMcpServerInstructions = new Map<string, string>();
+  private warnedAboutUnreachableEagerTools = false;
+  // Dedup state for the per-turn skill/command "now available" delta reminders
+  // (drainSkillAndCommandReminders). Keys are "skill:<name>" / "cmd:<name>". The
+  // set is seeded on the first drain from the current skills (the startup
+  // snapshot already listed them) and reset whenever the startup prelude is
+  // rebuilt (startChat), so a resumed/compacted session re-seeds from its fresh
+  // snapshot instead of re-announcing — mirrors Claude Code's
+  // suppressNextSkillListing / "don't re-inject on compact".
+  private announcedSkillReminderKeys = new Set<string>();
+  private skillRemindersInitialized = false;
+  private announcedAgentReminderNames = new Set<string>();
+  private agentRemindersInitialized = false;
+
+  private static skillEntryKey(e: AvailableSkillEntry): string {
+    return e.level !== undefined ? `skill:${e.name}` : `cmd:${e.name}`;
+  }
+
+  /**
+   * Seeds skill-reminder dedup from the entries actually rendered into the
+   * startup snapshot. Mirrors `rememberAnnouncedDeferredTools`: the dedup is
+   * seeded from what the model actually SAW, not from whatever happens to be
+   * current at the first drain (which may include late-registered MCP
+   * prompts/commands the snapshot never listed).
+   */
+  private seedSkillReminderDedupFromSnapshot(
+    snapshotEntries: AvailableSkillEntry[],
+  ): void {
+    this.announcedSkillReminderKeys = new Set(
+      snapshotEntries.map(LlmClient.skillEntryKey),
+    );
+    this.skillRemindersInitialized = true;
+  }
+
+  private async seedAgentReminderDedupFromCurrent(): Promise<void> {
+    try {
+      const agents = await this.config.getSubagentManager().listSubagents();
+      this.announcedAgentReminderNames = new Set(
+        agents.map((agent) => agent.name),
+      );
+      this.agentRemindersInitialized = true;
+    } catch (error) {
+      debugLogger.warn('seedAgentReminderDedupFromCurrent failed', error);
+      this.announcedAgentReminderNames.clear();
+      this.agentRemindersInitialized = false;
+    }
+  }
+
+  /**
+   * Tracks the most recently injected date string to prevent injecting
+   * duplicate or conflicting dates when a session spans midnight.
+   * Only UserQuery turns inject dates; Cron/ToolResult turns reuse the
+   * startup-context date which is still current within the same session.
+   */
+  private lastInjectedDate: string | undefined;
+
+  /**
+   * Promises for pending background memory tasks (dream / extract).
+   * Each promise resolves with a count of memory files touched (0 = nothing written).
+   * Consumed by the CLI via `consumePendingMemoryTaskPromises()`.
+   */
+  private pendingMemoryTaskPromises: Array<Promise<number>> = [];
+
+  /**
+   * Timestamp (epoch ms) of the last completed API call.
+   * Used to detect idle periods for thinking block cleanup.
+   * Starts as null — on the first query there is no prior thinking to clean,
+   * so the idle check is skipped until the first API call completes.
+   */
+  private lastApiCompletionTimestamp: number | null = null;
+  /** Cleanup checkpoint for long-running Hook continuations such as /goal. */
+  private lastHookMicrocompactionTimestamp: number | null = null;
+
+  constructor(private readonly config: Config) {
+    this.loopDetector = new LoopDetectionService(config);
+  }
+
+  async initialize(
+    sessionStartSource?: SessionStartSource,
+    signal?: AbortSignal,
+  ) {
+    signal?.throwIfAborted();
+    const sessionId = this.config.getSessionId();
+    this.lastPromptId = sessionId;
+
+    if (this.isInitialized() && this.initializedSessionId === sessionId) {
+      return;
+    }
+
+    // Check if we're resuming from a previous session
+    const resumedSessionData = this.config.getResumedSessionData();
+    const restoreRuntime = this.config.getSessionRestoreRuntime?.();
+    if (restoreRuntime) {
+      this.armTelemetrySwapUndo(sessionId);
+      uiTelemetryService.resetSession(sessionId);
+      for (const event of restoreRuntime.uiTelemetryEvents) {
+        uiTelemetryService.addEvent(event, sessionId);
+      }
+      this.seedRecentCompletedToolNamesFromHistory(restoreRuntime.apiHistory);
+      await this.startChat(
+        restoreRuntime.apiHistory,
+        sessionStartSource ?? SessionStartSource.Resume,
+        signal,
+      );
+      await this.restoreLoadedSkillsFromHistory(restoreRuntime.apiHistory);
+      const chat = this.getChat();
+      chat.setCompletedToolCallIds(restoreRuntime.completedToolCallIds);
+      if (restoreRuntime.resumeTokenCounts) {
+        const counts = restoreRuntime.resumeTokenCounts;
+        uiTelemetryService.setLastPromptTokenCount(counts.promptTokenCount);
+        chat.seedResumeTokenCounts(
+          counts.promptTokenCount,
+          counts.outputTokenCount,
+          counts.isEstimated,
+        );
+      }
+    } else if (resumedSessionData) {
+      this.armTelemetrySwapUndo(sessionId);
+      const resumeTokenCounts = replayUiTelemetryFromConversation(
+        resumedSessionData.conversation,
+        this.config.getSessionId(),
+      );
+      // Convert resumed session to API history format
+      // Each ChatRecord's message field is already a Content object
+      const restored = buildSessionHistoryFromConversation(
+        resumedSessionData.conversation,
+      );
+      const resumedHistory = restored.apiHistory;
+      this.seedRecentCompletedToolNamesFromHistory(resumedHistory);
+      await this.startChat(
+        resumedHistory,
+        sessionStartSource ?? SessionStartSource.Resume,
+        signal,
+      );
+      await this.restoreLoadedSkillsFromHistory(resumedHistory);
+      const chat = this.getChat();
+      chat.setCompletedToolCallIds(restored.completedToolCallIds);
+      if (resumeTokenCounts) {
+        chat.seedResumeTokenCounts(
+          resumeTokenCounts.promptTokenCount,
+          resumeTokenCounts.outputTokenCount,
+          resumeTokenCounts.isEstimated,
+        );
+      }
+
+      // Restore attribution state from the last snapshot in the session
+      this.restoreAttributionFromSession(resumedSessionData.conversation);
+    } else {
+      if (sessionStartSource !== undefined) {
+        await this.startChat(undefined, sessionStartSource, signal);
+      } else {
+        await this.startChat(undefined, undefined, signal);
+      }
+    }
+
+    signal?.throwIfAborted();
+    this.initializedSessionId = sessionId;
+
+    // Clean up stale tool result files from previous sessions (fire-and-forget)
+    void cleanupOldToolResults(Storage.getGlobalTempDir(), 24 * 60 * 60 * 1000);
+  }
+
+  /**
+   * Restore attribution state from the last snapshot in a resumed session.
+   */
+  private restoreAttributionFromSession(conversation: {
+    messages: Array<{ subtype?: string; systemPayload?: unknown }>;
+  }): void {
+    // Find the last attribution snapshot in the session
+    let lastSnapshot: unknown = null;
+    for (const msg of conversation.messages) {
+      if (
+        msg.subtype === 'attribution_snapshot' &&
+        msg.systemPayload &&
+        typeof msg.systemPayload === 'object' &&
+        'snapshot' in msg.systemPayload
+      ) {
+        lastSnapshot = (msg.systemPayload as { snapshot: unknown }).snapshot;
+      }
+    }
+    if (lastSnapshot && typeof lastSnapshot === 'object') {
+      try {
+        CommitAttributionService.getInstance().restoreFromSnapshot(
+          lastSnapshot as import('../services/commitAttribution.js').AttributionSnapshot,
+        );
+        debugLogger.debug('Restored attribution state from session snapshot');
+      } catch {
+        debugLogger.warn('Failed to restore attribution snapshot');
+      }
+    }
+  }
+
+  private async restoreLoadedSkillsFromHistory(
+    history: Content[],
+  ): Promise<void> {
+    const skillTool = this.config.getToolRegistry().getTool(ToolNames.SKILL) as
+      | {
+          restoreLoadedSkillsFromHistory?: (
+            history: Content[],
+          ) => void | Promise<void>;
+        }
+      | undefined;
+    await skillTool?.restoreLoadedSkillsFromHistory?.(history);
+  }
+
+  async addHistory(content: Content) {
+    this.getChat().addHistory(content);
+  }
+
+  getChat(): LlmChat {
+    if (!this.chat) {
+      throw new Error('Chat not initialized');
+    }
+    return this.chat;
+  }
+
+  isInitialized(): boolean {
+    return this.chat !== undefined;
+  }
+
+  /**
+   * Opens a session-swap telemetry transaction for the `/resume` / `/branch`
+   * hooks (#9833).
+   *
+   * Lifetime contract: one call per swap attempt, closed by exactly one
+   * {@link commitTelemetrySwap} (the UI swap committed — the replayed history
+   * now belongs to the session the user is on) or
+   * {@link abortTelemetrySwap} (the swap failed and core rolled back — put
+   * the usage aggregate back). The undo is armed lazily by
+   * {@link armTelemetrySwapUndo} inside `initialize()`'s replay branches, so
+   * it is scoped to the ONE replay this swap performs:
+   *
+   * - A replay outside any transaction (process-startup `Config.initialize()`,
+   *   ACP) arms nothing — there is no owning swap to settle it, and a
+   *   process-lived undo would let a much later failed swap restore a
+   *   process-start snapshot and wipe everything accrued since.
+   * - `initialize()` only replays when its private `initializedSessionId`
+   *   differs from the config session id. The hooks cannot see that fact, so
+   *   the snapshot is taken here, inside the replay decision, never keyed on
+   *   a caller's guess.
+   *
+   * Serialization: returns false WITHOUT opening when a transaction is
+   * already open. Callers MUST abort the swap attempt on a false return
+   * (the hooks surface "a session switch is already in progress"). Two
+   * concurrent swaps cannot share this single slot: the second open would
+   * no-op while both replays mutate the same aggregate, so the first swap's
+   * stale settlement would either no-op or restore its snapshot over the
+   * second swap's committed state — the double-count / split-brain this
+   * transaction exists to close. Nothing else serializes the swaps: the
+   * session picker fires them fire-and-forget and no input gate covers
+   * them, so this slot is the latch.
+   */
+  beginTelemetrySwap(): boolean {
+    if (this.telemetrySwap) {
+      if (debugLogger.isEnabled()) {
+        debugLogger.debug(
+          '[TELEMETRY_SWAP_BEGIN] rejected: a swap is already in progress',
+        );
+      }
+      return false;
+    }
+    // The hooks call this BEFORE config.startNewSession, so the config
+    // session id still names the session the process is on — capture it as
+    // the outgoing session now; initializedSessionId may already be stale
+    // or cleared by the time the undo arms.
+    this.telemetrySwap = { outgoingHint: this.config.getSessionId() };
+    return true;
+  }
+
+  /**
+   * The swap committed: drop the armed undo without restoring. The replayed
+   * history legitimately belongs to the session the user is now on, and a
+   * later failed swap must restore ITS OWN pre-swap snapshot, never this one.
+   * Safe to call with no transaction open (no-op).
+   */
+  commitTelemetrySwap(): void {
+    const undo = this.telemetrySwap?.undo;
+    this.telemetrySwap = undefined;
+    if (debugLogger.isEnabled()) {
+      debugLogger.debug(
+        `[TELEMETRY_SWAP_COMMIT] undo=${undo ? 'dropped' : 'none'} ` +
+          `incoming=${undo?.sessionId ?? 'n/a'}`,
+      );
+    }
+  }
+
+  /**
+   * The swap failed and core rolled back: restore the usage aggregate (and
+   * the two affected session buckets) to the state captured before this
+   * swap's replay. Overwrites rather than subtracts, so it stays correct
+   * when the rollback's own re-`initialize()` (the `/branch` and `/resume`
+   * paths) has already replayed something else on top.
+   *
+   * Also forgets `initializedSessionId` when it still names the abandoned
+   * INCOMING session: undoing the replay without forgetting it would make a
+   * retry early-return and never replay, permanently under-counting the
+   * session. The clear is an identity check, not the assumption that the
+   * undo always names the incoming session — when the swap's forward
+   * `initialize()` never ran (e.g. `/branch` fails between
+   * `startNewSession(fork)` and `initialize()`), the rollback's own
+   * re-initialize arms the undo with the PARENT's id and sets
+   * `initializedSessionId` to it. That session is live and correctly
+   * initialized; clearing it would make the next `initialize()` of the
+   * session the user is already on skip the early return and re-replay its
+   * stored telemetry on top of the live aggregate — a permanent
+   * double-count. The undo belongs to the outgoing session's own
+   * re-initialize exactly when `undo.sessionId` matches the begin-time
+   * `outgoingHint` (#9844 review).
+   *
+   * Safe to call with no transaction open or nothing armed (no-op). Returns
+   * whether an undo was applied.
+   */
+  abortTelemetrySwap(): boolean {
+    const swap = this.telemetrySwap;
+    this.telemetrySwap = undefined;
+    if (debugLogger.isEnabled()) {
+      debugLogger.debug(
+        `[TELEMETRY_SWAP_ABORT] undo=${swap?.undo ? 'applied' : 'none'} ` +
+          `incoming=${swap?.undo?.sessionId ?? 'n/a'} ` +
+          `outgoing=${swap?.undo?.snapshot.outgoingSessionId ?? 'n/a'}`,
+      );
+    }
+    if (!swap?.undo) return false;
+    uiTelemetryService.restoreFromReplaySnapshot(swap.undo.snapshot);
+    if (
+      swap.undo.sessionId !== swap.outgoingHint &&
+      this.initializedSessionId === swap.undo.sessionId
+    ) {
+      this.initializedSessionId = undefined;
+    }
+    return true;
+  }
+
+  /**
+   * Arms the undo for the replay the current `initialize()` call is about to
+   * perform. Called only by the replay branches; a fresh-start `initialize()`
+   * replays nothing, and an undo armed there would outlive the transaction.
+   *
+   * `??=` on the undo: within one swap only the FIRST replay's pre-state is
+   * the correct restore point — on the `/branch` rollback the re-initialize
+   * of the parent runs while the failed swap's undo is still outstanding.
+   * No-ops when no transaction is open (replay outside a swap).
+   *
+   * The snapshot also covers the session the process is currently on — the
+   * one a failed swap rolls back to. That is the transaction's
+   * `outgoingHint`, captured at open time, NOT `initializedSessionId`: an
+   * earlier failed swap's abort clears `initializedSessionId`, so keying on
+   * it would snapshot no outgoing bucket and the rollback's re-initialize
+   * would wipe the live session's never-persisted state. The `/branch`
+   * rollback re-initializes that session, and the re-initialize's
+   * `resetSession` wipes its live bucket — only what the transcript persists
+   * comes back (skill invocations never do), so the undo must put the
+   * captured bucket back.
+   */
+  private armTelemetrySwapUndo(sessionId: string): void {
+    if (!this.telemetrySwap || this.telemetrySwap.undo) return;
+    const outgoing =
+      this.telemetrySwap.outgoingHint ?? this.initializedSessionId;
+    this.telemetrySwap.undo = {
+      sessionId,
+      snapshot: uiTelemetryService.snapshotForReplay(sessionId, outgoing),
+    };
+    if (debugLogger.isEnabled()) {
+      debugLogger.debug(
+        `[TELEMETRY_SWAP_ARM] incoming=${sessionId} ` +
+          `outgoing=${outgoing ?? 'n/a'}`,
+      );
+    }
+  }
+
+  getHistory(curated: boolean = false): Content[] {
+    return this.getChat().getHistory(curated);
+  }
+
+  getHistoryShallow(curated: boolean = false): Content[] {
+    const chat = this.getChat();
+    return chat.getHistoryShallow?.(curated) ?? chat.getHistory(curated);
+  }
+
+  getHistoryForForkWindow(): Content[] {
+    return this.getChat().getHistoryForForkWindow();
+  }
+
+  getHistoryTail(count: number, curated: boolean = false): Content[] {
+    return this.getChat().getHistoryTail(count, curated);
+  }
+
+  recordTrustedUserAnswers(
+    callId: string,
+    questions: readonly TrustedUserAnswerQuestion[],
+    answers: unknown,
+  ): boolean {
+    return this.trustedUserAnswers.record(callId, questions, answers);
+  }
+
+  getTrustedUserAnswers(): TrustedUserAnswerSnapshot {
+    return this.trustedUserAnswers.snapshot();
+  }
+
+  private getHistoryTailShallow(
+    count: number,
+    curated: boolean = false,
+  ): Content[] {
+    const chat = this.getChat();
+    return (
+      chat.getHistoryTailShallow?.(count, curated) ??
+      chat.getHistoryTail?.(count, curated) ??
+      chat.getHistory(curated).slice(-count)
+    );
+  }
+
+  private peekLastHistoryEntry(): Content | undefined {
+    const chat = this.getChat();
+    return chat.peekLastHistoryEntry?.() ?? chat.getHistory().at(-1);
+  }
+
+  private getHistoryLength(): number {
+    const chat = this.getChat();
+    return chat.getHistoryLength?.() ?? chat.getHistory().length;
+  }
+
+  /**
+   * Applies a `propose_goal` approval at the true end of the turn that made it.
+   *
+   * Only when the model has stopped calling tools, and only in the turn
+   * that parked it (matched by prompt id): a proposal made mid-turn stays
+   * parked through the tool-result continuations, because creating the Goal
+   * earlier would leave those continuations without a permit. Tail
+   * continuations keep the proposal parked until their final boundary. An
+   * aborted turn drops the approval instead of starting a loop the user just
+   * cancelled; an abort during dispatch pauses the new Goal.
+   * Host-supported sessions settle after classifying their own protective
+   * exits, so core must leave their single-take proposal latch untouched.
+   */
+  private async settlePendingGoalProposal(
+    turnEnded: boolean,
+    signal: AbortSignal,
+    loadGoalRuntime: (required: boolean) => Promise<GoalRuntime | undefined>,
+    turnKey: string,
+    reportFailure: (message: string) => void,
+  ): Promise<void> {
+    if (this.config.getGoalProposalHostSupported?.()) return;
+    const take = this.config.takePendingGoalProposal;
+    if (typeof take !== 'function') return;
+    if (!turnEnded && !signal.aborted) return;
+    const proposal = take.call(this.config, turnKey);
+    if (!proposal) return;
+    if (signal.aborted) return;
+    const runtime = await loadGoalRuntime(false);
+    if (!runtime) {
+      debugLogger.debug(
+        'Dropping an approved Goal proposal: the Goal runtime is unavailable',
+      );
+      reportFailure(formatProposeGoalRecoveryFailed(proposal.objective));
+      return;
+    }
+    if (signal.aborted) return;
+    const result = await applyPendingGoalProposal(runtime, proposal);
+    if (
+      (signal.aborted || proposal.approvalSignal?.aborted) &&
+      result.applied
+    ) {
+      try {
+        await runtime.dispatch({
+          action: 'pause',
+          expectedGoalId: result.goal.goalId,
+          expectedRevision: result.goal.revision,
+          reason: GOAL_PAUSE_REASON_USER_INTERRUPT,
+        });
+      } catch (error) {
+        debugLogger.warn(
+          'Failed to pause a Goal applied during cancellation',
+          error,
+        );
+      }
+      return;
+    }
+    if (!result.applied) {
+      debugLogger.debug(`Dropping an approved Goal proposal: ${result.reason}`);
+      reportFailure(
+        result.kind === 'changed'
+          ? result.reason
+          : formatProposeGoalRecoveryFailed(proposal.objective),
+      );
+    }
+  }
+
+  private getLastModelMessageText(): string | undefined {
+    const chat = this.getChat();
+    if (chat.getLastModelMessageText) {
+      return chat.getLastModelMessageText();
+    }
+    const history = chat.getHistoryShallow?.() ?? chat.getHistory();
+    for (let i = history.length - 1; i >= 0; i--) {
+      const message = history[i];
+      if (message?.role !== 'model') continue;
+      const text =
+        message.parts
+          ?.filter(
+            (part): part is { text: string } =>
+              typeof part.text === 'string' && !part.thought,
+          )
+          .map((part) => part.text)
+          .join('') ?? '';
+      return text || undefined;
+    }
+    return undefined;
+  }
+
+  /**
+   * Fire-and-forget StopFailure hook for loop-detection early returns.
+   * Matches the detached pattern used by the CLI's API-error path
+   * (use-llm-stream.ts) — output and errors are ignored.
+   */
+  private fireLoopDetectedStopFailure(loopType: string | null): void {
+    if (this.config.getDisableAllHooks()) return;
+    const hookSystem = this.config.getHookSystem();
+    if (!hookSystem || !this.config.hasHooksForEvent('StopFailure')) return;
+    hookSystem
+      .fireStopFailureEvent('loop_detected', loopType ?? undefined)
+      .catch((err) => {
+        debugLogger.warn(`StopFailure hook failed: ${err}`);
+      });
+  }
+
+  /**
+   * Walk-only accessor for the set of `functionResponse.id` strings in
+   * raw history. Callers that only need the dedup id set (notably
+   * `useLlmStream.handleCompletedTools`) MUST prefer this over
+   * {@link getHistory}, which deep-clones the entire conversation via
+   * `structuredClone` on every call. On long sessions with sizable
+   * tool outputs the clone is a multi-millisecond hit on the React UI
+   * thread; running it on every tool-completion batch caused visible
+   * frame drops during streaming. See
+   * `LlmChat.getHistoryFunctionResponseIds` for the implementation.
+   */
+  getHistoryFunctionResponseIds(): Set<string> {
+    return this.getChat().getHistoryFunctionResponseIds();
+  }
+
+  /**
+   * Walk-only accessor for the handled tool-call id → (name, args)
+   * fingerprint map used by duplicate provider-id replay detection. Same
+   * no-clone rationale as {@link getHistoryFunctionResponseIds}. See
+   * `LlmChat.getHistoryToolCallFingerprints` for the implementation.
+   */
+  getHistoryToolCallFingerprints(): Map<string, string> {
+    return this.getChat().getHistoryToolCallFingerprints();
+  }
+
+  /**
+   * Pop orphaned trailing user entries from the in-memory chat history.
+   * Used by:
+   *   - The Retry submit path (sendMessageStream below), which drops a
+   *     prior failed attempt before re-sending.
+   *   - The auto-restore-on-cancel flow in AppContainer, which rewinds
+   *     a user prompt out of the UI transcript and the disk-backed
+   *     ↑-history; this is the third place the cancelled prompt lives.
+   *     Without calling this from auto-restore, the next request's wire
+   *     payload would carry two consecutive user turns — the cancelled
+   *     one and the new one — and the model would see context the user
+   *     thought had been undone.
+   */
+  stripOrphanedUserEntriesFromHistory(): Content[] {
+    const chat = this.getChat();
+    const before = chat.getHistoryLength();
+    const strippedEntries = chat.stripOrphanedUserEntriesFromHistory();
+    const after = chat.getHistoryLength();
+    if (after >= before) {
+      // Nothing to strip — leave caches and IDE context alone.
+      return strippedEntries;
+    }
+    this.trustedUserAnswers.clear();
+    // Stripped trailing user entries can include read_file
+    // functionResponses from a failed-then-retried request. The
+    // FileReadCache would still record those reads, so the retry's
+    // re-issued Read could hit the file_unchanged placeholder while
+    // the model has nothing to fall back on. Clear to be safe.
+    debugLogger.debug(
+      `[FILE_READ_CACHE] clear after stripOrphanedUserEntriesFromHistory(prev=${before}, new=${after})`,
+    );
+    this.config.getFileReadCache().clear();
+    // The stripped user turn may have carried the IDE context (open files,
+    // workspace state) that `lastSentIdeContext` advanced past. Without
+    // forcing a resend, the next request would either skip IDE context
+    // entirely or send only a diff against a now-removed baseline. Match
+    // the invalidation `setHistory()` / `truncateHistory()` already do.
+    this.forceFullIdeContext = true;
+    return strippedEntries;
+  }
+
+  /**
+   * Synthesize a `functionResponse` for every dangling `model[functionCall]`
+   * in chat history whose corresponding tool_result never landed. Inverse of
+   * {@link stripOrphanedUserEntriesFromHistory}, which only handles trailing
+   * `user` entries.
+   *
+   * This `LlmClient` method is the resume-path entry point — called once
+   * from {@link startChat} after the transcript loads, covering `--resume`
+   * of a session that crashed between a partial-tool_use push and the
+   * tool's eventual completion.
+   *
+   * The other two coverage points (Retry submit path after
+   * `stripOrphanedUserEntriesFromHistory`, and the defensive pass at the
+   * start of every UserQuery / Cron send) live one layer down inside
+   * `LlmChat.sendMessageStream` and call the standalone
+   * `repairOrphanedToolUseTurns(history)` function directly — they don't
+   * route through this wrapper. Anyone tracing the repair-pass coupling
+   * between the client and chat layers should follow that path
+   * separately rather than expect everything to funnel through here.
+   *
+   * Synthesizes an `error` `functionResponse`. The React tool scheduler
+   * (`useLlmStream.handleCompletedTools`) MUST dedupe by `callId` against
+   * the live history before submitting its own `tool_result` — otherwise a
+   * late real result lands as a second `user[tool_result]` block (orphan
+   * because the synthetic already consumed the matching `tool_use`).
+   */
+  repairOrphanedToolUseTurnsInHistory(
+    reason?: string,
+    options?: RepairOrphanedToolUseOptions,
+  ): {
+    injected: Array<{ callId: string; name: string }>;
+    droppedDuplicates: Array<{ callId: string; name: string }>;
+  } {
+    const result = this.getChat().repairOrphanedToolUseTurns(reason, options);
+    if (result.injected.length > 0) {
+      debugLogger.warn(
+        `[REPAIR] Synthesized ${result.injected.length} functionResponse(s) ` +
+          `for dangling tool_use(s): ${result.injected
+            .map((e) => `${e.name}(${e.callId})`)
+            .join(', ')}`,
+      );
+    }
+    if (result.droppedDuplicates.length > 0) {
+      // Surface the duplicate-cleanup pass so investigators tracing
+      // a dedup-drop log have a breadcrumb pointing back to the
+      // repair function. Without this a duplicate-only repair (no
+      // synthesis, no hoist) leaves zero diagnostic trail and a
+      // future callId-collision bug would silently delete the
+      // wrong fr.
+      debugLogger.warn(
+        `[REPAIR] Dropped ${result.droppedDuplicates.length} duplicate ` +
+          `functionResponse(s) for callId(s): ${result.droppedDuplicates
+            .map((e) => `${e.name}(${e.callId})`)
+            .join(', ')}`,
+      );
+    }
+    return result;
+  }
+
+  setHistory(history: Content[]) {
+    this.trustedUserAnswers.clear();
+    this.getChat().setHistory(history);
+    // Replacing history wholesale drops any prior read_file tool
+    // results the FileReadCache still believes the model has seen.
+    // Without clearing, a follow-up Read of an unchanged file would
+    // return the file_unchanged placeholder for bytes that no longer
+    // exist in the new history.
+    debugLogger.debug('[FILE_READ_CACHE] clear after setHistory');
+    this.config.getFileReadCache().clear();
+    // The active-todo reminder describes the discarded timeline: clear it and
+    // its chain so the next turn cannot continue work the restore removed.
+    this.activeTodoWorkChainPromptId = undefined;
+    this.config.clearActiveTodoReminders();
+    this.forceFullIdeContext = true;
+  }
+
+  truncateHistory(keepCount: number) {
+    // Use the O(1) length getter rather than getHistory() — the latter
+    // structuredClone's the entire history just to read .length, which
+    // gets expensive in long-running sessions.
+    const prevLen = this.getChat().getHistoryLength();
+    this.getChat().truncateHistory(keepCount);
+    // Decide whether to invalidate based on the *actual* post-truncate
+    // length, not on the keepCount argument. Comparing keepCount alone
+    // misses pathological inputs (e.g. NaN: slice(0, NaN) returns [],
+    // emptying history, but `NaN < prevLen` is false and would skip
+    // the clear, reintroducing the file_unchanged placeholder bug).
+    const newLen = this.getChat().getHistoryLength();
+    if (newLen < prevLen) {
+      this.trustedUserAnswers.clear();
+      debugLogger.debug(
+        `[FILE_READ_CACHE] clear after truncateHistory(keep=${keepCount}, prev=${prevLen}, new=${newLen})`,
+      );
+      this.config.getFileReadCache().clear();
+      // A rewind discards the timeline the active-todo reminder described:
+      // clear it and its chain so the next turn starts fresh instead of
+      // continuing work that was rewound away.
+      this.activeTodoWorkChainPromptId = undefined;
+      this.config.clearActiveTodoReminders();
+    }
+    this.forceFullIdeContext = true;
+  }
+
+  async setTools(options: { skipHistoryReveal?: boolean } = {}): Promise<void> {
+    if (!this.isInitialized()) {
+      return;
+    }
+
+    const toolRegistry = this.config.getToolRegistry();
+    await toolRegistry.warmAll();
+    const codeModeOnly = this.config.getToolMode?.() === ToolMode.CodeModeOnly;
+    const deferredSummary = toolRegistry.getDeferredToolSummary();
+    // Progressive MCP discovery registers tools after a resumed chat has
+    // already been constructed. Re-scan the live history here so historical
+    // MCP calls reveal their newly registered schemas before declarations are
+    // refreshed. setTools() is shared by interactive and headless refreshes.
+    if (!codeModeOnly && !options.skipHistoryReveal) {
+      this.revealDeferredToolsReferencedInHistory(deferredSummary, () =>
+        this.getHistoryShallow(),
+      );
+    }
+    const deferredTools = this.resolveDeferredToolsForReminder(deferredSummary);
+    const toolDeclarations = toolRegistry.getFunctionDeclarations();
+    const tools: Tool[] = [{ functionDeclarations: toolDeclarations }];
+    this.getChat().setTools(tools);
+    this.queueAddedMcpToolsReminder(deferredTools ?? []);
+    this.queueMcpServerInstructionsReminder(
+      toolRegistry.getMcpServerInstructions(),
+    );
+    recordStartupEvent('gemini_tools_updated', {
+      toolCount: toolDeclarations.length,
+      deferredCount: deferredTools?.length ?? 0,
+    });
+  }
+
+  /**
+   * Signal that shutdown is imminent. Subsequent calls to background memory
+   * tasks (extract, dream, skill review) will be skipped so the process can
+   * exit cleanly without spawning new work.
+   */
+  requestShutdown(): void {
+    this.shutdownRequested = true;
+    this.cancelPendingMemoryPrefetch('shutdown');
+  }
+
+  /**
+   * Abort and release the pending auto-memory prefetch in one step.
+   * Safe to call when no prefetch is pending — does nothing. Centralises
+   * the abort-then-clear idiom so every cleanup path (resetChat, early
+   * returns, finally) cannot half-fix one without the other.
+   *
+   * If the handle has already settled (recall completed but consume point
+   * hadn't run yet), the settled result is discarded — logged at debug so
+   * operators can diagnose missing-memory scenarios.
+   */
+  private logMemoryPrefetchDelivery(
+    handle: MemoryPrefetchHandle,
+    deliveryPoint: MemoryRecallDeliveryPoint,
+    result: RelevantAutoMemoryPromptResult,
+    discardReason?: MemoryRecallDiscardReason,
+  ): void {
+    if (handle.terminalLogged) return;
+    handle.terminalLogged = true;
+    logMemoryRecallDelivery(
+      this.config,
+      new MemoryRecallDeliveryEvent({
+        phase: 'refined',
+        delivery_point: deliveryPoint,
+        discard_reason: discardReason,
+        strategy: result.strategy,
+        docs_selected: result.selectedDocs.length,
+        latency_ms: Date.now() - handle.firedAt,
+      }),
+    );
+  }
+
+  private logMemoryPrefetchDiscard(
+    handle: MemoryPrefetchHandle,
+    discardReason: MemoryRecallDiscardReason,
+  ): void {
+    const result = handle.result ?? EMPTY_RELEVANT_AUTO_MEMORY_RESULT;
+    // A settled result whose every document the fast phase already injected
+    // was not lost, whatever ended the turn — most often a tool-free turn
+    // reaching `no_safe_delivery_point`. Reporting those under the
+    // cancellation reason would inflate the "memory never reached the model"
+    // bucket with turns that did get it, so apply the same rule the
+    // ToolResult consume point uses. A partial overlap still reports the
+    // cancellation reason: the documents outside `fastDeliveredPaths`
+    // genuinely had no delivery point.
+    const everyDocAlreadyDelivered =
+      result.selectedDocs.length > 0 &&
+      result.selectedDocs.every((doc) =>
+        handle.fastDeliveredPaths.has(doc.filePath),
+      );
+    this.logMemoryPrefetchDelivery(
+      handle,
+      'discarded',
+      result,
+      everyDocAlreadyDelivered ? 'already_delivered' : discardReason,
+    );
+  }
+
+  /** @internal */
+  beginManagedAutoMemoryRecall(query: string, signal: AbortSignal): void {
+    if (
+      !this.config.isManagedMemoryAvailable() ||
+      !this.config.getManagedAutoMemoryEnabled()
+    ) {
+      return;
+    }
+
+    // A previous recall may still be pending (slow side-query, new user turn
+    // arrived before it settled). Abort it before installing the new handle so
+    // the orphan doesn't keep running indefinitely.
+    this.cancelPendingMemoryPrefetch('new_query');
+    const controller = new AbortController();
+    // Bridge the caller's signal into the prefetch controller so a user abort
+    // on the parent turn also terminates the recall side-query.
+    let prefetchAbortReason: MemoryRecallDiscardReason | null = null;
+    const onParentAbort = () => {
+      prefetchAbortReason = 'abort';
+      controller.abort();
+      this.cancelPendingMemoryPrefetch('abort');
+    };
+    if (signal.aborted) {
+      prefetchAbortReason = 'abort';
+      controller.abort();
+    } else {
+      signal.addEventListener('abort', onParentAbort, { once: true });
+    }
+    const fastResultRef: MemoryFastResultBox = { current: null };
+    const promise = this.config
+      .getMemoryManager()
+      .recall(this.config.getProjectRoot(), query, {
+        config: this.config,
+        excludedFilePaths: this.surfacedRelevantAutoMemoryPaths,
+        recentTools: [...this.recentCompletedToolNames],
+        abortSignal: controller.signal,
+        onFastResult: (result) => {
+          fastResultRef.current = result;
+          fastResultRef.onArrive?.();
+        },
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          debugLogger.debug('Managed auto-memory recall prefetch aborted.');
+        } else {
+          debugLogger.warn(
+            'Managed auto-memory recall prefetch failed.',
+            error,
+          );
+        }
+        return EMPTY_RELEVANT_AUTO_MEMORY_RESULT;
+      });
+    const handle: MemoryPrefetchHandle = {
+      promise,
+      settledAt: null,
+      result: null,
+      consumed: false,
+      terminalLogged: false,
+      firedAt: Date.now(),
+      controller,
+      fastResultRef,
+      fastDelivered: false,
+      fastDeliveredPaths: new Set<string>(),
+    };
+    void promise.then((result) => {
+      handle.result = result;
+    });
+    void promise.finally(() => {
+      handle.settledAt = Date.now();
+      signal.removeEventListener('abort', onParentAbort);
+    });
+    this.pendingMemoryPrefetch = handle;
+    if (prefetchAbortReason) {
+      this.cancelPendingMemoryPrefetch(prefetchAbortReason);
+    }
+  }
+
+  /** @internal */
+  captureCacheSafeParams(): void {
+    try {
+      const chat = this.getChat();
+      const historyForCache = this.getHistoryTailShallow(40, true);
+      const cachedHistory = slimCompactionInput(
+        historyForCache,
+        this.config.getEffectiveInputModalities(),
+      ).slimmedHistory;
+      saveCacheSafeParams(
+        chat.getGenerationConfig(),
+        cachedHistory,
+        this.config.getModel(),
+        this.config.getSessionId(),
+      );
+    } catch {
+      // Best-effort — don't block the main flow
+    }
+  }
+
+  /** @internal */
+  consumeManagedAutoMemoryRecall(
+    deliveryPoint: 'initial' | 'tool_result',
+  ): Promise<RelevantAutoMemoryPromptResult | null> {
+    return this.tryConsumeMemoryPrefetch(
+      deliveryPoint,
+      deliveryPoint === 'initial' ? INITIAL_MEMORY_RECALL_WAIT_MS : 0,
+    );
+  }
+
+  /** @internal */
+  finishManagedAutoMemoryRecall(): void {
+    this.cancelPendingMemoryPrefetch('no_safe_delivery_point');
+  }
+
+  private cancelPendingMemoryPrefetch(
+    discardReason: MemoryRecallDiscardReason,
+  ): void {
+    const handle = this.pendingMemoryPrefetch;
+    if (!handle) return;
+    if (handle.settledAt !== null && !handle.consumed) {
+      debugLogger.debug('Discarding settled but unconsumed memory prefetch.');
+    }
+    this.logMemoryPrefetchDiscard(handle, discardReason);
+    handle.controller.abort();
+    this.pendingMemoryPrefetch = undefined;
+  }
+
+  /**
+   * Atomically consume the pending prefetch, optionally waiting for a bounded
+   * initial-turn budget. Budget expiry leaves the recall running for the next
+   * safe delivery point.
+   *
+   * Centralises the consume-and-mark dance so the UserQuery and ToolResult
+   * inject sites can't drift on the guard logic.
+   */
+  private async tryConsumeMemoryPrefetch(
+    deliveryPoint: Exclude<MemoryRecallDeliveryPoint, 'discarded'>,
+    waitMs = 0,
+  ): Promise<RelevantAutoMemoryPromptResult | null> {
+    const handle = this.pendingMemoryPrefetch;
+    if (!handle || handle.consumed) {
+      return null;
+    }
+
+    // `waitMs` is a ceiling, not a fixed cost. The wait ends on whichever
+    // comes first: recall settling, the deterministic result being published,
+    // cancellation, or the budget expiring.
+    //
+    // Ending on the fast result matters more than it looks. That result is
+    // published once recall has scanned the memory tree, which is milliseconds
+    // for an ordinary tree — while the model selector is a network round trip
+    // that this design already assumes will miss the budget. Spending the rest
+    // of the budget after the fast result is in hand therefore buys an
+    // outcome that almost never arrives, and charges every user turn for it.
+    // See `recall-scan-latency.test.ts` for the scan measurements.
+    //
+    // Consequence worth stating plainly, because the branch below reads as
+    // if it still arbitrated: on the initial turn, once the deterministic
+    // scorer matches anything, the fast result wins — the selector's speed is
+    // irrelevant. `onFastResult` is published before recall even issues the
+    // selector request, so `settledAt` is necessarily null when the wait ends
+    // on it. The settled-recall branch is reached at this point only when no
+    // fast result exists at all: no `Config`, or nothing matched
+    // lexically. That is deliberate, not incidental — a model side query does
+    // not complete inside this ceiling, so arbitrating between them would
+    // cost every turn the remainder of the budget to win a race that does not
+    // happen. The selector's judgement reaches the model at the ToolResult
+    // delivery point instead. Pinned by "delivers the fast result even when
+    // the selector settles inside the budget".
+    if (
+      handle.settledAt === null &&
+      handle.fastResultRef.current === null &&
+      waitMs > 0
+    ) {
+      await new Promise<void>((resolve) => {
+        const finish = () => {
+          clearTimeout(timer);
+          handle.controller.signal.removeEventListener('abort', finish);
+          if (handle.fastResultRef.onArrive === finish) {
+            handle.fastResultRef.onArrive = undefined;
+          }
+          resolve();
+        };
+
+        const timer = setTimeout(finish, waitMs);
+        if (handle.controller.signal.aborted) {
+          finish();
+        } else {
+          handle.controller.signal.addEventListener('abort', finish, {
+            once: true,
+          });
+          handle.fastResultRef.onArrive = finish;
+          void handle.promise.then(finish, finish);
+        }
+      });
+    }
+
+    if (this.pendingMemoryPrefetch !== handle || handle.consumed) {
+      return null;
+    }
+
+    // Budget expired with the selector still in flight. Inject the
+    // deterministic result now rather than gambling on a later tool call:
+    // a turn that makes none has no safe delivery point at all. The handle
+    // stays pending so the model-selected result can still land later.
+    if (handle.settledAt === null) {
+      if (deliveryPoint !== 'initial' || handle.fastDelivered) {
+        return null;
+      }
+      const fast = handle.fastResultRef.current;
+      if (!fast?.prompt) {
+        return null;
+      }
+      handle.fastDelivered = true;
+      for (const doc of fast.selectedDocs) {
+        this.surfacedRelevantAutoMemoryPaths.add(doc.filePath);
+        handle.fastDeliveredPaths.add(doc.filePath);
+      }
+      logMemoryRecallDelivery(
+        this.config,
+        new MemoryRecallDeliveryEvent({
+          phase: 'fast',
+          delivery_point: 'initial',
+          strategy: fast.strategy,
+          docs_selected: fast.selectedDocs.length,
+          latency_ms: Date.now() - handle.firedAt,
+        }),
+      );
+      return fast;
+    }
+
+    handle.consumed = true;
+    this.pendingMemoryPrefetch = undefined;
+    const result = await handle.promise; // already settled, returns immediately
+    // Drop anything the fast phase already put in front of the model. Both
+    // results come from the same scan, so the selector never saw the fast
+    // documents as excluded and can legitimately re-select them.
+    const remainingDocs = result.selectedDocs.filter(
+      (doc) => !handle.fastDeliveredPaths.has(doc.filePath),
+    );
+    const deduped =
+      remainingDocs.length === result.selectedDocs.length
+        ? result
+        : {
+            ...result,
+            selectedDocs: remainingDocs,
+            prompt:
+              remainingDocs.length > 0
+                ? buildRelevantAutoMemoryPrompt(remainingDocs)
+                : '',
+          };
+
+    if (deduped.prompt) {
+      for (const doc of deduped.selectedDocs) {
+        this.surfacedRelevantAutoMemoryPaths.add(doc.filePath);
+      }
+      this.logMemoryPrefetchDelivery(handle, deliveryPoint, deduped);
+    } else {
+      this.logMemoryPrefetchDelivery(
+        handle,
+        'discarded',
+        result,
+        result.selectedDocs.length > 0
+          ? 'already_delivered'
+          : 'no_relevant_results',
+      );
+    }
+    return deduped;
+  }
+
+  async resetChat(): Promise<void> {
+    const memBefore = process.memoryUsage();
+    const historyLength = this.chat?.getHistoryLength() ?? 0;
+    if (debugLogger.isEnabled()) {
+      debugLogger.debug(
+        `[RESET_CHAT_START] Starting resetChat, ` +
+          `historyLength=${historyLength}, ` +
+          `heapUsed=${(memBefore.heapUsed / 1024 / 1024).toFixed(1)}MB, ` +
+          `rss=${(memBefore.rss / 1024 / 1024).toFixed(1)}MB`,
+      );
+    }
+
+    this.initializedSessionId = undefined;
+    this.surfacedRelevantAutoMemoryPaths.clear();
+    this.cachedGitStatus = undefined;
+    this.lastApiCompletionTimestamp = null;
+    this.lastHookMicrocompactionTimestamp = null;
+    this.recentCompletedToolNames = [];
+    // startChat() rewrites the chat to its initial state. Any prior
+    // read_file tool results the FileReadCache still tracks are no
+    // longer in history, so a follow-up Read would serve a placeholder
+    // pointing at content the model can no longer retrieve.
+    debugLogger.debug('[FILE_READ_CACHE] clear after resetChat');
+    this.config.getFileReadCache().clear();
+    // Clean up old tool result overflow files on /clear
+    void cleanupOldToolResults(Storage.getGlobalTempDir(), 24 * 60 * 60 * 1000);
+    this.config.getBaseLlmClient().clearPerModelGeneratorCache();
+    // Abort any in-flight auto-memory recall so the stale controller
+    // does not leak into the next session.
+    this.cancelPendingMemoryPrefetch('reset');
+    // Drop any deferred tools revealed this session so /clear really gives
+    // a clean slate. We don't clear inside startChat itself because that path
+    // is also taken by compression (which preserves the session), and
+    // compression should keep session-setup reveals so the declaration list
+    // does not change mid-session.
+    this.config.getToolRegistry().clearRevealedDeferredTools();
+    await this.startChat(undefined, SessionStartSource.Clear);
+    this.initializedSessionId = this.config.getSessionId();
+
+    const memAfter = process.memoryUsage();
+    const newHistoryLength = this.chat?.getHistoryLength() ?? 0;
+    if (debugLogger.isEnabled()) {
+      debugLogger.debug(
+        `[RESET_CHAT_END] resetChat completed, ` +
+          `oldHistoryLength=${historyLength}, ` +
+          `newHistoryLength=${newHistoryLength}, ` +
+          `heapUsed=${(memAfter.heapUsed / 1024 / 1024).toFixed(1)}MB, ` +
+          `rss=${(memAfter.rss / 1024 / 1024).toFixed(1)}MB, ` +
+          `heapDiff=${((memAfter.heapUsed - memBefore.heapUsed) / 1024 / 1024).toFixed(1)}MB`,
+      );
+    }
+  }
+
+  getLoopDetectionService(): LoopDetectionService {
+    return this.loopDetector;
+  }
+
+  async addDirectoryContext(): Promise<void> {
+    if (!this.chat) {
+      return;
+    }
+
+    this.getChat().addHistory({
+      role: 'user',
+      parts: [{ text: await getDirectoryContextString(this.config) }],
+    });
+  }
+
+  async addWorkingDirectoryChangedContext(
+    oldDir: string,
+    newDir: string,
+  ): Promise<void> {
+    if (!this.chat) {
+      return;
+    }
+
+    this.cachedGitStatus = undefined;
+    await this.refreshSystemInstruction();
+    this.getChat().addHistory({
+      role: 'user',
+      parts: [
+        {
+          text:
+            `The session's working directory has changed from ${oldDir} to ${newDir} via /cd. ` +
+            `The startup directory context above is stale. All tool calls and relative paths now resolve from ${newDir}.`,
+        },
+      ],
+    });
+    await this.addDirectoryContext();
+  }
+
+  private getCachedGitStatus(): string | null {
+    if (this.cachedGitStatus === undefined) {
+      // Mirror claude-code: append git status (branch + recent commits) to the
+      // system prompt so the main agent treats version history as authoritative
+      // context, not background noise. Only injected when cwd is a git repo.
+      this.cachedGitStatus = getRecentGitStatus(this.config.getCwd());
+    }
+    return this.cachedGitStatus;
+  }
+
+  private getMainSessionSystemInstruction(): string {
+    const base = getMainSessionBaseSystemPrompt(this.config);
+    const stableLayers = {
+      base,
+      // Progressive media understanding contract: WHY deliveries carry
+      // 【媒体降质】/【媒体省略】/【媒体转写】 markers and how to fetch
+      // fuller evidence. Stable — omni config/provider don't change
+      // in-session — so it belongs inside the cached static prefix.
+      mediaGuidance: buildOmniMediaGuidanceSection(this.config),
+      contextFiles: this.config.getUserMemory(),
+      appendPrompt: this.config.getAppendSystemPrompt(),
+    };
+    // Record the stable → context layers (everything before the volatile
+    // gitStatus/autoMemory tail) as the cross-session-stable system prefix.
+    // The Anthropic converter splits the outgoing system prompt at this
+    // boundary and puts an early cache breakpoint on the stable part, so
+    // new sessions (different git status) and in-session memory saves
+    // don't re-bill it. Recorded on every rebuild so it tracks
+    // memory/model/mode changes; consumers match via `startsWith` and fail
+    // open when it goes stale.
+    this.config.setStaticSystemPrefix(assembleSystemPrompt(stableLayers));
+    return assembleSystemPrompt({
+      ...stableLayers,
+      gitStatus: this.getCachedGitStatus(),
+      autoMemory: this.config.getAutoMemoryPrompt(),
+    });
+  }
+
+  async refreshStartupContextReminder(): Promise<void> {
+    if (!this.chat) {
+      return;
+    }
+
+    const currentHistory = this.getChat().getHistory();
+    const startupLength = getStartupContextLength(currentHistory);
+    if (startupLength === 0) {
+      return;
+    }
+
+    // Slice by the detected prelude length, not a hardcoded 1: a restored
+    // legacy session stores startup context as a [user(env), model("Got
+    // it…")] pair (getStartupContextLength === 2), so slice(1) would leave
+    // the orphaned model-ack entry behind when re-prepending the prelude.
+    const remaining = currentHistory.slice(startupLength);
+    const [[startupContext], snapshotEntries] = await getInitialChatHistory(
+      this.config,
+    );
+    this.seedSkillReminderDedupFromSnapshot(snapshotEntries);
+    await this.seedAgentReminderDedupFromCurrent();
+    this.getChat().setHistory(
+      startupContext ? [startupContext, ...remaining] : remaining,
+      this.getChat().getCompletedToolCallIds(),
+    );
+  }
+
+  /**
+   * Re-prepend a fresh startup-context prelude after auto-compaction.
+   *
+   * Auto-compaction runs in-place inside `LlmChat.sendMessageStream`
+   * (`setHistory([summary, ack, ...kept])`) and does NOT route through
+   * `tryCompressChat` → `startChat`, so — unlike manual `/compress` — the
+   * startup prelude at history[0] is consumed into the summary and never
+   * rebuilt. Without this, workspace/env context, deferred-tool metadata,
+   * and MCP server instructions are lost for the rest of the session (before
+   * this PR they lived in the system instruction and survived compaction).
+   *
+   * Unlike `refreshStartupContextReminder` (which replaces an existing
+   * prelude and no-ops when absent), this prepends when absent. No-ops if a
+   * prelude is already present so it can't double-prepend.
+   */
+  async restoreStartupContextAfterCompaction(): Promise<void> {
+    if (!this.chat) {
+      return;
+    }
+
+    const currentHistory = this.getChat().getHistory();
+    if (getStartupContextLength(currentHistory) !== 0) {
+      return;
+    }
+
+    const [[startupContext], snapshotEntries] = await getInitialChatHistory(
+      this.config,
+    );
+    this.seedSkillReminderDedupFromSnapshot(snapshotEntries);
+    await this.seedAgentReminderDedupFromCurrent();
+    if (startupContext) {
+      this.getChat().setHistory(
+        [startupContext, ...currentHistory],
+        this.getChat().getCompletedToolCallIds(),
+      );
+    }
+  }
+
+  /**
+   * Rebuilds the main-session system instruction from the current
+   * `userMemory` / model / prompt overrides and re-binds it to the live chat.
+   *
+   * Use this after mutating inputs that feed into the system instruction
+   * (e.g. user memory refreshed from `output-language.md`) so the change
+   * takes effect on the next turn without restarting the session. No-op if
+   * no chat has been started yet.
+   */
+  async refreshSystemInstruction(): Promise<void> {
+    if (!this.chat) {
+      return;
+    }
+    await this.config.getToolRegistry().warmAll();
+    this.chat.setSystemInstruction(this.getMainSessionSystemInstruction());
+    if (this.lastSessionStartContext && this.lastSessionStartSource) {
+      this.chat.applySessionStartContext(
+        this.lastSessionStartContext,
+        this.lastSessionStartSource,
+      );
+    }
+  }
+
+  /**
+   * Preloads (reveals) every deferred tool — bundled built-ins and MCP
+   * alike — at session start when the combined estimated size of their
+   * schemas fits within `tools.toolSearch.threshold` percent of the
+   * context window. A small deferred set is cheaper to declare upfront
+   * than to load on demand through the bridge.
+   *
+   * Deliberately NOT called from setTools(): revealing a tool the startup
+   * reminder already announced would make queueAddedMcpToolsReminder flag
+   * it as removed, and a mid-session declaration change busts the very
+   * cache this preload exists to protect. Tools from servers that connect
+   * later stay deferred until the next session start.
+   */
+  private preloadDeferredToolsWithinBudget(): void {
+    if (this.config.getToolMode?.() === ToolMode.CodeModeOnly) return;
+    const toolRegistry = this.config.getToolRegistry();
+    // Without either bridge, resolveDeferredToolsForReminder() eagerly
+    // reveals everything — there is no budget decision to make.
+    if (
+      !toolRegistry.getTool(ToolNames.TOOL_SEARCH) ||
+      !toolRegistry.getTool(ToolNames.TOOL_CALL)
+    ) {
+      return;
+    }
+    const thresholdPercent = this.config.getToolSearchThreshold();
+    if (!Number.isFinite(thresholdPercent) || thresholdPercent <= 0) {
+      return;
+    }
+    // Symmetric upper guard to the non-finite / `<= 0` lower one: the setting
+    // is a percentage of the context window, so a value above 100 (a typo or
+    // misreading of the "(%)" label) would make the budget exceed the whole
+    // window and preload every deferred tool unconditionally. Cap it at 100%
+    // — the schema also bounds it, but clamp here so a hand-edited settings
+    // file can't slip past.
+    const boundedPercent = Math.min(thresholdPercent, 100);
+    const contextWindow =
+      this.config.getContentGeneratorConfig()?.contextWindowSize ??
+      tokenLimit(this.config.getModel(), 'input');
+    if (!contextWindow || contextWindow <= 0) {
+      return;
+    }
+    toolRegistry.preloadDeferredToolsWithinBudget(
+      Math.floor((contextWindow * boundedPercent) / 100),
+    );
+  }
+
+  /**
+   * Reveals deferred tools referenced by function calls in existing history.
+   *
+   * On resume this runs once before startup reminders are built. It also runs
+   * from setTools() because progressive MCP discovery can register deferred
+   * tools only after the resumed chat and its initial declarations exist.
+   */
+  private revealDeferredToolsReferencedInHistory(
+    deferredSummary: readonly DeferredToolSummary[],
+    getHistory: () => readonly Content[] | undefined,
+  ): void {
+    const toolRegistry = this.config.getToolRegistry();
+    const deferredNames = new Set(
+      deferredSummary
+        .filter((tool) => !toolRegistry.isDeferredToolRevealed(tool.name))
+        .map((tool) => tool.name),
+    );
+    if (deferredNames.size === 0) {
+      return;
+    }
+
+    // Reading live history is O(history), so defer it until the registry proves
+    // there is at least one hidden deferred tool that could be matched.
+    const history = getHistory();
+    if (!history || history.length === 0) {
+      return;
+    }
+
+    const revealedNames: string[] = [];
+    for (const entry of history) {
+      for (const part of entry.parts ?? []) {
+        const callName = part.functionCall?.name;
+        if (callName && deferredNames.delete(callName)) {
+          toolRegistry.revealDeferredTool(callName);
+          revealedNames.push(callName);
+        }
+      }
+      if (deferredNames.size === 0) {
+        break;
+      }
+    }
+    if (revealedNames.length > 0) {
+      debugLogger.debug(
+        `[DEFERRED_TOOLS] revealed from history: ${revealedNames.join(', ')}`,
+      );
+    }
+  }
+
+  /**
+   * Computes the deferred-tools list that should be announced through
+   * user-role system reminders.
+   *
+   * Caller MUST `await toolRegistry.warmAll()` first — this method only
+   * inspects the registry's eager state and would otherwise miss factory-
+   * backed deferred tools.
+   *
+   * Side effect: when either ToolSearch or ToolCall is not registered (e.g.
+   * `--exclude-tools tool_search` or a deny rule), deferred tools are eagerly
+   * revealed here so they land in the declaration list. Tools explicitly
+   * demoted by `tools.eager` stay hidden unless the history-reveal pass above
+   * already re-exposed one for a resumed session — that schema stays in the
+   * declarations, so it is not counted unreachable below. Skipping this for
+   * ordinary deferred tools would leave them both off the declarations AND
+   * off the deferred-summary list
+   * (since `undefined` is returned in that branch) — a silent disappearance.
+   *
+   * Returns `undefined` when the bridge is incomplete (ToolSearch or
+   * ToolCall unregistered): reminders must not advertise tools the model has
+   * no way to invoke on demand. Tools held back by `tools.eager` in that
+   * state are unreachable for the session, which is warned about once per
+   * session.
+   */
+  private resolveDeferredToolsForReminder(
+    deferredSummary: readonly DeferredToolSummary[],
+  ): DeferredToolSummary[] | undefined {
+    const toolRegistry = this.config.getToolRegistry();
+    const bridgeAvailable =
+      !!toolRegistry.getTool(ToolNames.TOOL_SEARCH) &&
+      !!toolRegistry.getTool(ToolNames.TOOL_CALL);
+    if (!bridgeAvailable) {
+      if (deferredSummary.length > 0) {
+        const withheld: string[] = [];
+        for (const t of deferredSummary) {
+          if (toolRegistry.isPermissionDeferred(t.name)) {
+            // The history-reveal pass runs first at both call sites and
+            // re-exposes resume-referenced tools regardless of why they
+            // are deferred. Such a tool's schema IS in the declarations,
+            // so calling it unreachable would be false for this session.
+            if (!toolRegistry.isDeferredToolRevealed(t.name)) {
+              withheld.push(t.name);
+            }
+            continue;
+          }
+          toolRegistry.revealDeferredTool(t.name);
+          if (t.serverName) {
+            // Keep the disconnect-announcement path seeded even though the
+            // reminder list is undefined in this state (see the field).
+            this.eagerlyRevealedMcpToolNames.add(t.name);
+            // Track the reveal as an announcement as well: the model now
+            // sees the tool, so a later disconnect must announce its
+            // removal. A mid-session setTools() reveal never passes through
+            // rememberAnnouncedDeferredTools (startChat-only), which is the
+            // sole path promoting the seed into announcedMcpToolNames —
+            // without this, a server that registers after the initial
+            // startChat disconnects silently and the model keeps calling a
+            // dead server's tools (R1-28).
+            this.announcedMcpToolNames.add(t.name);
+          }
+        }
+        if (withheld.length > 0 && !this.warnedAboutUnreachableEagerTools) {
+          this.warnedAboutUnreachableEagerTools = true;
+          const missingHalves: string[] = [];
+          if (!toolRegistry.getTool(ToolNames.TOOL_SEARCH)) {
+            missingHalves.push(ToolNames.TOOL_SEARCH);
+          }
+          if (!toolRegistry.getTool(ToolNames.TOOL_CALL)) {
+            missingHalves.push(ToolNames.TOOL_CALL);
+          }
+          // eslint-disable-next-line no-console -- operator-facing breadcrumb; the debug log file is off in default runs, where this reshaping would otherwise be invisible
+          console.warn(
+            `tools.eager is holding back ${withheld.length} tool(s) in a session where the ` +
+              `ToolSearch + ToolCall bridge is incomplete (${missingHalves.join(' and ')} not registered), ` +
+              `so they are not offered to the model and cannot be loaded through the bridge until restart; ` +
+              `they remain registered and direct calls by name still use normal approval: ${withheld.join(', ')}. ` +
+              `Enable tools.toolSearch.enabled (which registers both bridge tools) and drop any ` +
+              `tool_search/tool_call deny rule, --exclude-tools entry, or tools.disabled entry to keep them loadable, ` +
+              `list them in tools.eager to send their schemas upfront, or use permissions.deny if removal was the intent.`,
+          );
+        }
+      }
+      return undefined;
+    }
+    return deferredSummary.filter(
+      (t) => !toolRegistry.isDeferredToolRevealed(t.name),
+    );
+  }
+
+  private rememberAnnouncedDeferredTools(
+    deferredTools: readonly DeferredToolSummary[] | undefined,
+  ): void {
+    this.announcedDeferredToolNames = new Set(
+      (deferredTools ?? []).map((tool) => tool.name),
+    );
+    this.announcedMcpToolNames = new Set(
+      (deferredTools ?? [])
+        .filter((tool) => tool.serverName)
+        .map((tool) => tool.name),
+    );
+    // Re-seed eagerly revealed MCP tools so their later disconnect is still
+    // announced. Runs after the reset above (callers run
+    // resolveDeferredToolsForReminder first, which rebuilds the set); drop
+    // names already gone from the registry so a removal announced before a
+    // restart/compaction is not re-announced.
+    const toolRegistry = this.config.getToolRegistry();
+    for (const name of this.eagerlyRevealedMcpToolNames) {
+      if (toolRegistry.getTool(name)) {
+        this.announcedMcpToolNames.add(name);
+      } else {
+        this.eagerlyRevealedMcpToolNames.delete(name);
+      }
+    }
+    this.pendingAddedMcpTools.clear();
+    this.pendingRemovedMcpToolNames.clear();
+  }
+
+  private rememberAnnouncedMcpServerInstructions(
+    instructions: ReadonlyMap<string, string>,
+  ): void {
+    this.announcedMcpServerInstructions = new Map(instructions);
+    this.pendingMcpServerInstructions.clear();
+  }
+
+  private queueMcpServerInstructionsReminder(
+    instructions: ReadonlyMap<string, string>,
+  ): void {
+    this.pendingMcpServerInstructions.clear();
+    for (const serverName of this.announcedMcpServerInstructions.keys()) {
+      if (!instructions.has(serverName)) {
+        this.announcedMcpServerInstructions.delete(serverName);
+      }
+    }
+    for (const [serverName, text] of instructions) {
+      if (
+        text.trim().length > 0 &&
+        this.announcedMcpServerInstructions.get(serverName) !== text
+      ) {
+        this.pendingMcpServerInstructions.set(serverName, text);
+      }
+    }
+  }
+
+  private drainPendingMcpServerInstructionsReminder(): void {
+    if (this.pendingMcpServerInstructions.size === 0) {
+      return;
+    }
+    const reminder = buildMcpServerInstructionsReminderFromEntries(
+      this.pendingMcpServerInstructions,
+    );
+    if (!reminder) {
+      return;
+    }
+    this.getChat().addHistory({
+      role: 'user',
+      parts: [{ text: reminder }],
+    });
+    for (const [serverName, text] of this.pendingMcpServerInstructions) {
+      this.announcedMcpServerInstructions.set(serverName, text);
+    }
+    this.pendingMcpServerInstructions.clear();
+  }
+
+  private queueAddedMcpToolsReminder(
+    deferredTools: readonly DeferredToolSummary[],
+  ): void {
+    const toolRegistry = this.config.getToolRegistry();
+    const currentDeferredNames = new Set(
+      deferredTools.map((tool) => tool.name),
+    );
+    const currentMcpToolNames = new Set(
+      deferredTools.filter((tool) => tool.serverName).map((tool) => tool.name),
+    );
+    for (const name of this.pendingAddedMcpTools.keys()) {
+      if (!currentDeferredNames.has(name)) {
+        this.pendingAddedMcpTools.delete(name);
+      }
+    }
+    for (const name of this.pendingRemovedMcpToolNames) {
+      if (currentMcpToolNames.has(name) || toolRegistry.getTool(name)) {
+        this.pendingRemovedMcpToolNames.delete(name);
+      }
+    }
+
+    // Drop announced names that are no longer deferred (e.g. an MCP server
+    // disconnected and removeMcpToolsByServer() pruned its tools). Without
+    // this, a tool that reconnects later is still in announcedDeferredToolNames
+    // and gets silently skipped below, so the user never sees the "new tools
+    // available" reminder even though setTools() re-declared the tool.
+    for (const name of this.announcedDeferredToolNames) {
+      if (!currentDeferredNames.has(name)) {
+        this.announcedDeferredToolNames.delete(name);
+      }
+    }
+    for (const name of this.announcedMcpToolNames) {
+      if (currentMcpToolNames.has(name)) {
+        continue;
+      }
+      // A revealed or newly-visible tool is absent from the deferred reminder
+      // summary but still present in the registry. Keep tracking it as
+      // model-visible so a later real disconnect can still be announced; only
+      // a tool actually removed from the registry is unavailable now.
+      if (!toolRegistry.getTool(name)) {
+        this.pendingRemovedMcpToolNames.add(name);
+        // The removal is about to be announced; forget the eager-reveal seed
+        // so a later startChat does not re-announce the same removal.
+        this.eagerlyRevealedMcpToolNames.delete(name);
+      }
+    }
+
+    for (const tool of deferredTools) {
+      if (tool.serverName) {
+        if (!this.announcedMcpToolNames.has(tool.name)) {
+          this.pendingAddedMcpTools.set(tool.name, tool);
+        }
+      }
+      this.announcedDeferredToolNames.add(tool.name);
+    }
+  }
+
+  private drainPendingAddedMcpToolsReminder(): void {
+    if (
+      this.pendingAddedMcpTools.size === 0 &&
+      this.pendingRemovedMcpToolNames.size === 0
+    ) {
+      return;
+    }
+
+    const addedMcpTools = Array.from(this.pendingAddedMcpTools.values());
+    const removedMcpToolNames = Array.from(this.pendingRemovedMcpToolNames);
+    const reminder = buildChangedMcpToolsReminder(
+      addedMcpTools,
+      removedMcpToolNames,
+    );
+
+    if (!reminder) {
+      return;
+    }
+
+    this.getChat().addHistory({
+      role: 'user',
+      parts: [{ text: reminder }],
+    });
+
+    for (const name of removedMcpToolNames) {
+      this.announcedMcpToolNames.delete(name);
+    }
+    for (const tool of addedMcpTools) {
+      this.announcedMcpToolNames.add(tool.name);
+    }
+    this.pendingAddedMcpTools.clear();
+    this.pendingRemovedMcpToolNames.clear();
+  }
+
+  /**
+   * Per-turn delta for skills/commands that became invocable after session start
+   * — skills enabled mid-session (e.g. via `/skills`) and MCP prompts added after
+   * startup. Emitted as a tail `<system-reminder>` only, so it never mutates the
+   * cached tools/system/messages prefix. Deduped via `announcedSkillReminderKeys`.
+   *
+   * The first call after a (re)built startup prelude seeds the announced set from
+   * the current skills and emits nothing — the startup snapshot already listed
+   * them (mirrors Claude Code's `suppressNextSkillListing` and its decision not
+   * to re-inject the listing after compaction). Conditional path-activations are
+   * announced inline on the tool result by `coreToolScheduler`, so they are
+   * recorded here as announced (not re-queued) to avoid a double announcement.
+   */
+  private async drainSkillAndCommandReminders(): Promise<void> {
+    const toolRegistry = this.config.getToolRegistry();
+    // Only relevant when the model can actually invoke skills (subagents often
+    // run without the Skill tool).
+    if (!toolRegistry?.getTool(ToolNames.SKILL)) {
+      return;
+    }
+    const skillManager = this.config.getSkillManager();
+    if (!skillManager) {
+      return;
+    }
+
+    let entries: AvailableSkillEntry[];
+    try {
+      ({ entries } = await collectAvailableSkillEntries(
+        skillManager,
+        this.config,
+      ));
+    } catch (error) {
+      debugLogger.warn(
+        'drainSkillAndCommandReminders: collectAvailableSkillEntries failed',
+        error,
+      );
+      return;
+    }
+
+    const currentKeys = new Set(entries.map(LlmClient.skillEntryKey));
+    const wasInitialized = this.skillRemindersInitialized;
+    const removedNames: string[] = [];
+
+    // Prune announced keys no longer present so a later re-enable / reconnect
+    // re-announces (mirrors the MCP added-tools prune above).
+    for (const key of this.announcedSkillReminderKeys) {
+      if (!currentKeys.has(key)) {
+        if (wasInitialized) {
+          removedNames.push(key.slice(key.indexOf(':') + 1));
+        }
+        this.announcedSkillReminderKeys.delete(key);
+      }
+    }
+
+    // Safety net: if seedSkillReminderDedupFromSnapshot was never called (e.g.
+    // edge-case construction path), mark initialized but do NOT seed from
+    // current entries — no startup snapshot was shown to the model, so all
+    // entries are genuinely new and should be announced by the code below.
+    // Seeding here used to silently swallow late registrations (cmd:* keys
+    // and MCP prompts discovered after startChat) by marking them as
+    // "already announced" when the model had never seen them.
+    if (!this.skillRemindersInitialized) {
+      this.skillRemindersInitialized = true;
+    }
+
+    // Consume skill keys that coreToolScheduler announced inline on a tool
+    // result this turn (e.g. path-activated conditional skills). Mark them as
+    // announced so the drain below does not re-announce them. This fixes the
+    // subagent shared-SkillManager case: the inline reminder lands in the
+    // subagent's discarded transcript, but the parent's drain now skips those
+    // keys because the scheduler recorded them on the shared Config.
+    const inlineKeys = this.config.consumeInlineAnnouncedSkillKeys();
+    for (const key of inlineKeys) {
+      this.announcedSkillReminderKeys.add(key);
+    }
+
+    // Announce every genuinely new skill/command that was not already
+    // announced — either in the startup snapshot, a prior drain, or inline
+    // by coreToolScheduler above.
+    const newEntries: AvailableSkillEntry[] = [];
+    for (const entry of entries) {
+      const key = LlmClient.skillEntryKey(entry);
+      if (this.announcedSkillReminderKeys.has(key)) {
+        continue;
+      }
+      this.announcedSkillReminderKeys.add(key);
+      newEntries.push(entry);
+    }
+
+    if (newEntries.length === 0 && removedNames.length === 0) {
+      return;
+    }
+    const reminder = buildChangedSkillsReminder(newEntries, removedNames);
+    if (!reminder) {
+      return;
+    }
+    this.getChat().addHistory({
+      role: 'user',
+      parts: [{ text: reminder }],
+    });
+  }
+
+  private async drainAgentReminders(): Promise<void> {
+    const toolRegistry = this.config.getToolRegistry();
+    if (!toolRegistry?.getTool(ToolNames.AGENT)) {
+      return;
+    }
+
+    if (!this.agentRemindersInitialized) {
+      await this.seedAgentReminderDedupFromCurrent();
+      return;
+    }
+
+    let agents: AgentAvailabilityEntry[];
+    try {
+      agents = await this.config.getSubagentManager().listSubagents();
+    } catch (error) {
+      debugLogger.warn('drainAgentReminders: listSubagents failed', error);
+      return;
+    }
+
+    const currentByName = new Map(agents.map((agent) => [agent.name, agent]));
+    const addedAgents: AgentAvailabilityEntry[] = [];
+    const removedAgentNames: string[] = [];
+
+    for (const name of this.announcedAgentReminderNames) {
+      if (!currentByName.has(name)) {
+        removedAgentNames.push(name);
+      }
+    }
+
+    for (const agent of currentByName.values()) {
+      if (this.announcedAgentReminderNames.has(agent.name)) {
+        continue;
+      }
+      addedAgents.push({
+        name: agent.name,
+        description: agent.description,
+      });
+    }
+
+    const reminder = buildChangedAgentsReminder(addedAgents, removedAgentNames);
+    if (!reminder) {
+      return;
+    }
+    this.getChat().addHistory({
+      role: 'user',
+      parts: [{ text: reminder }],
+    });
+
+    for (const name of removedAgentNames) {
+      this.announcedAgentReminderNames.delete(name);
+    }
+    for (const agent of addedAgents) {
+      this.announcedAgentReminderNames.add(agent.name);
+    }
+  }
+
+  private async fireSessionStartHook(
+    source: SessionStartSource,
+    signal?: AbortSignal,
+  ): Promise<string | undefined> {
+    const hookSystem = this.config.getHookSystem();
+    if (
+      this.config.getDisableAllHooks() ||
+      !hookSystem ||
+      !this.config.hasHooksForEvent('SessionStart')
+    ) {
+      return undefined;
+    }
+
+    try {
+      const output = signal
+        ? await hookSystem.fireSessionStartEvent(
+            source,
+            this.config.getModel() ?? '',
+            approvalModeToPermissionMode(this.config.getApprovalMode()),
+            undefined,
+            signal,
+          )
+        : await hookSystem.fireSessionStartEvent(
+            source,
+            this.config.getModel() ?? '',
+            approvalModeToPermissionMode(this.config.getApprovalMode()),
+          );
+      signal?.throwIfAborted();
+      return output?.getAdditionalContext()?.trim() || undefined;
+    } catch (err) {
+      signal?.throwIfAborted();
+      this.config.getDebugLogger().warn(`SessionStart hook failed: ${err}`);
+      return undefined;
+    }
+  }
+
+  async startChat(
+    extraHistory?: Content[],
+    sessionStartSource = extraHistory
+      ? SessionStartSource.Resume
+      : SessionStartSource.Startup,
+    signal?: AbortSignal,
+  ): Promise<LlmChat> {
+    signal?.throwIfAborted();
+    this.trustedUserAnswers.clear();
+    this.forceFullIdeContext = true;
+    this.lastInjectedDate = undefined;
+    // Clear stale cache params on session reset to prevent cross-session leakage
+    clearCacheSafeParams();
+
+    const profiler = createSessionStartProfiler(sessionStartSource, {
+      sessionId: this.config.getSessionId(),
+    });
+    let history: Content[] = [];
+    let snapshotEntries: AvailableSkillEntry[] = [];
+    let deferredReminderCount = 0;
+    const finishProfile = (ok: boolean) => {
+      profiler.finish({
+        ok,
+        extraHistoryLength: extraHistory?.length ?? 0,
+        historyLength: history.length,
+        snapshotEntryCount: snapshotEntries.length,
+        deferredReminderCount,
+      });
+    };
+
+    try {
+      // Warm the tool registry before building startup reminders and tool
+      // declarations. Revealed-deferred state is NOT cleared here because
+      // startChat is also taken by the compression path (which preserves the
+      // session); `/clear` clears the revealed set via resetChat() before
+      // calling us.
+      const toolRegistry = this.config.getToolRegistry();
+      await profiler.time('tool_registry_warm', () => toolRegistry.warmAll());
+      const codeModeOnly =
+        this.config.getToolMode?.() === ToolMode.CodeModeOnly;
+      const deferredSummary = toolRegistry.getDeferredToolSummary();
+      // Resume support: when a transcript contains prior calls to a deferred
+      // tool, re-reveal that tool so `setTools()` below sends its schema in
+      // the declaration list. Without this, the model sees history like
+      // "I called foo_tool, got result" but the API rejects a follow-up
+      // call to foo_tool because the schema is absent. This must happen
+      // BEFORE `resolveDeferredToolsForReminder()` runs so the resumed tools
+      // are correctly filtered out of the startup reminder built below.
+      if (!codeModeOnly) {
+        profiler.timeSync('resume_deferred_tool_reveal', () => {
+          this.revealDeferredToolsReferencedInHistory(
+            deferredSummary,
+            () => extraHistory,
+          );
+        });
+      }
+      // Budget-based deferred-tool preload runs BEFORE the deferred
+      // reminder is resolved so preloaded tools are filtered out of the
+      // startup reminder and never enter the announced set.
+      profiler.timeSync('deferred_tool_preload', () => {
+        this.preloadDeferredToolsWithinBudget();
+      });
+      // Snapshot what this session declares once the registry is warm and the
+      // preload has settled, so the prompt built below can gate its
+      // tool-specific text on it and `/context` can report the same set
+      // (#12032). Mid-session reveals deliberately do not update this: they
+      // change only the tools block, keeping the cached system prefix stable.
+      //
+      // Not wrapped in a profiler stage: it is a map over declarations the
+      // registry has already built, and the startup stage list is asserted in
+      // client.test.ts — a stage here would be noise in that profile.
+      //
+      // Optional call: partial Config stubs (tests, derived agent shims) do not
+      // carry the setter, and a missing snapshot simply leaves the prompt
+      // ungated rather than failing session startup.
+      this.config.setPromptToolSnapshot?.(
+        new Set(
+          toolRegistry
+            .getFunctionDeclarations()
+            .map((declaration) => declaration.name)
+            .filter((name): name is string => Boolean(name)),
+        ),
+      );
+      const deferredTools = profiler.timeSync('deferred_reminder_setup', () => {
+        const resolved = this.resolveDeferredToolsForReminder(deferredSummary);
+        this.rememberAnnouncedDeferredTools(resolved);
+        this.rememberAnnouncedMcpServerInstructions(
+          toolRegistry.getMcpServerInstructions(),
+        );
+        return resolved;
+      });
+      deferredReminderCount = deferredTools?.length ?? 0;
+      [history, snapshotEntries] = await profiler.time(
+        'initial_chat_history',
+        () => getInitialChatHistory(this.config, extraHistory),
+      );
+      profiler.timeSync('skill_reminder_seed', () => {
+        this.seedSkillReminderDedupFromSnapshot(snapshotEntries);
+      });
+      await profiler.time('agent_reminder_seed', () =>
+        this.seedAgentReminderDedupFromCurrent(),
+      );
+      const systemInstruction = profiler.timeSync('system_instruction', () =>
+        this.getMainSessionSystemInstruction(),
+      );
+
+      const chat = profiler.timeSync(
+        'gemini_chat_construct',
+        () =>
+          new LlmChat(
+            this.config,
+            {
+              systemInstruction,
+            },
+            history,
+            this.config.getChatRecordingService(),
+            uiTelemetryService,
+          ),
+      );
+      chat.enableManualPlanExitNotices();
+      this.chat = chat;
+
+      // Repair any dangling `model[functionCall]` whose `functionResponse`
+      // never made it back into the transcript before we wrote the JSONL.
+      // The common cause is a process crash / OOM / SIGKILL between the
+      // partial-tool_use push (see `processStreamResponse`) and the React
+      // scheduler's tool_result submission. Without this pass, the first
+      // API call on a resumed session would 400 with the same
+      // `tool_use_id ... corresponding tool_use` error this whole
+      // subsystem is trying to escape. (Belt-and-suspenders: the same
+      // helper runs again inside `chat.sendMessageStream` after the user
+      // content is pushed, so a dangling left here by setHistory /
+      // compaction reordering is also caught — but doing it here keeps
+      // any pre-send code reading `chat.history` from seeing a malformed
+      // shape.)
+      profiler.timeSync('orphan_tool_use_repair', () => {
+        const preserveCallIds =
+          (this.config.getPreserveRestorableAskUserQuestion?.() ??
+          this.config.getRestoreAskUserQuestion?.())
+            ? restorableAskUserQuestionCallIds(chat.peekLastHistoryEntry())
+            : undefined;
+        this.repairOrphanedToolUseTurnsInHistory(
+          undefined,
+          preserveCallIds ? { preserveCallIds } : undefined,
+        );
+      });
+
+      const sessionStartAdditionalContext = await profiler.time(
+        'session_start_hook',
+        () => this.fireSessionStartHook(sessionStartSource, signal),
+      );
+      this.lastSessionStartContext = sessionStartAdditionalContext;
+      this.lastSessionStartSource = sessionStartAdditionalContext
+        ? sessionStartSource
+        : undefined;
+
+      if (sessionStartAdditionalContext) {
+        profiler.timeSync('session_start_context_apply', () => {
+          chat.applySessionStartContext(
+            sessionStartAdditionalContext,
+            sessionStartSource,
+          );
+        });
+      }
+
+      // setTools() intentionally keeps its own warmAll() guard, so this stage
+      // overlaps with tool_registry_warm while preserving the startup path.
+      await profiler.time('set_tools', () =>
+        this.setTools({ skipHistoryReveal: true }),
+      );
+      signal?.throwIfAborted();
+
+      finishProfile(true);
+      return this.chat;
+    } catch (error) {
+      finishProfile(false);
+      signal?.throwIfAborted();
+      await reportError(
+        error,
+        'Error initializing chat session.',
+        history,
+        'startChat',
+      );
+      throw new Error(`Failed to initialize chat: ${getErrorMessage(error)}`);
+    }
+  }
+
+  private getIdeContextParts(forceFullContext: boolean): {
+    contextParts: string[];
+    newIdeContext: IdeContext | undefined;
+  } {
+    const currentIdeContext = ideContextStore.get();
+    if (!currentIdeContext) {
+      return { contextParts: [], newIdeContext: undefined };
+    }
+
+    if (forceFullContext || !this.lastSentIdeContext) {
+      // Send full context as plain text
+      const openFiles = currentIdeContext.workspaceState?.openFiles || [];
+      const activeFile = openFiles.find((f) => f.isActive);
+      const otherOpenFiles = openFiles
+        .filter((f) => !f.isActive)
+        .map((f) => f.path);
+
+      const contextLines: string[] = [];
+
+      if (activeFile) {
+        contextLines.push('Active file:');
+        contextLines.push(`  Path: ${activeFile.path}`);
+        if (activeFile.cursor) {
+          contextLines.push(
+            `  Cursor: line ${activeFile.cursor.line}, character ${activeFile.cursor.character}`,
+          );
+        }
+        if (activeFile.selectedText) {
+          contextLines.push('  Selected text:');
+          contextLines.push('```');
+          contextLines.push(activeFile.selectedText);
+          contextLines.push('```');
+        }
+      }
+
+      if (otherOpenFiles.length > 0) {
+        if (contextLines.length > 0) {
+          contextLines.push('');
+        }
+        contextLines.push('Other open files:');
+        for (const filePath of otherOpenFiles) {
+          contextLines.push(`  - ${filePath}`);
+        }
+      }
+
+      if (contextLines.length === 0) {
+        return { contextParts: [], newIdeContext: currentIdeContext };
+      }
+
+      const contextParts = [
+        "Here is the user's current editor context. Use it when relevant, including to answer questions about the active file, open files, cursor, or selected text.",
+        contextLines.join('\n'),
+      ];
+
+      debugLogger.debug(contextParts.join('\n'));
+      return {
+        contextParts,
+        newIdeContext: currentIdeContext,
+      };
+    } else {
+      // Calculate and send delta as plain text
+      const changeLines: string[] = [];
+
+      const lastFiles = new Map(
+        (this.lastSentIdeContext.workspaceState?.openFiles || []).map(
+          (f: File) => [f.path, f],
+        ),
+      );
+      const currentFiles = new Map(
+        (currentIdeContext.workspaceState?.openFiles || []).map((f: File) => [
+          f.path,
+          f,
+        ]),
+      );
+
+      const openedFiles: string[] = [];
+      for (const [path] of currentFiles.entries()) {
+        if (!lastFiles.has(path)) {
+          openedFiles.push(path);
+        }
+      }
+      if (openedFiles.length > 0) {
+        changeLines.push('Files opened:');
+        for (const filePath of openedFiles) {
+          changeLines.push(`  - ${filePath}`);
+        }
+      }
+
+      const closedFiles: string[] = [];
+      for (const [path] of lastFiles.entries()) {
+        if (!currentFiles.has(path)) {
+          closedFiles.push(path);
+        }
+      }
+      if (closedFiles.length > 0) {
+        if (changeLines.length > 0) {
+          changeLines.push('');
+        }
+        changeLines.push('Files closed:');
+        for (const filePath of closedFiles) {
+          changeLines.push(`  - ${filePath}`);
+        }
+      }
+
+      const lastActiveFile = (
+        this.lastSentIdeContext.workspaceState?.openFiles || []
+      ).find((f: File) => f.isActive);
+      const currentActiveFile = (
+        currentIdeContext.workspaceState?.openFiles || []
+      ).find((f: File) => f.isActive);
+
+      if (currentActiveFile) {
+        if (!lastActiveFile || lastActiveFile.path !== currentActiveFile.path) {
+          if (changeLines.length > 0) {
+            changeLines.push('');
+          }
+          changeLines.push('Active file changed:');
+          changeLines.push(`  Path: ${currentActiveFile.path}`);
+          if (currentActiveFile.cursor) {
+            changeLines.push(
+              `  Cursor: line ${currentActiveFile.cursor.line}, character ${currentActiveFile.cursor.character}`,
+            );
+          }
+          if (currentActiveFile.selectedText) {
+            changeLines.push('  Selected text:');
+            changeLines.push('```');
+            changeLines.push(currentActiveFile.selectedText);
+            changeLines.push('```');
+          }
+        } else {
+          const lastCursor = lastActiveFile.cursor;
+          const currentCursor = currentActiveFile.cursor;
+          if (
+            currentCursor &&
+            (!lastCursor ||
+              lastCursor.line !== currentCursor.line ||
+              lastCursor.character !== currentCursor.character)
+          ) {
+            if (changeLines.length > 0) {
+              changeLines.push('');
+            }
+            changeLines.push('Cursor moved:');
+            changeLines.push(`  Path: ${currentActiveFile.path}`);
+            changeLines.push(
+              `  New position: line ${currentCursor.line}, character ${currentCursor.character}`,
+            );
+          }
+
+          const lastSelectedText = lastActiveFile.selectedText || '';
+          const currentSelectedText = currentActiveFile.selectedText || '';
+          if (lastSelectedText !== currentSelectedText) {
+            if (changeLines.length > 0) {
+              changeLines.push('');
+            }
+            changeLines.push('Selection changed:');
+            changeLines.push(`  Path: ${currentActiveFile.path}`);
+            if (currentSelectedText) {
+              changeLines.push('  Selected text:');
+              changeLines.push('```');
+              changeLines.push(currentSelectedText);
+              changeLines.push('```');
+            } else {
+              changeLines.push('  Selected text: (none)');
+            }
+          }
+        }
+      } else if (lastActiveFile) {
+        if (changeLines.length > 0) {
+          changeLines.push('');
+        }
+        changeLines.push('Active file changed:');
+        changeLines.push('  No active file');
+        changeLines.push(`  Previous path: ${lastActiveFile.path}`);
+      }
+
+      if (changeLines.length === 0) {
+        return { contextParts: [], newIdeContext: currentIdeContext };
+      }
+
+      const contextParts = [
+        "Here is a summary of changes in the user's current editor context. Use it with the previous editor context when relevant, including to answer questions about the active file, open files, cursor, or selected text.",
+        changeLines.join('\n'),
+      ];
+
+      debugLogger.debug(contextParts.join('\n'));
+      return {
+        contextParts,
+        newIdeContext: currentIdeContext,
+      };
+    }
+  }
+
+  private runManagedAutoMemoryBackgroundTasks(
+    messageType: SendMessageType,
+  ): void {
+    // During shutdown, skip all background memory tasks so the process
+    // can exit cleanly without spawning new work.
+    if (this.shutdownRequested) {
+      debugLogger.debug(
+        'Skipping background memory tasks: shutdown requested.',
+      );
+      return;
+    }
+
+    // autoSkill counts tool calls and can trigger on both UserQuery and
+    // ToolResult turns so the threshold can fire mid-session.
+    if (
+      messageType === SendMessageType.UserQuery ||
+      messageType === SendMessageType.ToolResult
+    ) {
+      const projectRoot = this.config.getProjectRoot();
+      const sessionId = this.config.getSessionId();
+      const history = this.getHistoryShallow();
+      const mgr = this.config.getMemoryManager();
+      const autoSkillEnabled = this.config.getAutoSkillEnabled();
+
+      if (autoSkillEnabled) {
+        const skillReviewResult = mgr.scheduleSkillReview({
+          projectRoot,
+          sessionId,
+          history,
+          config: this.config,
+          toolCallCount: this.toolCallCount,
+          skillsModified: this.skillsModifiedInSession,
+          enabled: autoSkillEnabled,
+          threshold: AUTO_SKILL_THRESHOLD,
+          confirmBeforePersist: this.config.getAutoSkillConfirmEnabled(),
+        });
+        if (skillReviewResult.status === 'scheduled') {
+          // Reset tool-call counter when a review is dispatched so the next
+          // review only fires after a full new threshold worth of tool calls.
+          this.toolCallCount = 0;
+          if (skillReviewResult.promise) {
+            this.pendingMemoryTaskPromises.push(
+              skillReviewResult.promise
+                .then((record) => {
+                  const touched = record.metadata?.['touchedSkillFiles'];
+                  return Array.isArray(touched) ? touched.length : 0;
+                })
+                .catch((error: unknown) => {
+                  debugLogger.warn(
+                    'Failed to run managed skill review.',
+                    error,
+                  );
+                  return 0;
+                }),
+            );
+          }
+        } else if (
+          skillReviewResult.status === 'skipped' &&
+          skillReviewResult.skippedReason === 'already_running' &&
+          this.toolCallCount >= AUTO_SKILL_THRESHOLD
+        ) {
+          // A review is already in-flight; reset the counter so that when the
+          // current review completes the next call doesn't immediately trigger
+          // another review without accumulating a fresh threshold of tool calls.
+          this.toolCallCount = 0;
+        }
+        // Always reset the skills-modified flag after the scheduleSkillReview
+        // check, regardless of whether a review was dispatched. This prevents
+        // a deadlock where skillsModifiedInSession stays true forever: when
+        // the flag is set, scheduleSkillReview returns 'skipped' immediately
+        // (never 'scheduled'), so without this reset the flag can never clear.
+        this.skillsModifiedInSession = false;
+      }
+    }
+
+    // extract and dream keep the original UserQuery-only gate to preserve
+    // the existing "once per user turn" semantics and avoid redundant work.
+    if (messageType !== SendMessageType.UserQuery) {
+      return;
+    }
+
+    const projectRoot = this.config.getProjectRoot();
+    const sessionId = this.config.getSessionId();
+    const history = this.getHistoryShallow();
+    const mgr = this.config.getMemoryManager();
+
+    if (!this.config.getManagedAutoMemoryEnabled()) {
+      return;
+    }
+
+    const extractPromise = mgr
+      .scheduleExtract({
+        projectRoot,
+        sessionId,
+        history,
+        config: this.config,
+      })
+      .then((result) => result.touchedTopics.length)
+      .catch((error: unknown) => {
+        debugLogger.warn(
+          'Failed to schedule managed auto-memory extraction.',
+          error,
+        );
+        return 0;
+      });
+    this.pendingMemoryTaskPromises.push(extractPromise);
+
+    const dreamPromise = mgr
+      .scheduleDream({
+        projectRoot,
+        sessionId,
+        config: this.config,
+      })
+      .then((schedResult) => {
+        if (schedResult.status === 'scheduled' && schedResult.promise) {
+          return schedResult.promise.then((state) => {
+            const topics = state.metadata?.['touchedTopics'] as
+              | string[]
+              | undefined;
+            return topics ? topics.length : 0;
+          });
+        }
+        return 0;
+      })
+      .catch((error: unknown) => {
+        debugLogger.warn(
+          'Failed to schedule managed auto-memory dream.',
+          error,
+        );
+        return 0;
+      });
+    this.pendingMemoryTaskPromises.push(dreamPromise);
+  }
+
+  /**
+   * Returns and clears the list of pending background memory task promises.
+   * Each promise resolves with the number of memory files touched (0 = nothing
+   * was written, caller should ignore).
+   */
+  consumePendingMemoryTaskPromises(): Array<Promise<number>> {
+    const promises = this.pendingMemoryTaskPromises;
+    this.pendingMemoryTaskPromises = [];
+    return promises;
+  }
+
+  recordCompletedToolCall(
+    toolName: string,
+    args?: Record<string, unknown>,
+  ): void {
+    this.rememberCompletedToolName(toolName);
+
+    if (args && SKILL_WRITE_TOOL_NAMES.has(toolName)) {
+      const filePath = args['file_path'] ?? args['path'] ?? args['target_file'];
+      if (
+        typeof filePath === 'string' &&
+        isProjectSkillPath(filePath, this.config.getProjectRoot())
+      ) {
+        this.skillsModifiedInSession = true;
+      }
+    }
+    this.toolCallCount += 1;
+  }
+
+  private rememberCompletedToolName(toolName: string): void {
+    const normalizedToolName = toolName.trim();
+    if (!normalizedToolName) {
+      return;
+    }
+    this.recentCompletedToolNames = [
+      ...this.recentCompletedToolNames.filter(
+        (name) => name !== normalizedToolName,
+      ),
+      normalizedToolName,
+    ].slice(-MAX_RECENT_TOOL_NAMES_FOR_MEMORY);
+  }
+
+  private seedRecentCompletedToolNamesFromHistory(history: Content[]): void {
+    const completedCallIds = new Set<string>();
+    const refusedBridgeCallIds = new Set<string>();
+    const cancelledBridgeCallIds = new Set<string>();
+    for (const message of history) {
+      for (const part of message.parts ?? []) {
+        const response = part.functionResponse;
+        const responseId = response?.id;
+        if (responseId) {
+          completedCallIds.add(responseId);
+          const error = response.response?.['error'];
+          if (
+            typeof error === 'string' &&
+            error.startsWith(DEFERRED_TOOL_CALL_REFUSAL_PREFIX)
+          ) {
+            refusedBridgeCallIds.add(responseId);
+          } else if (
+            typeof error === 'string' &&
+            error.startsWith(DEFERRED_TOOL_CALL_CANCELLATION_PREFIX)
+          ) {
+            cancelledBridgeCallIds.add(responseId);
+          }
+        }
+      }
+    }
+
+    this.recentCompletedToolNames = [];
+    for (const message of history) {
+      for (const part of message.parts ?? []) {
+        const call = part.functionCall;
+        if (!call?.name) {
+          continue;
+        }
+        if (call.id && !completedCallIds.has(call.id)) {
+          continue;
+        }
+        if (call.id && cancelledBridgeCallIds.has(call.id)) {
+          continue;
+        }
+        // Bridged calls replay from history under the tool_call envelope;
+        // seed the resolved target name so resume matches what the live
+        // path records (recordCompletedToolCall sees the resolved name).
+        const callArgs = call.args as Record<string, unknown> | undefined;
+        const bridgedName = callArgs?.['name'];
+        this.rememberCompletedToolName(
+          call.name === ToolNames.TOOL_CALL &&
+            typeof bridgedName === 'string' &&
+            !(call.id && refusedBridgeCallIds.has(call.id))
+            ? bridgedName
+            : call.name,
+        );
+      }
+    }
+  }
+
+  private async microcompactHistoryBeforeSend(
+    lastCompletionTimestamp: number | null,
+    opts?: MicrocompactOptions,
+  ): Promise<boolean> {
+    try {
+      const projectRoot = this.config.getProjectRoot();
+      const targetDir = this.config.getTargetDir?.() ?? projectRoot;
+      const mcResult = microcompactHistory(
+        this.getHistoryShallow(),
+        lastCompletionTimestamp,
+        this.config.getClearContextOnIdle(),
+        {
+          ...opts,
+          preserveReadFileResult: (filePath) =>
+            isManagedMemoryPath(filePath, projectRoot, targetDir),
+        },
+      );
+      if (!mcResult.meta) {
+        return false;
+      }
+
+      const m = mcResult.meta;
+      const changed = m.tokensSaved > 0;
+      if (changed) {
+        // setHistory conservatively clears loaded-skill tracking.
+        this.getChat().setHistory(
+          mcResult.history,
+          this.getChat().getCompletedToolCallIds(),
+        );
+        await this.disarmFileReadCacheAfterEviction(m, 'microcompaction');
+      }
+      if (m.triggerReason === 'size') {
+        const pendingNote =
+          m.pendingToolResultChars && m.pendingToolResultChars > 0
+            ? ` (+${m.pendingToolResultChars} pending)`
+            : '';
+        const virtualAfter =
+          (m.toolResultCharsAfter ?? 0) + (m.pendingToolResultChars ?? 0);
+        const targetNote =
+          m.toolResultsLowWatermark !== undefined
+            ? `, target ${m.toolResultsLowWatermark}` +
+              (virtualAfter > m.toolResultsLowWatermark
+                ? ' (soft-exceeded)'
+                : '')
+            : '';
+        debugLogger.info(
+          `[TOOL-RESULT MC] tool result chars ${m.toolResultCharsBefore} > ` +
+            `${m.toolResultsTotalCharsThreshold}, cleared ${m.toolsCleared} ` +
+            `tool result(s) (~${m.tokensSaved} tokens), history now ` +
+            `${m.toolResultCharsAfter}${pendingNote}${targetNote}, kept ` +
+            `${m.toolsKept} tool result(s)`,
+        );
+      } else {
+        debugLogger.info(
+          `[TIME-BASED MC] gap ${m.gapMinutes}min > ${m.thresholdMinutes}min, ` +
+            `cleared ${m.toolsCleared} tool result(s) + ${m.mediaCleared} media (~${m.tokensSaved} tokens), ` +
+            `kept ${m.toolsKept} tool / ${m.mediaKept} media`,
+        );
+      }
+      return changed;
+    } catch (err) {
+      debugLogger.error(
+        `[MICROCOMPACTION] microcompactHistory failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return false;
+    }
+  }
+
+  private nextStopHookBlock(promptId: string, reason: string) {
+    const chain = this.stopHookChains.get(promptId);
+    const iterationCount = (chain?.count ?? 0) + 1;
+    const reasons = [...(chain?.reasons ?? []), reason];
+    const cap = this.config.getStopHookBlockingCap();
+    return { iterationCount, reasons, cap, capped: iterationCount >= cap };
+  }
+
+  private recordStopHookBlock(
+    promptId: string,
+    iterationCount: number,
+    reasons: string[],
+  ): void {
+    this.stopHookChains.delete(promptId);
+    this.stopHookChains.set(promptId, { count: iterationCount, reasons });
+    while (this.stopHookChains.size > MAX_STOP_HOOK_CHAIN_PROMPT_IDS) {
+      const oldest = this.stopHookChains.keys().next().value;
+      if (oldest === undefined) break;
+      this.stopHookChains.delete(oldest);
+    }
+  }
+
+  private clearStopHookChain(promptId: string): void {
+    this.stopHookChains.delete(promptId);
+  }
+
+  /**
+   * Open the turn's token budget: the session's output-token total now, and
+   * the `+500k`-style target the user typed, if any. Only a user query or its
+   * retry can carry a directive; a cron, goal, notification or teammate turn
+   * starts with none. A retry of the same prompt keeps the snapshot it
+   * already has, so the failed attempt's tokens still count against it.
+   */
+  private beginTurnBudget(
+    messageType: SendMessageType,
+    request: PartListUnion,
+    promptId: string,
+  ): void {
+    const turnBudget = this.config.getTurnBudget?.();
+    if (!turnBudget) return;
+    const sessionId = this.config.getSessionId();
+    if (
+      messageType === SendMessageType.Retry &&
+      turnBudget.current(sessionId)?.promptId === promptId
+    ) {
+      return;
+    }
+    const directive =
+      messageType === SendMessageType.UserQuery ||
+      messageType === SendMessageType.Retry
+        ? parseTurnBudgetDirective(extractTurnBudgetDirectiveText(request))
+        : null;
+    turnBudget.beginTurn({
+      promptId,
+      sessionId,
+      budget: directive?.total ?? null,
+      ...(directive ? { directiveText: directive.text } : {}),
+      outputTokensAtTurnStart:
+        uiTelemetryService.getTotalOutputTokens(sessionId),
+    });
+  }
+
+  async *sendMessageStream(
+    request: PartListUnion,
+    callerSignal: AbortSignal,
+    prompt_id: string,
+    options?: SendMessageOptions,
+    turns: number = MAX_TURNS,
+  ): AsyncGenerator<ServerLlmStreamEvent, Turn> {
+    const messageType = options?.type ?? SendMessageType.UserQuery;
+    const startsInteraction =
+      messageType === SendMessageType.UserQuery ||
+      messageType === SendMessageType.Retry ||
+      messageType === SendMessageType.Cron ||
+      messageType === SendMessageType.Notification ||
+      messageType === SendMessageType.Teammate ||
+      messageType === SendMessageType.Goal;
+    let interactionOwner = startsInteraction
+      ? undefined
+      : getActiveInteractionSpan(prompt_id);
+    if (interactionOwner) {
+      recordInteractionActivity(prompt_id, interactionOwner);
+    }
+    const agentOutput = new AgentOutputMessageCapture(this.config);
+    const endCurrentInteraction = (
+      status: 'ok' | 'error' | 'cancelled',
+      errorMessage?: string,
+      errorType?: string,
+    ) => {
+      if (
+        !interactionOwner ||
+        getActiveInteractionSpan(prompt_id) !== interactionOwner
+      ) {
+        return;
+      }
+      const interactionStartType =
+        this.interactionStartTypeByOwner.get(interactionOwner);
+      const ownsStructuredOutputContract =
+        interactionStartType === SendMessageType.UserQuery ||
+        interactionStartType === SendMessageType.Retry;
+      if (
+        status === 'ok' &&
+        ownsStructuredOutputContract &&
+        this.config.getJsonSchema?.()
+      ) {
+        endInteractionSpan('error', {
+          promptId: prompt_id,
+          errorMessage: 'model did not produce structured output',
+          errorType: 'structured_output_missing',
+        });
+        return;
+      }
+      if (status === 'ok') {
+        agentOutput.writeToSpan(interactionOwner);
+      }
+      endInteractionSpan(status, {
+        promptId: prompt_id,
+        ...(errorMessage ? { errorMessage } : {}),
+        ...(errorType ? { errorType } : {}),
+      });
+    };
+    if (
+      messageType === SendMessageType.UserQuery ||
+      messageType === SendMessageType.Cron ||
+      messageType === SendMessageType.Notification ||
+      messageType === SendMessageType.Teammate
+    ) {
+      await this.config.assertCanStartTurn();
+    }
+    if (
+      messageType === SendMessageType.UserQuery &&
+      !options?.isConcurrentSideQuery
+    )
+      this.config.applyReasoningOverrides?.();
+    const signal = options?.goalSignal
+      ? AbortSignal.any([callerSignal, options.goalSignal])
+      : callerSignal;
+    let goalPermit = options?.goalPermit
+      ? { ...options.goalPermit }
+      : undefined;
+    let goalTurnKey = options?.goalTurnKey;
+    let goalOrigin = options?.goalOrigin;
+    let goalRuntime: GoalRuntime | undefined;
+    let goalPermitReleased = false;
+    let unsubscribeGoalState: (() => void) | undefined;
+    const pendingGoalStateEvents: GoalStateStreamEvent[] = [];
+    const pendingGoalSettlementMessages: ServerLlmStreamEvent[] = [];
+    const reportGoalSettlementFailure = (message: string) => {
+      pendingGoalSettlementMessages.push({
+        type: LlmEventType.GoalSettlementFailed,
+        value: message,
+      });
+    };
+    const closeGoalStateEvents = () => {
+      const unsubscribe = unsubscribeGoalState;
+      unsubscribeGoalState = undefined;
+      unsubscribe?.();
+    };
+    const bindGoalStateEvents = (runtime: GoalRuntime) => {
+      if (unsubscribeGoalState) return;
+      unsubscribeGoalState = runtime.subscribe((value, cause) => {
+        pendingGoalStateEvents.push({
+          type: LlmEventType.GoalState,
+          value,
+          ...(cause !== undefined ? { cause } : {}),
+        });
+      });
+      pendingGoalStateEvents.push({
+        type: LlmEventType.GoalState,
+        value: runtime.getSnapshot(),
+      });
+    };
+    const takePendingGoalEvents = (): ServerLlmStreamEvent[] => {
+      const events = pendingGoalSettlementMessages.splice(
+        0,
+        pendingGoalSettlementMessages.length,
+      );
+      events.push(
+        ...pendingGoalStateEvents.splice(0, pendingGoalStateEvents.length),
+      );
+      return events;
+    };
+    const loadGoalRuntime = async (
+      required: boolean,
+    ): Promise<GoalRuntime | undefined> => {
+      if (goalRuntime) return goalRuntime;
+      try {
+        const getReady = this.config.getGoalRuntimeReady;
+        if (typeof getReady === 'function') {
+          goalRuntime = await getReady.call(this.config);
+        } else {
+          const getRuntime = this.config.getGoalRuntime;
+          if (typeof getRuntime === 'function') {
+            goalRuntime = getRuntime.call(this.config);
+          }
+        }
+      } catch (error) {
+        if (!(error instanceof GoalPersistenceUnavailableError) || required) {
+          throw error;
+        }
+      }
+      return goalRuntime;
+    };
+    const releaseGoalPermitOnInterruptedExit = async (
+      pauseReason?: string,
+      failure?: string,
+      cause?: 'stop-hook-cap',
+    ) => {
+      if (
+        goalPermitReleased ||
+        !goalPermit ||
+        !goalTurnKey ||
+        options?.goalSignal?.aborted
+      ) {
+        return;
+      }
+
+      try {
+        const runtime = goalRuntime ?? (await loadGoalRuntime(true));
+        if (runtime) bindGoalStateEvents(runtime);
+        if (
+          !runtime ||
+          !sameGoalPermit(runtime.permitForTurn(goalTurnKey), goalPermit)
+        ) {
+          return;
+        }
+
+        if (runtime.getSnapshot().goal?.status === 'active') {
+          try {
+            // This is the pause that wins the race on the interactive Esc
+            // path: it runs before every host's own reasoned pause, and a
+            // second pause on a non-active Goal throws, so the reason has to
+            // ride here or it never reaches the record. The site also runs
+            // for a turn that merely failed to complete (`!normalCompletion`),
+            // which is not a user interrupt and must not read as one.
+            await runtime.dispatch({
+              action: 'pause',
+              expectedGoalId: goalPermit.goalId,
+              expectedRevision: goalPermit.revision,
+              reason:
+                pauseReason ??
+                options?.getInterruptedGoalPauseReason?.({
+                  failure,
+                  ...(cause ? { cause } : {}),
+                }) ??
+                (cause === 'stop-hook-cap'
+                  ? GOAL_PAUSE_REASON_STOP_HOOK_CAP
+                  : callerSignal.aborted
+                    ? GOAL_PAUSE_REASON_USER_INTERRUPT
+                    : goalPauseReasonForFailure('the turn was interrupted')),
+            });
+          } catch (error) {
+            debugLogger.warn('Failed to pause interrupted Goal turn', error);
+          }
+        }
+
+        try {
+          await this.config.getChatRecordingService()?.flush();
+        } catch (error) {
+          debugLogger.warn('Failed to flush interrupted Goal turn', error);
+        }
+
+        if (sameGoalPermit(runtime.permitForTurn(goalTurnKey), goalPermit)) {
+          await runtime.finishTurn(goalPermit);
+        }
+        goalPermitReleased = true;
+      } catch (error) {
+        debugLogger.warn('Failed to release interrupted Goal turn', error);
+      }
+    };
+    const finalizeInterruptedGoalTurn = async (
+      pauseReason?: string,
+      failure?: string,
+      cause?: 'stop-hook-cap',
+    ) => {
+      await releaseGoalPermitOnInterruptedExit(pauseReason, failure, cause);
+      closeGoalStateEvents();
+      return takePendingGoalEvents();
+    };
+    let strippedRetryEntries: Content[] = [];
+    const currentPushCount = () =>
+      this.getChat().getUserContentPushCount?.() ?? 0;
+
+    // Settle a carrier exactly once. With `pushCountBefore`, acceptance
+    // compares the user-content push counter against that snapshot — for
+    // the attached carrier the snapshot published by `GeminiChat`
+    // immediately before this send's own push, for the recursive
+    // continuations below the snapshot taken immediately before their
+    // send. Without it (`undefined`), the send provably never pushed its
+    // user content — blocked by a UserPromptSubmit hook, or any exit
+    // before the push site — so restore unconditionally instead of
+    // comparing the push counter: the counter is global, and a concurrent
+    // submission admitted in the meantime pushes its own content into the
+    // same counter, which would read as "accepted" for content THIS send
+    // never pushed.
+    const settleSteerInput = (
+      steerInput: SteerInput | undefined,
+      pushCountBefore?: number,
+    ) => {
+      if (!steerInput || this.settledSteerInputs.has(steerInput)) return;
+      this.settledSteerInputs.add(steerInput);
+      try {
+        if (
+          pushCountBefore !== undefined &&
+          currentPushCount() > pushCountBefore
+        ) {
+          steerInput.accept();
+        } else {
+          steerInput.restore();
+        }
+      } catch (error) {
+        debugLogger.warn(`Failed to settle steer input: ${error}`);
+      }
+    };
+
+    const attachedSteerInput = options?.steerInput;
+    // Acceptance snapshot for the attached carrier: `GeminiChat` publishes
+    // the user-content push counter on the request array immediately
+    // before this send's history push (see `userContentPushSnapshotKey`
+    // in geminiChat.ts), so the comparison window around the push is
+    // empty. A client-side snapshot — even one retaken immediately before
+    // `turn.run` — would still cover the send-lock and `tryCompress`
+    // awaits inside `chat.sendMessageStream`, where a concurrently
+    // admitted send (e.g. /btw) can push and supply the observed counter
+    // growth for a send that then exits before its own push.
+    // `attachedSnapshotSource` is the array handed to `turn.run`; a send
+    // that exits before the publish never pushed, so it settles by
+    // unconditional restore. `pushInitiated` tracks whether the send ever
+    // reached `turn.run`; exits before it settle the same way.
+    let attachedSnapshotSource: readonly unknown[] | undefined;
+    const attachedPushSnapshot = (): number | undefined => {
+      const published = attachedSnapshotSource
+        ? (attachedSnapshotSource as unknown as Record<PropertyKey, unknown>)[
+            userContentPushSnapshotKey
+          ]
+        : undefined;
+      return typeof published === 'number' ? published : undefined;
+    };
+    let pushInitiated = false;
+
+    const restoreStrippedRetryEntries = () => {
+      if (strippedRetryEntries.length === 0) {
+        return;
+      }
+      // `chat.sendMessageStream` pushes the re-submitted user content back into
+      // history before the API call. Restore the stripped entries only when
+      // that push never landed (the send threw before pushing, or the push was
+      // rolled back on a setup error) — otherwise re-adding would duplicate it.
+      //
+      // Gate on the push counter, not on history length: auto-compression
+      // inside `sendMessageStream` runs BEFORE the push and shrinks history
+      // independently of it, so a length comparison can read "history didn't
+      // grow" even after a successful push and duplicate the prompt. The counter
+      // only advances on a push that survived (it's decremented if the push is
+      // rolled back), so it is invariant under compression.
+      const pushCountBefore = attachedPushSnapshot();
+      const pushCountNow = currentPushCount();
+      if (pushCountBefore === undefined || pushCountNow <= pushCountBefore) {
+        // Diagnostic: restoring means the send never pushed the re-submitted
+        // content. If the counter were ever wrong, this line is the anchor for
+        // a silent duplicate/loss.
+        debugLogger.info('[Retry] restoring stripped orphan entries', {
+          entries: strippedRetryEntries.length,
+          pushCountBefore,
+          pushCountNow,
+        });
+        for (const entry of strippedRetryEntries) {
+          this.getChat().addHistory(entry);
+        }
+      }
+      // Loaded-skill tracking was conservatively cleared by the strip
+      // above; restored bodies simply re-inject on their next invoke.
+      strippedRetryEntries = [];
+    };
+
+    if (
+      (messageType === SendMessageType.UserQuery &&
+        !options?.isConcurrentSideQuery) ||
+      messageType === SendMessageType.Retry
+    ) {
+      // A propose_goal approval is applied when its own turn ends. One still
+      // parked when a new user/retry chain starts belongs to a turn that ended
+      // without settling, so clear it before the replacement chain can exit.
+      this.config.takePendingGoalProposal?.();
+    }
+
+    if (messageType === SendMessageType.Retry) {
+      strippedRetryEntries = this.stripOrphanedUserEntriesFromHistory() ?? [];
+      // The matching dangling-`functionCall` repair runs inside
+      // `chat.sendMessageStream` AFTER the user content is pushed, so any
+      // tool_result the user is supplying (Retry of a ToolResult
+      // submission, lastPrompt === fr parts) closes the pair via the real
+      // `functionResponse` before we synthesize an error one. Doing the
+      // repair here would happen pre-push and race against the user
+      // content's own pairing.
+    }
+
+    // Fire UserPromptSubmit hook through MessageBus (only if hooks are enabled)
+    const preHookUserPromptText =
+      messageType === SendMessageType.UserQuery
+        ? partToString(request)
+        : undefined;
+    if (startsInteraction) {
+      this.loopDetector.reset(prompt_id);
+      this.lastPromptId = prompt_id;
+      // A side question asked while a turn is running is not a new turn: it
+      // must not move the running turn's starting point or drop its target.
+      if (!options?.isConcurrentSideQuery) {
+        this.beginTurnBudget(messageType, request, prompt_id);
+      }
+      // New input starts this interaction, so its first Stop is not
+      // hook-forced even when a retry or goal turn reuses the prompt id.
+      this.clearStopHookChain(prompt_id);
+      startInteractionSpan(this.config, {
+        promptId: prompt_id,
+        model: options?.modelOverride ?? this.config.getModel(),
+        messageType,
+      });
+      interactionOwner = getActiveInteractionSpan(prompt_id);
+      if (
+        interactionOwner &&
+        !this.interactionStartTypeByOwner.has(interactionOwner)
+      ) {
+        this.interactionStartTypeByOwner.set(interactionOwner, messageType);
+      }
+      if (
+        interactionOwner &&
+        messageType === SendMessageType.UserQuery &&
+        typeof options?.submittedPrompt === 'string'
+      ) {
+        addAgentInputMessageAttributes(
+          this.config,
+          interactionOwner,
+          options.submittedPrompt,
+        );
+      }
+    }
+    let userPromptRecordPayload: UserPromptRecordPayload | undefined;
+    let hooksEnabled: boolean;
+    let messageBus: ReturnType<Config['getMessageBus']>;
+    let userPromptSubmitFailureMessage = 'UserPromptSubmit hook failed';
+    try {
+      hooksEnabled = !this.config.getDisableAllHooks();
+      messageBus = this.config.getMessageBus();
+      if (
+        messageType !== SendMessageType.Retry &&
+        messageType !== SendMessageType.Steer &&
+        messageType !== SendMessageType.Cron &&
+        messageType !== SendMessageType.Notification &&
+        // Teammate envelopes are machine-driven re-entries like Cron /
+        // Notification, not user prompts: user-authored UserPromptSubmit
+        // hooks must not fire on (or be able to block) internal team
+        // coordination traffic.
+        messageType !== SendMessageType.Teammate &&
+        messageType !== SendMessageType.Goal &&
+        hooksEnabled &&
+        messageBus &&
+        this.config.hasHooksForEvent('UserPromptSubmit')
+      ) {
+        const promptText = preHookUserPromptText ?? partToString(request);
+        const submittedPrompt =
+          messageType === SendMessageType.UserQuery &&
+          typeof options?.submittedPrompt === 'string' &&
+          options.submittedPrompt.trim().length > 0
+            ? options.submittedPrompt
+            : undefined;
+        const response = await messageBus.request<
+          HookExecutionRequest,
+          HookExecutionResponse
+        >(
+          {
+            type: MessageBusType.HOOK_EXECUTION_REQUEST,
+            eventName: 'UserPromptSubmit',
+            input: {
+              prompt: promptText,
+              ...(submittedPrompt !== undefined
+                ? { submitted_prompt: submittedPrompt }
+                : {}),
+            },
+          },
+          MessageBusType.HOOK_EXECUTION_RESPONSE,
+        );
+        const hookOutput = response.output
+          ? createHookOutput('UserPromptSubmit', response.output)
+          : undefined;
+
+        if (
+          hookOutput?.isBlockingDecision() ||
+          hookOutput?.shouldStopExecution()
+        ) {
+          if (goalPermit) {
+            userPromptSubmitFailureMessage = 'Goal turn finalization failed';
+            const runtime = await loadGoalRuntime(true);
+            if (!runtime || !goalTurnKey) {
+              throw new Error('Goal turn admission is unavailable');
+            }
+            bindGoalStateEvents(runtime);
+            const admitted = runtime.permitForTurn(goalTurnKey);
+            if (!sameGoalPermit(admitted, goalPermit)) {
+              throw new Error('Goal turn permit is no longer valid');
+            }
+            await this.config.getChatRecordingService()?.flush();
+            await runtime.finishTurn(goalPermit);
+            goalPermitReleased = true;
+            closeGoalStateEvents();
+            endCurrentInteraction('cancelled');
+            for (const goalEvent of takePendingGoalEvents()) {
+              yield goalEvent;
+            }
+          } else {
+            endCurrentInteraction('cancelled');
+          }
+          await this.settlePendingGoalProposal(
+            true,
+            signal,
+            async (required) => {
+              const runtime = await loadGoalRuntime(required);
+              if (runtime) bindGoalStateEvents(runtime);
+              return runtime;
+            },
+            prompt_id,
+            reportGoalSettlementFailure,
+          );
+          for (const goalEvent of takePendingGoalEvents()) {
+            yield goalEvent;
+          }
+          yield {
+            type: LlmEventType.UserPromptSubmitBlocked,
+            value: {
+              reason: hookOutput.getEffectiveReason(),
+              originalPrompt: promptText,
+            },
+          };
+          // A blocked send never reaches the history push: settle the
+          // attached carrier by unconditional restore, never by the push
+          // counter (a concurrent push inside the hook window above would
+          // otherwise masquerade as this send's acceptance).
+          settleSteerInput(attachedSteerInput);
+          return new Turn(this.getChat(), prompt_id);
+        }
+
+        // Add additional context from hooks to the request. The context is
+        // appended as its own part, wrapped in a reserved tag so it stays
+        // distinguishable from user-authored text in model history, resume,
+        // and offline transcript analysis. `getAdditionalContext()` escapes
+        // `<`/`>`, so hook output cannot forge the closing tag.
+        // `promptText` is declared above this block so assignment here cannot
+        // hit a TDZ if the surrounding Goal try/catch is later reshuffled.
+        const additionalContext = hookOutput?.getAdditionalContext();
+        if (additionalContext) {
+          const requestArray = Array.isArray(request) ? request : [request];
+          request = [
+            ...requestArray,
+            { text: wrapUserPromptSubmitContext(additionalContext) },
+          ];
+          if (messageType === SendMessageType.UserQuery) {
+            userPromptRecordPayload = {
+              displayText: submittedPrompt ?? promptText,
+              hookContext: additionalContext,
+            };
+          }
+        }
+      }
+    } catch (error) {
+      endCurrentInteraction(
+        signal.aborted ? 'cancelled' : 'error',
+        signal.aborted ? undefined : userPromptSubmitFailureMessage,
+        signal.aborted ? undefined : getErrorType(error),
+      );
+      this.config.takePendingGoalProposal?.(prompt_id);
+      for (const goalEvent of await finalizeInterruptedGoalTurn(
+        undefined,
+        getErrorMessage(error),
+      )) {
+        yield goalEvent;
+      }
+      // A hook failure (including an abort during the hook await) exits
+      // before the settlement try/finally below, and this send provably
+      // never pushed: settle the attached carrier here by unconditional
+      // restore instead of leaving it to caller-side failure handling.
+      // Symmetric with the Goal-admission catch below: re-add any Retry
+      // orphan entries popped above (a no-op today — hooks never fire for
+      // Retry, the only type that populates the entries — but keeps this
+      // exit safe under future hook-scope changes).
+      restoreStrippedRetryEntries();
+      settleSteerInput(attachedSteerInput);
+      throw error;
+    }
+
+    try {
+      goalRuntime = await loadGoalRuntime(
+        messageType === SendMessageType.Goal || Boolean(goalPermit),
+      );
+
+      if (messageType === SendMessageType.Goal) {
+        if (!goalPermit) {
+          throw new Error('An automatic Goal turn requires an exact permit');
+        }
+        goalTurnKey ??= `goal-runtime:${goalPermit.turnId}`;
+        goalOrigin = 'runtime';
+      } else if (messageType === SendMessageType.UserQuery) {
+        goalOrigin = 'user';
+      }
+
+      const goalRequiresPermit = goalRuntime
+        ? goalRequiresExactPermit(goalRuntime.getSnapshot())
+        : false;
+      if (goalPermit) {
+        if (!goalRuntime || !goalTurnKey) {
+          throw new Error('Goal turn admission is unavailable');
+        }
+        const admitted = goalRuntime.permitForTurn(goalTurnKey);
+        if (!sameGoalPermit(admitted, goalPermit)) {
+          throw new Error('Goal turn permit is no longer valid');
+        }
+      } else if (
+        messageType === SendMessageType.UserQuery &&
+        goalRuntime &&
+        goalRequiresPermit
+      ) {
+        goalTurnKey ??= prompt_id;
+        goalPermit =
+          goalRuntime.permitForTurn(goalTurnKey) ??
+          goalRuntime.beginTurn(goalTurnKey);
+        if (!goalPermit) {
+          throw new Error('Goal turn is already owned by another permit');
+        }
+      } else if (goalRequiresPermit) {
+        throw new Error('An active Goal requires an exact turn permit');
+      }
+
+      if (goalPermit) {
+        goalOrigin ??= 'runtime';
+        options = {
+          ...(options ?? { type: messageType }),
+          type: messageType,
+          goalPermit,
+          goalTurnKey,
+          goalOrigin,
+        };
+      }
+      if (goalRuntime) bindGoalStateEvents(goalRuntime);
+    } catch (error) {
+      endCurrentInteraction(
+        signal.aborted ? 'cancelled' : 'error',
+        signal.aborted ? undefined : 'Goal turn admission failed',
+        signal.aborted ? undefined : getErrorType(error),
+      );
+      this.config.takePendingGoalProposal?.(prompt_id);
+      for (const goalEvent of await finalizeInterruptedGoalTurn(
+        undefined,
+        getErrorMessage(error),
+      )) {
+        yield goalEvent;
+      }
+      // A Goal admission failure rethrows before the settlement
+      // try/finally below, and this send provably never pushed: settle the
+      // attached carrier here by unconditional restore, the same contract
+      // as the hook-failure catch above. Idempotently safe via the
+      // `settledSteerInputs` guard when the caller side settles too.
+      // Re-add the Retry orphan entries popped above first: this catch
+      // exits before the settlement try/finally holding the only other
+      // `restoreStrippedRetryEntries` call site, so without this the
+      // popped entries stay dropped from history while the restored
+      // carrier re-records debt against entries that no longer exist.
+      restoreStrippedRetryEntries();
+      settleSteerInput(attachedSteerInput);
+      throw error;
+    }
+    const isGoalRuntimeTurn = goalOrigin === 'runtime';
+
+    if (
+      messageType === SendMessageType.Notification ||
+      messageType === SendMessageType.Teammate
+    ) {
+      // Teammate envelopes record like notifications: the UI rendered
+      // them as a compact `●` line (the displayText) and the envelope
+      // is the model-bound payload, so a resumed session restores the
+      // same info item. Without this they were the one top-level
+      // interaction missing from chat recording entirely.
+      this.config
+        .getChatRecordingService()
+        ?.recordNotification(
+          request,
+          options?.notificationDisplayText,
+          undefined,
+          goalPermit,
+        );
+    }
+
+    // Notifications start a fresh Turn with a new prompt_id, so the loop
+    // detector must reset — otherwise a prior turn's count can trip
+    // LoopDetected early on the notification turn.
+    if (messageType === SendMessageType.UserQuery) {
+      this.activeAutomaticTodoWorkChainPromptIds.clear();
+      // A registered reminder means the previous chain's plan still has
+      // unfinished items (todo_write deletes it on completion): continue
+      // that chain instead of discarding its context with the very turn
+      // that may be asking about it (#10953).
+      const continuedFrom =
+        this.activeTodoWorkChainPromptId !== undefined &&
+        this.config.getActiveTodoReminder(this.activeTodoWorkChainPromptId) !==
+          undefined &&
+        this.config.getActiveTodoWorkChainOwner(
+          this.activeTodoWorkChainPromptId,
+        ) === this.config.getActiveTodoPlanWriterOwner()
+          ? this.activeTodoWorkChainPromptId
+          : undefined;
+      this.config.startActiveTodoWorkChain(prompt_id, continuedFrom);
+      this.activeTodoWorkChainPromptId = prompt_id;
+    } else if (messageType === SendMessageType.Retry) {
+      this.config.startActiveTodoWorkChain(
+        prompt_id,
+        this.activeTodoWorkChainPromptId,
+      );
+      this.activeTodoWorkChainPromptId = prompt_id;
+    } else if (
+      messageType === SendMessageType.Cron ||
+      messageType === SendMessageType.Notification ||
+      messageType === SendMessageType.Teammate
+    ) {
+      this.config.startAutomaticActiveTodoWorkChain(
+        prompt_id,
+        options?.todoWorkChainId ??
+          (messageType === SendMessageType.Teammate
+            ? this.activeTodoWorkChainPromptId
+            : undefined),
+      );
+      this.activeAutomaticTodoWorkChainPromptIds.add(prompt_id);
+    }
+    if (messageType === SendMessageType.Goal) {
+      this.loopDetector.reset(prompt_id);
+      this.lastPromptId = prompt_id;
+    }
+    if (startsInteraction) {
+      const interactionSpan = interactionOwner;
+      if (
+        interactionSpan &&
+        this.config.getTelemetryIncludeSensitiveSpanAttributes?.()
+      ) {
+        // Guard partToString — addUserPromptAttributes would early-return
+        // anyway, but the argument is evaluated unconditionally otherwise.
+        addUserPromptAttributes(
+          this.config,
+          interactionSpan,
+          preHookUserPromptText ?? partToString(request),
+        );
+      }
+    }
+    // Tracks whether the generator reached its natural end (the bottom-of-try
+    // `return turn`). Only on that path do we want to preserve the pending
+    // memory prefetch so the next ToolResult turn can consume it. Any other
+    // exit (LoopDetected, Error, signal abort, uncaught exception, abnormal
+    // early-return) leaves this `false`, and the `finally` block aborts the
+    // prefetch as a safety net.
+    let normalCompletion = false;
+    let sessionTokenLimitExceeded = false;
+    let hasToolCalls = false;
+    // Declared outside the try so the finally block can close it out on
+    // uncaught-exception exits too; created (when the hook is registered)
+    // right before the turn's streaming loop below.
+    let messageDisplay: MessageDisplayDispatcher | null = null;
+    try {
+      if (messageType === SendMessageType.Goal) {
+        this.config
+          .getChatRecordingService()
+          ?.recordGoalRuntimeMessage(request, goalPermit!);
+      } else if (
+        messageType === SendMessageType.UserQuery ||
+        messageType === SendMessageType.Cron
+      ) {
+        this.beginManagedAutoMemoryRecall(
+          preHookUserPromptText ?? partToString(request),
+          signal,
+        );
+
+        // Track prompt count for commit attribution. Only the user typing a
+        // fresh prompt should bump the counter — `ToolResult` (tool-call
+        // continuation), `Retry`, `Hook`, `Cron`, and `Notification` are all
+        // model-driven or background-driven re-entries of the same logical
+        // turn. Counting them inflates the "N-shotted" label in the PR
+        // attribution trailer (one user message becomes "10-shotted" when it
+        // triggered ten tool calls).
+        const attributionService = CommitAttributionService.getInstance();
+        if (messageType === SendMessageType.UserQuery) {
+          attributionService.incrementPromptCount();
+        }
+
+        // record user/cron message for session management
+        if (messageType === SendMessageType.Cron) {
+          this.config
+            .getChatRecordingService()
+            ?.recordCronPrompt(
+              request,
+              options?.notificationDisplayText,
+              goalPermit,
+            );
+        } else {
+          const recorder = this.config.getChatRecordingService();
+          if (userPromptRecordPayload) {
+            recorder?.recordUserMessage(
+              request,
+              goalPermit,
+              userPromptRecordPayload,
+            );
+          } else {
+            recorder?.recordUserMessage(request, goalPermit);
+          }
+        }
+      }
+
+      if (
+        messageType === SendMessageType.UserQuery ||
+        messageType === SendMessageType.Cron
+      ) {
+        // Pre-send microcompaction: user and cron turns can trigger both
+        // idle-based and cumulative-size cleanup. ToolResult and Retry are
+        // excluded here; ToolResult runs a size-only checkpoint after its
+        // pending content is assembled.
+        const compacted = await this.microcompactHistoryBeforeSend(
+          this.lastApiCompletionTimestamp,
+        );
+        if (messageType === SendMessageType.UserQuery || compacted) {
+          this.lastHookMicrocompactionTimestamp = Date.now();
+        }
+      } else if (messageType === SendMessageType.Hook && !isGoalRuntimeTurn) {
+        this.lastHookMicrocompactionTimestamp ??=
+          this.lastApiCompletionTimestamp ?? Date.now();
+        const checkpoint = this.lastHookMicrocompactionTimestamp;
+        if (await this.microcompactHistoryBeforeSend(checkpoint)) {
+          this.lastHookMicrocompactionTimestamp = Date.now();
+        }
+      }
+
+      // A runtime-scheduled Goal turn is not a session turn. `maxSessionTurns`
+      // counts every model call the user's own prompts drive, tool
+      // continuations included; a Goal that reads a few files per
+      // continuation would spend a user-set cap of N in N/4 continuations
+      // and die mid-run with no resume path in headless. Autonomous Goal
+      // spend is bounded by the Goal's own token budget instead (armed at
+      // creation, re-armed only by an explicit resume or edit), and the
+      // headless host excludes runtime Goal turns from the same cap for the
+      // same reason, so counting them here would split the two ceilings.
+      if (messageType !== SendMessageType.Retry && !isGoalRuntimeTurn) {
+        // Attribution snapshots are recorded on every non-retry turn. File
+        // history snapshots are created only at UserQuery boundaries; later
+        // tool edits update that latest snapshot through trackEdit().
+        this.config
+          .getChatRecordingService()
+          ?.recordAttributionSnapshot(
+            CommitAttributionService.getInstance().toSnapshot(),
+          );
+
+        this.sessionTurnCount++;
+
+        if (messageType === SendMessageType.UserQuery) {
+          try {
+            await this.config.getFileHistoryService().makeSnapshot(prompt_id);
+            try {
+              const latestSnapshot = this.config
+                .getFileHistoryService()
+                .getSnapshots()
+                .at(-1);
+              if (latestSnapshot) {
+                this.config
+                  .getChatRecordingService()
+                  ?.recordFileHistorySnapshot(latestSnapshot);
+              }
+            } catch (e) {
+              debugLogger.error(`FileHistory: recordSnapshot failed: ${e}`);
+            }
+          } catch (e) {
+            debugLogger.error(`FileHistory: makeSnapshot failed: ${e}`);
+          }
+        }
+
+        if (
+          this.config.getMaxSessionTurns() > 0 &&
+          this.sessionTurnCount > this.config.getMaxSessionTurns()
+        ) {
+          this.cancelPendingMemoryPrefetch('no_safe_delivery_point');
+          yield { type: LlmEventType.MaxSessionTurns };
+          endCurrentInteraction(
+            'error',
+            'max session turns exceeded',
+            'max_session_turns',
+          );
+          return new Turn(this.getChat(), prompt_id);
+        }
+      }
+
+      // Ensure turns never exceeds MAX_TURNS to prevent infinite loops. A
+      // runtime Goal turn honours the caller's budget like every other
+      // message type: each continuation is a fresh top-level send that
+      // starts from MAX_TURNS on its own, so nothing about a Goal needs to
+      // outlive one turn's recursion allowance.
+      const boundedTurns = Math.min(turns, MAX_TURNS);
+      if (!boundedTurns) {
+        this.cancelPendingMemoryPrefetch('no_safe_delivery_point');
+        endCurrentInteraction('error', 'max turns exhausted', 'max_turns');
+        return new Turn(this.getChat(), prompt_id);
+      }
+
+      const takeSteerInput = async (
+        nextTurnBudget: number,
+      ): Promise<SteerInput | undefined> => {
+        if (
+          nextTurnBudget <= 0 ||
+          !signal ||
+          signal.aborted ||
+          !options?.getSteerInput
+        ) {
+          return undefined;
+        }
+        // Same ceiling as the session-turn check above, same exclusion: a
+        // runtime Goal turn does not count toward `maxSessionTurns`, so it
+        // must not be refused steer input on that count either.
+        const maxSessionTurns = this.config.getMaxSessionTurns();
+        if (
+          !isGoalRuntimeTurn &&
+          maxSessionTurns > 0 &&
+          this.sessionTurnCount >= maxSessionTurns
+        ) {
+          return undefined;
+        }
+        const steerInput = await options.getSteerInput(signal);
+        if (!steerInput || steerInput.parts.length === 0) {
+          return undefined;
+        }
+        if (signal.aborted) {
+          steerInput.restore();
+          return undefined;
+        }
+        return steerInput;
+      };
+
+      // Auto-compaction happens inside LlmChat.sendMessageStream and surfaces
+      // via the `compressed → ChatCompressed` bridge in turn.ts. Manual /compress
+      // still calls tryCompressChat directly for the full reset (env refresh +
+      // forceFullIdeContext flip).
+      const model = options?.modelOverride ?? this.config.getModel();
+      const sessionTokenLimit = this.config.getSessionTokenLimit();
+      if (sessionTokenLimit > 0) {
+        // An exact `\0` full-turn route selector resolves to its route before
+        // LlmChat.sendMessageStream stamps counts under it, so the gate
+        // must key the resolved route too — the raw selector key can never
+        // match a stamped count. Mirrors the resolution at the top of
+        // LlmChat.sendMessageStream (#9454).
+        const exactRoute = model.endsWith('\0')
+          ? await this.config
+              .getBaseLlmClient()
+              .resolveForModel(model.slice(0, -1), { failClosed: true })
+          : undefined;
+        const requestRouteKey = this.config.getModelRouteIdentity(
+          exactRoute ? exactRoute.model : model,
+          exactRoute?.contentGeneratorConfig,
+        );
+        const lastPromptTokenCount =
+          this.getChat().getLastPromptTokenCount(requestRouteKey);
+        if (lastPromptTokenCount > sessionTokenLimit) {
+          sessionTokenLimitExceeded = true;
+          this.cancelPendingMemoryPrefetch('no_safe_delivery_point');
+          yield {
+            type: LlmEventType.SessionTokenLimitExceeded,
+            value: {
+              currentTokens: lastPromptTokenCount,
+              limit: sessionTokenLimit,
+              message:
+                `Session token limit exceeded: ${lastPromptTokenCount} tokens > ${sessionTokenLimit} limit. ` +
+                'Please start a new session or increase the sessionTokenLimit in your settings.json.',
+            },
+          };
+          endCurrentInteraction(
+            'error',
+            'session token limit exceeded',
+            'session_token_limit',
+          );
+          return new Turn(this.getChat(), prompt_id);
+        }
+      }
+
+      // Prevent context updates from being sent while a tool call is
+      // waiting for a response. The Qwen API requires that a functionResponse
+      // part from the user immediately follows a functionCall part from the model
+      // in the conversation history. The IDE context is not discarded; it will
+      // be included in the next regular message sent to the model.
+      const historyLength = this.getHistoryLength();
+      const lastMessage = this.peekLastHistoryEntry();
+      const hasPendingToolCall =
+        !!lastMessage &&
+        lastMessage.role === 'model' &&
+        (lastMessage.parts?.some((p) => 'functionCall' in p) || false);
+      let ideContextText: string | undefined;
+      let nextIdeContext: IdeContext | undefined;
+      let shouldUpdateIdeContextState = false;
+
+      if (this.config.getIdeMode() && !hasPendingToolCall) {
+        const { contextParts, newIdeContext } = this.getIdeContextParts(
+          this.forceFullIdeContext || historyLength === 0,
+        );
+        if (contextParts.length > 0) {
+          ideContextText = wrapIdeContext(contextParts.join('\n'));
+          nextIdeContext = newIdeContext;
+          shouldUpdateIdeContextState = true;
+        } else {
+          debugLogger.debug(
+            'IDE mode enabled but no context parts generated (forceFull=%s)',
+            this.forceFullIdeContext,
+          );
+        }
+      }
+
+      // Check for arena control signal before starting a new turn
+      const arenaAgentClient = this.config.getArenaAgentClient();
+      if (arenaAgentClient) {
+        const controlSignal = await arenaAgentClient.checkControlSignal();
+        if (controlSignal) {
+          debugLogger.info(
+            `Arena control signal received: ${controlSignal.type} - ${controlSignal.reason}`,
+          );
+          await arenaAgentClient.reportCancelled();
+          this.cancelPendingMemoryPrefetch('abort');
+          endCurrentInteraction('cancelled');
+          return new Turn(this.getChat(), prompt_id);
+        }
+      }
+
+      if (
+        !hasPendingToolCall &&
+        (messageType === SendMessageType.UserQuery ||
+          messageType === SendMessageType.Cron)
+      ) {
+        try {
+          this.drainPendingMcpServerInstructionsReminder();
+        } catch (error) {
+          debugLogger.warn(
+            'drainPendingMcpServerInstructionsReminder failed',
+            error,
+          );
+        }
+        try {
+          this.drainPendingAddedMcpToolsReminder();
+        } catch (error) {
+          debugLogger.warn('drainPendingAddedMcpToolsReminder failed', error);
+        }
+        try {
+          await this.drainSkillAndCommandReminders();
+        } catch (error) {
+          debugLogger.warn('drainSkillAndCommandReminders failed', error);
+        }
+        try {
+          await this.drainAgentReminders();
+        } catch (error) {
+          debugLogger.warn('drainAgentReminders failed', error);
+        }
+      }
+
+      const turn = new Turn(this.getChat(), prompt_id, goalPermit);
+
+      // Assemble the outgoing request. IDE context is merged into the
+      // user prompt's first text part, then on UserQuery / Cron turns
+      // the system reminders block is prepended in front of everything
+      // so the final shape is: [systemReminders..., ideContext + user prompt].
+      let requestToSend = await flatMapTextParts(request, async (text) => [
+        text,
+      ]);
+      if (ideContextText) {
+        requestToSend = prependToFirstTextPart(requestToSend, ideContextText);
+      }
+      if (
+        messageType === SendMessageType.UserQuery ||
+        messageType === SendMessageType.Cron
+      ) {
+        const systemReminders = [];
+
+        if (
+          messageType === SendMessageType.UserQuery &&
+          !goalPermit &&
+          goalRuntime?.getSnapshot().goal?.status === 'paused'
+        ) {
+          systemReminders.push(PAUSED_GOAL_SYSTEM_REMINDER);
+        }
+
+        // Inject fresh date on UserQuery turns only; Cron and ToolResult turns
+        // reuse the same session and the startup-context date is still current.
+        if (messageType === SendMessageType.UserQuery) {
+          const today = formatDateForContext();
+
+          // Only inject if the date has changed since the last injection.
+          // This prevents accumulating conflicting dates when a session
+          // spans midnight.
+          if (today !== this.lastInjectedDate) {
+            systemReminders.push(
+              `<system-reminder>\nThe current date is: ${today}. Note: This is the authoritative current date — it may differ from the "Today's date" mentioned earlier in the conversation startup context.\n</system-reminder>`,
+            );
+            this.lastInjectedDate = today;
+          }
+        }
+
+        // add plan mode system reminder if approval mode is plan
+        if (this.config.getApprovalMode() === ApprovalMode.PLAN) {
+          systemReminders.push(
+            // SDK clients do not receive the interactive exit-plan flow, so
+            // they need plan-only guidance even outside subagent contexts.
+            getPlanModeSystemReminder(
+              shouldUsePlanOnlyReminderInSubagentContext() ||
+                this.config.getSdkMode(),
+            ),
+          );
+        }
+
+        // add arena system reminder if an arena session is active
+        const arenaManager = this.config.getArenaManager();
+        if (arenaManager) {
+          try {
+            const sessionDir = arenaManager.getArenaSessionDir();
+            const configPath = `${sessionDir}/config.json`;
+            systemReminders.push(getArenaSystemReminder(configPath));
+          } catch {
+            // Arena config not yet initialized — skip
+          }
+        }
+
+        // Remind the model of the style its system prompt carries: the
+        // section sits in the cached prompt and fades over a long
+        // conversation without a nudge next to the newest user text.
+        const outputStyle = resolveMainSessionOutputStyle(this.config);
+        if (outputStyle) {
+          systemReminders.push(
+            wrapSystemReminder(getOutputStyleTurnReminder(outputStyle)),
+          );
+        }
+
+        const userQueryMemory =
+          messageType === SendMessageType.UserQuery
+            ? await this.consumeManagedAutoMemoryRecall('initial')
+            : await this.tryConsumeMemoryPrefetch('initial');
+        if (userQueryMemory?.prompt) {
+          // Unshift to the front of systemReminders: on a UserQuery turn
+          // requestToSend leads with user text, so positioning memory at
+          // the very start of the system-reminder block keeps it close to
+          // the user prompt. Contrast the ToolResult path below, which
+          // must append to avoid splitting functionCall / functionResponse.
+          systemReminders.unshift(userQueryMemory.prompt);
+        }
+
+        // Omni passive media-memory recall (memory design M §9.3, D10
+        // sideQuery mode): a bounded selector reads what memory knows
+        // about the media handles THIS request carries and the chosen
+        // entries are injected here — strictly before the main request
+        // is sent (never retrofitted into a later turn). Latency is
+        // bounded by sideQuery.timeoutMs; the no-op cases (mode active,
+        // memory off, no handles in the request) return null without
+        // model traffic, and every failure degrades to no injection.
+        // Optional call: stub configs in tests may omit the method.
+        if (this.config.isOmniEnabled?.()) {
+          const { runOmniMemorySideQuery, formatOmniMemorySideQueryReminder } =
+            await import('../omni/memory-side-query.js');
+          const omniRecall = await runOmniMemorySideQuery({
+            config: this.config,
+            requestParts: requestToSend,
+            promptId: prompt_id,
+            ...(signal !== undefined ? { signal } : {}),
+          });
+          if (omniRecall?.result) {
+            systemReminders.push(
+              formatOmniMemorySideQueryReminder(omniRecall.result),
+            );
+            // The user record was persisted before this reminder existed —
+            // record the payload so the transcript (and the trajectory
+            // exporter) shows what memory the model was actually given.
+            this.config
+              .getChatRecordingService()
+              ?.recordOmniRecallReminder(omniRecall.result);
+          } else if (omniRecall?.reason) {
+            // A degraded passive recall is invisible by construction: the
+            // turn proceeds normally, just without the memory it was
+            // supposed to carry. With a pinned-but-unavailable selector
+            // model that is a permanent outage of the feature with nothing
+            // to see, so the reason is recorded (memory design M §9.3
+            // obliges recording it) rather than dropped on the floor.
+            debugLogger.debug(
+              `omni passive media-memory recall degraded ` +
+                `(${omniRecall.reason}) for ` +
+                `${omniRecall.resourceIds.length} resource(s)`,
+            );
+          }
+        }
+
+        requestToSend = [...systemReminders, ...requestToSend];
+      }
+
+      if (
+        messageType === SendMessageType.Retry ||
+        messageType === SendMessageType.Cron ||
+        messageType === SendMessageType.Notification ||
+        messageType === SendMessageType.Teammate
+      ) {
+        const activeTodoReminder = this.config.takeActiveTodoReminder(
+          prompt_id,
+          true,
+        );
+        const alreadyHasActiveTodoReminder = requestToSend.some(
+          (part) =>
+            part === activeTodoReminder ||
+            (typeof part === 'object' &&
+              part !== null &&
+              'text' in part &&
+              part.text === activeTodoReminder),
+        );
+        if (activeTodoReminder && !alreadyHasActiveTodoReminder) {
+          const insertAt = requestToSend.findIndex(
+            (part) =>
+              typeof part !== 'object' ||
+              part === null ||
+              !('functionResponse' in part),
+          );
+          requestToSend.splice(
+            insertAt < 0 ? requestToSend.length : insertAt,
+            0,
+            activeTodoReminder,
+          );
+        }
+      }
+
+      if (messageType === SendMessageType.ToolResult) {
+        // Record executed tool results for stateful read tools (task_list)
+        // so the loop guards can distinguish productive re-polling — the
+        // shared task board changed between identical calls — from a stuck
+        // loop (issue #9450). A detection here (the result-aware global
+        // duplicate count) halts the turn exactly like the event-loop
+        // guards below.
+        for (const part of requestToSend) {
+          if (
+            typeof part !== 'object' ||
+            part === null ||
+            !('functionResponse' in part)
+          ) {
+            continue;
+          }
+          const functionResponseId = (part as Part).functionResponse?.id;
+          if (!functionResponseId) continue;
+          if (
+            this.loopDetector.recordToolResultByCallId(functionResponseId, [
+              part as Part,
+            ])
+          ) {
+            for (const goalEvent of await finalizeInterruptedGoalTurn(
+              undefined,
+              'loop detected',
+            )) {
+              yield goalEvent;
+            }
+            const loopType = this.loopDetector.getLastLoopType();
+            yield {
+              type: LlmEventType.LoopDetected,
+              ...(loopType && { value: { loopType } }),
+            };
+            await arenaAgentClient?.reportError('Loop detected');
+            this.lastApiCompletionTimestamp = Date.now();
+            endCurrentInteraction('error', 'loop detected', 'loop_detected');
+            this.cancelPendingMemoryPrefetch('no_safe_delivery_point');
+            this.fireLoopDetectedStopFailure(loopType);
+            return turn;
+          }
+        }
+        const toolResultMemory =
+          await this.consumeManagedAutoMemoryRecall('tool_result');
+        if (toolResultMemory?.prompt) {
+          // Append (not prepend): on a ToolResult turn, requestToSend leads
+          // with functionResponse parts that must immediately follow the
+          // model's functionCall (Qwen API constraint — same reason the
+          // IDE-context block above is skipped while a tool call is pending,
+          // see the `hasPendingToolCall` guard). Putting the memory text
+          // after the functionResponse parts keeps the call/response pairing
+          // intact under native Gemini; the OpenAI converter then emits the
+          // text as a separate user message after the tool messages.
+          requestToSend = [...requestToSend, toolResultMemory.prompt];
+        }
+        // A top-level Agent tool result means a delegated execution just
+        // returned (#10953): real work advanced while the parent earned a
+        // single tool turn, so the turn budget cannot come due on its own.
+        // Force the reminder exactly where the progress information arrives.
+        const carriesAgentToolResult = requestToSend.some(
+          (part) =>
+            typeof part === 'object' &&
+            part !== null &&
+            canonicalToolName(part.functionResponse?.name ?? '') ===
+              ToolNames.AGENT,
+        );
+        const activeTodoReminder = carriesAgentToolResult
+          ? this.config.takeActiveTodoReminder(prompt_id, true)
+          : this.config.takeActiveTodoReminder(prompt_id);
+        if (activeTodoReminder) {
+          const insertAt = requestToSend.findIndex(
+            (part) =>
+              typeof part !== 'object' ||
+              part === null ||
+              !('functionResponse' in part),
+          );
+          requestToSend.splice(
+            insertAt < 0 ? requestToSend.length : insertAt,
+            0,
+            activeTodoReminder,
+          );
+        }
+        await this.microcompactHistoryBeforeSend(null, {
+          sizeOnly: true,
+          pendingContent: createUserContent(requestToSend),
+        });
+      }
+
+      for (const goalEvent of takePendingGoalEvents()) {
+        yield goalEvent;
+      }
+
+      // MessageDisplay hook: fires repeatedly as this turn's reply streams
+      // (before Stop, which fires once at the end). One dispatcher — one
+      // message_id and one debounce accumulator — per turn.run() call;
+      // recursion into sendMessageStream (tool continuations, hook-forced
+      // continuations) naturally gets its own since this local is re-created
+      // on each invocation. `finish()` is awaited at every exit out of the
+      // `for await` loop below (normal completion and each early `return
+      // turn`) plus the outer finally, so a hook script's `is_final: true`
+      // completion signal is neither skipped when the turn ends via loop
+      // detection or a stream error, nor silently dropped by a process that
+      // exits (headless `-p`) before a slow hook's queue drained. Not gated
+      // on !turn.pendingToolCalls the way the Stop hook below is, since a
+      // message boundary and a Stop-worthy end-of-turn are different things.
+      // The dispatcher mirrors warnings to console.warn itself; this sink
+      // only adds them to the debug-log file.
+      messageDisplay =
+        hooksEnabled &&
+        messageBus &&
+        this.config.hasHooksForEvent('MessageDisplay')
+          ? new MessageDisplayDispatcher(messageBus, signal, (message) =>
+              this.config.getDebugLogger().warn(message),
+            )
+          : null;
+
+      // The acceptance snapshot for the attached carrier is published by
+      // `chat.sendMessageStream` on `requestToSend` immediately before the
+      // actual history push (see `userContentPushSnapshotKey`); a
+      // client-side snapshot taken here would still cover the send-lock
+      // and compression awaits between `turn.run` and that push.
+      attachedSnapshotSource = requestToSend;
+      pushInitiated = true;
+      agentOutput.beginResponse();
+      const resultStream = turn.run(model, requestToSend, signal);
+      let didUpdateIdeContextState = false;
+      let steerInputSettled = false;
+      // callIds already fed to the loop guards this attempt. Mirrors the
+      // execution-side dedup (coreToolScheduler.dedupeRequestsByCallId / the
+      // interactive duplicate-call-id suppression), which collapses
+      // provider-duplicate emissions into one executed call and one result:
+      // feeding the guards once per call id keeps request counts and result
+      // evidence on the same population (main-session twin of the agent-core
+      // fix, issue #9450). Id-less requests are never deduped. Cleared on
+      // retry/fallback alongside the attempt's accumulated state.
+      const loopGuardFedCallIds = new Set<string>();
+      try {
+        for await (const event of resultStream) {
+          if (!steerInputSettled) {
+            // Settle the attached steer input as soon as the first stream
+            // event arrives — the user-content push has landed by now.
+            // Settling here (before model-response events are committed to
+            // UI history) ensures the queued user message renders above the
+            // model's reply.  The outer finally re-runs settleSteerInput
+            // as a no-op thanks to the settledSteerInputs guard.
+            settleSteerInput(attachedSteerInput, attachedPushSnapshot());
+            steerInputSettled = true;
+          }
+          if (event.type === LlmEventType.ToolCallRequest) {
+            hasToolCalls = true;
+          } else if (
+            event.type === LlmEventType.Retry ||
+            event.type === LlmEventType.ModelFallback
+          ) {
+            hasToolCalls = false;
+            loopGuardFedCallIds.clear();
+            agentOutput.restartAttempt(
+              event.type === LlmEventType.Retry &&
+                event.isContinuation === true,
+            );
+          }
+          if (event.type === LlmEventType.Content) {
+            agentOutput.appendText(event.value);
+          } else if (event.type === LlmEventType.Finished) {
+            agentOutput.observeFinishReason(event.value?.reason);
+          }
+          if (messageDisplay && event.type === LlmEventType.Content) {
+            messageDisplay.addChunk(event.value);
+          }
+          if (shouldUpdateIdeContextState && !didUpdateIdeContextState) {
+            this.lastSentIdeContext = nextIdeContext;
+            this.forceFullIdeContext = false;
+            didUpdateIdeContextState = true;
+          }
+
+          // A provider-duplicate emission of an already-fed call id executes
+          // once (the schedulers collapse it), so feed the loop guards once —
+          // counting both emissions would leave the request counters one ahead
+          // of the executed result evidence and fail-safe-halt a productive
+          // stateful poller (issue #9450). The event itself still flows to
+          // consumers below; only the guard feed is deduped.
+          let duplicateLoopGuardRequest = false;
+          if (event.type === LlmEventType.ToolCallRequest) {
+            const fedCallId = event.value.callId;
+            if (fedCallId) {
+              duplicateLoopGuardRequest = loopGuardFedCallIds.has(fedCallId);
+              loopGuardFedCallIds.add(fedCallId);
+            }
+          }
+
+          // Always-on safety checks (consecutive-identical tool-call guard,
+          // shell inspection stagnation, and per-turn tool-call cap). These fire
+          // before the skipLoopDetection gate so they cannot be bypassed by
+          // configuration.
+          const alwaysOnLoop =
+            !duplicateLoopGuardRequest &&
+            this.loopDetector.checkAlwaysOnSafeties(event);
+          if (alwaysOnLoop) {
+            // Drop every tool call collected before the guard fired so the run
+            // halts here instead of spawning a continuation that re-trips it.
+            // turn.pendingToolCalls is internal to this loop and is not read
+            // after the early return — stream consumers (the TUI scheduler and
+            // the non-interactive runner) build their own list from the yielded
+            // ToolCallRequest events and stop on LoopDetected.
+            turn.pendingToolCalls.length = 0;
+            for (const goalEvent of await finalizeInterruptedGoalTurn(
+              undefined,
+              'loop detected',
+            )) {
+              yield goalEvent;
+            }
+            const loopType = this.loopDetector.getLastLoopType();
+            yield {
+              type: LlmEventType.LoopDetected,
+              ...(loopType && { value: { loopType } }),
+            };
+            if (arenaAgentClient) {
+              await arenaAgentClient.reportError('Loop detected');
+            }
+            this.lastApiCompletionTimestamp = Date.now();
+            endCurrentInteraction('error', 'loop detected', 'loop_detected');
+            this.cancelPendingMemoryPrefetch('no_safe_delivery_point');
+            this.fireLoopDetectedStopFailure(loopType);
+            return turn;
+          }
+
+          // Heuristic loop detection is opt-in: `model.skipLoopDetection`
+          // defaults to true (see settingsSchema) to avoid false-positive
+          // interruptions. Only the historically false-positive-prone heuristics
+          // (content/thought repetition, read-file and action stagnation,
+          // global-duplicate and alternating tool-call patterns) sit behind this
+          // flag. The precise consecutive-identical guard, shell inspection
+          // stagnation guard, and per-turn cap run unconditionally in
+          // checkAlwaysOnSafeties above, so the documented escape hatch only
+          // relaxes the heuristics (see nonInteractiveCli.ts).
+          const skipLoopDetection = this.config.getSkipLoopDetection();
+          const heuristicLoop =
+            !duplicateLoopGuardRequest &&
+            !skipLoopDetection &&
+            this.loopDetector.addAndCheckHeuristicLoops(event);
+          if (heuristicLoop) {
+            for (const goalEvent of await finalizeInterruptedGoalTurn(
+              undefined,
+              'loop detected',
+            )) {
+              yield goalEvent;
+            }
+            const loopType = this.loopDetector.getLastLoopType();
+            yield {
+              type: LlmEventType.LoopDetected,
+              ...(loopType && { value: { loopType } }),
+            };
+            if (arenaAgentClient) {
+              await arenaAgentClient.reportError('Loop detected');
+            }
+            this.lastApiCompletionTimestamp = Date.now();
+            endCurrentInteraction('error', 'loop detected', 'loop_detected');
+            // finally cleanup catches this, but cancel explicitly to match
+            // the cleanup pattern at other early-return sites.
+            this.cancelPendingMemoryPrefetch('no_safe_delivery_point');
+            this.fireLoopDetectedStopFailure(loopType);
+            return turn;
+          }
+          // Update arena status on Finished events — stats are derived
+          // automatically from uiTelemetryService by the reporter.
+          if (arenaAgentClient && event.type === LlmEventType.Finished) {
+            await arenaAgentClient.updateStatus();
+          }
+
+          // Re-send a full IDE context blob on the next regular message — auto
+          // compaction inside chat.sendMessageStream may have summarized away
+          // the previous merged IDE context.
+          if (event.type === LlmEventType.ChatCompressed) {
+            this.forceFullIdeContext = true;
+            // Auto-compaction summarized away the startup prelude. Rebuild it
+            // before the next turn so env/tool/MCP context isn't lost for the
+            // rest of the session (manual /compress gets this via startChat).
+            try {
+              await this.restoreStartupContextAfterCompaction();
+            } catch (error) {
+              this.config
+                .getDebugLogger()
+                .warn(
+                  `Failed to restore startup context after compaction: ${error}`,
+                );
+            }
+            void this.fireSessionStartHook(SessionStartSource.Compact)
+              .then((compactAdditionalContext) => {
+                if (!compactAdditionalContext || !this.chat) {
+                  return;
+                }
+                this.lastSessionStartContext = compactAdditionalContext;
+                this.lastSessionStartSource = SessionStartSource.Compact;
+                this.chat.applySessionStartContext(
+                  compactAdditionalContext,
+                  SessionStartSource.Compact,
+                );
+              })
+              .catch((error) => {
+                this.config
+                  .getDebugLogger()
+                  .warn(`SessionStart hook failed: ${error}`);
+              });
+          }
+
+          for (const goalEvent of takePendingGoalEvents()) {
+            yield goalEvent;
+          }
+          if (
+            (event.type === LlmEventType.UserCancelled && signal.aborted) ||
+            event.type === LlmEventType.Error
+          ) {
+            for (const goalEvent of await finalizeInterruptedGoalTurn(
+              undefined,
+              event.type === LlmEventType.Error
+                ? event.value.error?.message
+                : undefined,
+            )) {
+              yield goalEvent;
+            }
+          }
+          yield event;
+          if (event.type === LlmEventType.Error) {
+            this.forceFullIdeContext = true;
+            if (arenaAgentClient) {
+              const status = event.value.error?.status;
+              const arenaError =
+                status === 401 || status === 403
+                  ? 'Authentication failed'
+                  : status === 429
+                    ? 'Rate limit exceeded'
+                    : status !== undefined && status >= 500
+                      ? 'Provider service unavailable'
+                      : status !== undefined
+                        ? `API request failed (${status})`
+                        : 'Provider request failed';
+              try {
+                await arenaAgentClient.reportError(arenaError);
+              } catch {
+                this.config
+                  .getDebugLogger()
+                  .warn('Failed to report Arena provider error');
+              }
+            }
+            this.lastApiCompletionTimestamp = Date.now();
+            // Sanitize: do not pass raw API error messages to span status.
+            endCurrentInteraction('error', 'unknown error', 'api_error');
+            // finally cleanup catches this, but cancel explicitly to match
+            // the cleanup pattern at other early-return sites.
+            this.cancelPendingMemoryPrefetch('no_safe_delivery_point');
+            return turn;
+          }
+        }
+      } finally {
+        // Fires on every exit from the loop above: normal completion, any of
+        // the three early returns, or an uncaught exception -- instead of one
+        // explicit call duplicated at each site. This is the pattern the four
+        // raw-stream loops in Session.ts already use for the same dispatcher.
+        // finish() is idempotent and dispatches is_final (bounded by the
+        // shared drain budget) BEFORE the Stop hook below fires; the
+        // belt-and-suspenders call in the outer finally further down is then
+        // a no-op.
+        await messageDisplay?.finish();
+      }
+      agentOutput.commitResponse(
+        hasToolCalls || turn.pendingToolCalls.length > 0,
+      );
+      for (const goalEvent of signal.aborted
+        ? await finalizeInterruptedGoalTurn()
+        : takePendingGoalEvents()) {
+        yield goalEvent;
+      }
+
+      // Track API completion time for thinking block idle cleanup
+      this.lastApiCompletionTimestamp = Date.now();
+
+      if (!turn.pendingToolCalls.length) {
+        const steerTurnBudget = boundedTurns - 1;
+        const steerInput = await takeSteerInput(steerTurnBudget);
+        if (steerInput) {
+          // A steered turn is user-driven, not forced by a Stop hook.
+          this.clearStopHookChain(prompt_id);
+          const pushCountBefore = currentPushCount();
+          let steeredTurn: Turn;
+          try {
+            steeredTurn = yield* this.sendMessageStream(
+              steerInput.parts,
+              signal,
+              prompt_id,
+              {
+                ...options,
+                type: SendMessageType.Steer,
+                submittedPrompt: undefined,
+                steerInput,
+              },
+              steerTurnBudget,
+            );
+          } finally {
+            settleSteerInput(steerInput, pushCountBefore);
+          }
+          hasToolCalls = steeredTurn.pendingToolCalls.length > 0;
+          if (!hasToolCalls) {
+            endCurrentInteraction(signal.aborted ? 'cancelled' : 'ok');
+          }
+          normalCompletion = true;
+          return steeredTurn;
+        }
+      }
+
+      // Fire Stop hook through MessageBus (only if hooks are enabled and registered)
+      // This must be done before any early returns to ensure hooks are always triggered
+      if (
+        hooksEnabled &&
+        messageBus &&
+        !turn.pendingToolCalls.length &&
+        signal &&
+        !signal.aborted &&
+        this.config.hasHooksForEvent('Stop')
+      ) {
+        const responseText =
+          this.getLastModelMessageText() || '[no response text]';
+
+        const contextUsage = buildContextUsage(
+          this.config.getContentGeneratorConfig()?.contextWindowSize ??
+            DEFAULT_TOKEN_LIMIT,
+          uiTelemetryService.getLastPromptTokenCount(),
+        );
+
+        const response = await messageBus.request<
+          HookExecutionRequest,
+          HookExecutionResponse
+        >(
+          {
+            type: MessageBusType.HOOK_EXECUTION_REQUEST,
+            eventName: 'Stop',
+            input: {
+              // True while this prompt is continuing because a Stop hook
+              // blocked, including after tool calls made along the way, so a
+              // hook can tell its own continuation apart and stop re-blocking.
+              stop_hook_active: this.stopHookChains.has(prompt_id),
+              last_assistant_message: responseText,
+              ...contextUsage,
+            },
+            signal,
+          },
+          MessageBusType.HOOK_EXECUTION_RESPONSE,
+        );
+
+        for (const goalEvent of takePendingGoalEvents()) {
+          yield goalEvent;
+        }
+        // Check if aborted after hook execution
+        if (signal.aborted) {
+          for (const goalEvent of await finalizeInterruptedGoalTurn()) {
+            yield goalEvent;
+          }
+          endCurrentInteraction('cancelled');
+          return turn;
+        }
+
+        const hookOutput = response.output
+          ? createHookOutput('Stop', response.output)
+          : undefined;
+
+        const stopOutput = hookOutput as StopHookOutput | undefined;
+
+        // This should happen regardless of the hook's decision
+        if (stopOutput?.systemMessage) {
+          yield {
+            type: LlmEventType.HookSystemMessage,
+            value: stopOutput.systemMessage,
+          };
+        }
+
+        if (
+          goalPermit &&
+          (stopOutput?.isBlockingDecision() ||
+            stopOutput?.shouldStopExecution())
+        ) {
+          const continueReason = stopOutput.getEffectiveReason();
+          const { iterationCount, reasons, cap, capped } =
+            this.nextStopHookBlock(prompt_id, continueReason);
+
+          if (capped) {
+            this.clearStopHookChain(prompt_id);
+            const warning = formatStopHookBlockingCapWarning('Stop', cap);
+            yield {
+              type: LlmEventType.HookSystemMessage,
+              value: warning,
+            };
+            debugLogger.warn(warning);
+            for (const goalEvent of await finalizeInterruptedGoalTurn(
+              undefined,
+              undefined,
+              'stop-hook-cap',
+            )) {
+              yield goalEvent;
+            }
+            endCurrentInteraction('ok');
+            return turn;
+          } else {
+            for (const goalEvent of takePendingGoalEvents()) {
+              yield goalEvent;
+            }
+            yield {
+              type: LlmEventType.StopHookLoop,
+              value: {
+                iterationCount,
+                reasons,
+                stopHookCount: response.stopHookCount ?? 1,
+              },
+            };
+
+            this.loopDetector.reset(prompt_id);
+            const hookTurnBudget = boundedTurns - 1;
+            const pendingSteer = await takeSteerInput(hookTurnBudget);
+            for (const goalEvent of takePendingGoalEvents()) {
+              yield goalEvent;
+            }
+            if (signal.aborted) {
+              for (const goalEvent of await finalizeInterruptedGoalTurn()) {
+                yield goalEvent;
+              }
+              endCurrentInteraction('cancelled');
+              return turn;
+            }
+            const continueRequest: Part[] = [{ text: continueReason }];
+            if (pendingSteer) {
+              continueRequest.push({ text: '\n\n' }, ...pendingSteer.parts);
+            }
+            const pushCountBefore = currentPushCount();
+            this.recordStopHookBlock(prompt_id, iterationCount, reasons);
+            let hookTurn: Turn;
+            try {
+              hookTurn = yield* this.sendMessageStream(
+                continueRequest,
+                signal,
+                prompt_id,
+                {
+                  ...options,
+                  type: SendMessageType.Hook,
+                  submittedPrompt: undefined,
+                  steerInput: pendingSteer,
+                },
+                hookTurnBudget,
+              );
+            } finally {
+              settleSteerInput(pendingSteer, pushCountBefore);
+            }
+            hasToolCalls = hookTurn.pendingToolCalls.length > 0;
+            if (!hasToolCalls) {
+              endCurrentInteraction(signal.aborted ? 'cancelled' : 'ok');
+            }
+            normalCompletion = true;
+            return hookTurn;
+          }
+        }
+
+        // For Stop hooks, blocking/stop execution should force continuation
+        if (
+          !goalPermit &&
+          (stopOutput?.isBlockingDecision() ||
+            stopOutput?.shouldStopExecution())
+        ) {
+          // Check if aborted before continuing
+          if (signal.aborted) {
+            endCurrentInteraction('cancelled');
+            return turn;
+          }
+
+          const continueReason = stopOutput.getEffectiveReason();
+
+          // Track stop hook iterations
+          const { iterationCount, reasons, cap, capped } =
+            this.nextStopHookBlock(prompt_id, continueReason);
+
+          // Emit StopHookLoop starting with the first blocking decision so
+          // /goal and configured Stop hooks both surface their reason before
+          // the follow-up turn is generated. The cap check stays before the
+          // yield because a cap of 1 means no follow-up turn should run.
+          if (capped) {
+            this.clearStopHookChain(prompt_id);
+            const warning = formatStopHookBlockingCapWarning('Stop', cap);
+            yield {
+              type: LlmEventType.HookSystemMessage,
+              value: warning,
+            };
+            debugLogger.warn(warning);
+            await this.settlePendingGoalProposal(
+              true,
+              signal,
+              loadGoalRuntime,
+              prompt_id,
+              reportGoalSettlementFailure,
+            );
+            for (const goalEvent of takePendingGoalEvents()) {
+              yield goalEvent;
+            }
+            endCurrentInteraction('ok');
+            return turn;
+          }
+
+          yield {
+            type: LlmEventType.StopHookLoop,
+            value: {
+              iterationCount,
+              reasons,
+              stopHookCount: response.stopHookCount ?? 1,
+            },
+          };
+
+          // A blocking Stop hook feeds a fresh user-role prompt back to the
+          // model, starting a new logical turn — reset per-turn loop
+          // accounting so each continuation gets its own tool-call budget.
+          // Without this, a hook chain accumulates every iteration's tool
+          // calls into one "turn" and trips TURN_TOOL_CALL_CAP after a handful
+          // of healthy iterations. The ACP daemon path already has these
+          // semantics (fresh DaemonToolLoopState per continuation). Runaway
+          // protection is preserved: the cap still bounds each iteration, and
+          // the chain itself is bounded by stopHookBlockingCap.
+          this.loopDetector.reset(prompt_id);
+
+          const hookTurnBudget = boundedTurns - 1;
+          const pendingSteer = await takeSteerInput(hookTurnBudget);
+          const continueRequest: Part[] = [{ text: continueReason }];
+          if (pendingSteer) {
+            continueRequest.push({ text: '\n\n' }, ...pendingSteer.parts);
+          }
+          const pushCountBefore = currentPushCount();
+          this.recordStopHookBlock(prompt_id, iterationCount, reasons);
+          let hookTurn: Turn;
+          try {
+            hookTurn = yield* this.sendMessageStream(
+              continueRequest,
+              signal,
+              prompt_id,
+              {
+                type: SendMessageType.Hook,
+                modelOverride: options?.modelOverride,
+                getSteerInput: options?.getSteerInput,
+                steerInput: pendingSteer,
+              },
+              hookTurnBudget,
+            );
+          } finally {
+            settleSteerInput(pendingSteer, pushCountBefore);
+          }
+          hasToolCalls = hookTurn.pendingToolCalls.length > 0;
+          if (!hasToolCalls) {
+            endCurrentInteraction(signal.aborted ? 'cancelled' : 'ok');
+          }
+          await this.settlePendingGoalProposal(
+            !hasToolCalls,
+            signal,
+            loadGoalRuntime,
+            prompt_id,
+            reportGoalSettlementFailure,
+          );
+          for (const goalEvent of takePendingGoalEvents()) {
+            yield goalEvent;
+          }
+          // Preserve the pending prefetch: the inner Hook turn we just
+          // yielded may have produced tool calls, and the caller's next
+          // ToolResult turn still needs to consume the recall result.
+          normalCompletion = true;
+          return hookTurn;
+        }
+
+        // The stop was allowed, so this prompt is no longer hook-forced.
+        this.clearStopHookChain(prompt_id);
+        for (const goalEvent of takePendingGoalEvents()) {
+          yield goalEvent;
+        }
+      }
+
+      if (
+        goalPermit &&
+        goalRuntime &&
+        !turn.pendingToolCalls.length &&
+        !signal.aborted
+      ) {
+        await this.config.getChatRecordingService()?.flush();
+        const queuedGoalTurnKey = options?.getQueuedGoalTurnKey?.();
+        if (queuedGoalTurnKey) {
+          goalRuntime.beginTurn(queuedGoalTurnKey);
+        }
+        await goalRuntime.finishTurn(goalPermit);
+        goalPermitReleased = true;
+        for (const goalEvent of takePendingGoalEvents()) {
+          yield goalEvent;
+        }
+        endCurrentInteraction('ok');
+        normalCompletion = true;
+        return turn;
+      }
+
+      if (!turn.pendingToolCalls.length && signal && !signal.aborted) {
+        // Save cache-safe params here — before any early return — so that
+        // background readers calling getCacheSafeParams(sessionId) can see the
+        // current turn's history regardless of which path exits below.
+        this.captureCacheSafeParams();
+
+        if (this.config.getSkipNextSpeakerCheck()) {
+          if (!isGoalRuntimeTurn) {
+            this.runManagedAutoMemoryBackgroundTasks(messageType);
+          }
+          if (arenaAgentClient) {
+            await arenaAgentClient.reportCompleted();
+          }
+          await this.settlePendingGoalProposal(
+            true,
+            signal,
+            loadGoalRuntime,
+            prompt_id,
+            reportGoalSettlementFailure,
+          );
+          for (const goalEvent of takePendingGoalEvents()) {
+            yield goalEvent;
+          }
+          endCurrentInteraction('ok');
+          return turn;
+        }
+
+        const nextSpeakerCheck = await checkNextSpeaker(
+          this.getChat(),
+          this.config,
+          signal,
+          prompt_id,
+        );
+        logNextSpeakerCheck(
+          this.config,
+          new NextSpeakerCheckEvent(
+            prompt_id,
+            turn.finishReason?.toString() || '',
+            nextSpeakerCheck?.next_speaker || '',
+          ),
+        );
+        if (nextSpeakerCheck?.next_speaker === 'model') {
+          const continueTurnBudget = boundedTurns - 1;
+          const pendingSteer = await takeSteerInput(continueTurnBudget);
+          const nextRequest: Part[] = pendingSteer
+            ? pendingSteer.parts
+            : [{ text: 'Please continue.' }];
+          const pushCountBefore = currentPushCount();
+          let continueTurn: Turn;
+          try {
+            continueTurn = yield* this.sendMessageStream(
+              nextRequest,
+              signal,
+              prompt_id,
+              {
+                ...options,
+                type: pendingSteer
+                  ? SendMessageType.Steer
+                  : SendMessageType.Hook,
+                submittedPrompt: undefined,
+                steerInput: pendingSteer,
+              },
+              continueTurnBudget,
+            );
+          } finally {
+            settleSteerInput(pendingSteer, pushCountBefore);
+          }
+          hasToolCalls = continueTurn.pendingToolCalls.length > 0;
+          if (!hasToolCalls) {
+            endCurrentInteraction(signal.aborted ? 'cancelled' : 'ok');
+          }
+          await this.settlePendingGoalProposal(
+            !hasToolCalls,
+            signal,
+            loadGoalRuntime,
+            prompt_id,
+            reportGoalSettlementFailure,
+          );
+          for (const goalEvent of takePendingGoalEvents()) {
+            yield goalEvent;
+          }
+          // Preserve the pending prefetch: same reasoning as the
+          // `return hookTurn` site above — the recursive Hook turn may
+          // have produced tool calls whose ToolResult turn still needs
+          // the recall result.
+          normalCompletion = true;
+          return continueTurn;
+        }
+
+        if (!isGoalRuntimeTurn) {
+          this.runManagedAutoMemoryBackgroundTasks(messageType);
+        }
+
+        if (arenaAgentClient) {
+          // No continuation needed — agent completed its task
+          await arenaAgentClient.reportCompleted();
+        }
+      }
+
+      // Report cancelled to arena when user cancelled mid-stream
+      if (signal?.aborted && arenaAgentClient) {
+        await arenaAgentClient.reportCancelled();
+      }
+
+      if (!hasToolCalls) {
+        endCurrentInteraction(signal?.aborted ? 'cancelled' : 'ok');
+      }
+      // Reached the bottom of the try — this turn ended cleanly. If the
+      // model did not request tool calls, no future ToolResult will arrive
+      // to consume the prefetch, so close it out now. When tool calls ARE
+      // pending, preserve the handle so the next ToolResult turn can
+      // consume it (the fire-and-forget design).
+      if (!hasToolCalls) {
+        this.finishManagedAutoMemoryRecall();
+      }
+      await this.settlePendingGoalProposal(
+        turn.pendingToolCalls.length === 0,
+        signal,
+        loadGoalRuntime,
+        prompt_id,
+        reportGoalSettlementFailure,
+      );
+      for (const goalEvent of takePendingGoalEvents()) {
+        yield goalEvent;
+      }
+      normalCompletion = true;
+      return turn;
+    } catch (error) {
+      for (const goalEvent of await finalizeInterruptedGoalTurn(
+        undefined,
+        getErrorMessage(error),
+      )) {
+        yield goalEvent;
+      }
+      if (
+        error instanceof UnauthorizedError &&
+        messageType !== SendMessageType.Hook &&
+        messageType !== SendMessageType.Steer
+      ) {
+        try {
+          await this.config
+            .getArenaAgentClient()
+            ?.reportError('Authentication failed');
+        } catch {
+          this.config
+            .getDebugLogger()
+            .warn('Failed to report Arena authentication error');
+        }
+      }
+      throw error;
+    } finally {
+      if (
+        this.activeAutomaticTodoWorkChainPromptIds.has(prompt_id) &&
+        (!normalCompletion || !hasToolCalls)
+      ) {
+        this.activeAutomaticTodoWorkChainPromptIds.delete(prompt_id);
+        this.config.endAutomaticActiveTodoWorkChain(prompt_id);
+      }
+      if (!goalPermitReleased && (callerSignal.aborted || !normalCompletion)) {
+        await releaseGoalPermitOnInterruptedExit(
+          sessionTokenLimitExceeded
+            ? GOAL_PAUSE_REASON_SESSION_TOKEN_LIMIT
+            : undefined,
+        );
+      }
+      closeGoalStateEvents();
+      if (pushInitiated) {
+        // Snapshot published by the chat ⇒ compare against it; no snapshot
+        // ⇒ the send exited before its push site (no await between the
+        // publish and the push) and restores unconditionally.
+        settleSteerInput(attachedSteerInput, attachedPushSnapshot());
+      } else {
+        // Exited before `turn.run` (cancelled during the hook await, setup
+        // failure, ...): this send never pushed, so any counter comparison
+        // could be fooled by concurrent pushes.
+        settleSteerInput(attachedSteerInput);
+      }
+      restoreStrippedRetryEntries();
+      // Belt-and-suspenders: close out the MessageDisplay dispatcher on any
+      // exit the explicit finish() sites above didn't cover (an uncaught
+      // exception thrown out of the streaming loop still ends the message,
+      // and buffering hook consumers need the is_final signal). finish() is
+      // idempotent, so on the normal paths this resolves immediately.
+      await messageDisplay?.finish();
+      // Abort the prefetch on any exit other than the bottom-of-try
+      // `return turn`. Catches uncaught exceptions and guards against
+      // future early-return sites that forget to call cancel.
+      if (!normalCompletion) {
+        // Only a natural end can hand a hook-forced turn's tool calls back to
+        // the caller for a ToolResult re-entry; any other exit ends it.
+        this.clearStopHookChain(prompt_id);
+        this.config.takePendingGoalProposal?.(prompt_id);
+        this.cancelPendingMemoryPrefetch(
+          signal?.aborted ? 'abort' : 'no_safe_delivery_point',
+        );
+      }
+      if (!normalCompletion) {
+        endCurrentInteraction(
+          signal?.aborted ? 'cancelled' : 'error',
+          signal?.aborted ? undefined : 'unexpected exit',
+          signal?.aborted ? undefined : 'unexpected_exit',
+        );
+      }
+    }
+  }
+
+  async generateContent(
+    contents: Content[],
+    generationConfig: GenerateContentConfig,
+    abortSignal: AbortSignal,
+    model: string,
+    promptIdOverride?: string,
+  ): Promise<GenerateContentResponse> {
+    const promptId =
+      promptIdOverride ?? promptIdContext.getStore() ?? this.lastPromptId!;
+
+    let currentAttemptModel: string = model;
+
+    try {
+      const finalSystemInstruction = generationConfig.systemInstruction
+        ? assembleSystemPrompt({
+            base: getCustomSystemPrompt(generationConfig.systemInstruction),
+            contextFiles: this.config.getUserMemory(),
+            autoMemory: this.config.getAutoMemoryPrompt(),
+          })
+        : this.getMainSessionSystemInstruction();
+
+      const requestConfig: GenerateContentConfig = {
+        abortSignal,
+        ...generationConfig,
+        systemInstruction: finalSystemInstruction,
+      };
+
+      // When the requested model differs from the main model (e.g. fast model
+      // side queries for session recap / title / summary), resolve the target
+      // model's own ContentGeneratorConfig so that per-model settings like
+      // extra_body, samplingParams, and reasoning are not inherited from the
+      // main model's config. The retry authType is resolved alongside so that
+      // provider-specific checks (e.g. QWEN_OAUTH quota detection) reference
+      // the target model's provider.
+      const {
+        contentGenerator,
+        contentGeneratorConfig,
+        retryAuthType,
+        retryErrorCodes,
+        model: requestModel,
+      } = await this.config.getBaseLlmClient().resolveForModel(model);
+      const requestContents = slimCompactionInput(
+        contents,
+        contentGeneratorConfig?.modalities ?? {},
+      ).slimmedHistory;
+
+      const apiCall = () => {
+        currentAttemptModel = requestModel;
+
+        return contentGenerator.generateContent(
+          {
+            model: requestModel,
+            config: requestConfig,
+            contents: requestContents,
+          },
+          promptId,
+        );
+      };
+      const result = await retryWithBackoff(apiCall, {
+        authType: retryAuthType,
+        extraRetryErrorCodes: retryErrorCodes,
+        persistentMode: isUnattendedMode(),
+        signal: abortSignal,
+        heartbeatFn: (info) => {
+          process.stderr.write(
+            `[qwen-code] Waiting for API capacity... attempt ${info.attempt}, retry in ${Math.ceil(info.remainingMs / 1000)}s\n`,
+          );
+        },
+        // Phase 4b — emit ApiRetryEvent telemetry for HTTP-status retries.
+        // subagent_name read from subagentNameContext (active in catch block
+        // since the entire generateContent invocation runs inside the parent
+        // subagent's ALS frame when applicable).
+        onRetry: (info) => {
+          logApiRetry(
+            this.config,
+            new ApiRetryEvent({
+              model: currentAttemptModel,
+              promptId,
+              attemptNumber: info.attempt,
+              error: info.error,
+              statusCode: info.errorStatus,
+              retryDelayMs: info.delayMs,
+              subagentName: subagentNameContext.getStore(),
+            }),
+          );
+        },
+      });
+      return result;
+    } catch (error: unknown) {
+      if (abortSignal.aborted) {
+        throw error;
+      }
+      await reportError(
+        error,
+        `Error generating content via API with model ${currentAttemptModel}.`,
+        {
+          requestContents: contents,
+          requestConfig: generationConfig,
+        },
+        'generateContent-api',
+      );
+      throw new Error(
+        `Failed to generate content with model ${currentAttemptModel}: ${getErrorMessage(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Wrapper around {@link LlmChat.tryCompress} that restores main-session
+   * startup context after successful compaction and flips the IDE full-context
+   * flag for the next regular message.
+   */
+  async tryCompressChat(
+    prompt_id: string,
+    force: boolean = false,
+    signal?: AbortSignal,
+    customInstructions?: string,
+  ): Promise<ChatCompressionInfo> {
+    const previousSessionStartContext = this.lastSessionStartContext;
+    const previousSessionStartSource = this.lastSessionStartSource;
+    const previousChat = this.getChat();
+    const info = await previousChat.tryCompress(
+      prompt_id,
+      force,
+      signal,
+      customInstructions ? { customInstructions } : undefined,
+    );
+    if (info.compressionStatus === CompressionStatus.COMPRESSED) {
+      const compressedHistory =
+        previousChat.getHistoryShallow?.() ?? previousChat.getHistory();
+      await this.startChat(compressedHistory, SessionStartSource.Compact);
+      this.getChat().setCompletedToolCallIds(
+        previousChat.getCompletedToolCallIds(),
+      );
+      if (
+        !this.lastSessionStartContext &&
+        previousSessionStartContext &&
+        previousSessionStartSource
+      ) {
+        this.lastSessionStartContext = previousSessionStartContext;
+        this.lastSessionStartSource = previousSessionStartSource;
+        this.getChat().applySessionStartContext(
+          previousSessionStartContext,
+          previousSessionStartSource,
+        );
+      }
+      // startChat() creates a new LlmChat without touching FileReadCache,
+      // so prior read_file results that were summarised away would still
+      // resolve to the file_unchanged placeholder. Clear so post-compaction
+      // Reads re-emit bytes the model can no longer see in history.
+      debugLogger.debug('[FILE_READ_CACHE] clear after tryCompressChat');
+      this.config.getFileReadCache().clear();
+      this.getChat().setLastPromptTokenCount(
+        info.newTokenCount,
+        info.newTokenCountIsEstimated ?? true,
+      );
+      // Re-send a full IDE context blob on the next regular message
+      // compression may have summarized away the merged IDE context
+      // that lived inside the previous user prompt.
+      this.forceFullIdeContext = true;
+    }
+    return info;
+  }
+
+  /**
+   * Surgically disarm FileReadCache entries for files evicted by
+   * microcompaction. Falls back to a blanket clear() when a blanked read has
+   * no path or worker invalidation fails. Local path-resolution failures target
+   * only that path so one ghost file does not wipe unrelated cache entries.
+   *
+   * Shared by pre-send microcompaction and /compress-fast.
+   */
+  private async disarmFileReadCacheAfterEviction(
+    meta: MicrocompactMeta,
+    logTag: string,
+  ): Promise<void> {
+    const fileReadCache = this.config.getFileReadCache();
+    if (meta.unresolvedEvictedReads > 0) {
+      debugLogger.debug(
+        `[FILE_READ_CACHE] clear after ${logTag} ` +
+          `(${meta.unresolvedEvictedReads} unresolved blanked read(s))`,
+      );
+      fileReadCache.clear();
+      return;
+    }
+    if (meta.evictedReadPaths.length === 0) {
+      return;
+    }
+    const executionEnvironment = this.config.getExecutionEnvironment();
+    if (executionEnvironment) {
+      try {
+        await executionEnvironment.invalidateReadCache(meta.evictedReadPaths);
+      } catch (error) {
+        fileReadCache.clear();
+        debugLogger.warn(
+          'Execution cache invalidation after compression failed',
+          error,
+        );
+      }
+      return;
+    }
+    const statResults = await Promise.all(
+      meta.evictedReadPaths.map((p) =>
+        fsPromises.stat(p).catch(() => undefined),
+      ),
+    );
+    let usedPathFallback = false;
+    for (let i = 0; i < meta.evictedReadPaths.length; i++) {
+      const stats = statResults[i];
+      if (stats && fileReadCache.markReadEvictedFromHistory(stats)) {
+        continue;
+      }
+      const evictedPath = meta.evictedReadPaths[i];
+      if (evictedPath) {
+        fileReadCache.invalidateByPath(evictedPath);
+        usedPathFallback = true;
+      }
+    }
+    if (usedPathFallback) {
+      debugLogger.debug(
+        `[FILE_READ_CACHE] disarmed fast-path by path for ` +
+          `${meta.evictedReadPaths.length} file(s) after ${logTag}`,
+      );
+    } else {
+      debugLogger.debug(
+        `[FILE_READ_CACHE] disarmed fast-path for ` +
+          `${meta.evictedReadPaths.length} file(s) after ${logTag}`,
+      );
+    }
+  }
+
+  /**
+   * Fast, rule-based compression without any LLM side-query.
+   * Delegates to {@link LlmChat.compressFast} and handles post-compression
+   * FileReadCache disarming.
+   */
+  async tryCompressChatFast(): Promise<ChatCompressionInfo> {
+    const { info, microcompactMeta } = this.getChat().compressFast();
+
+    if (info.compressionStatus !== CompressionStatus.COMPRESSED) {
+      return info;
+    }
+
+    if (microcompactMeta) {
+      await this.disarmFileReadCacheAfterEviction(
+        microcompactMeta,
+        'compress-fast',
+      );
+    }
+    this.forceFullIdeContext = true;
+
+    return info;
+  }
+}
+
+/** @deprecated Use `LlmClient`; retained until a future major release. */
+export { LlmClient as GeminiClient };

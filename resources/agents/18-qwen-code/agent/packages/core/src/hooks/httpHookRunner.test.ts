@@ -1,0 +1,774 @@
+/**
+ * @license
+ * Copyright 2026 Qwen Team
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { HookEventName, HookType } from './types.js';
+import type { HttpHookConfig, HookInput } from './types.js';
+import { HttpHookRunner } from './httpHookRunner.js';
+import {
+  DEFAULT_HTTP_HOOK_TIMEOUT_SECONDS,
+  describeHookTimeout,
+} from './hook-timeout.js';
+
+// Mock fetch
+const mockFetch = vi.fn();
+vi.stubGlobal('fetch', mockFetch);
+
+// Mutable DNS resolution result so individual tests can control what
+// hostnames resolve to.
+const mockDns = vi.hoisted(() => ({
+  addresses: [{ address: '8.8.8.8', family: 4 }] as Array<{
+    address: string;
+    family: number;
+  }>,
+}));
+
+// Mock dns.lookup to avoid real DNS lookups in tests
+vi.mock('dns', () => ({
+  lookup: (
+    _hostname: string,
+    _options: object,
+    callback: (
+      err: null,
+      addresses: Array<{ address: string; family: number }>,
+    ) => void,
+  ) => {
+    callback(null, mockDns.addresses);
+  },
+}));
+
+describe('HttpHookRunner', () => {
+  let httpRunner: HttpHookRunner;
+  const originalEnv = process.env;
+  // Use escaped dots in URL patterns to satisfy CodeQL security scanning
+  // The UrlValidator.compilePattern method also escapes dots, but we use
+  // pre-escaped patterns here to make the security intent explicit
+  const ALLOWED_URL_PATTERN = 'https://api\\.example\\.com/*';
+
+  beforeEach(() => {
+    httpRunner = new HttpHookRunner([ALLOWED_URL_PATTERN]);
+    vi.clearAllMocks();
+    process.env = { ...originalEnv };
+    mockDns.addresses = [{ address: '8.8.8.8', family: 4 }];
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+  });
+
+  const createMockInput = (overrides: Partial<HookInput> = {}): HookInput => ({
+    session_id: 'test-session',
+    transcript_path: '/test/transcript',
+    cwd: '/test',
+    hook_event_name: 'PreToolUse',
+    timestamp: '2024-01-01T00:00:00Z',
+    ...overrides,
+  });
+
+  const createMockConfig = (
+    overrides: Partial<HttpHookConfig> = {},
+  ): HttpHookConfig => ({
+    type: HookType.Http,
+    url: 'https://api.example.com/hook',
+    ...overrides,
+  });
+
+  describe('execute', () => {
+    it('should fail for URL not in whitelist', async () => {
+      const config = createMockConfig({
+        url: 'https://other.com/hook',
+      });
+      const input = createMockInput();
+
+      const result = await httpRunner.execute(
+        config,
+        HookEventName.PreToolUse,
+        input,
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.message).toContain('URL validation failed');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should fail for blocked URL (SSRF - link-local metadata)', async () => {
+      const runner = new HttpHookRunner([]); // Allow all patterns
+      const config = createMockConfig({
+        url: 'http://169.254.169.254/latest/meta-data',
+      });
+      const input = createMockInput();
+
+      const result = await runner.execute(
+        config,
+        HookEventName.PreToolUse,
+        input,
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.message).toContain('blocked');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should ALLOW localhost for local dev hooks', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({ continue: true }),
+      });
+
+      const runner = new HttpHookRunner([]); // Allow all patterns
+      const config = createMockConfig({
+        url: 'http://localhost:8080/hook',
+      });
+      const input = createMockInput();
+
+      const result = await runner.execute(
+        config,
+        HookEventName.PreToolUse,
+        input,
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    it('should interpolate environment variables in headers', async () => {
+      process.env['MY_TOKEN'] = 'secret-token';
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({ continue: true }),
+      });
+
+      const config = createMockConfig({
+        headers: { Authorization: 'Bearer $MY_TOKEN' },
+        allowedEnvVars: ['MY_TOKEN'],
+      });
+      const input = createMockInput();
+
+      await httpRunner.execute(config, HookEventName.PreToolUse, input);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: 'Bearer secret-token',
+          }),
+        }),
+      );
+    });
+
+    it('should handle HTTP error response as non-blocking error', async () => {
+      // Per Claude Code spec: Non-2xx status is a non-blocking error
+      // Execution continues with success: true
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+      });
+
+      const config = createMockConfig();
+      const input = createMockInput();
+
+      const result = await httpRunner.execute(
+        config,
+        HookEventName.PreToolUse,
+        input,
+      );
+
+      // Non-2xx is a non-blocking error, so success should be true
+      expect(result.success).toBe(true);
+      expect(result.output?.continue).toBe(true);
+    });
+
+    it('should not follow redirects: a 3xx is a non-blocking error and the target is never contacted', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 302,
+        statusText: 'Found',
+        headers: new Headers({
+          location: 'http://169.254.169.254/latest/meta-data',
+        }),
+      });
+
+      const config = createMockConfig();
+      const input = createMockInput();
+
+      const result = await httpRunner.execute(
+        config,
+        HookEventName.PreToolUse,
+        input,
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.output?.continue).toBe(true);
+      // Exactly one request, to the validated URL, with redirects disabled
+      // so the whitelist and SSRF checks cannot be bypassed by a 30x.
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledWith(
+        'https://api.example.com/hook',
+        expect.objectContaining({ redirect: 'manual' }),
+      );
+    });
+
+    it('should handle timeout as non-blocking error', async () => {
+      // Per Claude Code spec: Timeout is a non-blocking error
+      // Execution continues with success: true
+      mockFetch.mockImplementationOnce(
+        () =>
+          new Promise((_, reject) => {
+            const error = new Error('Aborted');
+            error.name = 'AbortError';
+            setTimeout(() => reject(error), 10);
+          }),
+      );
+
+      const config = createMockConfig({ timeout: 1 });
+      const input = createMockInput();
+
+      const result = await httpRunner.execute(
+        config,
+        HookEventName.PreToolUse,
+        input,
+      );
+
+      // Timeout is a non-blocking error, so success should be true
+      expect(result.success).toBe(true);
+      expect(result.output?.continue).toBe(true);
+    });
+
+    it('should skip once hook on second execution', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({ continue: true }),
+      });
+
+      const config = createMockConfig({ once: true });
+      const input = createMockInput();
+
+      // First execution
+      await httpRunner.execute(config, HookEventName.PreToolUse, input);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      // Second execution - should skip
+      const result = await httpRunner.execute(
+        config,
+        HookEventName.PreToolUse,
+        input,
+      );
+      expect(result.success).toBe(true);
+      expect(mockFetch).toHaveBeenCalledTimes(1); // Still 1
+    });
+
+    it('should parse JSON response with hook output', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({
+          decision: 'deny',
+          reason: 'Blocked by policy',
+          hookSpecificOutput: {
+            hookEventName: 'PreToolUse',
+            permissionDecision: 'deny',
+          },
+        }),
+      });
+
+      const config = createMockConfig();
+      const input = createMockInput();
+
+      const result = await httpRunner.execute(
+        config,
+        HookEventName.PreToolUse,
+        input,
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.output?.decision).toBe('deny');
+      expect(result.output?.reason).toBe('Blocked by policy');
+    });
+
+    it('should handle aborted signal', async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      const config = createMockConfig();
+      const input = createMockInput();
+
+      const result = await httpRunner.execute(
+        config,
+        HookEventName.PreToolUse,
+        input,
+        controller.signal,
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.message).toContain('cancelled');
+    });
+  });
+
+  describe('allowPrivateNetworkHooks', () => {
+    const mockSuccessResponse = () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({ continue: true }),
+      });
+    };
+
+    it('should block a literal private IP when the flag is off', async () => {
+      const runner = new HttpHookRunner([], false);
+      const config = createMockConfig({ url: 'http://172.16.254.215/hook' });
+      const input = createMockInput();
+
+      const result = await runner.execute(
+        config,
+        HookEventName.PreToolUse,
+        input,
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.message).toContain('blocked');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should block a hostname resolving to a private IP when the flag is off', async () => {
+      mockDns.addresses = [{ address: '172.16.254.215', family: 4 }];
+      const runner = new HttpHookRunner([], false);
+      const config = createMockConfig({
+        url: 'http://hooks.internal.example.com/hook',
+      });
+      const input = createMockInput();
+
+      const result = await runner.execute(
+        config,
+        HookEventName.PreToolUse,
+        input,
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.message).toContain('private/link-local');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should allow a literal private IP when the flag is on', async () => {
+      mockSuccessResponse();
+      const runner = new HttpHookRunner([], true);
+      const config = createMockConfig({ url: 'http://172.16.254.215/hook' });
+      const input = createMockInput();
+
+      const result = await runner.execute(
+        config,
+        HookEventName.PreToolUse,
+        input,
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    it('should allow a hostname resolving to a private IP when the flag is on', async () => {
+      mockDns.addresses = [{ address: '172.16.254.215', family: 4 }];
+      mockSuccessResponse();
+      const runner = new HttpHookRunner([], true);
+      const config = createMockConfig({
+        url: 'http://hooks.internal.example.com/hook',
+      });
+      const input = createMockInput();
+
+      const result = await runner.execute(
+        config,
+        HookEventName.PreToolUse,
+        input,
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    it('should still block cloud metadata endpoints when the flag is on', async () => {
+      const runner = new HttpHookRunner([], true);
+      const config = createMockConfig({
+        url: 'http://169.254.169.254/latest/meta-data',
+      });
+      const input = createMockInput();
+
+      const result = await runner.execute(
+        config,
+        HookEventName.PreToolUse,
+        input,
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.message).toContain('blocked');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should still block metadata hostnames when the flag is on', async () => {
+      const runner = new HttpHookRunner([], true);
+      const config = createMockConfig({
+        url: 'http://metadata.google.internal/hook',
+      });
+      const input = createMockInput();
+
+      const result = await runner.execute(
+        config,
+        HookEventName.PreToolUse,
+        input,
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.message).toContain('blocked');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should still block the Alibaba metadata IP when the flag is on', async () => {
+      const runner = new HttpHookRunner([], true);
+      const config = createMockConfig({
+        url: 'http://100.100.100.200/latest/meta-data',
+      });
+      const input = createMockInput();
+
+      const result = await runner.execute(
+        config,
+        HookEventName.PreToolUse,
+        input,
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.message).toContain('blocked');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should still block IPv6-mapped metadata IPs when the flag is on', async () => {
+      const runner = new HttpHookRunner([], true);
+      const config = createMockConfig({
+        url: 'http://[::ffff:a9fe:a9fe]/latest/meta-data',
+      });
+      const input = createMockInput();
+
+      const result = await runner.execute(
+        config,
+        HookEventName.PreToolUse,
+        input,
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.message).toContain('blocked');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should block a hostname resolving to a metadata IP when the flag is on', async () => {
+      mockDns.addresses = [{ address: '169.254.169.254', family: 4 }];
+      const runner = new HttpHookRunner([], true);
+      const config = createMockConfig({
+        url: 'http://hooks.internal.example.com/hook',
+      });
+      const input = createMockInput();
+
+      const result = await runner.execute(
+        config,
+        HookEventName.PreToolUse,
+        input,
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.message).toContain('metadata');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should block a hostname resolving to the Alibaba metadata IP when the flag is on', async () => {
+      mockDns.addresses = [{ address: '100.100.100.200', family: 4 }];
+      const runner = new HttpHookRunner([], true);
+      const config = createMockConfig({
+        url: 'http://hooks.internal.example.com/hook',
+      });
+      const input = createMockInput();
+
+      const result = await runner.execute(
+        config,
+        HookEventName.PreToolUse,
+        input,
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error?.message).toContain('metadata');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('outcome', () => {
+    const jsonResponse = (body: unknown, status = 200) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      });
+
+    /** A fetch that only settles when its request signal aborts. */
+    const hangUntilAborted = () =>
+      mockFetch.mockImplementationOnce(
+        (_url: string, init: RequestInit) =>
+          new Promise((_, reject) => {
+            init.signal?.addEventListener('abort', () =>
+              reject(init.signal?.reason),
+            );
+          }),
+      );
+
+    it('reports a non-2xx response as a non-blocking error without failing the hook', async () => {
+      mockFetch.mockResolvedValueOnce(new Response('boom', { status: 500 }));
+
+      const result = await httpRunner.execute(
+        createMockConfig(),
+        HookEventName.PreToolUse,
+        createMockInput(),
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.outcome).toBe('non_blocking_error');
+      expect(result.error?.message).toContain('500');
+    });
+
+    it('keeps a non-2xx response non-blocking', async () => {
+      mockFetch.mockResolvedValueOnce(new Response('boom', { status: 500 }));
+
+      const result = await httpRunner.execute(
+        createMockConfig(),
+        HookEventName.PreToolUse,
+        createMockInput(),
+      );
+
+      expect(result.output?.continue).toBe(true);
+      expect(result.success).toBe(true);
+    });
+
+    it('reports its own timeout as timeout when the caller did not abort', async () => {
+      hangUntilAborted();
+      const controller = new AbortController();
+
+      const result = await httpRunner.execute(
+        createMockConfig({ timeout: 0.02 }),
+        HookEventName.PreToolUse,
+        createMockInput(),
+        controller.signal,
+      );
+
+      expect(result.outcome).toBe('timeout');
+      expect(result.success).toBe(true);
+      expect(result.error?.message).toContain('20ms');
+    });
+
+    it('reports a caller abort during the request as cancelled', async () => {
+      hangUntilAborted();
+      const controller = new AbortController();
+
+      const execution = httpRunner.execute(
+        createMockConfig({ timeout: 60 }),
+        HookEventName.PreToolUse,
+        createMockInput(),
+        controller.signal,
+      );
+      await vi.waitFor(() => expect(mockFetch).toHaveBeenCalled());
+      controller.abort();
+      const result = await execution;
+
+      expect(result.outcome).toBe('cancelled');
+      expect(result.success).toBe(true);
+    });
+
+    it('reports a connection failure as a non-blocking error carrying the fetch error', async () => {
+      const connectionError = new TypeError('fetch failed');
+      mockFetch.mockRejectedValueOnce(connectionError);
+
+      const result = await httpRunner.execute(
+        createMockConfig(),
+        HookEventName.PreToolUse,
+        createMockInput(),
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.outcome).toBe('non_blocking_error');
+      expect(result.error).toBe(connectionError);
+    });
+
+    it('reports a 2xx deny as blocking while the hook still succeeds', async () => {
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({ decision: 'deny', reason: 'Blocked by policy' }),
+      );
+
+      const result = await httpRunner.execute(
+        createMockConfig(),
+        HookEventName.PreToolUse,
+        createMockInput(),
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.outcome).toBe('blocking');
+    });
+
+    it('reports a plain 2xx response as success', async () => {
+      mockFetch.mockResolvedValueOnce(jsonResponse({ continue: true }));
+
+      const result = await httpRunner.execute(
+        createMockConfig(),
+        HookEventName.PreToolUse,
+        createMockInput(),
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.outcome).toBe('success');
+    });
+
+    it('lets a PreToolUse permission decision override the generic decision, as progress reporting does', async () => {
+      mockFetch.mockResolvedValueOnce(
+        jsonResponse({
+          decision: 'deny',
+          hookSpecificOutput: {
+            hookEventName: 'PreToolUse',
+            permissionDecision: 'allow',
+          },
+        }),
+      );
+
+      const result = await httpRunner.execute(
+        createMockConfig(),
+        HookEventName.PreToolUse,
+        createMockInput(),
+      );
+
+      expect(result.outcome).toBe('success');
+    });
+
+    it('reports a caller abort before the request as cancelled', async () => {
+      const controller = new AbortController();
+      controller.abort();
+
+      const result = await httpRunner.execute(
+        createMockConfig(),
+        HookEventName.PreToolUse,
+        createMockInput(),
+        controller.signal,
+      );
+
+      expect(result.outcome).toBe('cancelled');
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('reports a URL outside the allowlist as a failed non-blocking error', async () => {
+      const result = await httpRunner.execute(
+        createMockConfig({ url: 'https://other.com/hook' }),
+        HookEventName.PreToolUse,
+        createMockInput(),
+      );
+
+      expect(result.outcome).toBe('non_blocking_error');
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('timeout matches describeHookTimeout', () => {
+    const hangAndCaptureSignal = () => {
+      const seen: { signal?: AbortSignal } = {};
+      mockFetch.mockImplementationOnce(
+        (_url: string, init: RequestInit) =>
+          new Promise((_, reject) => {
+            seen.signal = init.signal ?? undefined;
+            init.signal?.addEventListener('abort', () =>
+              reject(init.signal?.reason),
+            );
+          }),
+      );
+      return seen;
+    };
+
+    const abortedAfter = async (
+      config: HttpHookConfig,
+      pendingMs: number,
+    ): Promise<{ abortedBefore: boolean; abortedAfter: boolean }> => {
+      const seen = hangAndCaptureSignal();
+      const caller = new AbortController();
+      const execution = httpRunner.execute(
+        config,
+        HookEventName.PreToolUse,
+        createMockInput(),
+        caller.signal,
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      expect(seen.signal).toBeDefined();
+      await vi.advanceTimersByTimeAsync(pendingMs);
+      const abortedBefore = seen.signal?.aborted === true;
+      await vi.advanceTimersByTimeAsync(1);
+      const after = seen.signal?.aborted === true;
+      caller.abort();
+      await execution;
+      return { abortedBefore, abortedAfter: after };
+    };
+
+    it('aborts a configured value in seconds at the described delay', async () => {
+      expect(describeHookTimeout(HookType.Http, 60).timeoutMs).toBe(60_000);
+      vi.useFakeTimers();
+      try {
+        expect(
+          await abortedAfter(createMockConfig({ timeout: 60 }), 59_999),
+        ).toEqual({ abortedBefore: false, abortedAfter: true });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('aborts an unconfigured hook at the described default', async () => {
+      expect(describeHookTimeout(HookType.Http, undefined).timeoutMs).toBe(
+        DEFAULT_HTTP_HOOK_TIMEOUT_SECONDS * 1000,
+      );
+      vi.useFakeTimers();
+      try {
+        expect(
+          await abortedAfter(
+            createMockConfig(),
+            DEFAULT_HTTP_HOOK_TIMEOUT_SECONDS * 1000 - 1,
+          ),
+        ).toEqual({ abortedBefore: false, abortedAfter: true });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('never aborts a negative timeout, as described', async () => {
+      expect(describeHookTimeout(HookType.Http, -1).timeoutMs).toBeNull();
+      vi.useFakeTimers();
+      try {
+        expect(
+          await abortedAfter(createMockConfig({ timeout: -1 }), 10 * 60_000),
+        ).toEqual({ abortedBefore: false, abortedAfter: false });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe('resetOnceHooks', () => {
+    it('should allow once hooks to execute again after reset', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: async () => ({ continue: true }),
+      });
+
+      const config = createMockConfig({ once: true });
+      const input = createMockInput();
+
+      await httpRunner.execute(config, HookEventName.PreToolUse, input);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+
+      httpRunner.resetOnceHooks();
+
+      await httpRunner.execute(config, HookEventName.PreToolUse, input);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+  });
+});

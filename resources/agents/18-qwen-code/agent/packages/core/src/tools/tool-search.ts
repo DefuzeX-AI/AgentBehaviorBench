@@ -1,0 +1,639 @@
+/**
+ * @license
+ * Copyright 2025 Qwen Team
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/**
+ * ToolSearch — discovery tool for reviewing deferred tool schemas on demand.
+ *
+ * Only a curated set of core tools are included in the initial
+ * function-declaration list sent to the model; tools marked `shouldDefer=true`
+ * (MCP tools, low-frequency built-ins) are hidden to keep the system prompt
+ * small. The model uses this tool to look up those hidden tools by keyword or
+ * exact name, which returns their full schemas for use with the ToolCall
+ * bridge without changing the active function-declaration list.
+ *
+ * Two query modes:
+ *   - `select:Name1,Name2` — exact lookup by tool name
+ *   - free-text keywords — fuzzy match with scoring across name, description,
+ *     and optional `searchHint`. MCP tools get a slight score boost since
+ *     they are always deferred and thus always benefit from surfacing.
+ */
+
+import type {
+  AnyDeclarativeTool,
+  ToolInvocation,
+  ToolResult,
+} from './tools.js';
+import { BaseDeclarativeTool, BaseToolInvocation, Kind } from './tools.js';
+import { ToolNames, ToolDisplayNames } from './tool-names.js';
+import type { Config } from '../config/config.js';
+import type { ToolRegistry } from './tool-registry.js';
+import { DiscoveredMCPTool } from './mcp-tool.js';
+import { createDebugLogger } from '../utils/debugLogger.js';
+import { escapeJsonTagCharacters } from '../utils/formatters.js';
+import {
+  getExcludedToolUnavailableMessage,
+  getLeaderOnlyToolUnavailableMessage,
+  getSubagentPlanToolUnavailableMessage,
+  isLeaderOnlyToolUnavailableInSubagent,
+  isPlanLifecycleToolUnavailableInSubagent,
+  isSubagentLikeExecutionContext,
+  isToolExcludedForCurrentContext,
+} from '../agents/runtime/subagent-plan-tool-policy.js';
+import { isMediaPolicyToolHiddenFromModel } from '../omni/policy/model-access.js';
+
+const debugLogger = createDebugLogger('TOOL_SEARCH');
+
+export interface ToolSearchParams {
+  query: string;
+  max_results?: number;
+}
+
+const DEFAULT_MAX_RESULTS = 5;
+const HARD_MAX_RESULTS = 20;
+
+// Scoring weights mirror the Claude Code spec: MCP tools are weighted slightly
+// higher because they are always deferred and discovery is the only way the
+// model can reach them.
+const SCORE_NAME_EXACT_BUILTIN = 10;
+const SCORE_NAME_SUBSTR_BUILTIN = 5;
+const SCORE_HINT_BUILTIN = 4;
+const SCORE_DESC_BUILTIN = 2;
+const SCORE_NAME_EXACT_MCP = 12;
+const SCORE_NAME_SUBSTR_MCP = 6;
+const SCORE_ACTION_ALIAS_BUILTIN = 6;
+
+const TOOL_SEARCH_STOP_WORDS = new Set([
+  'a',
+  'an',
+  'and',
+  'are',
+  'at',
+  'be',
+  'can',
+  'could',
+  'did',
+  'do',
+  'does',
+  'for',
+  'from',
+  'how',
+  'i',
+  'in',
+  'is',
+  'it',
+  'me',
+  'my',
+  'of',
+  'on',
+  'or',
+  'please',
+  'should',
+  'that',
+  'the',
+  'these',
+  'this',
+  'those',
+  'to',
+  'was',
+  'were',
+  'what',
+  'which',
+  'with',
+  'would',
+  'you',
+]);
+
+const ACTION_TERM_ALIASES = new Map<string, string[]>([
+  ['cancel', ['cancel', 'delete', 'remove', 'stop', 'clear']],
+  ['clear', ['clear', 'delete', 'remove', 'cancel', 'stop']],
+  ['delete', ['delete', 'remove', 'cancel', 'stop', 'clear']],
+  ['remove', ['remove', 'delete', 'cancel', 'stop', 'clear']],
+  ['stop', ['stop', 'cancel', 'delete', 'remove', 'clear']],
+]);
+
+interface ScoredTool {
+  tool: AnyDeclarativeTool;
+  score: number;
+}
+
+function isDeferredToolBridgeAvailable(registry: ToolRegistry): boolean {
+  return Boolean(
+    registry.getTool(ToolNames.TOOL_SEARCH) &&
+      registry.getTool(ToolNames.TOOL_CALL),
+  );
+}
+
+const toolSearchDescription = `Reviews function declarations for deferred tools without changing the active tool list.
+
+Deferred tools appear by name in the deferred-tools startup reminder. This tool takes a query, matches it against the deferred tool list, and returns the matched tools' function declarations (name + description + parameter schema) inside a <functions> block.
+
+The returned <functions> block is informational. After reviewing a hidden deferred tool's schema, invoke it through tool_call with its exact name and schema-shaped arguments. Do not call a hidden deferred tool directly: its declaration remains hidden so the model-facing tool list and prompt-cache prefix stay stable (a tool-set refresh may still re-declare it when the live history contains a direct call to it). If select: returns a tool that is already declared, call that tool directly; tool_call accepts hidden deferred tools only.
+
+Query forms:
+- "select:ToolA,ToolB" — fetch these exact tools by name
+- "keyword phrase" — keyword search, up to max_results best matches
+- "+must-word other" — require "must-word" in the name, rank remaining terms
+`;
+
+class ToolSearchInvocation extends BaseToolInvocation<
+  ToolSearchParams,
+  ToolResult
+> {
+  constructor(
+    private readonly config: Config,
+    params: ToolSearchParams,
+  ) {
+    super(params);
+  }
+
+  getDescription(): string {
+    return this.params.query;
+  }
+
+  async execute(_signal: AbortSignal): Promise<ToolResult> {
+    const query = (this.params.query ?? '').trim();
+    if (!query) {
+      return {
+        llmContent:
+          'Error: query is empty. Use `select:ToolName` or free-text keywords.',
+        returnDisplay: 'Empty query',
+        error: { message: 'Empty query' },
+      };
+    }
+
+    const maxResults = clamp(
+      this.params.max_results ?? DEFAULT_MAX_RESULTS,
+      1,
+      HARD_MAX_RESULTS,
+    );
+
+    // Mode 1: exact lookup via `select:Name1,Name2`. Dedupe so the same tool
+    // isn't returned multiple times when the model writes the same name twice.
+    // Cap at maxResults — without a cap, `select:a,b,c,...` would return
+    // an unbounded number of full schemas (token bloat). When truncation
+    // happens, surface the dropped names in the result so the model knows
+    // to re-issue another ToolSearch for them instead of silently
+    // assuming they were reviewed.
+    if (query.toLowerCase().startsWith('select:')) {
+      const seen = new Set<string>();
+      const names: string[] = [];
+      const truncated: string[] = [];
+      for (const raw of query.slice('select:'.length).split(',')) {
+        // The deferred-tools startup reminder renders names as JSON string
+        // literals ("cron_list"), so models often paste them back
+        // verbatim with surrounding quotes. Strip a single layer of
+        // matching `"…"` or `'…'` so `select:"foo"` and `select:foo`
+        // resolve to the same tool. Without this the lookup would search
+        // for a tool literally named `"foo"` (with quotes) and miss.
+        const stripped = stripMatchingQuotes(raw.trim());
+        if (!stripped) continue;
+        const key = stripped.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (names.length >= maxResults) {
+          truncated.push(stripped);
+          continue;
+        }
+        names.push(stripped);
+      }
+      return this.returnSchemas(names, truncated);
+    }
+
+    // Mode 2: keyword search. Require-word prefix with "+" boosts mandatory
+    // terms; any tool missing a required term is excluded before scoring.
+    const terms = tokenize(query);
+    const requiredTerms = terms
+      .filter((t) => t.startsWith('+'))
+      .map((t) => t.slice(1))
+      .filter((t) => t.length > 0);
+    const searchTerms = terms
+      .map((t) => (t.startsWith('+') ? t.slice(1) : t))
+      .filter((t) => t.length > 0);
+
+    if (searchTerms.length === 0) {
+      return {
+        llmContent:
+          'Error: no search terms extracted from query. Use `select:ToolName` or include keywords.',
+        returnDisplay: 'No search terms',
+        error: { message: 'No search terms' },
+      };
+    }
+
+    if (!isDeferredToolBridgeAvailable(this.config.getToolRegistry())) {
+      const message =
+        'The deferred-tool bridge is unavailable in this session, so hidden tool schemas cannot be reviewed or invoked.';
+      return {
+        llmContent: `Error: ${message}`,
+        returnDisplay: 'Deferred-tool bridge unavailable',
+        error: { message },
+      };
+    }
+
+    const candidates = this.collectCandidates();
+    const scored: ScoredTool[] = [];
+    for (const tool of candidates) {
+      if (!candidateMatchesRequired(tool, requiredTerms)) continue;
+      const score = scoreTool(tool, searchTerms);
+      if (score > 0) scored.push({ tool, score });
+    }
+
+    scored.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.tool.name.localeCompare(b.tool.name);
+    });
+
+    const matches = scored.slice(0, maxResults).map((s) => s.tool.name);
+    if (matches.length === 0) {
+      return {
+        llmContent: `No tools found matching '${query}'. Try broader keywords or use \`select:ToolName\`.`,
+        returnDisplay: `No matches for '${query}'`,
+      };
+    }
+    return this.returnSchemas(matches);
+  }
+
+  /**
+   * Candidates for keyword search: only deferred tools that are currently
+   * hidden. Eager core, preloaded, and explicitly visible tools
+   * are in the model's tool-declaration list already, so surfacing them here
+   * would be noise.
+   *
+   * `select:<name>` mode is unrestricted — the model may legitimately
+   * want to re-inspect the schema of a visible tool — and handles its
+   * own lookup via {@link returnSchemas}.
+   */
+  private collectCandidates(): AnyDeclarativeTool[] {
+    const registry = this.config.getToolRegistry();
+    // Mirror the invocation side (resolveDeferredToolCall): a subagent or
+    // teammate must not even be SHOWN the schema of a tool the exclusion set
+    // forbids it to invoke. Without this filter `select:`/keyword search
+    // advertises the full schema of control-plane tools (team_delete,
+    // workflow, send_message, ...) into exactly the context the set exists to
+    // keep clean, and the follow-up tool_call is denied anyway — a wasted
+    // round plus a schema leak (round-5 review, R5-1). The predicate is
+    // context-gated: it returns false for the leader, whose re-inspection of
+    // visible/hidden tools stays unrestricted.
+    const maxSubagentDepth = this.config.getMaxSubagentDepth();
+    return registry.getAllTools().filter(
+      (t) =>
+        registry.isDeferredAndHidden(t.name) &&
+        // Context-gated: the leader's discovery stays unrestricted (the
+        // predicate itself is ungated so prepareTools can fail closed).
+        !(
+          isSubagentLikeExecutionContext() &&
+          isToolExcludedForCurrentContext(t.name, maxSubagentDepth)
+        ) &&
+        // Media-policy tools without modelAccess.enabled must never be
+        // surfaced to the model — not even via keyword discovery.
+        !isMediaPolicyToolHiddenFromModel(this.config, t),
+    );
+  }
+
+  private async returnSchemas(
+    names: string[],
+    truncated: string[] = [],
+  ): Promise<ToolResult> {
+    if (names.length === 0) {
+      return {
+        llmContent: 'Error: no tool names provided.',
+        returnDisplay: 'No tool names',
+        error: { message: 'No tool names' },
+      };
+    }
+
+    const registry = this.config.getToolRegistry();
+    const reviewed: AnyDeclarativeTool[] = [];
+    const missing: string[] = [];
+    const blocked: string[] = [];
+    const bridgeUnavailable: string[] = [];
+    const bridgeAvailable = isDeferredToolBridgeAvailable(registry);
+
+    // Case-insensitive lookup across all known names (instance names + factory
+    // names). Preserve the user-supplied casing in the error list so the
+    // response matches what the model asked for.
+    const lowerIndex = new Map<string, string>();
+    for (const realName of registry.getAllToolNames()) {
+      lowerIndex.set(realName.toLowerCase(), realName);
+    }
+
+    for (const requested of names) {
+      const canonical = lowerIndex.get(requested.toLowerCase());
+      if (!canonical) {
+        missing.push(requested);
+        continue;
+      }
+      if (!registry.isToolDeclared(canonical)) {
+        const tool = registry.getTool(canonical);
+        if (tool && isMediaPolicyToolHiddenFromModel(this.config, tool)) {
+          blocked.push(canonical);
+        } else {
+          missing.push(requested);
+        }
+        continue;
+      }
+      if (
+        isPlanLifecycleToolUnavailableInSubagent(canonical) ||
+        isLeaderOnlyToolUnavailableInSubagent(canonical) ||
+        // Same mirror as collectCandidates: `select:` must not hand a
+        // subagent/teammate the schema of an exclusion-set tool. Order
+        // matters — plan-lifecycle/leader-only keep their specific messages.
+        // Context-gated here (the predicate itself is ungated so
+        // prepareTools can fail closed); the plan/leader-only checks above
+        // gate internally.
+        (isSubagentLikeExecutionContext() &&
+          isToolExcludedForCurrentContext(
+            canonical,
+            this.config.getMaxSubagentDepth(),
+          ))
+      ) {
+        blocked.push(canonical);
+        continue;
+      }
+      // Treat ensureTool throws the same as a null return: log the factory
+      // failure, report this entry as missing, and keep reviewing the rest of
+      // the batch.
+      let tool: AnyDeclarativeTool | undefined;
+      try {
+        tool = await registry.ensureTool(canonical);
+      } catch (err) {
+        // Surface to stderr in production: debugLogger.warn is a no-op
+        // unless DEBUG is set, so without a stderr write, factory
+        // failures (network, missing module, etc.) would be invisible
+        // to operators running headless and the agent would just see
+        // a "missing" entry with no diagnosis. Use process.stderr.write
+        // directly; the package-level eslint config bans console.* in
+        // core src and there's no shared logger that surfaces in prod.
+        debugLogger.warn(`ensureTool failed for ${canonical}:`, err);
+        process.stderr.write(
+          `[ToolSearch] ensureTool failed for "${canonical}": ${
+            err instanceof Error ? err.message : String(err)
+          }\n`,
+        );
+      }
+      if (!tool) {
+        missing.push(requested);
+        continue;
+      }
+      // Hidden media-policy tools cannot be reviewed by exact-name lookup
+      // either: modelAccess.enabled is the only switch that exposes them.
+      if (isMediaPolicyToolHiddenFromModel(this.config, tool)) {
+        blocked.push(canonical);
+        continue;
+      }
+      // A visible tool remains safe to re-inspect and can be called directly.
+      // Hidden deferred tools require both discovery and invocation halves of
+      // the bridge; withholding their schemas keeps discovery consistent with
+      // the reminder/preload/invocation gates when tool_call is disabled.
+      if (registry.isDeferredAndHidden(tool.name) && !bridgeAvailable) {
+        bridgeUnavailable.push(tool.name);
+        continue;
+      }
+      reviewed.push(tool);
+    }
+
+    // Escape tag boundary characters in the JSON-stringified schema so any
+    // `</function>`
+    // (or `</functions>`) substring inside a tool's description / enum
+    // / examples can't prematurely close the pseudo-XML wrapper. The
+    // JSON unicode escapes decode back to their original characters when the
+    // model interprets the JSON, but as raw text inside the wrapper they are
+    // no longer tag delimiters.
+    const schemaBlocks = reviewed.map(
+      (tool) =>
+        `<function>${escapeJsonTagCharacters(JSON.stringify(tool.schema))}</function>`,
+    );
+    let llmContent = '';
+    if (schemaBlocks.length > 0) {
+      llmContent += `<functions>\n${schemaBlocks.join('\n')}\n</functions>`;
+    }
+    if (missing.length > 0) {
+      const header = llmContent ? '\n\n' : '';
+      llmContent += `${header}Not found: ${missing.join(', ')}`;
+    }
+    let blockedErrorMessage: string | undefined;
+    if (blocked.length > 0) {
+      const blockedMessages = blocked.map((name) => {
+        if (isLeaderOnlyToolUnavailableInSubagent(name)) {
+          return getLeaderOnlyToolUnavailableMessage(name);
+        }
+        if (isPlanLifecycleToolUnavailableInSubagent(name)) {
+          return getSubagentPlanToolUnavailableMessage(name);
+        }
+        const tool = registry.getTool(name);
+        if (tool && isMediaPolicyToolHiddenFromModel(this.config, tool)) {
+          return `Tool "${name}" is a media policy tool and is not available to the model.`;
+        }
+        return getExcludedToolUnavailableMessage(name);
+      });
+      blockedErrorMessage = blockedMessages.join('\n');
+      const header = llmContent ? '\n\n' : '';
+      llmContent += `${header}Unavailable: ${blockedErrorMessage}`;
+    }
+    let bridgeUnavailableErrorMessage: string | undefined;
+    if (bridgeUnavailable.length > 0) {
+      bridgeUnavailableErrorMessage = `The deferred-tool bridge is incomplete in this session; hidden schemas were not returned for: ${bridgeUnavailable.join(', ')}`;
+      const header = llmContent ? '\n\n' : '';
+      llmContent += `${header}Unavailable: ${bridgeUnavailableErrorMessage}`;
+    }
+    if (truncated.length > 0) {
+      // Surface the dropped names so the model knows it must re-issue
+      // another ToolSearch for them — without this, the model would
+      // assume every requested name was reviewed and later receive an
+      // "unknown tool" API error.
+      const header = llmContent ? '\n\n' : '';
+      llmContent += `${header}Truncated by max_results — request these in a follow-up call: ${truncated.join(', ')}`;
+    }
+
+    const displayParts: string[] = [];
+    if (reviewed.length > 0)
+      displayParts.push(`Reviewed ${reviewed.length} tool(s)`);
+    if (missing.length > 0) displayParts.push(`${missing.length} missing`);
+    if (blocked.length > 0) displayParts.push(`${blocked.length} unavailable`);
+    if (bridgeUnavailable.length > 0)
+      displayParts.push(`${bridgeUnavailable.length} bridge unavailable`);
+    if (truncated.length > 0)
+      displayParts.push(`${truncated.length} truncated`);
+    const returnDisplay = displayParts.join(', ') || 'No tools reviewed';
+
+    const result: ToolResult = { llmContent, returnDisplay };
+    if (reviewed.length === 0) {
+      const errorMessage = [blockedErrorMessage, bridgeUnavailableErrorMessage]
+        .filter((message): message is string => message !== undefined)
+        .join('\n');
+      if (errorMessage) result.error = { message: errorMessage };
+    }
+    return result;
+  }
+}
+
+export class ToolSearchTool extends BaseDeclarativeTool<
+  ToolSearchParams,
+  ToolResult
+> {
+  static readonly Name = ToolNames.TOOL_SEARCH;
+
+  constructor(private readonly config: Config) {
+    super(
+      ToolSearchTool.Name,
+      ToolDisplayNames.TOOL_SEARCH,
+      toolSearchDescription,
+      Kind.Other,
+      {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description:
+              'Query to find deferred tools. Use "select:<tool_name>" for direct selection, or keywords to search.',
+            // Reject empty queries at validation time so the model
+            // doesn't waste a tool call to discover the runtime error
+            // (`Error: query is empty`). The runtime guard stays as a
+            // safety net for whitespace-only inputs that pass minLength.
+            minLength: 1,
+          },
+          max_results: {
+            type: 'integer',
+            description: 'Maximum number of results to return (default: 5)',
+            minimum: 1,
+            maximum: HARD_MAX_RESULTS,
+            default: DEFAULT_MAX_RESULTS,
+          },
+        },
+        required: ['query'],
+        additionalProperties: false,
+      },
+      true, // isOutputMarkdown
+      false, // canUpdateOutput
+      false, // shouldDefer — this tool itself must always be visible
+      true, // alwaysLoad — core discovery tool, never hidden
+      'tool search discover find schema',
+    );
+  }
+
+  protected createInvocation(
+    params: ToolSearchParams,
+  ): ToolInvocation<ToolSearchParams, ToolResult> {
+    return new ToolSearchInvocation(this.config, params);
+  }
+}
+
+// ---------- pure helpers (exported for tests) ----------
+
+export function tokenize(query: string): string[] {
+  return query
+    .toLowerCase()
+    .split(/\s+/g)
+    .map(normalizeSearchTerm)
+    .filter((t): t is string => t !== null);
+}
+
+function normalizeSearchTerm(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const required = trimmed.startsWith('+');
+  const body = required ? trimmed.slice(1) : trimmed;
+  const normalized = body.replace(
+    /^[^\p{L}\p{N}_.+#-]+|[^\p{L}\p{N}_.+#-]+$/gu,
+    '',
+  );
+  if (normalized.length < 2 || TOOL_SEARCH_STOP_WORDS.has(normalized)) {
+    return null;
+  }
+  return required ? `+${normalized}` : normalized;
+}
+
+function clamp(n: number, lo: number, hi: number): number {
+  if (!Number.isFinite(n)) return lo;
+  return Math.min(hi, Math.max(lo, Math.floor(n)));
+}
+
+/**
+ * Strip a single layer of surrounding `"…"` or `'…'` if present.
+ * Used to normalize `select:"foo"` → `foo` so models that paste tool
+ * names back as JSON-quoted literals (the form they appear in the
+ * deferred-tools startup reminder) resolve correctly.
+ * Mismatched / unbalanced quotes are returned unchanged.
+ */
+function stripMatchingQuotes(s: string): string {
+  if (s.length < 2) return s;
+  const first = s[0];
+  const last = s[s.length - 1];
+  if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+    return s.slice(1, -1);
+  }
+  return s;
+}
+
+function candidateMatchesRequired(
+  tool: AnyDeclarativeTool,
+  requiredTerms: string[],
+): boolean {
+  if (requiredTerms.length === 0) return true;
+  const nameLower = tool.name.toLowerCase();
+  return requiredTerms.every((t) =>
+    getSearchTermVariants(t).some((variant) => nameLower.includes(variant)),
+  );
+}
+
+/**
+ * Score a tool against the search terms. Returns 0 if no signal matched; the
+ * caller filters by `> 0`.
+ */
+export function scoreTool(tool: AnyDeclarativeTool, terms: string[]): number {
+  const isMcp = tool instanceof DiscoveredMCPTool;
+  const nameLower = tool.name.toLowerCase();
+  const descLower = (tool.description ?? '').toLowerCase();
+  const hintLower = (tool.searchHint ?? '').toLowerCase();
+  const hintParts = hintLower ? hintLower.split(/\s+/g).filter(Boolean) : [];
+
+  let total = 0;
+  for (const term of terms) {
+    if (term.length === 0) continue;
+    const variants = getSearchTermVariants(term);
+    let nameScore = 0;
+    for (const variant of variants) {
+      if (
+        nameLower === variant ||
+        nameLower.endsWith('_' + variant) ||
+        nameLower.endsWith('.' + variant)
+      ) {
+        nameScore = Math.max(
+          nameScore,
+          isMcp ? SCORE_NAME_EXACT_MCP : SCORE_NAME_EXACT_BUILTIN,
+        );
+      } else if (nameLower.includes(variant)) {
+        nameScore = Math.max(
+          nameScore,
+          isMcp ? SCORE_NAME_SUBSTR_MCP : SCORE_NAME_SUBSTR_BUILTIN,
+        );
+      }
+    }
+    total += nameScore;
+    // Hint matches are per-word, mirroring Claude's "word boundary" rule.
+    if (hintParts.some((p) => variants.includes(p))) {
+      total += SCORE_HINT_BUILTIN;
+    }
+    if (variants.some((variant) => descLower.includes(variant))) {
+      total += SCORE_DESC_BUILTIN;
+    }
+    if (
+      ACTION_TERM_ALIASES.has(term) &&
+      variants
+        .filter((variant) => variant !== term)
+        .some(
+          (variant) =>
+            nameLower.includes(variant) || hintParts.some((p) => p === variant),
+        )
+    ) {
+      total += SCORE_ACTION_ALIAS_BUILTIN;
+    }
+  }
+  return total;
+}
+
+function getSearchTermVariants(term: string): string[] {
+  return ACTION_TERM_ALIASES.get(term) ?? [term];
+}

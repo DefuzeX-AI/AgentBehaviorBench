@@ -1,0 +1,312 @@
+import { type ReactNode } from 'react';
+import {
+  DaemonWorkspaceProvider,
+  type DaemonProductSessionContext,
+} from '@qwen-code/web-shell/daemon-react-sdk';
+import { App, type WebShellProps } from './App';
+import {
+  BrowserTurnNotifications,
+  type WebShellBrowserNotificationsOptions,
+} from './browser-turn-notifications';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { RootErrorFallback } from './components/RootErrorFallback';
+import { WorkspaceSessionProvider } from './components/WorkspaceSessionProvider';
+import { normalizeLanguage, type WebShellLanguage } from './i18n';
+export { WebShellTranscript } from './components/WebShellTranscript';
+export type { WebShellTranscriptProps } from './components/WebShellTranscript';
+export * from './daemon-react-sdk';
+export type { WebShellBrowserNotificationsOptions } from './browser-turn-notifications';
+
+export interface WebShellWithProvidersProps extends WebShellProps {
+  /** Connect browser notifications with optional branding and an initial preference (off by default). */
+  browserNotifications?: WebShellBrowserNotificationsOptions;
+  /** Daemon API base URL. Defaults to the browser origin when omitted. */
+  baseUrl?: string;
+  /** Bearer token passed to daemon requests. */
+  token?: string;
+  /** Session id to load. Undefined starts on an empty page. */
+  sessionId?: string;
+  /** Registered daemon workspace id for the session. Undefined uses primary. */
+  workspaceId?: string;
+  /** Registered daemon workspace path for the session. Takes precedence over workspaceId. */
+  workspaceCwd?: string;
+  /** Explicit product context. Use standalone without workspaceId/workspaceCwd. */
+  sessionContext?: DaemonProductSessionContext;
+  /**
+   * Workspace path to lock this shell to. Missing paths are registered
+   * persistently before rendering. Takes precedence over workspaceCwd and workspaceId.
+   */
+  lockWorkspaceCwd?: string;
+  /** Client identity to reuse when attaching to an externally created session. */
+  clientId?: string;
+  /**
+   * Restart a live SSE event stream after each accepted prompt. Disabled by
+   * default. A stream that is already down is always rebuilt immediately on
+   * prompt admission, regardless of this flag.
+   */
+  restartSseOnPrompt?: boolean;
+  /** Persisted transcript records requested per page. Defaults to 100; valid range is 1–500. */
+  historyPageSize?: number;
+}
+
+function resolveBaseUrl(baseUrl: string | undefined): string {
+  if (baseUrl) return baseUrl;
+  if (typeof window !== 'undefined') return window.location.origin;
+  return '';
+}
+
+/**
+ * Top-level boundary so a catastrophic render failure degrades to a recoverable
+ * fallback instead of taking down the host page. Place it at the outermost point
+ * each entry owns: a boundary nested *inside* the daemon providers can't catch a
+ * throw from the providers themselves, so the batteries-included paths wrap the
+ * providers too.
+ */
+function RootBoundary({
+  language,
+  children,
+}: {
+  language?: WebShellLanguage;
+  children: ReactNode;
+}) {
+  return (
+    <ErrorBoundary
+      label="web-shell-root"
+      fallback={(error, reset) => (
+        <RootErrorFallback error={error} onRetry={reset} language={language} />
+      )}
+    >
+      {children}
+    </ErrorBoundary>
+  );
+}
+
+/**
+ * Low-level UI component. Requires ancestor `DaemonWorkspaceProvider` and
+ * `DaemonSessionProvider` from `@qwen-code/web-shell`. The consumer
+ * owns those providers, so this boundary covers only what we render (`App`).
+ */
+export function WebShell(props: WebShellProps) {
+  return (
+    <RootBoundary
+      language={props.language ? normalizeLanguage(props.language) : undefined}
+    >
+      <App {...props} />
+    </RootBoundary>
+  );
+}
+
+/**
+ * Batteries-included component for product integrations. It wraps WebShell
+ * with both daemon providers, so MCP/tools/skills/memory/agents/session APIs
+ * are available without extra setup.
+ */
+export function WebShellWithProviders(props: WebShellWithProvidersProps) {
+  const {
+    browserNotifications,
+    baseUrl,
+    token,
+    sessionId,
+    workspaceId,
+    workspaceCwd,
+    sessionContext,
+    lockWorkspaceCwd,
+    clientId,
+    restartSseOnPrompt,
+    historyPageSize,
+    ...webShellProps
+  } = props;
+  const resolvedBaseUrl = resolveBaseUrl(baseUrl);
+  const shell = (
+    <DaemonWorkspaceProvider baseUrl={resolvedBaseUrl} token={token}>
+      <WorkspaceSessionProvider
+        sessionId={sessionId}
+        workspaceId={workspaceId}
+        workspaceCwd={workspaceCwd}
+        sessionContext={sessionContext}
+        lockWorkspaceCwd={lockWorkspaceCwd}
+        clientId={clientId}
+        restartSseOnPrompt={restartSseOnPrompt}
+        historyPageSize={historyPageSize}
+        webShellProps={webShellProps}
+      />
+    </DaemonWorkspaceProvider>
+  );
+
+  return (
+    <RootBoundary
+      language={
+        webShellProps.language
+          ? normalizeLanguage(webShellProps.language)
+          : undefined
+      }
+    >
+      <BrowserTurnNotifications
+        language={normalizeLanguage(webShellProps.language)}
+        options={browserNotifications}
+        active={browserNotifications !== undefined}
+      >
+        {shell}
+      </BrowserTurnNotifications>
+    </RootBoundary>
+  );
+}
+
+/** Alias for consumers who prefer a standalone naming style. */
+export const StandaloneWebShell = WebShellWithProviders;
+
+export type {
+  WebShellApi,
+  WebShellComposerPlaceholders,
+  WebShellComposerPlaceholderState,
+  WebShellSlashCommand,
+  WebShellSlashCommandHandler,
+  WebShellProps,
+  WebShellSidebarOptions,
+  BugReportInfo,
+  SessionChangeEvent,
+} from './App';
+export type { WebShellShadowDom, WebShellShadowDomOptions } from './shadowDom';
+export type { ToastTone } from './components/ToastHost';
+export type {
+  WebShellSidebarBranding,
+  WebShellSidebarFooterItem,
+  WebShellSidebarFooterOptions,
+  WebShellSidebarLockedWorkspace,
+  WebShellSidebarPrimaryNavOptions,
+  WebShellSidebarPrimaryNavItem,
+  WebShellSidebarSessionActionsOptions,
+  WebShellSidebarSessionActionItem,
+  WebShellSidebarSessionInlineActionItem,
+  WebShellSidebarWorkspaceOverviewOptions,
+  WorkspaceManagementTarget,
+  WorkspaceOverviewItem,
+} from './components/sidebar/WebShellSidebar';
+export type { WebShellLanguage } from './i18n';
+export type { WebShellTheme } from './themeContext';
+export type { WebShellBrand, WebShellResolvedBrand } from './brandContext';
+export type {
+  CommandDisplayCategory,
+  CommandDisplayCategoryOrder,
+} from './utils/commandDisplay';
+export type { ComposerToolbarAction } from './components/ChatEditor';
+export type {
+  CodeBlockRenderer,
+  MarkdownContentSource,
+  MarkdownTableMode,
+  MarkdownRenderContext,
+  ToolHeaderExtraRenderer,
+  ToolHeaderExtraRenderInfo,
+  ToolHeaderKind,
+  ComposerTagClickHandler,
+  ComposerTagRenderer,
+  AssistantTurnFooterRenderer,
+  UserMessageContentRenderer,
+  UserMessageContentRenderInfo,
+  UserMessageContentParser,
+  ComposerHeaderRenderer,
+  ComposerFooterRenderer,
+  ComposerToolbarStartRenderer,
+  ComposerToolbarRightRenderer,
+  WebShellAtItemRenderInfo,
+  WebShellAtItemRenderer,
+  WebShellComposerApi,
+  WebShellBuiltinComposerTagKind,
+  WebShellBuiltinAtProviderId,
+  WebShellBuiltinAtProvidersConfig,
+  WebShellComposerInput,
+  WebShellComposerTag,
+  WebShellComposerTagIconMap,
+  WebShellComposerTagKind,
+  WebShellComposerTagOptions,
+  WebShellComposerTagPlacement,
+  WebShellComposerToolbarRenderInfo,
+  WebShellComposerToolbarStartRenderInfo,
+  WebShellComposerToolbarRightRenderInfo,
+  WebShellComposerTextOptions,
+  WelcomeFooterRenderer,
+  WelcomeHeaderRenderer,
+  ChatHeaderRenderer,
+  ChatHeaderRenderInfo,
+  WebShellChatHeaderItem,
+  WebShellChatHeaderOptions,
+  WebShellRightPanelItem,
+  WebShellRightPanelOptions,
+  WebShellEnvironmentPanelItem,
+  WebShellEnvironmentPanelOptions,
+  WebShellFooterRenderInfo,
+  FooterRenderer,
+  LoadingPhrasesResolver,
+  WebShellAtProviderTab,
+  WebShellAtItem,
+  WebShellAtProvider,
+  WebShellBottomStatusItem,
+  WebShellCodeBlockRenderInfo,
+  WebShellMarkdownChartCustomization,
+  WebShellMarkdownCustomization,
+  WebShellFootnote,
+  WebShellSource,
+  WebShellSourceReference,
+  WebShellSourceIconResolver,
+  WebShellFootnoteIconResolver,
+  WebShellFootnotePreviewInfo,
+  WebShellFootnotePreviewHandle,
+  WebShellFootnotePreviewMount,
+  WebShellAssistantMessageInfo,
+  WebShellAssistantTurnOutcome,
+  WebShellAssistantTurnSettledEvent,
+  WebShellAssistantTurnFooterRenderInfo,
+  ArtifactImageRenderer,
+  WebShellArtifactCustomization,
+  WebShellIconSource,
+  WebShellTaskInfo,
+  WebShellUserMessagePart,
+  WebShellAgentTask,
+  WebShellShellTask,
+  WebShellMonitorTask,
+  WebShellWorkflowTask,
+  WebShellPreparedSubmit,
+  WebShellSubmitSnapshot,
+  WebShellSessionArtifactsChange,
+  WebShellSessionArtifactsChangeReason,
+  WebShellModelInfo,
+  WebShellSkillInfo,
+  WebShellAssistantFeedbackInfo,
+  WebShellAssistantFeedbackOptions,
+  WebShellAssistantFeedbackRating,
+  WebShellAssistantFeedbackUserMessage,
+  AssistantFeedbackHandler,
+} from './customization';
+export type { WelcomeHeaderProps } from './components/WelcomeHeader';
+export type {
+  PaneHeaderActionsInfo,
+  PaneHeaderActionsRenderer,
+} from './components/ChatPane';
+export type {
+  TurnOutputKind,
+  TurnOutputOpenRequest,
+} from './components/artifacts/TurnOutputs';
+export {
+  ECHARTS_FULLDATA_LANGUAGE,
+  EchartsFullDataBlock,
+  createMarkdownChartRegistry,
+  createEchartsFullDataRenderer,
+} from './components/messages/MarkdownChartRenderer';
+export type {
+  DatasetCell,
+  EchartsFullDataBlockProps,
+  EchartsFullDataOption,
+  EchartsFullDataRefMeta,
+  EchartsFullDataRefResolver,
+  EchartsFullDataResolvedDataset,
+  EchartsFullDataRendererOptions,
+  EchartsInstance,
+  EchartsRuntime,
+  EchartsRuntimeLoader,
+} from './components/messages/MarkdownChartRenderer';
+
+export { WEB_SHELL_SETTING_ITEM_IDS } from './settings';
+export type {
+  WebShellSettingItemId,
+  WebShellSettingsOptions,
+} from './settings';

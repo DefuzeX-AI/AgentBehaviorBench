@@ -1,0 +1,2890 @@
+/**
+ * @license
+ * Copyright 2025 Qwen Team
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const {
+  mockConfigChangeHandlers,
+  availableCommandsCallbackRef,
+  mockCreateImagePathResolver,
+  mockConfigGet,
+  mockConfigUpdate,
+  mockGetGlobalTempDir,
+  mockGetPanel,
+  mockOnDidChangeConfiguration,
+  mockOnDidChangeActiveTextEditor,
+  mockOnDidChangeTextEditorSelection,
+  mockOpenExternal,
+  mockReadQwenSettingsForVSCode,
+  mockWriteCodingPlanConfig,
+  mockWriteModelProvidersConfig,
+  mockClearPersistedAuth,
+  mockApplyProviderInstallPlanToFile,
+  mockSnapshotSettingsForRollback,
+  mockRestoreSettingsSnapshot,
+  slashCommandNotificationCallbackRef,
+  endTurnCallbackRef,
+  streamChunkCallbackRef,
+  transcriptUpdateCallbackRef,
+  mockShowInformationMessage,
+  mockWindowState,
+  mockQwenAgentManagerInstances,
+  mockClipboardWriteText,
+  mockEnvRemoteName,
+  mockAsExternalUri,
+} = vi.hoisted(() => ({
+  mockConfigChangeHandlers: [] as Array<
+    (event: { affectsConfiguration: (section: string) => boolean }) => unknown
+  >,
+  availableCommandsCallbackRef: {
+    current: undefined as
+      | ((commands: Array<{ name: string; description?: string }>) => void)
+      | undefined,
+  },
+  mockCreateImagePathResolver: vi.fn(),
+  mockConfigGet: vi.fn(),
+  mockConfigUpdate: vi.fn(),
+  mockGetGlobalTempDir: vi.fn(() => '/global-temp'),
+  mockGetPanel: vi.fn<() => { webview: { postMessage: unknown } } | null>(
+    () => null,
+  ),
+  mockOnDidChangeConfiguration: vi.fn(
+    (
+      handler: (event: {
+        affectsConfiguration: (section: string) => boolean;
+      }) => unknown,
+    ) => {
+      mockConfigChangeHandlers.push(handler);
+      return { dispose: vi.fn() };
+    },
+  ),
+  mockOnDidChangeActiveTextEditor: vi.fn(() => ({ dispose: vi.fn() })),
+  mockOnDidChangeTextEditorSelection: vi.fn(() => ({ dispose: vi.fn() })),
+  mockOpenExternal: vi.fn(),
+  mockReadQwenSettingsForVSCode: vi.fn<
+    () => {
+      provider: 'coding-plan' | 'api-key';
+      apiKey: string;
+      codingPlanRegion: 'china' | 'global';
+    } | null
+  >(() => null),
+  mockWriteCodingPlanConfig: vi.fn(() => ({})),
+  mockWriteModelProvidersConfig: vi.fn(),
+  mockClearPersistedAuth: vi.fn(),
+  mockApplyProviderInstallPlanToFile: vi.fn().mockResolvedValue(undefined),
+  mockSnapshotSettingsForRollback: vi.fn<() => Record<string, unknown> | null>(
+    () => null,
+  ),
+  mockRestoreSettingsSnapshot: vi.fn(),
+  slashCommandNotificationCallbackRef: {
+    current: undefined as
+      | ((event: {
+          sessionId: string;
+          command: string;
+          messageType: 'info' | 'error';
+          message: string;
+        }) => void)
+      | undefined,
+  },
+  endTurnCallbackRef: {
+    current: undefined as
+      | ((reason?: string, source?: string) => void)
+      | undefined,
+  },
+  streamChunkCallbackRef: {
+    current: undefined as ((chunk: string) => void) | undefined,
+  },
+  transcriptUpdateCallbackRef: {
+    current: undefined as
+      | ((notification: Record<string, unknown>) => void)
+      | undefined,
+  },
+  mockShowInformationMessage: vi.fn<
+    (message: string, ...items: string[]) => Thenable<string | undefined>
+  >(() => Promise.resolve(undefined)),
+  mockWindowState: { focused: true },
+  mockQwenAgentManagerInstances: [] as Array<{
+    disconnect: ReturnType<typeof vi.fn>;
+  }>,
+  mockClipboardWriteText: vi.fn(),
+  // `vscode.env.remoteName` is undefined in a local window and a string
+  // ('ssh-remote', 'dev-container', 'wsl', ...) in a remote one.
+  mockEnvRemoteName: { current: undefined as string | undefined },
+  mockAsExternalUri: vi.fn(),
+}));
+
+vi.mock('@qwen-code/qwen-code-core', async () => {
+  const actual = await vi.importActual<
+    typeof import('@qwen-code/qwen-code-core')
+  >('@qwen-code/qwen-code-core');
+  return {
+    ...actual,
+    Storage: {
+      getGlobalTempDir: mockGetGlobalTempDir,
+    },
+  };
+});
+
+const daemonMocks = vi.hoisted(() => {
+  // Contract-faithful stand-in for QwenDaemonProcess: workspace switches
+  // notify superseded listeners, exits notify exit listeners, and a disposed
+  // subscription stops receiving either.
+  class FakeQwenDaemonProcess {
+    boundCwd: string | null = null;
+    runtimeCount = 0;
+    exitListeners = new Set<() => void>();
+    supersededListeners = new Set<() => void>();
+
+    async start(_cliEntryPath: string, workspaceCwd: string) {
+      if (this.boundCwd !== null && this.boundCwd !== workspaceCwd) {
+        for (const listener of [...this.supersededListeners]) listener();
+      }
+      this.boundCwd = workspaceCwd;
+      this.runtimeCount += 1;
+      return {
+        baseUrl: `http://127.0.0.1:${4100 + this.runtimeCount}`,
+        token: `token-${this.runtimeCount}`,
+      };
+    }
+
+    addExitListener(listener: () => void) {
+      this.exitListeners.add(listener);
+      return {
+        dispose: () => {
+          this.exitListeners.delete(listener);
+        },
+      };
+    }
+
+    addSupersededListener(listener: () => void) {
+      this.supersededListeners.add(listener);
+      return {
+        dispose: () => {
+          this.supersededListeners.delete(listener);
+        },
+      };
+    }
+
+    dispose(): void {}
+  }
+
+  return {
+    FakeQwenDaemonProcess,
+    instances: [] as FakeQwenDaemonProcess[],
+  };
+});
+
+vi.mock('../../services/qwenDaemonProcess.js', () => ({
+  QwenDaemonProcess: class extends daemonMocks.FakeQwenDaemonProcess {
+    constructor() {
+      super();
+      daemonMocks.instances.push(this);
+    }
+  },
+}));
+
+vi.mock('vscode', () => ({
+  ExtensionMode: {
+    Production: 1,
+    Development: 2,
+    Test: 3,
+  },
+  ConfigurationTarget: {
+    Global: 'global',
+  },
+  Uri: {
+    joinPath: vi.fn((base: { fsPath?: string }, ...parts: string[]) => ({
+      fsPath: `${base.fsPath ?? ''}/${parts.join('/')}`.replace(/\/+/g, '/'),
+    })),
+    file: vi.fn((filePath: string) => ({ fsPath: filePath })),
+    parse: vi.fn((value: string) => ({ toString: () => value })),
+  },
+  env: {
+    get remoteName() {
+      return mockEnvRemoteName.current;
+    },
+    asExternalUri: mockAsExternalUri,
+    openExternal: mockOpenExternal,
+    clipboard: {
+      writeText: mockClipboardWriteText,
+    },
+  },
+  window: {
+    onDidChangeActiveTextEditor: mockOnDidChangeActiveTextEditor,
+    onDidChangeTextEditorSelection: mockOnDidChangeTextEditorSelection,
+    activeTextEditor: undefined,
+    showInformationMessage: mockShowInformationMessage,
+    state: mockWindowState,
+  },
+  workspace: {
+    workspaceFolders: [{ uri: { fsPath: '/workspace-root' } }],
+    onDidChangeConfiguration: mockOnDidChangeConfiguration,
+    getConfiguration: vi.fn(() => ({
+      get: mockConfigGet,
+      update: mockConfigUpdate,
+    })),
+  },
+  commands: {
+    executeCommand: vi.fn(),
+  },
+}));
+
+vi.mock('../../services/settingsWriter.js', async (importOriginal) => ({
+  resolveProviderSettings: (
+    await importOriginal<typeof import('../../services/settingsWriter.js')>()
+  ).resolveProviderSettings,
+  writeCodingPlanConfig: mockWriteCodingPlanConfig,
+  writeModelProvidersConfig: mockWriteModelProvidersConfig,
+  readQwenSettingsForVSCode: mockReadQwenSettingsForVSCode,
+  clearPersistedAuth: mockClearPersistedAuth,
+  applyProviderInstallPlanToFile: mockApplyProviderInstallPlanToFile,
+  snapshotSettingsForRollback: mockSnapshotSettingsForRollback,
+  restoreSettingsSnapshot: mockRestoreSettingsSnapshot,
+}));
+
+vi.mock('../../services/qwenAgentManager.js', () => ({
+  QwenAgentManager: class {
+    isConnected = false;
+    currentSessionId = null;
+    connect = vi.fn();
+    createNewSession = vi.fn();
+    setModelFromUi = vi.fn();
+    onMessage = vi.fn();
+    onStreamChunk = vi.fn((cb: (chunk: string) => void) => {
+      streamChunkCallbackRef.current = cb;
+    });
+    onThoughtChunk = vi.fn();
+    onModeInfo = vi.fn();
+    onModeChanged = vi.fn();
+    onUsageUpdate = vi.fn();
+    onModelInfo = vi.fn();
+    onModelChanged = vi.fn();
+    onAvailableCommands = vi.fn(
+      (
+        callback: (
+          commands: Array<{ name: string; description?: string }>,
+        ) => void,
+      ) => {
+        availableCommandsCallbackRef.current = callback;
+      },
+    );
+    onAvailableSkills = vi.fn();
+    onAvailableModels = vi.fn();
+    onSlashCommandNotification = vi.fn(
+      (
+        callback: (event: {
+          sessionId: string;
+          command: string;
+          messageType: 'info' | 'error';
+          message: string;
+        }) => void,
+      ) => {
+        slashCommandNotificationCallbackRef.current = callback;
+      },
+    );
+    onEndTurn = vi.fn((cb: (reason?: string, source?: string) => void) => {
+      endTurnCallbackRef.current = cb;
+    });
+    onToolCall = vi.fn();
+    onPlan = vi.fn();
+    onTranscriptUpdate = vi.fn(
+      (callback: (notification: Record<string, unknown>) => void) => {
+        transcriptUpdateCallbackRef.current = callback;
+      },
+    );
+    onDisconnected = vi.fn();
+    disconnect = vi.fn();
+    constructor() {
+      mockQwenAgentManagerInstances.push(this);
+    }
+  },
+}));
+
+const conversationStoreMocks = vi.hoisted(() => ({
+  getAllConversations: vi.fn(
+    async (): Promise<
+      Array<{ id: string; title: string; messages: unknown[] }>
+    > => [],
+  ),
+}));
+
+vi.mock('../../services/conversationStore.js', () => ({
+  ConversationStore: class {
+    constructor(_context: unknown) {}
+    createConversation = vi.fn().mockResolvedValue({
+      id: 'conversation-1',
+      messages: [],
+    });
+    addMessage = vi.fn().mockResolvedValue(undefined);
+    getCurrentConversationId = vi.fn(() => null);
+    getAllConversations = conversationStoreMocks.getAllConversations;
+  },
+}));
+
+vi.mock('./PanelManager.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./PanelManager.js')>();
+
+  return {
+    ...actual,
+    PanelManager: class {
+      constructor(_extensionUri: unknown, _onPanelDispose: () => void) {}
+      getPanel() {
+        return mockGetPanel();
+      }
+      setPanel = vi.fn();
+      dispose = vi.fn();
+    },
+  };
+});
+
+vi.mock('./MessageHandler.js', () => ({
+  MessageHandler: class {
+    setAuthInteractiveHandler = vi.fn();
+    setCurrentConversationId = vi.fn();
+    getCurrentConversationId = vi.fn(() => null);
+    setupFileWatchers = vi.fn(() => ({ dispose: vi.fn() }));
+    appendStreamContent = vi.fn();
+    route = vi.fn();
+  },
+}));
+
+vi.mock('./WebViewContent.js', () => ({
+  WebViewContent: {
+    generate: vi.fn(() => '<html />'),
+  },
+}));
+
+vi.mock('../utils/imageHandler.js', () => ({
+  createImagePathResolver: mockCreateImagePathResolver,
+}));
+
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    exec: vi.fn((_cmd: string, cb?: (err: Error | null) => void) => {
+      cb?.(null);
+    }),
+    execFile: vi.fn(
+      (_file: string, _args?: string[], cb?: (err: Error | null) => void) => {
+        if (typeof _args === 'function') {
+          (_args as unknown as (err: Error | null) => void)(null);
+        } else {
+          cb?.(null);
+        }
+      },
+    ),
+  };
+});
+
+vi.mock('../../utils/authErrors.js', () => ({
+  isAuthenticationRequiredError: vi.fn(() => false),
+}));
+
+vi.mock('../../utils/errorMessage.js', () => ({
+  getErrorMessage: vi.fn((error: unknown) => String(error)),
+}));
+
+import * as vscode from 'vscode';
+import { WebViewProvider, resolveQwenCliEntryPath } from './WebViewProvider.js';
+import {
+  truncatePanelTitle,
+  MAX_PANEL_TITLE_LENGTH,
+} from '../utils/panelTitleUtils.js';
+import { logger } from '../../utils/logger.js';
+import {
+  mkdtempSync,
+  mkdirSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import * as path from 'node:path';
+
+const createConfigChangeEvent = (...affectedSections: string[]) => ({
+  affectsConfiguration: (section: string) => affectedSections.includes(section),
+});
+
+type WebViewMessageHandler = (message: {
+  type: string;
+  data?: unknown;
+}) => Promise<void>;
+
+describe('resolveQwenCliEntryPath', () => {
+  it('uses the source dev entry when the extension runs in development mode', () => {
+    const tempRoot = mkdtempSync(path.join(tmpdir(), 'qwen-vscode-dev-'));
+    try {
+      const extensionRoot = path.join(
+        tempRoot,
+        'packages',
+        'vscode-ide-companion',
+      );
+      const devEntry = path.join(tempRoot, 'scripts', 'dev.js');
+      mkdirSync(extensionRoot, { recursive: true });
+      mkdirSync(path.dirname(devEntry), { recursive: true });
+      writeFileSync(devEntry, '');
+
+      expect(
+        resolveQwenCliEntryPath({ fsPath: extensionRoot } as never, 2),
+      ).toBe(devEntry);
+    } finally {
+      rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('uses the bundled CLI outside development mode', () => {
+    expect(
+      resolveQwenCliEntryPath(
+        { fsPath: '/extension-root' } as never,
+        undefined,
+      ),
+    ).toBe('/extension-root/dist/qwen-cli/cli.js');
+  });
+});
+
+/**
+ * Create a mock webview + provider and attach them.
+ * If `captureMessageHandler` is true, the `onDidReceiveMessage` handler is
+ * captured and returned so the test can simulate messages from the webview.
+ */
+async function setupAttachedProvider(options?: {
+  captureMessageHandler?: boolean;
+  context?: unknown;
+}) {
+  let messageHandler: WebViewMessageHandler | undefined;
+  const viewDisposeListeners: Array<() => void> = [];
+
+  const postMessage = vi.fn();
+  const webview = {
+    options: undefined as unknown,
+    html: '',
+    postMessage,
+    asWebviewUri: vi.fn((uri: { fsPath: string }) => ({
+      toString: () => `webview:${uri.fsPath}`,
+    })),
+    onDidReceiveMessage: vi.fn((handler: WebViewMessageHandler) => {
+      if (options?.captureMessageHandler) {
+        messageHandler = handler;
+      } else {
+        void handler;
+      }
+      return { dispose: vi.fn() };
+    }),
+  };
+
+  const provider = new WebViewProvider(
+    (options?.context ?? { subscriptions: [] }) as never,
+    { fsPath: '/extension-root' } as never,
+  );
+
+  await provider.attachToView(
+    {
+      webview,
+      visible: true,
+      onDidChangeVisibility: vi.fn(() => ({ dispose: vi.fn() })),
+      onDidDispose: vi.fn((listener: () => void) => {
+        viewDisposeListeners.push(listener);
+        return { dispose: vi.fn() };
+      }),
+    } as never,
+    'qwen-code.chatView.sidebar',
+  );
+
+  return {
+    webview,
+    postMessage,
+    provider,
+    messageHandler,
+    viewDisposeListeners,
+  };
+}
+
+beforeEach(() => {
+  mockConfigChangeHandlers.length = 0;
+  endTurnCallbackRef.current = undefined;
+  streamChunkCallbackRef.current = undefined;
+  transcriptUpdateCallbackRef.current = undefined;
+  mockWindowState.focused = true;
+  mockShowInformationMessage.mockReset();
+  mockShowInformationMessage.mockReturnValue(Promise.resolve(undefined));
+  mockClipboardWriteText.mockReset();
+  mockClipboardWriteText.mockResolvedValue(undefined);
+  mockEnvRemoteName.current = undefined;
+  mockAsExternalUri.mockReset();
+});
+
+describe('WebViewProvider.attachToView', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockQwenAgentManagerInstances.length = 0;
+    mockGetPanel.mockReturnValue(null);
+    mockConfigGet.mockImplementation(
+      (_key: string, defaultValue: unknown) => defaultValue,
+    );
+    availableCommandsCallbackRef.current = undefined;
+    slashCommandNotificationCallbackRef.current = undefined;
+    mockCreateImagePathResolver.mockReturnValue((paths: string[]) =>
+      paths.map((entry) => ({
+        path: entry,
+        src: `webview:${entry}`,
+      })),
+    );
+    vi.spyOn(
+      WebViewProvider.prototype as unknown as {
+        initializeAgentConnection: () => Promise<void>;
+      },
+      'initializeAgentConnection',
+    ).mockResolvedValue(undefined);
+  });
+
+  it('configures sidebar views with workspace/temp roots and resolves image paths through the attached webview', async () => {
+    let messageHandler:
+      | ((message: { type: string; data?: unknown }) => Promise<void>)
+      | undefined;
+
+    const postMessage = vi.fn();
+    const webview = {
+      options: undefined as unknown,
+      html: '',
+      postMessage,
+      asWebviewUri: vi.fn((uri: { fsPath: string }) => ({
+        toString: () => `webview:${uri.fsPath}`,
+      })),
+      onDidReceiveMessage: vi.fn(
+        (
+          handler: (message: { type: string; data?: unknown }) => Promise<void>,
+        ) => {
+          messageHandler = handler;
+          return { dispose: vi.fn() };
+        },
+      ),
+    };
+
+    const provider = new WebViewProvider(
+      { subscriptions: [] } as never,
+      { fsPath: '/extension-root' } as never,
+    );
+
+    await provider.attachToView(
+      {
+        webview,
+        visible: true,
+        onDidChangeVisibility: vi.fn(() => ({ dispose: vi.fn() })),
+        onDidDispose: vi.fn(() => ({ dispose: vi.fn() })),
+      } as never,
+      'qwen-code.chatView.sidebar',
+    );
+
+    const roots = (
+      webview.options as { localResourceRoots?: Array<{ fsPath: string }> }
+    ).localResourceRoots;
+    expect(roots).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ fsPath: '/extension-root/dist' }),
+        expect.objectContaining({ fsPath: '/extension-root/assets' }),
+        expect.objectContaining({ fsPath: '/global-temp' }),
+        expect.objectContaining({ fsPath: '/workspace-root' }),
+      ]),
+    );
+
+    expect(messageHandler).toBeTypeOf('function');
+
+    await messageHandler?.({
+      type: 'resolveImagePaths',
+      data: { paths: ['clipboard/example.png'], requestId: 7 },
+    });
+
+    expect(mockCreateImagePathResolver).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceRoots: ['/workspace-root'],
+        toWebviewUri: expect.any(Function),
+      }),
+    );
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'imagePathsResolved',
+      data: {
+        resolved: [
+          {
+            path: 'clipboard/example.png',
+            src: 'webview:clipboard/example.png',
+          },
+        ],
+        requestId: 7,
+      },
+    });
+  });
+
+  it('reports clipboard copy success back to the requesting webview', async () => {
+    const { messageHandler, postMessage } = await setupAttachedProvider({
+      captureMessageHandler: true,
+    });
+
+    await messageHandler?.({
+      type: 'copyToClipboard',
+      data: { text: 'copy me', requestId: 'copy-1' },
+    });
+
+    expect(mockClipboardWriteText).toHaveBeenCalledWith('copy me');
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'copyToClipboardResult',
+      data: { requestId: 'copy-1', success: true },
+    });
+  });
+
+  it('writes webview log messages through the extension host logger', async () => {
+    const error = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const { messageHandler } = await setupAttachedProvider({
+      captureMessageHandler: true,
+    });
+    const message = `render failed\n${'x'.repeat(10_000)}`;
+
+    await messageHandler?.({
+      type: 'log',
+      data: { level: 'error', message },
+    });
+
+    expect(error).toHaveBeenCalledWith(
+      '[Webview]',
+      `${message.slice(0, 10_000)}...[truncated]`.replace('\n', '\\n'),
+    );
+    error.mockRestore();
+  });
+
+  it('reports clipboard copy failures back to the requesting webview', async () => {
+    mockClipboardWriteText.mockRejectedValueOnce(new Error('denied'));
+    const { messageHandler, postMessage } = await setupAttachedProvider({
+      captureMessageHandler: true,
+    });
+
+    await messageHandler?.({
+      type: 'copyToClipboard',
+      data: { text: 'copy me', requestId: 'copy-1' },
+    });
+
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'copyToClipboardResult',
+      data: { requestId: 'copy-1', success: false, error: 'denied' },
+    });
+  });
+
+  it('streams slash-command notifications into the attached webview', async () => {
+    const { postMessage } = await setupAttachedProvider();
+
+    slashCommandNotificationCallbackRef.current?.({
+      sessionId: 'session-1',
+      command: '/summary',
+      messageType: 'info',
+      message: 'Generating project summary...',
+    });
+
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'streamChunk',
+      data: {
+        chunk: 'Generating project summary...\n',
+      },
+    });
+  });
+
+  it('re-sends cached available commands when the webview becomes ready', async () => {
+    const { postMessage, messageHandler } = await setupAttachedProvider({
+      captureMessageHandler: true,
+    });
+
+    availableCommandsCallbackRef.current?.([
+      {
+        name: 'insight',
+        description: 'Generate personalized insights',
+      },
+    ]);
+    postMessage.mockClear();
+
+    await messageHandler?.({
+      type: 'webviewReady',
+      data: {},
+    });
+
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'availableCommands',
+      data: {
+        commands: [
+          {
+            name: 'insight',
+            description: 'Generate personalized insights',
+          },
+        ],
+      },
+    });
+  });
+
+  it('does not special-case plain insight slash notifications in the provider', async () => {
+    const { postMessage } = await setupAttachedProvider();
+
+    slashCommandNotificationCallbackRef.current?.({
+      sessionId: 'session-1',
+      command: '/insight',
+      messageType: 'info',
+      message: 'Starting insight generation...',
+    });
+
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'streamChunk',
+      data: {
+        chunk: 'Starting insight generation...\n',
+      },
+    });
+  });
+
+  it('routes structured insight progress markers into the attached webview', async () => {
+    const { postMessage } = await setupAttachedProvider();
+
+    slashCommandNotificationCallbackRef.current?.({
+      sessionId: 'session-1',
+      command: '/insight',
+      messageType: 'info',
+      message:
+        '{"insight_progress":{"stage":"Analyzing sessions","progress":42,"detail":"21/50"}}',
+    });
+
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'insightProgress',
+      data: {
+        stage: 'Analyzing sessions',
+        progress: 42,
+        detail: '21/50',
+      },
+    });
+  });
+
+  it('routes structured insight progress markers even when command text is normalized differently', async () => {
+    const { postMessage } = await setupAttachedProvider();
+
+    slashCommandNotificationCallbackRef.current?.({
+      sessionId: 'session-1',
+      command: 'insight',
+      messageType: 'info',
+      message:
+        '{"insight_progress":{"stage":"Analyzing sessions","progress":42,"detail":"21/50"}}',
+    });
+
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'insightProgress',
+      data: {
+        stage: 'Analyzing sessions',
+        progress: 42,
+        detail: '21/50',
+      },
+    });
+  });
+
+  it('clears structured insight progress when the ready marker arrives', async () => {
+    const { webview } = await setupAttachedProvider();
+
+    slashCommandNotificationCallbackRef.current?.({
+      sessionId: 'session-1',
+      command: '/insight',
+      messageType: 'info',
+      message: '{"insight_ready":{"path":"/tmp/insight-report.html"}}',
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(webview.postMessage).toHaveBeenCalledWith({
+      type: 'insightReportReady',
+      data: {
+        path: '/tmp/insight-report.html',
+      },
+    });
+  });
+
+  it('opens the insight report in the browser when requested from the webview', async () => {
+    const { messageHandler } = await setupAttachedProvider({
+      captureMessageHandler: true,
+    });
+
+    await messageHandler?.({
+      type: 'openInsightReport',
+      data: { path: '/tmp/insight-report.html' },
+    });
+
+    expect(mockOpenExternal).toHaveBeenCalledWith({
+      fsPath: '/tmp/insight-report.html',
+    });
+  });
+
+  it('routes resolved image paths back to the requesting attached webview even when a panel exists', async () => {
+    let messageHandler:
+      | ((message: { type: string; data?: unknown }) => Promise<void>)
+      | undefined;
+
+    const attachedPostMessage = vi.fn();
+    const panelPostMessage = vi.fn();
+    mockGetPanel.mockReturnValue({
+      webview: {
+        postMessage: panelPostMessage,
+      },
+    });
+
+    const webview = {
+      options: undefined as unknown,
+      html: '',
+      postMessage: attachedPostMessage,
+      asWebviewUri: vi.fn((uri: { fsPath: string }) => ({
+        toString: () => `attached:${uri.fsPath}`,
+      })),
+      onDidReceiveMessage: vi.fn(
+        (
+          handler: (message: { type: string; data?: unknown }) => Promise<void>,
+        ) => {
+          messageHandler = handler;
+          return { dispose: vi.fn() };
+        },
+      ),
+    };
+
+    const provider = new WebViewProvider(
+      { subscriptions: [] } as never,
+      { fsPath: '/extension-root' } as never,
+    );
+
+    await provider.attachToView(
+      {
+        webview,
+        visible: true,
+        onDidChangeVisibility: vi.fn(() => ({ dispose: vi.fn() })),
+        onDidDispose: vi.fn(() => ({ dispose: vi.fn() })),
+      } as never,
+      'qwen-code.chatView.sidebar',
+    );
+
+    await messageHandler?.({
+      type: 'resolveImagePaths',
+      data: { paths: ['/global-temp/clipboard/example.png'], requestId: 8 },
+    });
+
+    expect(attachedPostMessage).toHaveBeenCalledWith({
+      type: 'imagePathsResolved',
+      data: {
+        resolved: [
+          {
+            path: '/global-temp/clipboard/example.png',
+            src: 'webview:/global-temp/clipboard/example.png',
+          },
+        ],
+        requestId: 8,
+      },
+    });
+    expect(panelPostMessage).not.toHaveBeenCalled();
+  });
+
+  it('replays available skills to the webview after webviewReady', async () => {
+    let messageHandler:
+      | ((message: { type: string; data?: unknown }) => Promise<void>)
+      | undefined;
+
+    const postMessage = vi.fn();
+    const webview = {
+      options: undefined as unknown,
+      html: '',
+      postMessage,
+      asWebviewUri: vi.fn((uri: { fsPath: string }) => ({
+        toString: () => `webview:${uri.fsPath}`,
+      })),
+      onDidReceiveMessage: vi.fn(
+        (
+          handler: (message: { type: string; data?: unknown }) => Promise<void>,
+        ) => {
+          messageHandler = handler;
+          return { dispose: vi.fn() };
+        },
+      ),
+    };
+
+    const provider = new WebViewProvider(
+      { subscriptions: [] } as never,
+      { fsPath: '/extension-root' } as never,
+    );
+
+    await provider.attachToView(
+      {
+        webview,
+        visible: true,
+        onDidChangeVisibility: vi.fn(() => ({ dispose: vi.fn() })),
+        onDidDispose: vi.fn(() => ({ dispose: vi.fn() })),
+      } as never,
+      'qwen-code.chatView.sidebar',
+    );
+
+    const agentManager = (
+      provider as unknown as {
+        agentManager: {
+          onAvailableSkills: ReturnType<typeof vi.fn>;
+        };
+      }
+    ).agentManager;
+    const onAvailableSkills = agentManager.onAvailableSkills.mock
+      .calls[0]?.[0] as ((skills: string[]) => void) | undefined;
+
+    expect(onAvailableSkills).toBeTypeOf('function');
+
+    const skills = ['code-review-expert'];
+    onAvailableSkills?.(skills);
+
+    postMessage.mockClear();
+
+    await messageHandler?.({
+      type: 'webviewReady',
+      data: {},
+    });
+
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'availableSkills',
+      data: { skills },
+    });
+  });
+
+  it('replays available commands to the webview after webviewReady', async () => {
+    let messageHandler:
+      | ((message: { type: string; data?: unknown }) => Promise<void>)
+      | undefined;
+
+    const postMessage = vi.fn();
+    const webview = {
+      options: undefined as unknown,
+      html: '',
+      postMessage,
+      asWebviewUri: vi.fn((uri: { fsPath: string }) => ({
+        toString: () => `webview:${uri.fsPath}`,
+      })),
+      onDidReceiveMessage: vi.fn(
+        (
+          handler: (message: { type: string; data?: unknown }) => Promise<void>,
+        ) => {
+          messageHandler = handler;
+          return { dispose: vi.fn() };
+        },
+      ),
+    };
+
+    const provider = new WebViewProvider(
+      { subscriptions: [] } as never,
+      { fsPath: '/extension-root' } as never,
+    );
+
+    await provider.attachToView(
+      {
+        webview,
+        visible: true,
+        onDidChangeVisibility: vi.fn(() => ({ dispose: vi.fn() })),
+        onDidDispose: vi.fn(() => ({ dispose: vi.fn() })),
+      } as never,
+      'qwen-code.chatView.sidebar',
+    );
+
+    const agentManager = (
+      provider as unknown as {
+        agentManager: {
+          onAvailableCommands: ReturnType<typeof vi.fn>;
+        };
+      }
+    ).agentManager;
+    const onAvailableCommands = agentManager.onAvailableCommands.mock
+      .calls[0]?.[0] as
+      | ((commands: Array<{ name: string; description: string }>) => void)
+      | undefined;
+
+    expect(onAvailableCommands).toBeTypeOf('function');
+
+    const commands = [
+      { name: 'skills', description: 'List available skills' },
+      { name: 'compress', description: 'Compress the context' },
+    ];
+    onAvailableCommands?.(commands);
+
+    postMessage.mockClear();
+
+    await messageHandler?.({
+      type: 'webviewReady',
+      data: {},
+    });
+
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'availableCommands',
+      data: { commands },
+    });
+  });
+});
+
+describe('WebViewProvider transcript forwarding', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockQwenAgentManagerInstances.length = 0;
+    mockGetPanel.mockReturnValue(null);
+  });
+
+  it('forwards agent transcriptUpdate notifications to the webview', async () => {
+    const { postMessage } = await setupAttachedProvider();
+
+    // The subscription is registered in the provider constructor; without it
+    // the webview never receives timeline frames and renders an empty
+    // transcript while every other message flow keeps working.
+    expect(transcriptUpdateCallbackRef.current).toBeDefined();
+
+    const notification = {
+      sessionId: 'session-1',
+      update: {
+        sessionUpdate: 'agent_message_chunk',
+        content: { type: 'text', text: 'hello transcript' },
+      },
+    };
+
+    transcriptUpdateCallbackRef.current?.(notification);
+
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'transcriptUpdate',
+      data: notification,
+    });
+  });
+});
+
+describe('WebViewProvider settings sync', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockConfigChangeHandlers.length = 0;
+    mockConfigGet.mockImplementation(
+      (_key: string, defaultValue: unknown) => defaultValue,
+    );
+  });
+
+  it('does not report success for api-key settings without interactive auth data', async () => {
+    mockConfigGet.mockImplementation((key: string, defaultValue: unknown) => {
+      if (key === 'apiKey') {
+        return 'sk-test';
+      }
+      if (key === 'provider') {
+        return 'api-key';
+      }
+      return defaultValue;
+    });
+
+    const provider = new WebViewProvider(
+      { subscriptions: [] } as never,
+      { fsPath: '/extension-root' } as never,
+    );
+
+    const synced = await (
+      provider as unknown as {
+        syncVSCodeSettingsToQwenConfig: () => Promise<boolean>;
+      }
+    ).syncVSCodeSettingsToQwenConfig();
+
+    expect(synced).toBe(false);
+    expect(mockWriteCodingPlanConfig).not.toHaveBeenCalled();
+    expect(mockWriteModelProvidersConfig).not.toHaveBeenCalled();
+  });
+
+  it('only syncs non-secret VS Code settings from ~/.qwen/settings.json', async () => {
+    mockReadQwenSettingsForVSCode.mockReturnValue({
+      provider: 'coding-plan',
+      apiKey: 'sk-updated',
+      codingPlanRegion: 'global',
+    });
+    mockConfigGet.mockImplementation((key: string, defaultValue: unknown) => {
+      if (key === 'provider') {
+        return 'api-key';
+      }
+      if (key === 'apiKey') {
+        return 'sk-current';
+      }
+      if (key === 'codingPlanRegion') {
+        return 'china';
+      }
+      return defaultValue;
+    });
+
+    const provider = new WebViewProvider(
+      { subscriptions: [] } as never,
+      { fsPath: '/extension-root' } as never,
+    );
+
+    await (
+      provider as unknown as {
+        syncQwenConfigToVSCodeSettings: () => Promise<void>;
+      }
+    ).syncQwenConfigToVSCodeSettings();
+
+    expect(mockConfigUpdate).toHaveBeenCalledTimes(2);
+    expect(mockConfigUpdate).toHaveBeenCalledWith(
+      'provider',
+      'coding-plan',
+      expect.anything(),
+    );
+    expect(mockConfigUpdate).toHaveBeenCalledWith(
+      'codingPlanRegion',
+      'global',
+      expect.anything(),
+    );
+    expect(mockConfigUpdate).not.toHaveBeenCalledWith(
+      'apiKey',
+      'sk-updated',
+      expect.anything(),
+    );
+  });
+
+  it('ignores non-auth qwen-code setting changes', async () => {
+    const provider = new WebViewProvider(
+      { subscriptions: [] } as never,
+      { fsPath: '/extension-root' } as never,
+    );
+    const syncSpy = vi
+      .spyOn(
+        provider as unknown as {
+          syncVSCodeSettingsToQwenConfig: () => Promise<boolean>;
+        },
+        'syncVSCodeSettingsToQwenConfig',
+      )
+      .mockResolvedValue(true);
+
+    const configChangeHandler = mockConfigChangeHandlers.at(-1);
+    expect(configChangeHandler).toBeDefined();
+
+    await configChangeHandler?.(createConfigChangeEvent('qwen-code'));
+
+    expect(syncSpy).not.toHaveBeenCalled();
+  });
+
+  it('reacts to auth-related qwen-code setting changes', async () => {
+    const provider = new WebViewProvider(
+      { subscriptions: [] } as never,
+      { fsPath: '/extension-root' } as never,
+    );
+    const syncSpy = vi
+      .spyOn(
+        provider as unknown as {
+          syncVSCodeSettingsToQwenConfig: () => Promise<boolean>;
+        },
+        'syncVSCodeSettingsToQwenConfig',
+      )
+      .mockResolvedValue(false);
+
+    const configChangeHandler = mockConfigChangeHandlers.at(-1);
+    expect(configChangeHandler).toBeDefined();
+
+    await configChangeHandler?.(
+      createConfigChangeEvent('qwen-code', 'qwen-code.apiKey'),
+    );
+
+    expect(syncSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears persisted credentials and disconnects when apiKey is emptied', async () => {
+    const provider = new WebViewProvider(
+      { subscriptions: [] } as never,
+      { fsPath: '/extension-root' } as never,
+    );
+
+    // Simulate an already-initialized agent connection
+    (provider as unknown as { agentInitialized: boolean }).agentInitialized =
+      true;
+
+    // syncVSCodeSettingsToQwenConfig returns false because apiKey is empty
+    vi.spyOn(
+      provider as unknown as {
+        syncVSCodeSettingsToQwenConfig: () => Promise<boolean>;
+      },
+      'syncVSCodeSettingsToQwenConfig',
+    ).mockResolvedValue(false);
+
+    // apiKey is empty (user cleared it in Settings)
+    mockConfigGet.mockImplementation((key: string, defaultValue: unknown) => {
+      if (key === 'apiKey') {
+        return '';
+      }
+      return defaultValue;
+    });
+
+    const configChangeHandler = mockConfigChangeHandlers.at(-1);
+    expect(configChangeHandler).toBeDefined();
+
+    await configChangeHandler?.(
+      createConfigChangeEvent('qwen-code', 'qwen-code.apiKey'),
+    );
+
+    // Should clear persisted auth
+    expect(mockClearPersistedAuth).toHaveBeenCalledTimes(1);
+
+    // Should disconnect the agent
+    const agentManager = mockQwenAgentManagerInstances.at(-1);
+    expect(agentManager?.disconnect).toHaveBeenCalledTimes(1);
+
+    // agentInitialized should be reset
+    expect(
+      (provider as unknown as { agentInitialized: boolean }).agentInitialized,
+    ).toBe(false);
+  });
+
+  it('does not de-auth when non-apiKey auth settings change on an api-key provider', async () => {
+    const provider = new WebViewProvider(
+      { subscriptions: [] } as never,
+      { fsPath: '/extension-root' } as never,
+    );
+
+    // Simulate an already-initialized agent with api-key provider
+    (provider as unknown as { agentInitialized: boolean }).agentInitialized =
+      true;
+
+    // syncVSCodeSettingsToQwenConfig returns false — normal for api-key providers
+    vi.spyOn(
+      provider as unknown as {
+        syncVSCodeSettingsToQwenConfig: () => Promise<boolean>;
+      },
+      'syncVSCodeSettingsToQwenConfig',
+    ).mockResolvedValue(false);
+
+    // apiKey is empty because api-key providers don't use this VS Code setting
+    mockConfigGet.mockImplementation((key: string, defaultValue: unknown) => {
+      if (key === 'apiKey') {
+        return '';
+      }
+      if (key === 'provider') {
+        return 'api-key';
+      }
+      return defaultValue;
+    });
+
+    const configChangeHandler = mockConfigChangeHandlers.at(-1);
+    expect(configChangeHandler).toBeDefined();
+
+    // Changing codingPlanRegion should NOT trigger de-auth
+    await configChangeHandler?.(
+      createConfigChangeEvent('qwen-code', 'qwen-code.codingPlanRegion'),
+    );
+
+    expect(mockClearPersistedAuth).not.toHaveBeenCalled();
+
+    const agentManager = mockQwenAgentManagerInstances.at(-1);
+    expect(agentManager?.disconnect).not.toHaveBeenCalled();
+
+    // agentInitialized should remain true
+    expect(
+      (provider as unknown as { agentInitialized: boolean }).agentInitialized,
+    ).toBe(true);
+  });
+});
+
+describe('WebViewProvider.createNewSession', () => {
+  it('forces a fresh ACP session for the sidebar new-session action', async () => {
+    const provider = new WebViewProvider(
+      { subscriptions: [] } as never,
+      { fsPath: '/extension-root' } as never,
+    );
+    const agentManager = (
+      provider as unknown as {
+        agentManager: {
+          createNewSession: ReturnType<typeof vi.fn>;
+        };
+      }
+    ).agentManager;
+    const messageHandler = (
+      provider as unknown as {
+        messageHandler: {
+          setCurrentConversationId: ReturnType<typeof vi.fn>;
+        };
+      }
+    ).messageHandler;
+
+    await provider.createNewSession();
+
+    expect(agentManager.createNewSession).toHaveBeenCalledWith(
+      '/workspace-root',
+      { forceNew: true },
+    );
+    expect(messageHandler.setCurrentConversationId).toHaveBeenCalledWith(null);
+  });
+});
+
+describe('truncatePanelTitle', () => {
+  it('passes through a short title unchanged', () => {
+    expect(truncatePanelTitle('Short title')).toBe('Short title');
+  });
+
+  it('passes through an empty string unchanged', () => {
+    expect(truncatePanelTitle('')).toBe('');
+  });
+
+  it(`passes through a title of exactly ${MAX_PANEL_TITLE_LENGTH} code points unchanged`, () => {
+    const title = 'a'.repeat(MAX_PANEL_TITLE_LENGTH);
+    expect(truncatePanelTitle(title)).toBe(title);
+  });
+
+  it('truncates a title of MAX+1 characters to MAX content chars + ellipsis', () => {
+    const title = 'a'.repeat(MAX_PANEL_TITLE_LENGTH + 1);
+    const result = truncatePanelTitle(title);
+    expect(result).toBe('a'.repeat(MAX_PANEL_TITLE_LENGTH) + '…');
+    expect([...result].length).toBe(MAX_PANEL_TITLE_LENGTH + 1);
+  });
+
+  it('truncates a very long title to MAX content code points + ellipsis', () => {
+    const title = 'a'.repeat(200);
+    const result = truncatePanelTitle(title);
+    expect(result).toBe('a'.repeat(MAX_PANEL_TITLE_LENGTH) + '…');
+    expect([...result].length).toBe(MAX_PANEL_TITLE_LENGTH + 1);
+  });
+
+  it('does not split a surrogate pair (emoji) at the truncation boundary', () => {
+    // 49 ASCII chars + emoji (1 code point, 2 UTF-16 code units) + trailing text
+    // Total: 49 + 1 + 5 = 55 code points → needs truncation
+    const emoji = '😀';
+    const title = 'a'.repeat(MAX_PANEL_TITLE_LENGTH - 1) + emoji + 'extra';
+    const result = truncatePanelTitle(title);
+    // First 50 code points: 49 'a's + emoji, then '…' — emoji is not split
+    expect(result).toBe('a'.repeat(MAX_PANEL_TITLE_LENGTH - 1) + emoji + '…');
+    expect([...result].length).toBe(MAX_PANEL_TITLE_LENGTH + 1);
+  });
+});
+
+describe('WebViewProvider initial model inheritance', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetPanel.mockReturnValue(null);
+  });
+
+  it('applies the requested initial model after creating a new session', async () => {
+    const provider = new WebViewProvider(
+      { subscriptions: [] } as never,
+      { fsPath: '/extension-root' } as never,
+    );
+    provider.setInitialModelId('glm-5');
+
+    const agentManager = (
+      provider as unknown as {
+        agentManager: {
+          currentSessionId: string | null;
+          createNewSession: ReturnType<typeof vi.fn>;
+          setModelFromUi: ReturnType<typeof vi.fn>;
+        };
+      }
+    ).agentManager;
+    agentManager.createNewSession.mockResolvedValue('session-1');
+    agentManager.setModelFromUi.mockResolvedValue({
+      modelId: 'glm-5',
+      name: 'GLM-5',
+    });
+
+    await (
+      provider as unknown as {
+        loadCurrentSessionMessages: (options?: {
+          autoAuthenticate?: boolean;
+        }) => Promise<boolean>;
+      }
+    ).loadCurrentSessionMessages();
+
+    expect(agentManager.createNewSession).toHaveBeenCalledWith(
+      '/workspace-root',
+      { autoAuthenticate: true },
+    );
+    expect(agentManager.setModelFromUi).toHaveBeenCalledWith('glm-5');
+  });
+
+  it('does not apply a discontinued initial model to the new session', async () => {
+    const provider = new WebViewProvider(
+      { subscriptions: [] } as never,
+      { fsPath: '/extension-root' } as never,
+    );
+    provider.setInitialModelId('qwen3-coder-plus(qwen-oauth)');
+
+    const agentManager = (
+      provider as unknown as {
+        agentManager: {
+          createNewSession: ReturnType<typeof vi.fn>;
+          setModelFromUi: ReturnType<typeof vi.fn>;
+        };
+      }
+    ).agentManager;
+    agentManager.createNewSession.mockResolvedValue('session-1');
+    agentManager.setModelFromUi.mockResolvedValue({
+      modelId: 'qwen3-coder-plus(qwen-oauth)',
+      name: 'Qwen3 Coder Plus',
+    });
+
+    await (
+      provider as unknown as {
+        loadCurrentSessionMessages: (options?: {
+          autoAuthenticate?: boolean;
+        }) => Promise<boolean>;
+      }
+    ).loadCurrentSessionMessages();
+
+    expect(agentManager.setModelFromUi).not.toHaveBeenCalled();
+  });
+
+  it('still applies a runtime snapshot id that wraps a discontinued model', async () => {
+    const provider = new WebViewProvider(
+      { subscriptions: [] } as never,
+      { fsPath: '/extension-root' } as never,
+    );
+    provider.setInitialModelId(
+      '$runtime|qwen-oauth|qwen3-coder-plus(qwen-oauth)',
+    );
+
+    const agentManager = (
+      provider as unknown as {
+        agentManager: {
+          createNewSession: ReturnType<typeof vi.fn>;
+          setModelFromUi: ReturnType<typeof vi.fn>;
+        };
+      }
+    ).agentManager;
+    agentManager.createNewSession.mockResolvedValue('session-1');
+    agentManager.setModelFromUi.mockResolvedValue({
+      modelId: '$runtime|qwen-oauth|qwen3-coder-plus(qwen-oauth)',
+      name: 'Qwen3 Coder Plus',
+    });
+
+    await (
+      provider as unknown as {
+        loadCurrentSessionMessages: (options?: {
+          autoAuthenticate?: boolean;
+        }) => Promise<boolean>;
+      }
+    ).loadCurrentSessionMessages();
+
+    expect(agentManager.setModelFromUi).toHaveBeenCalledWith(
+      '$runtime|qwen-oauth|qwen3-coder-plus(qwen-oauth)',
+    );
+  });
+});
+
+describe('Notification & dot indicator', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    mockConfigGet.mockImplementation((key: string, defaultValue?: unknown) => {
+      if (key === 'dotIndicator') {
+        return true;
+      }
+      if (key === 'notifications') {
+        return true;
+      }
+      return defaultValue;
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('shows orange dot and notification when a long task completes while panel is not active', async () => {
+    const mockPanel = {
+      active: false,
+      visible: false,
+      webview: { postMessage: vi.fn() },
+      iconPath: undefined as unknown,
+    };
+    mockGetPanel.mockReturnValue(mockPanel as never);
+    mockWindowState.focused = false;
+
+    await setupAttachedProvider();
+
+    // Simulate stream chunk to set agentStartTime
+    streamChunkCallbackRef.current?.('chunk');
+
+    // Advance time past 20s threshold
+    vi.advanceTimersByTime(25_000);
+
+    // Trigger endTurn
+    endTurnCallbackRef.current?.('end_turn');
+
+    // Orange dot should be set
+    expect(mockPanel.iconPath).toEqual(
+      expect.objectContaining({
+        fsPath: expect.stringContaining('icon-orange.png'),
+      }),
+    );
+
+    // Notification should be shown
+    expect(mockShowInformationMessage).toHaveBeenCalledWith(
+      'Qwen Code: Waiting for your input.',
+      'Show',
+    );
+  });
+
+  it('does not show notification for short tasks (< 20s)', async () => {
+    const mockPanel = {
+      active: false,
+      visible: false,
+      webview: { postMessage: vi.fn() },
+      iconPath: undefined as unknown,
+    };
+    mockGetPanel.mockReturnValue(mockPanel as never);
+    mockWindowState.focused = false;
+
+    await setupAttachedProvider();
+
+    streamChunkCallbackRef.current?.('chunk');
+    vi.advanceTimersByTime(5_000); // only 5s
+    endTurnCallbackRef.current?.('end_turn');
+
+    // Orange dot should still appear (no duration requirement for dot)
+    expect(mockPanel.iconPath).toEqual(
+      expect.objectContaining({
+        fsPath: expect.stringContaining('icon-orange.png'),
+      }),
+    );
+
+    // But NO notification for short task
+    expect(mockShowInformationMessage).not.toHaveBeenCalled();
+  });
+
+  it('does not show notification when user is watching the panel', async () => {
+    const mockPanel = {
+      active: true,
+      visible: true,
+      webview: { postMessage: vi.fn() },
+      iconPath: undefined as unknown,
+    };
+    mockGetPanel.mockReturnValue(mockPanel as never);
+    mockWindowState.focused = true;
+
+    await setupAttachedProvider();
+
+    streamChunkCallbackRef.current?.('chunk');
+    vi.advanceTimersByTime(25_000);
+    endTurnCallbackRef.current?.('end_turn');
+
+    // No dot (panel is active)
+    expect(mockPanel.iconPath).toBeUndefined();
+    // No notification (user is watching)
+    expect(mockShowInformationMessage).not.toHaveBeenCalled();
+  });
+
+  it('does not send duplicate idle notifications for multi-turn tasks', async () => {
+    const mockPanel = {
+      active: false,
+      visible: false,
+      webview: { postMessage: vi.fn() },
+      iconPath: undefined as unknown,
+    };
+    mockGetPanel.mockReturnValue(mockPanel as never);
+    mockWindowState.focused = false;
+
+    await setupAttachedProvider();
+
+    streamChunkCallbackRef.current?.('chunk');
+    vi.advanceTimersByTime(25_000);
+
+    // First endTurn (intermediate)
+    endTurnCallbackRef.current?.('end_turn');
+    expect(mockShowInformationMessage).toHaveBeenCalledTimes(1);
+
+    // Second endTurn (final) — should NOT fire another notification
+    endTurnCallbackRef.current?.('end_turn');
+    expect(mockShowInformationMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not show idle notification for background notification turns', async () => {
+    const mockPanel = {
+      active: false,
+      visible: false,
+      webview: { postMessage: vi.fn() },
+      iconPath: undefined as unknown,
+    };
+    mockGetPanel.mockReturnValue(mockPanel as never);
+    mockWindowState.focused = false;
+
+    await setupAttachedProvider();
+
+    streamChunkCallbackRef.current?.('chunk');
+    vi.advanceTimersByTime(25_000);
+    endTurnCallbackRef.current?.('end_turn', 'background_notification');
+
+    expect(mockPanel.webview.postMessage).toHaveBeenCalledWith({
+      type: 'streamEnd',
+      data: expect.objectContaining({
+        reason: 'end_turn',
+        source: 'background_notification',
+      }),
+    });
+    expect(mockShowInformationMessage).not.toHaveBeenCalledWith(
+      'Qwen Code: Waiting for your input.',
+      'Show',
+    );
+  });
+
+  it('does not notify when notifications setting is disabled', async () => {
+    mockConfigGet.mockImplementation((key: string, defaultValue?: unknown) => {
+      if (key === 'notifications') {
+        return false;
+      }
+      if (key === 'dotIndicator') {
+        return true;
+      }
+      return defaultValue;
+    });
+
+    const mockPanel = {
+      active: false,
+      visible: false,
+      webview: { postMessage: vi.fn() },
+      iconPath: undefined as unknown,
+    };
+    mockGetPanel.mockReturnValue(mockPanel as never);
+    mockWindowState.focused = false;
+
+    await setupAttachedProvider();
+
+    streamChunkCallbackRef.current?.('chunk');
+    vi.advanceTimersByTime(25_000);
+    endTurnCallbackRef.current?.('end_turn');
+
+    // Dot should still appear
+    expect(mockPanel.iconPath).toEqual(
+      expect.objectContaining({
+        fsPath: expect.stringContaining('icon-orange.png'),
+      }),
+    );
+    // But no notification
+    expect(mockShowInformationMessage).not.toHaveBeenCalled();
+  });
+
+  it('cancellation resets agentStartTime so the next short task does not trigger phantom notification', async () => {
+    const mockPanel = {
+      active: false,
+      visible: false,
+      webview: { postMessage: vi.fn() },
+      iconPath: undefined as unknown,
+    };
+    mockGetPanel.mockReturnValue(mockPanel as never);
+    mockWindowState.focused = false;
+
+    const { messageHandler } = await setupAttachedProvider({
+      captureMessageHandler: true,
+    });
+
+    // Start a task
+    streamChunkCallbackRef.current?.('chunk');
+    vi.advanceTimersByTime(30_000);
+
+    // User sends a new message (resets timer)
+    await messageHandler?.({ type: 'sendMessage', data: { text: 'hello' } });
+
+    // Short task starts and completes quickly
+    streamChunkCallbackRef.current?.('chunk2');
+    vi.advanceTimersByTime(2_000);
+    endTurnCallbackRef.current?.('end_turn');
+
+    // Should NOT send notification (only 2s)
+    expect(mockShowInformationMessage).not.toHaveBeenCalled();
+  });
+
+  it('does not show dot when dotIndicator setting is disabled', async () => {
+    mockConfigGet.mockImplementation((key: string, defaultValue?: unknown) => {
+      if (key === 'dotIndicator') {
+        return false;
+      }
+      if (key === 'notifications') {
+        return true;
+      }
+      return defaultValue;
+    });
+
+    const mockPanel = {
+      active: false,
+      visible: false,
+      webview: { postMessage: vi.fn() },
+      iconPath: undefined as unknown,
+    };
+    mockGetPanel.mockReturnValue(mockPanel as never);
+    mockWindowState.focused = false;
+
+    await setupAttachedProvider();
+
+    streamChunkCallbackRef.current?.('chunk');
+    vi.advanceTimersByTime(25_000);
+    endTurnCallbackRef.current?.('end_turn');
+
+    // Dot should NOT appear (setting disabled)
+    expect(mockPanel.iconPath).toBeUndefined();
+    // But notification should still fire
+    expect(mockShowInformationMessage).toHaveBeenCalled();
+  });
+
+  it('notifies when VS Code is focused but panel is not visible', async () => {
+    const mockPanel = {
+      active: false,
+      visible: false,
+      webview: { postMessage: vi.fn() },
+      iconPath: undefined as unknown,
+    };
+    mockGetPanel.mockReturnValue(mockPanel as never);
+    mockWindowState.focused = true; // VS Code focused
+
+    await setupAttachedProvider();
+
+    streamChunkCallbackRef.current?.('chunk');
+    vi.advanceTimersByTime(25_000);
+    endTurnCallbackRef.current?.('end_turn');
+
+    // User is in VS Code but not looking at the panel — should notify
+    expect(mockShowInformationMessage).toHaveBeenCalledWith(
+      'Qwen Code: Waiting for your input.',
+      'Show',
+    );
+  });
+
+  it('notifies when VS Code is not focused but panel is visible', async () => {
+    const mockPanel = {
+      active: false,
+      visible: true,
+      webview: { postMessage: vi.fn() },
+      iconPath: undefined as unknown,
+    };
+    mockGetPanel.mockReturnValue(mockPanel as never);
+    mockWindowState.focused = false; // VS Code not focused
+
+    await setupAttachedProvider();
+
+    streamChunkCallbackRef.current?.('chunk');
+    vi.advanceTimersByTime(25_000);
+    endTurnCallbackRef.current?.('end_turn');
+
+    // User left VS Code — should notify even though panel is visible
+    expect(mockShowInformationMessage).toHaveBeenCalledWith(
+      'Qwen Code: Waiting for your input.',
+      'Show',
+    );
+  });
+});
+
+describe('WebViewProvider.handleAuthInteractive credential rollback', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSnapshotSettingsForRollback.mockReturnValue(null);
+  });
+
+  // Minimal real-ish provider config + inputs so the real buildInstallPlan
+  // (core is not mocked beyond Storage) produces a valid plan.
+  const providerConfig = {
+    id: 'deepseek',
+    label: 'DeepSeek',
+    protocol: 'openai',
+    baseUrl: 'https://api.deepseek.com',
+    envKey: 'DEEPSEEK_API_KEY',
+    models: [{ id: 'deepseek-v4-flash' }],
+    modelNamePrefix: 'DeepSeek',
+  } as unknown as Parameters<WebViewProvider['handleAuthInteractive']>[0];
+  const inputs = {
+    baseUrl: 'https://api.deepseek.com',
+    apiKey: 'sk-bad-key',
+    modelIds: ['deepseek-v4-flash'],
+  } as unknown as Parameters<WebViewProvider['handleAuthInteractive']>[1];
+
+  function makeProvider() {
+    const provider = new WebViewProvider(
+      { subscriptions: [] } as never,
+      { fsPath: '/extension-root' } as never,
+    );
+    // Avoid touching the real webview pipe.
+    (
+      provider as unknown as { sendMessageToWebView: () => void }
+    ).sendMessageToWebView = vi.fn();
+    return provider;
+  }
+
+  it('keeps a first-time service save without claiming authentication or rolling it back', async () => {
+    const { minimaxProvider, resolveBaseUrl } = await import(
+      '@qwen-code/qwen-code-core'
+    );
+    const provider = makeProvider();
+    const initialize = vi.fn();
+    (
+      provider as unknown as {
+        doInitializeAgentConnection: () => Promise<void>;
+      }
+    ).doInitializeAgentConnection = initialize;
+    await provider['handleAuthInteractive'](minimaxProvider, {
+      baseUrl: resolveBaseUrl(minimaxProvider),
+      apiKey: 'test-image',
+      modelIds: ['image-01'],
+    });
+    expect(mockApplyProviderInstallPlanToFile).toHaveBeenCalledOnce();
+    expect(initialize).not.toHaveBeenCalled();
+    expect(mockRestoreSettingsSnapshot).not.toHaveBeenCalled();
+    expect(
+      (
+        provider as unknown as {
+          sendMessageToWebView: ReturnType<typeof vi.fn>;
+        }
+      ).sendMessageToWebView,
+    ).toHaveBeenCalledExactlyOnceWith({
+      type: 'authState',
+      data: { authenticated: false },
+    });
+    expect(mockShowInformationMessage).toHaveBeenCalledWith(
+      'Service models saved. Configure a conversation model to start chatting.',
+    );
+  });
+
+  it('retains saved model fields when reconnecting through the extension', async () => {
+    const model = {
+      id: inputs.modelIds[0],
+      baseUrl: inputs.baseUrl,
+      envKey: 'DEEPSEEK_API_KEY',
+      name: '[DeepSeek] My tuned model',
+      generationConfig: {
+        contextWindowSize: 65536,
+        customHeaders: { 'X-Route': '${ROUTE}' },
+      },
+    };
+    mockSnapshotSettingsForRollback.mockReturnValue({
+      modelProviders: { openai: [model] },
+    });
+    const provider = makeProvider();
+    (
+      provider as unknown as {
+        doInitializeAgentConnection: () => Promise<void>;
+      }
+    ).doInitializeAgentConnection = vi.fn(async () => {
+      (provider as unknown as { authState: boolean }).authState = true;
+    });
+    await provider['handleAuthInteractive'](providerConfig, inputs);
+    expect(mockApplyProviderInstallPlanToFile).toHaveBeenCalledOnce();
+    expect(
+      mockApplyProviderInstallPlanToFile.mock.calls[0][0].modelProviders[0]
+        .models,
+    ).toEqual([model]);
+    expect(mockRestoreSettingsSnapshot).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: 'Responses-only reconnect',
+      sibling: false,
+      savedAuth: undefined,
+      otherEndpoint: false,
+      explicitChat: false,
+      expected: 'openai-responses',
+    },
+    {
+      name: 'selected Responses beside Chat',
+      sibling: true,
+      savedAuth: 'openai-responses',
+      otherEndpoint: false,
+      explicitChat: false,
+      expected: 'openai-responses',
+    },
+    {
+      name: 'selected Chat beside Responses',
+      sibling: true,
+      savedAuth: 'openai',
+      otherEndpoint: false,
+      explicitChat: false,
+      expected: 'openai',
+    },
+    {
+      name: 'new endpoint',
+      sibling: false,
+      savedAuth: 'openai-responses',
+      otherEndpoint: true,
+      explicitChat: false,
+      expected: 'openai',
+    },
+    {
+      name: 'explicit Chat choice',
+      sibling: false,
+      savedAuth: 'openai-responses',
+      otherEndpoint: false,
+      explicitChat: true,
+      expected: 'openai',
+    },
+  ])(
+    'preserves preset routes and selects the identified wire: $name',
+    async ({ sibling, savedAuth, otherEndpoint, explicitChat, expected }) => {
+      const model = {
+        id: inputs.modelIds[0],
+        baseUrl: inputs.baseUrl,
+        envKey: 'DEEPSEEK_API_KEY',
+        name: '[DeepSeek] Tuned',
+        wireApi: 'responses',
+        generationConfig: { contextWindowSize: 32000 },
+      };
+      mockSnapshotSettingsForRollback.mockReturnValue({
+        modelProviders: {
+          openai: [
+            ...(sibling ? [{ ...model, wireApi: undefined }] : []),
+            model,
+          ],
+        },
+        model: { name: model.id },
+        security: { auth: { selectedType: savedAuth } },
+      });
+      const provider = makeProvider();
+      (
+        provider as unknown as {
+          doInitializeAgentConnection: () => Promise<void>;
+        }
+      ).doInitializeAgentConnection = vi.fn(async () => {
+        (provider as unknown as { authState: boolean }).authState = true;
+      });
+      await provider['handleAuthInteractive'](providerConfig, {
+        ...inputs,
+        ...(otherEndpoint ? { baseUrl: 'https://another.example/v1' } : {}),
+        ...(explicitChat ? { wireApi: 'chat-completions' as const } : {}),
+      });
+      expect(mockApplyProviderInstallPlanToFile).toHaveBeenCalledOnce();
+      const plan = mockApplyProviderInstallPlanToFile.mock.calls[0][0];
+      expect(plan.authType).toBe(expected);
+      if (!otherEndpoint && !explicitChat) {
+        expect(plan.modelProviders[0].models).toEqual([
+          ...(sibling ? [{ ...model, wireApi: undefined }] : []),
+          model,
+        ]);
+      } else {
+        expect(plan.modelProviders[0].models).toHaveLength(1);
+        expect(plan.modelProviders[0].models[0]).toMatchObject({
+          id: model.id,
+          baseUrl: otherEndpoint
+            ? 'https://another.example/v1'
+            : inputs.baseUrl,
+          ...(explicitChat ? { wireApi: 'chat-completions' } : {}),
+        });
+        if (otherEndpoint) {
+          expect(plan.modelProviders[0].models[0].wireApi).toBeUndefined();
+        }
+      }
+    },
+  );
+
+  it('reconnects a mixed preset without changing either API or the selected model', async () => {
+    const models = [
+      {
+        id: 'deepseek-v4-pro',
+        name: '[DeepSeek] Pro',
+        baseUrl: inputs.baseUrl,
+        envKey: 'DEEPSEEK_API_KEY',
+      },
+      {
+        id: 'deepseek-v4-flash',
+        name: '[DeepSeek] Flash',
+        baseUrl: inputs.baseUrl,
+        envKey: 'DEEPSEEK_API_KEY',
+        wireApi: 'responses',
+      },
+    ];
+    mockSnapshotSettingsForRollback.mockReturnValue({
+      modelProviders: { openai: models },
+      model: { name: 'deepseek-v4-flash', baseUrl: inputs.baseUrl },
+      security: { auth: { selectedType: 'openai-responses' } },
+    });
+    const provider = makeProvider();
+    (
+      provider as unknown as {
+        doInitializeAgentConnection: () => Promise<void>;
+      }
+    ).doInitializeAgentConnection = vi.fn(async () => {
+      (provider as unknown as { authState: boolean }).authState = true;
+    });
+    await provider['handleAuthInteractive'](
+      { ...providerConfig, models: models.map(({ id }) => ({ id })) },
+      { ...inputs, modelIds: models.map(({ id }) => id) },
+    );
+    expect(mockApplyProviderInstallPlanToFile).toHaveBeenCalledOnce();
+    const plan = mockApplyProviderInstallPlanToFile.mock.calls[0][0];
+    expect(plan.modelProviders[0].models).toEqual(models);
+    expect(plan.authType).toBe('openai-responses');
+    expect(plan.modelSelection).toEqual({ modelId: 'deepseek-v4-flash' });
+    expect(mockRestoreSettingsSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('restores the snapshot when the reconnect leaves authState !== true', async () => {
+    const snapshot = { env: { OPENAI_API_KEY: 'sk-old' } };
+    mockSnapshotSettingsForRollback.mockReturnValue(snapshot);
+
+    const provider = makeProvider();
+    // doInitializeAgentConnection runs but the backend rejects the key, so
+    // authState stays false.
+    (
+      provider as unknown as {
+        doInitializeAgentConnection: () => Promise<void>;
+        authState: boolean;
+      }
+    ).doInitializeAgentConnection = vi.fn(async () => {
+      (provider as unknown as { authState: boolean }).authState = false;
+    });
+
+    await (
+      provider as unknown as {
+        handleAuthInteractive: (c: unknown, i: unknown) => Promise<void>;
+      }
+    ).handleAuthInteractive(providerConfig, inputs);
+
+    expect(mockApplyProviderInstallPlanToFile).toHaveBeenCalledTimes(1);
+    expect(mockRestoreSettingsSnapshot).toHaveBeenCalledWith(snapshot);
+  });
+
+  it('disconnects the agent after rolling back rejected credentials', async () => {
+    mockSnapshotSettingsForRollback.mockReturnValue({
+      env: { OPENAI_API_KEY: 'sk-old' },
+    });
+
+    const provider = makeProvider();
+    const disconnect = vi.fn();
+    (
+      provider as unknown as {
+        agentManager: { disconnect: () => void };
+        agentInitialized: boolean;
+      }
+    ).agentManager = { disconnect } as never;
+    (provider as unknown as { agentInitialized: boolean }).agentInitialized =
+      true;
+    (
+      provider as unknown as {
+        doInitializeAgentConnection: () => Promise<void>;
+        authState: boolean;
+      }
+    ).doInitializeAgentConnection = vi.fn(async () => {
+      // Reconnect happened (sets agentInitialized true) but auth rejected.
+      (provider as unknown as { agentInitialized: boolean }).agentInitialized =
+        true;
+      (provider as unknown as { authState: boolean }).authState = false;
+    });
+
+    await (
+      provider as unknown as {
+        handleAuthInteractive: (c: unknown, i: unknown) => Promise<void>;
+      }
+    ).handleAuthInteractive(providerConfig, inputs);
+
+    // Bad-key agent must be torn down so later actions don't hit it.
+    expect(disconnect).toHaveBeenCalled();
+    expect(
+      (provider as unknown as { agentInitialized: boolean }).agentInitialized,
+    ).toBe(false);
+  });
+
+  it('does NOT restore when the reconnect authenticates (authState === true)', async () => {
+    mockSnapshotSettingsForRollback.mockReturnValue({
+      env: { OPENAI_API_KEY: 'sk-old' },
+    });
+
+    const provider = makeProvider();
+    (
+      provider as unknown as {
+        doInitializeAgentConnection: () => Promise<void>;
+        authState: boolean;
+      }
+    ).doInitializeAgentConnection = vi.fn(async () => {
+      (provider as unknown as { authState: boolean }).authState = true;
+    });
+
+    await (
+      provider as unknown as {
+        handleAuthInteractive: (c: unknown, i: unknown) => Promise<void>;
+      }
+    ).handleAuthInteractive(providerConfig, inputs);
+
+    expect(mockRestoreSettingsSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('swallows a rollback write failure so the authError message still sends', async () => {
+    mockSnapshotSettingsForRollback.mockReturnValue({
+      env: { OPENAI_API_KEY: 'sk-old' },
+    });
+    // restore itself throws (e.g. EPERM on Windows renameSync).
+    mockRestoreSettingsSnapshot.mockImplementation(() => {
+      throw new Error('EPERM: rename failed');
+    });
+
+    const provider = makeProvider();
+    const sendToWebView = (
+      provider as unknown as { sendMessageToWebView: ReturnType<typeof vi.fn> }
+    ).sendMessageToWebView;
+    (
+      provider as unknown as {
+        doInitializeAgentConnection: () => Promise<void>;
+        authState: boolean;
+      }
+    ).doInitializeAgentConnection = vi.fn(async () => {
+      (provider as unknown as { authState: boolean }).authState = false;
+    });
+
+    await expect(
+      (
+        provider as unknown as {
+          handleAuthInteractive: (c: unknown, i: unknown) => Promise<void>;
+        }
+      ).handleAuthInteractive(providerConfig, inputs),
+    ).resolves.toBeUndefined();
+
+    // The rollback throw must not prevent the user-facing authError.
+    expect(sendToWebView).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'authError' }),
+    );
+  });
+
+  it('rolls back + disconnects + reports authError when doInitializeAgentConnection throws (outer catch)', async () => {
+    // The outer catch handles unexpected exceptions (disk errors, partial
+    // writes) — the path where rollback is most likely to also be needed.
+    const snapshot = { env: { OPENAI_API_KEY: 'sk-old' } };
+    mockSnapshotSettingsForRollback.mockReturnValue(snapshot);
+
+    const provider = makeProvider();
+    const sendToWebView = (
+      provider as unknown as { sendMessageToWebView: ReturnType<typeof vi.fn> }
+    ).sendMessageToWebView;
+    const disconnect = vi.fn();
+    (
+      provider as unknown as { agentManager: { disconnect: () => void } }
+    ).agentManager = { disconnect } as never;
+    (
+      provider as unknown as {
+        doInitializeAgentConnection: () => Promise<void>;
+      }
+    ).doInitializeAgentConnection = vi.fn(async () => {
+      // Partial init: agent process spawned (agentInitialized=true) then a
+      // post-connect step throws.
+      (provider as unknown as { agentInitialized: boolean }).agentInitialized =
+        true;
+      throw new Error('disk exploded mid-reconnect');
+    });
+
+    await expect(
+      (
+        provider as unknown as {
+          handleAuthInteractive: (c: unknown, i: unknown) => Promise<void>;
+        }
+      ).handleAuthInteractive(providerConfig, inputs),
+    ).resolves.toBeUndefined();
+
+    // (1) snapshot restored, (2) the half-connected stale-credential agent is
+    // torn down, (3) authError with "Configuration failed", (4) resolved
+    // without throwing (asserted above).
+    expect(mockRestoreSettingsSnapshot).toHaveBeenCalledWith(snapshot);
+    expect(disconnect).toHaveBeenCalled();
+    expect(
+      (provider as unknown as { agentInitialized: boolean }).agentInitialized,
+    ).toBe(false);
+    expect(sendToWebView).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'authError',
+        data: expect.objectContaining({
+          message: expect.stringContaining('Configuration failed'),
+        }),
+      }),
+    );
+  });
+});
+
+describe('WebViewProvider web-shell daemon bootstrap', () => {
+  function setWorkspaceFolders(folders: string[]): void {
+    (
+      vscode.workspace as unknown as {
+        workspaceFolders: Array<{ uri: { fsPath: string } }>;
+      }
+    ).workspaceFolders = folders.map((fsPath) => ({ uri: { fsPath } }));
+  }
+
+  function createSharedContext(): unknown {
+    return {
+      subscriptions: [],
+      workspaceState: {
+        get: vi.fn(() => undefined),
+        update: vi.fn(() => Promise.resolve()),
+      },
+    };
+  }
+
+  /**
+   * A view-host context whose Memento only answers the keys it is seeded with,
+   * and writes through — so a migration that retires an entry is observable.
+   */
+  function createSessionStateContext(entries: Record<string, unknown>) {
+    return {
+      subscriptions: [],
+      workspaceState: {
+        get: vi.fn((key: string) => entries[key]),
+        update: vi.fn((key: string, value: unknown) => {
+          if (value === undefined) {
+            delete entries[key];
+          } else {
+            entries[key] = value;
+          }
+          return Promise.resolve();
+        }),
+      },
+    };
+  }
+
+  const WEB_SHELL_SESSION_KEY_PREFIX = 'qwenCode.webShellSessionId:';
+
+  /** Run `body` against a folder reachable only through a symlink. */
+  async function withSymlinkedWorkspace<T>(
+    body: (paths: { alias: string; canonical: string }) => Promise<T>,
+  ): Promise<T> {
+    const root = mkdtempSync(path.join(tmpdir(), 'qwen-vscode-workspace-'));
+    const target = path.join(root, 'workspace');
+    const alias = path.join(root, 'workspace-link');
+    mkdirSync(target);
+    symlinkSync(
+      target,
+      alias,
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
+    try {
+      setWorkspaceFolders([alias]);
+      return await body({ alias, canonical: realpathSync.native(target) });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockQwenAgentManagerInstances.length = 0;
+    mockGetPanel.mockReturnValue(null);
+    conversationStoreMocks.getAllConversations.mockReset();
+    conversationStoreMocks.getAllConversations.mockResolvedValue([]);
+    mockConfigGet.mockImplementation(
+      (_key: string, defaultValue: unknown) => defaultValue,
+    );
+    daemonMocks.instances.length = 0;
+    setWorkspaceFolders(['/workspace-a']);
+    vi.spyOn(
+      WebViewProvider.prototype as unknown as {
+        initializeAgentConnection: () => Promise<void>;
+      },
+      'initializeAgentConnection',
+    ).mockResolvedValue(undefined);
+  });
+
+  it('canonicalizes a symlinked workspace before bootstrapping the daemon', async () => {
+    await withSymlinkedWorkspace(async ({ alias, canonical }) => {
+      // Seed a restorable id ONLY under the canonical key. The write side keys
+      // off the canonical payload, so a read still keyed off the raw alias
+      // would split the very identity this PR exists to unify.
+      const context = createSessionStateContext({
+        [`${WEB_SHELL_SESSION_KEY_PREFIX}${canonical}`]: 'session-restored-1',
+      });
+      const setup = await setupAttachedProvider({
+        captureMessageHandler: true,
+        context,
+      });
+      await setup.messageHandler?.({ type: 'webShellReady' });
+
+      expect(daemonMocks.instances[0].boundCwd).toBe(canonical);
+      expect(context.workspaceState.get).toHaveBeenCalledWith(
+        `${WEB_SHELL_SESSION_KEY_PREFIX}${canonical}`,
+      );
+      expect(setup.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'webShellBootstrap',
+          data: expect.objectContaining({
+            workspaceCwd: canonical,
+            // Every `activeEditorChanged` sender posts VS Code's raw
+            // `uri.fsPath`, which keeps the alias spelling; the webview needs
+            // it to relativize the active file.
+            editorWorkspaceCwd: alias,
+            sessionId: 'session-restored-1',
+          }),
+        }),
+      );
+    });
+  });
+
+  it('persists and restores a terminal session without source sidecar state', async () => {
+    const context = createSessionStateContext({});
+    const setup = await setupAttachedProvider({
+      captureMessageHandler: true,
+      context,
+    });
+    await setup.messageHandler?.({
+      type: 'webShellSessionChanged',
+      data: { sessionId: 'terminal-session', workspaceCwd: '/workspace-a' },
+    });
+    expect(
+      context.workspaceState.get(WEB_SHELL_SESSION_KEY_PREFIX + '/workspace-a'),
+    ).toBe('terminal-session');
+
+    const reloaded = await setupAttachedProvider({
+      captureMessageHandler: true,
+      context,
+    });
+    await reloaded.messageHandler?.({ type: 'webShellReady' });
+    const bootstrap = reloaded.postMessage.mock.calls
+      .map(
+        ([message]) =>
+          message as { type?: string; data?: Record<string, unknown> },
+      )
+      .find((message) => message.type === 'webShellBootstrap');
+    expect(bootstrap?.data?.sessionId).toBe('terminal-session');
+    expect(bootstrap?.data).not.toHaveProperty('sessionHistorySource');
+    expect(
+      context.workspaceState.update.mock.calls.map(([key]) => key),
+    ).not.toContain(
+      'qwenCode.webShellSessionSource:/workspace-a:terminal-session',
+    );
+  });
+
+  it('restores a session id persisted under the pre-canonicalization key', async () => {
+    await withSymlinkedWorkspace(async ({ alias, canonical }) => {
+      // Someone who chatted in this folder before the state key was
+      // canonicalized has their id under the raw spelling. Without a legacy
+      // read the upgrade silently opens a fresh sidebar conversation.
+      const context = createSessionStateContext({
+        [`${WEB_SHELL_SESSION_KEY_PREFIX}${alias}`]: 'pre-upgrade-session-id',
+      });
+      const setup = await setupAttachedProvider({
+        captureMessageHandler: true,
+        context,
+      });
+      await setup.messageHandler?.({ type: 'webShellReady' });
+
+      expect(setup.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'webShellBootstrap',
+          data: expect.objectContaining({
+            workspaceCwd: canonical,
+            sessionId: 'pre-upgrade-session-id',
+          }),
+        }),
+      );
+
+      // Clearing the session posts `sessionId: undefined` against the
+      // canonical cwd, which deletes only the canonical key. Without the
+      // legacy entry being retired by the bootstrap above, the next bootstrap
+      // resurrects the id the user just cleared.
+      await setup.messageHandler?.({
+        type: 'webShellSessionChanged',
+        data: { sessionId: undefined, workspaceCwd: canonical },
+      });
+      setup.postMessage.mockClear();
+      await setup.messageHandler?.({ type: 'webShellReady' });
+
+      const secondBootstrap = setup.postMessage.mock.calls
+        .map(
+          ([message]) =>
+            message as {
+              type?: string;
+              data?: { sessionId?: string };
+            },
+        )
+        .find((message) => message.type === 'webShellBootstrap');
+      expect(secondBootstrap).toBeDefined();
+      expect(secondBootstrap?.data?.sessionId).toBeUndefined();
+      expect(context.workspaceState.update).toHaveBeenCalledWith(
+        `${WEB_SHELL_SESSION_KEY_PREFIX}${alias}`,
+        undefined,
+      );
+    });
+  });
+
+  it('keeps the binding when the bootstrap is interrupted before the echo', async () => {
+    await withSymlinkedWorkspace(async ({ alias, canonical }) => {
+      // The canonical key's only other writer (`webShellSessionChanged`) runs
+      // after the shell attaches. Retiring the alias without moving the id
+      // first would lose the folder->session binding for good if the window
+      // reloads inside that window.
+      const context = createSessionStateContext({
+        [`${WEB_SHELL_SESSION_KEY_PREFIX}${alias}`]: 'pre-upgrade-session-id',
+      });
+      const setup = await setupAttachedProvider({
+        captureMessageHandler: true,
+        context,
+      });
+
+      await setup.messageHandler?.({ type: 'webShellReady' });
+      setup.postMessage.mockClear();
+      // No `webShellSessionChanged` in between: this is the interrupted path.
+      await setup.messageHandler?.({ type: 'webShellReady' });
+
+      const secondBootstrap = setup.postMessage.mock.calls
+        .map(
+          ([message]) =>
+            message as { type?: string; data?: { sessionId?: string } },
+        )
+        .find((message) => message.type === 'webShellBootstrap');
+      expect(secondBootstrap?.data?.sessionId).toBe('pre-upgrade-session-id');
+      expect(
+        context.workspaceState.get(
+          `${WEB_SHELL_SESSION_KEY_PREFIX}${canonical}`,
+        ),
+      ).toBe('pre-upgrade-session-id');
+    });
+  });
+
+  it('does not let the alias id overwrite an existing canonical one', async () => {
+    await withSymlinkedWorkspace(async ({ alias, canonical }) => {
+      // A user who opened the same folder under both spellings before
+      // upgrading has an entry under each. The canonical one is authoritative;
+      // the alias is retired without clobbering it.
+      const context = createSessionStateContext({
+        [`${WEB_SHELL_SESSION_KEY_PREFIX}${canonical}`]: 'canonical-session-id',
+        [`${WEB_SHELL_SESSION_KEY_PREFIX}${alias}`]: 'alias-session-id',
+      });
+      const setup = await setupAttachedProvider({
+        captureMessageHandler: true,
+        context,
+      });
+
+      await setup.messageHandler?.({ type: 'webShellReady' });
+
+      const bootstrap = setup.postMessage.mock.calls
+        .map(
+          ([message]) =>
+            message as { type?: string; data?: { sessionId?: string } },
+        )
+        .find((message) => message.type === 'webShellBootstrap');
+      expect(bootstrap?.data?.sessionId).toBe('canonical-session-id');
+      expect(
+        context.workspaceState.get(
+          `${WEB_SHELL_SESSION_KEY_PREFIX}${canonical}`,
+        ),
+      ).toBe('canonical-session-id');
+      expect(
+        context.workspaceState.get(`${WEB_SHELL_SESSION_KEY_PREFIX}${alias}`),
+      ).toBeUndefined();
+    });
+  });
+
+  it('leaves the stored id alone when the folder is not symlinked', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'qwen-vscode-workspace-'));
+    const workspace = realpathSync.native(root);
+    try {
+      // Here the legacy and canonical keys are the same string, so a
+      // retirement that is not gated on an alias actually existing would
+      // delete the entry it just read.
+      setWorkspaceFolders([workspace]);
+      const context = createSessionStateContext({
+        [`${WEB_SHELL_SESSION_KEY_PREFIX}${workspace}`]: 'existing-session-id',
+      });
+      const setup = await setupAttachedProvider({
+        captureMessageHandler: true,
+        context,
+      });
+
+      await setup.messageHandler?.({ type: 'webShellReady' });
+
+      expect(
+        context.workspaceState.get(
+          `${WEB_SHELL_SESSION_KEY_PREFIX}${workspace}`,
+        ),
+      ).toBe('existing-session-id');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('surfaces the failure to an attached webview when another host switches the shared daemon workspace', async () => {
+    const context = createSharedContext();
+    const first = await setupAttachedProvider({
+      captureMessageHandler: true,
+      context,
+    });
+    const second = await setupAttachedProvider({
+      captureMessageHandler: true,
+      context,
+    });
+
+    setWorkspaceFolders(['/workspace-a']);
+    await first.messageHandler?.({ type: 'webShellReady' });
+    expect(first.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'webShellBootstrap',
+        data: expect.objectContaining({ workspaceCwd: '/workspace-a' }),
+      }),
+    );
+
+    // A second host bootstrapping against another folder replaces the
+    // daemon the first webview is streaming against.
+    setWorkspaceFolders(['/workspace-b']);
+    await second.messageHandler?.({ type: 'webShellReady' });
+
+    expect(second.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'webShellBootstrap',
+        data: expect.objectContaining({ workspaceCwd: '/workspace-b' }),
+      }),
+    );
+    // The first webview must hear about the replacement — its baseUrl and
+    // token are dead and nothing else tells it.
+    expect(first.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'webShellBootstrapError' }),
+    );
+    // The host that triggered the switch must not be told its own daemon died.
+    const secondErrors = second.postMessage.mock.calls.filter(
+      ([message]) =>
+        (message as { type?: string }).type === 'webShellBootstrapError',
+    );
+    expect(secondErrors).toHaveLength(0);
+  });
+
+  it('does not notify a host about a workspace switch it triggers itself', async () => {
+    const context = createSharedContext();
+    const host = await setupAttachedProvider({
+      captureMessageHandler: true,
+      context,
+    });
+
+    setWorkspaceFolders(['/workspace-a']);
+    await host.messageHandler?.({ type: 'webShellReady' });
+    expect(host.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'webShellBootstrap',
+        data: expect.objectContaining({ workspaceCwd: '/workspace-a' }),
+      }),
+    );
+
+    // The same host re-bootstrapping against another folder (a webview
+    // reload with a different active editor) replaces the daemon itself —
+    // it must not be told its own daemon died.
+    setWorkspaceFolders(['/workspace-b']);
+    await host.messageHandler?.({ type: 'webShellReady' });
+
+    expect(host.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'webShellBootstrap',
+        data: expect.objectContaining({ workspaceCwd: '/workspace-b' }),
+      }),
+    );
+    const errors = host.postMessage.mock.calls.filter(
+      ([message]) =>
+        (message as { type?: string }).type === 'webShellBootstrapError',
+    );
+    expect(errors).toHaveLength(0);
+  });
+
+  it('keeps notifying live hosts after another host disposes', async () => {
+    const context = createSharedContext();
+    const first = await setupAttachedProvider({
+      captureMessageHandler: true,
+      context,
+    });
+    const second = await setupAttachedProvider({
+      captureMessageHandler: true,
+      context,
+    });
+
+    await first.messageHandler?.({ type: 'webShellReady' });
+    await second.messageHandler?.({ type: 'webShellReady' });
+
+    // A disposed host's subscription must not swallow the crash notice for
+    // the hosts still alive.
+    first.provider.dispose();
+    const daemon = daemonMocks.instances[0];
+    for (const listener of [...daemon.exitListeners]) listener();
+
+    expect(second.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'webShellBootstrapError' }),
+    );
+    const firstErrors = first.postMessage.mock.calls.filter(
+      ([message]) =>
+        (message as { type?: string }).type === 'webShellBootstrapError',
+    );
+    expect(firstErrors).toHaveLength(0);
+  });
+
+  function bootstrapPayloads(postMessage: ReturnType<typeof vi.fn>) {
+    return postMessage.mock.calls
+      .map(
+        ([message]) =>
+          message as { type?: string; data?: Record<string, unknown> },
+      )
+      .filter((message) => message.type === 'webShellBootstrap')
+      .map((message) => message.data);
+  }
+
+  it('hands the webview the tunnelled daemon URL in a remote window', async () => {
+    mockEnvRemoteName.current = 'ssh-remote';
+    mockAsExternalUri.mockResolvedValue({
+      toString: () => 'http://localhost:52100',
+    });
+    const setup = await setupAttachedProvider({
+      captureMessageHandler: true,
+      context: createSharedContext(),
+    });
+
+    await setup.messageHandler?.({ type: 'webShellReady' });
+
+    // The daemon binds the loopback of the machine hosting the extension
+    // process, but the shell renders on the client, where that address points
+    // at the client's own loopback. Only the forwarded URL is reachable.
+    const [bootstrap] = bootstrapPayloads(setup.postMessage);
+    expect(bootstrap?.baseUrl).toBe('http://localhost:52100');
+    expect(bootstrap?.token).toBe('token-1');
+    // The tunnel is resolved from the daemon's own loopback URL, which stays
+    // the source of truth for everything the host does with it.
+    const resolvedFrom = mockAsExternalUri.mock.calls[0]?.[0] as {
+      toString(): string;
+    };
+    expect(resolvedFrom.toString()).toBe('http://127.0.0.1:4101');
+  });
+
+  it('leaves the daemon URL untouched in a local window', async () => {
+    const setup = await setupAttachedProvider({
+      captureMessageHandler: true,
+      context: createSharedContext(),
+    });
+
+    await setup.messageHandler?.({ type: 'webShellReady' });
+
+    const [bootstrap] = bootstrapPayloads(setup.postMessage);
+    expect(bootstrap?.baseUrl).toBe('http://127.0.0.1:4101');
+    expect(mockAsExternalUri).not.toHaveBeenCalled();
+  });
+
+  it('re-resolves the tunnel on every bootstrap instead of caching it', async () => {
+    mockEnvRemoteName.current = 'dev-container';
+    mockAsExternalUri
+      .mockResolvedValueOnce({ toString: () => 'http://localhost:52100' })
+      .mockResolvedValueOnce({ toString: () => 'http://localhost:52101' });
+    const setup = await setupAttachedProvider({
+      captureMessageHandler: true,
+      context: createSharedContext(),
+    });
+
+    await setup.messageHandler?.({ type: 'webShellReady' });
+    await setup.messageHandler?.({ type: 'webShellReady' });
+
+    // A restarted extension host forwards to a fresh client-side port, so a
+    // cached resolution would point every later panel at a dead one.
+    expect(
+      bootstrapPayloads(setup.postMessage).map((data) => data?.baseUrl),
+    ).toEqual(['http://localhost:52100', 'http://localhost:52101']);
+  });
+
+  it('refuses a resolution that is not a forwarded loopback address', async () => {
+    // A browser-based remote resolves to a relay origin. The bootstrap payload
+    // carries the daemon's bearer token, so it must not be handed to a webview
+    // pointed at a third-party host.
+    mockEnvRemoteName.current = 'codespaces';
+    mockAsExternalUri.mockResolvedValue({
+      toString: () => 'https://4101-space.app.github.dev',
+    });
+    const setup = await setupAttachedProvider({
+      captureMessageHandler: true,
+      context: createSharedContext(),
+    });
+
+    await setup.messageHandler?.({ type: 'webShellReady' });
+
+    expect(bootstrapPayloads(setup.postMessage)).toHaveLength(0);
+    const errors = setup.postMessage.mock.calls
+      .map(
+        ([message]) =>
+          message as { type?: string; data?: { message?: string } },
+      )
+      .filter((message) => message.type === 'webShellBootstrapError');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.data?.message).toContain(
+      'not a forwarded loopback address',
+    );
+  });
+
+  it('refuses an IPv6 loopback that the webview CSP cannot express', async () => {
+    mockEnvRemoteName.current = 'ssh-remote';
+    mockAsExternalUri.mockResolvedValue({
+      toString: () => 'http://[::1]:52100',
+    });
+    const setup = await setupAttachedProvider({
+      captureMessageHandler: true,
+      context: createSharedContext(),
+    });
+
+    await setup.messageHandler?.({ type: 'webShellReady' });
+
+    expect(bootstrapPayloads(setup.postMessage)).toHaveLength(0);
+    const errors = setup.postMessage.mock.calls
+      .map(
+        ([message]) =>
+          message as { type?: string; data?: { message?: string } },
+      )
+      .filter((message) => message.type === 'webShellBootstrapError');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.data?.message).toContain(
+      'cannot connect to an IPv6 literal',
+    );
+  });
+});
+
+describe('WebViewProvider web-shell permission bridge', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockQwenAgentManagerInstances.length = 0;
+    mockGetPanel.mockReturnValue(null);
+    mockConfigGet.mockImplementation(
+      (_key: string, defaultValue: unknown) => defaultValue,
+    );
+    vi.spyOn(
+      WebViewProvider.prototype as unknown as {
+        initializeAgentConnection: () => Promise<void>;
+      },
+      'initializeAgentConnection',
+    ).mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  async function setupPendingWebShellPermission(requestId = 'req-1') {
+    const setup = await setupAttachedProvider({
+      captureMessageHandler: true,
+    });
+    await setup.messageHandler?.({
+      type: 'webShellPermissionState',
+      data: { pending: true, requestId },
+    });
+    return setup;
+  }
+
+  function decisionCalls(postMessage: ReturnType<typeof vi.fn>) {
+    return postMessage.mock.calls.filter(
+      ([message]) =>
+        (message as { type?: string }).type === 'webShellPermissionDecision',
+    );
+  }
+
+  it('routes accept to the request-owner webview', async () => {
+    const { postMessage, provider } = await setupPendingWebShellPermission();
+    const activePostMessage = vi.fn();
+    mockGetPanel.mockReturnValue({
+      webview: { postMessage: activePostMessage },
+    } as never);
+
+    provider.respondToPendingPermission('allow', {
+      fromDiffEditor: true,
+      permissionRequestId: 'req-1',
+    });
+
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'webShellPermissionDecision',
+      data: { decision: 'allow', requestId: 'req-1' },
+    });
+    expect(decisionCalls(activePostMessage)).toHaveLength(0);
+  });
+
+  it('routes cancel as a reject decision', async () => {
+    const { postMessage, provider } = await setupPendingWebShellPermission();
+
+    provider.respondToPendingPermission('cancel', {
+      fromDiffEditor: true,
+      permissionRequestId: 'req-1',
+    });
+
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'webShellPermissionDecision',
+      data: { decision: 'reject', requestId: 'req-1' },
+    });
+  });
+
+  it('does not vote when a diff command has no exact request id', async () => {
+    const { postMessage, provider } = await setupPendingWebShellPermission();
+
+    provider.respondToPendingPermission('allow', {
+      fromDiffEditor: true,
+    });
+
+    expect(decisionCalls(postMessage)).toHaveLength(0);
+  });
+
+  it('does not route an unknown request id to the active webview', async () => {
+    const { postMessage, provider } = await setupPendingWebShellPermission();
+    const activePostMessage = vi.fn();
+    mockGetPanel.mockReturnValue({
+      webview: { postMessage: activePostMessage },
+    } as never);
+
+    provider.respondToPendingPermission('allow', {
+      fromDiffEditor: true,
+      permissionRequestId: 'req-not-yet-mapped',
+    });
+
+    expect(decisionCalls(postMessage)).toHaveLength(0);
+    expect(decisionCalls(activePostMessage)).toHaveLength(0);
+  });
+
+  it('does not vote when the trigger is the original workspace file', async () => {
+    const { postMessage, provider } = await setupPendingWebShellPermission();
+
+    // qwen.diff.isVisible is also true on the user's own file while a diff
+    // is open, so Ctrl+S there invokes qwen.diff.accept with a file: uri.
+    // That must not resolve an approval the user may never have looked at.
+    provider.respondToPendingPermission('allow', {
+      fromDiffEditor: false,
+      permissionRequestId: 'req-1',
+    });
+    provider.respondToPendingPermission('allow');
+
+    expect(decisionCalls(postMessage)).toHaveLength(0);
+  });
+
+  it('relays a permission diff dismissal to the webview under requestId', async () => {
+    const { postMessage, provider } = await setupPendingWebShellPermission();
+
+    provider.notifyPermissionDiffClosed('req-1');
+
+    // The receiver in the webview reads data.requestId only and treats any
+    // other key as "not a dismissal", so the rename this wire invites has to
+    // be pinned here.
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'permissionDiffClosed',
+      data: { requestId: 'req-1' },
+    });
+  });
+
+  it('does not vote before permission ownership state arrives', async () => {
+    const setup = await setupAttachedProvider({ captureMessageHandler: true });
+
+    setup.provider.respondToPendingPermission('allow', {
+      fromDiffEditor: true,
+      permissionRequestId: 'req-1',
+    });
+
+    expect(decisionCalls(setup.postMessage)).toHaveLength(0);
+  });
+
+  it('reports hasPendingPermission from the webview-pushed state', async () => {
+    const setup = await setupAttachedProvider({ captureMessageHandler: true });
+
+    // The extension command gate consults hasPendingPermission() before
+    // asking the provider to vote; it must track the state the webview
+    // pushes, not only the legacy ACP resolver.
+    expect(setup.provider.hasPendingPermission()).toBe(false);
+
+    await setup.messageHandler?.({
+      type: 'webShellPermissionState',
+      data: { pending: true, requestId: 'req-1' },
+    });
+    expect(setup.provider.hasPendingPermission()).toBe(true);
+
+    await setup.messageHandler?.({
+      type: 'webShellPermissionState',
+      data: { pending: false },
+    });
+    expect(setup.provider.hasPendingPermission()).toBe(false);
+  });
+
+  it('clears the pending flag when the hosting view is disposed', async () => {
+    const setup = await setupAttachedProvider({ captureMessageHandler: true });
+
+    await setup.messageHandler?.({
+      type: 'webShellPermissionState',
+      data: { pending: true, requestId: 'req-1' },
+    });
+    expect(setup.provider.hasPendingPermission()).toBe(true);
+
+    for (const listener of setup.viewDisposeListeners) listener();
+
+    // Without a webview there is no route for the decision; leaving the
+    // ownership entry would let a diff-editor accept find hasPendingPermission()
+    // true, skip the vote, and close the diff while the daemon stays
+    // blocked. The panel dispose path already resets it; the view-hosted
+    // path must too.
+    expect(setup.provider.hasPendingPermission()).toBe(false);
+  });
+});

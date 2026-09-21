@@ -1,0 +1,1323 @@
+/**
+ * @license
+ * Copyright 2026 Qwen Team
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import type { Config } from '../config/config.js';
+import type { HookPlanner, HookEventContext } from './hookPlanner.js';
+import { getHookMatcherTarget } from './hookPlanner.js';
+import type { HookRunner } from './hookRunner.js';
+import type { HookAggregator, AggregatedHookResult } from './hookAggregator.js';
+import type { SessionHooksManager } from './sessionHooksManager.js';
+import { HookEventName } from './types.js';
+import type {
+  HookConfig,
+  HookInput,
+  HookExecutionResult,
+  UserPromptSubmitInput,
+  UserPromptExpansionInput,
+  StopInput,
+  MessageDisplayInput,
+  ContextUsageData,
+  SessionStartInput,
+  SessionEndInput,
+  SessionDeleteInput,
+  SessionStartSource,
+  SessionEndReason,
+  AgentType,
+  PreToolUseInput,
+  PostToolUseInput,
+  PostToolUseFailureInput,
+  PostToolBatchInput,
+  PostToolBatchToolCall,
+  PreCompactInput,
+  PreCompactTrigger,
+  PostCompactInput,
+  PostCompactTrigger,
+  NotificationInput,
+  NotificationType,
+  PermissionDeniedInput,
+  PermissionDeniedReason,
+  PermissionRequestInput,
+  PermissionSuggestion,
+  SubagentStartInput,
+  SubagentStopInput,
+  MessagesProvider,
+  FunctionHookContext,
+  StopFailureInput,
+  StopFailureErrorType,
+  TodoCreatedInput,
+  TodoCompletedInput,
+  TodoItem,
+  TodoStatus,
+  InstructionsLoadedInput,
+  InstructionMemoryType,
+  InstructionLoadReason,
+  BackgroundTaskInfo,
+  CronJobInfo,
+} from './types.js';
+import {
+  createHookOutput,
+  HookPhase,
+  isBlockingHookOutput,
+  PermissionMode,
+  PreToolUseHookOutput,
+} from './types.js';
+import {
+  MessageBusType,
+  type HookProgress,
+  type HookProgressOutcome,
+} from '../confirmation-bus/types.js';
+import { approvalModeToPermissionMode } from './permission-mode.js';
+import { getCurrentAgentId } from '../agents/runtime/agent-context.js';
+import { promptIdContext } from '../utils/promptIdContext.js';
+import { createDebugLogger } from '../utils/debugLogger.js';
+import { logHookCall } from '../telemetry/loggers.js';
+import { HookCallEvent } from '../telemetry/types.js';
+import type { CronJob } from '../services/cronScheduler.js';
+import { ToolNames } from '../tools/tool-names.js';
+
+const debugLogger = createDebugLogger('TRUSTED_HOOKS');
+
+/**
+ * Serial for {@link HookProgress.invocationId}. Module level, so ids are unique
+ * across every HookEventHandler and every MessageBus in this process.
+ */
+let hookInvocationSerial = 0;
+
+/** Longest prompt text used as a hook's display name. */
+const HOOK_DISPLAY_NAME_MAX_LENGTH = 80;
+
+/**
+ * Maps one hook's execution result to the outcome reported on the bus. A hook
+ * that exits cleanly but decides to block or deny is reported as blocked, so a
+ * consumer does not have to re-parse the output.
+ */
+function toProgressOutcome(
+  eventName: HookEventName,
+  result: HookExecutionResult,
+): { outcome: HookProgressOutcome; blockedReason?: string } {
+  switch (result.outcome) {
+    case 'timeout':
+      return { outcome: 'timeout' };
+    case 'cancelled':
+      return { outcome: 'cancelled' };
+    case 'blocking':
+      return {
+        outcome: 'blocked',
+        blockedReason: blockedReasonOf(eventName, result),
+      };
+    case 'non_blocking_error':
+      return { outcome: 'error' };
+    case 'success':
+    case undefined:
+      break;
+    default: {
+      const exhaustive: never = result.outcome;
+      return exhaustive;
+    }
+  }
+  if (!result.success) {
+    return { outcome: 'error' };
+  }
+  if (result.output && isBlockingHookOutput(eventName, result.output)) {
+    return {
+      outcome: 'blocked',
+      blockedReason: blockedReasonOf(eventName, result),
+    };
+  }
+  return { outcome: 'success' };
+}
+
+function blockedReasonOf(
+  eventName: HookEventName,
+  result: HookExecutionResult,
+): string | undefined {
+  if (!result.output) {
+    return undefined;
+  }
+  const output = createHookOutput(eventName, result.output);
+  const reason =
+    output instanceof PreToolUseHookOutput
+      ? output.getPermissionDecisionReason()
+      : output.stopReason || output.reason;
+  return reason || undefined;
+}
+
+function getHookDisplayName(config: HookConfig): string {
+  if (config.name) {
+    return config.name;
+  }
+  switch (config.type) {
+    case 'command':
+      return config.command || 'command hook';
+    case 'http':
+      return config.url || 'http hook';
+    case 'function':
+      return config.id || 'function hook';
+    case 'prompt': {
+      const prompt = config.prompt.replace(/\s+/g, ' ').trim();
+      return prompt.length > HOOK_DISPLAY_NAME_MAX_LENGTH
+        ? `${prompt.slice(0, HOOK_DISPLAY_NAME_MAX_LENGTH - 1)}…`
+        : prompt || 'prompt hook';
+    }
+    default:
+      return 'hook';
+  }
+}
+
+function normalizeQuestionHookResponse(
+  toolName: string,
+  response: Record<string, unknown>,
+  displayKey: 'returnDisplay' | 'result_display',
+): Record<string, unknown> {
+  const display = response[displayKey];
+  if (
+    toolName === ToolNames.ASK_USER_QUESTION &&
+    display !== null &&
+    typeof display === 'object' &&
+    'type' in display &&
+    display.type === 'ask_user_question_answers' &&
+    'text' in display &&
+    typeof display.text === 'string'
+  ) {
+    // Preserve the existing hook contract without changing the stored UI result.
+    return { ...response, [displayKey]: display.text };
+  }
+  return response;
+}
+
+/**
+ * Hook event bus that coordinates hook execution across the system
+ */
+export class HookEventHandler {
+  private readonly config: Config;
+  private readonly hookPlanner: HookPlanner;
+  private readonly hookRunner: HookRunner;
+  private readonly hookAggregator: HookAggregator;
+  private readonly sessionHooksManager: SessionHooksManager;
+  /** Optional provider for conversation history */
+  private messagesProvider?: MessagesProvider;
+
+  constructor(
+    config: Config,
+    hookPlanner: HookPlanner,
+    hookRunner: HookRunner,
+    hookAggregator: HookAggregator,
+    sessionHooksManager: SessionHooksManager,
+    messagesProvider?: MessagesProvider,
+  ) {
+    this.config = config;
+    this.hookPlanner = hookPlanner;
+    this.hookRunner = hookRunner;
+    this.hookAggregator = hookAggregator;
+    this.sessionHooksManager = sessionHooksManager;
+    this.messagesProvider = messagesProvider;
+  }
+
+  /**
+   * Set the messages provider for automatic conversation history passing
+   */
+  setMessagesProvider(provider: MessagesProvider): void {
+    this.messagesProvider = provider;
+  }
+
+  /**
+   * Get the current messages provider
+   */
+  getMessagesProvider(): MessagesProvider | undefined {
+    return this.messagesProvider;
+  }
+
+  /**
+   * Snapshot of current background tasks for hook payloads.
+   * Non-blocking: reads registry state synchronously.
+   */
+  private getBackgroundTaskSnapshot(): BackgroundTaskInfo[] {
+    try {
+      const registry = this.config.getBackgroundTaskRegistry();
+      return registry.getAll().map((task) => ({
+        id: task.id,
+        status: task.status,
+        agent_type: task.subagentType ?? 'unknown',
+        started_at: new Date(task.startTime).toISOString(),
+        description: task.description,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Snapshot of current cron jobs for hook payloads.
+   * Non-blocking: reads scheduler state synchronously.
+   */
+  private getCronJobSnapshot(): CronJobInfo[] {
+    try {
+      const scheduler = this.config.getCronScheduler();
+      return scheduler.list().map((job: CronJob) => ({
+        id: job.id,
+        schedule: job.cronExpr,
+        prompt: job.prompt,
+        recurring: job.recurring,
+        next_run: job.fireAtMs
+          ? new Date(job.fireAtMs).toISOString()
+          : undefined,
+        last_run: job.lastFiredAt
+          ? new Date(job.lastFiredAt).toISOString()
+          : undefined,
+        enabled: true,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Fire a UserPromptSubmit event
+   * Called by handleHookExecutionRequest - executes hooks directly
+   */
+  async fireUserPromptSubmitEvent(
+    prompt: string,
+    signal?: AbortSignal,
+    submittedPrompt?: string,
+  ): Promise<AggregatedHookResult> {
+    const input: UserPromptSubmitInput = {
+      ...this.createBaseInput(HookEventName.UserPromptSubmit),
+      prompt,
+      ...(typeof submittedPrompt === 'string' &&
+      submittedPrompt.trim().length > 0
+        ? { submitted_prompt: submittedPrompt }
+        : {}),
+    };
+
+    return this.executeHooks(
+      HookEventName.UserPromptSubmit,
+      input,
+      undefined,
+      signal,
+    );
+  }
+
+  /**
+   * Fire an InstructionsLoaded event.
+   * Called when instruction/context files are loaded during session startup or
+   * import resolution.
+   */
+  async fireInstructionsLoadedEvent(
+    filePath: string,
+    memoryType: InstructionMemoryType,
+    loadReason: InstructionLoadReason,
+    options: {
+      triggerFilePath?: string;
+      parentFilePath?: string;
+    } = {},
+    signal?: AbortSignal,
+  ): Promise<AggregatedHookResult> {
+    const input: InstructionsLoadedInput = {
+      ...this.createBaseInput(HookEventName.InstructionsLoaded),
+      file_path: filePath,
+      memory_type: memoryType,
+      load_reason: loadReason,
+      trigger_file_path: options.triggerFilePath,
+      parent_file_path: options.parentFilePath,
+    };
+
+    return this.executeHooks(
+      HookEventName.InstructionsLoaded,
+      input,
+      {
+        filePath,
+      },
+      signal,
+    );
+  }
+
+  /**
+   * Fire a UserPromptExpansion event
+   * Called when a slash command expands into a prompt.
+   */
+  async fireUserPromptExpansionEvent(
+    commandName: string,
+    commandArgs: string,
+    prompt: string,
+    signal?: AbortSignal,
+  ): Promise<AggregatedHookResult> {
+    const input: UserPromptExpansionInput = {
+      ...this.createBaseInput(HookEventName.UserPromptExpansion),
+      command_name: commandName,
+      command_args: commandArgs,
+      prompt,
+    };
+
+    return this.executeHooks(
+      HookEventName.UserPromptExpansion,
+      input,
+      { commandName },
+      signal,
+    );
+  }
+
+  /**
+   * Fire a Stop event
+   * Called by handleHookExecutionRequest - executes hooks directly
+   */
+  async fireStopEvent(
+    stopHookActive: boolean = false,
+    lastAssistantMessage: string = '',
+    contextUsage?: ContextUsageData,
+    signal?: AbortSignal,
+  ): Promise<AggregatedHookResult> {
+    const input: StopInput = {
+      ...this.createBaseInput(HookEventName.Stop),
+      stop_hook_active: stopHookActive,
+      last_assistant_message: lastAssistantMessage,
+      background_tasks: this.getBackgroundTaskSnapshot(),
+      crons: this.getCronJobSnapshot(),
+      ...contextUsage,
+    };
+
+    return this.executeHooks(HookEventName.Stop, input, undefined, signal);
+  }
+
+  /**
+   * Fire a MessageDisplay event
+   * Called repeatedly as the assistant's reply streams (before Stop). Fire-and-forget:
+   * callers should not await this on the critical streaming path — see client.ts, which
+   * fires it without blocking the next chunk's display.
+   */
+  async fireMessageDisplayEvent(
+    messageId: string,
+    displayedText: string,
+    isFinal: boolean,
+    signal?: AbortSignal,
+  ): Promise<AggregatedHookResult> {
+    const input: MessageDisplayInput = {
+      ...this.createBaseInput(HookEventName.MessageDisplay),
+      message_id: messageId,
+      displayed_text: displayedText,
+      is_final: isFinal,
+    };
+
+    return this.executeHooks(
+      HookEventName.MessageDisplay,
+      input,
+      undefined,
+      signal,
+    );
+  }
+
+  /**
+   * Fire a SessionStart event
+   * Called when a new session starts or resumes
+   */
+  async fireSessionStartEvent(
+    source: SessionStartSource,
+    model: string,
+    permissionMode?: PermissionMode,
+    agentType?: AgentType,
+    signal?: AbortSignal,
+  ): Promise<AggregatedHookResult> {
+    const input: SessionStartInput = {
+      ...this.createBaseInput(HookEventName.SessionStart),
+      permission_mode: permissionMode ?? PermissionMode.Default,
+      source,
+      model,
+      agent_type: agentType,
+    };
+
+    // Pass source as context for matcher filtering
+    return this.executeHooks(
+      HookEventName.SessionStart,
+      input,
+      {
+        trigger: source,
+      },
+      signal,
+    );
+  }
+
+  /**
+   * Fire a SessionEnd event
+   * Called when a session ends
+   */
+  async fireSessionEndEvent(
+    reason: SessionEndReason,
+    signal?: AbortSignal,
+  ): Promise<AggregatedHookResult> {
+    const input: SessionEndInput = {
+      ...this.createBaseInput(HookEventName.SessionEnd),
+      reason,
+    };
+
+    // Pass reason as context for matcher filtering
+    return this.executeHooks(
+      HookEventName.SessionEnd,
+      input,
+      {
+        trigger: reason,
+      },
+      signal,
+    );
+  }
+
+  /**
+   * Fire a SessionDelete event after an explicitly selected session is deleted.
+   */
+  async fireSessionDeleteEvent(
+    deletedSessionId: string,
+    signal?: AbortSignal,
+  ): Promise<AggregatedHookResult> {
+    const input: SessionDeleteInput = {
+      ...this.createBaseInput(HookEventName.SessionDelete),
+      deleted_session_id: deletedSessionId,
+    };
+
+    return this.executeHooks(
+      HookEventName.SessionDelete,
+      input,
+      undefined,
+      signal,
+    );
+  }
+
+  /**
+   * Fire a PreToolUse event
+   * Called before tool execution begins
+   */
+  async firePreToolUseEvent(
+    toolName: string,
+    toolInput: Record<string, unknown>,
+    toolUseId: string,
+    permissionMode: PermissionMode,
+    signal?: AbortSignal,
+    tool_call_id?: string,
+  ): Promise<AggregatedHookResult> {
+    const input: PreToolUseInput = {
+      ...this.createBaseInput(HookEventName.PreToolUse),
+      permission_mode: permissionMode,
+      tool_name: toolName,
+      tool_input: toolInput,
+      tool_use_id: toolUseId,
+      ...(tool_call_id && { tool_call_id }),
+    };
+
+    // Pass tool name as context for matcher filtering
+    return this.executeHooks(
+      HookEventName.PreToolUse,
+      input,
+      {
+        toolName,
+      },
+      signal,
+    );
+  }
+
+  /**
+   * Fire a PostToolUse event
+   * Called after successful tool execution
+   */
+  async firePostToolUseEvent(
+    toolName: string,
+    toolInput: Record<string, unknown>,
+    toolResponse: Record<string, unknown>,
+    toolUseId: string,
+    permissionMode: PermissionMode,
+    signal?: AbortSignal,
+    tool_call_id?: string,
+    durationMs?: number,
+  ): Promise<AggregatedHookResult> {
+    const input: PostToolUseInput = {
+      ...this.createBaseInput(HookEventName.PostToolUse),
+      permission_mode: permissionMode,
+      tool_name: toolName,
+      tool_input: toolInput,
+      tool_response: normalizeQuestionHookResponse(
+        toolName,
+        toolResponse,
+        'returnDisplay',
+      ),
+      tool_use_id: toolUseId,
+      ...(tool_call_id && { tool_call_id }),
+      ...(durationMs === undefined ? {} : { duration_ms: durationMs }),
+    };
+
+    // Pass tool name as context for matcher filtering
+    return this.executeHooks(
+      HookEventName.PostToolUse,
+      input,
+      {
+        toolName,
+      },
+      signal,
+    );
+  }
+
+  /**
+   * Fire a PostToolUseFailure event
+   * Called when tool execution fails
+   */
+  async firePostToolUseFailureEvent(
+    toolUseId: string,
+    toolName: string,
+    toolInput: Record<string, unknown>,
+    errorMessage: string,
+    isInterrupt?: boolean,
+    permissionMode?: PermissionMode,
+    signal?: AbortSignal,
+    tool_call_id?: string,
+    durationMs?: number,
+  ): Promise<AggregatedHookResult> {
+    const input: PostToolUseFailureInput = {
+      ...this.createBaseInput(HookEventName.PostToolUseFailure),
+      permission_mode: permissionMode ?? PermissionMode.Default,
+      tool_use_id: toolUseId,
+      ...(tool_call_id && { tool_call_id }),
+      tool_name: toolName,
+      tool_input: toolInput,
+      error: errorMessage,
+      is_interrupt: isInterrupt,
+      ...(durationMs === undefined ? {} : { duration_ms: durationMs }),
+    };
+
+    // Pass tool name as context for matcher filtering
+    return this.executeHooks(
+      HookEventName.PostToolUseFailure,
+      input,
+      {
+        toolName,
+      },
+      signal,
+    );
+  }
+
+  /**
+   * Fire a PreCompact event
+   * Called before conversation compaction begins
+   */
+  async firePreCompactEvent(
+    trigger: PreCompactTrigger,
+    customInstructions: string = '',
+    signal?: AbortSignal,
+  ): Promise<AggregatedHookResult> {
+    const input: PreCompactInput = {
+      ...this.createBaseInput(HookEventName.PreCompact),
+      trigger,
+      custom_instructions: customInstructions,
+    };
+
+    // Pass trigger as context for matcher filtering
+    return this.executeHooks(
+      HookEventName.PreCompact,
+      input,
+      {
+        trigger,
+      },
+      signal,
+    );
+  }
+
+  /**
+   * Fire a PostToolBatch event
+   * Called once after every tool call in a batch has resolved
+   */
+  async firePostToolBatchEvent(
+    toolCalls: PostToolBatchToolCall[],
+    permissionMode: PermissionMode = PermissionMode.Default,
+    signal?: AbortSignal,
+  ): Promise<AggregatedHookResult> {
+    const input: PostToolBatchInput = {
+      ...this.createBaseInput(HookEventName.PostToolBatch),
+      permission_mode: permissionMode,
+      tool_calls: toolCalls.map((call) =>
+        call.tool_response
+          ? {
+              ...call,
+              tool_response: normalizeQuestionHookResponse(
+                call.tool_name,
+                call.tool_response,
+                'result_display',
+              ),
+            }
+          : call,
+      ),
+    };
+
+    return this.executeHooks(
+      HookEventName.PostToolBatch,
+      input,
+      undefined,
+      signal,
+    );
+  }
+
+  /**
+   * Fire a Notification event
+   */
+  async fireNotificationEvent(
+    message: string,
+    notificationType: NotificationType,
+    title?: string,
+    signal?: AbortSignal,
+  ): Promise<AggregatedHookResult> {
+    const input: NotificationInput = {
+      ...this.createBaseInput(HookEventName.Notification),
+      message,
+      notification_type: notificationType,
+      title,
+    };
+
+    // Pass notification_type as context for matcher filtering
+    return this.executeHooks(
+      HookEventName.Notification,
+      input,
+      {
+        notificationType,
+      },
+      signal,
+    );
+  }
+
+  /**
+   * Fire a PermissionRequest event
+   * Called when a permission dialog is about to be shown to the user
+   */
+  async firePermissionRequestEvent(
+    toolName: string,
+    toolInput: Record<string, unknown>,
+    permissionMode: PermissionMode,
+    permissionSuggestions?: PermissionSuggestion[],
+    signal?: AbortSignal,
+  ): Promise<AggregatedHookResult> {
+    const input: PermissionRequestInput = {
+      ...this.createBaseInput(HookEventName.PermissionRequest),
+      permission_mode: permissionMode,
+      tool_name: toolName,
+      tool_input: toolInput,
+      permission_suggestions: permissionSuggestions,
+    };
+
+    // Pass tool name as context for matcher filtering
+    return this.executeHooks(
+      HookEventName.PermissionRequest,
+      input,
+      {
+        toolName,
+      },
+      signal,
+    );
+  }
+
+  /**
+   * Fire a PermissionDenied event for AUTO-mode classifier denials. Unlike
+   * PermissionRequest, this event does not ask hooks to approve or modify the
+   * call. A threshold fallback may still show a manual dialog afterward.
+   */
+  async firePermissionDeniedEvent(
+    toolName: string,
+    toolInput: Record<string, unknown>,
+    toolUseId: string,
+    reason: PermissionDeniedReason,
+    signal?: AbortSignal,
+    tool_call_id?: string,
+  ): Promise<AggregatedHookResult> {
+    const input: PermissionDeniedInput = {
+      ...this.createBaseInput(HookEventName.PermissionDenied),
+      tool_name: toolName,
+      tool_input: toolInput,
+      tool_use_id: toolUseId,
+      ...(tool_call_id && { tool_call_id }),
+      reason,
+    };
+
+    return this.executeHooks(
+      HookEventName.PermissionDenied,
+      input,
+      {
+        toolName,
+      },
+      signal,
+    );
+  }
+
+  /**
+   * Fire a SubagentStart event
+   * Called when a subagent is spawned via the Agent tool
+   */
+  async fireSubagentStartEvent(
+    agentId: string,
+    agentType: AgentType | string,
+    permissionMode: PermissionMode,
+    signal?: AbortSignal,
+  ): Promise<AggregatedHookResult> {
+    const input: SubagentStartInput = {
+      ...this.createBaseInput(HookEventName.SubagentStart),
+      permission_mode: permissionMode,
+      agent_id: agentId,
+      agent_type: agentType,
+    };
+
+    // Pass agentType as context for matcher filtering
+    return this.executeHooks(
+      HookEventName.SubagentStart,
+      input,
+      {
+        agentType: String(agentType),
+      },
+      signal,
+    );
+  }
+
+  /**
+   * Fire a SubagentStop event
+   * Called when a subagent has finished responding
+   */
+  async fireSubagentStopEvent(
+    agentId: string,
+    agentType: AgentType | string,
+    agentTranscriptPath: string,
+    lastAssistantMessage: string,
+    stopHookActive: boolean,
+    permissionMode: PermissionMode,
+    signal?: AbortSignal,
+  ): Promise<AggregatedHookResult> {
+    const input: SubagentStopInput = {
+      ...this.createBaseInput(HookEventName.SubagentStop),
+      permission_mode: permissionMode,
+      stop_hook_active: stopHookActive,
+      agent_id: agentId,
+      agent_type: agentType,
+      agent_transcript_path: agentTranscriptPath,
+      last_assistant_message: lastAssistantMessage,
+      background_tasks: this.getBackgroundTaskSnapshot(),
+      crons: this.getCronJobSnapshot(),
+    };
+
+    // Pass agentType as context for matcher filtering
+    return this.executeHooks(
+      HookEventName.SubagentStop,
+      input,
+      {
+        agentType: String(agentType),
+      },
+      signal,
+    );
+  }
+
+  /**
+   * Fire a StopFailure event
+   * Called when an API error ends the turn (instead of Stop)
+   * Fire-and-forget: output and exit codes are ignored
+   */
+  async fireStopFailureEvent(
+    error: StopFailureErrorType,
+    errorDetails?: string,
+    lastAssistantMessage?: string,
+    signal?: AbortSignal,
+  ): Promise<AggregatedHookResult> {
+    const input: StopFailureInput = {
+      ...this.createBaseInput(HookEventName.StopFailure),
+      error,
+      error_details: errorDetails,
+      last_assistant_message: lastAssistantMessage,
+    };
+
+    // Pass error type as context for matcher filtering (fieldToMatch: 'error')
+    return this.executeHooks(
+      HookEventName.StopFailure,
+      input,
+      { error },
+      signal,
+    );
+  }
+
+  /**
+   * Fire a PostCompact event
+   * Called after conversation compaction completes
+   */
+  async firePostCompactEvent(
+    trigger: PostCompactTrigger,
+    compactSummary: string,
+    signal?: AbortSignal,
+  ): Promise<AggregatedHookResult> {
+    const input: PostCompactInput = {
+      ...this.createBaseInput(HookEventName.PostCompact),
+      trigger,
+      compact_summary: compactSummary,
+    };
+
+    // Pass trigger as context for matcher filtering
+    return this.executeHooks(
+      HookEventName.PostCompact,
+      input,
+      { trigger },
+      signal,
+    );
+  }
+
+  /**
+   * Fire a TodoCreated event
+   * Called when a new todo item is added to the list
+   */
+  async fireTodoCreatedEvent(
+    todoId: string,
+    todoContent: string,
+    todoStatus: TodoStatus,
+    allTodos: TodoItem[],
+    phase: HookPhase,
+    signal?: AbortSignal,
+  ): Promise<AggregatedHookResult> {
+    const input: TodoCreatedInput = {
+      ...this.createBaseInput(HookEventName.TodoCreated),
+      hook_event_name: 'TodoCreated',
+      todo_id: todoId,
+      todo_content: todoContent,
+      todo_status: todoStatus,
+      all_todos: allTodos,
+      phase,
+    };
+
+    return this.executeHooks(
+      HookEventName.TodoCreated,
+      input,
+      undefined,
+      signal,
+    );
+  }
+
+  /**
+   * Fire a TodoCompleted event
+   * Called when a todo item's status changes to 'completed'
+   */
+  async fireTodoCompletedEvent(
+    todoId: string,
+    todoContent: string,
+    previousStatus: 'pending' | 'in_progress',
+    allTodos: TodoItem[],
+    phase: HookPhase,
+    signal?: AbortSignal,
+  ): Promise<AggregatedHookResult> {
+    const input: TodoCompletedInput = {
+      ...this.createBaseInput(HookEventName.TodoCompleted),
+      hook_event_name: 'TodoCompleted',
+      todo_id: todoId,
+      todo_content: todoContent,
+      previous_status: previousStatus,
+      all_todos: allTodos,
+      phase,
+    };
+
+    return this.executeHooks(
+      HookEventName.TodoCompleted,
+      input,
+      undefined,
+      signal,
+    );
+  }
+
+  /**
+   * Execute hooks for a specific event (direct execution without MessageBus)
+   * Used as fallback when MessageBus is not available
+   */
+  private async executeHooks(
+    eventName: HookEventName,
+    input: HookInput,
+    context?: HookEventContext,
+    signal?: AbortSignal,
+  ): Promise<AggregatedHookResult> {
+    const failClosedResult: AggregatedHookResult = {
+      success: false,
+      allOutputs: [],
+      errors: [],
+      totalDuration: 0,
+      finalOutput:
+        eventName === HookEventName.TodoCreated ||
+        eventName === HookEventName.TodoCompleted
+          ? {
+              decision: 'block',
+              reason: `Hook system failed while processing ${eventName}`,
+            }
+          : undefined,
+    };
+
+    try {
+      // Create execution plan from registry hooks
+      const plan = this.hookPlanner.createExecutionPlan(eventName, context);
+
+      // Get session hooks and merge with registry hooks
+      const sessionId = input.session_id;
+      const matcherTarget = getHookMatcherTarget(eventName, context)?.target;
+      const registeredSessionHooks =
+        sessionId !== undefined
+          ? matcherTarget === undefined
+            ? this.sessionHooksManager.getHooksForEvent(sessionId, eventName)
+            : this.sessionHooksManager.getMatchingHooks(
+                sessionId,
+                eventName,
+                matcherTarget,
+              )
+          : [];
+      // The second side of the project-skill trust gate: a hook registered
+      // from a repository's `.qwen/skills/` frontmatter (`trustGated`) runs
+      // only while the folder is STILL trusted. `Config.isTrustedFolder()`
+      // is live under an IDE connection, so a revocation mid-session
+      // silences the hook at its next event without a restart or any
+      // per-skill unregistration; trust granted again lets it fire. Only
+      // consulted when a gated entry is present — nothing else changes.
+      const sessionHooks = registeredSessionHooks.some(
+        (entry) => entry.trustGated === true,
+      )
+        ? registeredSessionHooks.filter(
+            (entry) => !entry.trustGated || this.config.isTrustedFolder(),
+          )
+        : registeredSessionHooks;
+      if (sessionHooks.length !== registeredSessionHooks.length) {
+        debugLogger.debug(
+          `Skipping ${registeredSessionHooks.length - sessionHooks.length} project-skill hook(s) for ${eventName}: the folder is no longer trusted`,
+        );
+      }
+
+      // Merge hook configs from registry plan and session hooks
+      const registryHookConfigs = plan?.hookConfigs || [];
+      const sessionHookConfigs = sessionHooks.map((entry) => entry.config);
+      const allHookConfigs = [...registryHookConfigs, ...sessionHookConfigs];
+
+      if (allHookConfigs.length === 0) {
+        return {
+          success: true,
+          allOutputs: [],
+          errors: [],
+          totalDuration: 0,
+        };
+      }
+
+      // Determine execution strategy: sequential if any hook requires it
+      const sequential =
+        (plan?.sequential ?? false) ||
+        sessionHooks.some((entry) => entry.sequential === true);
+
+      // Build function hook context with messages from provider
+      const messages = this.messagesProvider?.();
+      const functionContext: FunctionHookContext = {
+        messages,
+        toolUseID:
+          'tool_use_id' in input ? (input.tool_use_id as string) : undefined,
+        signal,
+      };
+
+      const totalHooks = allHookConfigs.length;
+      // One id per hook in this batch, allocated at start and reused at end, so
+      // a consumer pairs the two even when several batches of the same event
+      // overlap (tool calls run up to QWEN_CODE_MAX_TOOL_CONCURRENCY at a time).
+      const invocationIds = allHookConfigs.map(
+        () => `hook-${++hookInvocationSerial}`,
+      );
+      // Read once per batch so a hook's start and end carry the same value by
+      // construction rather than by relying on async context propagation.
+      // Same source as the hook input's `agent_id`.
+      const agentId = getCurrentAgentId() ?? undefined;
+      const onHookStart = (config: HookConfig, index: number) => {
+        const hookName = this.getHookName(config);
+        debugLogger.debug(
+          `Hook ${hookName} started for event ${eventName} (${index + 1}/${totalHooks})`,
+        );
+        this.publishHookProgress({
+          phase: 'start',
+          eventName,
+          hookName: getHookDisplayName(config),
+          hookType: config.type,
+          invocationId: invocationIds[index],
+          ...(agentId ? { agentId } : {}),
+          index,
+          total: totalHooks,
+          ...(config.statusMessage
+            ? { statusMessage: config.statusMessage }
+            : {}),
+        });
+      };
+
+      const onHookEnd = (
+        config: HookConfig,
+        result: HookExecutionResult,
+        index: number,
+      ) => {
+        const hookName = this.getHookName(config);
+        debugLogger.debug(
+          `Hook ${hookName} ended for event ${eventName}: ${result.success ? 'success' : 'failed'}`,
+        );
+        const { outcome, blockedReason } = toProgressOutcome(eventName, result);
+        const systemMessage = result.output?.systemMessage;
+        this.publishHookProgress({
+          phase: 'end',
+          eventName,
+          hookName: getHookDisplayName(config),
+          hookType: config.type,
+          invocationId: invocationIds[index],
+          ...(agentId ? { agentId } : {}),
+          index,
+          total: totalHooks,
+          ...(config.statusMessage
+            ? { statusMessage: config.statusMessage }
+            : {}),
+          durationMs: result.duration,
+          outcome,
+          ...(result.error ? { error: result.error.message } : {}),
+          ...(result.exitCode !== undefined
+            ? { exitCode: result.exitCode }
+            : {}),
+          ...(typeof systemMessage === 'string' && systemMessage
+            ? { systemMessage }
+            : {}),
+          ...(blockedReason ? { blockedReason } : {}),
+          ...(result.isAsync === true ? { async: true } : {}),
+        });
+      };
+
+      // Execute hooks according to the merged strategy
+      const results = sequential
+        ? await this.hookRunner.executeHooksSequential(
+            allHookConfigs,
+            eventName,
+            input,
+            onHookStart,
+            onHookEnd,
+            signal,
+            functionContext,
+          )
+        : await this.hookRunner.executeHooksParallel(
+            allHookConfigs,
+            eventName,
+            input,
+            onHookStart,
+            onHookEnd,
+            signal,
+            functionContext,
+          );
+
+      // Aggregate results
+      const aggregated = this.hookAggregator.aggregateResults(
+        results,
+        eventName,
+      );
+
+      // Process common hook output fields centrally
+      this.processCommonHookOutputFields(aggregated);
+
+      // Log hook execution for telemetry
+      this.logHookExecution(eventName, input, results, aggregated);
+
+      return aggregated;
+    } catch (error) {
+      debugLogger.error(`Hook event bus error for ${eventName}: ${error}`);
+
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      failClosedResult.errors = [normalizedError];
+      if (failClosedResult.finalOutput) {
+        failClosedResult.finalOutput.reason = `${failClosedResult.finalOutput.reason}: ${normalizedError.message}`;
+      }
+      return failClosedResult;
+    }
+  }
+
+  /**
+   * Publishes a hook's start or end on the MessageBus. Progress is only
+   * observed, so a missing bus or a failing subscriber never affects the hook
+   * or its result.
+   *
+   * Every execution publishes exactly one start and one end; nothing here
+   * throttles or drops events, even for a high-frequency event such as
+   * MessageDisplay:
+   * - dropping any end would break the start/end pairing by `invocationId`
+   *   and leave a consumer's status line hanging forever;
+   * - how to present a frequent event differs per surface (fold it in the
+   *   terminal UI, dedupe it in headless output, keep all of it for
+   *   telemetry), so that choice belongs to the consumer;
+   * - Claude Code likewise dedupes hook progress in its display layer, not
+   *   at the publisher.
+   */
+  private publishHookProgress(message: Omit<HookProgress, 'type'>): void {
+    const bus = this.config.getMessageBus?.();
+    if (!bus) {
+      return;
+    }
+    try {
+      void Promise.resolve(
+        bus.publish({ type: MessageBusType.HOOK_PROGRESS, ...message }),
+      ).catch((error: unknown) => {
+        debugLogger.debug(`Failed to publish hook progress: ${error}`);
+      });
+    } catch (error) {
+      debugLogger.debug(`Failed to publish hook progress: ${error}`);
+    }
+  }
+
+  /**
+   * Create base hook input with common fields
+   */
+  private createBaseInput(eventName: HookEventName): HookInput {
+    // Get the transcript path from the Config
+    const transcriptPath = this.config.getTranscriptPath();
+    const sourceType = this.config.getSessionSourceType();
+    const sourceId = this.config.getSessionSourceId();
+
+    const agentId = getCurrentAgentId();
+    const promptId = promptIdContext.getStore();
+
+    return {
+      session_id: this.config.getSessionId(),
+      ...(sourceType !== undefined ? { source_type: sourceType } : {}),
+      ...(sourceId !== undefined ? { source_id: sourceId } : {}),
+      transcript_path: transcriptPath,
+      cwd: this.config.getWorkingDir(),
+      hook_event_name: eventName,
+      timestamp: new Date().toISOString(),
+      // Tool and subagent events spread this first and set their own mode.
+      permission_mode: approvalModeToPermissionMode(
+        this.config.getApprovalMode(),
+      ),
+      ...(agentId ? { agent_id: agentId } : {}),
+      ...(promptId ? { prompt_id: promptId } : {}),
+    };
+  }
+
+  /**
+   * Process common hook output fields centrally
+   */
+  private processCommonHookOutputFields(
+    aggregated: AggregatedHookResult,
+  ): void {
+    if (!aggregated.finalOutput) {
+      return;
+    }
+
+    // Handle systemMessage - show to user in transcript mode (not to agent)
+    const systemMessage = aggregated.finalOutput.systemMessage;
+    if (systemMessage && !aggregated.finalOutput.suppressOutput) {
+      debugLogger.warn(`Hook system message: ${systemMessage}`);
+    }
+
+    // Handle continue=false - this should stop the entire agent execution
+    if (aggregated.finalOutput.continue === false) {
+      const stopReason =
+        aggregated.finalOutput.stopReason ||
+        aggregated.finalOutput.reason ||
+        'No reason provided';
+      debugLogger.debug(`Hook requested to stop execution: ${stopReason}`);
+    }
+  }
+
+  private sanitizeHookInputForTelemetry(
+    eventName: HookEventName,
+    input: HookInput,
+  ): Record<string, unknown> {
+    const telemetryInput: Record<string, unknown> = { ...input };
+
+    if (eventName === HookEventName.TodoCreated) {
+      delete telemetryInput['todo_content'];
+      delete telemetryInput['all_todos'];
+      if ('phase' in telemetryInput) {
+        telemetryInput['phase'] =
+          telemetryInput['phase'] === HookPhase.PostWrite
+            ? HookPhase.PostWrite
+            : HookPhase.Validation;
+      }
+    }
+
+    if (eventName === HookEventName.TodoCompleted) {
+      delete telemetryInput['todo_content'];
+      delete telemetryInput['all_todos'];
+      if ('phase' in telemetryInput) {
+        telemetryInput['phase'] =
+          telemetryInput['phase'] === HookPhase.PostWrite
+            ? HookPhase.PostWrite
+            : HookPhase.Validation;
+      }
+    }
+
+    return telemetryInput;
+  }
+
+  /**
+   * Log hook execution for observability
+   */
+  private logHookExecution(
+    eventName: HookEventName,
+    input: HookInput,
+    results: HookExecutionResult[],
+    aggregated: AggregatedHookResult,
+  ): void {
+    const failedHooks = results.filter((r) => !r.success);
+    const successCount = results.length - failedHooks.length;
+    const errorCount = failedHooks.length;
+
+    if (errorCount > 0) {
+      const failedNames = failedHooks
+        .map((r) => this.getHookNameFromResult(r))
+        .join(', ');
+
+      debugLogger.warn(
+        `Hook(s) [${failedNames}] failed for event ${eventName}. Check debug logs for more details.`,
+      );
+    } else {
+      debugLogger.debug(
+        `Hook execution for ${eventName}: ${successCount} hooks executed successfully, ` +
+          `total duration: ${aggregated.totalDuration}ms`,
+      );
+    }
+
+    const telemetryInput = this.sanitizeHookInputForTelemetry(eventName, input);
+
+    for (const result of results) {
+      const hookName = this.getHookNameFromResult(result);
+      const hookType = this.getHookTypeFromResult(result);
+
+      const hookCallEvent = new HookCallEvent(
+        eventName,
+        hookType,
+        hookName,
+        telemetryInput,
+        result.duration,
+        result.success,
+        result.output ? { ...result.output } : undefined,
+        result.exitCode,
+        result.stdout,
+        result.stderr,
+        result.error?.message,
+      );
+
+      logHookCall(this.config, hookCallEvent);
+    }
+
+    for (const error of aggregated.errors) {
+      debugLogger.warn(`Hook execution error: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get hook name from config for display or telemetry
+   */
+  private getHookName(config: HookConfig): string {
+    if (config.type === 'command') {
+      return config.name || config.command || 'unknown-command';
+    }
+    return config.name || 'unknown-hook';
+  }
+
+  /**
+   * Get hook name from execution result for telemetry
+   */
+  private getHookNameFromResult(result: HookExecutionResult): string {
+    return this.getHookName(result.hookConfig);
+  }
+
+  /**
+   * Get hook type from execution result for telemetry
+   */
+  private getHookTypeFromResult(
+    result: HookExecutionResult,
+  ): 'command' | 'http' | 'function' | 'prompt' {
+    return result.hookConfig.type;
+  }
+}

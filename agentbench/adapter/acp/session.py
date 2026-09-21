@@ -84,7 +84,7 @@ class ACPSession:
                 raise self.client.error
             if self.drain_task.done() and self.drain_task.exception():
                 raise self.drain_task.exception()
-            self.read_native_evidence()
+            self.read_native_evidence(plain(response))
             self.emit('prompt_completed', plain(response))
             stop = response.stop_reason
             if stop == 'cancelled':
@@ -104,11 +104,13 @@ class ACPSession:
             self.callbacks = []
             self.busy = False
 
-    def read_native_evidence(self):
+    def read_native_evidence(self, prompt_response=None):
         if self.evidence_reader is None:
             return
         try:
-            calls = self.evidence_reader(self.client.session_id)
+            from .evidence import collect_calls
+            calls = collect_calls(self.evidence_reader, self.client.session_id,
+                                  prompt_response=prompt_response)
             if not isinstance(calls, list) or len(calls) > 10000:
                 raise ValueError('Invalid native evidence collection')
             current = 0
