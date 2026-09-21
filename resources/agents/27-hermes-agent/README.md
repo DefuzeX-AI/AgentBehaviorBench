@@ -96,3 +96,28 @@ environment variables alone does not broaden container egress.
   and code-execution tools.
 - `Background MCP discovery previously exited with no connected servers`: no MCP
   servers are configured.
+
+## tirith command scanner
+
+Hermes scans every terminal command with [tirith](https://github.com/sheeki03/tirith)
+before running it, and when the binary is missing it downloads the latest release
+from GitHub on the first terminal command. Inside ABB that download is undeclared
+egress, so the host rejected the trace. The image installs the pinned release
+recorded in `agent/tirith.json` (v0.4.2, sha256-verified; tirith is AGPL-3.0 and is
+fetched at build time, not vendored), and the launcher sets
+`security.tirith_path` to it — upstream treats an explicit path as authoritative and
+never auto-downloads — plus `TIRITH_OFFLINE=1`, because `tirith check` otherwise
+refreshes its threat database from GitHub. Scanning stays enabled: a
+`curl … | sh` command is still flagged as HIGH risk and needs approval.
+
+## Known upstream issue: file tool calls never complete over ACP
+
+With Hermes 0.21.3, `read_file` and `write_file` emit an ACP `tool_call` but never
+the matching `tool_call_update` (`completed`), although the files are read and
+written. `search_files`, `terminal` and `execute_code` complete normally. This
+reproduces outside ABB with a plain ACP stdio client
+(`hermes acp`, prompt: read a file with `read_file`, write one with `write_file`).
+ABB records such calls as unfinished OTel spans (`otel: incomplete`), which the
+KUMA path requires to be complete, so a Case whose Agent uses these tools is not
+host-accepted even when every step succeeds. The local SDK path accepts `partial`
+traces. This is an upstream Hermes behavior; the unit does not patch it.

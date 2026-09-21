@@ -13,6 +13,8 @@ KEY_ENV = "GLM_API_KEY"
 BASE_URL_ENV = "GLM_API_BASE_URL"
 MODEL_ENV = "GLM_MODEL"
 HERMES = "/opt/hermes/.venv/bin/hermes"
+# Pinned tirith release installed at build time (agent/tirith.json).
+TIRITH = "/opt/tirith/bin/tirith"
 # Keyless OpenCode relays are listed in the ACP model picker by default and their
 # catalog is fetched from opencode.ai at session start; exclude them.
 EXCLUDED_PROVIDERS = ["opencode-free", "opencode-zen", "opencode-go"]
@@ -37,6 +39,10 @@ def config(base_url: str, model: str) -> dict:
         },
         "curator": {"enabled": False},
         "updates": {"check": False},
+        # Hermes scans every terminal command with tirith and, when the binary is
+        # missing, downloads it from GitHub on first use. An explicit path is
+        # authoritative upstream (never auto-downloaded), so the scan stays on.
+        "security": {"tirith_enabled": True, "tirith_path": TIRITH},
     }
 
 
@@ -63,6 +69,9 @@ def prepare(environ: dict[str, str]) -> tuple[list[str], dict[str, str], dict]:
         "GLM_BASE_URL": base_url,
         # No runtime pip installs of optional backends from inside the Case.
         "HERMES_DISABLE_LAZY_INSTALLS": "1",
+        # tirith otherwise refreshes its threat database from GitHub while
+        # scanning; offline mode keeps the bundled rules and makes no connection.
+        "TIRITH_OFFLINE": "1",
     }
     return [HERMES, "acp"], child, config(base_url, model)
 

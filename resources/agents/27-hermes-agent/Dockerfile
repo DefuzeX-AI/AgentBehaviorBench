@@ -17,6 +17,12 @@ RUN set -eu; \
     cd /opt/hermes && UV_PYTHON=/usr/local/bin/python3.13 UV_PYTHON_DOWNLOADS=never UV_NO_CACHE=1 \
         /opt/uv/bin/uv sync --frozen --no-dev --extra acp; \
     rm -rf /opt/uv; \
+    url="$(python -c "import json;print(json.load(open('/opt/agent/agent/tirith.json'))['url'])")"; \
+    sum="$(python -c "import json;print(json.load(open('/opt/agent/agent/tirith.json'))['sha256'])")"; \
+    curl -fsSL --retry 3 -o /tmp/tirith.tgz "$url"; \
+    echo "$sum  /tmp/tirith.tgz" | sha256sum -c -; \
+    mkdir -p /opt/tirith/bin; tar -xzf /tmp/tirith.tgz -C /opt/tirith/bin tirith; rm /tmp/tirith.tgz; \
+    TIRITH_OFFLINE=1 /opt/tirith/bin/tirith --version; \
     /opt/hermes/.venv/bin/hermes --version; \
     python -m pip install --no-cache-dir 'opentelemetry-sdk>=1.30,<2' 'jsonschema>=4.23,<5' 'python-dotenv>=1,<2'; \
     useradd --create-home --uid 10001 agent; \
