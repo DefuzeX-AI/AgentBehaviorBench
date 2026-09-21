@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Alert, Breadcrumb, Button, Card, Descriptions, Empty, Skeleton, Statistic, Typography } from 'antd';
+import { Alert, Card, Descriptions, Empty, Skeleton, Statistic, Tag, Typography } from 'antd';
+import SuiteBreadcrumb from '../navigation/SuiteBreadcrumb.jsx';
 import ReactMarkdown from 'react-markdown';
 import useLiveJson from '../useLiveJson.js';
 import { agentSummaries } from '../suite/summaryModel.js';
@@ -15,12 +16,20 @@ export default function AgentDetailsPage({ agentId, endpoint, snapshot, cases, o
   const [pageSize, setPageSize] = useState(12);
   const repository = /^https:\/\//i.test(data?.repository || '') ? data.repository : null;
   return <section className="agent-details" aria-label="Agent overview">
-    <Breadcrumb items={[{ title: <Button type="link" onClick={onBack}>Suite overview</Button> }, { title: agentId }]} />
+    <SuiteBreadcrumb agentId={agentId} onSuiteSelect={onBack} />
     <header className="agent-intro-header"><Typography.Text type="secondary">AGENT OVERVIEW</Typography.Text>
       <Typography.Title level={1}>{data?.display_name || agentId}</Typography.Title>
       <Typography.Text copyable>{agentId}</Typography.Text>
     </header>
     {data && <Card title="Strategy Group" className="agent-strategy-card">
+      <Tag color={data.strategy_check?.status === 'valid' ? 'success' : data.strategy_check?.status === 'invalid' ? 'error' : 'warning'}>
+        strategy {data.strategy_check?.status || 'unverified'}
+      </Tag>
+      {data.strategy_check?.display_name && <Typography.Title level={3}>{data.strategy_check.display_name}</Typography.Title>}
+      <Typography.Paragraph type="secondary">{data.strategy_check
+        ? `Last CLI check · ${data.strategy_check.sdk} · ${new Date(data.strategy_check.checked_at).toLocaleString()}`
+        : 'No matching CLI check recorded. Run discovery to validate against the current SDK catalog.'}</Typography.Paragraph>
+      {data.strategy_check?.reason && <Typography.Paragraph>{data.strategy_check.reason}</Typography.Paragraph>}
       {data.strategy_group ? <>
         <Typography.Title level={2}>{data.strategy_group.id} <Typography.Text type="secondary">Version {data.strategy_group.version}</Typography.Text></Typography.Title>
         <Typography.Paragraph type="secondary">Declared in the current requirement.md. Historical Case selections are recorded separately.</Typography.Paragraph>

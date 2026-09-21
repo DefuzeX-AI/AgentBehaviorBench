@@ -51,3 +51,15 @@ def test_invalid_frontmatter_keeps_description_available(tmp_path):
     assert data['strategy_group'] is None
     assert data['profile_warning']
     assert data['description'].strip() == 'Research.'
+
+
+def test_profile_changes_invalidate_saved_strategy_check(tmp_path):
+    import hashlib, json
+    from agentbench.sdk.strategy_checks import snapshot_path
+    unit = profile_files(tmp_path)
+    cache = snapshot_path(tmp_path, unit)
+    cache.parent.mkdir(parents=True)
+    cache.write_text(json.dumps({'status': 'valid', 'profile_sha256': hashlib.sha256((unit/'requirement.md').read_bytes()).hexdigest()}))
+    assert agent_profile(tmp_path, 'alpha')['strategy_check']['status'] == 'valid'
+    (unit/'requirement.md').write_text('Changed profile')
+    assert agent_profile(tmp_path, 'alpha')['strategy_check'] is None

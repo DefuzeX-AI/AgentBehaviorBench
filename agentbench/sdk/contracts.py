@@ -103,6 +103,34 @@ class SDKOnboardingContext(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
+class StrategyCheck:
+    status: Literal['valid', 'invalid', 'unverified', 'unsupported']
+    id: str | None = None
+    version: str | None = None
+    display_name: str | None = None
+    reason: str = ''
+    catalog_release: str | None = None
+
+
+@runtime_checkable
+class SDKVersionInfo(Protocol):
+    """Optional silent version/update metadata for host-owned presentation."""
+    def version_info(self) -> Mapping[str, str | None]: ...
+
+
+class StrategyChecker(Protocol):
+    """Checks against one freshly acquired catalog; no I/O per selection."""
+    def strategies_check(self, strategy_id: str, version: str | None = None) -> StrategyCheck: ...
+
+
+@runtime_checkable
+class SDKStrategyChecks(Protocol):
+    """Optional SDK-owned profile parsing and live catalog checking."""
+    def strategy_selection(self, directory: Path) -> tuple[str, str] | None: ...
+    def strategy_checker(self, *, environ: Mapping[str, str], timeout: float) -> StrategyChecker: ...
+
+
+@dataclass(frozen=True, slots=True)
 class PreparedCase:
     """Immutable work description passed from preparation to one Case runner."""
 

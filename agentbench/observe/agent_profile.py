@@ -2,6 +2,8 @@
 from pathlib import Path
 import re
 import yaml
+import json
+import hashlib
 from agentbench.harness.registry import tomllib
 
 
@@ -39,8 +41,17 @@ def agent_profile(root, agent_id):
                 profile_warning = 'Agent profile front matter could not be read.'
     except FileNotFoundError:
         description = ''
+    from agentbench.sdk.strategy_checks import snapshot_path
+    strategy_check = None
+    try:
+        saved = json.loads(snapshot_path(root, unit).read_text(encoding='utf-8'))
+        fingerprint = hashlib.sha256((unit / 'requirement.md').read_bytes()).hexdigest()
+        if saved.get('profile_sha256') == fingerprint:
+            strategy_check = {key: saved.get(key) for key in ('status', 'id', 'version', 'display_name', 'reason', 'checked_at', 'sdk', 'catalog_release')}
+    except (OSError, ValueError, AttributeError):
+        pass
     return {'agent_id': agent_id, 'display_name': manifest.get('display_name', agent_id),
             'framework': manifest.get('framework'), 'runtime': manifest.get('runtime', {}).get('type'),
             'repository': source.get('repository'), 'revision': source.get('revision'),
-            'description': description, 'strategy_group': strategy_group, 'profile_warning': profile_warning,
+            'description': description, 'strategy_group': strategy_group, 'strategy_check': strategy_check, 'profile_warning': profile_warning,
             'provenance': 'Current local Agent profile'}

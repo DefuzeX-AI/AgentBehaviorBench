@@ -36,6 +36,7 @@ class ProgressPrinter:
         self._live_cases = live_cases
         self._llm_activity = llm_activity
         self._active_label: str | None = None
+        self._source_line_pending = False
         self._animation_interval = animation_interval
         self._stop_animation = Event()
         self._render_lock = Lock()
@@ -51,10 +52,29 @@ class ProgressPrinter:
             marker, color = {'started': ('RUNNING', ANSI_YELLOW),
                              'succeeded': ('OK', ANSI_GREEN),
                              'failed': ('FAILED', ANSI_RED)}[event.status]
-            self._output_fn(f'[{event.agent_id}] {event.detail} .... {color}{marker}{ANSI_RESET}')
+            line = f'[{event.agent_id}] {event.detail} .... {color}{marker}{ANSI_RESET}'
+            if self._live_updates:
+                # Source preparation is sequential and precedes SDK activity.
+                # Replace temporary progress instead of leaving RUNNING behind.
+                prefix = '\r\033[2K' if self._source_line_pending else ''
+                ending = '' if event.status == 'started' else '\n'
+                sys.stdout.write(prefix + line + ending)
+                sys.stdout.flush()
+                self._source_line_pending = event.status == 'started'
+            else:
+                self._output_fn(line)
             return
         if self._live_cases is not None and event.stage != "sdk_check":
             self._live_cases.on_progress(event)
+            return
+        if (self._llm_activity is not None and self._llm_activity.compact
+                and event.stage not in {'sdk_check', 'agent_start'}):
+            if event.status == 'started':
+                label = 'Generating' if event.stage == 'case_generation' else 'Running Agent'
+                self._llm_activity.show_case_status(event.agent_id, event.case_index, label)
+            elif event.status == 'failed':
+                self._llm_activity.write_static(f'[{event.agent_id}] {ANSI_RED}FAILED{ANSI_RESET} | {event.detail or event.stage}')
+            # Successful artifact validation is retained in the event log.
             return
         if self._concurrent:
             if (event.stage == "case_generation" and getattr(event, "phase", None) == "generate"
@@ -134,6 +154,10 @@ class ProgressPrinter:
     def close(self) -> None:
         """Stop any live renderer left active by an interrupted run."""
 
+        if self._source_line_pending:
+            sys.stdout.write('\r\033[2K')
+            sys.stdout.flush()
+            self._source_line_pending = False
         if self._llm_activity is not None:
             self._llm_activity.close()
             return

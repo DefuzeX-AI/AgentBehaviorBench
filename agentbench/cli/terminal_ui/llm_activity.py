@@ -81,6 +81,45 @@ class LLMActivity:
         self._rendered_line_count = 0
         self._concurrent = False
         self._live_cases: LiveCases | None = None
+        self.compact = False
+        self.case_counts = {}
+        self._compact_label = None
+
+    def show_case_status(self, agent_id, case_index, status):
+        total = self.case_counts.get(agent_id)
+        if case_index is None and total == 1:
+            case_index = 0
+        identity = case_identity(agent_id, case_index, None, total)
+        label = f'{identity} {status}'
+        if label == self._compact_label:
+            return
+        self._compact_label = label
+        if self._concurrent:
+            self.write_static(label)
+        else:
+            self.start_stage(label)
+
+    def _emit_compact(self, event):
+        data = event.data
+        status = str(data.get('status', ''))
+        failed = event.event in {'llm_error', 'tool_error'} or (
+            event.event in {'llm_response', 'tool_response'} and status.isdigit() and int(status) >= 400)
+        if failed:
+            if data.get('purpose') == 'evaluation':
+                self._write_evaluation_http(event)
+            else:
+                identity = case_identity(data.get('agent_id'), data.get('case_index'))
+                self.write_static(f"{identity} Model error · {data.get('error') or ('HTTP ' + status)}")
+            return
+        if data.get('phase') == 'generate':
+            from .generation_progress import read_generation_progress
+            progress = read_generation_progress(data)
+            if progress is not None and progress.active_index is not None:
+                self.show_case_status(data.get('agent_id'), progress.active_index, 'Generating')
+        elif (data.get('purpose') == 'evaluation' and event.event == 'tool_request'
+              and str(data.get('method', '')).upper() == 'POST'
+              and '/judge/' in str(data.get('path', ''))):
+            self.show_case_status(data.get('agent_id'), data.get('case_index'), 'Waiting for Judge')
 
     def set_concurrent(self, enabled: bool) -> None:
         """Use permanent identity-prefixed events when several Agents run."""
@@ -137,6 +176,9 @@ class LLMActivity:
             return
         if self._live_cases is not None:
             self._live_cases.on_trace(event)
+            return
+        if self.compact:
+            self._emit_compact(event)
             return
         if self._concurrent:
             self._emit_concurrent(event)
@@ -260,6 +302,7 @@ class LLMActivity:
         """Stop animation and erase all temporary terminal content."""
 
         self._stop_animation_thread()
+        self._compact_label = None
         with self._lock:
             self._clear_live_block_locked()
             self._reset_locked()

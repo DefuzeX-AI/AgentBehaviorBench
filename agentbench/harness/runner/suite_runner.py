@@ -188,6 +188,7 @@ class SuiteRunner:
                     bus.publish({'event': 'progress', **asdict(event)}, on_progress, (event,))
                 try:
                     prepare_agent_source(agent.path, check=control.check, output_fn=source_progress)
+                    source_progress('Checking Agent files .... OK')
                 except Exception as exc:
                     event = BenchmarkProgress('source_preparation', 'failed', agent_id=agent.agent_id,
                                               detail=str(exc), suite_id=suite_id)

@@ -1,4 +1,5 @@
-import { Alert, Breadcrumb, Button, Select, Skeleton, Space, Tabs, Tag, Typography } from 'antd';
+import { Alert, Select, Skeleton, Space, Tabs, Tag, Typography } from 'antd';
+import SuiteBreadcrumb from '../navigation/SuiteBreadcrumb.jsx';
 import { useDispatch, useSelector } from 'react-redux';
 import useLiveJson from '../useLiveJson.js';
 import { actions } from '../suite/store.js';
@@ -38,7 +39,7 @@ export default function CaseDetailsPage({ item, revision, onBack, onAgentSelect 
   ];
 
   return <section className="case-details" aria-label={`${item.agent_id} Case ${item.case_index + 1}`}>
-    <Breadcrumb items={[{ title: <Button type="link" className="case-back" onClick={onBack}>Suite overview</Button> }, { title: <Button type="link" onClick={() => onAgentSelect(item.agent_id)}>{item.agent_id}</Button> }, { title: `Case ${item.case_index + 1}` }]} />
+    <SuiteBreadcrumb agentId={item.agent_id} caseIndex={item.case_index} onSuiteSelect={onBack} onAgentSelect={onAgentSelect} />
     <div className="case-header"><div><Text className="case-eyebrow">{item.agent_id}</Text><Title level={1}>Case {item.case_index + 1}</Title>
       <Text copyable type="secondary">{item.case_id || 'Case ID pending'}</Text></div>
       <Space wrap><ExecutionBadge status={attempt ? executionStatus(attempt) : item.execution_status} /><JudgeBadge status={attempt?.judge_status || report?.status || item.judge_status} />{rejected && <Tag color="error">Host rejected</Tag>}<RetryButton item={item} /></Space></div>

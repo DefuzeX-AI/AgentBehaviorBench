@@ -11,6 +11,23 @@ class KumaEvaluationSDK:
     """Strategy adapter for the existing formal KUMA container runner."""
 
     execution = "container"
+
+    def version_info(self):
+        # Complete the public check before catalog transport can schedule an
+        # asynchronous stderr reminder. The SDK cache deduplicates later checks.
+        from kuma import check_for_updates
+        result = check_for_updates()
+        return {'name': 'KUMA', 'version': result['current_version'],
+                'latest_version': result['latest_version']
+                if result['status'] in {'required', 'optional'} else None}
+
+    def strategy_selection(self, directory):
+        from .strategy_checks import selection
+        return selection(directory)
+
+    def strategy_checker(self, *, environ, timeout):
+        from .strategy_checks import checker
+        return checker(environ=environ, timeout=timeout)
     concurrency_capabilities = RunnerConcurrencyCapabilities(
         isolated_cases=True, cooperative_cancel=True,
     )

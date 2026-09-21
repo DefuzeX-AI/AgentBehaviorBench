@@ -72,7 +72,13 @@ def execute(args):
             agent = replace(agent, case_count=args.cases)
         print(f'Evaluation: {agent.case_count} independent Case(s) using {plan.selection.reference.name}; '
               'selected services may incur charges.', flush=True)
-        if not args.yes and not confirm_agents((agent,), input_fn=input, output_fn=print):
+        from agentbench.sdk.strategy_checks import check_agents
+        from agentbench.cli.terminal_ui.presentation import print_agents
+        checks = check_agents((agent,), selection=plan.selection, environ=loaded.environ,
+                              root=Path(args.registry).resolve().parent.parent)
+        if args.yes:
+            print_agents((agent,), print, strategy_checks=checks)
+        if not args.yes and not confirm_agents((agent,), input_fn=input, output_fn=print, strategy_checks=checks):
             return 0
         output = args.result_output or _default_output_path(args.registry, agent.agent_id, command="evaluate")
         if args.output is not None:

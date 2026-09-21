@@ -131,10 +131,16 @@ def run(configuration: RunConfiguration | None = None) -> int:
             "Use 'agentbench certify <agent_id>' when an adapter is ready."
         )
 
+    from agentbench.sdk.strategy_checks import check_agents
+    checks = None if config.suite_runner is not None else check_agents(
+        agents, selection=config.sdk_selection, sdk=config.sdk, environ=config.environ)
+    if config.assume_yes:
+        print_agents(agents, config.output_fn, strategy_checks=checks)
     if not config.assume_yes and not confirm_agents(
         agents,
         input_fn=config.input_fn,
         output_fn=config.output_fn,
+        strategy_checks=checks,
     ):
         return 0
 

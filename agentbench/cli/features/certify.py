@@ -140,7 +140,13 @@ def certify(
         "The registry will change to ready if the Agent completes its Cases "
         "without invocation errors."
     )
-    if not assume_yes and not confirm_agents((agent,), input_fn=input_fn, output_fn=output_fn):
+    from agentbench.sdk.strategy_checks import check_agents
+    from agentbench.cli.terminal_ui.presentation import print_agents
+    checks = None if suite_runner is not None else check_agents(
+        (agent,), selection=sdk_selection, sdk=sdk, environ=environ, root=Path(registry_path).resolve().parent.parent)
+    if assume_yes:
+        print_agents((agent,), output_fn, strategy_checks=checks)
+    if not assume_yes and not confirm_agents((agent,), input_fn=input_fn, output_fn=output_fn, strategy_checks=checks):
         return 0
     llm_activity = LLMActivity(output_fn)
     runner = suite_runner or build_trace_suite_runner(

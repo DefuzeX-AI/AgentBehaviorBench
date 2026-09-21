@@ -260,3 +260,19 @@ def test_source_progress_uses_colored_running_success_and_failure():
     assert ANSI_YELLOW+'RUNNING' in lines[0]
     assert '.... '+ANSI_GREEN+'OK' in lines[1]
     assert ANSI_RED+'FAILED' in lines[2]
+
+
+def test_live_source_progress_replaces_running_line(capsys):
+    from agentbench.cli.terminal_ui.progress import ProgressPrinter
+    from agentbench.cli.terminal_ui.constants import ANSI_GREEN
+    from agentbench.harness.progress import BenchmarkProgress
+    printer = ProgressPrinter(live_updates=True)
+    printer(BenchmarkProgress('source_preparation', 'started', agent_id='test', detail='Checking Agent files'))
+    started = capsys.readouterr().out
+    assert 'RUNNING' in started and not started.endswith('\n')
+    printer(BenchmarkProgress('source_preparation', 'succeeded', agent_id='test', detail='Checking Agent files'))
+    finished = capsys.readouterr().out
+    assert finished.startswith('\r\033[2K')
+    assert f'Checking Agent files .... {ANSI_GREEN}OK' in finished
+    assert finished.endswith('\n')
+    printer.close()
