@@ -14,6 +14,11 @@ def configure_netfilter() -> None:
         ["iptables", "-A", "OUTPUT", "-p", "udp", "-m", "conntrack", "--ctorigdst", "127.0.0.11", "--ctorigdstport", "53", "-j", "ACCEPT"],
         ["iptables", "-A", "OUTPUT", "-p", "tcp", "-d", "127.0.0.11", "-m", "conntrack", "--ctorigdstport", "53", "-j", "ACCEPT"],
         ["iptables", "-A", "OUTPUT", "-p", "tcp", "-d", "127.0.0.1", "--dport", str(PROXY_PORT), "-j", "ACCEPT"],
+        # Replies on connections this chain already admitted. Without it, an Agent
+        # process that serves on loopback (an ACP bridge driving its own local HTTP
+        # server, reached through a declared tool route) can accept the interceptor's
+        # connection but never answer it. New outbound connections still fail closed.
+        ["iptables", "-A", "OUTPUT", "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT"],
         ["iptables", "-A", "OUTPUT", "-j", "REJECT"],
         # IPv6 and QUIC are not translated by this release: fail closed.
         ["ip6tables", "-A", "OUTPUT", "-m", "owner", "!", "--uid-owner", "0", "-j", "REJECT"],

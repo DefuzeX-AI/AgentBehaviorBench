@@ -1,0 +1,27 @@
+schema_version = "abb.network.v1"
+
+# OpenCode's local filesystem and shell tools need no external network routes.
+# The only admitted model route is declared in agent.toml [[llm_interception.routes]].
+# Startup downloads (models.dev catalog, @opencode-ai/plugin npm install,
+# ripgrep release) are prevented in the image/launcher instead of allowlisted.
+#
+# Loopback only: `opencode acp` is a thin ACP front end over OpenCode's own HTTP
+# server, which the same process starts on 127.0.0.1:4096 (pinned by launch.py).
+# The front end drives sessions, prompts, permissions and the event stream
+# through that server's REST/SSE API. The runtime redirects every non-root TCP
+# connection, loopback included, to the interceptor, so without this route the
+# first call is rejected as undeclared egress. The traffic never leaves the
+# container. Paths are the endpoints used by packages/opencode/src/acp/*.ts at
+# v1.18.31 (app.agents/skills, command.list, config.get/providers, global.event,
+# mcp.add, permission.reply, session.*).
+[[tool_routes]]
+host_patterns = ["127.0.0.1"]
+ports = [4096]
+methods = ["GET", "POST", "PATCH", "DELETE"]
+path_patterns = [
+  "/agent", "/skill", "/command", "/config", "/config/providers",
+  "/global/event", "/event", "/mcp", "/permission/*",
+  "/session", "/session/*",
+]
+purpose = "tool"
+required = false
