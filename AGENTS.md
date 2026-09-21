@@ -14,6 +14,7 @@ This file guides contributors and coding assistants. User setup belongs in
 | `agentbench/adapter/` | Framework loading and native input/output invocation. |
 | `agentbench/harness/` | Agent registry, suite scheduling, Case concurrency, recovery and results. |
 | `agentbench/runtime/` | Generic Docker execution, runtime services and interception integration. |
+| `agentbench/runtime/source/` | Source checks and missing-file restoration before SDK startup; see its README. |
 | `agentbench/services/model-interceptor/` | Model protocol recognition, authentication, routing and traffic evidence. |
 | `agentbench/sdk/plugin/<name>/` | SDK-specific Case generation, submission, judging and onboarding requirements. |
 | `agentbench/sdk/contracts.py`, `agentbench/sdk/common/` | Shared SDK contracts and helpers. |
@@ -42,6 +43,9 @@ configuration; Docker construction and execution belong to certification/runtime
 - Keep upstream source under `resources/agents/NN-name/agent/`. Put `agent.toml`,
   `bindings/`, `Dockerfile`, `.dockerignore`, `requirement.md` and source provenance
   beside `agent/`, not inside it. Preserve upstream behavior and source files.
+- Package-based units use `[source] method = "install"` and commit installation
+  inputs under `install/`. Preflight generates ignored `agent/` copies before SDK
+  startup. Do not commit those copies or mix them with upstream source trees.
 - Generate `agent.toml` programmatically from validated source facts and options.
   Other model-generated files are requested individually, validated and saved
   before advancing. `.dockerignore` comes from a local template.

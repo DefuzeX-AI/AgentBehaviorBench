@@ -12,6 +12,7 @@ from agentbench.onboarding.source import download_agent
 from .base import CommandFeature
 from .run import DEFAULT_REGISTRY_PATH
 from agentbench.cli.sdk import configure_sdk_parser
+from agentbench.cli.terminal_ui.constants import ANSI_RED, ANSI_RESET
 
 
 class _RejectDirectoryFlag(Action):
@@ -96,6 +97,12 @@ def _add(args: Namespace) -> int:
     print(f"Agent directory: {result.directory}", file=sys.stderr)
     if result.source_type == "local-directory":
         print(f"Local source copied from: {result.repository}", file=sys.stderr)
+        print(
+            f"{ANSI_RED}Note: Please upload this Agent's source code to GitHub so others "
+            "can download and use it, and restore or update it if the local copy "
+            f"is damaged or lost.{ANSI_RESET}",
+            file=sys.stderr,
+        )
     print(f"Source revision: {result.revision}", file=sys.stderr)
     for warning in result.warnings:
         print(f"Warning: {warning}", file=sys.stderr)

@@ -9,7 +9,7 @@ vendored or modified.
 The npm package is a small Node.js resolver; the agent itself is the prebuilt
 native binary in the optional dependency `@cline/cli-linux-x64@3.0.62`
 (about 151 MB, Bun runtime embedded). Both are pinned with registry integrity in
-`agent/package-lock.json`.
+`install/package-lock.json`.
 
 The acceptance profile uses Zhipu GLM's OpenAI-compatible coding endpoint.
 Supply these variables only at runtime:
@@ -80,3 +80,7 @@ an "AI SDK Warning System" banner on stderr for each model call. They come from
 the upstream provider wiring, do not affect requests, and appear only in ACP
 stderr evidence. No background title or summary model calls were observed: every
 recorded model request belongs to a prompt turn and completed before ACP closed.
+
+## Installation inputs
+
+Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.

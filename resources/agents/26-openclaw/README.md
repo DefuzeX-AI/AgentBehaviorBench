@@ -110,3 +110,7 @@ The package requires Node `>=24.16 <25 || >=26.1`;
   mention channels or web research that this unit does not provision.
 - OpenClaw's system prompt is large (about 52k tokens), so the first model call
   of a Case is slow; `timeout_sec = 900` and `handshake_timeout = 180` allow for it.
+
+## Installation inputs
+
+Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.

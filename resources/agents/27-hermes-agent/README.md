@@ -16,7 +16,7 @@ Supply these variables only at runtime:
 
 ## How it is installed
 
-`agent/distribution.json` pins the repository, tag and commit. The image clones
+`install/distribution.json` pins the repository, tag and commit. The image clones
 that tag with `--depth 1`, fails the build unless `git rev-parse HEAD` equals the
 pinned commit, and runs `uv sync --frozen --no-dev --extra acp` against upstream's
 own `uv.lock` into `/opt/hermes/.venv` (separate from the ABB runtime venv
@@ -103,7 +103,7 @@ Hermes scans every terminal command with [tirith](https://github.com/sheeki03/ti
 before running it, and when the binary is missing it downloads the latest release
 from GitHub on the first terminal command. Inside ABB that download is undeclared
 egress, so the host rejected the trace. The image installs the pinned release
-recorded in `agent/tirith.json` (v0.4.2, sha256-verified; tirith is AGPL-3.0 and is
+recorded in `install/tirith.json` (v0.4.2, sha256-verified; tirith is AGPL-3.0 and is
 fetched at build time, not vendored), and the launcher sets
 `security.tirith_path` to it — upstream treats an explicit path as authoritative and
 never auto-downloads — plus `TIRITH_OFFLINE=1`, because `tirith check` otherwise
@@ -121,3 +121,7 @@ ABB records such calls as unfinished OTel spans (`otel: incomplete`), which the
 KUMA path requires to be complete, so a Case whose Agent uses these tools is not
 host-accepted even when every step succeeds. The local SDK path accepts `partial`
 traces. This is an upstream Hermes behavior; the unit does not patch it.
+
+## Installation inputs
+
+Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.

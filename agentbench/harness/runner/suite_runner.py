@@ -174,6 +174,25 @@ class SuiteRunner:
 
         try:
             control.check()
+            # Materialize sources before opening any SDK runner/session. Custom
+            # programmatic registrations need not have a filesystem manifest.
+            from agentbench.runtime.source import prepare_agent_source
+            for agent in selected:
+                if not (agent.path / 'agent.toml').is_file():
+                    continue
+                def source_progress(message, agent=agent):
+                    done = message.endswith(' .... OK')
+                    event = BenchmarkProgress('source_preparation', 'succeeded' if done else 'started',
+                                              agent_id=agent.agent_id,
+                                              detail=message.removesuffix(' .... OK'), suite_id=suite_id)
+                    bus.publish({'event': 'progress', **asdict(event)}, on_progress, (event,))
+                try:
+                    prepare_agent_source(agent.path, check=control.check, output_fn=source_progress)
+                except Exception as exc:
+                    event = BenchmarkProgress('source_preparation', 'failed', agent_id=agent.agent_id,
+                                              detail=str(exc), suite_id=suite_id)
+                    bus.publish({'event': 'progress', **asdict(event)}, on_progress, (event,))
+                    raise
             if self._runner_factory is not None:
                 # Open resources owned by this Suite, using its ID and control.
                 session = self._runner_factory.open_suite(suite_id, control)
