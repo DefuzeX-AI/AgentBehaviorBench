@@ -1,0 +1,28 @@
+schema_version = "abb.network.v1"
+
+# Kilo's local filesystem and shell tools need no external network routes. The
+# only admitted model route is declared in agent.toml [[llm_interception.routes]].
+# Kilo's startup calls (models.dev catalog, PostHog telemetry, api.kilo.ai
+# gateway, auto-update) are switched off in bootstrap/launch.py, not allowlisted.
+#
+# Loopback only: `kilo acp` is a thin ACP bridge over Kilo's own HTTP server,
+# which the same process starts on 127.0.0.1:4096 (pinned by launch.py). The
+# bridge drives sessions, prompts, permissions and the event stream through
+# that server's REST/SSE API. The runtime redirects every non-root TCP
+# connection, loopback included, to the interceptor, so without this route the
+# bridge's first call is rejected as undeclared egress. The traffic never
+# leaves the container; the paths are the server's API groups used by the
+# bridge (captured from the 7.7.5 binary's SDK and observed runs).
+[[tool_routes]]
+host_patterns = ["127.0.0.1"]
+ports = [4096]
+methods = ["GET", "POST", "PATCH", "PUT", "DELETE"]
+path_patterns = [
+  "/global/*", "/event", "/config", "/config/*", "/command", "/skill", "/agent",
+  "/provider", "/provider/*", "/session", "/session/*", "/permission", "/permission/*",
+  "/question", "/question/*", "/project", "/project/*", "/path", "/mcp", "/mcp/*",
+  "/file", "/file/*", "/find", "/find/*", "/vcs", "/vcs/*", "/lsp", "/formatter",
+  "/network", "/network/*", "/experimental/*", "/kilo/*", "/kilocode/*",
+]
+purpose = "tool"
+required = false
