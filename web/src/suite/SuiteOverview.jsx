@@ -3,12 +3,13 @@ import { AppstoreOutlined, TableOutlined } from '@ant-design/icons';
 import { Alert, Button, Input, Progress, Segmented, Select, Space, Statistic, Switch, Table, Tooltip, Typography } from 'antd';
 import { useDispatch, useSelector } from 'react-redux';
 import { actions } from './store.js';
-import { countCases, executionLabels, normalizeCases } from './model.js';
+import { countCases, executionLabels, isActive, normalizeCases } from './model.js';
 import { filterCases, latestTimestamp, sortCases } from './tableModel.js';
 import CaseStatus, { JudgeBadge } from './CaseStatus.jsx';
-import SuiteControls, { ExportReportButton, RetryButton } from './SuiteControls.jsx';
+import { ExportReportButton } from './SuiteControls.jsx';
 import AgentSummaryCards from './AgentSummaryCards.jsx';
 import CaseCardGrid from './CaseCardGrid.jsx';
+import SuiteActivity from './SuiteActivity.jsx';
 import './suite.css';
 
 const { Text, Title } = Typography;
@@ -37,8 +38,10 @@ export default function SuiteOverview({ onCaseSelect, onAgentSelect }) {
 
   const sortOrder = field => table.field === field ? table.order : null;
   const columns = [
-    { title: 'Agent / Case', key: 'case', sorter: true, sortOrder: sortOrder('case'), width: 230,
-      render: (_, item) => <div className="suite-case-cell"><Button type="link" onClick={event => { event.stopPropagation(); onAgentSelect(item.agent_id); }}>{item.agent_id}</Button><span>Case {item.case_index + 1}</span></div> },
+    { title: 'Agent', key: 'agent', sorter: true, sortOrder: sortOrder('agent'), width: 230,
+      render: (_, item) => <Button type="link" onClick={event => { event.stopPropagation(); onAgentSelect(item.agent_id); }}>{item.agent_id}</Button> },
+    { title: 'Case', key: 'caseNumber', sorter: true, sortOrder: sortOrder('caseNumber'), width: 110,
+      render: (_, item) => <Button type="link" onClick={event => { event.stopPropagation(); onCaseSelect(item); }}>Case {item.case_index + 1}</Button> },
     { title: 'Execution', key: 'status', sorter: true, sortOrder: sortOrder('status'), width: 230,
       render: (_, item) => <CaseStatus item={item} /> },
     { title: 'Judge', key: 'judge', sorter: true, sortOrder: sortOrder('judge'), width: 150,
@@ -48,8 +51,6 @@ export default function SuiteOverview({ onCaseSelect, onAgentSelect }) {
     { title: 'Last activity', key: 'updated', sorter: true, sortOrder: sortOrder('updated'), width: 170,
       render: (_, item) => latestTimestamp(item) ? new Date(latestTimestamp(item)).toLocaleString() : <Text type="secondary">Not recorded</Text> },
   ];
-  if (cases.some(item => item.can_retry)) columns.push({ title: 'Recovery', key: 'recovery', fixed: 'right', width: 130,
-    render: (_, item) => <Space onClick={event => event.stopPropagation()}><RetryButton item={item} /></Space> });
 
   return <section className="suite-overview" aria-label="Suite overview">
     <div className="suite-heading"><div><Text className="suite-eyebrow">SUITE OVERVIEW</Text><Title level={2}>All Cases</Title>
@@ -58,6 +59,7 @@ export default function SuiteOverview({ onCaseSelect, onAgentSelect }) {
 
     {error && <Alert type="warning" showIcon message="Live sync is temporarily unavailable" description="The latest saved Suite data remains visible. The viewer will retry automatically." />}
 
+    <SuiteActivity cases={cases} jobs={snapshot.jobs || []} onCaseSelect={onCaseSelect} onAgentSelect={onAgentSelect} disconnected={Boolean(error)} />
     <div className="suite-visuals">
       <div className="suite-metrics" aria-label="Case statistics">
         <Metric value={counts.completed} label="Completed" tone="complete" />
@@ -73,7 +75,6 @@ export default function SuiteOverview({ onCaseSelect, onAgentSelect }) {
     </div>
 
     <div className="suite-report-line"><span>Judge reports <strong>{counts.reports}/{cases.length}</strong></span><span>Host accepted <strong>{counts.accepted}</strong></span></div>
-    <SuiteControls cases={cases} />
     <AgentSummaryCards cases={cases} jobs={snapshot.jobs || []} onSelect={onAgentSelect} />
 
     <div className="suite-table-heading"><div><Title level={3}>Cases</Title><Text type="secondary">Select a result to inspect the complete Case record.</Text></div>
@@ -90,8 +91,9 @@ export default function SuiteOverview({ onCaseSelect, onAgentSelect }) {
     </div>
 
     {table.view === 'grid' ? <CaseCardGrid cases={visible} page={table.page} pageSize={table.pageSize} onSelect={onCaseSelect}
-      onPage={(page, pageSize) => dispatch(actions.tableChanged({ page: table.pageSize === pageSize ? page : 1, pageSize }))} /> : <Table className="suite-table" rowKey="key" columns={columns} dataSource={visible} size="middle" scroll={{ x: 900 }}
-      onRow={item => ({ onClick: () => onCaseSelect(item), onKeyDown: event => { if (event.key === 'Enter' || event.key === ' ') onCaseSelect(item); }, tabIndex: 0 })}
+      onPage={(page, pageSize) => dispatch(actions.tableChanged({ page: table.pageSize === pageSize ? page : 1, pageSize }))} /> : <Table className="suite-table" rowKey="key" columns={columns} dataSource={visible} size="middle" tableLayout="fixed" scroll={{ x: 1140 }}
+      rowClassName={item => isActive(item.execution_status) ? 'suite-row-running' : ''}
+      onRow={item => ({ onClick: () => onCaseSelect(item), onKeyDown: event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onCaseSelect(item); } }, tabIndex: 0 })}
       onChange={(pagination, _tableFilters, sorter) => dispatch(actions.tableChanged({ page: pagination.current, pageSize: pagination.pageSize,
         field: sorter.columnKey || table.field, order: sorter.order || table.order }))}
       pagination={{ current: table.page, pageSize: table.pageSize, showSizeChanger: true, pageSizeOptions: [10, 20, 50, 100], showTotal: total => `${total} Cases` }}

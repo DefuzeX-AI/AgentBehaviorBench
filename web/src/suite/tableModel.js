@@ -30,6 +30,7 @@ const statusOrder = ['failed', 'exhausted', 'blocked', 'needs_attention', 'inter
   'pending_generation', 'prepared', 'ready', 'completed', 'succeeded'];
 
 function valueFor(item, field) {
+  if (field === 'caseNumber') return item.case_index;
   if (field === 'agent') return text(item.agent_id);
   if (field === 'status') return statusOrder.indexOf(item.execution_status);
   if (field === 'judge') return text(item.judge_status || 'not_received');

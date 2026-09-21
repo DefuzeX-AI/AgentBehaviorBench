@@ -126,7 +126,7 @@ def test_cli_records_effective_case_workers_and_uses_coordinator_tick(tmp_path, 
     execution = run_benchmark_once(tuple(SimpleNamespace(agent_id=name, case_count=count) for name, count in selected),
                                    runner=Runner(), output_path=tmp_path / "result.json",
                                    output_fn=lines.append, viewer_starter=None)
-    assert "Case workers: 4 (configured: 4)" in lines
+    assert any('Case workers: 4 (configured: 4)' in line for line in lines)
     document = parse_result_log(execution.result_log.path)
     assert document["configured_workers"] == 4
     assert document["effective_workers"] == 4

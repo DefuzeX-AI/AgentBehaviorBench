@@ -21,6 +21,7 @@ from .terminal_ui.presentation import (
     agent_view_url,
     print_agent_complete,
     print_agent_start,
+    print_run_queued,
     print_suite_summary,
     print_viewer_footer,
 )
@@ -154,12 +155,8 @@ def run_benchmark_once(
                         controller.close()
                         controller = None
                     output_fn(f'Live viewer unavailable: {exc}. Results will still be saved.')
-            output_fn(f"Suite ID: {suite_id}")
-            if viewer is not None:
-                output_fn(f"View: {viewer.url}")
-
-
-        output_fn(f"Case workers: {effective_workers} (configured: {parallelism})")
+        print_run_queued(len(agents), suite_id, viewer.url if viewer else None,
+                         effective_workers, parallelism, output_fn)
         activity.set_concurrent(concurrent)
         if concurrent and output_fn is builtin_print and sys.stdout.isatty():
             live_cases = LiveCases({agent.agent_id: agent.case_count for agent in agents}, effective_workers)

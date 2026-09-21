@@ -5,7 +5,6 @@ import useLiveJson from '../useLiveJson.js';
 import { actions } from '../suite/store.js';
 import { currentAttempt, errorText, executionStatus, reportOf } from '../suite/model.js';
 import { ExecutionBadge, JudgeBadge } from '../suite/CaseStatus.jsx';
-import { RetryButton } from '../suite/SuiteControls.jsx';
 import CaseOverview from './CaseOverview.jsx';
 import CaseConversation from './CaseConversation.jsx';
 import CaseToolsFiles from './CaseToolsFiles.jsx';
@@ -42,7 +41,7 @@ export default function CaseDetailsPage({ item, revision, onBack, onAgentSelect 
     <SuiteBreadcrumb agentId={item.agent_id} caseIndex={item.case_index} onSuiteSelect={onBack} onAgentSelect={onAgentSelect} />
     <div className="case-header"><div><Text className="case-eyebrow">{item.agent_id}</Text><Title level={1}>Case {item.case_index + 1}</Title>
       <Text copyable type="secondary">{item.case_id || 'Case ID pending'}</Text></div>
-      <Space wrap><ExecutionBadge status={attempt ? executionStatus(attempt) : item.execution_status} /><JudgeBadge status={attempt?.judge_status || report?.status || item.judge_status} />{rejected && <Tag color="error">Host rejected</Tag>}<RetryButton item={item} /></Space></div>
+      <Space wrap><ExecutionBadge status={attempt ? executionStatus(attempt) : item.execution_status} /><JudgeBadge status={attempt?.judge_status || report?.status || item.judge_status} />{rejected && <Tag color="error">Host rejected</Tag>}</Space></div>
 
     <div className="case-attempt-bar"><label><Text type="secondary">Execution attempt</Text><Select value={attempt?.attempt_id || ''} disabled={!item.attempts.length} onChange={value => dispatch(actions.attemptSelected({ key: item.key, attempt_id: value }))}
       options={item.attempts.map(value => ({ value: value.attempt_id, label: `Attempt ${value.attempt_number}${value.attempt_id === item.active_attempt_id ? ' (current)' : ''}` }))} placeholder="Execution has not started" /></label>

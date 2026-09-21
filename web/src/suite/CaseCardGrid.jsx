@@ -2,7 +2,6 @@ import { ArrowRightOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { Pagination, Progress, Tag, Typography } from 'antd';
 import { executionLabels, isComplete } from './model.js';
 import { latestTimestamp } from './tableModel.js';
-import { RetryButton } from './SuiteControls.jsx';
 
 const { Paragraph, Text, Title } = Typography;
 
@@ -27,7 +26,7 @@ export default function CaseCardGrid({ cases, page, pageSize, onPage, onSelect }
           status={['failed', 'exhausted', 'blocked'].includes(item.execution_status) ? 'exception' : 'normal'} strokeColor="#2f8f68" />
         <div className="case-card-meta"><Text type="secondary">{item.attempts.length} {item.attempts.length === 1 ? 'attempt' : 'attempts'}</Text>
           <Text type="secondary"><ClockCircleOutlined /> {updated ? new Date(updated).toLocaleString() : 'Time not recorded'}</Text></div>
-        <div className="case-card-footer"><span onClick={event => event.stopPropagation()}><RetryButton item={item} /></span><Text className="case-card-link">View Case <ArrowRightOutlined /></Text></div>
+        <div className="case-card-footer"><Text className="case-card-link">View Case <ArrowRightOutlined /></Text></div>
       </article>;
     })}</div>
     <Pagination className="case-card-pagination" current={page} pageSize={pageSize} total={cases.length} showSizeChanger

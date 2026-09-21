@@ -15,6 +15,7 @@ export const phaseLabels = {
   judge: 'Judge', recovery: 'Recover request', recover: 'Recover request', completed: 'Complete',
 };
 export const needsAttention = status => ['blocked', 'needs_attention', 'failed', 'exhausted', 'interrupted', 'cancelled', 'skipped'].includes(status);
+export const isActive = status => ['running', 'retrying', 'judging', 'waiting_judge', 'recovering', 'reconciling', 'generating'].includes(status);
 export const isComplete = status => ['completed', 'succeeded'].includes(status);
 
 export function reportOf(item) {
@@ -57,7 +58,7 @@ export function countCases(cases) {
     const status = item.execution_status;
     const category = isComplete(status) ? 'completed' : status === 'retry_wait' ? 'retry_wait'
       : needsAttention(status) ? 'attention'
-      : ['running', 'retrying', 'judging', 'waiting_judge', 'recovering', 'reconciling', 'generating'].includes(status) ? 'running' : 'queued';
+      : isActive(status) ? 'running' : 'queued';
     counts[category] += 1;
     if (item.report_received) counts.reports += 1;
     if (item.host_accepted === true || item.host_acceptance === true || item.host_acceptance === 'accepted') counts.accepted += 1;

@@ -55,16 +55,24 @@ def confirm_agents(
         output_fn("Cancelled.")
         return False
 
-    output_fn("")
-    output_fn(panel_rule("RUN QUEUED", ANSI_GREEN))
-    output_fn(
-        panel_line(
-            f"{ANSI_GREEN}OK{ANSI_RESET}  {len(agents)} benchmark agent(s) selected"
-        )
-    )
-    output_fn(panel_line("Next stage: evaluation SDK configuration check"))
-    output_fn(panel_rule("", ANSI_GREEN))
     return True
+
+
+def print_run_queued(agent_count, suite_id, viewer_url, workers, configured_workers, output_fn):
+    """Render the queue once its Suite and optional viewer are available."""
+    rows = [f'{ANSI_GREEN}OK{ANSI_RESET}  {agent_count} benchmark agent(s) selected',
+            'Next stage: evaluation SDK configuration check',
+            f'Suite ID: {suite_id}']
+    if viewer_url:
+        rows.append(f'View: {viewer_url}')
+    rows.append(f'Case workers: {workers} (configured: {configured_workers})')
+    inner = max(PANEL_INNER_WIDTH, *(visible_width(row) + 2 for row in rows))
+    title = ' RUN QUEUED '
+    output_fn('')
+    output_fn(f'{ANSI_GREEN}+{title}{"-" * (inner - len(title))}+{ANSI_RESET}')
+    for row in rows:
+        output_fn(f'{ANSI_GREEN}|{ANSI_RESET} {row}{" " * (inner - visible_width(row) - 1)}{ANSI_GREEN}|{ANSI_RESET}')
+    output_fn(f'{ANSI_GREEN}+{"-" * inner}+{ANSI_RESET}')
 
 
 def print_agents(

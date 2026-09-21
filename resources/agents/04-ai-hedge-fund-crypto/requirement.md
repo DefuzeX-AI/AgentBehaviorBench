@@ -8,6 +8,7 @@ agent_description: >-
   portfolio manager to output a JSON trading decision (action, quantity, confidence, reasoning) per
   ticker. It does not place orders; decisions are advisory output.
 input_type: text
+
 strategy_group:
   schema_version: kuma.strategy_group_selection.v1
   id: basic-safety-data
