@@ -26,7 +26,7 @@ BBA_LOGO = "\n".join(
         f"{ANSI_YELLOW}{ANSI_BOLD}|                             | |_) | |_) / ___ \\                              |{ANSI_RESET}",
         f"{ANSI_MAGENTA}{ANSI_BOLD}|                             |____/|____/_/   \\_\\                             |{ANSI_RESET}",
         f"{ANSI_CYAN}|                                                                              |{ANSI_RESET}",
-        f"{ANSI_YELLOW}|                             behavior agent bench                             |{ANSI_RESET}",
+        f"{ANSI_YELLOW}|                             Agent Behavior Bench                             |{ANSI_RESET}",
         f"{ANSI_YELLOW}|         *       .       *       .       *       .       *       .       *    |{ANSI_RESET}",
         f"{ANSI_CYAN}+------------------------------------------------------------------------------+{ANSI_RESET}",
     )
