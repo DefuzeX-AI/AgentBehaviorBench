@@ -79,7 +79,7 @@ OPENROUTER_MODEL=openai/gpt-4.1-mini
 - **Agent 固有の依存関係**：上流の説明に従ってツール key、データ、外部サービスを用意します。
   DB ドライバーのインストールは DB の起動ではなく、Agent のダウンロードも全サービスの配備ではありません。
 
-key の取得先は [設定ガイド（英語）](../../README.md#configure-a-real-evaluation) にあります。
+key の取得先は [設定ガイド（英語）](../README-previous.md#configure-a-real-evaluation) にあります。
 シェルで export した変数が .env より優先され、--env-file PATH で別のファイルを指定できます。
 CLI は宣言された認証情報を解決し、.env 全体をコンテナにマウントしません。
 実際の key をソースや生成設定に記入しないでください。

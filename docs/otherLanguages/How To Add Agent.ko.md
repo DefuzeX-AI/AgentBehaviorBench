@@ -78,7 +78,7 @@ OPENROUTER_MODEL=openai/gpt-4.1-mini
 - **Agent 의존성**: 원본 저장소 지침에 따라 도구 key, 데이터와 외부 서비스를 준비하세요.
   DB 드라이버 설치는 DB 실행이 아니며 Agent 다운로드가 전체 서비스를 배포하지는 않습니다.
 
-key 발급 링크는 [설정 가이드(영어)](../../README.md#configure-a-real-evaluation)에 있습니다.
+key 발급 링크는 [설정 가이드(영어)](../README-previous.md#configure-a-real-evaluation)에 있습니다.
 셸에서 export한 변수가 .env보다 우선하며 --env-file PATH로 다른 파일을 선택할 수 있습니다.
 CLI는 선언된 인증 정보를 처리하며 .env 전체를 컨테이너에 마운트하지 않습니다.
 실제 key를 소스나 생성 설정에 넣지 마세요.
