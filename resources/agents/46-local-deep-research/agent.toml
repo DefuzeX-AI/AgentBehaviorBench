@@ -1,0 +1,62 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "local-deep-research"
+display_name = "Local Deep Research (langgraph-agent strategy)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+repository = "https://github.com/LearningCircuit/local-deep-research"
+revision = "ede8a7b4a8ac746db176285e1075f327e188be00"
+downloaded_on = "2026-09-23"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 3000
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+# Writable state (HOME, LDR data dir, caches) lives under /tmp; see Dockerfile.
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+config = "abb-langgraph.json"
+graph_id = "agent"
+input_key = "query"
+output_key = "answer"
+binding = "ldr_bridge.py:create_graph"
+
+[llm_interception]
+required = true
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
+
+# Wikipedia search engine (python `wikipedia` package: MediaWiki API, first over http then
+# the https redirect target).
+[[llm_interception.tool_routes]]
+host_patterns = ["en.wikipedia.org"]
+ports = [80, 443]
+methods = ["GET"]
+path_patterns = ["/w/api.php"]

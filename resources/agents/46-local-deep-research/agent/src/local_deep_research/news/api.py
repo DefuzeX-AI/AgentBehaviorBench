@@ -1,0 +1,1434 @@
+"""
+Direct API functions for news system.
+These functions can be called directly by scheduler or wrapped by Flask endpoints.
+"""
+
+from typing import Dict, Any, Optional
+from datetime import datetime, timezone, UTC
+from loguru import logger
+from sqlalchemy.orm import Session
+import json
+
+from ..constants import ResearchStatus
+from ..llm.providers.base import normalize_provider
+from ..utilities.sql_utils import escape_like
+from .exceptions import (
+    InvalidLimitException,
+    SubscriptionNotFoundException,
+    SubscriptionCreationException,
+    SubscriptionUpdateException,
+    SubscriptionDeletionException,
+    DatabaseAccessException,
+    NewsFeedGenerationException,
+    NotImplementedException,
+    NewsAPIException,
+)
+from ..utilities.request_context import (
+    get_current_session_id,
+    get_current_username,
+)
+from ..constants import DEFAULT_SEARCH_TOOL
+# Removed welcome feed import - no placeholders
+# get_db_setting not available in merged codebase
+
+# Generic detail surfaced to API clients in place of a raw exception string.
+# These messages are returned to the client via NewsAPIException.to_dict(), so
+# echoing str(e) would leak DB/driver internals (SQL, schema, paths) to callers
+# on shared/multi-user deployments (CWE-209). The real cause is always captured
+# server-side by the adjacent logger.exception(...) for diagnosis.
+_GENERIC_ERROR_DETAIL = "an internal error occurred"
+
+
+def _notify_scheduler_about_subscription_change(
+    action: str, user_id: Optional[str] = None
+):
+    """
+    Notify the scheduler about subscription changes.
+
+    Args:
+        action: The action performed (created, updated, deleted)
+        user_id: Optional user_id to use as fallback for username
+    """
+    try:
+        from ..scheduler.background import get_background_job_scheduler
+
+        scheduler = get_background_job_scheduler()
+        if scheduler.is_running:
+            # Get username, with optional fallback to user_id
+            username = get_current_username()
+            if not username and user_id:
+                username = user_id
+
+            # Get password from session password store
+            from ..database.session_passwords import session_password_store
+
+            session_id = get_current_session_id()
+            password = None
+            if session_id and username:
+                password = session_password_store.get_session_password(
+                    username, session_id
+                )
+
+            if password and username:
+                # Update scheduler to reschedule subscriptions
+                scheduler.update_user_info(username, password)
+                logger.info(
+                    f"Scheduler notified about {action} subscription for {username}"
+                )
+            else:
+                logger.warning(
+                    f"Could not notify scheduler - no password available{' for ' + username if username else ''}"
+                )
+    except Exception:
+        logger.exception(
+            f"Could not notify scheduler about {action} subscription"
+        )
+
+
+def get_news_feed(
+    user_id: str = "anonymous",
+    limit: int = 20,
+    use_cache: bool = True,
+    focus: Optional[str] = None,
+    search_strategy: Optional[str] = None,
+    subscription_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Get personalized news feed by pulling from news_items table first, then research history.
+
+    Args:
+        user_id: User identifier
+        limit: Maximum number of cards to return
+        use_cache: Whether to use cached news
+        focus: Optional focus area for news
+        search_strategy: Override default recommendation strategy
+
+    Returns:
+        Dictionary with news items and metadata. Each item's ``findings``
+        field is the answer-only report content (post chat-mode-v2 refactor,
+        #3665 Fix B); structured top-N source links are in the separate
+        ``links`` array, not embedded in ``findings``.
+    """
+    # Validate limit - allow any positive number
+    if limit < 1:
+        raise InvalidLimitException(limit)
+
+    try:
+        logger.info(
+            f"get_news_feed called with user_id={user_id}, limit={limit}"
+        )
+
+        # News is always enabled for now - per-user settings will be handled later
+        # if not get_db_setting("news.enabled", True):
+        #     return {"error": "News system is disabled", "news_items": []}
+
+        # Import database functions
+        from ..database.session_context import get_user_db_session
+        from ..database.models import ResearchHistory
+
+        news_items = []
+        remaining_limit = limit
+
+        # Query research history from user's database for news items
+        logger.info("Getting news items from research history")
+        try:
+            # Use the user_id provided to the function
+            with get_user_db_session(user_id) as db_session:
+                # Build query using ORM
+                query = db_session.query(ResearchHistory).filter(
+                    ResearchHistory.status == ResearchStatus.COMPLETED
+                )
+
+                # Filter by subscription if provided
+                if subscription_id and subscription_id != "all":
+                    # Use JSON containment for PostgreSQL or LIKE for SQLite.
+                    # Note: research_meta is serialized via json.dumps which
+                    # emits a space after the colon, so the LIKE pattern must
+                    # include that space too — otherwise the filter silently
+                    # matches zero rows. Mirrors the patterns used in
+                    # get_subscriptions and get_subscription_history below.
+                    query = query.filter(
+                        ResearchHistory.research_meta.like(
+                            f'%"subscription_id": "{escape_like(subscription_id)}"%',
+                            escape="\\",
+                        )
+                    )
+
+                # Order by creation date and limit
+                results = (
+                    query.order_by(ResearchHistory.created_at.desc())
+                    .limit(remaining_limit * 2)
+                    .all()
+                )
+
+                # Convert ORM objects to dictionaries for compatibility
+                results = [
+                    {
+                        "id": r.id,
+                        "uuid_id": r.id,  # In ResearchHistory, id is the UUID
+                        "query": r.query,
+                        "title": r.title
+                        if hasattr(r, "title")
+                        else None,  # Include title field if exists
+                        # created_at is NOT NULL (set to isoformat() on every
+                        # insert), so it's always a usable timestamp string.
+                        "created_at": r.created_at,
+                        "completed_at": r.completed_at
+                        if r.completed_at
+                        else None,
+                        "duration_seconds": r.duration_seconds
+                        if hasattr(r, "duration_seconds")
+                        else None,
+                        "report_path": r.report_path
+                        if hasattr(r, "report_path")
+                        else None,
+                        "report_content": r.report_content
+                        if hasattr(r, "report_content")
+                        else None,  # Include database content
+                        "research_meta": r.research_meta,
+                        "status": r.status,
+                    }
+                    for r in results
+                ]
+
+                # Source links used to be parsed out of report_content via
+                # regex over `URL:` lines (when report_content held the
+                # inline ## Sources block). Now sources live in the
+                # research_resources table — fetch top-N for every row in
+                # ONE batched query (avoids N+1 in the loop below).
+                from ..web.services.report_assembly_service import (
+                    get_research_source_links_batch,
+                )
+
+                research_ids_for_links = [r["id"] for r in results]
+                links_by_research_id = get_research_source_links_batch(
+                    research_ids_for_links, db_session, limit=3
+                )
+
+            logger.info(f"Database returned {len(results)} research items")
+            if results and len(results) > 0:
+                logger.info(f"First row keys: {list(results[0].keys())}")
+                # Log first few items' metadata
+                for i, row in enumerate(results[:3]):
+                    logger.info(
+                        f"Item {i}: query='{row['query'][:50]}...', has meta={bool(row.get('research_meta'))}"
+                    )
+
+            # Process results to find news items
+            processed_count = 0
+            error_count = 0
+
+            for row in results:
+                try:
+                    # Parse metadata
+                    metadata = {}
+                    if row.get("research_meta"):
+                        try:
+                            # Handle both dict and string formats
+                            if isinstance(row["research_meta"], dict):
+                                metadata = row["research_meta"]
+                            else:
+                                metadata = json.loads(row["research_meta"])
+                        except (json.JSONDecodeError, TypeError):
+                            logger.exception("Error parsing metadata")
+                            metadata = {}
+
+                    # Check if this has news metadata (generated_headline or generated_topics)
+                    # or if it's a news-related query
+                    has_news_metadata = (
+                        metadata.get("generated_headline") is not None
+                        or metadata.get("generated_topics") is not None
+                    )
+
+                    query_lower = row["query"].lower()
+                    is_news_query = (
+                        has_news_metadata
+                        or metadata.get("is_news_search")
+                        or metadata.get("search_type") == "news_analysis"
+                        or "breaking news" in query_lower
+                        or "news stories" in query_lower
+                        or (
+                            "today" in query_lower
+                            and (
+                                "news" in query_lower
+                                or "breaking" in query_lower
+                            )
+                        )
+                        or "latest news" in query_lower
+                    )
+
+                    # Log the decision for first few items
+                    if processed_count < 3 or error_count < 3:
+                        logger.info(
+                            f"Item check: query='{row['query'][:30]}...', is_news_search={metadata.get('is_news_search')}, "
+                            f"has_news_metadata={has_news_metadata}, is_news_query={is_news_query}"
+                        )
+
+                    # Only show items that have news metadata or are news queries
+                    if is_news_query:
+                        processed_count += 1
+                        logger.info(
+                            f"Processing research item #{processed_count}: {row['query'][:50]}..."
+                        )
+
+                        # Always use database content
+                        findings = ""
+                        summary = ""
+                        report_content_db = row.get(
+                            "report_content"
+                        )  # Get database content
+
+                        # Use database content
+                        content = report_content_db
+                        if content:
+                            logger.debug(
+                                f"Using database content for research {row['id']}"
+                            )
+
+                            # Process database content
+                            lines = content.split("\n") if content else []
+                            # `findings` is the answer-only report_content
+                            # after the chat-mode-v2 refactor (#3665 Fix B,
+                            # intentional). The legacy answer + ## Sources
+                            # blob is gone: structured top-N source URLs live
+                            # in the separate `links` array below, so snippet
+                            # extraction is cleaner without Sources headers in
+                            # the substrate.
+                            findings = content
+                            # Extract summary from first non-empty line
+                            for line in lines:
+                                if line.strip() and not line.startswith("#"):
+                                    summary = line.strip()
+                                    break
+                        else:
+                            logger.debug(
+                                f"No database content for research {row['id']}"
+                            )
+
+                        # Use stored headline/topics if available, otherwise generate
+                        original_query = row["query"]
+
+                        # Check for headline - first try database title, then metadata
+                        headline = row.get("title") or metadata.get(
+                            "generated_headline"
+                        )
+
+                        # For subscription results, generate headline from query if needed
+                        if not headline and metadata.get("is_news_search"):
+                            # Use subscription name or query as headline
+                            subscription_name = metadata.get(
+                                "subscription_name"
+                            )
+                            if subscription_name:
+                                headline = f"News Update: {subscription_name}"
+                            else:
+                                # Generate headline from query
+                                headline = f"News: {row['query'][:60]}..."
+
+                        # Skip items without meaningful headlines or that are incomplete
+                        if (
+                            not headline
+                            or headline == "[No headline available]"
+                        ):
+                            logger.debug(
+                                f"Skipping item without headline: {row['id']}"
+                            )
+                            continue
+
+                        # Skip items that are still in progress or suspended
+                        if row["status"] in (
+                            ResearchStatus.IN_PROGRESS,
+                            ResearchStatus.SUSPENDED,
+                        ):
+                            logger.debug(
+                                f"Skipping incomplete item: {row['id']} (status: {row['status']})"
+                            )
+                            continue
+
+                        # Skip items without content (neither file nor database)
+                        if not content:
+                            logger.debug(
+                                f"Skipping item without content: {row['id']}"
+                            )
+                            continue
+
+                        # Use ID properly, preferring uuid_id
+                        research_id = row.get("uuid_id") or str(row["id"])
+
+                        # Use stored category and topics - no defaults
+                        category = metadata.get("category")
+                        if not category:
+                            category = "[Uncategorized]"
+
+                        topics = metadata.get("generated_topics")
+                        if not topics:
+                            topics = ["[No topics]"]
+
+                        # Top-N links pulled from research_resources via
+                        # the batch fetch above (no per-row DB query, no
+                        # text parsing of report_content).
+                        links = links_by_research_id.get(row["id"], [])
+
+                        # Create news item from research
+                        news_item = {
+                            "id": f"news-{research_id}",
+                            "headline": headline,
+                            "category": category,
+                            "summary": summary
+                            or f"Research analysis for: {headline[:100]}",
+                            "findings": findings,
+                            "impact_score": metadata.get(
+                                "impact_score", 0
+                            ),  # 0 indicates missing
+                            "time_ago": _format_time_ago(row["created_at"]),
+                            "upvotes": metadata.get("upvotes", 0),
+                            "downvotes": metadata.get("downvotes", 0),
+                            "source_url": f"/results/{research_id}",
+                            "topics": topics,  # Use generated topics
+                            "links": links,  # Add extracted links
+                            "research_id": research_id,
+                            "created_at": row["created_at"],
+                            "duration_seconds": row.get("duration_seconds", 0),
+                            "original_query": original_query,  # Keep original query for reference
+                            "is_news": metadata.get(
+                                "is_news_search", False
+                            ),  # Flag for news searches
+                            "news_date": metadata.get(
+                                "news_date"
+                            ),  # If specific date for news
+                            "news_source": metadata.get(
+                                "news_source"
+                            ),  # If from specific source
+                            "priority": metadata.get(
+                                "priority", "normal"
+                            ),  # Priority level
+                        }
+
+                        news_items.append(news_item)
+                        logger.info(f"Added news item: {headline[:50]}...")
+
+                        if len(news_items) >= limit:
+                            break
+
+                except Exception:
+                    error_count += 1
+                    logger.exception(
+                        f"Error processing research item with query: {row.get('query', 'UNKNOWN')[:100]}"
+                    )
+                    continue
+
+            logger.info(
+                f"Processing summary: total_results={len(results)}, processed={processed_count}, "
+                f"errors={error_count}, added={len(news_items)}"
+            )
+
+            # Log subscription-specific items if we were filtering
+            if subscription_id and subscription_id != "all":
+                sub_items = [
+                    item for item in news_items if item.get("is_news", False)
+                ]
+                logger.info(
+                    f"Subscription {subscription_id}: found {len(sub_items)} items"
+                )
+
+        except Exception as db_error:
+            # This block is wide enough to catch far more than database
+            # errors -- everything the feed does with a row runs inside
+            # it. Name the concrete exception type and chain it, so a
+            # plain ValueError from a formatting helper is not reported
+            # to the logs as "Database error" with no way back to the
+            # real raise site. The client still gets the generic detail.
+            logger.exception(
+                "Error in research history query ({}): {}",
+                type(db_error).__name__,
+                db_error,
+            )
+            raise DatabaseAccessException(
+                "research_history_query", _GENERIC_ERROR_DETAIL
+            ) from db_error
+
+        # If no news items found, return empty list
+        if not news_items:
+            logger.info("No news items found, returning empty list")
+            news_items = []
+
+        logger.info(f"Returning {len(news_items)} news items to client")
+
+        # Determine the source
+        source = (
+            "news_items"
+            if any(item.get("is_news", False) for item in news_items)
+            else "research_history"
+        )
+
+        return {
+            "news_items": news_items[:limit],
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "focus": focus,
+            "search_strategy": search_strategy or "default",
+            "total_items": len(news_items),
+            "source": source,
+        }
+
+    except NewsAPIException:
+        # Re-raise our custom exceptions
+        raise
+    except Exception:
+        logger.exception("Error getting news feed")
+        raise NewsFeedGenerationException(
+            _GENERIC_ERROR_DETAIL, user_id=user_id
+        )
+
+
+def get_subscription_history(
+    subscription_id: str,
+    limit: int = 20,
+    username: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Get research history for a specific subscription.
+
+    Args:
+        subscription_id: The subscription UUID
+        limit: Maximum number of history items to return
+        username: The owner of the subscription (required so we open the
+            correct per-user encrypted database)
+
+    Returns:
+        Dict containing subscription info and its research history
+    """
+    try:
+        from ..database.session_context import get_user_db_session
+        from ..database.models import ResearchHistory
+        from ..database.models.news import NewsSubscription
+
+        # Get subscription details using ORM from user's encrypted database
+        with get_user_db_session(username) as session:
+            subscription = (
+                session.query(NewsSubscription)
+                .filter_by(id=subscription_id)
+                .first()
+            )
+
+            if not subscription:
+                raise SubscriptionNotFoundException(subscription_id)  # noqa: TRY301 — re-raised by except NewsAPIException
+
+            # Convert to dict for response
+            subscription_dict = {
+                "id": subscription.id,
+                "query_or_topic": subscription.query_or_topic,
+                "subscription_type": subscription.subscription_type,
+                "refresh_interval_minutes": subscription.refresh_interval_minutes,
+                # refresh_count is derived from the actual research-run history
+                # below (NewsSubscription has no refresh_count column — reading
+                # it raised AttributeError and 500'd this endpoint).
+                "created_at": subscription.created_at.isoformat()
+                if subscription.created_at
+                else None,
+                "next_refresh": subscription.next_refresh.isoformat()
+                if subscription.next_refresh
+                else None,
+            }
+
+        # Use the same per-user DB for research history (subscriptions and
+        # ResearchHistory live in the same encrypted database). The
+        # NewsSubscription model has no user_id column — this codebase uses
+        # per-user encrypted databases, so "the subscription's user" is just
+        # whichever user's DB we found the subscription in, identified by the
+        # explicit ``username`` arg (the FastAPI service layer has no Flask
+        # session to fall back on).
+        with get_user_db_session(username) as db_session:
+            # Get all research runs that were triggered by this subscription
+            # Look for subscription_id in the research_meta JSON
+            # Note: JSON format has space after colon
+            like_pattern = (
+                f'%"subscription_id": "{escape_like(subscription_id)}"%'
+            )
+            logger.info(
+                f"Searching for research history with pattern: {like_pattern}"
+            )
+
+            history_items = (
+                db_session.query(ResearchHistory)
+                .filter(
+                    ResearchHistory.research_meta.like(
+                        like_pattern, escape="\\"
+                    )
+                )
+                .order_by(ResearchHistory.created_at.desc())
+                .limit(limit)
+                .all()
+            )
+
+            # Convert to dict format for compatibility.
+            # ResearchHistory.id is the UUID PK (see comment on line 151);
+            # there is no separate uuid_id column, so populate both keys
+            # from h.id to preserve the downstream contract used by the
+            # processed_item['research_id']/url builders below.
+            history_items = [
+                {
+                    "id": h.id,
+                    "uuid_id": h.id,
+                    "query": h.query,
+                    "status": h.status,
+                    # created_at/completed_at are Text columns already holding
+                    # isoformat strings (see get_news_feed above), so use them
+                    # directly — calling .isoformat() on a str raises
+                    # AttributeError and previously broke this endpoint for any
+                    # subscription that had research history.
+                    "created_at": h.created_at,
+                    "completed_at": h.completed_at if h.completed_at else None,
+                    "duration_seconds": h.duration_seconds,
+                    "research_meta": h.research_meta,
+                    "report_path": h.report_path,
+                }
+                for h in history_items
+            ]
+
+        # Process history items
+        processed_history = []
+        for item in history_items:
+            processed_item = {
+                "research_id": item.get("uuid_id") or str(item.get("id")),
+                "query": item["query"],
+                "status": item["status"],
+                "created_at": item["created_at"],
+                "completed_at": item.get("completed_at"),
+                "duration_seconds": item.get("duration_seconds", 0),
+                "url": f"/progress/{item.get('uuid_id') or item.get('id')}",
+            }
+
+            # Parse metadata if available to get headline and topics
+            if item.get("research_meta"):
+                try:
+                    # research_meta is a JSON column, so SQLAlchemy already
+                    # deserializes it to a dict on read; only legacy/text rows
+                    # arrive as a JSON string. Calling json.loads() on the dict
+                    # raised TypeError that the bare except below swallowed,
+                    # silently blanking the headline/topics for every item.
+                    # Mirror the dict/str handling already used at the top of
+                    # this module (see get_news_feed).
+                    raw_meta = item["research_meta"]
+                    meta = (
+                        json.loads(raw_meta)
+                        if isinstance(raw_meta, str)
+                        else raw_meta
+                    )
+                    processed_item["triggered_by"] = meta.get(
+                        "triggered_by", "subscription"
+                    )
+                    # Add headline and topics from metadata
+                    processed_item["headline"] = meta.get(
+                        "generated_headline", "[No headline]"
+                    )
+                    processed_item["topics"] = meta.get("generated_topics", [])
+                except Exception:
+                    processed_item["headline"] = "[No headline]"
+                    processed_item["topics"] = []
+            else:
+                processed_item["headline"] = "[No headline]"
+                processed_item["topics"] = []
+
+            processed_history.append(processed_item)
+
+        # Run count comes from the research history (the source of truth);
+        # the subscription row carries no counter.
+        subscription_dict["refresh_count"] = len(processed_history)
+
+        return {
+            "subscription": subscription_dict,
+            "history": processed_history,
+            "total_runs": len(processed_history),
+        }
+
+    except NewsAPIException:
+        # Re-raise our custom exceptions
+        raise
+    except Exception:
+        logger.exception("Error getting subscription history")
+        raise DatabaseAccessException(
+            "get_subscription_history", _GENERIC_ERROR_DETAIL
+        )
+
+
+def _format_time_ago(timestamp: str) -> str:
+    """Format timestamp as 'X hours ago' string.
+
+    Raises on unparseable input instead of masking it with a neutral label.
+    ResearchHistory.created_at is a NOT NULL column written as
+    datetime.now(UTC).isoformat() on every insert path, so a value that won't
+    parse means the row is corrupt — not a routine edge case. The only caller
+    (the per-row loop in get_news_feed) already wraps each row in a
+    try/except that logs the failure and skips the row, so a bad timestamp
+    surfaces in the logs and drops that one card rather than rendering it with
+    a misleading "Recently".
+    """
+    from dateutil import parser
+
+    dt = parser.parse(timestamp)
+
+    # If dt is naive, assume it's in UTC
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+
+    now = datetime.now(timezone.utc)
+    diff = now - dt
+
+    if diff.days > 0:
+        return f"{diff.days} day{'s' if diff.days > 1 else ''} ago"
+    if diff.seconds > 3600:
+        hours = diff.seconds // 3600
+        return f"{hours} hour{'s' if hours > 1 else ''} ago"
+    if diff.seconds > 60:
+        minutes = diff.seconds // 60
+        return f"{minutes} minute{'s' if minutes > 1 else ''} ago"
+    return "Just now"
+
+
+def get_subscription(
+    subscription_id: str, username: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Get a single subscription by ID.
+
+    Args:
+        subscription_id: Subscription identifier
+        username: User identifier; required to scope the lookup to that
+            user's encrypted database. Without it the lookup falls back
+            to Flask session and will fail under FastAPI.
+
+    Returns:
+        Dictionary with subscription data or None if not found
+    """
+    try:
+        # Get subscription directly from user's encrypted database
+        from ..database.session_context import get_user_db_session
+        from ..database.models.news import NewsSubscription
+
+        with get_user_db_session(username) as db_session:
+            subscription = (
+                db_session.query(NewsSubscription)
+                .filter_by(id=subscription_id)
+                .first()
+            )
+
+            if not subscription:
+                raise SubscriptionNotFoundException(subscription_id)  # noqa: TRY301 — re-raised by except NewsAPIException
+
+            # Convert to API format matching the template expectations
+            return {
+                "id": subscription.id,
+                "name": subscription.name or "",
+                "query_or_topic": subscription.query_or_topic,
+                "subscription_type": subscription.subscription_type,
+                "refresh_interval_minutes": subscription.refresh_interval_minutes,
+                "is_active": subscription.status == "active",
+                "status": subscription.status,
+                "folder_id": subscription.folder_id,
+                "model_provider": subscription.model_provider,
+                "model": subscription.model,
+                "search_strategy": subscription.search_strategy,
+                "custom_endpoint": subscription.custom_endpoint,
+                "search_engine": subscription.search_engine,
+                "search_iterations": subscription.search_iterations or 3,
+                "questions_per_iteration": subscription.questions_per_iteration
+                or 5,
+                "created_at": subscription.created_at.isoformat()
+                if subscription.created_at
+                else None,
+                "updated_at": subscription.updated_at.isoformat()
+                if subscription.updated_at
+                else None,
+            }
+
+    except NewsAPIException:
+        # Re-raise our custom exceptions
+        raise
+    except Exception:
+        logger.exception(f"Error getting subscription {subscription_id}")
+        raise DatabaseAccessException("get_subscription", _GENERIC_ERROR_DETAIL)
+
+
+def get_subscriptions(user_id: str) -> Dict[str, Any]:
+    """
+    Get all subscriptions for a user.
+
+    Args:
+        user_id: User identifier
+
+    Returns:
+        Dictionary with subscriptions list
+    """
+    try:
+        # Get subscriptions directly from user's encrypted database
+        from ..database.session_context import get_user_db_session
+        from ..database.models import ResearchHistory
+        from ..database.models.news import NewsSubscription
+        from sqlalchemy import func
+
+        sub_list = []
+
+        with get_user_db_session(user_id) as db_session:
+            # Query all subscriptions for this user
+            subscriptions = db_session.query(NewsSubscription).all()
+
+            for sub in subscriptions:
+                # Count actual research runs for this subscription.
+                # sub.id is an internal PK (not user input), but escape it
+                # too so every subscription_id LIKE in this module is
+                # uniformly wildcard-safe — a no-op for UUID-shaped ids.
+                like_pattern = f'%"subscription_id": "{escape_like(sub.id)}"%'
+                total_runs = (
+                    db_session.query(func.count(ResearchHistory.id))
+                    .filter(
+                        ResearchHistory.research_meta.like(
+                            like_pattern, escape="\\"
+                        )
+                    )
+                    .scalar()
+                    or 0
+                )
+
+                # Convert ORM object to API format
+                sub_dict = {
+                    "id": sub.id,
+                    "query": sub.query_or_topic,
+                    "type": sub.subscription_type,
+                    "refresh_minutes": sub.refresh_interval_minutes,
+                    "created_at": sub.created_at.isoformat()
+                    if sub.created_at
+                    else None,
+                    "next_refresh": sub.next_refresh.isoformat()
+                    if sub.next_refresh
+                    else None,
+                    "last_refreshed": sub.last_refresh.isoformat()
+                    if sub.last_refresh
+                    else None,
+                    "is_active": sub.status == "active",
+                    "status": sub.status,
+                    "total_runs": total_runs,  # Use actual count from research_history
+                    "name": sub.name or "",
+                    "folder_id": sub.folder_id,
+                    # Model/search config: included so consumers (the
+                    # subscriptions UI, run-now callers) see the subscription's
+                    # saved configuration instead of silently getting None and
+                    # falling back to global defaults.
+                    "model_provider": sub.model_provider,
+                    "model": sub.model,
+                    "search_strategy": sub.search_strategy,
+                    "search_engine": sub.search_engine,
+                    "custom_endpoint": sub.custom_endpoint,
+                    "search_iterations": sub.search_iterations,
+                    "questions_per_iteration": sub.questions_per_iteration,
+                }
+                sub_list.append(sub_dict)
+
+        return {"subscriptions": sub_list, "total": len(sub_list)}
+
+    except Exception:
+        logger.exception("Error getting subscriptions")
+        raise DatabaseAccessException(
+            "get_subscriptions", _GENERIC_ERROR_DETAIL
+        )
+
+
+def update_subscription(
+    subscription_id: str,
+    data: Dict[str, Any],
+    username: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Update an existing subscription.
+
+    Args:
+        subscription_id: Subscription identifier
+        data: Dictionary with fields to update
+        username: User identifier; required to scope the update to that
+            user's encrypted database.
+
+    Returns:
+        Dictionary with updated subscription data
+    """
+    try:
+        from ..database.session_context import get_user_db_session
+        from ..database.models.news import NewsSubscription
+        from datetime import datetime, timedelta
+
+        with get_user_db_session(username) as db_session:
+            # Get existing subscription
+            subscription = (
+                db_session.query(NewsSubscription)
+                .filter_by(id=subscription_id)
+                .first()
+            )
+            if not subscription:
+                raise SubscriptionNotFoundException(subscription_id)  # noqa: TRY301 — re-raised by except NewsAPIException
+
+            # Update fields
+            if "name" in data:
+                subscription.name = data["name"]
+            if "query_or_topic" in data:
+                subscription.query_or_topic = data["query_or_topic"]
+            if "subscription_type" in data:
+                subscription.subscription_type = data["subscription_type"]
+            if "refresh_interval_minutes" in data:
+                old_interval = subscription.refresh_interval_minutes
+                subscription.refresh_interval_minutes = data[
+                    "refresh_interval_minutes"
+                ]
+                # Recalculate next_refresh if interval changed
+                if old_interval != subscription.refresh_interval_minutes:
+                    subscription.next_refresh = datetime.now(UTC) + timedelta(
+                        minutes=subscription.refresh_interval_minutes
+                    )
+            if "is_active" in data:
+                subscription.status = (
+                    "active" if data["is_active"] else "paused"
+                )
+            if "status" in data:
+                subscription.status = data["status"]
+            if "folder_id" in data:
+                subscription.folder_id = data["folder_id"]
+            if "model_provider" in data:
+                subscription.model_provider = normalize_provider(
+                    data["model_provider"]
+                )
+            if "model" in data:
+                subscription.model = data["model"]
+            if "search_strategy" in data:
+                subscription.search_strategy = data["search_strategy"]
+            if "custom_endpoint" in data:
+                subscription.custom_endpoint = data["custom_endpoint"]
+            if "search_engine" in data:
+                subscription.search_engine = data["search_engine"]
+            if "search_iterations" in data:
+                subscription.search_iterations = data["search_iterations"]
+            if "questions_per_iteration" in data:
+                subscription.questions_per_iteration = data[
+                    "questions_per_iteration"
+                ]
+
+            # N14: if this update touched the engine or provider, validate
+            # the resulting (effective) values against the user's egress
+            # policy before committing. Best-effort — needs a request
+            # context to resolve the current user's settings DB.
+            if "search_engine" in data or "model_provider" in data:
+                # FastAPI: resolve the user from the explicit param (the router
+                # passes username=username), falling back to the request-context
+                # var. The old Flask `has_request_context()` gate was always
+                # False under FastAPI, silently skipping this create/update-time
+                # egress-policy check.
+                _uid = username or get_current_username()
+                if _uid:
+                    policy_reason = _validate_subscription_policy(
+                        db_session,
+                        _uid,
+                        subscription.search_engine,
+                        subscription.model_provider,
+                    )
+                    if policy_reason is not None:
+                        raise SubscriptionUpdateException(  # noqa: TRY301 — re-raised by except NewsAPIException
+                            subscription_id, policy_reason
+                        )
+
+            # Update timestamp
+            subscription.updated_at = datetime.now(UTC)
+
+            # Commit changes
+            db_session.commit()
+
+            # Notify scheduler about updated subscription
+            _notify_scheduler_about_subscription_change("updated")
+
+            # Convert to API format
+            return {
+                "status": "success",
+                "subscription": {
+                    "id": subscription.id,
+                    "name": subscription.name or "",
+                    "query_or_topic": subscription.query_or_topic,
+                    "subscription_type": subscription.subscription_type,
+                    "refresh_interval_minutes": subscription.refresh_interval_minutes,
+                    "is_active": subscription.status == "active",
+                    "status": subscription.status,
+                    "folder_id": subscription.folder_id,
+                    "model_provider": subscription.model_provider,
+                    "model": subscription.model,
+                    "search_strategy": subscription.search_strategy,
+                    "custom_endpoint": subscription.custom_endpoint,
+                    "search_engine": subscription.search_engine,
+                    "search_iterations": subscription.search_iterations or 3,
+                    "questions_per_iteration": subscription.questions_per_iteration
+                    or 5,
+                },
+            }
+
+    except NewsAPIException:
+        # Re-raise our custom exceptions
+        raise
+    except Exception:
+        logger.exception("Error updating subscription")
+        raise SubscriptionUpdateException(
+            subscription_id, _GENERIC_ERROR_DETAIL
+        )
+
+
+def _validate_subscription_policy(
+    db_session: Session, user_id, search_engine, model_provider
+) -> Optional[str]:
+    """Validate a subscription's search engine + LLM provider against the
+    user's current egress policy (N14).
+
+    News subscriptions store a fixed engine/provider that runs on a
+    schedule. The factory PEP catches a forbidden engine at execution
+    time, but validating at create/update time stops a forbidden config
+    from being persisted in the first place (and gives the user
+    immediate feedback). Returns a human-readable reason string when the
+    subscription should be rejected, or None when it's allowed.
+
+    Best-effort: if the settings backend or policy module is unavailable
+    (e.g. programmatic API use without a settings DB), validation is
+    skipped — the execution-time factory PEP remains the backstop.
+    """
+    try:
+        from ..utilities.db_utils import get_settings_manager
+        from ..security.egress.policy import (
+            PolicyDeniedError,
+            context_from_snapshot,
+            evaluate_engine,
+            evaluate_llm_endpoint,
+        )
+
+        settings_manager = get_settings_manager(db_session, user_id)
+        snapshot = settings_manager.get_settings_snapshot()
+        if not isinstance(snapshot, dict):
+            return None
+        primary = settings_manager.get_setting(
+            "search.tool", DEFAULT_SEARCH_TOOL
+        )
+        try:
+            ctx = context_from_snapshot(
+                snapshot, primary or DEFAULT_SEARCH_TOOL, username=user_id
+            )
+        except PolicyDeniedError as exc:
+            return f"egress policy refused: {exc.decision.reason}"
+        except ValueError as exc:
+            # An incoherent egress config makes context_from_snapshot
+            # raise ValueError. Surface it as a validation failure at
+            # subscription create/update time instead of letting the outer
+            # except silently skip the check — otherwise the subscription
+            # persists and only fails at execution time. Do not echo the raw
+            # ValueError to the client (CWE-209): it can carry policy-config
+            # internals; log it server-side instead. Mirrors the same fix in
+            # web/routers/research.py's start-research precheck.
+            logger.bind(policy_audit=True).warning(
+                "Subscription egress policy misconfigured",
+                reason=str(exc),
+            )
+            return "egress policy is misconfigured"
+
+        if search_engine:
+            decision = evaluate_engine(
+                search_engine, ctx, settings_snapshot=snapshot
+            )
+            if not decision.allowed:
+                return (
+                    f"search engine '{search_engine}' is not permitted "
+                    f"under the current egress policy ({decision.reason})"
+                )
+        if model_provider:
+            decision = evaluate_llm_endpoint(
+                normalize_provider(model_provider),
+                ctx,
+                settings_snapshot=snapshot,
+            )
+            if not decision.allowed:
+                return (
+                    f"LLM provider '{model_provider}' is not permitted "
+                    f"under the current egress policy ({decision.reason})"
+                )
+        return None
+    except Exception:
+        # Settings/policy unavailable → skip; execution-time PEP backstops.
+        logger.debug("subscription policy pre-check skipped", exc_info=True)
+        return None
+
+
+def create_subscription(
+    user_id: str,
+    query: str,
+    subscription_type: str = "search",
+    refresh_minutes: Optional[int] = None,
+    source_research_id: Optional[str] = None,
+    model_provider: Optional[str] = None,
+    model: Optional[str] = None,
+    search_strategy: Optional[str] = None,
+    custom_endpoint: Optional[str] = None,
+    name: Optional[str] = None,
+    folder_id: Optional[str] = None,
+    is_active: bool = True,
+    search_engine: Optional[str] = None,
+    search_iterations: Optional[int] = None,
+    questions_per_iteration: Optional[int] = None,
+) -> Dict[str, Any]:
+    """
+    Create a new subscription for user.
+
+    Args:
+        user_id: User identifier
+        query: Search query or topic
+        subscription_type: "search" or "topic"
+        refresh_minutes: Refresh interval in minutes
+
+    Returns:
+        Dictionary with subscription details
+    """
+    try:
+        from ..database.session_context import get_user_db_session
+        from ..database.models.news import NewsSubscription
+        from datetime import datetime, timedelta
+        import uuid
+
+        # Get default refresh interval from settings if not provided
+        # NOTE: This API function accesses the settings DB for convenience when used
+        # within the Flask application context. For programmatic API access outside
+        # the web context, callers should provide refresh_minutes explicitly to avoid
+        # dependency on the settings database being initialized.
+
+        with get_user_db_session(user_id) as db_session:
+            # N14: reject a subscription whose engine/provider violates
+            # the user's current egress policy before persisting it.
+            policy_reason = _validate_subscription_policy(
+                db_session, user_id, search_engine, model_provider
+            )
+            if policy_reason is not None:
+                raise SubscriptionCreationException(  # noqa: TRY301 — re-raised as-is by except SubscriptionCreationException
+                    policy_reason,
+                    {"query": query, "type": subscription_type},
+                )
+
+            if refresh_minutes is None:
+                try:
+                    from ..utilities.db_utils import get_settings_manager
+
+                    settings_manager = get_settings_manager(db_session, user_id)
+                    refresh_minutes = settings_manager.get_setting(
+                        "news.subscription.refresh_minutes", 240
+                    )
+                except (ImportError, AttributeError, TypeError):
+                    # Fallback for when settings DB is not available (e.g., programmatic API usage)
+                    logger.debug(
+                        "Settings manager not available, using default refresh_minutes"
+                    )
+                    refresh_minutes = 240  # Default to 4 hours
+            # Create new subscription
+            subscription = NewsSubscription(
+                id=str(uuid.uuid4()),
+                name=name,
+                query_or_topic=query,
+                subscription_type=subscription_type,
+                refresh_interval_minutes=refresh_minutes,
+                status="active" if is_active else "paused",
+                model_provider=normalize_provider(model_provider),
+                model=model,
+                search_strategy=search_strategy or "news_aggregation",
+                custom_endpoint=custom_endpoint,
+                folder_id=folder_id,
+                search_engine=search_engine,
+                search_iterations=search_iterations,
+                questions_per_iteration=questions_per_iteration,
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+                last_refresh=None,
+                next_refresh=datetime.now(UTC)
+                + timedelta(minutes=refresh_minutes),
+                source_id=source_research_id,
+            )
+
+            # Add to database
+            db_session.add(subscription)
+            db_session.commit()
+
+            # Notify scheduler about new subscription
+            _notify_scheduler_about_subscription_change("created", user_id)
+
+            return {
+                "status": "success",
+                "subscription_id": subscription.id,
+                "type": subscription_type,
+                "query": query,
+                "refresh_minutes": refresh_minutes,
+            }
+
+    except SubscriptionCreationException:
+        # Already a structured creation error (e.g. the N14 policy
+        # rejection) — propagate as-is instead of re-wrapping.
+        raise
+    except Exception:
+        logger.exception("Error creating subscription")
+        raise SubscriptionCreationException(
+            _GENERIC_ERROR_DETAIL,
+            {"query": query, "type": subscription_type},
+        )
+
+
+def delete_subscription(
+    subscription_id: str, username: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Delete a subscription.
+
+    Args:
+        subscription_id: ID of subscription to delete
+        username: User identifier; required to scope to user's encrypted DB.
+
+    Returns:
+        Dictionary with status
+    """
+    try:
+        from ..database.session_context import get_user_db_session
+        from ..database.models.news import NewsSubscription
+
+        with get_user_db_session(username) as db_session:
+            subscription = (
+                db_session.query(NewsSubscription)
+                .filter_by(id=subscription_id)
+                .first()
+            )
+            if subscription:
+                db_session.delete(subscription)
+                db_session.commit()
+
+                # Notify scheduler about deleted subscription
+                _notify_scheduler_about_subscription_change("deleted")
+
+                return {"status": "success", "deleted": subscription_id}
+            raise SubscriptionNotFoundException(subscription_id)  # noqa: TRY301 — re-raised by except NewsAPIException
+    except NewsAPIException:
+        # Re-raise our custom exceptions
+        raise
+    except Exception:
+        logger.exception("Error deleting subscription")
+        raise SubscriptionDeletionException(
+            subscription_id, _GENERIC_ERROR_DETAIL
+        )
+
+
+def get_votes_for_cards(card_ids: list, user_id: str) -> Dict[str, Any]:
+    """
+    Get vote counts and user's votes for multiple news cards.
+
+    Args:
+        card_ids: List of card IDs to get votes for
+        user_id: User identifier (not used - per-user database)
+
+    Returns:
+        Dictionary with vote information for each card
+    """
+    from ..database.models.news import UserRating, RatingType
+    from ..database.session_context import get_user_db_session
+
+    # Prefer the request's authenticated username (FastAPI contextvar),
+    # fall back to the explicit `user_id` arg for off-request callers
+    # like tests. The earlier version gated this on Flask's
+    # `has_request_context()` which is always False under FastAPI
+    # (Flask not running), so it always fell through to `user_id` —
+    # and that import will raise ImportError outright once Phase 8
+    # drops Flask from dependencies.
+    username = get_current_username() or (user_id if user_id else None)
+    if not username:
+        raise ValueError("No username available from context or user_id")
+
+    try:
+        # Get database session
+        with get_user_db_session(username) as db:
+            results = {}
+
+            for card_id in card_ids:
+                # Get user's vote for this card
+                user_vote = (
+                    db.query(UserRating)
+                    .filter_by(
+                        card_id=card_id, rating_type=RatingType.RELEVANCE
+                    )
+                    .first()
+                )
+
+                # Count total votes for this card
+                upvotes = (
+                    db.query(UserRating)
+                    .filter_by(
+                        card_id=card_id,
+                        rating_type=RatingType.RELEVANCE,
+                        rating_value="up",
+                    )
+                    .count()
+                )
+
+                downvotes = (
+                    db.query(UserRating)
+                    .filter_by(
+                        card_id=card_id,
+                        rating_type=RatingType.RELEVANCE,
+                        rating_value="down",
+                    )
+                    .count()
+                )
+
+                results[card_id] = {
+                    "upvotes": upvotes,
+                    "downvotes": downvotes,
+                    "user_vote": user_vote.rating_value if user_vote else None,
+                }
+
+            return {"success": True, "votes": results}
+
+    except Exception:
+        logger.exception("Error getting votes for cards")
+        raise
+
+
+def submit_feedback(card_id: str, user_id: str, vote: str) -> Dict[str, Any]:
+    """
+    Submit feedback (vote) for a news card.
+
+    Args:
+        card_id: ID of the news card
+        user_id: User identifier (not used - per-user database)
+        vote: "up" or "down"
+
+    Returns:
+        Dictionary with updated vote counts
+    """
+    from sqlalchemy_utc import utcnow
+    from ..database.models.news import UserRating, RatingType
+    from ..database.session_context import get_user_db_session
+
+    # Validate vote value
+    if vote not in ["up", "down"]:
+        raise ValueError(f"Invalid vote type: {vote}")
+
+    # Prefer the request's authenticated username (FastAPI contextvar),
+    # fall back to the explicit `user_id` arg for off-request callers.
+    # See the sibling `get_votes_for_cards` for why the Flask
+    # `has_request_context()` gate is gone.
+    username = get_current_username() or (user_id if user_id else None)
+    if not username:
+        raise ValueError("No username available from context or user_id")
+
+    try:
+        # Get database session
+        with get_user_db_session(username) as db:
+            # We don't check if the card exists in the database since news items
+            # are generated dynamically and may not be stored as NewsCard entries
+
+            # Check if user already voted on this card
+            existing_rating = (
+                db.query(UserRating)
+                .filter_by(card_id=card_id, rating_type=RatingType.RELEVANCE)
+                .first()
+            )
+
+            if existing_rating:
+                # Update existing vote
+                existing_rating.rating_value = vote
+                existing_rating.created_at = utcnow()
+            else:
+                # Create new rating
+                new_rating = UserRating(
+                    card_id=card_id,
+                    rating_type=RatingType.RELEVANCE,
+                    rating_value=vote,
+                )
+                db.add(new_rating)
+
+            db.commit()
+
+            # Count total votes for this card
+            upvotes = (
+                db.query(UserRating)
+                .filter_by(
+                    card_id=card_id,
+                    rating_type=RatingType.RELEVANCE,
+                    rating_value="up",
+                )
+                .count()
+            )
+
+            downvotes = (
+                db.query(UserRating)
+                .filter_by(
+                    card_id=card_id,
+                    rating_type=RatingType.RELEVANCE,
+                    rating_value="down",
+                )
+                .count()
+            )
+
+            logger.info(
+                f"Feedback submitted for card {card_id}: {vote} (up: {upvotes}, down: {downvotes})"
+            )
+
+            return {
+                "success": True,
+                "card_id": card_id,
+                "vote": vote,
+                "upvotes": upvotes,
+                "downvotes": downvotes,
+            }
+
+    except Exception:
+        logger.exception(f"Error submitting feedback for card {card_id}")
+        raise
+
+
+def research_news_item(card_id: str, depth: str = "quick") -> Dict[str, Any]:
+    """
+    Perform deeper research on a news item.
+
+    Args:
+        card_id: ID of the news card to research
+        depth: Research depth - "quick", "detailed", or "report"
+
+    Returns:
+        Dictionary with research results
+    """
+    # TODO: Implement with per-user database for cards
+    logger.warning(
+        "research_news_item not yet implemented with per-user databases"
+    )
+    raise NotImplementedException("research_news_item")
+
+
+def save_news_preferences(
+    user_id: str, preferences: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Save user preferences for news.
+
+    Args:
+        user_id: User identifier
+        preferences: Dictionary of preferences to save
+
+    Returns:
+        Dictionary with status and message
+    """
+    # TODO: Implement with per-user database for preferences
+    logger.warning(
+        "save_news_preferences not yet implemented with per-user databases"
+    )
+    raise NotImplementedException("save_news_preferences")
+
+
+def get_news_categories() -> Dict[str, Any]:
+    """
+    Get available news categories with counts.
+
+    Returns:
+        Dictionary with categories and statistics
+    """
+    # TODO: Implement with per-user database for categories
+    logger.warning(
+        "get_news_categories not yet implemented with per-user databases"
+    )
+    raise NotImplementedException("get_news_categories")

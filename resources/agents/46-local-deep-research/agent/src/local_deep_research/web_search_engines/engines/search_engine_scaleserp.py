@@ -1,0 +1,248 @@
+from ...security.secure_logging import logger
+from typing import Any, Dict, List, Optional
+import requests
+
+from langchain_core.language_models import BaseLLM
+
+from ..search_engine_base import BaseSearchEngine, Exposure, Sensitivity
+from ..rate_limiting import RateLimitError
+from ...security import safe_get
+
+
+class ScaleSerpSearchEngine(BaseSearchEngine):
+    """Google search engine implementation using ScaleSerp API with caching support"""
+
+    # Mark as public search engine
+    is_public = True
+    egress_sensitivity = Sensitivity.NON_SENSITIVE
+    egress_exposure = Exposure.EXPOSING
+    # Mark as generic search engine (general web search via Google)
+    is_generic = True
+
+    def __init__(
+        self,
+        max_results: int = 10,
+        location: str = "United States",
+        language: str = "en",
+        device: str = "desktop",
+        safe_search: bool = True,
+        api_key: Optional[str] = None,
+        llm: Optional[BaseLLM] = None,
+        include_full_content: bool = False,
+        max_filtered_results: Optional[int] = None,
+        settings_snapshot: Optional[Dict[str, Any]] = None,
+        enable_cache: bool = True,
+        **kwargs,
+    ):
+        """
+        Initialize the ScaleSerp search engine.
+
+        Args:
+            max_results: Maximum number of search results (default 10, max 100)
+            location: Location for localized results (e.g., 'United States', 'London,England,United Kingdom')
+            language: Language code for results (e.g., 'en', 'es', 'fr')
+            device: Device type for search ('desktop' or 'mobile')
+            safe_search: Whether to enable safe search
+            api_key: ScaleSerp API key (can also be set in settings)
+            llm: Language model for relevance filtering
+            include_full_content: Retained for backward compatibility; full-content
+                retrieval is handled via the factory wrapper.
+            max_filtered_results: Maximum number of results to keep after filtering
+            settings_snapshot: Settings snapshot for thread context
+            enable_cache: Whether to use ScaleSerp's 1-hour caching (saves costs for repeated searches)
+            **kwargs: Additional parameters (ignored but accepted for compatibility)
+        """
+        # Initialize the BaseSearchEngine with LLM, max_filtered_results, and max_results
+        super().__init__(
+            llm=llm,
+            max_filtered_results=max_filtered_results,
+            max_results=max_results,
+            include_full_content=include_full_content,
+            settings_snapshot=settings_snapshot,
+        )
+        self.location = location
+        self.language = language
+        self.device = device
+        self.safe_search = safe_search
+        self.enable_cache = enable_cache  # ScaleSerp's unique caching feature
+
+        # Get API key - check params, settings, or env vars
+        scaleserp_api_key = self._resolve_api_key(
+            api_key,
+            "search.engine.web.scaleserp.api_key",
+            engine_name="ScaleSerp",
+            settings_snapshot=settings_snapshot,
+        )
+
+        self.api_key = scaleserp_api_key
+        self.base_url = "https://api.scaleserp.com/search"
+
+        # Initialize per-query attributes (reset in _get_previews per search)
+        self._knowledge_graph = None
+
+        # Full-content retrieval is the factory wrapper's job — the
+        # wrapper fetches pages via ``batch_fetch_and_extract`` and
+        # populates ``full_content`` on each result; the inner engine
+        # only emits snippets from ``_get_previews``.
+
+    def _get_previews(self, query: str) -> List[Dict[str, Any]]:
+        """
+        Get preview information from ScaleSerp API.
+
+        Args:
+            query: The search query
+
+        Returns:
+            List of preview dictionaries
+        """
+        logger.info("Getting search results from ScaleSerp API")
+
+        # Reset per-query attributes to prevent leakage between searches
+        self._knowledge_graph = None
+
+        try:
+            # Build request parameters
+            params = {
+                "api_key": self.api_key,
+                "q": query,
+                "num": min(self.max_results, 100),  # ScaleSerp max is 100
+                "location": self.location,
+                "hl": self.language,
+                "device": self.device,
+            }
+
+            # Add safe search if enabled
+            if self.safe_search:
+                params["safe"] = "on"
+
+            # ScaleSerp automatically caches identical queries for 1 hour
+            # Cached results are served instantly and don't consume API credits
+            if self.enable_cache:
+                params["output"] = (
+                    "json"  # Ensure JSON output for cache detection
+                )
+                logger.debug(
+                    "ScaleSerp caching enabled - identical searches within 1 hour are free"
+                )
+
+            # Apply rate limiting before request
+            self._last_wait_time = self.rate_tracker.apply_rate_limit(
+                self.engine_type
+            )
+
+            # Make API request
+            response = safe_get(self.base_url, params=params, timeout=30)
+
+            # Check for rate limits
+            self._raise_if_rate_limit(response.status_code)
+
+            response.raise_for_status()
+
+            data = response.json()
+
+            # Extract organic results
+            organic_results = data.get("organic_results", [])
+
+            # Format results as previews
+            previews = []
+
+            # Check if results were served from cache for monitoring
+            from_cache = data.get("request_info", {}).get("cached", False)
+
+            for idx, result in enumerate(organic_results):
+                # Extract display link — ScaleSerp uses truncated URL as fallback
+                # `or ""` guards against a JSON null link: the fallback slice
+                # is evaluated eagerly and would raise TypeError on None.
+                link = result.get("link") or ""
+                display_link = self._extract_display_link(
+                    link, fallback=link[:50]
+                )
+
+                preview = {
+                    "id": idx,
+                    "title": result.get("title", ""),
+                    "link": link,
+                    "snippet": result.get("snippet", ""),
+                    "displayed_link": display_link,
+                    "position": result.get("position", idx + 1),
+                    "from_cache": from_cache,  # Add cache status for monitoring
+                }
+
+                # Store full ScaleSerp result for later
+                preview["_full_result"] = result
+
+                # Include rich snippets if available
+                if "rich_snippet" in result:
+                    preview["rich_snippet"] = result["rich_snippet"]
+
+                # Include date if available
+                if "date" in result:
+                    preview["date"] = result["date"]
+
+                # Include sitelinks if available
+                if "sitelinks" in result:
+                    preview["sitelinks"] = result["sitelinks"]
+
+                previews.append(preview)
+
+            # Store the previews for potential full content retrieval
+            self._search_results = previews
+
+            # Store knowledge graph if available
+            if "knowledge_graph" in data:
+                self._knowledge_graph = data["knowledge_graph"]
+                logger.info(
+                    f"Found knowledge graph for query: {data['knowledge_graph'].get('title', 'Unknown')}"
+                )
+
+            # Log if result was served from cache
+            if from_cache:
+                logger.debug(
+                    "Result served from ScaleSerp cache - no API credit used!"
+                )
+
+            return previews
+
+        except RateLimitError:
+            raise  # Re-raise rate limit errors
+        except requests.exceptions.RequestException as e:
+            safe_msg = self._scrub_error(e)
+            logger.warning(
+                f"Error getting ScaleSerp API results: {safe_msg}. "
+                "Check API docs: https://docs.scaleserp.com"
+            )
+            self._raise_if_rate_limit(e)
+            return []
+        except Exception as e:
+            safe_msg = self._scrub_error(e)
+            logger.warning(
+                f"Unexpected error getting ScaleSerp API results: {safe_msg}"
+            )
+            return []
+
+    def _get_full_content(
+        self, relevant_items: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Get full content for the relevant search results.
+        Extends base implementation to include knowledge graph data.
+
+        Args:
+            relevant_items: List of relevant preview dictionaries
+
+        Returns:
+            List of result dictionaries with full content if requested
+        """
+        results = super()._get_full_content(relevant_items)
+
+        # Include knowledge graph if available
+        if results and hasattr(self, "_knowledge_graph"):
+            results[0]["knowledge_graph"] = self._knowledge_graph
+
+        return results
+
+    def _temp_attributes(self):
+        """Return list of temporary attribute names to clean up after run()."""
+        return super()._temp_attributes() + [
+            "_knowledge_graph",
+        ]

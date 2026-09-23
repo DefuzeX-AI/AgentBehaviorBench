@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Document Chunks - Deep Research System{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="/static/css/document_details.css">
+{% endblock %}
+
+{% block content %}
+<div class="ldr-chunks-container">
+    <a href="/library/document/{{ document.id }}" class="ldr-back-button">
+        <i aria-hidden="true" class="fas fa-arrow-left"></i> Back to Document
+    </a>
+
+    <div class="ldr-chunks-header">
+        <h1><i aria-hidden="true" class="fas fa-puzzle-piece"></i> Document Chunks</h1>
+        <div class="ldr-chunks-stats">
+            <strong>Document:</strong> {{ document.filename or document.title or "Untitled" }}<br>
+            <strong>Total Chunks:</strong> {{ total_chunks }} chunk{{ 's' if total_chunks != 1 else '' }} across {{ chunks_by_collection|length }} collection{{ 's' if chunks_by_collection|length != 1 else '' }}
+        </div>
+    </div>
+
+    {% if chunks_by_collection %}
+        {% for collection_name, collection_data in chunks_by_collection.items() %}
+        <div class="ldr-collection-section">
+            <div class="ldr-collection-header">
+                <h2>{{ collection_data.name }}</h2>
+                <div class="ldr-chunk-count">
+                    {{ collection_data.chunks|length }} chunk{{ 's' if collection_data.chunks|length != 1 else '' }}
+                </div>
+            </div>
+
+            {% for chunk in collection_data.chunks %}
+            <div class="ldr-chunk" id="chunk-{{ chunk.index }}">
+                <div class="ldr-chunk-meta">
+                    <div class="ldr-chunk-meta-item">
+                        <strong>Chunk #{{ chunk.index + 1 }}</strong>
+                    </div>
+                    <div class="ldr-chunk-meta-item">
+                        <strong>Words:</strong> {{ chunk.word_count }}
+                    </div>
+                    <div class="ldr-chunk-meta-item">
+                        <strong>Position:</strong> {{ chunk.start_char }}-{{ chunk.end_char }}
+                    </div>
+                    <div class="ldr-chunk-meta-item">
+                        <strong>ID:</strong> <code>{{ chunk.id }}</code>
+                    </div>
+                </div>
+
+                <div class="ldr-chunk-text">{{ chunk.text }}</div>
+
+                <div class="ldr-embedding-info">
+                    <i aria-hidden="true" class="fas fa-brain"></i>
+                    <strong>Embedding:</strong> {{ chunk.embedding_model }} ({{ chunk.embedding_model_type }})
+                    {% if chunk.embedding_dimension %}
+                    | <strong>Dimension:</strong> {{ chunk.embedding_dimension }}
+                    {% endif %}
+                    | <strong>Created:</strong> {{ chunk.created_at.strftime('%Y-%m-%d %H:%M') if chunk.created_at else 'N/A' }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="ldr-no-chunks">
+            <i aria-hidden="true" class="fas fa-inbox" style="font-size: 48px; margin-bottom: 20px; display: block;"></i>
+            <p>No chunks found for this document.</p>
+            <p>The document may not be indexed yet.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
