@@ -1,0 +1,1118 @@
+import inspect
+from typing import Any, Dict, Optional
+
+from ..security.egress.policy import PolicyDeniedError
+from ..security.log_sanitizer import scrub_error
+from ..security.module_whitelist import get_safe_module_class
+from ..security.secure_logging import logger
+from .engine_groups import is_collection_engine
+from .retriever_registry import retriever_registry
+from ..utilities.search_utilities import LANGUAGE_CODE_MAP
+from ..utilities.type_utils import resolve_snippets_only, to_bool
+from .search_engine_base import BaseSearchEngine
+from .search_engines_config import search_config
+
+# Engines whose constructors accept the global ``search.time_period`` filter.
+# Used both by get_search()'s explicit forwarding and by
+# create_search_engine()'s settings-snapshot fallback so that direct callers
+# (langgraph-agent strategy tools, MCP server) honor the setting too.
+TIME_PERIOD_ENGINES = ("serpapi", "tavily", "wikinews")
+
+# Non-geographic region sentinels that should not be mapped to provider `location`
+_NON_LOCATION_REGIONS = frozenset({"wt-wt", "all", "none", "worldwide", ""})
+
+# Engines that accept a language code (ISO 639-1) in their ``language`` parameter.
+# Engines like OpenLibrary (MARC code or None) or Wayback/DDG (language name
+# for Justext) are excluded so that global language settings do not corrupt them.
+LANGUAGE_CODE_ENGINES = frozenset(
+    {"searxng", "mojeek", "wikipedia", "tinyfish", "scaleserp"}
+)
+
+# Engines that accept a language code (Google hl code) in their ``search_language`` parameter.
+# Engines like Brave, Google PSE, SerpAPI, Wikinews expect the language name ("English").
+SEARCH_LANGUAGE_CODE_ENGINES = frozenset({"serper"})
+
+# Engines that accept an ISO country code in their ``location`` parameter.
+# ScaleSerp expects a free-text place name ("United States") and is excluded.
+LOCATION_CODE_ENGINES = frozenset({"tinyfish"})
+
+# Parameters forwarded to BaseSearchEngine or accepted across multiple engines
+_BASE_FORWARDED_PARAMS = frozenset(
+    {
+        "search_snippets_only",
+        "max_filtered_results",
+        "max_results",
+        "safe_search",
+        "region",
+        "location",
+        "search_language",
+        "language",
+        "time_period",
+        "include_full_content",
+    }
+)
+
+
+def _resolve_setting(
+    snapshot: Optional[Dict[str, Any]],
+    key: str,
+    default: Any = None,
+) -> Any:
+    """Safely extract a setting value from settings_snapshot (dict or scalar)."""
+    if not snapshot or key not in snapshot:
+        return default
+    raw = snapshot[key]
+    val = raw.get("value", default) if isinstance(raw, dict) else raw
+    return default if val is None else val
+
+
+def _normalize_language_code(language: str) -> Optional[str]:
+    """Normalize a language name or code to an ISO 639-1 code.
+
+    Returns None if the language name is unknown and cannot be converted to a valid code.
+    """
+    if not language:
+        return None
+    lang_clean = language.strip().lower()
+    if lang_clean in LANGUAGE_CODE_MAP:
+        return LANGUAGE_CODE_MAP[lang_clean]
+    # Pass through values that already look like ISO language codes (len <= 3 and alpha)
+    if len(lang_clean) <= 3 and lang_clean.isalpha():
+        return lang_clean
+    return None
+
+
+def _to_extraction_language_name(value: Any) -> Optional[str]:
+    """Convert a language name or ISO code to a justext stoplist name.
+
+    ``justext.get_stoplist`` expects names like ``English`` / ``German``,
+    not provider codes like ``en`` / ``de``.
+    """
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    lower = cleaned.lower()
+    if lower in LANGUAGE_CODE_MAP:
+        return lower.capitalize()
+    for name, code in LANGUAGE_CODE_MAP.items():
+        if code == lower:
+            return name.capitalize()
+    if len(cleaned) <= 3 and cleaned.isalpha():
+        return None
+    return cleaned
+
+
+def _resolve_extraction_language(
+    params: Dict[str, Any],
+    settings_snapshot: Optional[Dict[str, Any]],
+) -> Optional[str]:
+    """Resolve justext extraction language separately from provider codes."""
+    candidates: list[Any] = []
+    if "search_language" in params:
+        candidates.append(params.get("search_language"))
+    snapshot_lang = _resolve_setting(
+        settings_snapshot, "search.search_language"
+    )
+    if snapshot_lang is not None:
+        candidates.append(snapshot_lang)
+    if "language" in params:
+        candidates.append(params.get("language"))
+    for candidate in candidates:
+        converted = _to_extraction_language_name(candidate)
+        if converted:
+            return converted
+    return None
+
+
+_resolve_snippets_only = resolve_snippets_only
+
+
+def create_search_engine(
+    engine_name: str,
+    llm=None,
+    username: str | None = None,
+    settings_snapshot: Dict[str, Any] | None = None,
+    programmatic_mode: bool = False,
+    **kwargs,
+) -> Optional[BaseSearchEngine]:
+    """
+    Create a search engine instance based on the engine name.
+
+    Args:
+        engine_name: Name of the search engine to create
+        llm: Language model instance (passed to engines that accept one)
+        programmatic_mode: If True, disables database operations and metrics tracking
+        **kwargs: Additional parameters to override defaults
+
+    Returns:
+        Initialized search engine instance or None if creation failed
+    """
+    # Debug logging
+    logger.info(
+        f"create_search_engine called with engine_name={engine_name} (type: {type(engine_name)})"
+    )
+
+    # Resolve the effective username for per-user registry lookups. Callers
+    # that thread it explicitly win; otherwise fall back to the ``_username``
+    # carried in the settings snapshot (injected by search_config.get_search /
+    # AdvancedSearchSystem). None resolves the shared namespace only.
+    if username is None:
+        from ..search_system import username_from_snapshot
+
+        username = username_from_snapshot(settings_snapshot)
+
+    # Egress policy PEP runs AFTER retriever-registry + config lookup, so
+    # registered retrievers don't go through engine-name classification.
+    # The actual call site is right before engine instantiation, further
+    # down.
+
+    # Check if this is a registered retriever first (the caller's own
+    # retrievers resolve before shared/global ones).
+    retriever = retriever_registry.get(engine_name, username=username)
+    if retriever:
+        # Egress policy: gate the retriever against the active scope.
+        # Retrievers are classified at registration (is_local, default
+        # True). Snapshot REQUIRED — previously the policy block was
+        # gated on "if settings_snapshot:" which let snapshot=None
+        # callers instantiate retrievers ungated.
+        # NB: PolicyDeniedError is imported at MODULE level — importing it
+        # again here (function-local) would shadow it across the whole
+        # function and make the outer `except PolicyDeniedError` an unbound
+        # local on code paths that skip this branch.
+        from ..security.egress.policy import (
+            Decision,
+            context_from_snapshot,
+            evaluate_retriever,
+            resolve_run_primary_engine,
+        )
+
+        if not settings_snapshot:
+            raise PolicyDeniedError(
+                Decision(False, "no_snapshot"),
+                target=engine_name,
+            )
+
+        primary = resolve_run_primary_engine(
+            settings_snapshot, default=engine_name
+        )
+        try:
+            _ctx = context_from_snapshot(
+                settings_snapshot,
+                primary,
+                username=username,
+            )
+        except PolicyDeniedError:
+            raise
+        except ValueError as exc:
+            raise PolicyDeniedError(
+                Decision(False, "invalid_policy_config"),
+                target=engine_name,
+            ) from exc
+        # Pass metadata from the SAME registry reference used for
+        # .get() above, so evaluate_retriever doesn't re-read a
+        # different (e.g. test-patched) global singleton.
+        try:
+            _meta = retriever_registry.get_metadata(
+                engine_name, username=username
+            )
+        except AttributeError:
+            _meta = None
+        _decision = evaluate_retriever(engine_name, _ctx, metadata=_meta)
+        if not _decision.allowed:
+            logger.bind(policy_audit=True).warning(
+                "retriever denied by egress policy",
+                retriever=engine_name,
+                scope=_ctx.scope.value,
+                reason=_decision.reason,
+            )
+            raise PolicyDeniedError(_decision, target=engine_name)
+
+        logger.info(f"Using registered LangChain retriever: {engine_name}")
+        from .engines.search_engine_retriever import RetrieverSearchEngine
+
+        return RetrieverSearchEngine(
+            retriever=retriever,
+            name=engine_name,
+            max_results=kwargs.get("max_results", 10),
+            programmatic_mode=programmatic_mode,
+        )
+
+    # Extract search engine configs from settings snapshot
+    if settings_snapshot:
+        config = search_config(
+            username=username, settings_snapshot=settings_snapshot
+        )
+
+        logger.debug(
+            f"Extracted search engines from snapshot: {list(config.keys())}"
+        )
+    else:
+        raise RuntimeError(
+            "settings_snapshot is required for search engine creation in threads"
+        )
+
+    if engine_name == "none":
+        # Reject the literal string "none". Historically this silently fell
+        # through to a meta engine and hit live networks — callers that
+        # wanted an offline pipeline were unknowingly doing real searches.
+        raise ValueError(
+            "search.tool='none' is not a valid engine. Register a LangChain "
+            "retriever via `retrievers={...}` (see "
+            "examples/llm_integration/mock_llm_example.py) or pick a real "
+            "engine."
+        )
+
+    if engine_name not in config:
+        # Deprecated path: some older callers pass UI display labels instead of
+        # config keys. Display labels look like "{icon} {base_name} ({category})"
+        # e.g. "🔬 OpenAlex (Scientific)". Only attempt (and warn about)
+        # this fallback when the name actually matches that shape — plain keys
+        # like "collection_<uuid>" never will, and the warning was pure noise.
+        looks_like_display_label = " (" in engine_name and engine_name.endswith(
+            ")"
+        )
+        if looks_like_display_label:
+            logger.warning(
+                f"Engine '{engine_name}' not found in config - attempting "
+                "display label fallback. This is deprecated; callers should "
+                "pass the config key directly."
+            )
+
+            # To avoid ReDoS, use string ops instead of regex.
+            # Pattern: icon, space, base_name, space, (category)
+            parts = engine_name.rsplit(" (", 1)
+            if len(parts) == 2:
+                before_paren = parts[0]
+                space_idx = before_paren.find(" ")
+                if space_idx > 0:
+                    base_name = before_paren[space_idx + 1 :].strip()
+                    logger.info(
+                        f"Extracted base name '{base_name}' from label "
+                        f"'{engine_name}'"
+                    )
+
+                    for config_key, config_data in config.items():
+                        if isinstance(config_data, dict):
+                            display_name = config_data.get(
+                                "display_name", config_key
+                            )
+                            if display_name == base_name:
+                                logger.info(
+                                    f"Matched label to config key: "
+                                    f"'{engine_name}' -> '{config_key}'"
+                                )
+                                engine_name = config_key
+                                break
+
+        # If still not found, FAIL CLOSED.
+        # We raise a plain ValueError (not PolicyDeniedError) because
+        # "unknown engine name" is a config/wiring error, not a policy
+        # decision — keeping the exception type clean lets policy-aware
+        # callers tell them apart.
+        if engine_name not in config:
+            logger.bind(policy_audit=True).warning(
+                "unknown engine name rejected",
+                engine=engine_name,
+                available=list(config.keys()),
+            )
+            raise ValueError(
+                f"Unknown search engine '{engine_name}'. Available: "
+                f"{sorted(config.keys())}. The 'auto', 'meta', 'parallel' "
+                "and 'parallel_scientific' meta engines were removed — the "
+                "langgraph-agent strategy (the default) selects engines "
+                "dynamically; pick a concrete engine instead."
+            )
+
+    # Egress policy PEP: gate the resolved engine against the user's declared
+    # scope. Lazy import to break the circular dependency
+    # (security/egress/policy.py → web_search_engines/* → security/*).
+    # PolicyDeniedError comes from the module-level import (see the note
+    # in the retriever branch above — re-importing it here would shadow
+    # it function-wide and break the outer except clause).
+    from ..security.egress.policy import (
+        Decision,
+        context_from_snapshot,
+        evaluate_engine,
+        resolve_run_primary_engine,
+    )
+
+    # Resolve the run's primary via the shared helper so the scope this PEP
+    # enforces matches the one the LangGraph tool-list filter pre-filters with
+    # (default: this engine when search.tool is unset).
+    primary_engine = resolve_run_primary_engine(
+        settings_snapshot, default=engine_name
+    )
+
+    try:
+        ctx = context_from_snapshot(
+            settings_snapshot, primary_engine, username=username
+        )
+    except ValueError as exc:
+        raise PolicyDeniedError(
+            Decision(False, "invalid_policy_config"),
+            target=engine_name,
+        ) from exc
+
+    # Pass the engine config entry as metadata so a per-collection
+    # is_public classification is honored without a redundant DB lookup.
+    decision = evaluate_engine(
+        engine_name,
+        ctx,
+        settings_snapshot=settings_snapshot,
+        metadata=config.get(engine_name),
+    )
+    if not decision.allowed:
+        logger.bind(policy_audit=True).warning(
+            "engine denied by egress policy",
+            engine=engine_name,
+            scope=ctx.scope.value,
+            reason=decision.reason,
+        )
+        raise PolicyDeniedError(decision, target=engine_name)
+
+    # Get engine configuration
+    engine_config = config[engine_name]
+    default_params = engine_config.get("default_params", {}) or {}
+
+    # Set default max_results from config if not provided in kwargs
+    if "max_results" not in kwargs:
+        if settings_snapshot:
+            raw_mr = _resolve_setting(
+                settings_snapshot, "search.max_results", 20
+            )
+            try:
+                max_results = int(raw_mr)
+            except (ValueError, TypeError):
+                max_results = 20
+        else:
+            max_results = 20
+        kwargs["max_results"] = max_results
+
+    # Route the global time filter to engines that understand it when the
+    # caller didn't pass one explicitly. get_search() forwards it as a kwarg,
+    # but direct callers (langgraph-agent strategy tools, the MCP server)
+    # only pass a settings_snapshot — without this fallback the user's
+    # Settings → Search → Time Period choice is silently ignored on those
+    # paths. Placed in kwargs so it takes precedence over per-engine
+    # default_params, matching get_search()'s behavior.
+    if (
+        engine_name in TIME_PERIOD_ENGINES
+        and "time_period" not in kwargs
+        and settings_snapshot
+        and "search.time_period" in settings_snapshot
+    ):
+        raw_time_period = _resolve_setting(
+            settings_snapshot, "search.time_period", "all"
+        )
+        if raw_time_period is not None:
+            kwargs["time_period"] = str(raw_time_period)
+
+    # Route search.snippets_only to engines when the caller didn't pass one
+    # explicitly. get_search() forwards it as a kwarg, but direct callers
+    # (langgraph-agent strategy tools, MCP server) only pass a settings_snapshot
+    # — without this fallback the user's Settings → Search → Snippets Only choice
+    # is silently ignored on those paths and defaults to True. Placed in kwargs
+    # so it takes precedence over per-engine default_params.
+    if "search_snippets_only" not in kwargs and settings_snapshot:
+        resolved_snippets = _resolve_snippets_only(settings_snapshot)
+        if resolved_snippets is not None:
+            kwargs["search_snippets_only"] = resolved_snippets
+
+    # Mirror get_search(): wrap FullSearchResults when snippets-only is off
+    # and the caller did not pass use_full_search. Direct callers (langgraph
+    # tools, MCP) never set that flag, so without this the engine fetches
+    # full content (search_snippets_only=False) but the wrapper path that
+    # actually hydrates ``full_content`` for searxng/ddg/serpapi/etc. never
+    # runs.
+    if "use_full_search" not in kwargs and "search_snippets_only" in kwargs:
+        kwargs["use_full_search"] = not kwargs["search_snippets_only"]
+
+    # Route search.max_filtered_results to engines when not explicitly passed.
+    if "max_filtered_results" not in kwargs and settings_snapshot:
+        raw_mfr = _resolve_setting(
+            settings_snapshot, "search.max_filtered_results"
+        )
+        if raw_mfr is not None:
+            try:
+                kwargs["max_filtered_results"] = int(raw_mfr)
+            except (ValueError, TypeError):
+                pass
+
+    # Route search.region to engines when not explicitly passed.
+    if "region" not in kwargs and settings_snapshot:
+        val_region = _resolve_setting(settings_snapshot, "search.region")
+        if val_region is not None:
+            kwargs["region"] = str(val_region)
+
+    # Route region -> location alias when location is not explicitly passed.
+    # Exclude non-country sentinels like 'wt-wt' / 'all' to avoid invalid location values.
+    # Only alias for engines whose location parameter expects an ISO country code.
+    if (
+        "location" not in kwargs
+        and "location" not in default_params
+        and engine_name in LOCATION_CODE_ENGINES
+    ):
+        effective_region = kwargs.get("region")
+        if (
+            not effective_region
+            and settings_snapshot
+            and "search.region" in settings_snapshot
+        ):
+            effective_region = _resolve_setting(
+                settings_snapshot, "search.region"
+            )
+        if (
+            effective_region
+            and isinstance(effective_region, str)
+            and effective_region.lower() not in _NON_LOCATION_REGIONS
+            and len(effective_region.strip()) == 2
+            and effective_region.strip().isalpha()
+        ):
+            kwargs["location"] = effective_region.strip().upper()
+
+    # Route search.safe_search to engines when not explicitly passed.
+    # Do not override a key the engine's default_params defines (e.g. SearXNG).
+    if (
+        "safe_search" not in kwargs
+        and "safe_search" not in default_params
+        and settings_snapshot
+        and "search.safe_search" in settings_snapshot
+    ):
+        raw_safe = _resolve_setting(settings_snapshot, "search.safe_search")
+        if raw_safe is not None:
+            kwargs["safe_search"] = to_bool(raw_safe, default=True)
+
+    # Route search.search_language to engines when not explicitly passed.
+    # Only inject when actually present in snapshot (no hardcoded default),
+    # and do not override a key the engine's default_params defines.
+    # For Serper, normalize to Google hl code; for other engines, pass language name.
+    if (
+        "search_language" not in kwargs
+        and "search_language" not in default_params
+        and settings_snapshot
+        and "search.search_language" in settings_snapshot
+    ):
+        val_lang = _resolve_setting(settings_snapshot, "search.search_language")
+        if val_lang is not None:
+            if engine_name in SEARCH_LANGUAGE_CODE_ENGINES:
+                norm_code = _normalize_language_code(str(val_lang))
+                if norm_code:
+                    kwargs["search_language"] = norm_code
+            else:
+                kwargs["search_language"] = str(val_lang)
+
+    # Route language code (ISO 639-1) for engines expecting code in 'language' param.
+    # Only alias when not defined in default_params, and only for engines whose parameter is a code.
+    if (
+        "language" not in kwargs
+        and "language" not in default_params
+        and engine_name in LANGUAGE_CODE_ENGINES
+    ):
+        lang_source = kwargs.get("search_language")
+        if (
+            not lang_source
+            and settings_snapshot
+            and "search.search_language" in settings_snapshot
+        ):
+            lang_source = _resolve_setting(
+                settings_snapshot, "search.search_language"
+            )
+        if lang_source and isinstance(lang_source, str):
+            norm_code = _normalize_language_code(lang_source)
+            if norm_code:
+                kwargs["language"] = norm_code
+    # Check for API key requirements
+    requires_api_key = engine_config.get("requires_api_key", False)
+
+    # Bound here (not just inside ``if requires_api_key``) so the except
+    # handler below can pass the in-scope key to scrub_error() — without
+    # the hoist, the no-key path would hit a NameError when scrubbing.
+    api_key = None
+
+    if requires_api_key:
+        # Check the settings snapshot for the API key
+        api_key_path = f"search.engine.web.{engine_name}.api_key"
+
+        if settings_snapshot:
+            api_key_setting = settings_snapshot.get(api_key_path)
+
+            if api_key_setting:
+                api_key = (
+                    api_key_setting.get("value")
+                    if isinstance(api_key_setting, dict)
+                    else api_key_setting
+                )
+
+        # Still try to get from engine config if not found
+        if not api_key:
+            api_key = engine_config.get("api_key")
+
+        if not api_key:
+            logger.info(
+                f"Required API key for {engine_name} not found in settings."
+            )
+            return None
+
+        # Pass the API key in kwargs for engines that need it
+        if api_key:
+            kwargs["api_key"] = api_key
+
+    # Warn about missing LLM but allow engine creation in degraded mode.
+    # All engines with requires_llm=True handle llm=None gracefully
+    # (e.g. skipping query optimization, using reliability-based sorting).
+    if engine_config.get("requires_llm", False) and not llm:
+        logger.warning(
+            f"Engine '{engine_name}' is configured with requires_llm=True but no LLM provided. "
+            f"Creating engine without LLM — some features (query optimization, relevance filtering) "
+            f"may be unavailable."
+        )
+
+    try:
+        # Load the engine class
+        module_path = engine_config["module_path"]
+        class_name = engine_config["class_name"]
+
+        engine_class = get_safe_module_class(module_path, class_name)
+
+        # Get the engine class's __init__ parameters to filter out unsupported ones
+        engine_init_signature = inspect.signature(engine_class.__init__)
+        engine_init_params = list(engine_init_signature.parameters.keys())
+        has_var_keyword = any(
+            p.kind == inspect.Parameter.VAR_KEYWORD
+            for p in engine_init_signature.parameters.values()
+        )
+
+        # Combine default parameters with provided ones
+        all_params = {**engine_config.get("default_params", {}), **kwargs}
+
+        # Filter out parameters that aren't accepted by the engine class
+        # Note: 'self' is always the first parameter of instance methods, so we skip it.
+        # If the class accepts **kwargs, parameters handled by BaseSearchEngine or
+        # common wrappers are preserved.
+        filtered_params = {
+            k: v for k, v in all_params.items() if k in engine_init_params[1:]
+        }
+        if has_var_keyword:
+            for k in _BASE_FORWARDED_PARAMS:
+                if k in all_params and k not in filtered_params:
+                    filtered_params[k] = all_params[k]
+
+        # Always pass settings_snapshot if the engine accepts it
+        if "settings_snapshot" in engine_init_params[1:] and settings_snapshot:
+            filtered_params["settings_snapshot"] = settings_snapshot
+
+        # Pass programmatic_mode if the engine accepts it
+        if "programmatic_mode" in engine_init_params[1:]:
+            filtered_params["programmatic_mode"] = programmatic_mode
+
+        # Add LLM if required OR if provided and engine accepts it
+        if engine_config.get("requires_llm", False):
+            filtered_params["llm"] = llm
+        elif (
+            "llm" in engine_init_params[1:]
+            and llm
+            and "llm" not in filtered_params
+        ):
+            # If LLM was provided and engine accepts it, pass it through
+            filtered_params["llm"] = llm
+            logger.info(
+                f"Passing LLM to {engine_name} (engine accepts it and LLM was provided)"
+            )
+
+        # Add API key if required and not already in filtered_params
+        if (
+            engine_config.get("requires_api_key", False)
+            and "api_key" not in filtered_params
+        ):
+            # Use the api_key we got earlier from settings
+            if api_key:
+                filtered_params["api_key"] = api_key
+
+        logger.info(
+            f"Creating {engine_name} with filtered parameters: {filtered_params.keys()}"
+        )
+
+        # Create the engine instance with filtered parameters
+        engine = engine_class(**filtered_params)
+
+        # Stamp the registry name so BaseSearchEngine._verify_egress_scope()
+        # can check egress scope at run time.
+        if isinstance(engine, BaseSearchEngine):
+            engine._engine_name = engine_name
+
+        # Most engine subclasses do not name ``programmatic_mode`` in their
+        # signature (or accept it via **kwargs without forwarding to
+        # ``super().__init__``), so the constructor often falls back to the
+        # BaseSearchEngine default of False even when the API caller asked
+        # for True. Apply the requested mode post-construction so the
+        # engine's rate tracker matches.
+        if isinstance(engine, BaseSearchEngine) and (
+            engine.programmatic_mode != programmatic_mode
+        ):
+            engine._configure_programmatic_mode(programmatic_mode)
+
+        # Same swallow: Wikipedia (and others) accept **kwargs but do not
+        # forward ``search_snippets_only`` to BaseSearchEngine, so run()
+        # would keep the True default and skip _get_full_content. Stamp it
+        # after construction whenever the factory resolved a value.
+        if (
+            isinstance(engine, BaseSearchEngine)
+            and "search_snippets_only" in all_params
+        ):
+            engine.search_snippets_only = bool(
+                all_params["search_snippets_only"]
+            )
+
+        # Determine if this engine should use LLM relevance filtering
+        # Priority: per-engine setting > needs_llm_relevance_filter > global setting
+        #
+        # Rationale:
+        # - Engines with needs_llm_relevance_filter=True have poor native relevance ranking
+        #   (keyword-only, no ML ranking) and benefit from LLM-based filtering
+        # - Well-ranked engines (Google, Brave) and semantic engines (Exa, Tavily)
+        #   do not need this and should not waste LLM calls
+        # - The global skip_relevance_filter only affects unclassified engines
+        # - CrossEngineFilter still ranks combined results at the strategy level
+        should_filter = False
+
+        # Check for per-engine setting first (highest priority)
+        per_engine_key = f"search.engine.web.{engine_name}.default_params.enable_llm_relevance_filter"
+        if settings_snapshot and per_engine_key in settings_snapshot:
+            per_engine_setting = settings_snapshot[per_engine_key]
+            should_filter = (
+                per_engine_setting.get("value", False)
+                if isinstance(per_engine_setting, dict)
+                else per_engine_setting
+            )
+            logger.info(
+                f"Using per-engine setting for {engine_name}: "
+                f"enable_llm_relevance_filter={should_filter}"
+            )
+        else:
+            # Auto-detection based on engine attribute (medium priority)
+            if (
+                hasattr(engine_class, "needs_llm_relevance_filter")
+                and engine_class.needs_llm_relevance_filter
+            ):
+                should_filter = True
+                logger.info(
+                    f"Auto-enabling LLM filtering for {engine_name} "
+                    f"(needs_llm_relevance_filter=True)"
+                )
+            else:
+                # Global override only applies to engines without needs_llm_relevance_filter
+                if (
+                    settings_snapshot
+                    and "search.skip_relevance_filter" in settings_snapshot
+                ):
+                    skip_filter_setting = settings_snapshot[
+                        "search.skip_relevance_filter"
+                    ]
+                    skip_filter = (
+                        skip_filter_setting.get("value", False)
+                        if isinstance(skip_filter_setting, dict)
+                        else skip_filter_setting
+                    )
+                    if skip_filter:
+                        should_filter = False
+                        logger.debug(
+                            f"Global skip_relevance_filter=True applied "
+                            f"for {engine_name}"
+                        )
+
+        # Apply the setting
+        if should_filter and hasattr(engine, "llm") and engine.llm:
+            engine.enable_llm_relevance_filter = True
+            logger.info(f"✓ Enabled LLM relevance filtering for {engine_name}")
+        elif should_filter:
+            logger.warning(
+                f"LLM relevance filtering requested for {engine_name} "
+                f"but no LLM is available — filtering skipped"
+            )
+        else:
+            logger.debug(f"LLM relevance filtering disabled for {engine_name}")
+
+        # Check if we need to wrap with full search capabilities. Two
+        # config flags identify engines that participate in the unified
+        # full-search pipeline:
+        #   * ``supports_full_search`` — runtime-registered engines
+        #     (retrievers, set in ``search_engines_config.py``)
+        #   * ``full_search_module`` — registry engines, populated from
+        #     ``engine_registry.EngineEntry.full_search_module``
+        # An explicit ``supports_full_search=False`` wins as a per-engine
+        # opt-out, letting users disable wrapping for any engine via
+        # settings even when the registry marks it as wrap-eligible.
+        if kwargs.get("use_full_search", False):
+            explicit_opt_out = (
+                "supports_full_search" in engine_config
+                and not engine_config["supports_full_search"]
+            )
+            if not explicit_opt_out and (
+                engine_config.get("supports_full_search", False)
+                or engine_config.get("full_search_module")
+            ):
+                return _create_full_search_wrapper(
+                    engine_name,
+                    engine,
+                    engine_config,
+                    llm,
+                    kwargs,
+                    username,
+                    settings_snapshot,
+                )
+
+        return engine  # type: ignore[no-any-return]
+
+    except PolicyDeniedError:
+        # An engine __init__ (or a child engine / full-search wrapper it
+        # builds) may itself consult the PDP and raise. Re-raise so the
+        # denial surfaces to policy-aware callers and the audit trail,
+        # rather than being downgraded to a generic "failed to create"
+        # None — which would fail OPEN from an enforcement standpoint.
+        raise
+    except Exception as e:
+        safe_msg = scrub_error(e, api_key)
+        logger.exception(
+            f"Failed to create search engine '{engine_name}' ({type(e).__name__}): {safe_msg}"
+        )
+        return None
+
+
+def _create_full_search_wrapper(
+    engine_name: str,
+    base_engine: BaseSearchEngine,
+    engine_config: Dict[str, Any],
+    llm,
+    params: Dict[str, Any],
+    username: str | None = None,
+    settings_snapshot: Dict[str, Any] | None = None,
+) -> Optional[BaseSearchEngine]:
+    """Create a full search wrapper for the base engine if supported"""
+    try:
+        # Bound up here (re-populated below) so the except handler can
+        # always pull credential values out of it for scrub_error() —
+        # without the hoist, an exception before the dict is rebuilt would
+        # hit a NameError when trying to scrub the keys.
+        wrapper_params: Dict[str, Any] = {}
+
+        # Get full search class details from engine_config (already has
+        # registry-injected values from search_config()).
+        module_path = engine_config.get("full_search_module")
+        class_name = engine_config.get("full_search_class")
+
+        if not module_path or not class_name:
+            logger.warning(
+                f"Full search configuration missing for {engine_name}"
+            )
+            return base_engine
+
+        # Import the full search class
+        full_search_class = get_safe_module_class(module_path, class_name)
+
+        # Get the wrapper's __init__ parameters to filter out unsupported ones
+        wrapper_init_signature = inspect.signature(full_search_class.__init__)
+        wrapper_init_params = list(wrapper_init_signature.parameters.keys())[
+            1:
+        ]  # Skip 'self'
+
+        # Extract relevant parameters for the full search wrapper
+        wrapper_params = {
+            k: v for k, v in params.items() if k in wrapper_init_params
+        }
+
+        # Special case for SerpAPI which needs the API key directly
+        if (
+            engine_name == "serpapi"
+            and "serpapi_api_key" in wrapper_init_params
+        ):
+            # Check settings snapshot for API key
+            serpapi_api_key = None
+            if settings_snapshot:
+                serpapi_setting = settings_snapshot.get(
+                    "search.engine.web.serpapi.api_key"
+                )
+                if serpapi_setting:
+                    serpapi_api_key = (
+                        serpapi_setting.get("value")
+                        if isinstance(serpapi_setting, dict)
+                        else serpapi_setting
+                    )
+            if serpapi_api_key:
+                wrapper_params["serpapi_api_key"] = serpapi_api_key
+
+            # Map some parameter names to what the wrapper expects
+            if (
+                "language" in params
+                and "search_language" not in params
+                and "language" in wrapper_init_params
+            ):
+                wrapper_params["language"] = params["language"]
+
+            if (
+                "safesearch" not in wrapper_params
+                and "safe_search" in params
+                and "safesearch" in wrapper_init_params
+            ):
+                wrapper_params["safesearch"] = (
+                    "active" if params["safe_search"] else "off"
+                )
+
+        # Special case for Brave which needs the API key directly
+        if engine_name == "brave" and "api_key" in wrapper_init_params:
+            # Check settings snapshot for API key
+            brave_api_key = None
+            if settings_snapshot:
+                brave_setting = settings_snapshot.get(
+                    "search.engine.web.brave.api_key"
+                )
+                if brave_setting:
+                    brave_api_key = (
+                        brave_setting.get("value")
+                        if isinstance(brave_setting, dict)
+                        else brave_setting
+                    )
+
+            if brave_api_key:
+                wrapper_params["api_key"] = brave_api_key
+
+            # Map some parameter names to what the wrapper expects
+            if (
+                "language" in params
+                and "search_language" not in params
+                and "language" in wrapper_init_params
+            ):
+                wrapper_params["language"] = params["language"]
+
+            if (
+                "safesearch" not in wrapper_params
+                and "safe_search" in params
+                and "safesearch" in wrapper_init_params
+            ):
+                wrapper_params["safesearch"] = (
+                    "moderate" if params["safe_search"] else "off"
+                )
+
+        # FullSearchResults.language is a justext stoplist name, not a
+        # provider ISO code. LANGUAGE_CODE_ENGINES share kwargs with the
+        # wrapper, so remap (or drop) before construction.
+        if "language" in wrapper_init_params:
+            extraction_language = _resolve_extraction_language(
+                params, settings_snapshot
+            )
+            if extraction_language:
+                wrapper_params["language"] = extraction_language
+            else:
+                wrapper_params.pop("language", None)
+
+        # Always include llm if it's a parameter
+        if "llm" in wrapper_init_params:
+            wrapper_params["llm"] = llm
+
+        # If the wrapper needs the base engine and has a parameter for it
+        if "web_search" in wrapper_init_params:
+            wrapper_params["web_search"] = base_engine
+
+        logger.debug(
+            f"Creating full search wrapper for {engine_name} with filtered parameters: {wrapper_params.keys()}"
+        )
+
+        # Create the full search wrapper with filtered parameters
+        service: BaseSearchEngine = full_search_class(**wrapper_params)
+        return service
+
+    except Exception as e:
+        # Extract any credential values the wrapper was going to receive
+        # so a constructor exception echoing them gets literal-redacted
+        # (scrub_error skips None/falsy values and str-coerces the rest).
+        safe_msg = scrub_error(
+            e,
+            wrapper_params.get("api_key"),
+            wrapper_params.get("serpapi_api_key"),
+        )
+        logger.exception(
+            f"Failed to create full search wrapper for {engine_name} ({type(e).__name__}): {safe_msg}"
+        )
+        return base_engine
+
+
+def get_search(
+    search_tool: str,
+    llm_instance,
+    max_results: int = 10,
+    region: str = "us",
+    time_period: str = "all",
+    safe_search: bool = True,
+    search_snippets_only: Optional[bool] = None,
+    search_language: str = "English",
+    max_filtered_results: Optional[int] = None,
+    settings_snapshot: Dict[str, Any] | None = None,
+    programmatic_mode: bool = False,
+):
+    """
+    Get search tool instance based on the provided parameters.
+
+    Args:
+        search_tool: Name of the search engine to use
+        llm_instance: Language model instance
+        max_results: Maximum number of search results
+        region: Search region/locale
+        time_period: Time period for search results
+        safe_search: Whether to enable safe search
+        search_snippets_only: Whether to return just snippets (vs. full content).
+            Defaults to None (defers to settings_snapshot or engine default).
+        search_language: Language for search results
+        max_filtered_results: Maximum number of results to keep after filtering
+        programmatic_mode: If True, disables database operations and metrics tracking
+
+    Returns:
+        Initialized search engine instance
+    """
+    # Common parameters
+    params = {
+        "max_results": max_results,
+        "llm": llm_instance,  # Only used by engines that need it
+    }
+
+    # Add search_snippets_only if provided
+    if search_snippets_only is not None:
+        params["search_snippets_only"] = search_snippets_only
+
+    # Add max_filtered_results if provided
+    if max_filtered_results is not None:
+        params["max_filtered_results"] = max_filtered_results
+
+    # Resolve use_full_search for engines that support full search wrapping.
+    # When search_snippets_only is not explicitly passed, defer to settings_snapshot
+    # if present; otherwise default to False (matching BaseSearchEngine's snippet-only default).
+    if search_snippets_only is not None:
+        use_full_search = not search_snippets_only
+    else:
+        resolved_snippets = _resolve_snippets_only(settings_snapshot)
+        use_full_search = (
+            (not resolved_snippets) if resolved_snippets is not None else False
+        )
+
+    # Add engine-specific parameters
+    if search_tool in [
+        "duckduckgo",
+        "serpapi",
+        "google_pse",
+        "brave",
+        "mojeek",
+    ]:
+        params.update(
+            {
+                "region": region,
+                "safe_search": safe_search,
+                "use_full_search": use_full_search,
+            }
+        )
+
+    if search_tool == "searxng":
+        params["use_full_search"] = use_full_search
+
+    if search_tool in ["serpapi", "brave", "google_pse", "wikinews"]:
+        params["search_language"] = search_language
+
+    if search_tool == "tinyfish":
+        if (
+            region
+            and region.lower() not in _NON_LOCATION_REGIONS
+            and len(region.strip()) == 2
+            and region.strip().isalpha()
+        ):
+            params["location"] = region.strip().upper()
+        norm_lang = _normalize_language_code(search_language)
+        if norm_lang:
+            params["language"] = norm_lang
+
+    if search_tool == "sofya":
+        # Sofya derives its request depth from search_snippets_only: the paid
+        # "basic" depth (inline page content) is only requested when full
+        # content is used. Handled via common params / snapshot fallback.
+        pass
+
+    if search_tool == "wikinews":
+        params["adaptive_search"] = bool(
+            (settings_snapshot or {})
+            .get("search.engine.web.wikinews.adaptive_search", {})
+            .get("value", True)
+        )
+
+    if is_collection_engine(search_tool):
+        # BaseSearchEngine defaults this to True, so the RAG engines stay
+        # snippet-only unless the setting is forwarded in params or snapshot.
+        pass
+
+    if search_tool in TIME_PERIOD_ENGINES:
+        params["time_period"] = time_period
+
+    # Create and return the search engine
+    logger.info(
+        f"Creating search engine for tool: {search_tool} (type: {type(search_tool)}) with params: {params.keys()}"
+    )
+    logger.info(
+        f"About to call create_search_engine with search_tool={search_tool}, settings_snapshot type={type(settings_snapshot)}"
+    )
+    logger.info(
+        f"Params being passed to create_search_engine: {list(params.keys()) if isinstance(params, dict) else type(params)}"
+    )
+
+    engine = create_search_engine(
+        search_tool,
+        settings_snapshot=settings_snapshot,
+        programmatic_mode=programmatic_mode,
+        **params,
+    )
+
+    # Add debugging to check if engine is None
+    if engine is None:
+        logger.error(
+            f"Failed to create search engine for {search_tool} - returned None"
+        )
+    else:
+        engine_type = type(engine).__name__
+        logger.info(
+            f"Successfully created search engine of type: {engine_type}"
+        )
+        # Check if the engine has run method
+        if hasattr(engine, "run"):
+            logger.info(f"Engine has 'run' method: {engine.run}")
+        else:
+            logger.error("Engine does NOT have 'run' method!")
+
+        # Check engine availability flag / method
+        avail = None
+        if getattr(engine, "_is_available", None) is not None:
+            avail = getattr(engine, "_is_available")
+        elif hasattr(engine, "is_available"):
+            if callable(engine.is_available):
+                try:
+                    avail = engine.is_available(
+                        settings_snapshot=settings_snapshot
+                    )
+                except TypeError:
+                    try:
+                        avail = engine.is_available()
+                    except Exception as exc:
+                        logger.debug(
+                            "Engine availability fallback failed for {} ({})",
+                            engine_type,
+                            type(exc).__name__,
+                        )
+                        avail = None
+                except Exception as exc:
+                    logger.debug(
+                        "Engine availability check failed for {} ({})",
+                        engine_type,
+                        type(exc).__name__,
+                    )
+                    avail = None
+            else:
+                avail = engine.is_available
+        if avail is not None:
+            logger.info(f"Engine availability flag: {avail}")
+
+    return engine

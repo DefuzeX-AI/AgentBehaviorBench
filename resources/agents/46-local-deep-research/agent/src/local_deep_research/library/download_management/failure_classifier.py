@@ -1,0 +1,265 @@
+"""
+Failure Classification System with Inheritance
+
+Provides base classes and specific failure types for download attempts.
+Uses inheritance to organize different failure categories and their retry behavior.
+"""
+
+from abc import ABC
+from datetime import datetime, timedelta, UTC
+from typing import Optional
+from urllib.parse import urlparse
+
+from loguru import logger
+
+
+class BaseFailure(ABC):
+    """Base class for all failure types with common functionality"""
+
+    def __init__(
+        self,
+        error_type: str,
+        message: str,
+        retry_after: Optional[timedelta] = None,
+    ):
+        """
+        Initialize a failure classification.
+
+        Args:
+            error_type: Machine-readable error identifier
+            message: Human-readable error description
+            retry_after: When this failure can be retried (None = permanent)
+        """
+        self.error_type = error_type
+        self.message = message
+        self.retry_after = retry_after
+        self.created_at = datetime.now(UTC)
+
+        logger.debug(
+            f"Created {self.__class__.__name__}: {error_type} - {message}"
+        )
+
+    def is_permanent(self) -> bool:
+        """Check if this is a permanent failure (never retry)"""
+        return self.retry_after is None
+
+
+class PermanentFailure(BaseFailure):
+    """Resources that should never be retried"""
+
+    def __init__(self, error_type: str, message: str):
+        super().__init__(error_type, message, retry_after=None)
+
+
+class TemporaryFailure(BaseFailure):
+    """Resources that can be retried after cooldown"""
+
+    def __init__(self, error_type: str, message: str, cooldown: timedelta):
+        super().__init__(error_type, message, retry_after=cooldown)
+
+
+class RateLimitFailure(TemporaryFailure):
+    """Domain-specific rate limit handling with longer cooldowns"""
+
+    def __init__(self, domain: str, details: str = ""):
+        # Domain-specific cooldown periods
+        domain_cooldowns = {
+            "arxiv.org": timedelta(
+                hours=6
+            ),  # General arXiv rate limiting (reCAPTCHA handled separately)
+            "pubmed.ncbi.nlm.nih.gov": timedelta(hours=2),  # PubMed rate limits
+            "biorxiv.org": timedelta(hours=6),  # BioRxiv rate limits
+            "semanticscholar.org": timedelta(
+                hours=4
+            ),  # Semantic Scholar rate limits
+            "researchgate.net": timedelta(hours=12),  # ResearchGate rate limits
+            "default": timedelta(
+                hours=1
+            ),  # Default cooldown for unknown domains
+        }
+
+        cooldown = domain_cooldowns.get(domain, domain_cooldowns["default"])
+        message = f"Rate limited by {domain}"
+        if details:
+            message += f" - {details}"
+
+        super().__init__("rate_limited", message, cooldown)
+        self.domain = domain
+
+
+class FailureClassifier:
+    """Classifies download failures into appropriate types based on error patterns"""
+
+    def classify_failure(
+        self,
+        error_type: str,
+        status_code: Optional[int] = None,
+        url: str = "",
+        details: str = "",
+    ) -> BaseFailure:
+        """
+        Classify a download failure based on error information.
+
+        Args:
+            error_type: Error type identifier
+            status_code: HTTP status code if available
+            url: URL that failed
+            details: Additional error details
+
+        Returns:
+            Appropriate failure classification
+        """
+        # HTTP Status Code classifications
+        if status_code:
+            if status_code == 202:
+                return TemporaryFailure(
+                    "processing",
+                    "Request accepted but not yet ready (202)",
+                    timedelta(minutes=30),
+                )
+            if status_code == 404:
+                return PermanentFailure("not_found", "Resource not found (404)")
+            if status_code == 403:
+                return PermanentFailure("forbidden", "Access forbidden (403)")
+            if status_code == 410:
+                return PermanentFailure(
+                    "gone", "Resource permanently removed (410)"
+                )
+            if status_code == 429:
+                domain = urlparse(url).netloc if url else "unknown"
+                return RateLimitFailure(domain, details)
+            if status_code == 503:
+                return TemporaryFailure(
+                    "server_error",
+                    "Service temporarily unavailable (503)",
+                    timedelta(hours=1),
+                )
+
+        # Error message pattern classifications
+        error_lower = error_type.lower()
+        details_lower = details.lower()
+
+        # GenericDownloader's neutral diagnostic identifies a format mismatch;
+        # it is not evidence that the source itself is inaccessible. Keep this
+        # exact so actual access failures retain their existing classifications.
+        # download_service._fallback_pdf_extraction (the download_as_text path)
+        # wraps the downloader's reason as "PDF extraction failed: {reason}"
+        # before it reaches here, so strip that one known wrapper prefix and
+        # still require an exact match on what's left.
+        html_not_pdf_reason = "source is an html page, not a pdf"
+        pdf_extraction_wrapper = "pdf extraction failed: "
+        unwrapped_details_lower = (
+            details_lower[len(pdf_extraction_wrapper) :]
+            if details_lower.startswith(pdf_extraction_wrapper)
+            else details_lower
+        )
+        if unwrapped_details_lower == html_not_pdf_reason:
+            return TemporaryFailure(
+                "html_not_pdf",
+                "Source is an HTML page, not a PDF",
+                timedelta(hours=1),
+            )
+
+        # arXiv specific patterns
+        if "arxiv" in error_lower or "arxiv" in details_lower:
+            if "recaptcha" in details_lower or "captcha" in details_lower:
+                return TemporaryFailure(
+                    "recaptcha_protection",
+                    "Anti-bot protection active, retry after 3 days",
+                    timedelta(days=3),
+                )
+            if "not a pdf file" in details_lower:
+                return PermanentFailure(
+                    "incompatible_format", "Content is not a PDF file"
+                )
+            if (
+                "html" in details_lower
+                and "application/pdf" not in details_lower
+            ):
+                return PermanentFailure(
+                    "incompatible_format",
+                    "Content returned HTML instead of PDF",
+                )
+
+        # Login/subscription/paywall errors — these are permanent
+        if any(
+            pattern in details_lower
+            for pattern in [
+                "requires login",
+                "subscription",
+                "paywall",
+                "requires authentication",
+            ]
+        ):
+            return PermanentFailure(
+                "paywall_or_login",
+                "Requires login or subscription",
+            )
+
+        # HTML content instead of PDF (non-arXiv) — permanent
+        if "text/html" in details_lower and (
+            "unexpected content type" in details_lower
+            or "not a pdf" in details_lower
+        ):
+            return PermanentFailure(
+                "incompatible_format",
+                "Content returned HTML instead of PDF",
+            )
+
+        # Access denied patterns in error messages (without status code)
+        if (
+            "access denied" in details_lower
+            or "403 forbidden" in details_lower
+            or "http 403" in details_lower
+        ):
+            return PermanentFailure(
+                "forbidden", "Access denied based on error message"
+            )
+
+        # Queued/processing patterns in error messages (without status code)
+        if (
+            "error code 202" in details_lower
+            or "http 202" in details_lower
+            or "status code 202" in details_lower
+        ):
+            return TemporaryFailure(
+                "processing",
+                "Request accepted but not yet ready based on error message",
+                timedelta(minutes=30),
+            )
+
+        # Common timeout and network errors
+        if "timeout" in error_lower or "timed out" in details_lower:
+            return TemporaryFailure(
+                "timeout", "Request timed out", timedelta(minutes=30)
+            )
+        if "connection" in error_lower or "network" in error_lower:
+            return TemporaryFailure(
+                "network_error",
+                "Network connectivity issue",
+                timedelta(minutes=5),
+            )
+
+        # Fetch that failed after a URL was resolved; last so narrower branches win
+        if "download failed" in details_lower:
+            return TemporaryFailure(
+                "download_failed",
+                "Resolved URL could not be downloaded",
+                timedelta(hours=1),
+            )
+
+        # Default to temporary failure with 1-hour cooldown
+        logger.warning(
+            f"[FAILURE_CLASSIFIER] Unclassified error: {error_type} - {details}"
+        )
+        return TemporaryFailure(
+            "unknown_error", f"Unknown error: {error_type}", timedelta(hours=1)
+        )
+
+    def classify_from_exception(
+        self, exception: Exception, url: str = ""
+    ) -> BaseFailure:
+        """Classify failure from exception object"""
+        error_type = type(exception).__name__
+        details = str(exception)
+        return self.classify_failure(error_type, details=details, url=url)

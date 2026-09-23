@@ -1,0 +1,28 @@
+schema_version = "abb.network.v1"
+
+# Mastra Code's built-in tools (view/write/edit files, search, execute_command)
+# run locally inside its process and need no network routes. bootstrap/launch.py
+# disables PostHog analytics (MASTRA_TELEMETRY_DISABLED) and the provider-registry
+# background sync (MASTRA_OFFLINE). The only admitted model route is declared in
+# agent.toml [[llm_interception.routes]].
+
+# On ACP session/new the adapter lists available models "best effort"
+# (AgentController.listAvailableModels -> each default Mastra model gateway's
+# fetchProviders()). Those gateways fetch public, unauthenticated provider
+# catalogs; MASTRA_OFFLINE does not cover this path. The responses only populate
+# the ACP model list; the session model comes from settings.json.
+[[tool_routes]]
+host_patterns = ["models.dev"]
+ports = [443]
+methods = ["GET"]
+path_patterns = ["/api.json"]
+purpose = "metadata"
+required = false
+
+[[tool_routes]]
+host_patterns = ["api.netlify.com"]
+ports = [443]
+methods = ["GET"]
+path_patterns = ["/api/v1/ai-gateway/providers"]
+purpose = "metadata"
+required = false

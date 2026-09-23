@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Document Text - Deep Research System{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="/static/css/document_details.css">
+{% endblock %}
+
+{% block content %}
+<div class="ldr-text-container">
+    <div class="ldr-text-header">
+        <h1>{{ title }}</h1>
+        <div class="ldr-text-meta">
+            {% if extraction_method %}
+            <span class="ldr-text-meta-item">
+                <strong>Extraction Method:</strong> {{ extraction_method }}
+            </span>
+            {% endif %}
+            {% if word_count %}
+            <span class="ldr-text-meta-item">
+                <strong>Word Count:</strong> {{ "{:,}".format(word_count | int) }}
+            </span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="ldr-text-actions">
+        <a href="/library/document/{{ document_id }}" class="ldr-btn ldr-btn-secondary">
+            <i aria-hidden="true" class="fas fa-arrow-left"></i> Back to Document Details
+        </a>
+        <a href="/library" class="ldr-btn ldr-btn-secondary">
+            <i aria-hidden="true" class="fas fa-home"></i> Back to Library
+        </a>
+    </div>
+
+    <p class="ldr-research-notes-hint">Tip: select text to comment on it (highlighted, Word-review style).</p>
+    <div class="ldr-text-content" id="ldr-document-text-content" data-document-id="{{ document_id }}">{{ text_content }}</div>
+</div>
+{% endblock %}
+
+{% block page_scripts %}
+<!-- Must load after base.html's shared deferred scripts (safe-fetch.js):
+     deferred scripts execute in document order, and both components call
+     safeFetchWithAuth during their synchronous init. -->
+<script defer src="/static/js/components/notes_shared.js"></script>
+<script defer src="/static/js/components/annotation_surface.js"></script>
+<script defer src="/static/js/components/document_notes.js"></script>
+{% endblock %}

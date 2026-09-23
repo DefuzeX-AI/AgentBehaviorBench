@@ -1,0 +1,417 @@
+"""NASA Astrophysics Data System (ADS) search engine implementation."""
+
+from typing import Any, Dict, List, Optional
+
+from langchain_core.language_models import BaseLLM
+from ...security.secure_logging import logger
+
+from ...constants import SNIPPET_LENGTH_LONG, USER_AGENT
+from ...security.safe_requests import safe_get
+from ..rate_limiting import RateLimitError
+from ..search_engine_base import BaseSearchEngine, Exposure, Sensitivity
+
+
+class NasaAdsSearchEngine(BaseSearchEngine):
+    """NASA ADS search engine for physics, astronomy, and astrophysics papers."""
+
+    # Mark as public search engine
+    is_public = True
+    egress_sensitivity = Sensitivity.NON_SENSITIVE
+    egress_exposure = Exposure.EXPOSING
+    # Scientific/astronomy/astrophysics search engine
+    is_scientific = True
+    is_lexical = True
+    needs_llm_relevance_filter = True
+
+    def __init__(
+        self,
+        max_results: int = 25,
+        api_key: Optional[str] = None,
+        sort_by: str = "relevance",
+        min_citations: int = 0,
+        from_publication_date: Optional[str] = None,
+        include_arxiv: bool = True,
+        llm: Optional[BaseLLM] = None,
+        max_filtered_results: Optional[int] = None,
+        settings_snapshot: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ):
+        """
+        Initialize the NASA ADS search engine.
+
+        Args:
+            max_results: Maximum number of search results
+            api_key: NASA ADS API key (required for higher rate limits)
+            sort_by: Sort order ('relevance', 'citation_count', 'date')
+            min_citations: Minimum citation count filter
+            from_publication_date: Filter papers from this date (YYYY-MM-DD)
+            include_arxiv: Include ArXiv preprints in results
+            llm: Language model for relevance filtering
+            max_filtered_results: Maximum number of results to keep after filtering
+            settings_snapshot: Settings snapshot for configuration
+            **kwargs: Additional parameters to pass to parent class
+        """
+        # Journal filter runs before LLM relevance (Tiers 1-3 are instant)
+        preview_filters = []
+        journal_filter = self._create_journal_filter(
+            "nasa_ads", llm, settings_snapshot
+        )
+        if journal_filter is not None:
+            preview_filters.append(journal_filter)
+
+        super().__init__(
+            llm=llm,
+            max_filtered_results=max_filtered_results,
+            max_results=max_results,
+            preview_filters=preview_filters,  # type: ignore[arg-type]
+            settings_snapshot=settings_snapshot,
+            **kwargs,
+        )
+
+        self.sort_by = sort_by
+        self.min_citations = min_citations
+        self.include_arxiv = include_arxiv
+        # Handle from_publication_date
+        self.from_publication_date = (
+            from_publication_date
+            if from_publication_date
+            and from_publication_date not in ["False", "false", ""]
+            else None
+        )
+
+        # Get API key from settings if not provided
+        if not api_key and settings_snapshot:
+            from ...config.search_config import get_setting_from_snapshot
+
+            try:
+                api_key = get_setting_from_snapshot(
+                    "search.engine.web.nasa_ads.api_key",
+                    settings_snapshot=settings_snapshot,
+                )
+            except Exception:
+                logger.debug(
+                    "Failed to read nasa_ads.api_key from settings snapshot",
+                    exc_info=True,
+                )
+
+        # Handle "False" string for api_key
+        self.api_key = (
+            api_key
+            if api_key and api_key not in ["False", "false", ""]
+            else None
+        )
+
+        # API configuration
+        self.api_base = "https://api.adsabs.harvard.edu/v1"
+        self.headers = {
+            "User-Agent": USER_AGENT,
+            "Accept": "application/json",
+        }
+
+        if self.api_key:
+            self.headers["Authorization"] = f"Bearer {self.api_key}"
+            logger.info("Using NASA ADS with API key")
+        else:
+            logger.error(
+                "NASA ADS requires an API key to function. Get a free key at: https://ui.adsabs.harvard.edu/user/settings/token"
+            )
+
+    def _get_previews(self, query: str) -> List[Dict[str, Any]]:
+        """
+        Get preview information for NASA ADS search results.
+
+        Args:
+            query: The search query (natural language supported)
+
+        Returns:
+            List of preview dictionaries
+        """
+        logger.info("Searching NASA ADS")
+
+        # Build the search query - NASA ADS has good natural language support
+        # We can use the query directly or enhance it slightly
+        search_query = query
+
+        # Build filters
+        filters = []
+        if self.from_publication_date:
+            # Convert YYYY-MM-DD to ADS format
+            try:
+                year = self.from_publication_date.split("-")[0]
+                if year.isdigit():  # Only add if it's a valid year
+                    filters.append(f"year:{year}-9999")
+            except Exception:
+                logger.debug(
+                    "best-effort date parsing, invalid formats skipped",
+                    exc_info=True,
+                )
+
+        if self.min_citations > 0:
+            filters.append(f"citation_count:[{self.min_citations} TO *]")
+
+        if not self.include_arxiv:
+            filters.append('-bibstem:"arXiv"')
+
+        # Combine query with filters
+        if filters:
+            full_query = f"{search_query} {' '.join(filters)}"
+        else:
+            full_query = search_query
+
+        # Build request parameters
+        params = {
+            "q": full_query,
+            "fl": "id,bibcode,title,author,year,pubdate,abstract,citation_count,bibstem,doi,identifier,pub,keyword,aff",
+            "rows": min(
+                self.max_results, 200
+            ),  # NASA ADS allows up to 200 per request
+            "start": 0,
+        }
+
+        # Add sorting
+        sort_map = {
+            "relevance": "score desc",
+            "citation_count": "citation_count desc",
+            "date": "date desc",
+        }
+        params["sort"] = sort_map.get(self.sort_by, "score desc")
+
+        try:
+            # Apply rate limiting (simple like PubMed)
+            self._last_wait_time = self.rate_tracker.apply_rate_limit(
+                self.engine_type
+            )
+            logger.debug(
+                f"Applied rate limit wait: {self._last_wait_time:.2f}s"
+            )
+
+            # Make the API request
+            logger.info(
+                f"Making NASA ADS API request "
+                f"({len(str(params['q']))} query chars)"
+            )
+            response = safe_get(
+                f"{self.api_base}/search/query",
+                params=params,
+                headers=self.headers,
+                timeout=30,
+            )
+
+            # Log rate limit headers if available
+            if "X-RateLimit-Remaining" in response.headers:
+                remaining = response.headers.get("X-RateLimit-Remaining")
+                limit = response.headers.get("X-RateLimit-Limit", "unknown")
+                logger.debug(
+                    f"NASA ADS rate limit: {remaining}/{limit} requests remaining"
+                )
+
+            if response.status_code == 200:
+                data = response.json()
+                docs = data.get("response", {}).get("docs", [])
+                num_found = data.get("response", {}).get("numFound", 0)
+
+                logger.info(
+                    f"NASA ADS returned {len(docs)} results (total available: {num_found:,})"
+                )
+
+                # Format results as previews
+                previews = []
+                for doc in docs:
+                    preview = self._format_doc_preview(doc)
+                    if preview:
+                        previews.append(preview)
+
+                logger.info(f"Successfully formatted {len(previews)} previews")
+                return previews
+
+            if response.status_code == 429:
+                # Rate limited
+                logger.warning("NASA ADS rate limit reached")
+                raise RateLimitError("NASA ADS rate limit exceeded")  # noqa: TRY301 — re-raised by except RateLimitError for base class retry
+
+            if response.status_code == 401:
+                logger.error("NASA ADS API key is invalid or missing")
+                return []
+
+            logger.error(
+                f"NASA ADS API error: {response.status_code} - {response.text[:200]}"
+            )
+            return []
+
+        except RateLimitError:
+            # Re-raise rate limit errors for base class retry handling
+            raise
+        except Exception as e:
+            # logger.warning rather than logger.exception: the traceback
+            # frames hold self.headers (the "Authorization: Bearer <key>"
+            # value) and would render it under loguru diagnose. Redact the
+            # api_key from the message as defense-in-depth.
+            safe_msg = self._scrub_error(e)
+            logger.warning(f"Error searching NASA ADS: {safe_msg}")
+            return []
+
+    def _format_doc_preview(
+        self, doc: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Format a NASA ADS document as a preview dictionary.
+
+        Args:
+            doc: NASA ADS document object
+
+        Returns:
+            Formatted preview dictionary or None if formatting fails
+        """
+        try:
+            # Extract basic information
+            bibcode = doc.get("bibcode", "")
+            # Get title from list if available
+            title_list = doc.get("title", [])
+            title = title_list[0] if title_list else "No title"
+
+            # Get abstract or create snippet
+            abstract = doc.get("abstract", "")
+            snippet = (
+                abstract[:SNIPPET_LENGTH_LONG]
+                if abstract
+                else f"Academic paper: {title}"
+            )
+
+            # Get publication info
+            year = doc.get("year", "unknown")
+            pubdate = doc.get("pubdate", "unknown")
+
+            # Get journal/source
+            journal = "unknown"
+            if doc.get("pub"):
+                journal = str(doc.get("pub"))
+            elif doc.get("bibstem"):
+                bibstem = doc.get("bibstem", [])
+                if bibstem:
+                    journal = (
+                        bibstem[0] if isinstance(bibstem, list) else bibstem
+                    )
+
+            # Get authors
+            authors = doc.get("author", [])
+            authors_str = ", ".join(authors[:5])
+            if len(authors) > 5:
+                authors_str += " et al."
+
+            # NASA ADS returns each name as "Last, First" — emit a
+            # structured CSL list so the citation normalizer doesn't have
+            # to re-split the comma-joined display string above and
+            # mangle the family/given pairing in the process.
+            authors_csl: list[dict] = []
+            for raw in authors[:5]:
+                name = (raw or "").strip()
+                if not name:
+                    continue
+                if "," in name:
+                    family, _, given = name.partition(",")
+                    authors_csl.append(
+                        {"family": family.strip(), "given": given.strip()}
+                    )
+                else:
+                    authors_csl.append({"literal": name})
+
+            # Get metrics
+            citation_count = doc.get("citation_count", 0)
+
+            # Get URL - prefer DOI, fallback to ADS URL
+            url = None
+            if doc.get("doi"):
+                dois = doc.get("doi", [])
+                if dois:
+                    doi = dois[0] if isinstance(dois, list) else dois
+                    url = f"https://doi.org/{doi}"
+
+            if not url:
+                url = f"https://ui.adsabs.harvard.edu/abs/{bibcode}"
+
+            # Check if it's ArXiv
+            is_arxiv = "arXiv" in str(doc.get("bibstem", []))
+
+            # Get keywords
+            keywords = doc.get("keyword", [])
+
+            # Extract DOI for enrichment layer
+            doi_value = None
+            if doc.get("doi"):
+                dois = doc.get("doi", [])
+                if dois:
+                    doi_value = dois[0] if isinstance(dois, list) else dois
+
+            return {
+                "id": bibcode,
+                "title": title,
+                "link": url,
+                "snippet": snippet,
+                "authors": authors_str,
+                "authors_csl": authors_csl or None,
+                "year": year,
+                "date": pubdate,
+                # Both fields emit None (not the "unknown" sentinel) when
+                # no pub/bibstem is available. The "unknown" literal
+                # leaked through the normalizer's container_title fallback
+                # and even matched a real OpenAlex source named "unknown"
+                # (Q1, h_index=5) in the reference DB.
+                "journal": None if journal == "unknown" else journal,
+                # ArXiv preprints have pub="arXiv e-prints" — set journal_ref
+                # to None so the filter's preprint-handling path activates
+                # instead of trying to score "arXiv e-prints" as a journal.
+                "journal_ref": (
+                    None if is_arxiv or journal == "unknown" else journal
+                ),
+                "doi": doi_value,
+                "citations": citation_count,
+                "abstract": abstract,
+                "is_arxiv": is_arxiv,
+                "keywords": keywords[:5] if keywords else [],
+                "type": "academic_paper",
+            }
+
+        except Exception as e:
+            safe_msg = self._scrub_error(e)
+            logger.warning(
+                f"Error formatting NASA ADS document {doc.get('bibcode', 'unknown')}: {safe_msg}"
+            )
+            return None
+
+    def _get_full_content(
+        self, relevant_items: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Get full content for relevant items (NASA ADS provides most content in preview).
+
+        Args:
+            relevant_items: List of relevant preview dictionaries
+
+        Returns:
+            List of result dictionaries with full content
+        """
+        # NASA ADS returns comprehensive data in the initial search,
+        # so we don't need a separate full content fetch
+        results = []
+        for item in relevant_items:
+            result = {
+                "title": item.get("title", ""),
+                "link": item.get("link", ""),
+                "snippet": item.get("snippet", ""),
+                "content": item.get("abstract", item.get("snippet", "")),
+                # Forward journal quality fields for content filters
+                "journal_ref": item.get("journal_ref"),
+                "doi": item.get("doi"),
+                "metadata": {
+                    "authors": item.get("authors", ""),
+                    "year": item.get("year", ""),
+                    "journal": item.get("journal", ""),
+                    "citations": item.get("citations", 0),
+                    "is_arxiv": item.get("is_arxiv", False),
+                    "keywords": item.get("keywords", []),
+                    "doi": item.get("doi"),
+                },
+            }
+            results.append(result)
+
+        return results

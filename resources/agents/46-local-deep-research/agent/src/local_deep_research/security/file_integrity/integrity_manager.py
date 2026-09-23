@@ -1,0 +1,674 @@
+"""
+File Integrity Manager - Main service for file integrity verification.
+
+Provides smart verification with embedded statistics and sparse failure logging.
+"""
+
+from contextlib import contextmanager
+from datetime import datetime, UTC
+from pathlib import Path
+from typing import Optional, Tuple, List
+from loguru import logger
+
+from .base_verifier import BaseFileVerifier
+from ...database.models.file_integrity import (
+    FileIntegrityRecord,
+    FileVerificationFailure,
+)
+
+# The database session context is mandatory for integrity verification. Keep
+# this as a direct import: a circular import or other bootstrap/load-order
+# failure must propagate with its original traceback instead of being caught
+# and later replaced by misleading optional-Flask guidance.
+from ...database.session_context import get_user_db_session
+
+
+# Reason returned by verify_file when a file has no integrity record. Unknown
+# files are rejected (fail closed) rather than auto-registered, to avoid a
+# trust-on-first-use gap where deleted records or newly injected files would
+# otherwise bypass integrity verification.
+NO_INTEGRITY_RECORD = "no_integrity_record"
+
+
+class FileIntegrityManager:
+    """
+    Central service for file integrity verification.
+
+    Features:
+    - Smart verification (only verify if file modified)
+    - Embedded statistics (low overhead)
+    - Sparse failure logging (audit trail)
+    - Multi-verifier support (different file types)
+    - Automatic cleanup of old failure records
+    """
+
+    # Configuration for automatic cleanup
+    MAX_FAILURES_PER_FILE = 100  # Keep at most this many failures per file
+    MAX_TOTAL_FAILURES = 10000  # Global limit across all files
+
+    def __init__(self, username: str, password: Optional[str] = None):
+        """
+        Initialize file integrity manager.
+
+        Args:
+            username: Username for database access
+            password: Optional password for encrypted database
+
+        """
+        self.username = username
+        self.password = password
+        self.verifiers: List[BaseFileVerifier] = []
+
+        # Run startup cleanup to remove old failures
+        try:
+            deleted = self.cleanup_all_old_failures()
+            if deleted > 0:
+                logger.info(
+                    f"[FILE_INTEGRITY] Startup cleanup: removed {deleted} old failure records"
+                )
+        except Exception:
+            logger.warning("[FILE_INTEGRITY] Startup cleanup failed")
+
+    @contextmanager
+    def _integrity_write(self, session, nested: bool):
+        """Wrap an integrity write so it settles correctly for the caller.
+
+        ``nested=False`` (default, standalone callers): commit the
+        (thread-local) session — immediate durability.
+
+        ``nested=True``: run the write inside a SAVEPOINT and DON'T commit, so
+        the caller's outer transaction commits it. REQUIRED when record_file /
+        verify_file run reentrantly INSIDE another open transaction — the vector
+        store calls them during apply(), which has just-flushed, uncommitted
+        DocumentChunk rows on the SAME thread-local session. A plain commit
+        would settle those rows early, and a transient-failure rollback would
+        DISCARD them; a SAVEPOINT scopes any failure to just the integrity
+        write, leaving the caller's rows intact, and both commit together.
+        Same connection, so no second-writer SQLite contention.
+        """
+        if nested:
+            with session.begin_nested():
+                yield
+        else:
+            yield
+            session.commit()
+
+    @contextmanager
+    def _session_for(self, nested: bool):
+        """Yield the session for an integrity op.
+
+        Standalone (nested=False): a normal ``get_user_db_session``.
+
+        Reentrant (nested=True): the caller's LIVE thread-local session,
+        obtained via ``get_current_thread_session`` — NOT ``get_user_db_session``.
+        Re-entering ``get_user_db_session`` in a NON-request (background/
+        scheduler) context routes through ``ThreadSessionManager.get_session``,
+        which on re-acquisition runs a validation ``SELECT 1`` and then
+        ``session.rollback()`` to release the DEFERRED lock — that rollback
+        would discard the CALLER's just-flushed, uncommitted DocumentChunk rows
+        before our SAVEPOINT ever runs (silent data loss: vectors persisted,
+        text rows gone). The live-session accessor has no such side effect.
+        """
+        if nested:
+            from ...database.thread_local_session import (
+                get_current_thread_session,
+            )
+
+            existing = get_current_thread_session()
+            if existing is not None:
+                yield existing
+                return
+        with get_user_db_session(self.username, self.password) as session:
+            yield session
+
+    def _normalize_path(self, file_path: Path) -> str:
+        """
+        Normalize path for consistent storage and lookup.
+
+        Resolves symlinks, makes absolute, and normalizes separators
+        to ensure the same file is always represented the same way.
+
+        Args:
+            file_path: Path to normalize
+
+        Returns:
+            Normalized path string
+        """
+        return str(file_path.resolve())
+
+    def register_verifier(self, verifier: BaseFileVerifier) -> None:
+        """
+        Register a file type verifier.
+
+        Args:
+            verifier: Verifier instance to register
+        """
+        self.verifiers.append(verifier)
+        logger.debug(
+            f"[FILE_INTEGRITY] Registered verifier for type: {verifier.get_file_type()}"
+        )
+
+    def record_file(
+        self,
+        file_path: Path,
+        related_entity_type: Optional[str] = None,
+        related_entity_id: Optional[int] = None,
+        *,
+        nested: bool = False,
+    ) -> FileIntegrityRecord:
+        """
+        Create or update integrity record for a file.
+
+        Args:
+            file_path: Path to file to record
+            related_entity_type: Optional related entity type (e.g., 'rag_index')
+            related_entity_id: Optional related entity ID
+
+        Returns:
+            FileIntegrityRecord instance
+
+        Raises:
+            FileNotFoundError: If file doesn't exist
+            ValueError: If no verifier handles this file type
+        """
+        if not file_path.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+
+        verifier = self._get_verifier_for_file(file_path)
+        if not verifier:
+            raise ValueError(f"No verifier registered for file: {file_path}")
+
+        # Calculate checksum and get file stats
+        checksum = verifier.calculate_checksum(file_path)
+        file_stat = file_path.stat()
+        normalized_path = self._normalize_path(file_path)
+
+        nested_error: Optional[Exception] = None
+        with self._session_for(nested) as session:
+            # Check if record exists (using normalized path)
+            record = (
+                session.query(FileIntegrityRecord)
+                .filter_by(file_path=normalized_path)
+                .first()
+            )
+
+            try:
+                with self._integrity_write(session, nested):
+                    if record:
+                        # Update existing record
+                        record.checksum = checksum
+                        record.file_size = file_stat.st_size
+                        record.file_mtime = file_stat.st_mtime
+                        record.algorithm = verifier.get_algorithm()
+                        record.updated_at = datetime.now(UTC)
+                        logger.info(
+                            f"[FILE_INTEGRITY] Updated record for: {file_path}"
+                        )
+                    else:
+                        # Create new record
+                        record = FileIntegrityRecord(
+                            file_path=normalized_path,
+                            file_type=verifier.get_file_type(),
+                            checksum=checksum,
+                            algorithm=verifier.get_algorithm(),
+                            file_size=file_stat.st_size,
+                            file_mtime=file_stat.st_mtime,
+                            verify_on_load=True,
+                            allow_modifications=verifier.allows_modifications(),
+                            related_entity_type=related_entity_type,
+                            related_entity_id=related_entity_id,
+                            total_verifications=0,
+                            consecutive_successes=0,
+                            consecutive_failures=0,
+                        )
+                        session.add(record)
+                        logger.info(
+                            f"[FILE_INTEGRITY] Created record for: {file_path} (type: {verifier.get_file_type()})"
+                        )
+            except Exception as exc:
+                if not nested:
+                    # Standalone: let get_user_db_session roll back the failed
+                    # write (original behavior — nothing else is pending).
+                    raise
+                # Nested: the SAVEPOINT already rolled back JUST this write; the
+                # caller's flushed rows are intact. We must NOT let the exception
+                # escape this block, or get_user_db_session's except would do a
+                # FULL session.rollback() and discard them. Exit cleanly, then
+                # re-raise below so apply()'s retry/failure logic still sees it.
+                nested_error = exc
+
+            if nested_error is None:
+                session.refresh(record)
+
+        if nested_error is not None:
+            raise nested_error
+        return record
+
+    def verify_file(
+        self, file_path: Path, force: bool = False, *, nested: bool = False
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Verify file integrity with smart checking.
+
+        Only verifies if:
+        - File modification time changed since last verification, OR
+        - force=True
+
+        Args:
+            file_path: Path to file to verify
+            force: Force verification even if file hasn't changed
+
+        Returns:
+            Tuple of (success, reason_if_failed)
+        """
+        normalized_path = self._normalize_path(file_path)
+
+        with self._session_for(nested) as session:
+            record = (
+                session.query(FileIntegrityRecord)
+                .filter_by(file_path=normalized_path)
+                .first()
+            )
+
+            if not record:
+                logger.error(
+                    f"[FILE_INTEGRITY] No integrity record found for {file_path}, refusing to load"
+                )
+                return False, NO_INTEGRITY_RECORD
+
+            # Check if verification needed
+            if not force and not self._needs_verification(record, file_path):
+                logger.debug(
+                    f"[FILE_INTEGRITY] Skipping verification for {file_path} (unchanged)"
+                )
+                return True, None
+
+            # Perform verification (the RESULT below is computed here and is
+            # independent of the stats bookkeeping write that follows).
+            passed, reason = self._do_verification(record, file_path, session)
+
+            try:
+                with self._integrity_write(session, nested):
+                    # Update statistics
+                    self._update_stats(record, passed, session)
+
+                    # Log failure if needed
+                    if not passed:
+                        self._log_failure(
+                            record,
+                            file_path,
+                            reason or "Unknown failure",
+                            session,
+                        )
+            except Exception:
+                if not nested:
+                    raise
+                # Nested: the SAVEPOINT rolled back only this stats write; the
+                # caller's flushed rows are intact. Do NOT let the exception
+                # escape (get_user_db_session would FULL-rollback the caller's
+                # session). Stats bookkeeping is best-effort — the verification
+                # result is already decided, so log and return it.
+                logger.warning(
+                    "[FILE_INTEGRITY] Could not persist verification stats for "
+                    f"{file_path} (verification result unaffected)"
+                )
+
+            if passed:
+                logger.info(
+                    f"[FILE_INTEGRITY] Verification passed: {file_path}"
+                )
+            else:
+                logger.error(
+                    f"[FILE_INTEGRITY] Verification FAILED: {file_path} - {reason}"
+                )
+
+            return passed, reason
+
+    def update_checksum(self, file_path: Path) -> None:
+        """
+        Update checksum after legitimate file modification.
+
+        Use this when you know a file was legitimately modified
+        and want to update the baseline checksum.
+
+        Args:
+            file_path: Path to file
+
+        Raises:
+            FileNotFoundError: If file doesn't exist
+            ValueError: If no record exists for file
+        """
+        if not file_path.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+
+        verifier = self._get_verifier_for_file(file_path)
+        if not verifier:
+            raise ValueError(f"No verifier registered for file: {file_path}")
+
+        checksum = verifier.calculate_checksum(file_path)
+        file_stat = file_path.stat()
+
+        with get_user_db_session(self.username, self.password) as session:
+            record = (
+                session.query(FileIntegrityRecord)
+                .filter_by(file_path=str(file_path))
+                .first()
+            )
+
+            if not record:
+                raise ValueError(f"No integrity record exists for: {file_path}")
+
+            record.checksum = checksum
+            record.file_size = file_stat.st_size
+            record.file_mtime = file_stat.st_mtime
+            record.updated_at = datetime.now(UTC)
+
+            session.commit()
+            logger.info(f"[FILE_INTEGRITY] Updated checksum for: {file_path}")
+
+    def get_file_stats(self, file_path: Path) -> Optional[dict]:
+        """
+        Get verification statistics for a file.
+
+        Args:
+            file_path: Path to file
+
+        Returns:
+            Dictionary of stats or None if no record exists
+        """
+        with get_user_db_session(self.username, self.password) as session:
+            record = (
+                session.query(FileIntegrityRecord)
+                .filter_by(file_path=str(file_path))
+                .first()
+            )
+
+            if not record:
+                return None
+
+            return {
+                "total_verifications": record.total_verifications,
+                "last_verified_at": record.last_verified_at,
+                "last_verification_passed": record.last_verification_passed,
+                "consecutive_successes": record.consecutive_successes,
+                "consecutive_failures": record.consecutive_failures,
+                "file_type": record.file_type,
+                "created_at": record.created_at,
+            }
+
+    def get_failure_history(
+        self, file_path: Path, limit: int = 100
+    ) -> List[FileVerificationFailure]:
+        """
+        Get failure history for a file.
+
+        Args:
+            file_path: Path to file
+            limit: Maximum number of failures to return
+
+        Returns:
+            List of failure records
+        """
+        with get_user_db_session(self.username, self.password) as session:
+            record = (
+                session.query(FileIntegrityRecord)
+                .filter_by(file_path=str(file_path))
+                .first()
+            )
+
+            if not record:
+                return []
+
+            failures = (
+                session.query(FileVerificationFailure)
+                .filter_by(file_record_id=record.id)
+                .order_by(FileVerificationFailure.verified_at.desc())
+                .limit(limit)
+                .all()
+            )
+
+            # Detach from session
+            for f in failures:
+                session.expunge(f)
+
+            return failures
+
+    # Internal methods
+
+    def _get_verifier_for_file(
+        self, file_path: Path
+    ) -> Optional[BaseFileVerifier]:
+        """Find verifier that handles this file type."""
+        for verifier in self.verifiers:
+            if verifier.should_verify(file_path):
+                return verifier
+        return None
+
+    def _needs_verification(
+        self, record: FileIntegrityRecord, file_path: Path
+    ) -> bool:
+        """
+        Check if file needs verification.
+
+        Only verify if file modification time changed since last verification.
+        """
+        if not file_path.exists():
+            return True  # File missing needs verification
+
+        if not record.last_verified_at:
+            return True  # Never verified
+
+        current_mtime = file_path.stat().st_mtime
+
+        # Compare with stored mtime
+        if record.file_mtime is None:
+            return True  # No mtime stored
+
+        # Verify if file was modified (allow small floating point differences)
+        return abs(current_mtime - record.file_mtime) > 0.001
+
+    def _do_verification(
+        self, record: FileIntegrityRecord, file_path: Path, session
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Perform actual verification.
+
+        Returns:
+            Tuple of (success, reason_if_failed)
+        """
+        # Check file exists
+        if not file_path.exists():
+            return False, "file_missing"
+
+        # Get verifier
+        verifier = self._get_verifier_for_file(file_path)
+        if not verifier:
+            return False, "no_verifier"
+
+        # Calculate current checksum
+        try:
+            current_checksum = verifier.calculate_checksum(file_path)
+        except Exception as e:
+            logger.exception("[FILE_INTEGRITY] Failed to calculate checksum")
+            return False, f"checksum_calculation_failed: {str(e)}"
+
+        # Compare checksums
+        if current_checksum != record.checksum:
+            return False, "checksum_mismatch"
+
+        # Update file mtime in record
+        record.file_mtime = file_path.stat().st_mtime
+
+        return True, None
+
+    def _update_stats(
+        self, record: FileIntegrityRecord, passed: bool, session
+    ) -> None:
+        """Update verification statistics."""
+        record.total_verifications += 1
+        record.last_verified_at = datetime.now(UTC)
+        record.last_verification_passed = passed
+
+        if passed:
+            record.consecutive_successes += 1
+            record.consecutive_failures = 0
+        else:
+            record.consecutive_failures += 1
+            record.consecutive_successes = 0
+
+    def _log_failure(
+        self,
+        record: FileIntegrityRecord,
+        file_path: Path,
+        reason: str,
+        session,
+    ) -> None:
+        """Log verification failure to audit trail."""
+        # Get current checksum if possible
+        actual_checksum = None
+        file_size = None
+
+        if file_path.exists():
+            try:
+                verifier = self._get_verifier_for_file(file_path)
+                if verifier:
+                    actual_checksum = verifier.calculate_checksum(file_path)
+                    file_size = file_path.stat().st_size
+            except Exception:
+                logger.debug(
+                    "Checksum calculation failed for {}",
+                    file_path,
+                    exc_info=True,
+                )
+
+        failure = FileVerificationFailure(
+            file_record_id=record.id,
+            expected_checksum=record.checksum,
+            actual_checksum=actual_checksum,
+            file_size=file_size,
+            failure_reason=reason,
+        )
+        session.add(failure)
+
+        logger.warning(
+            f"[FILE_INTEGRITY] Logged failure for {file_path}: {reason}"
+        )
+
+        # Cleanup old failures for this file
+        self._cleanup_old_failures(record, session)
+
+        # Periodically check if global cleanup needed (every 100th file to avoid overhead)
+        if record.id % 100 == 0:
+            self._check_global_cleanup_needed(session)
+
+    def _cleanup_old_failures(
+        self, record: FileIntegrityRecord, session
+    ) -> None:
+        """
+        Clean up old failure records to prevent unbounded growth.
+
+        Keeps only the most recent MAX_FAILURES_PER_FILE failures per file.
+        """
+        # Count failures for this file
+        failure_count = (
+            session.query(FileVerificationFailure)
+            .filter_by(file_record_id=record.id)
+            .count()
+        )
+
+        if failure_count > self.MAX_FAILURES_PER_FILE:
+            # Delete oldest failures, keeping only the most recent MAX_FAILURES_PER_FILE
+            failures_to_delete = (
+                session.query(FileVerificationFailure)
+                .filter_by(file_record_id=record.id)
+                .order_by(FileVerificationFailure.verified_at.asc())
+                .limit(failure_count - self.MAX_FAILURES_PER_FILE)
+                .all()
+            )
+
+            for failure in failures_to_delete:
+                session.delete(failure)
+
+            logger.info(
+                f"[FILE_INTEGRITY] Cleaned up {len(failures_to_delete)} old failures for file_record {record.id}"
+            )
+
+    def _check_global_cleanup_needed(self, session) -> None:
+        """
+        Check if global cleanup is needed and run it if threshold exceeded.
+
+        Only runs cleanup if failure count exceeds MAX_TOTAL_FAILURES by 20%.
+        This prevents constant cleanup while allowing some buffer.
+        """
+        threshold = int(self.MAX_TOTAL_FAILURES * 1.2)  # 20% over limit
+        total_failures = session.query(FileVerificationFailure).count()
+
+        if total_failures > threshold:
+            logger.info(
+                f"[FILE_INTEGRITY] Global failure count ({total_failures}) exceeds threshold ({threshold}), "
+                f"running cleanup..."
+            )
+
+            # Delete oldest failures to get under limit
+            failures_to_delete_count = total_failures - self.MAX_TOTAL_FAILURES
+
+            failures_to_delete = (
+                session.query(FileVerificationFailure)
+                .order_by(FileVerificationFailure.verified_at.asc())
+                .limit(failures_to_delete_count)
+                .all()
+            )
+
+            for failure in failures_to_delete:
+                session.delete(failure)
+
+            logger.info(
+                f"[FILE_INTEGRITY] Threshold cleanup: deleted {len(failures_to_delete)} old failures"
+            )
+
+    def cleanup_all_old_failures(self) -> int:
+        """
+        Global cleanup of failure records across all files.
+
+        Enforces MAX_TOTAL_FAILURES limit by removing oldest failures.
+
+        Returns:
+            Number of records deleted
+        """
+        with get_user_db_session(self.username, self.password) as session:
+            total_failures = session.query(FileVerificationFailure).count()
+
+            if total_failures <= self.MAX_TOTAL_FAILURES:
+                return 0
+
+            # Delete oldest failures to get under limit
+            failures_to_delete_count = total_failures - self.MAX_TOTAL_FAILURES
+
+            failures_to_delete = (
+                session.query(FileVerificationFailure)
+                .order_by(FileVerificationFailure.verified_at.asc())
+                .limit(failures_to_delete_count)
+                .all()
+            )
+
+            for failure in failures_to_delete:
+                session.delete(failure)
+
+            session.commit()
+
+            logger.info(
+                f"[FILE_INTEGRITY] Global cleanup: deleted {len(failures_to_delete)} old failures "
+                f"(total was {total_failures}, now {total_failures - len(failures_to_delete)})"
+            )
+
+            return len(failures_to_delete)
+
+    def get_total_failure_count(self) -> int:
+        """
+        Get total number of failure records across all files.
+
+        Returns:
+            Total count of failure records
+        """
+        with get_user_db_session(self.username, self.password) as session:
+            return session.query(FileVerificationFailure).count()

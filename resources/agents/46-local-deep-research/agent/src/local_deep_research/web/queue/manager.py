@@ -1,0 +1,218 @@
+"""Queue manager for handling research queue operations"""
+
+from loguru import logger
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from ...database.session_context import get_user_db_session
+from ...database.models import QueuedResearch, ResearchHistory
+from .processor_v2 import queue_processor
+
+
+def _safe_commit(session: Session) -> None:
+    """Commit the transaction, rolling back on failure.
+
+    Mirrors ``UserQueueService._safe_commit``. The ``get_user_db_session``
+    context manager only closes the session; it does not roll back a failed
+    commit, which would leave the session in a dirty state and mask the
+    original error on any subsequent operation. See issue #2055.
+
+    The rollback itself is guarded so that a rollback failure is logged at
+    debug level rather than masking the original commit error — the same
+    defensive shape as ``QueueProcessorV2._commit_with_safe_rollback``.
+    """
+    try:
+        session.commit()
+    except Exception:
+        logger.exception("Database commit failed, attempting rollback")
+        try:
+            session.rollback()
+        except Exception:
+            logger.debug(
+                "Rollback after commit failure also failed", exc_info=True
+            )
+        raise
+
+
+class QueueManager:
+    """Manages the research queue operations"""
+
+    @staticmethod
+    def add_to_queue(username, research_id, query, mode, settings):
+        """
+        Add a research to the queue
+
+        Args:
+            username: User who owns the research
+            research_id: UUID of the research
+            query: Research query
+            mode: Research mode
+            settings: Research settings dictionary
+
+        Returns:
+            int: Queue position
+        """
+        with get_user_db_session(username) as session:
+            # Get the next position in queue for this user
+            max_position = (
+                session.query(func.max(QueuedResearch.position))
+                .filter_by(username=username)
+                .scalar()
+                or 0
+            )
+
+            queued_record = QueuedResearch(
+                username=username,
+                research_id=research_id,
+                query=query,
+                mode=mode,
+                settings_snapshot=settings,
+                position=max_position + 1,
+            )
+            session.add(queued_record)
+            _safe_commit(session)
+
+            logger.info(
+                f"Added research {research_id} to queue at position {max_position + 1}"
+            )
+
+            # Send RESEARCH_QUEUED notification if enabled
+            try:
+                from ...settings import SettingsManager
+                from ...notifications import send_queue_notification
+
+                settings_manager = SettingsManager(session)
+                settings_snapshot = settings_manager.get_settings_snapshot()
+
+                send_queue_notification(
+                    username=username,
+                    research_id=research_id,
+                    query=query,
+                    settings_snapshot=settings_snapshot,
+                    position=max_position + 1,
+                )
+            except Exception as e:
+                logger.debug(f"Failed to send queued notification: {e}")
+
+            # Notify queue processor about the new queued research
+            # Note: When using QueueManager, we don't have all parameters for direct execution
+            # So it will fall back to queue mode
+            try:
+                queue_processor.notify_research_queued(username, research_id)
+            except Exception:
+                logger.warning("Failed to notify queue processor")
+
+            return max_position + 1
+
+    @staticmethod
+    def get_queue_position(username, research_id):
+        """
+        Get the current queue position for a research
+
+        Args:
+            username: User who owns the research
+            research_id: UUID of the research
+
+        Returns:
+            int: Current queue position or None if not in queue
+        """
+        with get_user_db_session(username) as session:
+            queued = (
+                session.query(QueuedResearch)
+                .filter_by(username=username, research_id=research_id)
+                .first()
+            )
+
+            if not queued:
+                return None
+
+            # Count how many are ahead in queue
+            ahead_count = (
+                session.query(QueuedResearch)
+                .filter(
+                    QueuedResearch.username == username,
+                    QueuedResearch.position < queued.position,
+                )
+                .count()
+            )
+
+            return ahead_count + 1
+
+    @staticmethod
+    def remove_from_queue(username, research_id):
+        """
+        Remove a research from the queue
+
+        Args:
+            username: User who owns the research
+            research_id: UUID of the research
+
+        Returns:
+            bool: True if removed, False if not found
+        """
+        with get_user_db_session(username) as session:
+            queued = (
+                session.query(QueuedResearch)
+                .filter_by(username=username, research_id=research_id)
+                .first()
+            )
+
+            if not queued:
+                return False
+
+            position = queued.position
+            session.delete(queued)
+
+            # Update positions of items behind in queue
+            session.query(QueuedResearch).filter(
+                QueuedResearch.username == username,
+                QueuedResearch.position > position,
+            ).update({QueuedResearch.position: QueuedResearch.position - 1})
+
+            _safe_commit(session)
+            logger.info(f"Removed research {research_id} from queue")
+            return True
+
+    @staticmethod
+    def get_user_queue(username):
+        """
+        Get all queued researches for a user
+
+        Args:
+            username: User to get queue for
+
+        Returns:
+            list: List of queued research info
+        """
+        with get_user_db_session(username) as session:
+            queued_items = (
+                session.query(QueuedResearch)
+                .filter_by(username=username)
+                .order_by(QueuedResearch.position)
+                .all()
+            )
+
+            result = []
+            for item in queued_items:
+                # Get research info
+                research = (
+                    session.query(ResearchHistory)
+                    .filter_by(id=item.research_id)
+                    .first()
+                )
+
+                if research:
+                    result.append(
+                        {
+                            "research_id": item.research_id,
+                            "query": item.query,
+                            "mode": item.mode,
+                            "position": item.position,
+                            "created_at": item.created_at.isoformat()
+                            if item.created_at
+                            else None,
+                            "is_processing": item.is_processing,
+                        }
+                    )
+
+            return result

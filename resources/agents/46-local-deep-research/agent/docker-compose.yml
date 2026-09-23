@@ -1,0 +1,253 @@
+# ============================================================================
+# DOCKER COMPOSE BASE CONFIGURATION (CPU-only, works on all platforms)
+# ============================================================================
+# This base configuration works on:
+#   - macOS (M1/M2/M3/M4 Apple Silicon and Intel)
+#   - Windows
+#   - Linux (with or without GPU)
+#   - Unraid (via Docker Compose Manager plugin)
+#
+# To add NVIDIA GPU acceleration:
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.override.yml up -d
+#
+# See docker-compose.gpu.override.yml for GPU setup details.
+# Future: docker-compose.amd.override.yml will support AMD GPUs.
+#
+# For Unraid users: See docs/deployment/unraid.md for complete setup guide
+# ============================================================================
+
+services:
+  local-deep-research:
+    image: localdeepresearch/local-deep-research:latest
+
+    networks:
+      - ldr-network
+
+    # Enable host.docker.internal on Linux (already works on Mac/Windows)
+    # This allows containers to reach services on the host machine (e.g., LM Studio)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    ports:
+      - "5000:5000"
+    environment:
+      # ============================================================================
+      # Full configuration reference: docs/CONFIGURATION.md
+      # ============================================================================
+      # IMPORTANT: Almost all settings can be configured through the web interface.
+      #
+      # Environment variables FORCE settings and prevent ANY changes through the UI.
+      # These are NOT defaults - they are permanent overrides that lock the setting.
+      # Only use environment variables if you want to enforce specific settings
+      # that users should NEVER be able to change.
+      #
+      # After starting the container, configure your settings at:
+      # http://localhost:5000/settings
+      # ============================================================================
+
+      # ============================================================================
+      # DOCKER-SPECIFIC SETTINGS (Forced for good reasons!)
+      # These settings are forced to ensure proper Docker operation:
+      # - Prevents accidental misconfiguration that would break the container
+      # - Ensures consistency between Docker configuration and application settings
+      # - Users can still change ports via Docker's port mapping (see below)
+      # ============================================================================
+      - LDR_WEB_HOST=0.0.0.0                 # Must bind to all interfaces for Docker networking
+      - LDR_WEB_PORT=5000                    # Internal port must match Docker's expectation
+      - LDR_DATA_DIR=/data                   # Must match the volume mount point
+
+      # ============================================================================
+      # TO CHANGE PORTS: Use Docker port mapping, NOT the settings above!
+      # Example - to expose on port 8080 instead of 5000:
+      #   ports:
+      #     - "8080:5000"  # Maps host port 8080 to container port 5000
+      #
+      # This is the Docker way and avoids configuration mismatches.
+      # ============================================================================
+
+      # ============================================================================
+      # DOCKER-COMPOSE SERVICE ENDPOINTS (Forced for proper container networking)
+      # These are required for containers to communicate with each other.
+      # Docker containers cannot use 'localhost' to reach other containers.
+      # These settings override UI configuration for Docker Compose deployments.
+      # Env-locking the SearXNG URL also marks it operator-provisioned, which
+      # satisfies the private-engine-URL protection (v1.10.3+). pip/local
+      # installs using the localhost default must approve it instead, e.g.
+      # LDR_SEARCH_PRIVATE_ENGINE_URL_ALLOWLIST=http://localhost:8080 —
+      # see docs/SearXNG-Setup.md.
+      # ============================================================================
+      - LDR_LLM_OLLAMA_URL=http://ollama:11434
+      - LDR_SEARCH_ENGINE_WEB_SEARXNG_DEFAULT_PARAMS_INSTANCE_URL=http://searxng:8080
+
+      # ============================================================================
+      # SECURITY: Disable user registration (recommended for public deployments)
+      # When set to false, no new accounts can be created through the web UI.
+      # Register your initial account FIRST, then set this to false.
+      # ============================================================================
+      # - LDR_APP_ALLOW_REGISTRATIONS=false
+
+      # ============================================================================
+      # ADVANCED: Uncomment ONLY if you need to enforce/lock these settings
+      # WARNING: This will disable UI configuration for these settings!
+      # ============================================================================
+      # - LDR_LLM_PROVIDER=ollama              # Lock the LLM provider
+      # - LDR_LLM_MODEL=gemma3:12b              # Lock the model selection
+      # - LDR_LLM_OPENAI_API_KEY=<your-api-key>        # Lock OpenAI API key
+      # - LDR_LLM_ANTHROPIC_API_KEY=<your-api-key> # Lock Anthropic API key
+
+      # ============================================================================
+      # OPENROUTER CONFIGURATION
+      # To use OpenRouter (100+ models via one API), uncomment these lines:
+      # Get your API key from https://openrouter.ai/
+      # Browse models at https://openrouter.ai/models
+      # ============================================================================
+      # - LDR_LLM_PROVIDER=openai_endpoint
+      # - LDR_LLM_OPENAI_ENDPOINT_URL=https://openrouter.ai/api/v1
+      # - LDR_LLM_OPENAI_ENDPOINT_API_KEY=<your-api-key>
+      # - LDR_LLM_MODEL=anthropic/claude-3.5-sonnet  # or any OpenRouter model
+
+      # ============================================================================
+      # OTHER OPENAI-COMPATIBLE APIS
+      # The same pattern works for any OpenAI-compatible service:
+      # ============================================================================
+      # - LDR_LLM_PROVIDER=openai_endpoint
+      # - LDR_LLM_OPENAI_ENDPOINT_URL=https://your-provider.com/v1
+      # - LDR_LLM_OPENAI_ENDPOINT_API_KEY=<your-api-key>
+      # - LDR_LLM_MODEL=<your-model-name>
+
+      # ============================================================================
+      # LM STUDIO (Running on Host Machine)
+      # If using LM Studio on your host, use host.docker.internal to reach it.
+      # The extra_hosts setting above enables this on Linux.
+      # ============================================================================
+      # - LDR_LLM_PROVIDER=lmstudio
+      # - LDR_LLM_LMSTUDIO_URL=http://host.docker.internal:1234
+      # - LDR_LLM_LMSTUDIO_API_KEY=<api-key-if-required>   # optional; leave out for unauth instances
+      # - LDR_LLM_MODEL=<your-loaded-model-name>
+    volumes:
+      - ldr_data:/data
+      - ldr_scripts:/scripts
+      # ============================================================================
+      # NOTE: Do NOT add resource limits (deploy.resources.limits) here.
+      # Resource needs vary by deployment (RAM, CPU, workload). Deployers should
+      # use docker-compose.override.yml to set limits for their environment.
+      # ============================================================================
+      # NOTE: Local document collections are managed via the Collections UI,
+      # not via Docker volume mounts. Do not add local_collections mounts here.
+      # ============================================================================
+    # Allow SQLCipher mlock() without noisy kernel warnings
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    # ============================================================================
+    # CONTAINER SECURITY — Principle of Least Privilege
+    # ============================================================================
+    # The entrypoint (scripts/ldr_entrypoint.sh) runs as root to fix Docker
+    # volume ownership, then drops to ldruser (UID 1000) via setpriv before
+    # starting the application. The privilege timeline is:
+    #
+    #   1. Root phase (brief): mkdir, chmod, chown on /data and /home/ldruser
+    #   2. setpriv exec: irreversible switch to ldruser (empty capability set)
+    #   3. App phase: runs as ldruser with zero capabilities
+    #
+    # We drop ALL capabilities, then add back only what the root phase needs.
+    # no-new-privileges prevents re-escalation after setpriv drops privileges.
+    #
+    # WARNING: Removing cap_add entries will break container startup — the
+    # entrypoint will fail with "Operation not permitted" on chown/chmod.
+    # This is especially visible in restricted environments (Proxmox LXC).
+    #
+    # KEEP IN SYNC: README.md's Security section advertises this hardening
+    # (cap_drop: ALL, no-new-privileges, non-root runtime, digest-pinned
+    # images). If you change any of those here, update that section to match.
+    # ============================================================================
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN        # chown -R ldruser:ldruser /data
+      - FOWNER       # chmod on files not owned by root (after chown to ldruser)
+      - DAC_OVERRIDE # mkdir in /home/ldruser (.config dir, mode 755 = no write for others)
+      - SETUID       # setpriv setuid() syscall to switch to ldruser
+      - SETGID       # setpriv setgid() syscall to switch group
+    restart: unless-stopped
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+      searxng:
+        condition: service_started
+
+
+  ollama:
+    image: ollama/ollama:latest@sha256:8850b8b33936b9fb246e7b3e02849941f1151ea847e5fb15511f17de9589aea1
+    # Note: GPU acceleration disabled by default (CPU-only base)
+    # For NVIDIA GPU support, use docker-compose.gpu.override.yml
+    # For AMD GPU support (future), use docker-compose.amd.override.yml
+
+    container_name: ollama_service
+    # No custom entrypoint — uses the upstream image default (`ollama serve`).
+    # Considered-and-rejected: pre-pulling ${MODEL:-gemma3:12b} via
+    # scripts/ollama_entrypoint.sh on container start. That had three
+    # problems: (a) wasted ~5-10 min and ~7-8 GB on every fresh boot,
+    # (b) penalised users running LM Studio / OpenAI / llama.cpp who don't
+    # use ollama at all, and (c) coupled the compose to an opinionated
+    # default model. Users who choose ollama pull their model explicitly
+    # (`docker exec ollama_service ollama pull <model>`) or let LDR pull on
+    # first use. Healthcheck below probes the daemon (model-agnostic, #3885).
+    healthcheck:
+      test: [ "CMD", "ollama", "list" ]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    environment:
+      OLLAMA_KEEP_ALIVE: '30m'
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - ldr-network
+    security_opt:
+      - "no-new-privileges:true"
+    cap_drop:
+      - ALL
+    # WARNING: Do NOT add ports: - "11434:11434" — Ollama has no authentication.
+    # Access is intentionally restricted to the ldr-network internal network.
+    restart: unless-stopped
+
+  searxng:
+    image: searxng/searxng:latest@sha256:6dd0dffc05a75d92bbacd858953b4e93b8f709403c3fb1fb8a33ca8fd02e40a4
+    container_name: searxng
+    networks:
+      - ldr-network
+    security_opt:
+      - "no-new-privileges:true"
+    # Note: no cap_drop here — upstream removed cap_drop: ALL from their
+    # official compose in searxng/searxng-docker@31acd45 ("[fix] remove
+    # security cap", 2025-05-20), and the new container template at
+    # searxng/searxng/container/docker-compose.yml ships with no cap_drop /
+    # cap_add at all. The searxng entrypoint runs as root, copies config
+    # into the volume, and drops to the searxng user — chasing the exact
+    # cap_add list across uWSGI→Granian and future entrypoint changes is
+    # not worth the maintenance cost. no-new-privileges and the pinned
+    # digest are the meaningful guardrails. See #3874.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    volumes:
+      - searxng_data:/etc/searxng
+    restart: unless-stopped
+
+
+volumes:
+  ldr_data:
+  ldr_scripts:
+  ollama_data:
+  searxng_data:
+networks:
+  ldr-network:

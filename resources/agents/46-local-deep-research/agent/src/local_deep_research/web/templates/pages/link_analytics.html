@@ -1,0 +1,903 @@
+{% extends "base.html" %}
+{% from "components/help_macros.html" import tooltip, help_panel, help_step, help_tip %}
+
+{% block title %}Link Analytics - Deep Research System{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="/static/css/link_analytics.css">
+{% endblock %}
+
+{% block content %}
+<div class="ldr-link-analytics-container">
+    <div class="ldr-metrics-header">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+            <h1>🔗 Link Analytics Dashboard</h1>
+            <a href="/metrics/" style="background: var(--bg-tertiary); color: var(--text-primary); padding: 0.5rem 1rem; border-radius: 0.375rem; text-decoration: none; font-size: 0.875rem; border: 1px solid var(--border-color); transition: background-color 0.2s ease;">
+                ← Back to Metrics
+            </a>
+        </div>
+        <p>Analyze sources and domains used in your research sessions</p>
+    </div>
+
+    <div class="ldr-period-selector" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <label for="period-select">Time Period: </label>
+            <select id="period-select">
+                <option value="7d">Last 7 days</option>
+                <option value="30d" selected>Last 30 days</option>
+                <option value="90d">Last 3 months</option>
+                <option value="365d">Last year</option>
+                <option value="all">All time</option>
+            </select>
+        </div>
+        <div>
+            <button id="classify-domains-btn" class="btn" style="background: var(--accent-primary); color: white; padding: 0.5rem 1rem; border-radius: 0.375rem; border: none; cursor: pointer; font-size: 0.875rem;">
+                <i aria-hidden="true" class="fas fa-brain"></i> Classify Domains with AI
+            </button>
+            <span id="classification-status" style="margin-left: 1rem; font-size: 0.875rem; color: var(--text-secondary);"></span>
+        </div>
+    </div>
+
+    <!-- Understanding Link Analytics Help Panel -->
+    {% call help_panel('links-how', 'Understanding Link Analytics', icon='link', collapsed=true, dismissible=true) %}
+    <div class="ldr-help-steps">
+        {{ help_step(1, "Source Tracking", "Every source cited in your research is tracked, showing which domains provide the most information.") }}
+        {{ help_step(2, "Domain Diversity", "Higher diversity means your research draws from many different sources, reducing single-source bias.") }}
+        {{ help_step(3, "AI Classification", "Classify domains as academic, news, reference, etc. to understand your source composition.") }}
+    </div>
+    {{ help_tip("<strong>Tip:</strong> If one domain dominates your research, consider adding more diverse search engines to get varied perspectives.") }}
+    {% endcall %}
+
+    <div id="loading" class="ldr-loading" role="status">
+        <div>Loading link analytics data...</div>
+    </div>
+
+    <div id="error" class="ldr-error" style="display: none;"></div>
+
+    <div id="content" style="display: none;">
+        <!-- Overall Statistics -->
+        <div class="ldr-metric-card">
+            <h3>📊 Overall Link Statistics</h3>
+            <div class="ldr-overall-stats">
+                <div class="ldr-stat-item">
+                    <span class="ldr-stat-value" id="total-links">0</span>
+                    <div class="ldr-stat-label">Total Links</div>
+                </div>
+                <div class="ldr-stat-item">
+                    <span class="ldr-stat-value" id="unique-domains">0</span>
+                    <div class="ldr-stat-label">Unique Domains</div>
+                </div>
+                <div class="ldr-stat-item">
+                    <span class="ldr-stat-value" id="avg-links">0</span>
+                    <div class="ldr-stat-label">Avg Links/Research</div>
+                </div>
+                <div class="ldr-stat-item">
+                    <span class="ldr-stat-value" id="total-researches">0</span>
+                    <div class="ldr-stat-label">Total Researches</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ldr-metrics-grid">
+            <!-- Top Domains Chart -->
+            <div class="ldr-metric-card">
+                <h3>🌐 Top 10 Domains</h3>
+                <div class="ldr-chart-container">
+                    <canvas id="top-domains-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Domain Distribution Pie Chart -->
+            <div class="ldr-metric-card">
+                <h3>📊 Domain Distribution</h3>
+                <div class="ldr-chart-container">
+                    <canvas id="domain-distribution-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Temporal Trend Chart -->
+            <div class="ldr-metric-card" style="grid-column: span 2;">
+                <h3>📈 Links Over Time</h3>
+                <div class="ldr-chart-container">
+                    <canvas id="temporal-trend-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Source Type Analysis -->
+            <div class="ldr-metric-card">
+                <h3>📚 Domain Category Analysis</h3>
+                <div id="domain-category-grid" class="ldr-category-grid">
+                    <!-- Dynamic category cards will be generated here -->
+                </div>
+                <div class="ldr-chart-container" style="margin-top: 1.5rem;">
+                    <canvas id="source-type-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Top Domains List with Research Info -->
+            <div class="ldr-metric-card" style="grid-column: span 2;">
+                <h3>🔍 Domain Details & Research Connections</h3>
+                <div class="ldr-domain-list" id="domain-list" style="max-height: 600px;">
+                    <!-- Domain items will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Domain Classification Modal -->
+<div id="classification-modal" class="ldr-modal">
+    <div class="ldr-modal-content">
+        <span class="ldr-close-modal">&times;</span>
+        <div class="ldr-modal-header">
+            <h2><i aria-hidden="true" class="fas fa-brain"></i> AI Domain Classification</h2>
+            <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+                The AI will analyze and categorize each domain based on its content and purpose.
+            </p>
+        </div>
+
+        <div id="classification-info">
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: 0.5rem;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--accent-primary);" id="total-domains-count">0</div>
+                    <div style="font-size: 0.875rem; color: var(--text-secondary);">Total Domains</div>
+                </div>
+                <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: 0.5rem;">
+                    <div style="font-size: 1.5rem; font-weight: bold; color: var(--success-color);" id="classified-count">0</div>
+                    <div style="font-size: 0.875rem; color: var(--text-secondary);">Already Classified</div>
+                </div>
+            </div>
+
+            <div id="classification-options" style="margin-bottom: 1.5rem;">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" id="force-reclassify" style="margin-right: 0.5rem;">
+                    <span>Force reclassification of all domains (overwrite existing)</span>
+                </label>
+            </div>
+
+            <button id="start-classification" class="btn" style="width: 100%; background: var(--accent-primary); color: white; padding: 0.75rem; border-radius: 0.5rem; border: none; cursor: pointer; font-size: 1rem;">
+                <i aria-hidden="true" class="fas fa-play"></i> Start Classification
+            </button>
+        </div>
+
+        <div id="classification-progress" style="display: none;">
+            <div class="ldr-progress-bar">
+                <div class="ldr-progress-fill" id="progress-fill" style="width: 0%;">0%</div>
+            </div>
+
+            <div style="text-align: center; margin-bottom: 1rem;">
+                <span id="current-domain" style="color: var(--text-secondary);"></span>
+            </div>
+
+            <div class="ldr-classification-log" id="classification-log">
+                <!-- Log entries will be added here -->
+            </div>
+
+            <button id="stop-classification" class="btn" style="width: 100%; background: var(--error-color); color: white; padding: 0.75rem; border-radius: 0.5rem; border: none; cursor: pointer; font-size: 1rem; margin-top: 1rem;">
+                <i aria-hidden="true" class="fas fa-stop"></i> Stop Classification
+            </button>
+        </div>
+
+        <div id="classification-complete" style="display: none; text-align: center;">
+            <i aria-hidden="true" class="fas fa-check-circle" style="font-size: 3rem; color: var(--success-color); margin-bottom: 1rem;"></i>
+            <h3>Classification Complete!</h3>
+            <p style="color: var(--text-secondary); margin: 1rem 0;">
+                Successfully classified <span id="final-classified">0</span> domains.
+            </p>
+            <button id="close-complete" class="btn" style="background: var(--accent-primary); color: white; padding: 0.75rem 1.5rem; border-radius: 0.5rem; border: none; cursor: pointer;">
+                <i aria-hidden="true" class="fas fa-check"></i> Done
+            </button>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/pages/link_analytics_render.js"></script>
+<script>
+let topDomainsChart = null;
+let domainDistributionChart = null;
+let sourceTypeChart = null;
+let temporalTrendChart = null;
+let linkAnalyticsRequestId = 0;
+// The content script runs before base.html's deferred xss-protection.js.
+// Prefer its canonical global when available, with a scoped fallback for a
+// fast initial response or a failed dependency load.
+const linkAnalyticsEscapeHtml = window.escapeHtml || (value => String(value ?? '').replace(
+    /[&<>"'/]/g,
+    character => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+        '/': '&#x2F;',
+    })[character],
+));
+
+async function loadLinkAnalytics(period = '30d') {
+    const requestId = ++linkAnalyticsRequestId;
+    const loading = document.getElementById('loading');
+    const content = document.getElementById('content');
+    const error = document.getElementById('error');
+
+    loading.style.display = 'block';
+    content.style.display = 'none';
+    error.style.display = 'none';
+
+    try {
+        const response = await fetch(`/metrics/api/link-analytics?period=${period}`);
+        const result = await response.json();
+        if (requestId !== linkAnalyticsRequestId) return;
+
+        if (result.status === 'success') {
+            const data = result.data;
+
+            // Update overall statistics
+            document.getElementById('total-links').textContent = data.total_links || 0;
+            document.getElementById('unique-domains').textContent = data.total_unique_domains || 0;
+            document.getElementById('avg-links').textContent = data.avg_links_per_research || 0;
+            document.getElementById('total-researches').textContent = data.total_researches || 0;
+
+            // Update domain category grid
+            const domainCategories = data.domain_categories || {};
+            generateCategoryGrid(domainCategories);
+
+            // Update charts
+            updateTopDomainsChart(data.top_domains || []);
+            updateDomainDistributionChart(data.domain_distribution || {});
+            updateSourceTypeChart(domainCategories);
+            updateTemporalTrendChart(data.temporal_trend || []);
+
+            // Update enhanced domain list with research info
+            updateEnhancedDomainList(data.top_domains || [], data.domain_metrics || {});
+
+            loading.style.display = 'none';
+            content.style.display = 'block';
+        } else {
+            throw new Error(result.message || 'Failed to load data');
+        }
+    } catch (err) {
+        if (requestId !== linkAnalyticsRequestId) return;
+        console.error('Error loading link analytics:', err);
+        error.textContent = 'Failed to load link analytics data. Please try again later.';
+        error.style.display = 'block';
+        loading.style.display = 'none';
+    }
+}
+
+function generateCategoryGrid(domainCategories) {
+    const gridContainer = document.getElementById('domain-category-grid');
+    const categoryEntries = Object.entries(domainCategories);
+    const total = Object.values(domainCategories).reduce((sum, count) => sum + count, 0) || 1;
+
+    // Clear existing content
+    gridContainer.innerHTML = '';
+
+    // Generate colors for cards (same as pie chart)
+    const colors = generateChartColors(categoryEntries.length);
+
+    // Create cards for each category
+    categoryEntries.forEach(([categoryName, count], index) => {
+        const percentage = total > 0 ? ((count / total * 100).toFixed(1)) : 0;
+        const cardColor = colors.background[index];
+
+        const cardHtml = `
+            <div class="ldr-category-card" style="border-left: 4px solid ${cardColor};">
+                <div class="ldr-category-name">${linkAnalyticsEscapeHtml(categoryName)}</div>
+                <div class="ldr-category-count">${Number(count) || 0}</div>
+                <div class="ldr-category-percentage">${Number(percentage) || 0}%</div>
+            </div>
+        `;
+
+        gridContainer.innerHTML += cardHtml;
+    });
+}
+
+function updateSourceTypeBar(type, count, total) {
+    const percentage = total > 0 ? (count / total * 100) : 0;
+    const fillElement = document.getElementById(`${type}-fill`);
+    const countElement = document.getElementById(`${type}-count`);
+
+    if (fillElement) {
+        fillElement.style.width = `${percentage}%`;
+    }
+    if (countElement) {
+        countElement.textContent = count;
+    }
+}
+
+function updateTopDomainsChart(domains) {
+    const ctx = document.getElementById('top-domains-chart').getContext('2d');
+
+    if (topDomainsChart) {
+        topDomainsChart.destroy();
+    }
+
+    topDomainsChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: domains.map(d => d.domain),
+            datasets: [{
+                label: 'Number of Links',
+                data: domains.map(d => d.count),
+                backgroundColor: 'rgba(107, 70, 193, 0.6)',
+                borderColor: 'rgba(107, 70, 193, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                },
+                x: {
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        afterLabel: function(context) {
+                            const domain = domains[context.dataIndex];
+                            return `${domain.percentage}% of total`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateDomainDistributionChart(distribution) {
+    const ctx = document.getElementById('domain-distribution-chart').getContext('2d');
+
+    if (domainDistributionChart) {
+        domainDistributionChart.destroy();
+    }
+
+    const labels = [];
+    const data = [];
+
+    if (distribution.top_10 > 0) {
+        labels.push('Top 10 Domains');
+        data.push(distribution.top_10);
+    }
+
+    if (distribution.others > 0) {
+        labels.push('Other Domains');
+        data.push(distribution.others);
+    }
+
+    if (data.length === 0) {
+        labels.push('No Data');
+        data.push(1);
+    }
+
+    domainDistributionChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: [
+                    'rgba(107, 70, 193, 0.8)',
+                    'rgba(144, 97, 249, 0.8)'
+                ],
+                borderColor: [
+                    'rgba(107, 70, 193, 1)',
+                    'rgba(144, 97, 249, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+function updateSourceTypeChart(domainCategories) {
+    const ctx = document.getElementById('source-type-chart').getContext('2d');
+
+    if (sourceTypeChart) {
+        sourceTypeChart.destroy();
+    }
+
+    // Generate dynamic labels and data from whatever categories the LLM provides
+    const labels = Object.keys(domainCategories);
+    const data = Object.values(domainCategories);
+
+    // Generate colors dynamically based on number of categories
+    const colors = generateChartColors(labels.length);
+
+    sourceTypeChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: colors.background,
+                borderColor: colors.border,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+// Helper function to generate colors for dynamic number of categories
+function generateChartColors(count) {
+    const baseColors = [
+        'rgba(107, 70, 193, 0.8)',   // Purple
+        'rgba(245, 158, 11, 0.8)',   // Orange
+        'rgba(59, 130, 246, 0.8)',   // Blue
+        'rgba(16, 185, 129, 0.8)',   // Green
+        'rgba(239, 68, 68, 0.8)',    // Red
+        'rgba(139, 69, 19, 0.8)',    // Brown
+        'rgba(255, 192, 203, 0.8)',  // Pink
+        'rgba(128, 128, 128, 0.8)',  // Gray
+        'rgba(255, 165, 0, 0.8)',    // Orange
+        'rgba(75, 0, 130, 0.8)'      // Indigo
+    ];
+
+    const background = [];
+    const border = [];
+
+    for (let i = 0; i < count; i++) {
+        const colorIndex = i % baseColors.length;
+        background.push(baseColors[colorIndex]);
+        border.push(baseColors[colorIndex].replace('0.8', '1'));
+    }
+
+    return { background, border };
+}
+
+function updateTemporalTrendChart(trendData) {
+    const ctx = document.getElementById('temporal-trend-chart').getContext('2d');
+
+    if (temporalTrendChart) {
+        temporalTrendChart.destroy();
+    }
+
+    if (trendData.length === 0) {
+        return;
+    }
+
+    temporalTrendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: trendData.map(d => d.date),
+            datasets: [{
+                label: 'Links Collected',
+                data: trendData.map(d => d.count),
+                borderColor: 'rgba(107, 70, 193, 1)',
+                backgroundColor: 'rgba(107, 70, 193, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3,
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                },
+                x: {
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 0,
+                        autoSkip: true,
+                        maxTicksLimit: 15
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            return 'Date: ' + context[0].label;
+                        },
+                        label: function(context) {
+                            return 'Links: ' + context.parsed.y;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// updateEnhancedDomainList lives in /static/js/pages/link_analytics_render.js
+// and is exposed on window. The wrapper below (end of this script) reassigns
+// it to also call loadClassificationsAndUpdateDisplay.
+
+// Event listener for period selector
+document.getElementById('period-select').addEventListener('change', (e) => {
+    loadLinkAnalytics(e.target.value);
+});
+
+// Load initial data
+loadLinkAnalytics('30d');
+
+// Domain Classification functionality
+let classificationInProgress = false;
+let domainsToClassify = [];
+let classificationRunId = 0;
+let classificationAbortController = null;
+let currentDomainIndex = 0;
+
+// Modal elements
+const modal = document.getElementById('classification-modal');
+const classifyBtn = document.getElementById('classify-domains-btn');
+const closeModal = document.querySelector('.ldr-close-modal');
+const startBtn = document.getElementById('start-classification');
+const stopBtn = document.getElementById('stop-classification');
+const closeCompleteBtn = document.getElementById('close-complete');
+
+// Show modal when classify button is clicked
+classifyBtn.addEventListener('click', async () => {
+    modal.style.display = 'block';
+    await loadClassificationProgress();
+});
+
+// Close modal
+closeModal.addEventListener('click', () => {
+    if (!classificationInProgress) {
+        modal.style.display = 'none';
+    }
+});
+
+closeCompleteBtn.addEventListener('click', () => {
+    modal.style.display = 'none';
+    // Reload the page to show updated classifications
+    loadLinkAnalytics(document.getElementById('period-select').value);
+});
+
+// Load classification progress
+async function loadClassificationProgress() {
+    try {
+        const response = await fetch('/metrics/api/domain-classifications/progress');
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            const progress = result.progress;
+            document.getElementById('total-domains-count').textContent = progress.total_domains;
+            document.getElementById('classified-count').textContent = progress.classified;
+
+            // Update status text
+            const statusText = document.getElementById('classification-status');
+            if (progress.classified > 0) {
+                statusText.textContent = `${progress.classified}/${progress.total_domains} domains classified`;
+                statusText.style.color = 'var(--success-color)';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading classification progress:', error);
+    }
+}
+
+// Start classification
+async function startDomainClassification() {
+    // The start button is normally hidden as soon as a run begins, but guard
+    // the state as well so rapid/programmatic clicks cannot create two loops.
+    if (classificationInProgress) {
+        return;
+    }
+
+    const forceReclassify = document.getElementById('force-reclassify').checked;
+
+    // Hide info, show progress
+    document.getElementById('classification-info').style.display = 'none';
+    document.getElementById('classification-progress').style.display = 'block';
+    document.getElementById('classification-complete').style.display = 'none';
+
+    classificationInProgress = true;
+    startBtn.disabled = true;
+    const runId = ++classificationRunId;
+    const abortController = new AbortController();
+    classificationAbortController = abortController;
+    const isCurrentRun = () => (
+        classificationInProgress &&
+        runId === classificationRunId &&
+        classificationAbortController === abortController
+    );
+
+    // Get list of domains to classify
+    try {
+        const response = await fetch('/metrics/api/domain-classifications/progress', {
+            signal: abortController.signal
+        });
+        if (!isCurrentRun()) return;
+        if (!response.ok) {
+            throw new Error(`Unable to load classification progress (HTTP ${response.status})`);
+        }
+        const result = await response.json();
+        if (!isCurrentRun()) return;
+
+        if (result.status !== 'success') {
+            throw new Error(result.message || 'Unable to load classification progress');
+        }
+
+        // Start classification process
+        await classifyAllDomains(forceReclassify, runId, abortController.signal);
+    } catch (error) {
+        if (!isCurrentRun() || error.name === 'AbortError') return;
+        console.error('Error starting classification:', error);
+        addLogEntry(`Error: ${error.message}`, 'error');
+        // Make the start control reachable again so a transient failure can
+        // be retried without closing and reopening the modal.
+        document.getElementById('classification-info').style.display = 'block';
+        document.getElementById('classification-progress').style.display = 'none';
+    } finally {
+        if (runId === classificationRunId) {
+            classificationInProgress = false;
+            classificationAbortController = null;
+            startBtn.disabled = false;
+        }
+    }
+}
+
+startBtn.addEventListener('click', startDomainClassification);
+
+// Stop classification
+stopBtn.addEventListener('click', () => {
+    classificationInProgress = false;
+    classificationRunId++;
+    if (classificationAbortController) {
+        classificationAbortController.abort();
+        classificationAbortController = null;
+    }
+    startBtn.disabled = false;
+    addLogEntry('Classification stopped by user', 'error');
+});
+
+// Classify all domains
+async function classifyAllDomains(
+    forceUpdate = false,
+    runId = classificationRunId,
+    signal = classificationAbortController?.signal
+) {
+    const isCurrentRun = () => (
+        classificationInProgress && runId === classificationRunId
+    );
+    const logContainer = document.getElementById('classification-log');
+    logContainer.innerHTML = '';
+
+    try {
+        // Get all domains from the progress endpoint which now includes all domains
+        const progressResponse = await fetch('/metrics/api/domain-classifications/progress', {
+            signal
+        });
+        if (!isCurrentRun()) return;
+        if (!progressResponse.ok) {
+            throw new Error(`Unable to load domains (HTTP ${progressResponse.status})`);
+        }
+        const progressResult = await progressResponse.json();
+        if (!isCurrentRun()) return;
+
+        if (progressResult.status !== 'success') {
+            throw new Error(progressResult.message || 'Unable to load domains for classification');
+        }
+
+        if (!progressResult.progress?.all_domains) {
+            throw new Error('Classification progress did not include a domain list');
+        }
+
+        {
+            // Get all domains from the progress endpoint
+            const allDomains = new Set(progressResult.progress.all_domains);
+
+            // Get existing classifications to check which need updating
+            if (!forceUpdate) {
+                const classResponse = await fetch('/metrics/api/domain-classifications', {
+                    signal
+                });
+                if (!isCurrentRun()) return;
+                if (!classResponse.ok) {
+                    throw new Error(`Unable to load existing classifications (HTTP ${classResponse.status})`);
+                }
+                const classResult = await classResponse.json();
+                if (!isCurrentRun()) return;
+
+                if (classResult.status !== 'success') {
+                    throw new Error(classResult.message || 'Unable to load existing classifications');
+                }
+                const classified = new Set(classResult.classifications.map(c => c.domain));
+                // Remove already classified domains
+                classified.forEach(d => allDomains.delete(d));
+            }
+
+            if (!isCurrentRun()) return;
+
+            domainsToClassify = Array.from(allDomains);
+            const totalToClassify = domainsToClassify.length;
+
+            if (totalToClassify === 0) {
+                addLogEntry('All domains are already classified!', 'success');
+                showClassificationComplete(0);
+                return;
+            }
+
+            addLogEntry(`Starting classification of ${totalToClassify} domains...`, 'success');
+
+            let classified = 0;
+            let failed = 0;
+
+            for (let i = 0; i < domainsToClassify.length && classificationInProgress; i++) {
+                const domain = domainsToClassify[i];
+                const progress = ((i + 1) / totalToClassify) * 100;
+
+                // Update progress bar
+                document.getElementById('progress-fill').style.width = `${progress}%`;
+                document.getElementById('progress-fill').textContent = `${Math.round(progress)}%`;
+                document.getElementById('current-domain').textContent = `Classifying: ${domain}`;
+
+                try {
+                    // Get CSRF token if it exists
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+
+                    // Classify single domain
+                    const headers = {
+                        'Content-Type': 'application/json',
+                    };
+
+                    if (csrfToken) {
+                        headers['X-CSRFToken'] = csrfToken;
+                    }
+
+                    const response = await fetch('/metrics/api/domain-classifications/classify', {
+                        method: 'POST',
+                        headers: headers,
+                        credentials: 'same-origin', // Include cookies for session
+                        signal,
+                        body: JSON.stringify({
+                            domain: domain,
+                            force_update: forceUpdate
+                        })
+                    });
+                    if (!isCurrentRun()) return;
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        if (!isCurrentRun()) return;
+                        console.error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+                        failed++;
+                        addLogEntry(`✗ ${domain}: HTTP ${response.status} error`, 'error');
+                        continue;
+                    }
+
+                    const result = await response.json();
+                    if (!isCurrentRun()) return;
+
+                    if (result.status === 'success') {
+                        classified++;
+                        const cat = result.classification.category;
+                        const subcat = result.classification.subcategory;
+                        addLogEntry(`✓ ${domain}: ${cat} / ${subcat}`, 'success');
+                    } else {
+                        failed++;
+                        addLogEntry(`✗ ${domain}: ${result.message || 'Classification failed'}`, 'error');
+                    }
+
+                    // Small delay to avoid overwhelming the server
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Increased delay
+
+                } catch (error) {
+                    if (!isCurrentRun() || error.name === 'AbortError') return;
+                    console.error(`Error classifying ${domain}:`, error);
+                    failed++;
+                    addLogEntry(`✗ ${domain}: ${error.message}`, 'error');
+                }
+            }
+
+            if (classificationInProgress) {
+                showClassificationComplete(classified);
+            }
+
+        }
+    } catch (error) {
+        if (!isCurrentRun() || error.name === 'AbortError') return;
+        console.error('Error during classification:', error);
+        addLogEntry(`Fatal error: ${error.message}`, 'error');
+        throw error;
+    }
+
+}
+
+// Add log entry
+function addLogEntry(message, type = 'info') {
+    const logContainer = document.getElementById('classification-log');
+    const entry = document.createElement('div');
+    entry.className = `ldr-log-entry ldr-${type}`;
+    entry.textContent = message;
+    logContainer.appendChild(entry);
+    logContainer.scrollTop = logContainer.scrollHeight;
+}
+
+// Show classification complete
+function showClassificationComplete(count) {
+    document.getElementById('classification-progress').style.display = 'none';
+    document.getElementById('classification-complete').style.display = 'block';
+    document.getElementById('final-classified').textContent = count;
+}
+
+// Update domain display to show classifications
+async function loadClassificationsAndUpdateDisplay() {
+    try {
+        const response = await fetch('/metrics/api/domain-classifications');
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            const classifications = {};
+            result.classifications.forEach(c => {
+                classifications[c.domain] = c;
+            });
+
+            // Update domain list to show classifications
+            const domainItems = document.querySelectorAll('.ldr-domain-item-expanded');
+            domainItems.forEach(item => {
+                const domainName = item.querySelector('.ldr-domain-name');
+                if (domainName) {
+                    const domainText = domainName.textContent.replace(/^#\d+\s*/, '').trim();
+                    if (classifications[domainText]) {
+                        const classification = classifications[domainText];
+                        // Add classification badge
+                        if (!domainName.querySelector('.ldr-classified-badge')) {
+                            const badge = document.createElement('span');
+                            badge.className = 'ldr-classified-badge';
+                            badge.textContent = classification.category;
+                            badge.title = `${linkAnalyticsEscapeHtml(classification.subcategory)} (${Math.round(Number(classification.confidence) * 100)}% confidence)`;
+                            domainName.appendChild(badge);
+                        }
+                    }
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error loading classifications:', error);
+    }
+}
+
+// Load classifications when data is loaded
+const originalUpdateEnhancedDomainList = updateEnhancedDomainList;
+updateEnhancedDomainList = function(domains, domainMetrics) {
+    originalUpdateEnhancedDomainList(domains, domainMetrics);
+    // Load and display classifications
+    loadClassificationsAndUpdateDisplay();
+};
+</script>
+{% endblock %}

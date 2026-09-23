@@ -1,0 +1,157 @@
+"""
+Base storage interfaces for the news system.
+"""
+
+from abc import ABC, abstractmethod
+from typing import List, Optional, Dict, Any
+import uuid
+
+
+class BaseStorage(ABC):
+    """Abstract base class for all storage interfaces"""
+
+    @abstractmethod
+    def create(self, data: Dict[str, Any]) -> str:
+        """Create a new record and return its ID"""
+        pass
+
+    @abstractmethod
+    def get(self, id: str) -> Optional[Dict[str, Any]]:
+        """Get a record by ID"""
+        pass
+
+    @abstractmethod
+    def update(self, id: str, data: Dict[str, Any]) -> bool:
+        """Update a record, return True if successful"""
+        pass
+
+    @abstractmethod
+    def delete(self, id: str) -> bool:
+        """Delete a record, return True if successful"""
+        pass
+
+    @abstractmethod
+    def list(
+        self,
+        filters: Optional[Dict[str, Any]] = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """List records with optional filtering"""
+        pass
+
+    def generate_id(self) -> str:
+        """Generate a unique ID"""
+        return str(uuid.uuid4())
+
+
+class CardStorage(BaseStorage):
+    """Interface for news card storage"""
+
+    @abstractmethod
+    def get_by_user(
+        self, user_id: str, limit: int = 50, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """Get cards for a specific user"""
+        pass
+
+    @abstractmethod
+    def get_latest_version(self, card_id: str) -> Optional[Dict[str, Any]]:
+        """Get the latest version of a card"""
+        pass
+
+    @abstractmethod
+    def add_version(self, card_id: str, version_data: Dict[str, Any]) -> str:
+        """Add a new version to a card"""
+        pass
+
+    @abstractmethod
+    def update_latest_info(
+        self, card_id: str, version_data: Dict[str, Any]
+    ) -> bool:
+        """Update the denormalized latest version info on the card"""
+        pass
+
+    @abstractmethod
+    def archive_card(self, card_id: str) -> bool:
+        """Archive a card"""
+        pass
+
+    @abstractmethod
+    def pin_card(self, card_id: str, pinned: bool = True) -> bool:
+        """Pin or unpin a card"""
+        pass
+
+
+class RatingStorage(BaseStorage):
+    """Interface for rating storage"""
+
+    @abstractmethod
+    def get_user_rating(
+        self, user_id: str, item_id: str, rating_type: str
+    ) -> Optional[Dict[str, Any]]:
+        """Get a user's rating for a specific item"""
+        pass
+
+    @abstractmethod
+    def upsert_rating(
+        self,
+        user_id: str,
+        item_id: str,
+        rating_type: str,
+        rating_value: str,
+        item_type: str = "card",
+    ) -> str:
+        """Create or update a rating"""
+        pass
+
+    @abstractmethod
+    def get_ratings_summary(
+        self, item_id: str, item_type: str = "card"
+    ) -> Dict[str, Any]:
+        """Get aggregated ratings for an item"""
+        pass
+
+    @abstractmethod
+    def get_user_ratings(
+        self, user_id: str, rating_type: Optional[str] = None, limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """Get all ratings by a user"""
+        pass
+
+
+class PreferenceStorage(BaseStorage):
+    """Interface for user preference storage"""
+
+    @abstractmethod
+    def get_user_preferences(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get preferences for a user"""
+        pass
+
+    @abstractmethod
+    def upsert_preferences(
+        self, user_id: str, preferences: Dict[str, Any]
+    ) -> str:
+        """Create or update user preferences"""
+        pass
+
+    @abstractmethod
+    def add_liked_item(
+        self, user_id: str, item_id: str, item_type: str = "news"
+    ) -> bool:
+        """Add an item to liked list"""
+        pass
+
+    @abstractmethod
+    def add_disliked_item(
+        self, user_id: str, item_id: str, item_type: str = "news"
+    ) -> bool:
+        """Add an item to disliked list"""
+        pass
+
+    @abstractmethod
+    def update_preference_embedding(
+        self, user_id: str, embedding: List[float]
+    ) -> bool:
+        """Update the user's preference embedding"""
+        pass

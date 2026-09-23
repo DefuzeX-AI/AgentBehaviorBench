@@ -1,0 +1,304 @@
+"""Shared helpers for the two OpenAlex snapshot fetchers.
+
+Sources and institutions both pull from the OpenAlex S3 bucket, translate
+``s3://`` URLs to the public HTTPS gateway, and defend-in-depth against
+a compromised manifest by allowlisting the ``s3://openalex/`` prefix.
+This file owns those three shared symbols so ``openalex.py`` and
+``institutions.py`` don't duplicate them (and can't drift). It also
+owns the per-partition streaming helper they both use to iterate
+records with consistent malformed-line suppression and tmp-file
+lifecycle.
+"""
+
+from __future__ import annotations
+
+import gzip
+import hashlib
+import json
+from pathlib import Path
+from typing import Callable, Iterator, Tuple
+
+from loguru import logger
+
+# Public OpenAlex snapshot — CC0, no auth, no rate limits.
+# Manifest format documented at:
+#   https://docs.openalex.org/download-all-data/snapshot-data-format
+# Each entry in ``manifest["files"]`` (``manifest["entries"]`` before the
+# 2026-06 standard-format snapshot) has ``url`` (s3://...) and
+# ``meta.content_length`` / ``meta.record_count``. We translate s3:// to
+# the public HTTPS gateway so we don't need boto3.
+OPENALEX_S3_BASE = "https://openalex.s3.amazonaws.com"
+
+# Only fetch parts hosted under the OpenAlex public S3 bucket — defense
+# in depth on top of safe_get's private-IP block. A compromised or
+# malformed manifest could otherwise list arbitrary attacker-controlled
+# URLs.
+OPENALEX_MANIFEST_ALLOWED_PREFIX = "s3://openalex/"
+
+
+def s3_to_https(s3_url: str) -> str:
+    """Translate ``s3://openalex/...`` to the public HTTPS gateway."""
+    return s3_url.replace(
+        OPENALEX_MANIFEST_ALLOWED_PREFIX, OPENALEX_S3_BASE + "/", 1
+    )
+
+
+def validate_manifest_entries(entries: list[dict], label: str) -> None:
+    """Refuse to fetch if any manifest entry escapes the S3 allowlist.
+
+    Defense-in-depth: a compromised or tampered manifest could list
+    URLs outside the OpenAlex bucket. Refusing the whole fetch rather
+    than fetching some-and-not-others keeps failure modes simple.
+    """
+    for entry in entries:
+        raw = entry.get("url", "")
+        if not raw.startswith(OPENALEX_MANIFEST_ALLOWED_PREFIX):
+            raise ValueError(
+                f"{label} manifest contains disallowed URL "
+                f"(must start with {OPENALEX_MANIFEST_ALLOWED_PREFIX!r}): "
+                f"{raw!r}"
+            )
+
+
+# Per-partition retry budget. The default ``safe_get_with_retries``
+# budget (3 retries, 1-2-4 s backoff = ~7 s total) is sized for small
+# request bodies and trips on a sustained mid-stream S3 hiccup: every
+# retry of a ~5–10 MB partition that lands inside the same bad window
+# fails the same way, exhausts the budget in seconds, and aborts the
+# whole 30-partition pull. The release-gate workflow saw this twice in
+# a row on 2026-04-26.
+#
+# 5 retries with 2-5-10-20-40 s backoff rides out a ~75 s S3 blip
+# instead, while still bounding total wall-clock per partition at
+# roughly ``timeout * 6 + 77 s`` — well inside the 45 min job timeout
+# even if every partition needed all retries.
+_PARTITION_MAX_RETRIES = 5
+_PARTITION_BACKOFF_SECONDS = (2, 5, 10, 20, 40)
+
+_MD5_HEX_LENGTH = 32
+_HEX_DIGIT_CHARS = frozenset("0123456789abcdefABCDEF")
+
+
+def _normalize_md5(declared: object) -> str | None:
+    """Return a lowercase 32-hex digest from a manifest ``meta.md5`` value.
+
+    Accepts a bare hex digest or the same digest wrapped in one matching
+    pair of double quotes (the S3 ETag wire form for a non-multipart
+    object). Returns ``None`` for anything else — a multipart ETag
+    (``<hex>-<n>``), a base64 digest, the wrong length, non-hex
+    characters, or a non-string value — so the caller can skip
+    verification for this partition instead of comparing bytes against
+    a value that was never a valid md5 hex digest.
+    """
+    if not isinstance(declared, str):
+        return None
+    candidate = declared.strip()
+    if (
+        len(candidate) == _MD5_HEX_LENGTH + 2
+        and candidate[0] == '"'
+        and candidate[-1] == '"'
+    ):
+        candidate = candidate[1:-1]
+    if len(candidate) == _MD5_HEX_LENGTH and all(
+        c in _HEX_DIGIT_CHARS for c in candidate
+    ):
+        return candidate.lower()
+    return None
+
+
+def iter_partitions(
+    entries: list[dict],
+    data_dir: Path,
+    *,
+    file_prefix: str,
+    label: str,
+    safe_get: Callable,
+    timeout: int = 120,
+    max_retries: int = _PARTITION_MAX_RETRIES,
+    backoff_times: tuple = _PARTITION_BACKOFF_SECONDS,
+) -> Iterator[Tuple[int, int, Iterator[dict]]]:
+    """Download each partition, yielding ``(idx, total_parts, records)``.
+
+    Shared between ``openalex.py`` and ``institutions.py`` so the
+    tmp-file lifecycle and malformed-JSON suppression (first-10
+    warnings + one "further suppressed" notice) are defined once.
+
+    The caller iterates ``records`` for per-record work and is
+    responsible for per-partition progress logging and ``progress_cb``
+    invocations — those need caller-specific state (running record
+    count, schema-drift counters) that doesn't belong in the helper.
+
+    ``records`` decodes lazily and is valid only until this generator
+    is advanced — the gzip handle closes and the tmp file is removed
+    when the next partition is requested, so consume it in place.
+    Deferring it raises ``ValueError: I/O operation on closed file``.
+
+    Args:
+        entries: ``manifest["files"]`` — each dict has ``url``
+            starting with ``s3://openalex/``.
+        data_dir: Directory used for the transient ``.<prefix>_part_<n>.gz``
+            files. Cleaned up even on exception.
+        file_prefix: Leaf prefix for tmp files
+            (e.g. ``openalex_sources`` / ``openalex_institutions``).
+        label: Human-readable label used in log messages
+            (e.g. ``"OpenAlex sources"`` / ``"Institutions"``).
+        safe_get: Dependency-injected HTTP getter (lets the caller
+            pick ``safe_get_with_retries`` without forcing a global
+            import at module load). Must accept ``consume_body=True``
+            so body-stream transients (``ChunkedEncodingError``,
+            ``ReadTimeout``) raised during ``resp.content`` are
+            retried inside the wrapper, not propagated to abort the
+            whole multi-partition pull.
+        timeout: Per-partition HTTP timeout (seconds).
+        max_retries: Per-partition retry budget. Defaults higher than
+            ``safe_get_with_retries``' generic 3 because partition
+            bodies are MB-sized and a mid-stream IncompleteRead aborts
+            the whole multi-partition pull on exhaustion.
+        backoff_times: Per-attempt sleep schedule. Defaults to a
+            longer schedule than the generic ``safe_get_with_retries``
+            (1, 2, 4) so we ride out a sustained S3 blip instead of
+            burning all retries inside the same bad window.
+
+    Raises:
+        ValueError: If a partition's declared ``meta.content_length``
+            doesn't match the number of bytes actually received, or
+            its declared ``meta.md5`` (once normalized to a bare
+            digest) doesn't match the digest of the bytes received —
+            either aborts before anything is written to disk, so the
+            previous snapshot is left in place.
+    """
+    malformed_total = 0
+    total_parts = len(entries)
+
+    def decode(fh, idx: int) -> Iterator[dict]:
+        nonlocal malformed_total
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except (json.JSONDecodeError, ValueError):
+                malformed_total += 1
+                if malformed_total <= 10:
+                    logger.warning(
+                        f"{label} partition {idx}: skipping malformed JSON line"
+                    )
+                elif malformed_total == 11:
+                    logger.warning(
+                        f"{label} partition {idx}: further "
+                        "malformed lines suppressed"
+                    )
+                continue
+            yield rec
+
+    for idx, entry in enumerate(entries):
+        part_url = s3_to_https(entry["url"])
+        tmp_part = data_dir / f".{file_prefix}_part_{idx}.gz"
+
+        try:
+            # consume_body=True: an OpenAlex S3 partition is ~10 MB
+            # gzipped. A mid-stream ChunkedEncodingError /
+            # IncompleteRead would otherwise abort the whole 30+
+            # partition pull. With consume_body, safe_get_with_retries
+            # reads resp.content inside its retry loop and retries
+            # body-stream transients the same way it retries
+            # header-stage failures.
+            resp = safe_get(
+                part_url,
+                timeout=timeout,
+                consume_body=True,
+                max_retries=max_retries,
+                backoff_times=backoff_times,
+            )
+            resp.raise_for_status()
+            meta = entry.get("meta") or {}
+
+            # Transport-corruption check when the manifest declares an
+            # expected size: compressed bytes whose length doesn't match
+            # meta.content_length were truncated or corrupted in
+            # transit — refuse before writing them to disk. This is not
+            # an authentication check: the declared length comes from
+            # the same manifest fetch as the bytes it describes, so it
+            # can't detect a hostile origin, only a garbled download. A
+            # declared value that isn't a plain integer (a string,
+            # float, or bool) is logged and skipped rather than treated
+            # as a mismatch.
+            declared_length = meta.get("content_length")
+            if declared_length is not None:
+                if isinstance(declared_length, int) and not isinstance(
+                    declared_length, bool
+                ):
+                    actual_length = len(resp.content)
+                    if actual_length != declared_length:
+                        raise ValueError(
+                            f"{label} partition {idx}: content_length "
+                            f"mismatch — manifest declares "
+                            f"{declared_length} bytes but received "
+                            f"{actual_length} bytes; "
+                            "refusing possibly corrupted or truncated "
+                            "partition"
+                        )
+                else:
+                    shape = (
+                        f"{len(declared_length)}-character string"
+                        if isinstance(declared_length, str)
+                        else type(declared_length).__name__
+                    )
+                    logger.warning(
+                        f"{label} partition {idx}: manifest "
+                        f"content_length is not an integer ({shape}); "
+                        "skipping the size check for this partition"
+                    )
+
+            # Transport-corruption check when the manifest declares a
+            # digest: bytes that hash differently than meta.md5 were
+            # altered or corrupted in transit — refuse before writing
+            # them to disk. Like the content_length check above, this
+            # is not an authentication check: the digest comes from the
+            # same manifest fetch as the bytes it certifies, so a party
+            # able to substitute the partition can substitute the
+            # declared md5 too. A declared value that isn't a 32-hex
+            # digest (plain or ETag-quoted) is logged and skipped
+            # rather than treated as a mismatch.
+            declared_md5 = meta.get("md5")
+            if declared_md5 is not None:
+                normalized_md5 = _normalize_md5(declared_md5)
+                if normalized_md5 is None:
+                    shape = (
+                        f"{len(declared_md5)}-character string"
+                        if isinstance(declared_md5, str)
+                        else type(declared_md5).__name__
+                    )
+                    logger.warning(
+                        f"{label} partition {idx}: manifest md5 is not "
+                        f"a 32-character hex digest ({shape}); skipping "
+                        "the integrity check for this partition"
+                    )
+                else:
+                    actual_md5 = hashlib.md5(
+                        resp.content, usedforsecurity=False
+                    ).hexdigest()
+                    if actual_md5 != normalized_md5:
+                        raise ValueError(
+                            f"{label} partition {idx}: md5 mismatch — "
+                            f"manifest declares {normalized_md5!r} but "
+                            f"received {actual_md5!r}; refusing possibly "
+                            "corrupted partition"
+                        )
+
+            tmp_part.write_bytes(resp.content)
+            # Unpin the compressed body; the suspended frame would
+            # otherwise hold it until the caller drains the partition.
+            del resp
+
+            with gzip.open(tmp_part, "rt", encoding="utf-8") as fh:
+                yield idx, total_parts, decode(fh, idx)
+        finally:
+            tmp_part.unlink(missing_ok=True)
+
+    if malformed_total:
+        logger.warning(
+            f"{label}: {malformed_total:,} malformed lines skipped across "
+            f"{total_parts} partitions"
+        )
