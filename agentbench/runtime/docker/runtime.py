@@ -40,9 +40,17 @@ from agentbench.runtime.interception import (
 from .image_builder import DockerImageBuilder
 from .build_coordinator import BuildCoordinator
 from .command import DockerCommandRunner, DockerCommandTimeout
+from .egress_observer import (
+    EGRESS_PREFIX,
+    EgressObserverPolicy,
+    LocalEgressObserverImageProvider,
+    RunningEgressObserver,
+    default_egress_observer_image_provider,
+    observer_configuration,
+)
 from .interceptor_image import LocalInterceptorImageProvider, default_interceptor_image_provider
 from .interceptor_policy import InterceptorPolicy
-from .policy import DockerPolicy
+from .policy import DockerPolicy, EgressSettings
 from .session import DockerSession
 from .resources import ResourceRegistry
 from .worker_build import worker_build_context
@@ -78,6 +86,8 @@ class DockerRuntime:
         resource_registry: ResourceRegistry | None = None,
         limits: RuntimeLimits | None = None,
         command_environ: Mapping[str, str] | None = None,
+        egress_observer_image_provider: InterceptorImageProvider | None = None,
+        egress_sink: TraceSink | None = None,
     ) -> None:
         if trace_max_bytes < 1024:
             raise ValueError("trace_max_bytes must be at least 1024")
@@ -109,6 +119,13 @@ class DockerRuntime:
             interceptor_image_provider
             or default_interceptor_image_provider(self._images, self._environ)
         )
+        # A wrapping policy (e.g. KUMA's EvaluationPolicy) may not carry egress settings.
+        self._egress = EgressSettings.from_environment(self._environ, getattr(self._policy, "egress", None))
+        self._egress_observer_images = (
+            egress_observer_image_provider
+            or default_egress_observer_image_provider(self._images, self._environ)
+        )
+        self._egress_sink = egress_sink
         self._model_provider = model_provider
         self._trace_sink = trace_sink or NullTraceSink()
         self._trace_max_bytes = trace_max_bytes
@@ -162,6 +179,7 @@ class DockerRuntime:
         network_name = f"defuzex-{suffix}-egress"
         agent_name = f"defuzex-{suffix}-agent"
         interceptor: RunningModelInterceptor | None = None
+        egress_observer: RunningEgressObserver | None = None
         trace_state: InterceptionTraceState | None = None
         planned_network = False
         planned_agent = False
@@ -206,6 +224,12 @@ class DockerRuntime:
                         interceptor.close(deadline=deadline)
                     except Exception as exc:
                         errors.append(str(exc))
+                if egress_observer is not None:
+                    # Nothing can reach the observer once the interceptor is gone.
+                    try:
+                        egress_observer.close(deadline=deadline)
+                    except Exception as exc:
+                        errors.append(str(exc))
                 if planned_network:
                     # Remove the Docker network created for this job last.
                     try:
@@ -228,6 +252,11 @@ class DockerRuntime:
                 self._create_resource("network", network_name,
                                       ["network", "create", *self._labels("network", suffix), network_name],
                                       deadline=preparation)
+                if self._egress.mode == "observe":
+                    # Non-model traffic goes to its own service and event stream.
+                    egress_observer = self._start_egress_observer(
+                        agent_id=config.agent_id, suffix=suffix,
+                        network_name=network_name, deadline=preparation)
                 # Start the interceptor before routing Agent traffic through it.
                 interceptor, token_environment = self._start_interceptor(
                     agent_id=config.agent_id,
@@ -236,6 +265,10 @@ class DockerRuntime:
                     network_name=network_name,
                     trace_state=trace_state,
                     deadline=preparation,
+                    egress_proxy=(
+                        (egress_observer.container_name, egress_observer.port)
+                        if egress_observer is not None else None
+                    ),
                 )
                 agent_environment.update(interception.environment)
                 agent_environment.update(token_environment)
@@ -363,6 +396,7 @@ class DockerRuntime:
         network_name: str,
         trace_state: InterceptionTraceState,
         deadline: Deadline | None = None,
+        egress_proxy: tuple[str, int] | None = None,
     ) -> tuple[RunningModelInterceptor, dict[str, str]]:
         if deadline is not None:
             deadline.check()
@@ -387,7 +421,7 @@ class DockerRuntime:
             service_data, token_environment = prepare_service_config(
                 interception, agent_id=agent_id, max_trace_bytes=self._trace_max_bytes,
                 secret_dir=secret_dir, secret_resolver=self._secret_resolver,
-                environ=self._environ, model_provider=self._model_provider)
+                environ=self._environ, model_provider=self._model_provider, egress_proxy=egress_proxy)
             config_file.write_text(json.dumps(service_data, ensure_ascii=False), encoding='utf-8')
 
             command = [
@@ -455,6 +489,115 @@ class DockerRuntime:
             ),
             token_environment,
         )
+
+    def _start_egress_observer(
+        self, *, agent_id: str, suffix: str, network_name: str, deadline: Deadline | None = None,
+    ) -> RunningEgressObserver:
+        if deadline is not None:
+            deadline.check()
+        if isinstance(self._egress_observer_images, LocalEgressObserverImageProvider):
+            image = self._egress_observer_images.resolve_image(deadline=deadline, log_directory=self._build_logs())
+        else:
+            image = self._egress_observer_images.resolve_image()
+        self._run("image", "inspect", image, deadline=deadline)
+        container_name = f"defuzex-{suffix}-egress-observer"
+        policy = EgressObserverPolicy(dns_servers=getattr(self._interceptor_policy, "dns_servers", ()))
+        command = [
+            "run", "--detach", "--init", "--name", container_name,
+            *self._labels("egress-observer", suffix),
+            "--network", network_name,
+            *policy.run_arguments(),
+            "--env", "ABB_EGRESS_CONFIG=" + observer_configuration(agent_id, self._egress),
+            image,
+        ]
+        planned = False
+        log_process = reader = None
+        try:
+            self._plan_resource("container", container_name, "egress-observer", suffix)
+            planned = True
+            self._create_resource("container", container_name, command, deadline=deadline)
+            self._wait_for_egress_observer(container_name, deadline=deadline)
+            log_process, reader = self._follow_egress(container_name)
+        except BaseException as original:
+            try:
+                if planned:
+                    self._remove_resource("container", container_name)
+            except DockerCleanupError as exc:
+                raise exc from original
+            finally:
+                if log_process is not None:
+                    DockerCommandRunner.terminate(log_process)
+            raise
+
+        def close(deadline: Deadline | None = None) -> None:
+            try:
+                self._remove_resource("container", container_name, deadline=deadline)
+            finally:
+                DockerCommandRunner.terminate(log_process)
+                reader.join(timeout=2)
+
+        return RunningEgressObserver(container_name=container_name, _close=close)
+
+    def _wait_for_egress_observer(self, container_name: str, *, deadline: Deadline | None = None) -> None:
+        startup = Deadline.after(self._limits.startup_seconds)
+        deadline = startup if deadline is None else Deadline(min(startup.expires_at, deadline.expires_at))
+        while deadline.remaining():
+            self.control.check()
+            logs = self._run_quiet("logs", container_name, capture=True, deadline=deadline)
+            if logs is not None and '"event": "egress_ready"' in logs.stdout:
+                return
+            state = self._run_quiet("inspect", "--format", "{{.State.Running}}", container_name,
+                                    capture=True, deadline=deadline)
+            if state is not None and state.stdout.strip() == "false":
+                detail = ((logs.stdout + logs.stderr).strip() if logs is not None else "")[-2000:]
+                raise DockerRuntimeError(f"Egress observer stopped during startup{': ' + detail if detail else ''}")
+            self.control.wait(min(0.25, deadline.remaining()))
+        raise DockerRuntimeError("Egress observer did not become ready within its startup budget")
+
+    def _egress_event_sink(self) -> TraceSink:
+        if self._egress_sink is not None:
+            return self._egress_sink
+        if self.artifact_root is None:
+            return NullTraceSink()
+        from agentbench.observe.store import TraceStore
+        # Kept beside network.jsonl, never mixed into it: model and non-model
+        # traffic are accounted for separately.
+        self._egress_sink = TraceStore(self.artifact_root / "egress.jsonl",
+                                       self.run_id or self.artifact_root.name, source="egress-observer",
+                                       context=self.identity, environ=self._environ)
+        return self._egress_sink
+
+    def _follow_egress(self, container_name: str) -> tuple[subprocess.Popen[str], threading.Thread]:
+        sink = self._egress_event_sink()
+        process = self._commands.start(
+            ["logs", "--follow", container_name], control=self.control,
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            text=True, encoding="utf-8", errors="replace", bufsize=1,
+        )
+        if process.stdout is None:  # pragma: no cover - subprocess contract
+            raise DockerRuntimeError("Docker egress stream was not created")
+
+        def consume() -> None:
+            assert process.stdout is not None
+            try:
+                for line in process.stdout:
+                    event = TraceEvent.from_log_line(line.rstrip("\r\n"), prefix=EGRESS_PREFIX)
+                    if event is not None:
+                        # Egress is behavior evidence only; it never gates model trace acceptance.
+                        sink.emit(event)
+            except Exception as exc:
+                # Losing egress records must not reject the Case (#137), but the gap
+                # is recorded next to the model trace so nobody reads it as "no egress".
+                try:
+                    self._trace_sink.emit(TraceEvent("egress_capture_failed", {"error": type(exc).__name__}))
+                except Exception:
+                    pass
+            finally:
+                process.stdout.close()
+
+        reader = threading.Thread(target=consume, daemon=True, name=f"{container_name}-egress")
+        reader.start()
+        return process, reader
 
     def _follow_trace(
         self, container_name: str, trace_state: InterceptionTraceState

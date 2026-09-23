@@ -21,11 +21,11 @@ class TraceEvent:
     data: Mapping[str, object]
 
     @classmethod
-    def from_log_line(cls, line: str) -> "TraceEvent | None":
-        if not line.startswith(TRACE_PREFIX):
+    def from_log_line(cls, line: str, prefix: str = TRACE_PREFIX) -> "TraceEvent | None":
+        if not line.startswith(prefix):
             return None
         try:
-            payload = json.loads(line[len(TRACE_PREFIX) :])
+            payload = json.loads(line[len(prefix) :])
         except json.JSONDecodeError:
             return None
         if not isinstance(payload, dict):
@@ -51,8 +51,10 @@ class InterceptionTraceState:
     """Track recorded request terminal states, independently of Agent success.
 
     An observed upstream/transport failure ends a call without inventing a
-    response. Policy, authentication, conversion and capture failures still
-    reject evidence. A transport error alone does not identify who cancelled.
+    response. Authentication, conversion and capture failures still reject
+    evidence. A transport error alone does not identify who cancelled. A refused
+    non-model destination is the Agent's behavior, not lost evidence (#137): it
+    is counted and reported, and acceptance still requires completed model calls.
     """
 
     def __init__(self) -> None:
@@ -72,6 +74,7 @@ class InterceptionTraceState:
         self._auxiliary_pending: set[str] = set()
         self._required_pending: set[str] = set()
         self._operation_failure: str | None = None
+        self._denied: set[str] = set()
 
     def fail(self, error: Exception | None = None) -> None:
         """A failed trace write must never count as a completed observation."""
@@ -113,6 +116,8 @@ class InterceptionTraceState:
                 self._errors[call_id] = code if isinstance(code, str) else 'unclassified'
                 if code in {'transport_error', 'upstream_error'}:
                     self._terminated.add(call_id)
+                elif code == 'egress_denied' and event.data.get('request_kind') != 'model':
+                    self._denied.add(call_id)
                 else:
                     self._failed = True
                     self._note_rejection(event, call_id, self._errors[call_id])
@@ -158,6 +163,8 @@ class InterceptionTraceState:
             text = (f'requests={len(self._requests)}, responses={len(self._responses)}, '
                     f'observed_failures={len(self._terminated)}, unfinished={len(unfinished)}, '
                     f'errors={",".join(codes) or "none"}, capture_rejected={self._failed}')
+            if self._denied:
+                text += f', egress_denied={len(self._denied)}'
             if self._first_rejection is not None:
                 text += f', first_rejection={self._first_rejection}'
             first_unfinished = next((call for call in self._request_order if call in unfinished), None)

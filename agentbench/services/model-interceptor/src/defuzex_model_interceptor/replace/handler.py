@@ -51,7 +51,8 @@ class ReplaceInterceptor(CommonInterceptor):
             events.emit('tool_request', **self._tool_fields(flow), **self._body(flow.request))
             return
         if route is None:
-            self._error(flow, "Undeclared network request blocked", 403, code=ErrorCode.EGRESS_DENIED)
+            if not self._hand_off_egress(flow):
+                self._error(flow, "Undeclared network request blocked", 403, code=ErrorCode.EGRESS_DENIED)
             return
         flow.metadata["defuzex_route"] = route.route_id
         flow.metadata["defuzex_resolved_route"] = route

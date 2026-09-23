@@ -106,6 +106,14 @@ Judge pass. Check [the registry](../resources/registry.toml) for current selecti
 `ABB_MAX_PARALLEL_CASES=4` permits up to four Cases across the Suite, including
 Cases of the same Agent. It does not limit tool concurrency inside an Agent.
 
+Agent traffic that is neither a declared model route nor a tool route goes to the
+[egress observer](../agentbench/services/egress-observer/README.md). It admits the common
+package registries (PyPI, npm, Debian/Ubuntu, Maven Central, crates.io, Go proxy), so a
+tool's `pip install` works, and refuses everything else. Every attempt is written to
+`egress.jsonl`, next to the model traffic in `network.jsonl`. A refusal is recorded as
+Agent behavior and does not reject the Case. `ABB_EGRESS_ALLOW=host[:port],...` adds
+destinations; `ABB_EGRESS=deny` refuses all of this traffic in the interceptor instead.
+
 ## Smoke-test an Agent without KUMA credit
 
 `--sdk local` runs the same container, model interception and host trace checks as
