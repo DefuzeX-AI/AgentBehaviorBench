@@ -1,0 +1,54 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "ai-data-science-team"
+display_name = "40 ai-data-science-team Pandas Data Analyst (hand-written configuration)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+repository = "https://github.com/business-science/ai-data-science-team"
+revision = "4ffeb7f38178aa250917f29b01355f8b89ba809e"
+downloaded_on = "2026-09-23"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 1800
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+# log=False (as in the app), so upstream writes no ./logs/ files; HOME=/tmp is the only writable home.
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+config = "abb-langgraph.json"
+graph_id = "agent"
+input_key = "message"
+output_key = "answer"
+binding = "bridge.py:create_graph"
+
+[llm_interception]
+required = true
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
