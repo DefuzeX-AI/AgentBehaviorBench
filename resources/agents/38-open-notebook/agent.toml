@@ -1,0 +1,59 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "open-notebook"
+display_name = "Open Notebook chat (hand-written configuration, GLM provider)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+repository = "https://github.com/lfnovo/open-notebook"
+revision = "3127f14ea9dbb519f0e4ddc64a0742ca644ba6ef"
+downloaded_on = "2026-09-23"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 600
+env_keys = ["GLM_API_BASE_URL", "GLM_MODEL"]
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+# The binding switches to a disposable directory under /tmp before importing
+# open_notebook (its config creates ./data under the working directory).
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+# Upstream ships no langgraph.json; abb-langgraph.json only names upstream's compiled
+# chat graph (open_notebook/graphs/chat.py:graph). The binding drives that graph.
+config = "abb-langgraph.json"
+graph_id = "agent"
+input_key = "message"
+output_key = "answer"
+binding = "bridge.py:create_graph"
+
+[llm_interception]
+required = true
+trust_plugin = "pem-env"
+network_config = "network/rules.toml"
+
+[[llm_interception.credentials]]
+id = "glm-api-key"
+agent_env = "GLM_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "glm-openai-chat"
+host_patterns = ["open.bigmodel.cn"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/api/coding/paas/v4/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "glm-api-key"

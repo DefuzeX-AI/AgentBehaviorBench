@@ -1,0 +1,22 @@
+schema_version = "abb.network.v1"
+
+# jcode's built-in coding tools (read/write/edit/patch, bash, grep, ls) run
+# locally inside the jcode daemon and need no network routes. bootstrap/launch.py
+# turns off telemetry, update checks, the models.dev pricing refresh, memory
+# sidecar, swarm, ambient mode and integration discovery, and the provider
+# profile has a static model list, so no GET <base>/models inventory call is made.
+# The only admitted model route is declared in agent.toml [[llm_interception.routes]].
+
+# While a named OpenAI-compatible profile is active, jcode's background catalog
+# sweep (about 10 s after daemon start, then every 60 s) also treats its built-in
+# keyless local profiles, Ollama (localhost:11434) and LM Studio (localhost:1234),
+# as configured and asks them for a model list. Nothing listens on those ports in
+# the container, so the probe fails locally; these loopback-only routes keep it
+# from being reported as undeclared egress. No request leaves the container.
+[[tool_routes]]
+host_patterns = ["localhost", "127.0.0.1"]
+ports = [11434, 1234]
+methods = ["GET"]
+path_patterns = ["/v1/models"]
+purpose = "metadata"
+required = false
