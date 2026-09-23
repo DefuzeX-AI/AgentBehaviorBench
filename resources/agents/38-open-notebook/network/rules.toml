@@ -1,0 +1,18 @@
+schema_version = "abb.network.v1"
+
+# Open Notebook's chat graph has no tools; the only admitted model route is declared
+# in agent.toml [[llm_interception.routes]].
+
+# Loopback only: the binding starts SurrealDB (upstream's database) in the same
+# container on 127.0.0.1:18765 (pinned in bindings/bridge.py), as upstream's own
+# `single` image does. The SurrealDB Python SDK talks to it over one WebSocket per
+# repository call (HTTP upgrade on GET /rpc). The runtime redirects every non-root
+# TCP connection, loopback included, to the interceptor, so without this route the
+# upgrade is rejected as undeclared egress. The traffic never leaves the container.
+[[tool_routes]]
+host_patterns = ["127.0.0.1"]
+ports = [18765]
+methods = ["GET"]
+path_patterns = ["/rpc"]
+purpose = "tool"
+required = false
