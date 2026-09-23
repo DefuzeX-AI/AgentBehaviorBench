@@ -1,0 +1,99 @@
+[project]
+name = "open-notebook"
+version = "1.14.0"
+description = "An open source implementation of a research assistant, inspired by Google Notebook LM"
+authors = [
+    {name = "Luis Novo", email = "lfnovo@gmail.com"}
+]
+readme = "README.md"
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+]
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "pydantic>=2.9.2",
+    "loguru>=0.7.2",
+    "langchain>=1.3.9,<2",
+    "langchain-core>=1.4.6,<2",
+    "langchain-text-splitters>=1.1.2,<2",
+    "langgraph>=1.0.5,<2",
+    "tiktoken>=0.12.0",
+    "langgraph-checkpoint-sqlite>=3.1.1,<4",
+    # The langchain-* provider packages below have no direct imports in this
+    # codebase: they are runtime requirements of esperanto's dynamic
+    # `to_langchain()` (esperanto declares them only as optional extras).
+    # deepseek/xai/openrouter/openai-compatible all route through
+    # langchain-openai, so no dedicated packages are needed for them.
+    "langchain-openai>=1.1.14,<2",
+    "langchain-anthropic>=1.4.6,<2",
+    "langchain-ollama>=1.0.1,<2",
+    "langchain-google-genai>=4.1.2,<5",
+    "langchain-groq>=1.1.1,<2",
+    "langchain-mistralai>=1.1.1,<2",
+    "tomli>=2.0.2",
+    "python-dotenv>=1.2.2",
+    "httpx[socks]>=0.27.0",
+    "content-core>=2.0.7,<3",
+    "ai-prompter>=0.4,<1",
+    "esperanto>=2.25.1,<3",
+    "surrealdb>=1.0.4",
+    "podcast-creator>=0.12.0,<1",
+    "surreal-commands>=1.3.1,<2",
+    "numpy>=2.4.1",
+    "pycountry>=26.2.16",
+    "babel>=2.18.0",
+]
+
+[tool.setuptools]
+package-dir = {"open_notebook" = "open_notebook"}
+
+[tool.setuptools.package-data]
+open_notebook = ["ai/assets/*"]
+
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.11.1",
+    "pre-commit>=4.1.0",
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.2.0",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.14.13",
+    "types-requests>=2.32.4.20250913",
+]
+notebooks = [
+    "ipykernel>=6.29.5",
+    "ipywidgets>=8.1.5",
+]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = [
+    "E501",  # line too long
+    "E402",  # module level import not at top of file (Streamlit requires this pattern)
+    "F541",  # f-string without placeholders
+]
+
+[tool.uv]
+# Pillow < 12.2.0 has open security advisories (PSD OOB write, FITS
+# decompression bomb, PDF trailer DoS). The only thing holding it back is
+# moviepy's `pillow<12` cap, pulled in via podcast-creator 0.12.0 — and
+# moviepy only touches PIL in its video modules, which the audio-only podcast
+# pipeline never imports. Drop this override once podcast-creator ships a
+# release without moviepy (already removed on its main branch).
+override-dependencies = ["pillow>=12.2.0"]
