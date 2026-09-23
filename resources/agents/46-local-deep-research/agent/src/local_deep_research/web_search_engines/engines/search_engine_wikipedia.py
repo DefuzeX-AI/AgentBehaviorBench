@@ -1,0 +1,360 @@
+import json
+from typing import Any, Dict, List, Optional
+
+import requests
+import wikipedia
+from langchain_core.language_models import BaseLLM
+
+from ..search_engine_base import BaseSearchEngine, Exposure, Sensitivity
+from ...security import sanitize_for_log
+from ...security.secure_logging import logger
+
+
+# Wikipedia / MediaWiki returns a non-JSON HTML body with HTTP 429 when a
+# client is rate-limited. The `wikipedia` PyPI library calls
+# ``Response.json()`` unconditionally, so the symptom we observe is a
+# ``JSONDecodeError`` on every subsequent ``wikipedia.summary()`` call.
+# Catch that family explicitly so we can short-circuit instead of
+# emitting a full traceback per title (the original behaviour spammed
+# the log with 14+ stack traces for a single rate-limited query).
+_TRANSIENT_DECODE_ERRORS: tuple = (
+    json.JSONDecodeError,
+    requests.exceptions.JSONDecodeError,
+)
+
+
+class WikipediaSearchEngine(BaseSearchEngine):
+    """Wikipedia search engine implementation with two-phase approach"""
+
+    # Mark as public search engine
+    is_public = True
+    egress_sensitivity = Sensitivity.NON_SENSITIVE
+    egress_exposure = Exposure.EXPOSING
+    is_lexical = True
+    needs_llm_relevance_filter = True
+
+    def __init__(
+        self,
+        max_results: int = 10,
+        language: str = "en",
+        include_content: bool = True,
+        sentences: int = 5,
+        llm: Optional[BaseLLM] = None,
+        max_filtered_results: Optional[int] = None,
+        settings_snapshot: Optional[Dict[str, Any]] = None,
+        **kwargs,
+    ):
+        """
+        Initialize the Wikipedia search engine.
+
+        Args:
+            max_results: Maximum number of search results
+            language: Language code for Wikipedia (e.g., 'en', 'fr', 'es')
+            include_content: Whether to include full page content in results
+            sentences: Number of sentences to include in summary
+            llm: Language model for relevance filtering
+            max_filtered_results: Maximum number of results to keep after filtering
+            **kwargs: Additional parameters (ignored but accepted for compatibility)
+        """
+        # Initialize the BaseSearchEngine with LLM, max_filtered_results, and max_results
+        super().__init__(
+            llm=llm,
+            max_filtered_results=max_filtered_results,
+            max_results=max_results,
+            settings_snapshot=settings_snapshot,
+        )
+        self.include_content = include_content
+        self.sentences = sentences
+
+        # Set the Wikipedia language
+        wikipedia.set_lang(language)
+
+    def _get_previews(self, query: str) -> List[Dict[str, Any]]:
+        """
+        Get preview information (titles and summaries) for Wikipedia pages.
+
+        Args:
+            query: The search query
+
+        Returns:
+            List of preview dictionaries
+        """
+        logger.info("Getting Wikipedia page previews")
+
+        try:
+            # Apply rate limiting before search request
+            self._last_wait_time = self.rate_tracker.apply_rate_limit(
+                self.engine_type
+            )
+
+            # Get search results (just titles)
+            search_results = wikipedia.search(query, results=self.max_results)
+            safe_search_results = [
+                sanitize_for_log(title) for title in search_results
+            ]
+
+            logger.info(
+                f"Found {len(search_results)} Wikipedia results: "
+                f"{safe_search_results}"
+            )
+
+            if not search_results:
+                logger.info("No Wikipedia results found")
+                return []
+
+            # Generate previews with summaries.
+            # NOTE: This loop is intentionally sequential. Do NOT parallelize with
+            # ThreadPoolExecutor because:
+            # 1. The `wikipedia` PyPI library is not thread-safe — it uses global
+            #    mutable state (API_URL, RATE_LIMIT_LAST_CALL) and an unlocked cache.
+            #    Concurrent threads would corrupt the library's built-in rate limiting.
+            # 2. self._last_wait_time is a shared instance attribute with no lock —
+            #    concurrent writes would feed incorrect data to record_outcome().
+            # 3. Downstream _filter_for_relevance uses positional indices — random
+            #    completion order would cause the LLM to select wrong articles.
+            previews = []
+            for title in search_results:
+                safe_title = sanitize_for_log(title)
+                try:
+                    # Get just the summary, with auto_suggest=False to be more precise
+                    summary = None
+                    try:
+                        # Apply rate limiting before summary request
+                        self._last_wait_time = (
+                            self.rate_tracker.apply_rate_limit(self.engine_type)
+                        )
+
+                        summary = wikipedia.summary(
+                            title, sentences=self.sentences, auto_suggest=False
+                        )
+                    except wikipedia.exceptions.DisambiguationError as e:
+                        # If disambiguation error, try the first option
+                        if e.options and len(e.options) > 0:
+                            # Page titles are external content; sanitize
+                            # before interpolation to prevent log injection.
+                            first_option = e.options[0]
+                            safe_first_option = sanitize_for_log(first_option)
+                            logger.info(
+                                f"Disambiguation for '{safe_title}', trying "
+                                f"first option: {safe_first_option}"
+                            )
+                            try:
+                                summary = wikipedia.summary(
+                                    first_option,
+                                    sentences=self.sentences,
+                                    auto_suggest=False,
+                                )
+                                title = first_option  # Use the new title
+                            except Exception as inner_e:
+                                safe_msg = self._scrub_error(inner_e)
+                                logger.exception(
+                                    f"Error with disambiguation option ({type(inner_e).__name__}): {safe_msg}"
+                                )
+                                continue
+                        else:
+                            logger.warning(
+                                f"Disambiguation with no options for '{safe_title}'"
+                            )
+                            continue
+
+                    if summary:
+                        preview = {
+                            "id": title,  # Use title as ID
+                            "title": title,
+                            "snippet": summary,
+                            "link": f"https://en.wikipedia.org/wiki/{title.replace(' ', '_')}",
+                            "source": "Wikipedia",
+                        }
+
+                        previews.append(preview)
+
+                except (
+                    wikipedia.exceptions.PageError,
+                    wikipedia.exceptions.WikipediaException,
+                ):
+                    # Skip pages with errors
+                    logger.warning(f"Error getting summary for '{safe_title}'")
+                    continue
+                except _TRANSIENT_DECODE_ERRORS:
+                    # MediaWiki almost certainly returned a 429 (or other
+                    # non-JSON page) — every remaining title in this batch
+                    # will hit the same throttle. Bail out with one warning
+                    # instead of a per-title traceback storm.
+                    logger.warning(
+                        "Wikipedia rate-limited (non-JSON response while "
+                        "fetching '{}'); returning {} previews collected so far",
+                        safe_title,
+                        len(previews),
+                    )
+                    break
+                except Exception as e:
+                    safe_msg = self._scrub_error(e)
+                    logger.exception(
+                        f"Unexpected error for '{safe_title}' "
+                        f"({type(e).__name__}): {safe_msg}"
+                    )
+                    continue
+
+            logger.info(
+                f"Successfully created {len(previews)} previews from Wikipedia"
+            )
+            return previews
+
+        except _TRANSIENT_DECODE_ERRORS:
+            # Same 429-style failure on the outer wikipedia.search() call —
+            # log once at warning level and return an empty list.
+            logger.warning(
+                "Wikipedia rate-limited on search; returning no previews"
+            )
+            return []
+        except Exception as e:
+            safe_msg = self._scrub_error(e)
+            logger.exception(
+                f"Error getting Wikipedia previews ({type(e).__name__}): {safe_msg}"
+            )
+            return []
+
+    def _get_full_content(
+        self, relevant_items: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Get full content for the relevant Wikipedia pages.
+
+        Args:
+            relevant_items: List of relevant preview dictionaries
+
+        Returns:
+            List of result dictionaries with full content
+        """
+        logger.info(
+            f"Getting full content for {len(relevant_items)} relevant Wikipedia pages"
+        )
+
+        results = []
+        for item in relevant_items:
+            title = item.get("id")  # Title stored as ID
+
+            if not title:
+                results.append(item)
+                continue
+
+            safe_title = sanitize_for_log(str(title))
+            try:
+                # Apply rate limiting before page request
+                self._last_wait_time = self.rate_tracker.apply_rate_limit(
+                    self.engine_type
+                )
+
+                # Get the full page
+                page = wikipedia.page(title, auto_suggest=False)
+
+                # Create a full result with all information
+                result = {
+                    "title": page.title,
+                    "link": page.url,
+                    "snippet": item.get("snippet", ""),  # Keep existing snippet
+                    "source": "Wikipedia",
+                }
+
+                # Add additional information
+                result["content"] = page.content
+                result["full_content"] = page.content
+                result["categories"] = page.categories
+                result["references"] = page.references
+                result["links"] = page.links
+                result["images"] = page.images
+                result["sections"] = page.sections
+
+                results.append(result)
+
+            except (
+                wikipedia.exceptions.DisambiguationError,
+                wikipedia.exceptions.PageError,
+                wikipedia.exceptions.WikipediaException,
+            ):
+                # If error, use the preview
+                logger.warning(f"Error getting full content for '{safe_title}'")
+                results.append(item)
+            except Exception as e:
+                safe_msg = self._scrub_error(e)
+                logger.exception(
+                    f"Unexpected error getting full content for "
+                    f"'{safe_title}' ({type(e).__name__}): {safe_msg}"
+                )
+                results.append(item)
+
+        return results
+
+    def get_summary(self, title: str, sentences: Optional[int] = None) -> str:
+        """
+        Get a summary of a specific Wikipedia page.
+
+        Args:
+            title: Title of the Wikipedia page
+            sentences: Number of sentences to include (defaults to self.sentences)
+
+        Returns:
+            Summary of the page
+        """
+        sentences = sentences or self.sentences
+        try:
+            return str(
+                wikipedia.summary(
+                    title, sentences=sentences, auto_suggest=False
+                )
+            )
+        except wikipedia.exceptions.DisambiguationError as e:
+            if e.options and len(e.options) > 0:
+                return str(
+                    wikipedia.summary(
+                        e.options[0], sentences=sentences, auto_suggest=False
+                    )
+                )
+            raise
+
+    def get_page(self, title: str) -> Dict[str, Any]:
+        """
+        Get detailed information about a specific Wikipedia page.
+
+        Args:
+            title: Title of the Wikipedia page
+
+        Returns:
+            Dictionary with page information
+        """
+        include_content = self.include_content
+
+        try:
+            page = wikipedia.page(title, auto_suggest=False)
+
+            result = {
+                "title": page.title,
+                "link": page.url,
+                "snippet": self.get_summary(title, self.sentences),
+                "source": "Wikipedia",
+            }
+
+            # Add additional information if requested
+            if include_content:
+                result["content"] = page.content
+                result["full_content"] = page.content
+                result["categories"] = page.categories
+                result["references"] = page.references
+                result["links"] = page.links
+                result["images"] = page.images
+                result["sections"] = page.sections
+
+            return result
+        except wikipedia.exceptions.DisambiguationError as e:
+            if e.options and len(e.options) > 0:
+                return self.get_page(e.options[0])
+            raise
+
+    def set_language(self, language: str) -> None:
+        """
+        Change the Wikipedia language.
+
+        Args:
+            language: Language code (e.g., 'en', 'fr', 'es')
+        """
+        wikipedia.set_lang(language)

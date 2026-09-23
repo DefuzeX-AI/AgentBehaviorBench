@@ -1,0 +1,1764 @@
+{% extends "base.html" %}
+{% from "components/help_macros.html" import tooltip, help_panel, help_step, help_tip, privacy_note %}
+{% set active_page = 'metrics' %}
+{% block title %}Metrics Dashboard - Deep Research System{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="/static/css/metrics.css">
+{% endblock %}
+{% block content %}
+<div class="ldr-page active" id="metrics">
+    <div class="ldr-page-header" style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <h1>Metrics Dashboard</h1>
+            <a href="/metrics/star-reviews" class="ldr-nav-link-btn ldr-nav-accent">
+                ⭐ Star Reviews
+            </a>
+            <a href="/metrics/costs" class="ldr-nav-link-btn ldr-nav-success">
+                💰 Cost Analytics
+            </a>
+            <a href="/metrics/context-overflow" class="ldr-nav-link-btn ldr-nav-warning">
+                ⚠️ Context Overflow
+            </a>
+            <a href="/metrics/links" class="ldr-nav-link-btn ldr-nav-info">
+                🔗 Link Analytics
+            </a>
+            <a href="{{ url_for('metrics.journal_quality') }}" class="ldr-nav-link-btn ldr-nav-accent">
+                📔 Journals
+            </a>
+        </div>
+        <div style="display: flex; gap: 2rem; align-items: center;">
+            <!-- Research Mode Filter -->
+            <div class="ldr-time-range-selector">
+                <span style="color: var(--text-secondary); margin-right: 0.5rem; font-size: 0.875rem;">Research Mode:</span>
+                <button class="ldr-time-range-btn" data-mode="quick">Quick Summary</button>
+                <button class="ldr-time-range-btn" data-mode="detailed">Detailed</button>
+                <button class="ldr-time-range-btn active" data-mode="all">All</button>
+            </div>
+            <!-- Time Range Filter -->
+            <div class="ldr-time-range-selector">
+                <span style="color: var(--text-secondary); margin-right: 0.5rem; font-size: 0.875rem;">Time Range:</span>
+                <button class="ldr-time-range-btn active" data-period="30d">30D</button>
+                <button class="ldr-time-range-btn" data-period="7d">7D</button>
+                <button class="ldr-time-range-btn" data-period="3m">3M</button>
+                <button class="ldr-time-range-btn" data-period="1y">1Y</button>
+                <button class="ldr-time-range-btn" data-period="all">All</button>
+            </div>
+        </div>
+    </div>
+    <!-- Understanding Metrics Help Panel -->
+    {% call help_panel('metrics-how', 'Understanding Metrics', icon='tachometer-alt', collapsed=true, dismissible=true) %}
+    <div class="ldr-help-steps">
+        {{ help_step(1, "Token Usage", "Tokens are pieces of text (roughly 4 characters or 3/4 of a word). Higher token counts = longer research but more thorough results.") }}
+        {{ help_step(2, "Cost Estimates", "Costs are calculated from token usage and model pricing. Local models (Ollama) show $0.00 as they run on your hardware.") }}
+        {{ help_step(3, "Performance", "Response time and success rate help identify slow or problematic model configurations.") }}
+        {{ help_step(4, "Ratings", "Your satisfaction ratings help track which models and settings produce the best results for your needs.") }}
+    </div>
+    {{ privacy_note("All metrics are calculated locally. Your usage data never leaves your device.") }}
+    {% endcall %}
+    <div id="loading" class="ldr-loading-spinner">
+        <i class="fas fa-spinner fa-spin fa-2x"></i>
+        <p>Loading metrics...</p>
+    </div>
+    <div id="error" class="ldr-error-message" style="display: none;">
+        <i class="fas fa-exclamation-circle fa-2x"></i>
+        <p>Error loading metrics</p>
+    </div>
+    <div id="metrics-content" style="display: none;">
+        <!-- Key Metrics Overview -->
+        <div class="ldr-card">
+            <div class="card-header">
+                <h2><i class="fas fa-tachometer-alt"></i> System Overview</h2>
+            </div>
+            <div class="ldr-card-content">
+                <!-- Primary Metrics -->
+                <div class="ldr-metrics-grid">
+                    <div class="ldr-metric-card ldr-expandable-card">
+                        <div class="ldr-metric-main" id="token-toggle-btn" onclick="toggleTokenDetails()" role="button" tabindex="0" aria-expanded="false" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+                            <div class="ldr-metric-icon">
+                                <i class="fas fa-coins"></i>
+                            </div>
+                            <div class="ldr-metric-label ldr-tooltip" data-tooltip="Total input + output tokens consumed by all LLM calls in the selected time period">
+                                Total Tokens Used
+                                <i class="fas fa-info-circle ldr-info-icon"></i>
+                            </div>
+                            <div class="ldr-metric-value" id="total-tokens">0</div>
+                            <div class="ldr-expand-icon">
+                                <i class="fas fa-chevron-down" id="token-expand-icon"></i>
+                            </div>
+                        </div>
+                        <div class="ldr-metric-details" id="token-details" style="display: none;">
+                            <div class="ldr-token-breakdown">
+                                <div class="ldr-breakdown-section">
+                                    <h4 class="ldr-tooltip" data-tooltip="Average tokens consumed per research session">Average</h4>
+                                    <div class="ldr-breakdown-grid">
+                                        <div class="ldr-breakdown-item">
+                                            <span class="ldr-breakdown-label">Input:</span>
+                                            <span class="ldr-breakdown-value" id="avg-input-tokens">0</span>
+                                        </div>
+                                        <div class="ldr-breakdown-item">
+                                            <span class="ldr-breakdown-label">Output:</span>
+                                            <span class="ldr-breakdown-value" id="avg-output-tokens">0</span>
+                                        </div>
+                                        <div class="ldr-breakdown-item ldr-total">
+                                            <span class="ldr-breakdown-label">Total:</span>
+                                            <span class="ldr-breakdown-value" id="avg-total-tokens">0</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="ldr-breakdown-section">
+                                    <h4 class="ldr-tooltip" data-tooltip="Total tokens consumed across all research sessions">Total Usage</h4>
+                                    <div class="ldr-breakdown-grid">
+                                        <div class="ldr-breakdown-item">
+                                            <span class="ldr-breakdown-label">Input:</span>
+                                            <span class="ldr-breakdown-value" id="total-input-tokens">0</span>
+                                        </div>
+                                        <div class="ldr-breakdown-item">
+                                            <span class="ldr-breakdown-label">Output:</span>
+                                            <span class="ldr-breakdown-value" id="total-output-tokens">0</span>
+                                        </div>
+                                        <div class="ldr-breakdown-item ldr-total">
+                                            <span class="ldr-breakdown-label">Total:</span>
+                                            <span class="ldr-breakdown-value" id="total-all-tokens">0</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ldr-metric-card">
+                        <div class="ldr-metric-icon">
+                            <i class="fas fa-search"></i>
+                        </div>
+                        <div class="ldr-metric-label ldr-tooltip" data-tooltip="Number of research sessions that used LLM tokens in the selected time period">
+                            Total Researches
+                            <i class="fas fa-info-circle ldr-info-icon"></i>
+                        </div>
+                        <div class="ldr-metric-value" id="total-researches">0</div>
+                    </div>
+                    <div class="ldr-metric-card">
+                        <div class="ldr-metric-icon">
+                            <i class="fas fa-tachometer-alt"></i>
+                        </div>
+                        <div class="ldr-metric-label ldr-tooltip" data-tooltip="Average time for LLM calls to complete, measured from request to response">
+                            Avg Response Time (All)
+                            <i class="fas fa-info-circle ldr-info-icon"></i>
+                        </div>
+                        <div class="ldr-metric-value" id="avg-response-time">0s</div>
+                    </div>
+                    <div class="ldr-metric-card">
+                        <div class="ldr-metric-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="ldr-metric-label ldr-tooltip" data-tooltip="Percentage of LLM calls that completed successfully without errors">
+                            Success Rate
+                            <i class="fas fa-info-circle ldr-info-icon"></i>
+                        </div>
+                        <div class="ldr-metric-value" id="success-rate">0%</div>
+                    </div>
+                    <div class="ldr-metric-card">
+                        <div class="ldr-metric-icon">
+                            <i class="fas fa-ldr-star"></i>
+                        </div>
+                        <div class="ldr-metric-label ldr-tooltip" data-tooltip="Average user satisfaction rating (1-5 stars) for research sessions. All rating data is stored locally on your device only and never shared.">
+                            User Satisfaction
+                            <i class="fas fa-info-circle ldr-info-icon"></i>
+                        </div>
+                        <div class="ldr-metric-value" id="avg-user-rating">-</div>
+                    </div>
+                    <div class="ldr-metric-card ldr-expandable-card" id="cost-toggle-btn" onclick="toggleCostDetails()" role="button" tabindex="0" aria-expanded="false" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+                        <div class="ldr-metric-icon">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                        <div class="ldr-metric-header">
+                            <div class="ldr-metric-label ldr-tooltip" data-tooltip="Estimated cost based on token usage and current model pricing. Costs are calculated using static pricing data for major LLM providers.">
+                                Estimated Cost
+                                <i class="fas fa-info-circle ldr-info-icon"></i>
+                            </div>
+                            <div class="ldr-metric-value" id="total-cost">-</div>
+                            <div class="ldr-expand-icon">
+                                <i class="fas fa-chevron-down" id="cost-expand-icon"></i>
+                            </div>
+                        </div>
+                        <div class="ldr-metric-details" id="cost-details" style="display: none;">
+                            <div class="ldr-cost-breakdown">
+                                <div class="ldr-breakdown-section">
+                                    <h4 class="ldr-tooltip" data-tooltip="Average cost per research session">Average Cost</h4>
+                                    <div class="ldr-breakdown-grid">
+                                        <div class="ldr-breakdown-item">
+                                            <span class="ldr-breakdown-label">Per Research:</span>
+                                            <span class="ldr-breakdown-value" id="avg-cost-per-research">$0.00</span>
+                                        </div>
+                                        <div class="ldr-breakdown-item">
+                                            <span class="ldr-breakdown-label">Per Token:</span>
+                                            <span class="ldr-breakdown-value" id="avg-cost-per-token">$0.000000</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="ldr-breakdown-section">
+                                    <h4 class="ldr-tooltip" data-tooltip="Cost breakdown by token type">Cost Breakdown</h4>
+                                    <div class="ldr-breakdown-grid">
+                                        <div class="ldr-breakdown-item">
+                                            <span class="ldr-breakdown-label">Input Tokens:</span>
+                                            <span class="ldr-breakdown-value" id="total-input-cost">$0.00</span>
+                                        </div>
+                                        <div class="ldr-breakdown-item">
+                                            <span class="ldr-breakdown-label">Output Tokens:</span>
+                                            <span class="ldr-breakdown-value" id="total-output-cost">$0.00</span>
+                                        </div>
+                                        <div class="ldr-breakdown-item ldr-total">
+                                            <span class="ldr-breakdown-label">Total:</span>
+                                            <span class="ldr-breakdown-value" id="total-cost-breakdown">$0.00</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Charts Section -->
+                <div style="margin-top: 2rem; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                    <!-- Token Consumption Chart -->
+                    <div>
+                        <h3><i class="fas fa-chart-line"></i> Token Consumption Over Time</h3>
+                        <div class="ldr-chart-container" style="height: 400px;">
+                            <canvas id="time-series-chart"></canvas>
+                        </div>
+                    </div>
+                    <!-- Search Activity Chart -->
+                    <div>
+                        <h3><i class="fas fa-search"></i> Search Activity Over Time</h3>
+                        <div class="ldr-chart-container" style="height: 400px;">
+                            <canvas id="search-activity-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Models & Performance -->
+        <div class="ldr-card" style="margin-top: 2rem;">
+            <div class="card-header">
+                <h2><i class="fas fa-robot"></i> Models & Performance</h2>
+            </div>
+            <div class="ldr-card-content">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                    <!-- Model Usage List -->
+                    <div>
+                        <h3><i class="fas fa-list"></i> Model Usage</h3>
+                        <div class="ldr-model-usage-list" id="model-usage-list">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                    <!-- Model Usage Chart -->
+                    <div>
+                        <h3><i class="fas fa-chart-bar"></i> Token Distribution</h3>
+                        <div class="ldr-chart-container">
+                            <canvas id="token-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <!-- Research Analytics in Compact Grid -->
+                <div style="margin-top: 2rem;">
+                    <h3><i class="fas fa-analytics"></i> Research Analytics</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
+                        <!-- Research Mode Breakdown -->
+                        <div>
+                            <h4><i class="fas fa-layer-group"></i> Research Modes</h4>
+                            <div id="mode-breakdown">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                        <!-- Search Engine Usage -->
+                        <div>
+                            <h4><i class="fas fa-globe"></i> Search Engines</h4>
+                            <div id="search-engine-breakdown">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                        <!-- Strategy Usage -->
+                        <div>
+                            <h4 class="ldr-tooltip" data-tooltip="Shows which research strategies were used most frequently. Strategies determine how the system approaches and structures research queries.">
+                                <i class="fas fa-chess"></i> Research Strategies
+                                <i class="fas fa-info-circle ldr-info-icon"></i>
+                            </h4>
+                            <div id="strategy-breakdown">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                        <!-- Research Phase Analysis -->
+                        <div>
+                            <h4><i class="fas fa-project-diagram"></i> Research Phases</h4>
+                            <div id="phase-breakdown">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                        <!-- User Satisfaction -->
+                        <div>
+                            <h4 class="ldr-tooltip" data-tooltip="Your personal research satisfaction ratings. All data stays private on your local device.">
+                                <i class="fas fa-ldr-star"></i> User Satisfaction
+                                <i class="fas fa-info-circle ldr-info-icon"></i>
+                            </h4>
+                            <div id="rating-breakdown">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Rate Limiting Analytics -->
+        <div class="ldr-card" style="margin-top: 2rem;">
+            <div class="card-header">
+                <h2><i class="fas fa-clock"></i> Rate Limiting Analytics</h2>
+            </div>
+            <div class="ldr-card-content">
+                <!-- Rate Limiting Overview Cards -->
+                <div class="ldr-metrics-grid" style="margin-bottom: 2rem;">
+                    <div class="ldr-metric-card">
+                        <div class="ldr-metric-icon">
+                            <i class="fas fa-stopwatch"></i>
+                        </div>
+                        <div class="ldr-metric-label ldr-tooltip" data-tooltip="Success rate from tracked rate-limiting attempts">
+                            Rate Limit Success Rate
+                            <i class="fas fa-info-circle ldr-info-icon"></i>
+                        </div>
+                        <div class="ldr-metric-value" id="rate-limit-success-rate">-</div>
+                    </div>
+                    <div class="ldr-metric-card">
+                        <div class="ldr-metric-icon">
+                            <i class="fas fa-hourglass-ldr-half"></i>
+                        </div>
+                        <div class="ldr-metric-label ldr-tooltip" data-tooltip="Average learned base wait across tracked search engines">
+                            Avg Learned Base Wait
+                            <i class="fas fa-info-circle ldr-info-icon"></i>
+                        </div>
+                        <div class="ldr-metric-value" id="avg-wait-time">-</div>
+                    </div>
+                    <div class="ldr-metric-card">
+                        <div class="ldr-metric-icon">
+                            <i class="fas fa-server"></i>
+                        </div>
+                        <div class="ldr-metric-label ldr-tooltip" data-tooltip="Number of search engines being tracked for rate limiting">
+                            Engines Tracked
+                            <i class="fas fa-info-circle ldr-info-icon"></i>
+                        </div>
+                        <div class="ldr-metric-value" id="engines-tracked">0</div>
+                    </div>
+                </div>
+                <!-- Engine Status Grid -->
+                <div style="margin-bottom: 2rem;">
+                    <h3><i class="fas fa-tachometer-alt"></i> Search Engine Status</h3>
+                    <div id="engine-status-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-top: 1rem;">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+                <!-- Rate Limiting Chart -->
+                <div style="margin-top: 2rem;">
+                    <h3><i class="fas fa-chart-bar"></i> Rate Limiting Summary</h3>
+                    <div class="ldr-chart-container" style="height: 300px;">
+                        <canvas id="rate-limiting-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Context Overflow summary — links to /metrics/context-overflow for full diagnostics -->
+        <div class="ldr-card" style="margin-top: 2rem;">
+            <div class="card-header">
+                <h2><i aria-hidden="true" class="fas fa-exclamation-triangle"></i> Context Overflow</h2>
+            </div>
+            <div class="ldr-card-content">
+                <div class="ldr-metrics-grid">
+                    <div class="ldr-metric-card">
+                        <div class="ldr-metric-icon"><i aria-hidden="true" class="fas fa-percentage"></i></div>
+                        <div class="ldr-metric-label">Truncation Rate</div>
+                        <div class="ldr-metric-value" id="co-truncation-rate">0%</div>
+                        <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                            of requests with context data
+                        </div>
+                    </div>
+                    <div class="ldr-metric-card">
+                        <div class="ldr-metric-icon"><i aria-hidden="true" class="fas fa-cut"></i></div>
+                        <div class="ldr-metric-label">Avg Tokens Lost</div>
+                        <div class="ldr-metric-value" id="co-avg-tokens-lost">0</div>
+                        <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                            per truncated request
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top: 1rem; text-align: right;">
+                    <a href="/metrics/context-overflow" class="ldr-alert-action" style="text-decoration: underline;">
+                        View full diagnostics
+                        <span aria-hidden="true">→</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <!-- Developer Insights -->
+        <div class="ldr-card" style="margin-top: 2rem;">
+            <div class="card-header">
+                <h2><i class="fas fa-code"></i> Developer Insights</h2>
+            </div>
+            <div class="ldr-card-content">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+                    <!-- Most Active Files -->
+                    <div>
+                        <h3><i class="fas fa-file-code"></i> Most Active Files</h3>
+                        <div id="call-stack-files" style="margin-top: 1rem;">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                    <!-- Most Active Functions -->
+                    <div>
+                        <h3><i class="fas fa-function"></i> Most Active Functions</h3>
+                        <div id="call-stack-functions" style="margin-top: 1rem;">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+                <!-- Expandable Recent Call Stack Traces -->
+                <details style="margin-top: 1rem;">
+                    <summary style="cursor: pointer; font-weight: 600; color: var(--text-primary); padding: 0.5rem; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 0.375rem;">
+                        <i class="fas fa-sitemap"></i> Recent Call Stack Traces (Click to expand)
+                    </summary>
+                    <div id="recent-call-stacks" style="margin-top: 1rem; max-height: 400px; overflow-y: auto; padding: 1rem; background: var(--bg-tertiary); border-radius: 0.375rem;">
+                        <!-- Populated dynamically -->
+                    </div>
+                </details>
+            </div>
+        </div>
+        <!-- Research History & Activity -->
+        <div class="ldr-card" style="margin-top: 2rem;">
+            <div class="card-header">
+                <h2><i class="fas fa-history"></i> Research History & Activity</h2>
+            </div>
+            <div class="ldr-card-content">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                    <!-- Recent Researches -->
+                    <div>
+                        <h3><i class="fas fa-search"></i> Recent Researches</h3>
+                        <div id="recent-researches" style="margin-top: 1rem;">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                    <!-- Recent Enhanced Tracking Data -->
+                    <div>
+                        <h3><i class="fas fa-list"></i> Recent LLM Calls</h3>
+                        <div id="recent-enhanced-data" style="margin-top: 1rem; max-height: 400px; overflow-y: auto;">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Information Section -->
+        <div class="ldr-card" style="margin-top: 2rem; border-left: 4px solid var(--primary-color);">
+            <div class="card-header">
+                <h2><i class="fas fa-info-circle"></i> Understanding Your Metrics</h2>
+            </div>
+            <div class="ldr-card-content">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem;">
+                    <!-- Token Definitions -->
+                    <div>
+                        <h4><i class="fas fa-coins"></i> Token Definitions</h4>
+                        <ul style="list-style: none; padding: 0; color: var(--text-secondary); line-height: 1.6;">
+                            <li style="margin-bottom: 0.5rem;">
+                                <strong style="color: var(--text-primary);">Input Tokens:</strong> Text sent to the LLM (your prompts, context, etc.)
+                            </li>
+                            <li style="margin-bottom: 0.5rem;">
+                                <strong style="color: var(--text-primary);">Output Tokens:</strong> Text generated by the LLM (responses, completions)
+                            </li>
+                            <li style="margin-bottom: 0.5rem;">
+                                <strong style="color: var(--text-primary);">Total Tokens:</strong> Input tokens + Output tokens for each API call
+                            </li>
+                        </ul>
+                    </div>
+                    <!-- How We Calculate -->
+                    <div>
+                        <h4><i class="fas fa-calculator"></i> How We Calculate</h4>
+                        <ul style="list-style: none; padding: 0; color: var(--text-secondary); line-height: 1.6;">
+                            <li style="margin-bottom: 0.5rem;">
+                                <strong style="color: var(--text-primary);">Response Time:</strong> Measured from API request start to completion (detailed research takes longer)
+                            </li>
+                            <li style="margin-bottom: 0.5rem;">
+                                <strong style="color: var(--text-primary);">Success Rate:</strong> (Successful calls / Total calls) × 100%
+                            </li>
+                            <li style="margin-bottom: 0.5rem;">
+                                <strong style="color: var(--text-primary);">Cumulative Charts:</strong> Running total of all tokens used over time
+                            </li>
+                        </ul>
+                    </div>
+                    <!-- Time Periods -->
+                    <div>
+                        <h4><i class="fas fa-clock"></i> Time Period Filtering</h4>
+                        <ul style="list-style: none; padding: 0; color: var(--text-secondary); line-height: 1.6;">
+                            <li style="margin-bottom: 0.5rem;">
+                                <strong style="color: var(--text-primary);">7D/30D/3M/1Y:</strong> Shows data for the last N days/months/year
+                            </li>
+                            <li style="margin-bottom: 0.5rem;">
+                                <strong style="color: var(--text-primary);">All:</strong> Complete history (no time limits)
+                            </li>
+                            <li style="margin-bottom: 0.5rem;">
+                                <strong style="color: var(--text-primary);">Real-time:</strong> All metrics update instantly when you change time periods
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <!-- Cost Note -->
+                <div style="margin-top: 1.5rem; padding: 1rem; background: var(--bg-secondary); border-radius: 0.375rem; border-left: 3px solid var(--primary-color);">
+                    <p style="margin: 0; color: var(--text-secondary); font-size: 0.875rem;">
+                        <i class="fas fa-lightbulb" style="color: var(--primary-color); margin-right: 0.5rem;"></i>
+                        <strong style="color: var(--text-primary);">Tip:</strong> Token usage directly impacts API costs. Input tokens are typically cheaper than output tokens. Quick research mode uses fewer tokens but detailed mode provides more comprehensive results.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block component_scripts %}
+<script>
+// Metrics Dashboard JavaScript
+(function() {
+    let metricsData = null;
+    let tokenChart = null;
+    let timeSeriesChart = null;
+    let currentPeriod = '30d'; // Default period
+    let currentMode = 'all'; // Default research mode
+    let metricsRequestId = 0;
+    // Format large numbers with commas
+    function formatNumber(num) {
+        return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    }
+    // Toggle token details breakdown (make globally accessible)
+    window.toggleTokenDetails = function() {
+        const details = document.getElementById('token-details');
+        const icon = document.getElementById('token-expand-icon');
+        const btn = document.getElementById('token-toggle-btn');
+        const expanding = details.style.display === 'none';
+        details.style.display = expanding ? 'block' : 'none';
+        icon.classList.toggle('ldr-expanded', expanding);
+        if (btn) btn.setAttribute('aria-expanded', String(expanding));
+    }
+    // Toggle cost details breakdown (make globally accessible)
+    window.toggleCostDetails = function() {
+        const details = document.getElementById('cost-details');
+        const icon = document.getElementById('cost-expand-icon');
+        const btn = document.getElementById('cost-toggle-btn');
+        const expanding = details.style.display === 'none';
+        details.style.display = expanding ? 'block' : 'none';
+        icon.classList.toggle('ldr-expanded', expanding);
+        if (btn) btn.setAttribute('aria-expanded', String(expanding));
+    }
+    // Format currency
+    function formatCurrency(amount) {
+        if (amount < 0.01) {
+            return `$${amount.toFixed(6)}`;
+        } else if (amount < 1) {
+            return `$${amount.toFixed(4)}`;
+        } else {
+            return `$${amount.toFixed(2)}`;
+        }
+    }
+    // Load metrics data for current time period
+    async function loadMetrics(period = currentPeriod) {
+        const requestId = ++metricsRequestId;
+        // A mode click can land while the basic request is awaiting. Capture
+        // the complete filter intent once so the enhanced and secondary
+        // requests cannot accidentally belong to a different mode.
+        const requestMode = currentMode;
+        const isCurrentRequest = () => requestId === metricsRequestId;
+        try {
+            // Show loading state
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('metrics-content').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+            const basicResponse = await fetch(`/metrics/api/metrics?period=${period}&mode=${requestMode}`);
+            if (!isCurrentRequest()) return;
+            if (!basicResponse.ok) {
+                throw new Error(`Basic API failed: ${basicResponse.status}`);
+            }
+            const basicData = await basicResponse.json();
+            if (!isCurrentRequest()) return;
+            const enhancedResponse = await fetch(`/metrics/api/metrics/enhanced?period=${period}&mode=${requestMode}`);
+            if (!isCurrentRequest()) return;
+            if (!enhancedResponse.ok) {
+                throw new Error(`Enhanced API failed: ${enhancedResponse.status}`);
+            }
+            const enhancedData = await enhancedResponse.json();
+            if (!isCurrentRequest()) return;
+            if (basicData.status === 'success') {
+                metricsData = basicData.metrics;
+                // Check if we have any data at all
+                const hasData = metricsData.total_tokens > 0 ||
+                               metricsData.total_researches > 0 ||
+                               (metricsData.by_model && metricsData.by_model.length > 0) ||
+                               (metricsData.recent_researches && metricsData.recent_researches.length > 0);
+                if (hasData) {
+                    // We have data, display normally
+                    displayMetrics();
+                    if (enhancedData.status === 'success') {
+                        displayEnhancedMetrics(enhancedData.metrics);
+                        createTimeSeriesChart(enhancedData.metrics.time_series_data);
+                        createSearchActivityChart(enhancedData.metrics.search_time_series);
+                        // Re-setup tooltips for any new content
+                        setTimeout(() => {
+                            if (isCurrentRequest()) setupTooltipPositioning();
+                        }, 100);
+                    }
+                    // Load cost analytics
+                    loadCostAnalytics(period, requestId);
+                    // Load rate limiting analytics
+                    loadRateLimitingAnalytics(period, requestId);
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('metrics-content').style.display = 'block';
+                    } else {
+                    // No data yet, show empty state with helpful messages
+                    showEmptyState();
+                    // Still try to display enhanced metrics in case there's some enhanced data
+                    if (enhancedData.status === 'success') {
+                        displayEnhancedMetrics(enhancedData.metrics);
+                        // Re-setup tooltips for any new content
+                        setTimeout(() => {
+                            if (isCurrentRequest()) setupTooltipPositioning();
+                        }, 100);
+                    }
+                }
+            } else {
+                showError();
+            }
+        } catch (error) {
+            if (!isCurrentRequest()) return;
+            showError();
+        }
+    }
+    // Display metrics on the page
+    function displayMetrics() {
+        // Update summary cards
+        document.getElementById('total-tokens').textContent = formatNumber(metricsData.total_tokens);
+        document.getElementById('total-researches').textContent = formatNumber(metricsData.total_researches);
+        // Update token breakdown details
+        if (metricsData.token_breakdown) {
+            const breakdown = metricsData.token_breakdown;
+            document.getElementById('avg-input-tokens').textContent = formatNumber(breakdown.avg_input_tokens);
+            document.getElementById('avg-output-tokens').textContent = formatNumber(breakdown.avg_output_tokens);
+            document.getElementById('avg-total-tokens').textContent = formatNumber(breakdown.avg_total_tokens);
+            document.getElementById('total-input-tokens').textContent = formatNumber(breakdown.total_input_tokens);
+            document.getElementById('total-output-tokens').textContent = formatNumber(breakdown.total_output_tokens);
+            document.getElementById('total-all-tokens').textContent = formatNumber(metricsData.total_tokens);
+        }
+        // Set default values for avg-response-time and success-rate (will be updated by enhanced metrics)
+        document.getElementById('avg-response-time').textContent = '0s';
+        document.getElementById('success-rate').textContent = '0%';
+        // Context-overflow summary panel — null means "aggregation failed";
+        // render as em-dash so we don't claim 0% (which would mean "no truncation").
+        const coRate = document.getElementById('co-truncation-rate');
+        const coAvg = document.getElementById('co-avg-tokens-lost');
+        if (coRate) {
+            const rate = metricsData.truncation_rate;
+            coRate.textContent = (rate == null) ? '—' : `${rate}%`;
+        }
+        if (coAvg) {
+            const avg = metricsData.avg_tokens_truncated;
+            coAvg.textContent = (avg == null) ? '—' : formatNumber(avg);
+        }
+        // Update user satisfaction rating
+        if (metricsData.user_satisfaction && metricsData.user_satisfaction.avg_rating !== null) {
+            const rating = metricsData.user_satisfaction.avg_rating;
+            const stars = '⭐'.repeat(Math.floor(rating));
+            const displayText = `${rating} ${stars}`;
+            document.getElementById('avg-user-rating').textContent = displayText;
+        } else {
+            document.getElementById('avg-user-rating').textContent = '-';
+        }
+        // Display model usage list
+        displayModelUsage();
+        // Create token usage chart
+        createTokenChart();
+        // Display recent researches
+        displayRecentResearches();
+    }
+    // Display model usage list
+    function displayModelUsage() {
+        const container = document.getElementById('model-usage-list');
+        container.innerHTML = '';
+        metricsData.by_model.forEach(model => {
+            const item = document.createElement('div');
+            item.className = 'ldr-model-usage-item';
+            item.innerHTML = `
+                <div class="ldr-model-info">
+                    <div class="ldr-model-name">${window.escapeHtml(model.model)}</div>
+                    <div class="ldr-model-provider">${window.escapeHtml(model.provider)}</div>
+                </div>
+                <div class="ldr-model-stats">
+                    <div class="ldr-token-count">
+                        <span style="color: var(--primary-color);">${formatNumber(model.tokens)}</span>
+                        <span style="color: var(--text-primary); font-size: 0.875rem; margin-left: 4px;">tokens</span>
+                    </div>
+                    <div class="ldr-call-count">
+                        <span>${formatNumber(model.calls)}</span>
+                        <span style="color: var(--text-primary); font-size: 0.875rem; margin-left: 4px;">calls</span>
+                    </div>
+                </div>
+            `;
+            container.appendChild(item);
+        });
+    }
+    // Create token usage chart
+    function createTokenChart() {
+        try {
+            const chartElement = document.getElementById('token-chart');
+            if (!chartElement) {
+                console.warn('Token chart element not found');
+                return;
+            }
+            const ctx = chartElement.getContext('2d');
+        // Prepare data for chart
+        const labels = metricsData.by_model.map(m => m.model);
+        const promptTokens = metricsData.by_model.map(m => m.prompt_tokens);
+        const completionTokens = metricsData.by_model.map(m => m.completion_tokens);
+        // Destroy existing chart if it exists
+        if (tokenChart) {
+            tokenChart.destroy();
+        }
+        tokenChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Input Tokens',
+                    data: promptTokens,
+                    backgroundColor: 'rgba(54, 162, 235, 0.8)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }, {
+                    label: 'Output Tokens',
+                    data: completionTokens,
+                    backgroundColor: 'rgba(255, 99, 132, 0.8)',
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        stacked: true,
+                    },
+                    y: {
+                        stacked: true,
+                        beginAtZero: true
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                label += formatNumber(context.parsed.y);
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        } catch (error) {
+            console.error('Error creating token chart:', error);
+        }
+    }
+    // Display recent researches
+    function displayRecentResearches() {
+        const container = document.getElementById('recent-researches');
+        container.innerHTML = '';
+        if (metricsData.recent_researches.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No recent researches</p>';
+            return;
+        }
+        metricsData.recent_researches.forEach(research => {
+            const item = document.createElement('div');
+            item.className = 'ldr-recent-research-item';
+            item.innerHTML = `
+                <div class="ldr-research-query">${window.escapeHtml(research.query)}</div>
+                <div class="ldr-research-tokens">
+                    <span>${formatNumber(research.tokens)}</span>
+                    <span style="color: var(--text-primary); font-size: 0.875rem; margin-left: 4px;">tokens</span>
+                </div>
+            `;
+            item.onclick = () => {
+                window.location.href = `/details/${research.id}`;
+            };
+            container.appendChild(item);
+        });
+    }
+    // Display enhanced Phase 1 metrics
+    function displayEnhancedMetrics(enhancedData) {
+        // Update performance stats
+        if (enhancedData.performance_stats) {
+            const stats = enhancedData.performance_stats;
+            document.getElementById('avg-response-time').textContent = `${(stats.avg_response_time / 1000).toFixed(1)}s`;
+            document.getElementById('success-rate').textContent = `${stats.success_rate}%`;
+        }
+        // Display mode breakdown
+        const modeContainer = document.getElementById('mode-breakdown');
+        modeContainer.innerHTML = '';
+        enhancedData.mode_breakdown.forEach(mode => {
+            const item = document.createElement('div');
+            item.className = 'ldr-model-usage-item';
+            item.innerHTML = `
+                <div class="ldr-model-info">
+                    <div class="ldr-model-name">${window.escapeHtml(mode.mode || 'Unknown')} Mode</div>
+                    <div class="ldr-model-provider">Avg Response: ${(mode.avg_response_time / 1000).toFixed(1)}s</div>
+                </div>
+                <div class="ldr-model-stats">
+                    <div class="ldr-token-count">${formatNumber(mode.avg_tokens)} avg tokens</div>
+                    <div class="ldr-call-count">${formatNumber(mode.count)} calls</div>
+                </div>
+            `;
+            modeContainer.appendChild(item);
+        });
+        // Display search engine stats (prefer search call data over enhanced data)
+        const searchContainer = document.getElementById('search-engine-breakdown');
+        searchContainer.innerHTML = '';
+        // Use search call data if available, otherwise fall back to enhanced data
+        const searchStats = metricsData.search_engine_stats || enhancedData.search_engine_stats || [];
+        searchStats.forEach(engine => {
+            const item = document.createElement('div');
+            item.className = 'ldr-model-usage-item';
+            // Handle both search call format and enhanced data format
+            const engineName = engine.engine || engine.search_engine || 'Unknown';
+            const avgResponseTime = engine.avg_response_time || 0;
+            const usageCount = engine.call_count || engine.usage_count || 0;
+            const successRate = engine.success_rate || null;
+            item.innerHTML = `
+                <div class="ldr-model-info">
+                    <div class="ldr-model-name">${window.escapeHtml(engineName)}</div>
+                    <div class="ldr-model-provider">
+                        Avg Response: ${(avgResponseTime / 1000).toFixed(1)}s
+                        ${successRate !== null ? ` | Success: ${successRate.toFixed(1)}%` : ''}
+                    </div>
+                </div>
+                <div class="ldr-model-stats">
+                    <div class="ldr-token-count">${formatNumber(usageCount)} calls</div>
+                    ${engine.total_results ? `<div class="ldr-call-count">${formatNumber(engine.total_results)} results</div>` : ''}
+                </div>
+            `;
+            searchContainer.appendChild(item);
+        });
+        // Display strategy breakdown
+        const strategyContainer = document.getElementById('strategy-breakdown');
+        strategyContainer.innerHTML = '';
+        // Get strategy data from metricsData (added by our API)
+        const strategyData = metricsData.strategy_analytics;
+        if (strategyData && strategyData.strategy_usage && strategyData.strategy_usage.length > 0) {
+            strategyData.strategy_usage.forEach(strategy => {
+                const item = document.createElement('div');
+                item.className = 'ldr-model-usage-item';
+                item.innerHTML = `
+                    <div class="ldr-model-info">
+                        <div class="ldr-model-name">${window.escapeHtml(strategy.strategy)}</div>
+                        <div class="ldr-model-provider">${strategy.percentage}% of research sessions</div>
+                    </div>
+                    <div class="ldr-model-stats">
+                        <div class="ldr-token-count">${formatNumber(strategy.count)} uses</div>
+                        <div class="ldr-call-count">${strategyData.most_popular_strategy === strategy.strategy ? '👑 Most Popular' : ''}</div>
+                    </div>
+                `;
+                strategyContainer.appendChild(item);
+            });
+        } else {
+            const noDataMsg = document.createElement('div');
+            noDataMsg.style.textAlign = 'center';
+            noDataMsg.style.color = 'var(--text-secondary)';
+            noDataMsg.style.padding = '1rem';
+            // Show different message based on what data we have
+            let useTextContent = false;
+            let message = 'No strategy data yet. <a href="/" style="color: var(--accent-tertiary);">Start a research</a> to track strategies!';
+            if (strategyData) {
+                if (strategyData.message) {
+                    message = strategyData.message;
+                    useTextContent = true;
+                } else if (strategyData.total_research > 0 && strategyData.total_research_with_strategy === 0) {
+                    message = `Found ${strategyData.total_research} research sessions but no strategy data. Strategy tracking was recently added - new research will be tracked!`;
+                    useTextContent = true;
+                } else if (strategyData.error) {
+                    message = `Error loading strategy data: ${strategyData.error}`;
+                    useTextContent = true;
+                }
+            }
+            if (useTextContent) {
+                noDataMsg.textContent = message;
+            } else {
+                noDataMsg.innerHTML = message;
+            }
+            strategyContainer.appendChild(noDataMsg);
+        }
+        // Display phase breakdown
+        const phaseContainer = document.getElementById('phase-breakdown');
+        phaseContainer.innerHTML = '';
+        enhancedData.phase_breakdown.forEach(phase => {
+            const item = document.createElement('div');
+            item.className = 'ldr-model-usage-item';
+            item.innerHTML = `
+                <div class="ldr-model-info">
+                    <div class="ldr-model-name">${window.escapeHtml(phase.phase || 'Unknown')} Phase</div>
+                    <div class="ldr-model-provider">Avg Response: ${((phase.avg_response_time || 0) / 1000).toFixed(1)}s</div>
+                </div>
+                <div class="ldr-model-stats">
+                    <div class="ldr-token-count">${formatNumber(phase.avg_tokens)} avg tokens</div>
+                    <div class="ldr-call-count">${formatNumber(phase.count)} calls</div>
+                </div>
+            `;
+            phaseContainer.appendChild(item);
+        });
+        // Display user satisfaction ratings
+        const ratingContainer = document.getElementById('rating-breakdown');
+        ratingContainer.innerHTML = '';
+        if (metricsData.user_satisfaction && metricsData.user_satisfaction.total_ratings > 0) {
+            const satisfaction = metricsData.user_satisfaction;
+            const avgRating = satisfaction.avg_rating;
+            const totalRatings = satisfaction.total_ratings;
+            const stars = '⭐'.repeat(Math.floor(avgRating));
+            const item = document.createElement('div');
+            item.className = 'ldr-model-usage-item';
+            item.innerHTML = `
+                <div class="ldr-model-info">
+                    <div class="ldr-model-name">${avgRating} ${stars}</div>
+                    <div class="ldr-model-provider">Average User Rating</div>
+                </div>
+                <div class="ldr-model-stats">
+                    <div class="ldr-token-count">${totalRatings} ratings</div>
+                    <div class="ldr-call-count">
+                        <a href="/metrics/star-reviews" style="color: var(--accent-tertiary); text-decoration: none;">View Details →</a>
+                    </div>
+                </div>
+            `;
+            ratingContainer.appendChild(item);
+        } else {
+            const noDataMsg = document.createElement('div');
+            noDataMsg.style.textAlign = 'center';
+            noDataMsg.style.color = 'var(--text-secondary)';
+            noDataMsg.style.padding = '1rem';
+            noDataMsg.innerHTML = 'No ratings yet. <a href="/" style="color: var(--accent-tertiary);">Start a research</a> and rate it!';
+            ratingContainer.appendChild(noDataMsg);
+        }
+        // Display recent enhanced data
+        const enhancedContainer = document.getElementById('recent-enhanced-data');
+        enhancedContainer.innerHTML = '';
+        if (enhancedData.recent_enhanced_data.length === 0) {
+            enhancedContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary);">No enhanced tracking data yet. Run a research to see enhanced metrics!</p>';
+            return;
+        }
+        enhancedData.recent_enhanced_data.slice(0, 10).forEach(item => {
+            const row = document.createElement('div');
+            row.className = 'ldr-model-usage-item';
+            row.style.marginBottom = '0.5rem';
+            row.style.cursor = 'pointer';
+            row.innerHTML = `
+                <div class="ldr-model-info">
+                    <div class="ldr-model-name" style="margin-bottom: 0.25rem;">${window.escapeHtml(item.research_query || 'Unknown Query')}</div>
+                    <div class="ldr-model-provider">
+                        Mode: ${window.escapeHtml(item.research_mode || 'N/A')} |
+                        Phase: ${window.escapeHtml(item.research_phase || 'N/A')} |
+                        Engine: ${window.escapeHtml(item.search_engine_selected || 'N/A')}
+                    </div>
+                </div>
+                <div class="ldr-model-stats">
+                    <div class="ldr-token-count">${((item.response_time_ms || 0) / 1000).toFixed(1)}s</div>
+                    <div class="ldr-call-count" style="color: ${item.success_status === 'success' ? 'green' : 'red'}">
+                        ${window.escapeHtml(item.success_status || 'unknown')}
+                    </div>
+                </div>
+            `;
+            // Add click handler to navigate to research details
+            if (item.research_id) {
+                row.onclick = () => {
+                    window.location.href = `/details/${encodeURIComponent(item.research_id)}`;
+                };
+                row.title = `Click to view research details`;
+            }
+            enhancedContainer.appendChild(row);
+        });
+    }
+    // Create time-series chart for token consumption over time
+    function createTimeSeriesChart(timeSeriesData) {
+        try {
+            const chartElement = document.getElementById('time-series-chart');
+            if (!chartElement) {
+                console.warn('Time series chart element not found');
+                return;
+            }
+            if (!timeSeriesData || timeSeriesData.length === 0) {
+                console.warn('No time series data provided');
+                return;
+            }
+            const ctx = chartElement.getContext('2d');
+        // Prepare data for time-series chart
+        const labels = timeSeriesData.map(item => {
+            // Format timestamp for display (show time only if same day, otherwise show date)
+            const date = new Date(item.timestamp);
+            return date.toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        });
+        const cumulativeTokens = timeSeriesData.map(item => item.cumulative_tokens);
+        const cumulativePromptTokens = timeSeriesData.map(item => item.cumulative_prompt_tokens);
+        const cumulativeCompletionTokens = timeSeriesData.map(item => item.cumulative_completion_tokens);
+        const promptTokens = timeSeriesData.map(item => item.prompt_tokens);
+        const completionTokens = timeSeriesData.map(item => item.completion_tokens);
+        // Destroy existing chart if it exists
+        if (timeSeriesChart) {
+            timeSeriesChart.destroy();
+        }
+        timeSeriesChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Cumulative Total Tokens',
+                    data: cumulativeTokens,
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                }, {
+                    label: 'Cumulative Input Tokens',
+                    data: cumulativePromptTokens,
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    backgroundColor: 'rgba(54, 162, 235, 0.05)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 2,
+                    pointHoverRadius: 4,
+                }, {
+                    label: 'Cumulative Output Tokens',
+                    data: cumulativeCompletionTokens,
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    backgroundColor: 'rgba(255, 99, 132, 0.05)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 2,
+                    pointHoverRadius: 4,
+                }, {
+                    label: 'Input Tokens per Call',
+                    data: promptTokens,
+                    borderColor: 'rgba(54, 162, 235, 0.7)',
+                    backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                    borderWidth: 1,
+                    fill: false,
+                    tension: 0.2,
+                    pointRadius: 2,
+                    pointHoverRadius: 4,
+                    yAxisID: 'y1',
+                    borderDash: [5, 5],
+                }, {
+                    label: 'Output Tokens per Call',
+                    data: completionTokens,
+                    borderColor: 'rgba(255, 99, 132, 0.7)',
+                    backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                    borderWidth: 1,
+                    fill: false,
+                    tension: 0.2,
+                    pointRadius: 2,
+                    pointHoverRadius: 4,
+                    yAxisID: 'y1',
+                    borderDash: [5, 5],
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        },
+                        ticks: {
+                            maxRotation: 45
+                        }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Cumulative Tokens'
+                        },
+                        beginAtZero: true
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Tokens per Call'
+                        },
+                        beginAtZero: true,
+                        grid: {
+                            drawOnChartArea: false,
+                        },
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    },
+                    tooltip: {
+                        callbacks: {
+                            title: function(context) {
+                                const index = context[0].dataIndex;
+                                const item = timeSeriesData[index];
+                                return `${item.research_query || 'Unknown Query'}`;
+                            },
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                label += formatNumber(context.parsed.y);
+                                return label;
+                            },
+                            afterBody: function(context) {
+                                const index = context[0].dataIndex;
+                                const item = timeSeriesData[index];
+                                return [
+                                    `Research ID: ${item.research_id}`,
+                                    `Time: ${new Date(item.timestamp).toLocaleString()}`
+                                ];
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        } catch (error) {
+            console.error('Error creating time series chart:', error);
+        }
+    }
+    // Create search activity chart showing search engine usage over time
+    function createSearchActivityChart(searchTimeSeriesData) {
+        try {
+            const chartElement = document.getElementById('search-activity-chart');
+            if (!chartElement) {
+                console.warn('Search activity chart element not found');
+                return;
+            }
+            if (!searchTimeSeriesData || searchTimeSeriesData.length === 0) {
+                console.warn('No search time series data provided');
+                return;
+            }
+            const ctx = chartElement.getContext('2d');
+            // Get unique search engines and assign colors
+            const searchEngines = [...new Set(searchTimeSeriesData.map(item => item.search_engine))];
+            const colors = [
+                'rgba(255, 99, 132, 0.8)',   // Red
+                'rgba(54, 162, 235, 0.8)',   // Blue
+                'rgba(255, 205, 86, 0.8)',   // Yellow
+                'rgba(75, 192, 192, 0.8)',   // Teal
+                'rgba(153, 102, 255, 0.8)',  // Purple
+                'rgba(255, 159, 64, 0.8)',   // Orange
+                'rgba(199, 199, 199, 0.8)',  // Gray
+                'rgba(83, 102, 255, 0.8)',   // Indigo
+                'rgba(255, 99, 255, 0.8)',   // Pink
+                'rgba(99, 255, 132, 0.8)'    // Green
+            ];
+            // Group data by time periods (e.g., by hour or day depending on range)
+            const timeGroups = {};
+            searchTimeSeriesData.forEach(item => {
+                const timestamp = new Date(item.timestamp);
+                // Group by hour for better visualization
+                const timeKey = new Date(timestamp.getFullYear(), timestamp.getMonth(),
+                                       timestamp.getDate(), timestamp.getHours()).toISOString();
+                if (!timeGroups[timeKey]) {
+                    timeGroups[timeKey] = {};
+                    searchEngines.forEach(engine => {
+                        timeGroups[timeKey][engine] = { count: 0, totalResults: 0 };
+                    });
+                }
+                if (timeGroups[timeKey][item.search_engine]) {
+                    timeGroups[timeKey][item.search_engine].count += 1;
+                    timeGroups[timeKey][item.search_engine].totalResults += item.results_count || 0;
+                }
+            });
+            // Prepare chart data
+            const labels = Object.keys(timeGroups).sort().map(timeKey => {
+                const date = new Date(timeKey);
+                return date.toLocaleString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            });
+            const datasets = searchEngines.map((engine, index) => ({
+                label: engine.charAt(0).toUpperCase() + engine.slice(1),
+                data: Object.keys(timeGroups).sort().map(timeKey =>
+                    timeGroups[timeKey][engine].totalResults
+                ),
+                borderColor: colors[index % colors.length],
+                backgroundColor: colors[index % colors.length].replace('0.8', '0.2'),
+                borderWidth: 2,
+                fill: false,
+                tension: 0.4
+            }));
+            // Destroy existing chart if it exists
+            if (window.searchActivityChart) {
+                window.searchActivityChart.destroy();
+            }
+            window.searchActivityChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            },
+                            ticks: {
+                                maxRotation: 45
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Search Results Count'
+                            },
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                title: function(context) {
+                                    return `Search Activity at ${context[0].label}`;
+                                },
+                                label: function(context) {
+                                    const engineName = context.dataset.label;
+                                    const resultsCount = context.parsed.y;
+                                    return `${engineName}: ${formatNumber(resultsCount)} results`;
+                                },
+                                afterBody: function(context) {
+                                    const timeIndex = context[0].dataIndex;
+                                    const timeKey = Object.keys(timeGroups).sort()[timeIndex];
+                                    const totalSearches = Object.values(timeGroups[timeKey])
+                                        .reduce((sum, engine) => sum + engine.count, 0);
+                                    return `Total searches in this period: ${totalSearches}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Error creating search activity chart:', error);
+        }
+    }
+    // Create rate limiting activity chart
+    function createRateLimitingChart(rateLimitData) {
+        try {
+            const chartElement = document.getElementById('rate-limiting-chart');
+            if (!chartElement) {
+                console.warn('Rate limiting chart element not found');
+                return;
+            }
+            const ctx = chartElement.getContext('2d');
+            // Extract actual data from the API response
+            let successfulCount = 0;
+            let blockedCount = 0;
+            if (rateLimitData && rateLimitData.rate_limiting) {
+                successfulCount = rateLimitData.rate_limiting.successful_attempts || 0;
+                blockedCount = rateLimitData.rate_limiting.failed_attempts || 0;
+                console.log('Rate limiting chart data:', {
+                    successful: successfulCount,
+                    blocked: blockedCount,
+                    total: rateLimitData.rate_limiting.total_attempts
+                });
+            }
+            // For now, show a simple bar showing totals
+            // In the future, this should use time-series data from the backend
+            const labels = ['Total Activity'];
+            const successfulRequests = [successfulCount];
+            const blockedRequests = [blockedCount];
+            // Destroy existing chart if it exists
+            if (window.rateLimitingChart) {
+                window.rateLimitingChart.destroy();
+            }
+            window.rateLimitingChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Successful Requests',
+                        data: successfulRequests,
+                        backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 2
+                    }, {
+                        label: 'Blocked by Rate Limiting',
+                        data: blockedRequests,
+                        backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Number of Requests'
+                            },
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1,
+                                precision: 0
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    label += context.parsed.y;
+                                    // Add percentage
+                                    const total = successfulCount + blockedCount;
+                                    if (total > 0) {
+                                        const percentage = ((context.parsed.y / total) * 100).toFixed(1);
+                                        label += ` (${percentage}%)`;
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Error creating rate limiting chart:', error);
+        }
+    }
+    // Load cost analytics data
+    async function loadCostAnalytics(period = currentPeriod, requestId = metricsRequestId) {
+        try {
+            const response = await fetch(`/metrics/api/cost-analytics?period=${period}`);
+            if (requestId !== metricsRequestId) return;
+            if (!response.ok) {
+                displayCostData(null);
+                return;
+            }
+            const data = await response.json();
+            if (requestId !== metricsRequestId) return;
+            if (data.status === 'success') {
+                displayCostData(data);
+            } else {
+                displayCostData(null);
+            }
+        } catch (error) {
+            if (requestId !== metricsRequestId) return;
+            displayCostData(null);
+        }
+    }
+    // Display cost data in the dashboard
+    function displayCostData(costData) {
+        if (!costData || !costData.overview) {
+            // No cost data available, show dashes
+            document.getElementById('total-cost').textContent = '-';
+            document.getElementById('avg-cost-per-research').textContent = '-';
+            document.getElementById('avg-cost-per-token').textContent = '-';
+            document.getElementById('total-input-cost').textContent = '-';
+            document.getElementById('total-output-cost').textContent = '-';
+            document.getElementById('total-cost-breakdown').textContent = '-';
+            return;
+        }
+        const overview = costData.overview;
+        // Main cost display
+        document.getElementById('total-cost').textContent = formatCurrency(overview.total_cost);
+        // Cost breakdown details
+        document.getElementById('avg-cost-per-research').textContent = formatCurrency(overview.avg_cost_per_call);
+        document.getElementById('avg-cost-per-token').textContent = formatCurrency(overview.cost_per_token);
+        document.getElementById('total-input-cost').textContent = formatCurrency(overview.prompt_cost);
+        document.getElementById('total-output-cost').textContent = formatCurrency(overview.completion_cost);
+        document.getElementById('total-cost-breakdown').textContent = formatCurrency(overview.total_cost);
+    }
+    // Load rate limiting analytics
+    async function loadRateLimitingAnalytics(period = currentPeriod, requestId = metricsRequestId) {
+        try {
+            const response = await fetch(`/metrics/api/rate-limiting?period=${period}`);
+            if (requestId !== metricsRequestId) return;
+            if (!response.ok) {
+                displayRateLimitingData(null);
+                return;
+            }
+            const data = await response.json();
+            if (requestId !== metricsRequestId) return;
+            if (data.status === 'success') {
+                displayRateLimitingData(data.data);
+            } else {
+                displayRateLimitingData(null);
+            }
+        } catch (error) {
+            if (requestId !== metricsRequestId) return;
+            displayRateLimitingData(null);
+        }
+    }
+    // Display rate limiting data in the dashboard
+    function displayRateLimitingData(rateLimitData) {
+        if (!rateLimitData || !rateLimitData.rate_limiting) {
+            // No rate limiting data available, show unavailable values
+            document.getElementById('rate-limit-success-rate').textContent = '-';
+            document.getElementById('avg-wait-time').textContent = '-';
+            document.getElementById('engines-tracked').textContent = '0';
+            // Clear engine status grid
+            const statusGrid = document.getElementById('engine-status-grid');
+            statusGrid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fas fa-clock fa-2x" style="margin-bottom: 1rem;"></i><p>No rate limiting data yet</p><p style="font-size: 0.875rem;">Rate limiting will appear after search engines are used</p></div>';
+            return;
+        }
+        const analytics = rateLimitData.rate_limiting;
+        // Update overview cards
+        const hasTrackedEngines = Array.isArray(analytics.engine_stats) && analytics.engine_stats.length > 0;
+        document.getElementById('rate-limit-success-rate').textContent = hasTrackedEngines ? `${analytics.success_rate}%` : '-';
+        document.getElementById('avg-wait-time').textContent = hasTrackedEngines ? `${analytics.avg_wait_time}s` : '-';
+        document.getElementById('engines-tracked').textContent = formatNumber(analytics.total_engines_tracked);
+        // Update engine status grid
+        const statusGrid = document.getElementById('engine-status-grid');
+        statusGrid.innerHTML = '';
+        // Create rate limiting chart
+        console.log('Creating rate limiting chart with data:', rateLimitData);
+        createRateLimitingChart(rateLimitData);
+        if (!analytics.engine_stats || analytics.engine_stats.length === 0) {
+            statusGrid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fas fa-clock fa-2x" style="margin-bottom: 1rem;"></i><p>No engine data yet</p><p style="font-size: 0.875rem;">Search engine metrics will appear after rate limiting occurs</p></div>';
+        } else {
+            analytics.engine_stats.forEach((stats) => {
+                const engineName = stats.engine || 'Unknown Engine';
+                const displayName = engineName.replace('SearchEngine', '') || engineName;
+                const statusCard = document.createElement('div');
+                statusCard.className = 'ldr-metric-card';
+                statusCard.style.borderLeft = `4px solid ${getStatusColor(stats.status)}`;
+                statusCard.innerHTML = `
+                    <div class="ldr-metric-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h4 style="margin: 0; color: var(--text-primary);">${window.escapeHtml(displayName)}</h4>
+                        <span class="ldr-status-badge" style="
+                            background: ${getStatusColor(stats.status)};
+                            color: white;
+                            padding: 2px 8px;
+                            border-radius: 12px;
+                            font-size: 0.75rem;
+                            font-weight: 600;
+                            text-transform: uppercase;
+                        ">${window.escapeHtml(stats.status)}</span>
+                    </div>
+                    <div class="ldr-engine-stats-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.875rem;">
+                        <div>
+                            <div style="color: var(--text-secondary);">Base Wait:</div>
+                            <div style="font-weight: 600;">${stats.base_wait_seconds}s</div>
+                        </div>
+                        <div>
+                            <div style="color: var(--text-secondary);">Success Rate:</div>
+                            <div style="font-weight: 600;" class="${stats.success_rate > 80 ? 'ldr-status-success' : stats.success_rate > 50 ? 'ldr-status-warning' : 'ldr-status-error'}">${stats.success_rate}%</div>
+                        </div>
+                        <div>
+                            <div style="color: var(--text-secondary);">Total Attempts:</div>
+                            <div style="font-weight: 600;">${formatNumber(stats.total_attempts)}</div>
+                        </div>
+                        <div>
+                            <div style="color: var(--text-secondary);">Last Updated:</div>
+                            <div style="font-weight: 600;">${stats.last_updated === 'Never' ? 'No rate limits yet' : formatTime(stats.last_updated)}</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-secondary);">
+                        ${stats.base_wait_seconds === 0 ? 'No rate limit estimates yet' : `Range: ${stats.min_wait_seconds}s - ${stats.max_wait_seconds}s`}
+                    </div>
+                `;
+                statusGrid.appendChild(statusCard);
+            });
+        }
+    }
+    // Get status color based on engine health
+    function getStatusColor(status) {
+        // Return CSS variable references for theme support
+        switch (status) {
+            case 'healthy': return 'var(--success-color)';
+            case 'degraded': return 'var(--warning-color)';
+            case 'poor': return 'var(--error-color)';
+            default: return 'var(--text-muted)';
+        }
+    }
+    // Format time for display
+    function formatTime(timeString) {
+        try {
+            if (timeString === 'Never' || !timeString) {
+                return 'No rate limits yet';
+            }
+            const date = new Date(timeString);
+            if (isNaN(date.getTime())) {
+                console.error('Invalid date:', timeString);
+                return 'No rate limits yet';
+            }
+            const now = new Date();
+            const diffMs = now - date;
+            const diffHours = diffMs / (1000 * 60 * 60);
+            if (diffHours < 0) {
+                // Future time (shouldn't happen but handle it)
+                return 'Just now';
+            } else if (diffHours < 1) {
+                const diffMinutes = Math.floor(diffMs / (1000 * 60));
+                if (diffMinutes < 1) {
+                    return 'Just now';
+                }
+                return `${diffMinutes}m ago`;
+            } else if (diffHours < 24) {
+                return `${Math.floor(diffHours)}h ago`;
+            } else {
+                return `${Math.floor(diffHours / 24)}d ago`;
+            }
+        } catch (error) {
+            console.error('Error formatting time:', error, timeString);
+            return 'No rate limits yet';
+        }
+    }
+    // Show error message
+    function showError() {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('error').style.display = 'block';
+    }
+    // Show empty state with helpful message
+    function showEmptyState() {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('metrics-content').style.display = 'block';
+        // Update summary cards with zeros
+        document.getElementById('total-tokens').textContent = '0';
+        document.getElementById('total-researches').textContent = '0';
+        document.getElementById('avg-response-time').textContent = '0s';
+        document.getElementById('success-rate').textContent = '0%';
+        // Reset token breakdown details
+        document.getElementById('avg-input-tokens').textContent = '0';
+        document.getElementById('avg-output-tokens').textContent = '0';
+        document.getElementById('avg-total-tokens').textContent = '0';
+        document.getElementById('total-input-tokens').textContent = '0';
+        document.getElementById('total-output-tokens').textContent = '0';
+        document.getElementById('total-all-tokens').textContent = '0';
+        // Reset cost breakdown details
+        document.getElementById('total-cost').textContent = '-';
+        document.getElementById('avg-cost-per-research').textContent = '-';
+        document.getElementById('avg-cost-per-token').textContent = '-';
+        document.getElementById('total-input-cost').textContent = '-';
+        document.getElementById('total-output-cost').textContent = '-';
+        document.getElementById('total-cost-breakdown').textContent = '-';
+        // Reset rate limiting metrics
+        document.getElementById('rate-limit-success-rate').textContent = '-';
+        document.getElementById('avg-wait-time').textContent = '-';
+        document.getElementById('engines-tracked').textContent = '0';
+        // Show helpful message in charts
+        showEmptyChartsAndTables();
+    }
+    // Show empty charts and tables with helpful messages
+    function showEmptyChartsAndTables() {
+        // Model usage list
+        const modelContainer = document.getElementById('model-usage-list');
+        modelContainer.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fas fa-robot fa-2x" style="margin-bottom: 1rem;"></i><p>No research data yet</p><p style="font-size: 0.875rem;">Run a research to see model usage metrics</p></div>';
+        // Recent researches
+        const recentContainer = document.getElementById('recent-researches');
+        recentContainer.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fas fa-search fa-2x" style="margin-bottom: 1rem;"></i><p>No research history</p><p style="font-size: 0.875rem;">Complete a research to see history</p></div>';
+        // Enhanced metrics sections
+        const modeContainer = document.getElementById('mode-breakdown');
+        modeContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 1rem;">No mode data available</p>';
+        const engineContainer = document.getElementById('search-engine-breakdown');
+        engineContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 1rem;">No search engine data available</p>';
+        const phaseContainer = document.getElementById('phase-breakdown');
+        phaseContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 1rem;">No phase data available</p>';
+        const filesContainer = document.getElementById('call-stack-files');
+        filesContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 1rem;">No file activity data</p>';
+        const functionsContainer = document.getElementById('call-stack-functions');
+        functionsContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 1rem;">No function activity data</p>';
+        const enhancedContainer = document.getElementById('recent-enhanced-data');
+        enhancedContainer.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);"><i class="fas fa-chart-line fa-2x" style="margin-bottom: 1rem;"></i><p>No enhanced tracking data</p><p style="font-size: 0.875rem;">Enhanced metrics will appear here after running research</p></div>';
+        const callStacksContainer = document.getElementById('recent-call-stacks');
+        callStacksContainer.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 1rem;">No call stack traces available</p>';
+        // Create empty chart
+        createEmptyTimeSeriesChart();
+    }
+    // Create empty time-series chart
+    function createEmptyTimeSeriesChart() {
+        const ctx = document.getElementById('time-series-chart').getContext('2d');
+        // Destroy existing chart if it exists
+        if (timeSeriesChart) {
+            timeSeriesChart.destroy();
+        }
+        timeSeriesChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'No data available',
+                    data: [],
+                    borderColor: 'rgba(200, 200, 200, 0.5)',
+                    backgroundColor: 'rgba(200, 200, 200, 0.1)',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                elements: {
+                    point: {
+                        radius: 0
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    },
+                    y: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Tokens'
+                        },
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            },
+            plugins: [{
+                id: 'emptyChart',
+                beforeDraw: function(chart) {
+                    const ctx = chart.ctx;
+                    const width = chart.width;
+                    const height = chart.height;
+                    ctx.save();
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.font = '16px Arial';
+                    ctx.fillStyle = 'rgba(150, 150, 150, 0.8)';
+                    ctx.fillText('No research data yet - run a research to see token usage over time', width / 2, height / 2);
+                    ctx.restore();
+                }
+            }]
+        });
+    }
+    // Handle time range button clicks
+    function handleTimeRangeChange(period) {
+        // Update current period
+        currentPeriod = period;
+        // Update button states for time range
+        document.querySelectorAll('[data-period]').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelector(`[data-period="${period}"]`).classList.add('active');
+        // Reload metrics with current filters
+        loadMetrics(currentPeriod);
+    }
+    // Handle research mode button clicks
+    function handleResearchModeChange(mode) {
+        // Update current mode
+        currentMode = mode;
+        // Update button states for research mode
+        document.querySelectorAll('[data-mode]').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelector(`[data-mode="${mode}"]`).classList.add('active');
+        // Reload metrics with current filters
+        loadMetrics(currentPeriod);
+    }
+    // Initialize when DOM is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set up time range button event listeners
+        document.querySelectorAll('[data-period]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const period = this.getAttribute('data-period');
+                handleTimeRangeChange(period);
+            });
+        });
+        // Set up research mode button event listeners
+        document.querySelectorAll('[data-mode]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const mode = this.getAttribute('data-mode');
+                handleResearchModeChange(mode);
+            });
+        });
+        // Load initial metrics
+        loadMetrics();
+        // Set up smart tooltip positioning
+        setupTooltipPositioning();
+    });
+    // Smart tooltip positioning to prevent cutoff
+    function setupTooltipPositioning() {
+        document.querySelectorAll('.ldr-tooltip').forEach(tooltip => {
+            tooltip.addEventListener('mouseenter', function() {
+                // Remove existing positioning classes
+                this.classList.remove('ldr-tooltip-left', 'ldr-tooltip-right');
+
+                // Get element position
+                const rect = this.getBoundingClientRect();
+                const windowWidth = window.innerWidth;
+                // Check if tooltip would go off left edge
+                if (rect.left < 150) {
+                    this.classList.add('ldr-tooltip-left');
+                }
+                // Check if tooltip would go off right edge
+                else if (rect.right > windowWidth - 150) {
+                    this.classList.add('ldr-tooltip-right');
+                }
+            });
+        });
+    }
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Local Deep Research</title>
+
+    <!-- Vite HMR for development -->
+    {{ vite_hmr() }}
+
+    <!-- SafeLogger must load before app.js which uses it at init -->
+    <script src="/static/js/security/safe-logger.js"></script>
+    <script src="/static/js/security/auth-validation.js"></script>
+    <!-- Load all vendor dependencies and styles through Vite -->
+    {{ vite_asset('js/app.js') }}
+
+    <!-- Keep local styles -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        /* Override main layout for auth pages */
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: var(--bg-primary);
+            background-image:
+                radial-gradient(ellipse at top left, rgba(110, 79, 246, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at bottom right, rgba(64, 191, 255, 0.1) 0%, transparent 50%);
+        }
+
+        .ldr-auth-container {
+            width: 100%;
+            max-width: 600px;
+            padding: 2rem;
+        }
+
+        .ldr-auth-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .ldr-auth-header h1 {
+            font-size: 2.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+        }
+
+        .ldr-auth-header h1 i {
+            color: var(--accent-primary);
+            font-size: 2.25rem;
+        }
+
+        .ldr-auth-header p {
+            color: var(--text-secondary);
+            font-size: 1.25rem;
+        }
+
+        .ldr-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+        }
+
+        .ldr-card-content {
+            padding: 3rem;
+        }
+
+        .ldr-warning-banner {
+            background: rgba(249, 188, 11, 0.1);
+            border: 1px solid rgba(249, 188, 11, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 1.25rem;
+        }
+
+        .ldr-warning-banner i {
+            color: var(--warning-color);
+            font-size: 2rem;
+            margin-top: 0.25rem;
+        }
+
+        .ldr-warning-banner-content {
+            flex: 1;
+        }
+
+        .ldr-warning-banner-content strong {
+            color: var(--warning-color);
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .ldr-danger-alert i {
+            color: var(--error-color);
+            font-size: 2rem;
+            margin-right: 1rem;
+        }
+
+        .ldr-warning-banner-content span {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+
+        .ldr-danger-alert {
+            background: rgba(250, 92, 124, 0.1);
+            border: 1px solid rgba(250, 92, 124, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            color: var(--error-color);
+        }
+
+        .ldr-danger-alert strong {
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .alert {
+            background: rgba(250, 92, 124, 0.1);
+            border: 1px solid rgba(250, 92, 124, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            color: var(--error-color);
+            position: relative;
+        }
+
+        .alert-dismissible {
+            padding-right: 3rem;
+        }
+
+        .btn-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            color: inherit;
+            opacity: 0.5;
+            cursor: pointer;
+            font-size: 1.2rem;
+            line-height: 1;
+            padding: 0;
+            width: auto;
+            height: auto;
+        }
+
+        .btn-close:hover {
+            opacity: 1;
+        }
+
+        .form-group {
+            margin-bottom: 2rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+            font-weight: 500;
+            font-size: 1.1rem;
+        }
+
+        .form-group small {
+            display: block;
+            margin-top: 0.5rem;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .ldr-form-control {
+            width: 100%;
+            padding: 1rem 1.25rem;
+            min-height: 44px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            transition: all 0.2s;
+        }
+
+        .ldr-form-control:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(110, 79, 246, 0.1);
+        }
+
+        .ldr-form-control::placeholder {
+            color: var(--text-muted);
+        }
+
+        .ldr-password-requirements {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .form-group.ldr-password-field {
+            margin-bottom: 1rem;
+        }
+
+        .ldr-password-requirements strong {
+            color: var(--text-primary);
+            display: block;
+            margin-bottom: 0.75rem;
+            font-size: 1.05rem;
+        }
+
+        .ldr-password-requirements ul {
+            margin: 0;
+            padding-left: 1.75rem;
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        .ldr-password-requirements li {
+            margin-bottom: 0.5rem;
+            line-height: 1.5;
+        }
+
+        .ldr-password-strength {
+            height: 4px;
+            border-radius: 2px;
+            margin-top: 0.5rem;
+            transition: all 0.3s ease;
+            background: var(--bg-tertiary);
+        }
+
+        .ldr-strength-weak { background-color: var(--error-color); width: 33%; }
+        .ldr-strength-medium { background-color: var(--warning-color); width: 66%; }
+        .ldr-strength-strong { background-color: var(--success-color); width: 100%; }
+
+        .ldr-acknowledge-box {
+            background: rgba(250, 92, 124, 0.05);
+            border: 1px solid rgba(250, 92, 124, 0.2);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .ldr-checkbox-label {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 1.05rem;
+        }
+
+        .ldr-checkbox-label input[type="checkbox"] {
+            width: 1.5rem;
+            height: 1.5rem;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            flex-shrink: 0;
+            margin-top: 0.125rem;
+        }
+
+        .ldr-checkbox-label input[type="checkbox"]:checked {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .ldr-checkbox-label span {
+            line-height: 1.5;
+        }
+
+        .ldr-checkbox-label strong {
+            color: var(--error-color);
+            font-weight: 600;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            padding: 1.25rem 2.5rem;
+            background: var(--accent-primary);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.15rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+            width: 100%;
+        }
+
+        .btn:hover {
+            background: var(--accent-secondary);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(110, 79, 246, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .ldr-auth-links {
+            text-align: center;
+            margin-top: 2.5rem;
+            padding-top: 2.5rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .ldr-auth-links p {
+            color: var(--text-secondary);
+            margin-bottom: 0.75rem;
+            font-size: 1.05rem;
+        }
+
+        .ldr-auth-links a {
+            color: var(--accent-tertiary);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 1.05rem;
+        }
+
+        .ldr-auth-links a:hover {
+            color: var(--accent-secondary);
+        }
+
+        .ldr-browser-hint {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-top: 1rem;
+        }
+
+        .ldr-browser-hint i {
+            font-size: 1rem;
+        }
+
+        /* Validation styles */
+        .ldr-form-control.is-invalid {
+            border-color: var(--error-color);
+            box-shadow: 0 0 0 3px rgba(250, 92, 124, 0.15);
+        }
+
+        .ldr-form-control.is-valid {
+            border-color: var(--success-color);
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
+        }
+
+        .form-group .ldr-error-message {
+            display: none;
+            color: var(--error-color);
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+
+        .form-group .ldr-error-message.show {
+            display: block;
+        }
+
+        .ldr-checkbox-label.is-invalid span {
+            color: var(--error-color);
+        }
+    </style>
+</head>
+<body>
+    {{ vite_missing_assets_banner() }}
+    <div class="ldr-auth-container">
+        <div class="ldr-auth-header">
+            <h1><i aria-hidden="true" class="fas fa-user-plus"></i> Create Account</h1>
+            <p>Join Local Deep Research</p>
+        </div>
+
+        <div class="ldr-card">
+            <div class="ldr-card-content">
+
+                {% if has_encryption %}
+                    <div class="ldr-warning-banner">
+                        <i aria-hidden="true" class="fas fa-exclamation-triangle"></i>
+                        <div class="ldr-warning-banner-content">
+                            <strong>Important Security Notice</strong>
+                            <span>Your database will be encrypted with your password. There is NO way to recover your data if you forget your password. Please use a password manager.</span>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="ldr-danger-alert">
+                        <i aria-hidden="true" class="fas fa-shield-alt"></i>
+                        <strong>Security Alert: No Encryption Available</strong>
+                        SQLCipher is not installed. Your database will be created WITHOUT encryption.
+                        Your API keys and data will be stored in plain text.
+                        <br><br>
+                        <strong>This is NOT recommended for production use.</strong>
+                        <br>
+                        Install SQLCipher before creating accounts for secure operation.
+                    </div>
+                {% endif %}
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-dismissible">
+                                {{ message }}
+                                <button type="button" class="btn-close" onclick="this.parentElement.style.display='none'">×</button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <form method="post" action="{{ url_for('auth.register') }}" autocomplete="on">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <!-- Note: The hyphen in the pattern must be escaped (\-) for Chrome's
+                             unicodeSets (v) flag regex validation. Without escaping, Chrome
+                             reports: "Invalid regular expression: Invalid character in character class" -->
+                        <input type="text"
+                               class="ldr-form-control"
+                               id="username"
+                               name="username"
+                               placeholder="Choose a username"
+                               autocomplete="username"
+                               required
+                               autofocus
+                               minlength="3"
+                               pattern="[a-zA-Z0-9_\-]+"
+                               aria-describedby="username-error">
+                        <small>At least 3 characters. Letters, numbers, underscores, and hyphens only.</small>
+                        <div class="ldr-error-message" id="username-error"></div>
+                    </div>
+
+                    <div class="form-group ldr-password-field">
+                        <label for="password">Password</label>
+                        <input type="password"
+                               class="ldr-form-control"
+                               id="password"
+                               name="password"
+                               placeholder="Create a strong password"
+                               autocomplete="new-password"
+                               required
+                               minlength="8"
+                               aria-describedby="password-error">
+                        <div id="password-strength" class="ldr-password-strength" style="display: none;"></div>
+                        <div class="ldr-error-message" id="password-error"></div>
+                    </div>
+
+                    <div class="ldr-password-requirements">
+                        <strong>Password Requirements:</strong>
+                        <ul>
+                            {% for req in password_requirements %}
+                            <li>{{ req }}</li>
+                            {% endfor %}
+                            <li>Store it in your browser's password manager</li>
+                        </ul>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirm_password">Confirm Password</label>
+                        <input type="password"
+                               class="ldr-form-control"
+                               id="confirm_password"
+                               name="confirm_password"
+                               placeholder="Re-enter your password"
+                               autocomplete="new-password"
+                               required
+                               minlength="8"
+                               aria-describedby="confirm-password-error">
+                        <div class="ldr-error-message" id="confirm-password-error"></div>
+                    </div>
+
+                    <div class="ldr-acknowledge-box">
+                        <label class="ldr-checkbox-label">
+                            <input type="checkbox"
+                                   id="acknowledge"
+                                   name="acknowledge"
+                                   value="true"
+                                   required>
+                            <span>
+                                <i aria-hidden="true" class="fas fa-lock"></i> I understand that <strong>if I forget my password,
+                                I will permanently lose access to all my data</strong>. There is no password recovery.
+                            </span>
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn">
+                        <i aria-hidden="true" class="fas fa-shield-alt"></i>
+                        Create Encrypted Account
+                    </button>
+                </form>
+
+                <div class="ldr-auth-links">
+                    <p>Already have an account? <a href="{{ url_for('auth.login') }}">Login here</a></p>
+                    <div class="ldr-browser-hint">
+                        <i aria-hidden="true" class="fas fa-info-circle"></i>
+                        <span>Your browser will offer to save your password</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Validation helpers
+        function setFieldValid(input, errorEl) {
+            input.classList.remove('is-invalid');
+            input.classList.add('is-valid');
+            input.setAttribute('aria-invalid', 'false');
+            errorEl.classList.remove('show');
+            errorEl.textContent = '';
+        }
+
+        function setFieldInvalid(input, errorEl, message) {
+            input.classList.remove('is-valid');
+            input.classList.add('is-invalid');
+            input.setAttribute('aria-invalid', 'true');
+            errorEl.classList.add('show');
+            errorEl.textContent = message;
+        }
+
+        function clearFieldState(input, errorEl) {
+            input.classList.remove('is-valid', 'is-invalid');
+            input.removeAttribute('aria-invalid');
+            errorEl.classList.remove('show');
+            errorEl.textContent = '';
+        }
+
+        // Username validation
+        const usernameInput = document.getElementById('username');
+        const usernameError = document.getElementById('username-error');
+        const usernamePattern = /^[a-zA-Z0-9_\-]+$/;
+
+        usernameInput.addEventListener('input', function() {
+            const value = this.value.trim();
+
+            if (value.length === 0) {
+                clearFieldState(this, usernameError);
+                return;
+            }
+
+            if (value.length < 3) {
+                setFieldInvalid(this, usernameError, 'Username must be at least 3 characters');
+            } else if (!usernamePattern.test(value)) {
+                setFieldInvalid(this, usernameError, 'Username can only contain letters, numbers, underscores, and hyphens');
+            } else {
+                setFieldValid(this, usernameError);
+            }
+        });
+
+        usernameInput.addEventListener('blur', function() {
+            const value = this.value.trim();
+            if (value.length === 0) {
+                setFieldInvalid(this, usernameError, 'Username is required');
+            } else if (value.length < 3) {
+                setFieldInvalid(this, usernameError, 'Username must be at least 3 characters');
+            } else if (!usernamePattern.test(value)) {
+                setFieldInvalid(this, usernameError, 'Username can only contain letters, numbers, underscores, and hyphens');
+            } else {
+                setFieldValid(this, usernameError);
+            }
+        });
+
+        // Password validation and strength
+        const passwordInput = document.getElementById('password');
+        const passwordError = document.getElementById('password-error');
+        const strengthBar = document.getElementById('password-strength');
+        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+
+        passwordInput.addEventListener('input', function() {
+            const value = this.value;
+
+            // Strength indicator (always show during typing - helpful feedback)
+            if (value.length === 0) {
+                strengthBar.style.display = 'none';
+                clearFieldState(this, passwordError);
+                return;
+            }
+
+            strengthBar.style.display = 'block';
+            let strength = 0;
+            if (value.length >= 8) strength++;
+            if (value.length >= 12) strength++;
+            if (/[a-z]/.test(value)) strength++;
+            if (/[0-9]/.test(value)) strength++;
+
+            strengthBar.className = 'ldr-password-strength';
+            if (strength <= 1) {
+                strengthBar.classList.add('ldr-strength-weak');
+            } else if (strength <= 3) {
+                strengthBar.classList.add('ldr-strength-medium');
+            } else {
+                strengthBar.classList.add('ldr-strength-strong');
+            }
+
+            // If field was marked invalid, re-check via API to clear error
+            if (this.classList.contains('is-invalid')) {
+                validatePasswordViaAPI(value, csrfToken).then(result => {
+                    if (result.valid) {
+                        setFieldValid(passwordInput, passwordError);
+                    }
+                });
+            }
+
+            // Re-validate confirm password if it has a value
+            const confirmValue = confirmPasswordInput.value;
+            if (confirmValue.length > 0) {
+                validateConfirmPassword();
+            }
+        });
+
+        // Blur handler — validate via API
+        passwordInput.addEventListener('blur', function() {
+            const value = this.value;
+            if (value.length > 0) {
+                validatePasswordViaAPI(value, csrfToken).then(result => {
+                    if (!result.valid && result.errors.length > 0) {
+                        setFieldInvalid(passwordInput, passwordError, result.errors[0]);
+                    } else if (result.valid) {
+                        setFieldValid(passwordInput, passwordError);
+                    }
+                });
+            }
+        });
+
+        // Confirm password validation
+        const confirmPasswordInput = document.getElementById('confirm_password');
+        const confirmPasswordError = document.getElementById('confirm-password-error');
+
+        function validateConfirmPassword() {
+            const password = passwordInput.value;
+            const confirmPassword = confirmPasswordInput.value;
+
+            if (confirmPassword.length === 0) {
+                clearFieldState(confirmPasswordInput, confirmPasswordError);
+                return false;
+            }
+
+            if (confirmPassword !== password) {
+                setFieldInvalid(confirmPasswordInput, confirmPasswordError, 'Passwords do not match');
+                return false;
+            } else {
+                setFieldValid(confirmPasswordInput, confirmPasswordError);
+                return true;
+            }
+        }
+
+        confirmPasswordInput.addEventListener('input', validateConfirmPassword);
+
+        // Form submission validation
+        document.querySelector('form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            let hasError = false;
+
+            // Validate username
+            const username = usernameInput.value.trim();
+            if (username.length === 0) {
+                setFieldInvalid(usernameInput, usernameError, 'Username is required');
+                hasError = true;
+            } else if (!usernamePattern.test(username)) {
+                setFieldInvalid(usernameInput, usernameError, 'Username can only contain letters, numbers, underscores, and hyphens');
+                hasError = true;
+            }
+
+            // Validate password via API (single source of truth)
+            const password = passwordInput.value;
+            const result = await validatePasswordViaAPI(password, csrfToken);
+            if (!result.valid) {
+                setFieldInvalid(passwordInput, passwordError, result.errors?.[0] ?? 'Password does not meet requirements');
+                hasError = true;
+            }
+
+            // Validate confirm password
+            if (!validateConfirmPassword()) {
+                hasError = true;
+            }
+
+            // Validate acknowledgment
+            const acknowledge = document.getElementById('acknowledge');
+            if (!acknowledge.checked) {
+                acknowledge.parentElement.classList.add('is-invalid');
+                hasError = true;
+            } else {
+                acknowledge.parentElement.classList.remove('is-invalid');
+            }
+
+            if (hasError) {
+                // Scroll to first error
+                const firstError = document.querySelector('.is-invalid');
+                if (firstError) {
+                    firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    firstError.focus();
+                }
+                return;
+            }
+
+            // All valid — submit the form
+            this.submit();
+        });
+    </script>
+</body>
+</html>

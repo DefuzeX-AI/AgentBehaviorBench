@@ -1,0 +1,2340 @@
+"""
+PDF Download Service for Research Library
+
+Handles downloading PDFs from various academic sources with:
+- Deduplication using download tracker
+- Source-specific download strategies (arXiv, PubMed, etc.)
+- Progress tracking and error handling
+- File organization and storage
+"""
+
+import hashlib
+import os
+import re
+import time
+import uuid
+from datetime import datetime, UTC
+from pathlib import Path
+from typing import Any, Dict, Optional, Tuple, assert_never
+from urllib.parse import urlparse
+
+import requests
+from loguru import logger
+from sqlalchemy.orm import Session
+import pdfplumber
+from pypdf import PdfReader
+
+from ...utilities.arxiv import is_arxiv_paper_url
+from ...utilities.type_utils import unwrap_setting
+from ...constants import FILE_PATH_SENTINELS, FILE_PATH_TEXT_ONLY
+from ...database.models.download_tracker import (
+    DownloadAttempt,
+    DownloadTracker,
+)
+
+# SSRF chokepoint: every outbound fetch in this module goes through
+# `safe_get`, which validates via ssrf_validator (raising on failure,
+# re-validating after redirects, always blocking cloud-metadata
+# addresses). `requests` is imported above for its exception types only
+# — do not add a raw requests.get()/post() here. GHSA-9c54 was exactly
+# that bypass, and `is_downloadable_domain` upstream is a relevance
+# filter, not a security control.
+from ...security import safe_get, sanitize_error_for_client
+from ...database.models.library import (
+    Collection,
+    Document as Document,
+    DocumentStatus,
+    DownloadQueue as LibraryDownloadQueue,
+)
+from .pdf_storage_manager import (
+    DEFAULT_MAX_PDF_SIZE_MB,
+    PDFStorageManager,
+    resolve_pdf_storage_mode,
+)
+from ...database.models.research import ResearchResource
+from ...database.library_init import get_source_type_id, get_default_library_id
+from ...database.session_context import get_user_db_session, safe_rollback
+from ...utilities.db_utils import get_settings_manager
+from ...library.download_management import RetryManager
+from ...config.paths import get_library_directory
+from ..utils import (
+    apply_user_subdir,
+    ensure_in_collection,
+    get_document_for_resource,
+    get_url_hash,
+    get_absolute_path_from_settings,
+    is_downloadable_url,
+)
+
+# Import our modular downloaders
+from ..downloaders import (
+    ContentType,
+    ArxivDownloader,
+    PubMedDownloader,
+    BioRxivDownloader,
+    DirectPDFDownloader,
+    SemanticScholarDownloader,
+    OpenAlexDownloader,
+    GenericDownloader,
+)
+from ..downloaders.arxiv import ArxivTextSource
+from ..extraction_catalog import (
+    ExtractionMethodExtra,
+    ExtractionSourceExtra,
+)
+from ...constants import DEFAULT_SEARCH_TOOL
+
+
+def _arxiv_text_provenance(source: ArxivTextSource) -> tuple[str, str]:
+    match source:
+        case ArxivTextSource.ARXIV_HTML:
+            return (
+                ExtractionMethodExtra.HTML_EXTRACTION.value,
+                ExtractionSourceExtra.ARXIV_HTML.value,
+            )
+        case ArxivTextSource.LOCAL_PDF:
+            return "pdf_extraction", "local_pdf"
+        case ArxivTextSource.ARXIV_API:
+            return "native_api", "arxiv_api"
+        case unreachable:
+            assert_never(unreachable)
+
+
+class DownloadService:
+    """Service for downloading and managing research PDFs."""
+
+    def __init__(
+        self,
+        username: str,
+        password: Optional[str] = None,
+        settings_snapshot: Optional[Dict[str, Any]] = None,
+    ):
+        """Initialize download service for a user.
+
+        Args:
+            username: The username to download for
+            password: Optional password for encrypted database access
+            settings_snapshot: Optional snapshot used to build the
+                EgressContext for per-URL scope gating. When None,
+                downloads run without scope enforcement (back-compat
+                for the existing caller; new callers must pass it).
+        """
+        self.username = username
+        self.password = password
+        self.settings = get_settings_manager(username=username)
+        self._closed = False
+        # When no snapshot is passed (e.g. the library download routes, which
+        # construct DownloadService(username, password) directly), build one
+        # from this user's settings so egress policy is still enforced.
+        # Without this, _egress_context stays None and _check_url_against_policy
+        # returns (True, "no_context") — every download ungated. Best-effort:
+        # on failure, fall through to the pre-policy behavior.
+        # A real backend error (get_settings_snapshot raised) is different
+        # from a test double returning a non-dict: under a private scope we
+        # must NOT silently fall through to ungated downloads when we simply
+        # failed to READ the user's settings. Track that case and fail closed.
+        self._snapshot_build_failed = False
+        if settings_snapshot is None:
+            try:
+                built = self.settings.get_settings_snapshot()
+                # Only adopt a real dict — a test double or unavailable
+                # backend hands back something else; treat that as "no
+                # snapshot" (ungated back-compat) rather than letting the
+                # policy evaluation fail closed on a non-dict.
+                if isinstance(built, dict):
+                    settings_snapshot = built
+            except Exception:
+                # The user HAS a settings backend (self.settings exists) but
+                # reading it raised — a private scope could be configured and
+                # we just couldn't see it. Fail closed rather than ungate.
+                logger.bind(policy_audit=True).warning(
+                    "DownloadService: settings snapshot build raised; "
+                    "locking downloads closed (fail-safe)"
+                )
+                self._snapshot_build_failed = True
+        self._settings_snapshot = settings_snapshot
+        self._egress_context = self._build_egress_context(settings_snapshot)
+
+        # Debug settings manager and user context
+        logger.info(
+            f"[DOWNLOAD_SERVICE] Settings manager initialized: {type(self.settings)}, username: {self.username}"
+        )
+
+        # Get library path from settings (uses centralized path, respects LDR_DATA_DIR)
+        storage_path_setting = self.settings.get_setting(
+            "research_library.storage_path",
+            str(get_library_directory()),
+        )
+        logger.debug(
+            f"[DOWNLOAD_SERVICE_INIT] Storage path setting retrieved: {storage_path_setting} (type: {type(storage_path_setting)})"
+        )
+
+        if storage_path_setting is None:
+            logger.error(
+                "[DOWNLOAD_SERVICE_INIT] CRITICAL: storage_path_setting is None!"
+            )
+            raise ValueError("Storage path setting cannot be None")
+
+        # Per-user library root (issue #5521). PDFs are written to a per-user
+        # subdirectory (<base>/<username>) instead of the shared base, so two
+        # users' per-user autoincrement resource ids can't collide on the same
+        # `pdfs/<resource_id>.pdf` path in one shared directory. This mirrors
+        # get_library_storage_path()'s layout but derives the base from this
+        # user's own settings manager (self.settings) so it stays correct in
+        # background/scheduler threads that have no request context.
+        # `legacy_library_root` is the old shared base: it is never written to,
+        # only used as a READ fallback so PDFs downloaded before per-user
+        # isolation still load (no blind bulk file move — see PR notes).
+        base_library_root = (
+            Path(os.path.expandvars(storage_path_setting))
+            .expanduser()
+            .resolve()
+        )
+        shared_library = self.settings.get_setting(
+            "research_library.shared_library", False
+        )
+        self.legacy_library_root = str(base_library_root)
+        self.library_root = str(
+            apply_user_subdir(base_library_root, self.username, shared_library)
+        )
+        logger.debug(
+            f"[DOWNLOAD_SERVICE_INIT] Library root resolved to: {self.library_root} "
+            f"(legacy shared root: {self.legacy_library_root})"
+        )
+
+        # Create directory structure
+        self._setup_directories()
+
+        # Initialize modular downloaders
+
+        # Get Semantic Scholar API key from settings
+        semantic_scholar_api_key = self.settings.get_setting(
+            "search.engine.web.semantic_scholar.api_key", ""
+        )
+
+        # Same for OpenAlex: the downloader hits api.openalex.org for every
+        # work lookup, so it needs the key too. It is passed through raw —
+        # ``OpenAlexDownloader.__init__`` runs ``normalize_openalex_api_key``
+        # itself, so placeholders/sentinels/non-strings become None
+        # (keyless free tier) there, in one place.
+        openalex_api_key = self.settings.get_setting(
+            "search.engine.web.openalex.api_key", ""
+        )
+
+        # ArxivDownloader precedes DirectPDFDownloader: for a paper URL it
+        # builds the canonical PDF URL rather than fetching whatever the
+        # input pointed at. It can only do that for URLs that name a paper,
+        # and can_handle now says so, so arXiv's legacy /ftp/ PDF layout --
+        # which yields no identifier -- still reaches DirectPDFDownloader
+        # instead of being claimed and skipped.
+        self.downloaders = [
+            ArxivDownloader(timeout=30),
+            DirectPDFDownloader(timeout=30),
+            SemanticScholarDownloader(
+                timeout=30,
+                api_key=semantic_scholar_api_key
+                if semantic_scholar_api_key
+                else None,
+            ),
+            # OpenAlex work lookup; the key is optional (it raises the
+            # daily budget 10x) and None means the keyless free tier.
+            OpenAlexDownloader(timeout=30, api_key=openalex_api_key),
+            PubMedDownloader(timeout=30, rate_limit_delay=1.0),
+            BioRxivDownloader(timeout=30),
+            GenericDownloader(timeout=30),  # Generic should be last (fallback)
+        ]
+
+        # Initialize retry manager for smart failure tracking
+        self.retry_manager = RetryManager(username, password)
+        logger.info(
+            f"[DOWNLOAD_SERVICE] Initialized retry manager for user: {username}"
+        )
+
+        # PubMed rate limiting state
+        self._pubmed_delay = 1.0  # 1 second delay for PubMed
+        self._last_pubmed_request = 0.0  # Track last request time
+
+    def close(self):
+        """Close all downloader resources."""
+        if self._closed:
+            return
+        self._closed = True
+
+        from ...utilities.resource_utils import safe_close
+
+        for downloader in self.downloaders:
+            safe_close(downloader, "downloader")
+
+        # Close the settings manager's DB session to return the connection
+        # to the pool.  SettingsManager.close() is idempotent.
+        safe_close(self.settings, "settings manager", allow_none=True)
+
+        # Clear references to allow garbage collection
+        self.downloaders = []
+        self.retry_manager = None
+        self.settings = None
+
+    def __enter__(self):
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit context manager, ensuring cleanup."""
+        self.close()
+        return False
+
+    def _setup_directories(self):
+        """Create library directory structure."""
+        from ...security.directory_creation import create_directory
+
+        # Only create the root and pdfs folder - flat structure.
+        paths = [
+            self.library_root,
+            str(Path(self.library_root) / "pdfs"),
+        ]
+        for path in paths:
+            create_directory(
+                path,
+                context="download service library directory",
+            )
+
+    def _normalize_url(self, url: str) -> str:
+        """Normalize URL for consistent hashing."""
+        # Remove protocol variations
+        url = re.sub(r"^https?://", "", url)
+        # Remove www
+        url = re.sub(r"^www\.", "", url)
+        # Remove trailing slashes
+        url = url.rstrip("/")
+        # Sort query parameters
+        if "?" in url:
+            base, query = url.split("?", 1)
+            params = sorted(query.split("&"))
+            url = f"{base}?{'&'.join(params)}"
+        return url.lower()
+
+    def _get_url_hash(self, url: str) -> str:
+        """Generate SHA256 hash of normalized URL."""
+        normalized = self._normalize_url(url)
+        return get_url_hash(normalized)
+
+    def _build_egress_context(self, settings_snapshot):
+        """Build an EgressContext from the supplied snapshot. Returns
+        None when no snapshot is available — callers fall through to
+        the pre-policy behavior (back-compat with non-scheduler callers).
+
+        Sets ``self._policy_locked = True`` when a snapshot WAS supplied
+        but the policy itself cannot be evaluated (corrupt scope
+        value). The check_url method honors
+        this flag and fails closed — the previous code returned None on
+        PolicyDeniedError and check_url then returned ``(True,
+        "no_context")``, which silently allowed every download under a
+        misconfigured policy.
+        """
+        self._policy_locked = False
+        # Use an explicit `is None` check, not a truthiness test: an empty
+        # dict {} is a real (if minimal) snapshot, and `if not {}` would
+        # silently skip policy gating for it — fail-open. Match the
+        # `is None` guard used by the LLM/embeddings gates.
+        if settings_snapshot is None:
+            return None
+        try:
+            from ...security.egress.policy import (
+                PolicyDeniedError,
+                context_from_snapshot,
+            )
+        except ImportError:
+            logger.debug(
+                "egress_policy unavailable in DownloadService; "
+                "downloads will not be scope-gated"
+            )
+            return None
+
+        primary_raw = unwrap_setting(
+            settings_snapshot.get("search.tool", DEFAULT_SEARCH_TOOL)
+        )
+        try:
+            return context_from_snapshot(
+                settings_snapshot,
+                primary_raw or DEFAULT_SEARCH_TOOL,
+                username=self.username,
+            )
+        except (PolicyDeniedError, ValueError) as exc:
+            logger.bind(policy_audit=True).warning(
+                "DownloadService policy unavailable; locking out "
+                "every URL check",
+                reason=str(exc),
+            )
+            self._policy_locked = True
+            return None
+
+    def _check_url_against_policy(self, url: str) -> Tuple[bool, str]:
+        """Run evaluate_url against self._egress_context. Returns
+        (allowed, reason). When no context is configured (legacy
+        callers OR tests that mock __init__), returns (True, "no_context")
+        so back-compat callers aren't broken — but new callers passing
+        a snapshot DO get gated. Logged to policy_audit on denial.
+        """
+        # ``_policy_locked`` is set by _build_egress_context when a
+        # snapshot was supplied but the policy itself raised. Without
+        # this short-circuit, _egress_context is None and the legacy
+        # fall-through below would silently allow every URL.
+        if getattr(self, "_policy_locked", False):
+            return False, "policy_unavailable"
+
+        # Reading the user's settings raised during __init__ — we could not
+        # determine the scope, so fail closed instead of ungating downloads.
+        if getattr(self, "_snapshot_build_failed", False):
+            return False, "settings_unavailable"
+
+        # Use getattr so tests that mock DownloadService.__init__ (and
+        # therefore never set _egress_context) still work — they
+        # operated under the pre-policy contract.
+        egress_context = getattr(self, "_egress_context", None)
+        if egress_context is None:
+            return True, "no_context"
+        from ...security.egress.policy import evaluate_url
+        from ...security.ssrf_validator import redact_url_for_log
+
+        decision = evaluate_url(url, egress_context)
+        if not decision.allowed:
+            logger.bind(policy_audit=True).warning(
+                "DownloadService URL denied by egress policy",
+                # Redact userinfo creds / query-string tokens from the log.
+                url=redact_url_for_log(url),
+                scope=egress_context.scope.value,
+                reason=decision.reason,
+            )
+        return decision.allowed, decision.reason
+
+    def is_already_downloaded(self, url: str) -> Tuple[bool, Optional[str]]:
+        """
+        Check if URL is already downloaded.
+
+        Returns:
+            Tuple of (is_downloaded, file_path)
+        """
+        url_hash = self._get_url_hash(url)
+
+        with get_user_db_session(self.username, self.password) as session:
+            tracker = (
+                session.query(DownloadTracker)
+                .filter_by(url_hash=url_hash, is_downloaded=True)
+                .first()
+            )
+
+            if tracker and tracker.file_path:
+                # Compute absolute path and verify file still exists. Pass the
+                # username so per-user files resolve, with legacy-shared
+                # fallback for pre-isolation downloads (issue #5521). Pass
+                # self.settings so storage_path/shared_library are read from
+                # this user's captured manager — the ambient one is db-less in
+                # background/scheduler threads and would resolve the default
+                # root, missing a user's UI-customized storage_path. Use
+                # getattr: __init__ always sets self.settings in production
+                # (incl. scheduler threads), but test doubles that construct
+                # a DownloadService via __new__/partial mocks may not — fall
+                # back to None (the ambient get_settings_manager()) rather
+                # than raising AttributeError.
+                absolute_path = get_absolute_path_from_settings(
+                    tracker.file_path,
+                    self.username,
+                    settings_manager=getattr(self, "settings", None),
+                )
+                if absolute_path and absolute_path.is_file():
+                    return True, str(absolute_path)
+                if absolute_path:
+                    # File was deleted, mark as not downloaded
+                    tracker.is_downloaded = False
+                    session.commit()
+                # If absolute_path is None, path was blocked - treat as not downloaded
+
+            return False, None
+
+    def get_text_content(self, resource_id: int) -> Optional[str]:
+        """
+        Get text content for a research resource.
+
+        This will try to:
+        1. Produce text through a source-specific downloader if available
+        2. Extract text from downloaded PDF if exists
+        3. Download PDF and extract text if not yet downloaded
+
+        Args:
+            resource_id: ID of the research resource
+
+        Returns:
+            Text content as string, or None if extraction failed
+        """
+        with get_user_db_session(self.username, self.password) as session:
+            resource = session.get(ResearchResource, resource_id)
+            if not resource:
+                logger.error(f"Resource {resource_id} not found")
+                return None
+
+            url = resource.url
+
+            # Egress policy gate — denied URLs short-circuit before any
+            # downloader fires a request.
+            allowed, reason = self._check_url_against_policy(url)
+            if not allowed:
+                logger.warning(
+                    f"Skipping text extraction for {url}: refused by "
+                    f"egress policy ({reason})"
+                )
+                return None
+
+            # Find appropriate downloader
+            for downloader in self.downloaders:
+                if downloader.can_handle(url):
+                    logger.info(
+                        f"Using {downloader.__class__.__name__} for text extraction from {url}"
+                    )
+                    try:
+                        # Try to get text content
+                        text = downloader.download_text(url)
+                        if text:
+                            logger.info(
+                                f"Successfully extracted text for: {resource.title[:50]}"
+                            )
+                            return text
+                    except Exception:
+                        logger.exception("Failed to extract text")
+                    break
+
+            logger.warning(f"Could not extract text for {url}")
+            return None
+
+    def queue_research_downloads(
+        self, research_id: str, collection_id: Optional[str] = None
+    ) -> int:
+        """
+        Queue all downloadable PDFs from a research session.
+
+        Args:
+            research_id: The research session ID
+            collection_id: Optional target collection ID (defaults to Library if not provided)
+
+        Returns:
+            Number of items queued
+
+        Notes:
+            Resets existing FAILED/COMPLETED queue entries for the research back
+            to PENDING, effectively retrying them. Resources that already have a
+            PENDING queue entry or a COMPLETED Document are skipped. As of #4685,
+            ``download_bulk`` calls this unconditionally on every bulk run, so
+            previously-failed downloads are automatically retried each time.
+            A PROCESSING entry is in flight in another ``download_bulk`` stream,
+            so it is left alone rather than reset: resetting it would let this
+            run re-claim and re-download it (#4691).
+        """
+        queued = 0
+
+        # Get default library collection if no collection_id provided
+        if not collection_id:
+            from ...database.library_init import get_default_library_id
+
+            collection_id = get_default_library_id(self.username, self.password)
+
+        with get_user_db_session(self.username, self.password) as session:
+            # Get all resources for this research
+            resources = (
+                session.query(ResearchResource)
+                .filter_by(research_id=research_id)
+                .all()
+            )
+
+            for resource in resources:
+                if self._is_downloadable(resource):
+                    # Library resources linked via document_id are already done
+                    if resource.document_id:
+                        continue
+
+                    # Egress policy gate before queueing.
+                    allowed, reason = self._check_url_against_policy(
+                        resource.url
+                    )
+                    if not allowed:
+                        logger.warning(
+                            f"Skipping queue for {resource.url}: refused by "
+                            f"egress policy ({reason})"
+                        )
+                        continue
+
+                    # Check if already queued
+                    existing_queue = (
+                        session.query(LibraryDownloadQueue)
+                        .filter_by(
+                            resource_id=resource.id,
+                            status=DocumentStatus.PENDING,
+                        )
+                        .first()
+                    )
+
+                    # Check if already downloaded (trust the database status)
+                    existing_doc = (
+                        session.query(Document)
+                        .filter_by(
+                            resource_id=resource.id,
+                            status=DocumentStatus.COMPLETED,
+                        )
+                        .first()
+                    )
+
+                    # Queue if not already queued and not marked as completed
+                    if not existing_queue and not existing_doc:
+                        # Check one more time if ANY queue entry exists (regardless of status)
+                        any_queue = (
+                            session.query(LibraryDownloadQueue)
+                            .filter_by(resource_id=resource.id)
+                            .first()
+                        )
+
+                        if any_queue:
+                            # Reset the existing queue entry, but never one a
+                            # concurrent download_bulk stream has claimed: a
+                            # PROCESSING row is in flight, and resetting it to
+                            # PENDING lets this stream re-claim and re-download
+                            # a resource the other stream is still downloading
+                            # (issue #4691). The status guard lives inside the
+                            # UPDATE, not in an `if` above it, so the check and
+                            # the write cannot straddle another stream's claim.
+                            reset = (
+                                session.query(LibraryDownloadQueue)
+                                .filter(
+                                    LibraryDownloadQueue.id == any_queue.id,
+                                    LibraryDownloadQueue.status
+                                    != DocumentStatus.PROCESSING,
+                                )
+                                .update(
+                                    {
+                                        LibraryDownloadQueue.status: DocumentStatus.PENDING,
+                                        LibraryDownloadQueue.research_id: research_id,
+                                        LibraryDownloadQueue.collection_id: collection_id,
+                                    },
+                                    synchronize_session=False,
+                                )
+                            )
+                            if reset:
+                                queued += 1
+                        else:
+                            # Add new queue entry
+                            queue_entry = LibraryDownloadQueue(
+                                resource_id=resource.id,
+                                research_id=research_id,
+                                collection_id=collection_id,
+                                priority=0,
+                                status=DocumentStatus.PENDING,
+                            )
+                            session.add(queue_entry)
+                            queued += 1
+
+            session.commit()
+            logger.info(
+                f"Queued {queued} downloads for research {research_id} to collection {collection_id}"
+            )
+
+        return queued
+
+    def _is_downloadable(self, resource: ResearchResource) -> bool:
+        """Check if a resource is likely downloadable as PDF.
+
+        Delegates to the consolidated is_downloadable_url() from utils.
+        """
+        return is_downloadable_url(resource.url)
+
+    def download_resource(self, resource_id: int) -> Tuple[bool, Optional[str]]:
+        """
+        Download a specific resource.
+
+        Returns:
+            Tuple of (success: bool, skip_reason: str or None)
+        """
+        with get_user_db_session(self.username, self.password) as session:
+            resource = session.get(ResearchResource, resource_id)
+            if not resource:
+                logger.error(f"Resource {resource_id} not found")
+                return False, "Resource not found"
+
+            # Check if already downloaded (trust the database after sync)
+            existing_doc = (
+                session.query(Document)
+                .filter_by(
+                    resource_id=resource_id, status=DocumentStatus.COMPLETED
+                )
+                .first()
+            )
+
+            if existing_doc:
+                logger.info(
+                    "Resource already downloaded (according to database)"
+                )
+                return True, None
+
+            # Get collection_id from queue entry if it exists
+            queue_entry = (
+                session.query(LibraryDownloadQueue)
+                .filter_by(resource_id=resource_id)
+                .first()
+            )
+            collection_id = (
+                queue_entry.collection_id
+                if queue_entry and queue_entry.collection_id
+                else None
+            )
+
+            # Create download tracker entry
+            url_hash = self._get_url_hash(resource.url)
+            tracker = (
+                session.query(DownloadTracker)
+                .filter_by(url_hash=url_hash)
+                .first()
+            )
+
+            if not tracker:
+                tracker = DownloadTracker(
+                    url=resource.url,
+                    url_hash=url_hash,
+                    first_resource_id=resource.id,
+                    is_downloaded=False,
+                )
+                session.add(tracker)
+                session.commit()
+
+            # Attempt download
+            success, skip_reason, status_code = self._download_pdf(
+                resource, tracker, session, collection_id
+            )
+
+            # Record attempt with retry manager for smart failure tracking
+            self.retry_manager.record_attempt(
+                resource_id=resource.id,
+                result=(success, skip_reason),
+                status_code=status_code,
+                url=resource.url,
+                details=skip_reason
+                or (
+                    "Successfully downloaded" if success else "Download failed"
+                ),
+                session=session,
+            )
+
+            # Update queue status if exists
+            queue_entry = (
+                session.query(LibraryDownloadQueue)
+                .filter_by(resource_id=resource_id)
+                .first()
+            )
+
+            if queue_entry:
+                queue_entry.status = (
+                    DocumentStatus.COMPLETED
+                    if success
+                    else DocumentStatus.FAILED
+                )
+                queue_entry.completed_at = datetime.now(UTC)
+
+            session.commit()
+
+            # Trigger auto-indexing for successfully downloaded documents
+            if success and self.password:
+                try:
+                    from ...web.routers.rag import trigger_auto_index
+                    from ...database.library_init import get_default_library_id
+
+                    # Get the document that was just created
+                    doc = (
+                        session.query(Document)
+                        .filter_by(resource_id=resource_id)
+                        .order_by(Document.created_at.desc())
+                        .first()
+                    )
+                    if doc:
+                        # Use collection_id from queue entry or default Library
+                        # NB: pass username string, not the SQLAlchemy session
+                        target_collection = (
+                            collection_id
+                            or get_default_library_id(
+                                self.username, self.password
+                            )
+                        )
+                        if target_collection:
+                            trigger_auto_index(
+                                [doc.id],
+                                target_collection,
+                                self.username,
+                                self.password,
+                            )
+                except Exception:
+                    # The Document SELECT above runs on the shared session; a
+                    # connection-level failure there leaves it needing a
+                    # rollback. Auto-indexing is best-effort so we swallow and
+                    # return — the with-block exits normally and
+                    # get_user_db_session's rollback never fires. Recover the
+                    # session here so a later op on it (same request/thread)
+                    # doesn't cascade. (No-op for the other failures reachable
+                    # here: get_default_library_id self-heals via its own inner
+                    # get_user_db_session block, and trigger_auto_index does its
+                    # DB work off-thread, so neither dirties this session.)
+                    safe_rollback(session, "download_resource auto-index")
+                    logger.exception("Failed to trigger auto-indexing")
+
+            return success, skip_reason
+
+    def _download_pdf(
+        self,
+        resource: ResearchResource,
+        tracker: DownloadTracker,
+        session: Session,
+        collection_id: Optional[str] = None,
+    ) -> Tuple[bool, Optional[str], Optional[int]]:
+        """
+        Perform the actual PDF download.
+
+        Args:
+            resource: The research resource to download
+            tracker: Download tracker for this URL
+            session: Database session
+            collection_id: Optional target collection ID (defaults to Library if not provided)
+
+        Returns:
+            Tuple of (success: bool, skip_reason: Optional[str], status_code: Optional[int])
+        """
+        url = resource.url
+
+        # Egress policy gate at the network-fire point. The entry caller
+        # (download_resource) does not gate, so this is the true PEP — a
+        # denied URL must never reach a downloader regardless of route.
+        allowed, reason = self._check_url_against_policy(url)
+        if not allowed:
+            logger.warning(
+                f"Skipping PDF download for {url}: refused by egress "
+                f"policy ({reason})"
+            )
+            return False, f"egress_policy_denied:{reason}", None
+
+        # Log attempt
+        attempt = DownloadAttempt(
+            url_hash=tracker.url_hash,
+            attempt_number=tracker.download_attempts.count() + 1
+            if hasattr(tracker, "download_attempts")
+            else 1,
+            attempted_at=datetime.now(UTC),
+        )
+        session.add(attempt)
+
+        try:
+            # Use modular downloaders with detailed skip reasons
+            pdf_content = None
+            selected_downloader = None
+            skip_reason = None
+            status_code = None
+
+            for downloader in self.downloaders:
+                if downloader.can_handle(url):
+                    logger.info(
+                        f"Using {downloader.__class__.__name__} for {url}"
+                    )
+                    result = downloader.download_with_result(
+                        url, ContentType.PDF
+                    )
+                    selected_downloader = downloader
+
+                    if result.is_success and result.content:
+                        pdf_content = result.content
+                        status_code = result.status_code
+                        break
+                    if result.skip_reason:
+                        skip_reason = result.skip_reason
+                        status_code = result.status_code
+                        logger.info(f"Download skipped: {skip_reason}")
+                    if isinstance(
+                        downloader, (ArxivDownloader, GenericDownloader)
+                    ):
+                        break
+
+            if selected_downloader is None:
+                logger.error(f"No downloader found for {url}")
+                skip_reason = "No compatible downloader available"
+
+            if not pdf_content:
+                error_msg = skip_reason or "Failed to download PDF content"
+                # Store skip reason in attempt for retrieval
+                attempt.error_message = error_msg
+                attempt.succeeded = False
+                session.commit()
+                logger.info(f"Download failed with reason: {error_msg}")
+                return False, error_msg, status_code
+
+            # Get PDF storage mode setting. Resolve through the operator gate
+            # BEFORE any PDF is written: a stored value or an
+            # LDR_RESEARCH_LIBRARY_PDF_STORAGE_MODE env override could still
+            # read "filesystem" even though the settings UI withholds that
+            # option, so the unencrypted mode is coerced to the encrypted
+            # "database" default here unless the operator opted in. This is
+            # the true enforcement point — hiding the dropdown alone is not
+            # enough.
+            pdf_storage_mode = resolve_pdf_storage_mode(
+                self.settings.get_setting(
+                    "research_library.pdf_storage_mode", "none"
+                )
+            )
+            max_pdf_size_mb = int(
+                self.settings.get_setting(
+                    "research_library.max_pdf_size_mb",
+                    DEFAULT_MAX_PDF_SIZE_MB,
+                )
+            )
+            logger.info(
+                f"[DOWNLOAD_SERVICE] PDF storage mode: {pdf_storage_mode}"
+            )
+
+            # Update tracker
+            import hashlib
+
+            tracker.file_hash = hashlib.sha256(pdf_content).hexdigest()
+            tracker.file_size = len(pdf_content)
+            tracker.is_downloaded = True
+            tracker.downloaded_at = datetime.now(UTC)
+
+            # Initialize PDF storage manager. Writes go to the per-user root;
+            # legacy_root gives read fallback for pre-isolation files (#5521).
+            pdf_storage_manager = PDFStorageManager(
+                library_root=self.library_root,
+                storage_mode=pdf_storage_mode,
+                max_pdf_size_mb=max_pdf_size_mb,
+                legacy_root=self.legacy_library_root,
+            )
+
+            # Update attempt with success info
+            attempt.succeeded = True
+
+            # Check if library document already exists
+            existing_doc = get_document_for_resource(session, resource)
+
+            if existing_doc:
+                # Update existing document. Only replace document_hash when
+                # transitioning from FAILED — that's the placeholder hash from
+                # _record_failed_text_extraction. For any other prior state
+                # the hash is already a real content hash and clobbering it
+                # risks UNIQUE-constraint collisions (issue #3827).
+                was_failed = existing_doc.status == DocumentStatus.FAILED
+                if was_failed:
+                    existing_doc.document_hash = tracker.file_hash
+                existing_doc.file_size = len(pdf_content)
+                existing_doc.status = DocumentStatus.COMPLETED
+                existing_doc.processed_at = datetime.now(UTC)
+
+                # Save PDF using storage manager (updates storage_mode and file_path)
+                file_path_result, _ = pdf_storage_manager.save_pdf(
+                    pdf_content=pdf_content,
+                    document=existing_doc,
+                    session=session,
+                    filename=f"{resource.id}.pdf",
+                    url=url,
+                    resource_id=resource.id,
+                )
+
+                # Update tracker
+                tracker.file_path = (
+                    file_path_result if file_path_result else None
+                )
+                tracker.file_name = (
+                    Path(file_path_result).name
+                    if file_path_result and file_path_result != "database"
+                    else None
+                )
+            else:
+                # Get source type ID for research downloads
+                try:
+                    source_type_id = get_source_type_id(
+                        self.username, "research_download", self.password
+                    )
+                    # Use provided collection_id or default to Library
+                    library_collection_id = (
+                        collection_id
+                        or get_default_library_id(self.username, self.password)
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to get source type or library collection"
+                    )
+                    raise
+
+                # Create new unified document entry
+                doc_id = str(uuid.uuid4())
+                doc = Document(
+                    id=doc_id,
+                    source_type_id=source_type_id,
+                    resource_id=resource.id,
+                    research_id=resource.research_id,
+                    document_hash=tracker.file_hash,
+                    original_url=url,
+                    file_size=len(pdf_content),
+                    file_type="pdf",
+                    mime_type="application/pdf",
+                    title=resource.title,
+                    status=DocumentStatus.COMPLETED,
+                    processed_at=datetime.now(UTC),
+                    storage_mode=pdf_storage_mode,
+                )
+                session.add(doc)
+                session.flush()  # Ensure doc.id is available for blob storage
+
+                # Save PDF using storage manager (updates storage_mode and file_path)
+                file_path_result, _ = pdf_storage_manager.save_pdf(
+                    pdf_content=pdf_content,
+                    document=doc,
+                    session=session,
+                    filename=f"{resource.id}.pdf",
+                    url=url,
+                    resource_id=resource.id,
+                )
+
+                # Update tracker
+                tracker.file_path = (
+                    file_path_result if file_path_result else None
+                )
+                tracker.file_name = (
+                    Path(file_path_result).name
+                    if file_path_result and file_path_result != "database"
+                    else None
+                )
+
+                # Link document to default Library collection
+                ensure_in_collection(session, doc_id, library_collection_id)
+
+            # Update attempt
+            attempt.succeeded = True
+            attempt.bytes_downloaded = len(pdf_content)
+
+            if pdf_storage_mode == "database":
+                logger.info(
+                    f"Successfully stored PDF in database: {resource.url}"
+                )
+            elif pdf_storage_mode == "filesystem":
+                logger.info(f"Successfully downloaded: {tracker.file_path}")
+            else:
+                logger.info(f"Successfully extracted text from: {resource.url}")
+
+            # Produce and save text only after the PDF has been stored.
+            try:
+                text_details: tuple[str, str, str] | None
+                if isinstance(selected_downloader, ArxivDownloader):
+                    logger.info(
+                        f"Producing canonical arXiv text for: {resource.title[:50]}"
+                    )
+                    arxiv_text = selected_downloader.download_text_with_source(
+                        url,
+                        pdf_content=pdf_content,
+                    )
+                    if arxiv_text is None:
+                        text_details = None
+                    else:
+                        extraction_method, extraction_source = (
+                            _arxiv_text_provenance(arxiv_text.source)
+                        )
+                        text_details = (
+                            arxiv_text.text,
+                            extraction_method,
+                            extraction_source,
+                        )
+                else:
+                    logger.info(
+                        f"Extracting text from downloaded PDF for: {resource.title[:50]}"
+                    )
+                    text = self._extract_text_from_pdf(pdf_content)
+                    text_details = (
+                        (text, "pdf_extraction", "local_pdf") if text else None
+                    )
+
+                if text_details is not None:
+                    text, extraction_method, extraction_source = text_details
+                    # Get the document ID we just created/updated
+                    pdf_doc = get_document_for_resource(session, resource)
+                    pdf_document_id = pdf_doc.id if pdf_doc else None
+
+                    # Save text to encrypted database
+                    self._save_text_with_db(
+                        resource=resource,
+                        text=text,
+                        session=session,
+                        extraction_method=extraction_method,
+                        extraction_source=extraction_source,
+                        pdf_document_id=pdf_document_id,
+                    )
+                    logger.info(
+                        f"Successfully produced and saved text for: {resource.title[:50]}"
+                    )
+                else:
+                    logger.warning(
+                        f"Text production returned empty text for: {resource.title[:50]}"
+                    )
+            except Exception:
+                logger.exception(
+                    "Failed to produce text after PDF download, but PDF download succeeded"
+                )
+                # Text production is best-effort after a successful PDF download.
+
+            return True, None, status_code
+
+        except Exception as e:
+            logger.exception(f"Download failed for {url}")
+            # The error may have come from a failed flush/commit in the
+            # success path above (e.g. save_pdf / ensure_in_collection),
+            # leaving the *shared* session in PendingRollbackError. The caller
+            # (download_resource) keeps using this same session and commits
+            # again, so roll back here or that commit cascades. This swallow-
+            # and-return path is invisible to get_user_db_session's own
+            # rollback (we don't propagate), hence the explicit recovery.
+            safe_rollback(session, "_download_pdf")
+            tracker.is_accessible = False
+            # request/network errors can echo a resource URL carrying an
+            # api_key/token or user:pass@host — scrub before returning. The
+            # message is surfaced to the browser via the download SSE stream.
+            safe_error = sanitize_error_for_client(str(e))
+            # The rollback discarded the pending ``attempt`` row added above,
+            # so re-record the failed attempt on the now-clean session for
+            # download_resource to commit.
+            session.add(
+                DownloadAttempt(
+                    url_hash=tracker.url_hash,
+                    attempt_number=tracker.download_attempts.count() + 1
+                    if hasattr(tracker, "download_attempts")
+                    else 1,
+                    attempted_at=datetime.now(UTC),
+                    succeeded=False,
+                    error_type=type(e).__name__,
+                    error_message=safe_error,
+                )
+            )
+            return False, safe_error, None
+
+    def _extract_text_from_pdf(self, pdf_content: bytes) -> Optional[str]:
+        """
+        Extract text from PDF content using multiple methods for best results.
+
+        Args:
+            pdf_content: Raw PDF bytes
+
+        Returns:
+            Extracted text or None if extraction fails
+        """
+        try:
+            # First try with pdfplumber (better for complex layouts)
+            import io
+
+            with pdfplumber.open(io.BytesIO(pdf_content)) as pdf:
+                text_parts = []
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text_parts.append(page_text)
+
+                if text_parts:
+                    return "\n\n".join(text_parts)
+
+            # Fallback to PyPDF if pdfplumber fails
+            reader = PdfReader(io.BytesIO(pdf_content))
+            text_parts = []
+            for page in reader.pages:
+                text = page.extract_text()
+                if text:
+                    text_parts.append(text)
+
+            if text_parts:
+                return "\n\n".join(text_parts)
+
+            logger.warning("No text could be extracted from PDF")
+            return None
+
+        except Exception:
+            logger.exception("Failed to extract text from PDF")
+            return None
+
+    def download_as_text(self, resource_id: int) -> Tuple[bool, Optional[str]]:
+        """
+        Download resource and extract text to encrypted database.
+
+        Args:
+            resource_id: ID of the resource to download
+
+        Returns:
+            Tuple of (success, error_message)
+        """
+        with get_user_db_session(self.username, self.password) as session:
+            # Get the resource
+            resource = (
+                session.query(ResearchResource)
+                .filter_by(id=resource_id)
+                .first()
+            )
+            if not resource:
+                return False, "Resource not found"
+
+            # Handle library resources — content already in the database
+            # (local-only, no network — skip retry checks)
+            if resource.source_type == "library" or (
+                resource.url and resource.url.startswith("/library/document/")
+            ):
+                return self._try_library_text_extraction(session, resource)
+
+            # Try existing text in database
+            result = self._try_existing_text(session, resource_id)
+            if result is not None:
+                return result
+
+            # Try legacy text files on disk
+            result = self._try_legacy_text_file(session, resource, resource_id)
+            if result is not None:
+                return result
+
+            # Canonical arXiv sources, HTML first. This is network-bearing,
+            # so it applies the retry gate itself; when that denies it, it
+            # returns None rather than a verdict so the local-only strategies
+            # below still run.
+            result = self._try_arxiv_text_extraction(session, resource)
+            if result is not None:
+                self._record_retry_attempt(resource, result, session)
+                return result
+
+            # Try extracting from existing PDF (pure filesystem, no network)
+            result = self._try_existing_pdf_extraction(
+                session, resource, resource_id
+            )
+            if result is not None:
+                return result
+
+            # Check retry eligibility before network-dependent extraction
+            if self.retry_manager:
+                decision = self.retry_manager.should_retry_resource(resource_id)
+                if not decision.can_retry:
+                    logger.info(
+                        f"Skipping resource {resource_id}: {decision.reason}"
+                    )
+                    return False, decision.reason
+
+            # Try source-specific direct text extraction
+            result = self._try_api_text_extraction(session, resource)
+            if result is not None:
+                self._record_retry_attempt(resource, result, session)
+                return result
+
+            # Fallback: Download PDF and extract
+            result = self._fallback_pdf_extraction(session, resource)
+            self._record_retry_attempt(resource, result, session)
+            return result
+
+    def _record_retry_attempt(
+        self, resource, result: Tuple[bool, Optional[str]], session=None
+    ) -> None:
+        """Record a download attempt with the retry manager."""
+        if not self.retry_manager:
+            return
+        self.retry_manager.record_attempt(
+            resource_id=resource.id,
+            result=result,
+            url=resource.url or "",
+            details=result[1]
+            or (
+                "Successfully extracted text"
+                if result[0]
+                else "Text extraction failed"
+            ),
+            session=session,
+        )
+
+    def _try_library_text_extraction(
+        self, session, resource
+    ) -> Tuple[bool, Optional[str]]:
+        """Handle library resources — content already exists in local database.
+
+        Returns:
+            Tuple of (success, error_message). On success: (True, None).
+            On failure: (False, description of what went wrong).
+        """
+        # 1. Extract document UUID from metadata (authoritative) or URL (fallback)
+        doc_id = None
+        metadata = (resource.resource_metadata or {}).get("original_data", {})
+        if isinstance(metadata, dict):
+            meta_inner = metadata.get("metadata", {})
+            if isinstance(meta_inner, dict):
+                doc_id = meta_inner.get("source_id") or meta_inner.get(
+                    "document_id"
+                )
+
+        if not doc_id and resource.url:
+            # Parse from /library/document/{uuid} or /library/document/{uuid}/pdf
+            match = re.match(r"^/library/document/([^/]+)", resource.url)
+            if match:
+                doc_id = match.group(1)
+
+        if not doc_id:
+            return False, "Could not extract library document ID"
+
+        # 2. Query the existing Document by its primary key (UUID string)
+        doc = session.query(Document).filter_by(id=doc_id).first()
+        if not doc:
+            return False, f"Library document {doc_id} not found in database"
+
+        # 3. If text already exists and extraction succeeded, return success
+        if (
+            doc.text_content
+            and doc.extraction_method
+            and doc.extraction_method != "failed"
+        ):
+            logger.info(f"Library document {doc_id} already has text content")
+            resource.document_id = doc.id
+            session.commit()
+            return True, None
+
+        # 4. Try extracting text from stored PDF
+        pdf_storage_mode = self.settings.get_setting(
+            "research_library.pdf_storage_mode", "none"
+        )
+        pdf_manager = PDFStorageManager(
+            library_root=self.library_root,
+            storage_mode=pdf_storage_mode,
+            legacy_root=self.legacy_library_root,
+        )
+        pdf_content = pdf_manager.load_pdf(doc, session)
+
+        if not pdf_content:
+            return (
+                False,
+                f"Library document {doc_id} has no text or PDF content",
+            )
+
+        text = self._extract_text_from_pdf(pdf_content)
+        if not text:
+            return (
+                False,
+                f"Failed to extract text from library document {doc_id} PDF",
+            )
+
+        # 5. Update Document directly (don't use _save_text_with_db — it
+        # queries by resource_id which mismatches for library docs)
+        doc.text_content = text
+        doc.character_count = len(text)
+        doc.word_count = len(text.split())
+        doc.extraction_method = "pdf_extraction"
+        doc.extraction_source = "pdfplumber"
+        doc.extraction_quality = "medium"
+
+        resource.document_id = doc.id
+        session.commit()
+
+        logger.info(
+            f"Extracted text from library document {doc_id} "
+            f"({doc.word_count} words)"
+        )
+        return True, None
+
+    def _try_existing_text(
+        self, session, resource_id: int
+    ) -> Optional[Tuple[bool, Optional[str]]]:
+        """Check if text already exists in database (in Document.text_content)."""
+        existing_doc = (
+            session.query(Document).filter_by(resource_id=resource_id).first()
+        )
+
+        if not existing_doc:
+            return None
+
+        # Check if text content exists and extraction was successful
+        if (
+            existing_doc.text_content
+            and existing_doc.extraction_method
+            and existing_doc.extraction_method != "failed"
+        ):
+            logger.info(
+                f"Text content already exists in Document for resource_id={resource_id}, extraction_method={existing_doc.extraction_method}"
+            )
+            return True, None
+
+        # No text content or failed extraction
+        logger.debug(
+            f"Document exists but no valid text content: resource_id={resource_id}, extraction_method={existing_doc.extraction_method}"
+        )
+        return None  # Fall through to re-extraction
+
+    def _try_legacy_text_file(
+        self, session, resource, resource_id: int
+    ) -> Optional[Tuple[bool, Optional[str]]]:
+        """Check for legacy text files on disk."""
+        txt_path = Path(self.library_root) / "txt"
+        existing_files = (
+            list(txt_path.glob(f"*_{resource_id}.txt"))
+            if txt_path.exists()
+            else []
+        )
+
+        if not existing_files:
+            return None
+
+        logger.info(f"Text file already exists on disk: {existing_files[0]}")
+        self._create_text_document_record(
+            session,
+            resource,
+            existing_files[0],
+            extraction_method="unknown",
+            extraction_source="legacy_file",
+        )
+        session.commit()
+        return True, None
+
+    def _try_arxiv_text_extraction(
+        self, session: Session, resource
+    ) -> Optional[Tuple[bool, Optional[str]]]:
+        """Produce text from canonical arXiv sources, or None to fall through.
+
+        None means "this path does not apply", never "this resource has no
+        text": the caller must go on to the local-only strategies. A URL that
+        names no paper and an exhausted retry budget both return None, the
+        latter because this path is the only network-bearing one that runs
+        ahead of _try_existing_pdf_extraction. Deciding the whole call here
+        would have denied a resource with a stored PDF the pure filesystem
+        read it used to get (download_as_text applies the same gate itself,
+        after that read, so the budget still holds).
+        """
+        url = resource.url or ""
+        if not is_arxiv_paper_url(url):
+            return None
+
+        if self.retry_manager:
+            decision = self.retry_manager.should_retry_resource(resource.id)
+            if not decision.can_retry:
+                logger.info(
+                    "Skipping canonical arXiv text for resource {}: {}",
+                    resource.id,
+                    decision.reason,
+                )
+                return None
+
+        try:
+            downloader = self._get_downloader(url)
+            if not isinstance(downloader, ArxivDownloader):
+                return False, "No arXiv downloader available"
+
+            allowed, reason = self._check_url_against_policy(url)
+            if not allowed:
+                return False, f"egress_policy_denied:{reason}"
+
+            pdf_content: bytes | None = None
+            pdf_document_id: str | None = None
+            pdf_document = get_document_for_resource(session, resource)
+            if (
+                pdf_document is not None
+                and getattr(pdf_document, "status", None)
+                in {DocumentStatus.COMPLETED, DocumentStatus.COMPLETED.value}
+                and getattr(pdf_document, "file_type", None) == "pdf"
+            ):
+                settings = self.settings
+                if settings is None:
+                    return False, "Download settings unavailable"
+                pdf_storage_mode = resolve_pdf_storage_mode(
+                    settings.get_setting(
+                        "research_library.pdf_storage_mode", "none"
+                    )
+                )
+                pdf_manager = PDFStorageManager(
+                    library_root=Path(self.library_root),
+                    storage_mode=pdf_storage_mode,
+                    legacy_root=Path(self.legacy_library_root),
+                )
+                pdf_content = pdf_manager.load_pdf(pdf_document, session)
+                if pdf_content is not None:
+                    pdf_document_id = getattr(pdf_document, "id")
+
+            if pdf_content is None:
+                arxiv_text = downloader.download_text_with_source(url)
+            else:
+                arxiv_text = downloader.download_text_with_source(
+                    url,
+                    pdf_content=pdf_content,
+                )
+        except Exception as exc:
+            safe_rollback(session, "_try_arxiv_text_extraction")
+            logger.exception("Canonical arXiv text extraction failed")
+            safe_error = sanitize_error_for_client(
+                f"Failed to extract arXiv text: {exc}"
+            )
+            return False, safe_error
+
+        if arxiv_text is None:
+            return False, "Could not retrieve arXiv text"
+
+        extraction_method, extraction_source = _arxiv_text_provenance(
+            arxiv_text.source
+        )
+        try:
+            _ = self._save_text_with_db(
+                resource,
+                arxiv_text.text,
+                session,
+                extraction_method=extraction_method,
+                extraction_source=extraction_source,
+                pdf_document_id=pdf_document_id,
+            )
+            session.commit()
+        except Exception as exc:
+            safe_rollback(session, "_try_arxiv_text_extraction")
+            logger.exception("Failed to save canonical arXiv text")
+            safe_error = sanitize_error_for_client(
+                f"Failed to save text: {exc}"
+            )
+            return False, safe_error
+
+        return True, None
+
+    def _try_existing_pdf_extraction(
+        self, session, resource, resource_id: int
+    ) -> Optional[Tuple[bool, Optional[str]]]:
+        """Try extracting text from existing PDF in database."""
+        pdf_document = (
+            session.query(Document).filter_by(resource_id=resource_id).first()
+        )
+
+        if not pdf_document or pdf_document.status != "completed":
+            return None
+
+        # Validate path to prevent path traversal attacks. Resolve against the
+        # per-user root with legacy-shared fallback (issue #5521) so a PDF
+        # downloaded before per-user isolation is still found. Pass
+        # self.settings so storage_path/shared_library come from this user's
+        # captured manager — the ambient one is db-less in background/scheduler
+        # threads (this runs under the document scheduler) and would resolve
+        # the default root, missing a user's UI-customized storage_path. Use
+        # getattr: __init__ always sets self.settings in production (incl.
+        # scheduler threads), but test doubles that construct a
+        # DownloadService via __new__/partial mocks may not — fall back to
+        # None (the ambient get_settings_manager()) rather than raising
+        # AttributeError.
+        if (
+            not pdf_document.file_path
+            or pdf_document.file_path in FILE_PATH_SENTINELS
+        ):
+            return None
+        pdf_path = get_absolute_path_from_settings(
+            pdf_document.file_path,
+            self.username,
+            settings_manager=getattr(self, "settings", None),
+        )
+        if not pdf_path or not pdf_path.is_file():
+            return None
+
+        logger.info(f"Found existing PDF, extracting text from: {pdf_path}")
+        try:
+            with open(pdf_path, "rb") as f:
+                pdf_content = f.read()
+            text = self._extract_text_from_pdf(pdf_content)
+
+            if not text:
+                return None
+
+            self._save_text_with_db(
+                resource,
+                text,
+                session,
+                extraction_method="pdf_extraction",
+                extraction_source="pdfplumber",
+                pdf_document_id=pdf_document.id,
+            )
+            session.commit()
+            return True, None
+
+        except Exception:
+            logger.exception(
+                f"Failed to extract text from existing PDF: {pdf_path}"
+            )
+            # The commit above can fail and poison the shared session.
+            # download_as_text swallows this None and may then return cleanly
+            # (e.g. a non-retry decision), so the with-block exits without an
+            # exception — get_user_db_session's rollback never fires. Recover
+            # the session here or the next operation on this thread cascades.
+            safe_rollback(session, "_try_existing_pdf_extraction")
+            return None  # Fall through to other methods
+
+    def _try_api_text_extraction(
+        self, session, resource
+    ) -> Optional[Tuple[bool, Optional[str]]]:
+        """Try source-specific direct text extraction."""
+        logger.info(
+            f"Attempting direct API text extraction from: {resource.url}"
+        )
+
+        downloader = self._get_downloader(resource.url)
+        if not downloader:
+            return None
+
+        # Egress policy gate. Return a non-None tuple (not None) on denial
+        # so download_as_text hard-stops here instead of falling through
+        # to _fallback_pdf_extraction and firing a second request.
+        allowed, reason = self._check_url_against_policy(resource.url)
+        if not allowed:
+            logger.warning(
+                f"Skipping API text extraction for {resource.url}: refused "
+                f"by egress policy ({reason})"
+            )
+            return False, f"egress_policy_denied:{reason}"
+
+        if isinstance(downloader, ArxivDownloader):
+            arxiv_text = downloader.download_text_with_source(resource.url)
+            if arxiv_text is None:
+                return None
+            text = arxiv_text.text
+            extraction_method, extraction_source = _arxiv_text_provenance(
+                arxiv_text.source
+            )
+        else:
+            result = downloader.download_with_result(
+                resource.url, ContentType.TEXT
+            )
+            if not result.is_success or not result.content:
+                return None
+
+            text = (
+                result.content.decode("utf-8", errors="ignore")
+                if isinstance(result.content, bytes)
+                else result.content
+            )
+            extraction_method = "native_api"
+            extraction_source = (
+                "pubmed_api"
+                if isinstance(downloader, PubMedDownloader)
+                else "unknown"
+            )
+
+        try:
+            self._save_text_with_db(
+                resource,
+                text,
+                session,
+                extraction_method=extraction_method,
+                extraction_source=extraction_source,
+            )
+            session.commit()
+            logger.info(
+                f"✓ SUCCESS: Got text from {extraction_source.upper()} for '{resource.title[:50]}...'"
+            )
+            return True, None
+        except Exception as e:
+            # Roll back FIRST: the failed commit/flush poisoned the shared
+            # session, and even dereferencing resource.id in the log line below
+            # can trigger a refresh that re-raises PendingRollbackError.
+            # download_as_text reuses this session (_record_retry_attempt)
+            # after we return, so it must be clean.
+            safe_rollback(session, "_try_api_text_extraction")
+            logger.exception(f"Failed to save text for resource {resource.id}")
+            # Sanitize error message before returning to API
+            safe_error = sanitize_error_for_client(
+                f"Failed to save text: {str(e)}"
+            )
+            return False, safe_error
+
+    def _fallback_pdf_extraction(
+        self, session, resource
+    ) -> Tuple[bool, Optional[str]]:
+        """Fallback: Download PDF to memory and extract text."""
+        logger.info(
+            f"Direct text extraction unavailable; trying in-memory PDF for: {resource.url}"
+        )
+
+        downloader = self._get_downloader(resource.url)
+        if not downloader:
+            error_msg = "No compatible downloader found"
+            logger.warning(
+                f"✗ FAILED: {error_msg} for '{resource.title[:50]}...'"
+            )
+            self._record_failed_text_extraction(
+                session, resource, error=error_msg
+            )
+            session.commit()
+            return False, error_msg
+
+        # Egress policy gate at the network-fire point.
+        allowed, reason = self._check_url_against_policy(resource.url)
+        if not allowed:
+            error_msg = f"egress_policy_denied:{reason}"
+            logger.warning(
+                f"Skipping fallback PDF download for {resource.url}: "
+                f"refused by egress policy ({reason})"
+            )
+            self._record_failed_text_extraction(
+                session, resource, error=error_msg
+            )
+            session.commit()
+            return False, error_msg
+
+        result = downloader.download_with_result(resource.url, ContentType.PDF)
+
+        if not result.is_success or not result.content:
+            error_msg = result.skip_reason or "Failed to download PDF"
+            logger.warning(
+                f"✗ FAILED: Could not download PDF for '{resource.title[:50]}...' | Error: {error_msg}"
+            )
+            self._record_failed_text_extraction(
+                session, resource, error=f"PDF download failed: {error_msg}"
+            )
+            session.commit()
+            return False, f"PDF extraction failed: {error_msg}"
+
+        # Extract text from PDF
+        text = self._extract_text_from_pdf(result.content)
+        if not text:
+            error_msg = "PDF text extraction returned empty text"
+            logger.warning(
+                f"Failed to extract text from PDF for: {resource.url}"
+            )
+            self._record_failed_text_extraction(
+                session, resource, error=error_msg
+            )
+            session.commit()
+            return False, error_msg
+
+        try:
+            self._save_text_with_db(
+                resource,
+                text,
+                session,
+                extraction_method="pdf_extraction",
+                extraction_source="pdfplumber_fallback",
+            )
+            session.commit()
+            logger.info(
+                f"✓ SUCCESS: Extracted text from '{resource.title[:50]}...'"
+            )
+            return True, None
+        except Exception as e:
+            # Roll back FIRST (see _try_api_text_extraction): dereferencing
+            # resource.id while the session is poisoned would itself re-raise
+            # PendingRollbackError. download_as_text reuses this session after
+            # we return.
+            safe_rollback(session, "_fallback_pdf_extraction")
+            logger.exception(f"Failed to save text for resource {resource.id}")
+            # Sanitize error message before returning to API
+            safe_error = sanitize_error_for_client(
+                f"Failed to save text: {str(e)}"
+            )
+            return False, safe_error
+
+    def _get_downloader(self, url: str):
+        """
+        Get the appropriate downloader for a URL.
+
+        Args:
+            url: The URL to download from
+
+        Returns:
+            The appropriate downloader instance or None
+        """
+        for downloader in self.downloaders:
+            if downloader.can_handle(url):
+                return downloader
+        return None
+
+    def _download_generic(self, url: str) -> Optional[bytes]:
+        """Generic PDF download method."""
+        try:
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            }
+            response = safe_get(
+                url, headers=headers, timeout=30, allow_redirects=True
+            )
+            response.raise_for_status()
+
+            # Verify it's a PDF
+            content_type = response.headers.get("Content-Type", "")
+            if (
+                "pdf" not in content_type.lower()
+                and not response.content.startswith(b"%PDF")
+            ):
+                logger.warning(f"Response is not a PDF: {content_type}")
+                return None
+
+            return response.content
+
+        except Exception:
+            logger.exception("Generic download failed")
+            return None
+
+    def _download_arxiv(self, url: str) -> Optional[bytes]:
+        """Download from arXiv."""
+        try:
+            # Convert abstract URL to PDF URL
+            pdf_url = url.replace("abs", "pdf")
+            if not pdf_url.endswith(".pdf"):
+                pdf_url += ".pdf"
+
+            return self._download_generic(pdf_url)
+        except Exception:
+            logger.exception("arXiv download failed")
+            return None
+
+    def _try_europe_pmc(self, pmid: str) -> Optional[bytes]:
+        """Try downloading from Europe PMC which often has better PDF availability."""
+        try:
+            # Europe PMC API is more reliable for PDFs
+            # Check if PDF is available
+            api_url = f"https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=EXT_ID:{pmid}&format=json"
+            response = safe_get(api_url, timeout=10)
+
+            if response.status_code == 200:
+                data = response.json()
+                results = data.get("resultList", {}).get("result", [])
+
+                if results:
+                    article = results[0]
+                    # Check if article has open access PDF
+                    if (
+                        article.get("isOpenAccess") == "Y"
+                        and article.get("hasPDF") == "Y"
+                    ):
+                        pmcid = article.get("pmcid")
+                        if pmcid:
+                            # Europe PMC PDF URL
+                            pdf_url = f"https://europepmc.org/backend/ptpmcrender.fcgi?accid={pmcid}&blobtype=pdf"
+                            logger.info(
+                                f"Found Europe PMC PDF for PMID {pmid}: {pmcid}"
+                            )
+
+                            headers = {
+                                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                            }
+
+                            pdf_response = safe_get(
+                                pdf_url,
+                                headers=headers,
+                                timeout=30,
+                                allow_redirects=True,
+                            )
+                            if pdf_response.status_code == 200:
+                                content_type = pdf_response.headers.get(
+                                    "content-type", ""
+                                )
+                                if (
+                                    "pdf" in content_type.lower()
+                                    or len(pdf_response.content) > 1000
+                                ):
+                                    return pdf_response.content
+        except Exception as e:
+            logger.debug(f"Europe PMC download failed: {e}")
+
+        return None
+
+    def _download_pubmed(self, url: str) -> Optional[bytes]:
+        """Download from PubMed/PubMed Central with rate limiting."""
+        try:
+            # Apply rate limiting for PubMed requests
+            current_time = time.time()
+            time_since_last = current_time - self._last_pubmed_request
+            if time_since_last < self._pubmed_delay:
+                sleep_time = self._pubmed_delay - time_since_last
+                logger.debug(
+                    f"Rate limiting: sleeping {sleep_time:.2f}s before PubMed request"
+                )
+                time.sleep(sleep_time)
+            self._last_pubmed_request = time.time()
+
+            # If it's already a PMC article, download directly
+            if "/articles/PMC" in url:
+                pmc_match = re.search(r"(PMC\d+)", url)
+                if pmc_match:
+                    pmc_id = pmc_match.group(1)
+
+                    # Try Europe PMC (more reliable)
+                    europe_url = f"https://europepmc.org/backend/ptpmcrender.fcgi?accid={pmc_id}&blobtype=pdf"
+                    headers = {
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                    }
+
+                    try:
+                        response = safe_get(
+                            europe_url,
+                            headers=headers,
+                            timeout=30,
+                            allow_redirects=True,
+                        )
+                        if response.status_code == 200:
+                            content_type = response.headers.get(
+                                "content-type", ""
+                            )
+                            if (
+                                "pdf" in content_type.lower()
+                                or len(response.content) > 1000
+                            ):
+                                logger.info(
+                                    f"Downloaded PDF via Europe PMC for {pmc_id}"
+                                )
+                                return response.content
+                    except Exception as e:
+                        logger.debug(f"Direct Europe PMC download failed: {e}")
+                        return None
+
+            # If it's a regular PubMed URL, try to find PMC version
+            elif urlparse(url).hostname == "pubmed.ncbi.nlm.nih.gov":
+                # Extract PMID from URL
+                pmid_match = re.search(r"/(\d+)/?", url)
+                if pmid_match:
+                    pmid = pmid_match.group(1)
+                    logger.info(f"Attempting to download PDF for PMID: {pmid}")
+
+                    # Try Europe PMC first (more reliable)
+                    pdf_content = self._try_europe_pmc(pmid)
+                    if pdf_content:
+                        return pdf_content
+
+                    # First try using NCBI E-utilities API to find PMC ID
+                    try:
+                        # Use elink to convert PMID to PMCID
+                        elink_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/elink.fcgi"
+                        params = {
+                            "dbfrom": "pubmed",
+                            "db": "pmc",
+                            "id": pmid,
+                            "retmode": "json",
+                        }
+
+                        api_response = safe_get(
+                            elink_url, params=params, timeout=10
+                        )
+                        if api_response.status_code == 200:
+                            data = api_response.json()
+                            # Parse the response to find PMC ID
+                            link_sets = data.get("linksets", [])
+                            if link_sets and "linksetdbs" in link_sets[0]:
+                                for linksetdb in link_sets[0]["linksetdbs"]:
+                                    if linksetdb.get(
+                                        "dbto"
+                                    ) == "pmc" and linksetdb.get("links"):
+                                        pmc_id_num = linksetdb["links"][0]
+                                        # Now fetch PMC details to get the correct PMC ID format
+                                        esummary_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
+                                        summary_params = {
+                                            "db": "pmc",
+                                            "id": pmc_id_num,
+                                            "retmode": "json",
+                                        }
+                                        summary_response = safe_get(
+                                            esummary_url,
+                                            params=summary_params,
+                                            timeout=10,
+                                        )
+                                        if summary_response.status_code == 200:
+                                            summary_data = (
+                                                summary_response.json()
+                                            )
+                                            result = summary_data.get(
+                                                "result", {}
+                                            ).get(str(pmc_id_num), {})
+                                            if result:
+                                                # PMC IDs in the API don't have the "PMC" prefix
+                                                pmc_id = f"PMC{pmc_id_num}"
+                                                logger.info(
+                                                    f"Found PMC ID via API: {pmc_id} for PMID: {pmid}"
+                                                )
+
+                                                # Try Europe PMC with the PMC ID
+                                                europe_url = f"https://europepmc.org/backend/ptpmcrender.fcgi?accid={pmc_id}&blobtype=pdf"
+
+                                                time.sleep(self._pubmed_delay)
+
+                                                headers = {
+                                                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                                                }
+
+                                                try:
+                                                    response = safe_get(
+                                                        europe_url,
+                                                        headers=headers,
+                                                        timeout=30,
+                                                        allow_redirects=True,
+                                                    )
+                                                    if (
+                                                        response.status_code
+                                                        == 200
+                                                    ):
+                                                        content_type = response.headers.get(
+                                                            "content-type", ""
+                                                        )
+                                                        if (
+                                                            "pdf"
+                                                            in content_type.lower()
+                                                            or len(
+                                                                response.content
+                                                            )
+                                                            > 1000
+                                                        ):
+                                                            logger.info(
+                                                                f"Downloaded PDF via Europe PMC for {pmc_id}"
+                                                            )
+                                                            return (
+                                                                response.content
+                                                            )
+                                                except Exception as e:
+                                                    logger.debug(
+                                                        f"Europe PMC download with PMC ID failed: {e}"
+                                                    )
+                    except Exception as e:
+                        logger.debug(
+                            f"API lookup failed, trying webpage scraping: {e}"
+                        )
+
+                    # Fallback to webpage scraping if API fails
+                    try:
+                        headers = {
+                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                        }
+                        response = safe_get(url, headers=headers, timeout=10)
+                        if response.status_code == 200:
+                            # Look for PMC ID in the page
+                            pmc_match = re.search(r"PMC\d+", response.text)
+                            if pmc_match:
+                                pmc_id = pmc_match.group(0)
+                                logger.info(
+                                    f"Found PMC ID via webpage: {pmc_id} for PMID: {pmid}"
+                                )
+
+                                # Add delay before downloading PDF
+                                time.sleep(self._pubmed_delay)
+
+                                # Try Europe PMC with the PMC ID (more reliable)
+                                europe_url = f"https://europepmc.org/backend/ptpmcrender.fcgi?accid={pmc_id}&blobtype=pdf"
+                                headers = {
+                                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                                }
+
+                                try:
+                                    response = safe_get(
+                                        europe_url,
+                                        headers=headers,
+                                        timeout=30,
+                                        allow_redirects=True,
+                                    )
+                                    if response.status_code == 200:
+                                        content_type = response.headers.get(
+                                            "content-type", ""
+                                        )
+                                        if (
+                                            "pdf" in content_type.lower()
+                                            or len(response.content) > 1000
+                                        ):
+                                            logger.info(
+                                                f"Downloaded PDF via Europe PMC for {pmc_id}"
+                                            )
+                                            return response.content
+                                except Exception as e:
+                                    logger.debug(
+                                        f"Europe PMC download failed: {e}"
+                                    )
+                            else:
+                                logger.info(
+                                    f"No PMC version found for PMID: {pmid}"
+                                )
+                    except requests.exceptions.HTTPError as e:
+                        if e.response.status_code == 429:
+                            logger.warning(
+                                "Rate limited by PubMed, increasing delay"
+                            )
+                            self._pubmed_delay = min(
+                                self._pubmed_delay * 2, 5.0
+                            )  # Max 5 seconds
+                        raise
+                    except Exception as e:
+                        logger.debug(f"Could not check for PMC version: {e}")
+
+            return self._download_generic(url)
+        except Exception:
+            logger.exception("PubMed download failed")
+            return None
+
+    def _download_semantic_scholar(self, url: str) -> Optional[bytes]:
+        """Download from Semantic Scholar."""
+        # Semantic Scholar doesn't host PDFs directly
+        # Would need to extract actual PDF URL from page
+        return None
+
+    def _download_biorxiv(self, url: str) -> Optional[bytes]:
+        """Download from bioRxiv."""
+        try:
+            # Convert to PDF URL
+            pdf_url = url.replace(".org/", ".org/content/")
+            pdf_url = re.sub(r"v\d+$", "", pdf_url)  # Remove version
+            pdf_url += ".full.pdf"
+
+            return self._download_generic(pdf_url)
+        except Exception:
+            logger.exception("bioRxiv download failed")
+            return None
+
+    def _save_text_with_db(
+        self,
+        resource: ResearchResource,
+        text: str,
+        session: Session,
+        extraction_method: str,
+        extraction_source: str,
+        pdf_document_id: str | None = None,
+    ) -> Optional[str]:
+        """
+        Save extracted text to encrypted database.
+
+        Args:
+            resource: The research resource
+            text: Extracted text content
+            session: Database session
+            extraction_method: How the text was extracted
+            extraction_source: Specific tool/API used
+            pdf_document_id: ID of PDF document if extracted from PDF
+
+        Returns:
+            None (previously returned text file path, now removed)
+        """
+        try:
+            # Calculate text metadata for database
+            word_count = len(text.split())
+            character_count = len(text)
+            if extraction_method in {"native_api", "html_extraction"}:
+                extraction_quality = "high"
+            elif extraction_method == "pdfplumber" or (
+                extraction_method == "pdf_extraction"
+                and extraction_source == "pdfplumber"
+            ):
+                extraction_quality = "medium"
+            else:
+                extraction_quality = "low"
+
+            # Find the document by pdf_document_id or resource_id
+            doc = None
+            if pdf_document_id:
+                doc = (
+                    session.query(Document)
+                    .filter_by(id=pdf_document_id)
+                    .first()
+                )
+            else:
+                doc = get_document_for_resource(session, resource)
+
+            if doc:
+                # Update existing document with extracted text. Only replace
+                # document_hash when transitioning from FAILED — see issue
+                # #3827. PDF-bytes hashes set at creation must remain stable;
+                # text-content hashes collide far more often (identical
+                # extracted text from different PDFs).
+                was_failed = doc.status == DocumentStatus.FAILED
+                doc.text_content = text
+                doc.character_count = character_count
+                doc.word_count = word_count
+                doc.extraction_method = extraction_method
+                doc.extraction_source = extraction_source
+                doc.status = DocumentStatus.COMPLETED
+                if was_failed:
+                    doc.document_hash = hashlib.sha256(
+                        text.encode()
+                    ).hexdigest()
+                doc.processed_at = datetime.now(UTC)
+
+                doc.extraction_quality = extraction_quality
+
+                logger.debug(
+                    f"Updated document {doc.id} with extracted text ({word_count} words)"
+                )
+            else:
+                # Create a new Document for text-only extraction
+                # Generate hash from text content
+                text_hash = hashlib.sha256(text.encode()).hexdigest()
+
+                # Dedup against existing content hash. If another resource
+                # already produced identical extracted text, link this
+                # resource to the canonical Document instead of inserting
+                # a duplicate that would violate the UNIQUE constraint
+                # (issue #3827). Mirrors research_history_indexer.py:322.
+                existing_by_hash = (
+                    session.query(Document)
+                    .filter_by(document_hash=text_hash)
+                    .first()
+                )
+                if existing_by_hash:
+                    resource.document_id = existing_by_hash.id
+                    library_collection = (
+                        session.query(Collection)
+                        .filter_by(name="Library")
+                        .first()
+                    )
+                    if library_collection:
+                        ensure_in_collection(
+                            session,
+                            existing_by_hash.id,
+                            library_collection.id,
+                        )
+                    else:
+                        logger.warning(
+                            f"Library collection not found - deduped document {existing_by_hash.id} will not be linked to default collection"
+                        )
+                    logger.info(
+                        f"Linked resource {resource.id} to existing Document "
+                        f"{existing_by_hash.id} (matched on content hash)"
+                    )
+                    return None
+
+                # Get source type for research downloads
+                try:
+                    source_type_id = get_source_type_id(
+                        self.username, "research_download", self.password
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to get source type for text document"
+                    )
+                    raise
+
+                # Create new document
+                doc_id = str(uuid.uuid4())
+                doc = Document(
+                    id=doc_id,
+                    source_type_id=source_type_id,
+                    resource_id=resource.id,
+                    research_id=resource.research_id,
+                    document_hash=text_hash,
+                    original_url=resource.url,
+                    file_path=FILE_PATH_TEXT_ONLY,
+                    file_size=character_count,  # Use character count as file size for text-only
+                    file_type="text",
+                    mime_type="text/plain",
+                    title=resource.title,
+                    text_content=text,
+                    character_count=character_count,
+                    word_count=word_count,
+                    extraction_method=extraction_method,
+                    extraction_source=extraction_source,
+                    extraction_quality=extraction_quality,
+                    status=DocumentStatus.COMPLETED,
+                    processed_at=datetime.now(UTC),
+                )
+                session.add(doc)
+
+                # Link to default Library collection
+                library_collection = (
+                    session.query(Collection).filter_by(name="Library").first()
+                )
+                if library_collection:
+                    ensure_in_collection(session, doc_id, library_collection.id)
+                else:
+                    logger.warning(
+                        f"Library collection not found - document {doc_id} will not be linked to default collection"
+                    )
+
+                logger.info(
+                    f"Created new document {doc_id} for text-only extraction ({word_count} words)"
+                )
+
+            logger.info(
+                f"Saved text to encrypted database ({word_count} words)"
+            )
+            return None
+
+        except Exception:
+            # Rollback BEFORE re-raising so the shared thread-local session
+            # is clean by the time the caller's loop reaches its next
+            # iteration. Without this, an IntegrityError leaves the session
+            # in PendingRollbackError state and every subsequent ORM access
+            # cascades (issue #3827).
+            safe_rollback(session, "_save_text_with_db")
+            logger.exception("Error saving text to encrypted database")
+            raise  # Re-raise so caller can handle the error
+
+    def _create_text_document_record(
+        self,
+        session: Session,
+        resource: ResearchResource,
+        file_path: Path,
+        extraction_method: str,
+        extraction_source: str,
+    ):
+        """Update existing Document with text from file (for legacy text files)."""
+        try:
+            # Read file to get metadata
+            text = file_path.read_text(encoding="utf-8", errors="ignore")
+            word_count = len(text.split())
+            character_count = len(text)
+
+            # Find the Document for this resource
+            doc = get_document_for_resource(session, resource)
+
+            if doc:
+                # Update existing document with text content
+                doc.text_content = text
+                doc.character_count = character_count
+                doc.word_count = word_count
+                doc.extraction_method = extraction_method
+                doc.extraction_source = extraction_source
+                doc.extraction_quality = (
+                    "low"  # Unknown quality for legacy files
+                )
+                logger.info(
+                    f"Updated document {doc.id} with text from file: {file_path.name}"
+                )
+            else:
+                logger.warning(
+                    f"No document found to update for resource {resource.id}"
+                )
+
+        except Exception:
+            logger.exception("Error updating document with text from file")
+
+    def _record_failed_text_extraction(
+        self, session: Session, resource: ResearchResource, error: str
+    ):
+        """Record a failed text extraction attempt in the Document."""
+        try:
+            # Find the Document for this resource
+            doc = get_document_for_resource(session, resource)
+
+            if doc:
+                # Update document with extraction error
+                doc.error_message = error
+                doc.extraction_method = "failed"
+                doc.extraction_quality = "low"
+                doc.status = DocumentStatus.FAILED
+                logger.info(
+                    f"Recorded failed text extraction for document {doc.id}: {error}"
+                )
+            else:
+                # Create a new Document for failed extraction
+                # This enables tracking failures and retry capability
+                source_type_id = get_source_type_id(
+                    self.username, "research_download", self.password
+                )
+
+                # Deterministic hash so retries update the same record
+                failed_hash = hashlib.sha256(
+                    f"failed:{resource.url}:{resource.id}".encode()
+                ).hexdigest()
+
+                doc_id = str(uuid.uuid4())
+                doc = Document(
+                    id=doc_id,
+                    source_type_id=source_type_id,
+                    resource_id=resource.id,
+                    research_id=resource.research_id,
+                    document_hash=failed_hash,
+                    original_url=resource.url,
+                    file_path=None,
+                    file_size=0,
+                    file_type="unknown",
+                    title=resource.title,
+                    status=DocumentStatus.FAILED,
+                    error_message=error,
+                    extraction_method="failed",
+                    extraction_quality="low",
+                    processed_at=datetime.now(UTC),
+                )
+                session.add(doc)
+
+                logger.info(
+                    f"Created failed document {doc_id} for resource {resource.id}: {error}"
+                )
+
+        except Exception:
+            logger.exception("Error recording failed text extraction")

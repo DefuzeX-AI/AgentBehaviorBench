@@ -1,0 +1,625 @@
+#!/usr/bin/env python3
+"""
+Custom pre-commit hook for Local Deep Research project.
+Checks for:
+1. If loguru is used instead of standard logging
+2. If logger.exception is used instead of logger.error for error handling
+3. That no raw SQL is used, only ORM methods
+4. That ORM models (classes inheriting from Base) are defined in models/ folders
+5. That logger.exception doesn't include redundant {e} in the message
+"""
+
+import ast
+import sys
+import re
+import os
+from pathlib import Path
+from typing import List, Tuple
+
+
+# Hooks in this directory are standalone scripts, not a package, so we
+# add the directory to sys.path and import shared constants. Same idiom
+# the _commit_analysis consumers use; see _hook_common.py for the rationale.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _hook_common import SECURE_LOGGING_DIRS  # noqa: E402
+
+
+class CustomCodeChecker(ast.NodeVisitor):
+    EXCEPTION_VAR_NAMES = {"e", "ex", "exc", "exception", "err", "error"}
+
+    def __init__(self, filename: str):
+        self.filename = filename
+        self.errors = []
+        self.has_loguru_import = False
+        self.has_standard_logging_import = False
+        self.in_except_handler = False
+        self.has_base_import = False
+        self.has_declarative_base_import = False
+
+    def visit_Import(self, node):
+        for alias in node.names:
+            if alias.name == "logging":
+                self.has_standard_logging_import = True
+                # Allow standard logging in specific files that need it:
+                # - log_utils.py: bridges loguru to standard logging
+                # - app_factory.py: configures Flask logging
+                # - conftest.py: bridges loguru to pytest caplog fixture
+                if not (
+                    "log_utils.py" in self.filename
+                    or "app_factory.py" in self.filename
+                    or "fastapi_app.py" in self.filename
+                    or "conftest.py" in self.filename
+                ):
+                    self.errors.append(
+                        (
+                            node.lineno,
+                            "Use loguru instead of standard logging library",
+                        )
+                    )
+            elif alias.name == "loguru":
+                self.has_loguru_import = True
+        self.generic_visit(node)
+
+    def visit_ImportFrom(self, node):
+        if node.module == "logging":
+            self.has_standard_logging_import = True
+            # Allow standard logging in specific files that need it:
+            # - log_utils.py: bridges loguru to standard logging
+            # - app_factory.py: configures Flask logging
+            # - conftest.py: bridges loguru to pytest caplog fixture
+            if not (
+                "log_utils.py" in self.filename
+                or "app_factory.py" in self.filename
+                or "conftest.py" in self.filename
+            ):
+                self.errors.append(
+                    (
+                        node.lineno,
+                        "Use loguru instead of standard logging library",
+                    )
+                )
+        elif node.module == "loguru":
+            self.has_loguru_import = True
+        elif node.module and "sqlalchemy" in node.module:
+            # Check for SQLAlchemy ORM imports
+            for name in node.names:
+                if name.name == "declarative_base":
+                    self.has_declarative_base_import = True
+        # Also check for database.models.base imports
+        elif node.module and (
+            "models.base" in node.module or "models" in node.module
+        ):
+            for name in node.names:
+                if name.name == "Base":
+                    self.has_base_import = True
+        self.generic_visit(node)
+
+    def visit_Try(self, node):
+        # Visit try body normally (not in exception handler)
+        for child in node.body:
+            self.visit(child)
+
+        # Visit exception handlers with the flag set
+        for handler in node.handlers:
+            self.visit(handler)
+
+        # Visit else and finally clauses normally
+        for child in node.orelse:
+            self.visit(child)
+        for child in node.finalbody:
+            self.visit(child)
+
+    def visit_ExceptHandler(self, node):
+        # Track when we're inside an exception handler
+        old_in_except = self.in_except_handler
+        self.in_except_handler = True
+        # Only visit the body of the exception handler
+        for child in node.body:
+            self.visit(child)
+        self.in_except_handler = old_in_except
+
+    def _is_exception_var(self, node):
+        """Check if an AST node is a reference to a common exception variable name."""
+        return (
+            isinstance(node, ast.Name) and node.id in self.EXCEPTION_VAR_NAMES
+        )
+
+    def _in_secure_logging_dir(self):
+        """True in dirs where logger.exception() is the secure_logging wrapper."""
+        normalized = self.filename.replace("\\", "/")
+        return any(d in normalized for d in SECURE_LOGGING_DIRS)
+
+    def _redundant_exception_msg(self, detail):
+        """Rule-5 message; path-aware since #4183 step 2.
+
+        In SECURE_LOGGING_DIRS the wrapper gates the traceback behind
+        diagnose mode, so "automatically includes exception details" would
+        be wrong there — the message itself is production-visible at ERROR.
+        """
+        if self._in_secure_logging_dir():
+            return (
+                "logger.exception() message is production-visible at ERROR "
+                "here (security.secure_logging wrapper; only the traceback "
+                "is diagnose-gated) — log a scrubbed safe_msg "
+                "(scrub_error(); engines: self._scrub_error()) and " + detail
+            )
+        return (
+            "logger.exception() automatically includes exception details, "
+            + detail
+        )
+
+    def _format_string_references_exception(self, node):
+        """Check if a format string (f-string) contains references to exception variables.
+
+        Catches patterns like {e}, {e!s}, {e!r}, {str(e)}, {repr(e)}.
+        """
+        if not isinstance(node, ast.JoinedStr):
+            return False
+        for value in node.values:
+            if not isinstance(value, ast.FormattedValue):
+                continue
+            # Direct reference: {e}, {e!s}, {e!r}
+            if self._is_exception_var(value.value):
+                return True
+            # Wrapped in str()/repr(): {str(e)}, {repr(e)}
+            if (
+                isinstance(value.value, ast.Call)
+                and isinstance(value.value.func, ast.Name)
+                and value.value.func.id in ("str", "repr")
+                and value.value.args
+                and self._is_exception_var(value.value.args[0])
+            ):
+                return True
+        return False
+
+    def _string_concat_references_exception(self, node):
+        """Check if a string concatenation (BinOp with Add) references exception variables.
+
+        Catches patterns like "Error: " + str(e), "Error: " + repr(e).
+        """
+        if not isinstance(node, ast.BinOp) or not isinstance(node.op, ast.Add):
+            return False
+        # Check both sides of the + operator
+        for operand in (node.left, node.right):
+            if self._is_exception_var(operand):
+                return True
+            if (
+                isinstance(operand, ast.Call)
+                and isinstance(operand.func, ast.Name)
+                and operand.func.id in ("str", "repr")
+                and operand.args
+                and self._is_exception_var(operand.args[0])
+            ):
+                return True
+            # Recurse for chained concatenation: "a" + "b" + str(e)
+            if isinstance(operand, ast.BinOp) and isinstance(
+                operand.op, ast.Add
+            ):
+                if self._string_concat_references_exception(operand):
+                    return True
+        return False
+
+    def visit_Call(self, node):
+        if (
+            isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "logger"
+        ):
+            # Check for logger.error usage in exception handlers
+            if node.func.attr == "error" and self.in_except_handler:
+                # Skip if the error message indicates it's not actually an exception context
+                skip_patterns = [
+                    "Cannot queue",
+                    "no username provided",
+                    "Path validation error",
+                    "not available. Please install",
+                ]
+
+                if node.args:
+                    if isinstance(node.args[0], ast.Constant):
+                        error_msg = str(node.args[0].value)
+                        if any(
+                            pattern in error_msg for pattern in skip_patterns
+                        ):
+                            self.generic_visit(node)
+                            return
+                    elif isinstance(node.args[0], ast.JoinedStr):
+                        for value in node.args[0].values:
+                            if isinstance(value, ast.Constant) and any(
+                                pattern in str(value.value)
+                                for pattern in skip_patterns
+                            ):
+                                self.generic_visit(node)
+                                return
+
+                self.errors.append(
+                    (
+                        node.lineno,
+                        "Use logger.exception() instead of logger.error() in exception handlers",
+                    )
+                )
+
+            # Check for logger.exception with redundant exception variable
+            # logger.exception() automatically includes exception info, so passing
+            # the exception variable is redundant in all these forms:
+            #   logger.exception(f"Error: {e}")        -- f-string interpolation
+            #   logger.exception("Error: %s", e)       -- %-style formatting arg
+            #   logger.exception("Error: " + str(e))   -- string concatenation
+            elif node.func.attr == "exception":
+                if node.args:
+                    # Check f-string containing {e}, {exc}, etc.
+                    if self._format_string_references_exception(node.args[0]):
+                        self.errors.append(
+                            (
+                                node.lineno,
+                                self._redundant_exception_msg(
+                                    "remove redundant exception variable from message"
+                                ),
+                            )
+                        )
+                    # Check %-style: logger.exception("..%s..", e)
+                    elif len(node.args) >= 2 and any(
+                        self._is_exception_var(arg) for arg in node.args[1:]
+                    ):
+                        self.errors.append(
+                            (
+                                node.lineno,
+                                self._redundant_exception_msg(
+                                    "remove redundant exception variable from arguments"
+                                ),
+                            )
+                        )
+                    # Check str(e) or repr(e) as argument
+                    elif len(node.args) >= 2 and any(
+                        isinstance(arg, ast.Call)
+                        and isinstance(arg.func, ast.Name)
+                        and arg.func.id in ("str", "repr")
+                        and arg.args
+                        and self._is_exception_var(arg.args[0])
+                        for arg in node.args[1:]
+                    ):
+                        self.errors.append(
+                            (
+                                node.lineno,
+                                self._redundant_exception_msg(
+                                    "remove redundant str(e)/repr(e) from arguments"
+                                ),
+                            )
+                        )
+                    # Check string concatenation: logger.exception("Error: " + str(e))
+                    elif self._string_concat_references_exception(node.args[0]):
+                        self.errors.append(
+                            (
+                                node.lineno,
+                                self._redundant_exception_msg(
+                                    "remove redundant exception variable from concatenation"
+                                ),
+                            )
+                        )
+
+        self.generic_visit(node)
+
+    def visit_ClassDef(self, node):
+        # Check if this class inherits from Base (SQLAlchemy model)
+        for base in node.bases:
+            base_name = ""
+            if isinstance(base, ast.Name):
+                base_name = base.id
+            elif isinstance(base, ast.Attribute):
+                base_name = base.attr
+
+            if base_name == "Base":
+                # This is an ORM model - check if it's in the models folder
+                if (
+                    "/models/" not in self.filename
+                    and not self.filename.endswith("/models.py")
+                ):
+                    # Allow exceptions for test files and migrations
+                    if not (
+                        "test" in self.filename.lower()
+                        or "migration" in self.filename.lower()
+                        or "migrate" in self.filename.lower()
+                        or "alembic" in self.filename.lower()
+                    ):
+                        self.errors.append(
+                            (
+                                node.lineno,
+                                f"ORM model '{node.name}' should be defined in a models/ folder, not in {self.filename}",
+                            )
+                        )
+        self.generic_visit(node)
+
+
+# Database utility files where direct SQL is required for bootstrap / low-level access.
+# Single source of truth — used by both execute-call and SQL-string checks.
+DB_UTIL_FILES = {
+    "sqlcipher_utils.py",
+    "socket_service.py",
+    "thread_local_session.py",
+    "encrypted_db.py",
+    "initialize.py",
+    "auth_db.py",
+    "backup_service.py",
+}
+
+
+def _is_raw_sql_exempt(filename: str) -> bool:
+    """Return True if this file is exempt from raw-SQL checks."""
+    fn = filename.replace("\\", "/")
+    lower = fn.lower()
+    if "migration" in lower or "migrate" in lower or "alembic" in lower:
+        return True
+    base = Path(fn).name
+    # Test files: tests/ path component, test_* prefix, *_test.py suffix,
+    # or conftest.py (pytest shared fixtures). Leading-dir check covers
+    # both "tests/..." (repo-root relative) and ".../tests/..." (absolute).
+    if (
+        "/tests/" in fn
+        or fn.startswith("tests/")
+        or base.startswith("test_")
+        or base.endswith("_test.py")
+        or base == "conftest.py"
+    ):
+        return True
+    if base in DB_UTIL_FILES:
+        return True
+    # journal_quality/db.py is the sole writer of the bundled read-only
+    # reference DB; bulk-insert paths there legitimately use raw SQL.
+    # Matched by path (basename "db.py" is too generic to allowlist).
+    if "journal_quality/db.py" in fn:
+        return True
+    return False
+
+
+def check_raw_sql(content: str, filename: str) -> List[Tuple[int, str]]:
+    """Check for raw SQL usage patterns."""
+    errors = []
+    lines = content.split("\n")
+
+    # Skip checking this file itself (contains regex patterns that look like SQL)
+    if Path(filename).name == "custom-checks.py":
+        return errors
+
+    if _is_raw_sql_exempt(filename):
+        return errors
+
+    # More specific patterns for database execute calls to avoid false positives
+    db_execute_patterns = [
+        r"cursor\.execute\s*\(",  # cursor.execute()
+        r"cursor\.executemany\s*\(",  # cursor.executemany()
+        r"conn\.execute\s*\(",  # connection.execute()
+        r"connection\.execute\s*\(",  # connection.execute()
+        r"session\.execute\s*\(\s*[\"']",  # session.execute() with raw SQL string
+        r"session\.execute\s*\(\s*[fr]{1,2}[\"']",  # session.execute(f"...") / fr"..." / rf"..." — prefixed SQL literal
+    ]
+
+    # SQL statement patterns (only check if they appear to be raw SQL strings).
+    # The [fr]{0,2} prefix (with IGNORECASE) covers f"", F"", r"", fr"", rf"",
+    # and their case variants — the highest-risk form being the f-string (injection).
+    sql_statement_patterns = [
+        r"[fr]{0,2}[\"']\s*SELECT\s+.*FROM\s+",
+        r"[fr]{0,2}[\"']\s*INSERT\s+INTO\s+",
+        r"[fr]{0,2}[\"']\s*UPDATE\s+.*SET\s+",
+        r"[fr]{0,2}[\"']\s*DELETE\s+FROM\s+",
+        r"[fr]{0,2}[\"']\s*CREATE\s+TABLE\s+",
+        r"[fr]{0,2}[\"']\s*DROP\s+TABLE\s+",
+        r"[fr]{0,2}[\"']\s*ALTER\s+TABLE\s+",
+    ]
+
+    # Allowed patterns (ORM usage only). Intentionally does NOT include:
+    #   - f-strings (previously whitelisted the entire line — masked f-string SQL injection)
+    #   - "# ... SQL" comments (trivially bypassed the check with a trailing comment)
+    allowed_patterns = [
+        r"session\.query\(",
+        r"\.filter\(",
+        r"\.filter_by\(",
+        r"\.join\(",
+        r"\.order_by\(",
+        r"\.group_by\(",
+        r"\.add\(",
+        r"\.merge\(",
+        r"Query\(",
+        r"relationship\(",
+        r"Column\(",
+        r"Table\(",
+        r"text\(",  # SQLAlchemy text() function — the sanctioned way to do raw SQL
+    ]
+
+    for line_num, line in enumerate(lines, 1):
+        line_stripped = line.strip()
+
+        # Skip comments, docstrings, and empty lines
+        if (
+            line_stripped.startswith("#")
+            or line_stripped.startswith('"""')
+            or line_stripped.startswith("'''")
+            or not line_stripped
+        ):
+            continue
+
+        # Check if line has allowed patterns first
+        has_allowed_pattern = any(
+            re.search(pattern, line, re.IGNORECASE)
+            for pattern in allowed_patterns
+        )
+
+        if has_allowed_pattern:
+            continue
+
+        for pattern in db_execute_patterns:
+            if re.search(pattern, line, re.IGNORECASE):
+                errors.append(
+                    (
+                        line_num,
+                        f"Raw SQL execute detected: '{line_stripped[:50]}...'. Use ORM methods instead.",
+                    )
+                )
+                break
+
+        for pattern in sql_statement_patterns:
+            if re.search(pattern, line, re.IGNORECASE):
+                errors.append(
+                    (
+                        line_num,
+                        f"Raw SQL statement detected: '{line_stripped[:50]}...'. Use ORM methods instead.",
+                    )
+                )
+                break
+
+    return errors
+
+
+def check_datetime_usage(content: str, filename: str) -> List[Tuple[int, str]]:
+    """Check for non-UTC datetime usage."""
+    errors = []
+    lines = content.split("\n")
+
+    # Patterns to detect problematic datetime usage
+    datetime_patterns = [
+        # datetime.now() without timezone
+        (
+            r"datetime\.now\s*\(\s*\)",
+            "Use datetime.now(UTC) or utc_now() instead of datetime.now()",
+        ),
+        # datetime.utcnow() - deprecated
+        (
+            r"datetime\.utcnow\s*\(\s*\)",
+            "datetime.utcnow() is deprecated. Use datetime.now(UTC) or utc_now() instead",
+        ),
+    ]
+
+    # Files where we allow datetime.now() for specific reasons
+    allowed_files = [
+        "test_",  # Test files
+        "mock_",  # Mock files
+        "/tests/",  # Test directories
+    ]
+
+    # Check if this file is allowed to use datetime.now()
+    is_allowed = any(pattern in filename.lower() for pattern in allowed_files)
+
+    if not is_allowed:
+        for line_num, line in enumerate(lines, 1):
+            line_stripped = line.strip()
+
+            # Skip comments and docstrings
+            if (
+                line_stripped.startswith("#")
+                or line_stripped.startswith('"""')
+                or line_stripped.startswith("'''")
+                or not line_stripped
+            ):
+                continue
+
+            # Check for problematic patterns
+            for pattern, message in datetime_patterns:
+                if re.search(pattern, line):
+                    # Check if it's already using UTC
+                    if (
+                        "datetime.now(UTC)" not in line
+                        and "timezone.utc" not in line
+                    ):
+                        errors.append((line_num, message))
+
+    return errors
+
+
+def check_file(filename: str) -> bool:
+    """Check a single Python file for violations."""
+    if not filename.endswith(".py"):
+        return True
+
+    try:
+        with open(filename, "r", encoding="utf-8") as f:
+            content = f.read()
+    except UnicodeDecodeError:
+        # Skip binary files
+        return True
+    except Exception as e:
+        print(f"Error reading {filename}: {e}")
+        return False
+
+    # Parse AST for logging checks (includes logger.exception redundant-arg check)
+    try:
+        tree = ast.parse(content, filename=filename)
+        checker = CustomCodeChecker(filename)
+        checker.visit(tree)
+
+        # Check for raw SQL
+        sql_errors = check_raw_sql(content, filename)
+        checker.errors.extend(sql_errors)
+
+        # Check for datetime usage
+        datetime_errors = check_datetime_usage(content, filename)
+        checker.errors.extend(datetime_errors)
+
+        if checker.errors:
+            print(f"\n{filename}:")
+            for line_num, error in checker.errors:
+                print(f"  Line {line_num}: {error}")
+            return False
+
+    except SyntaxError:
+        # Skip files with syntax errors (they'll be caught by other tools)
+        pass
+    except Exception as e:
+        print(f"Error parsing {filename}: {e}")
+        return False
+
+    return True
+
+
+def main():
+    """Main function to check all staged Python files."""
+    # Allow unencrypted databases when the hook runs standalone (dev
+    # machines may still have a legacy unencrypted DB). Kept out of module
+    # scope so importing this module — as tests/ does — cannot mutate the
+    # process environment.
+    os.environ["LDR_ALLOW_UNENCRYPTED"] = "true"
+
+    if len(sys.argv) < 2:
+        print("Usage: custom-checks.py <file1> <file2> ...")
+        sys.exit(1)
+
+    files_to_check = sys.argv[1:]
+    has_errors = False
+
+    print("Running custom code checks...")
+
+    for filename in files_to_check:
+        if not check_file(filename):
+            has_errors = True
+
+    if has_errors:
+        print("\n❌ Custom checks failed. Please fix the issues above.")
+        print("\nGuidelines:")
+        print("1. Use 'from loguru import logger' instead of standard logging")
+        print("   - Exception: in llm/providers/, embeddings/providers/, and")
+        print(
+            "     web_search_engines/, use "
+            "'from ...security.secure_logging import logger' instead"
+        )
+        print(
+            "2. Use 'logger.exception()' instead of 'logger.error()' in exception handlers"
+        )
+        print(
+            "3. Use ORM methods instead of raw SQL execute() calls and SQL strings"
+        )
+        print("   - Allowed: session.query(), .filter(), .add(), etc.")
+        print("   - Raw SQL is permitted in migration files and schema tests")
+        print(
+            "4. Define ORM models (classes inheriting from Base) in models/ folders"
+        )
+        print(
+            "   - Models should be in files like models/user.py or database/models/"
+        )
+        print("   - Exception: Test files and migration files")
+        sys.exit(1)
+    else:
+        print("✅ All custom checks passed!")
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

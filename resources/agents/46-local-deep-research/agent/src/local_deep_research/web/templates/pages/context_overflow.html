@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% from "components/help_macros.html" import tooltip, help_panel, help_step, help_tip %}
+
+{% set active_page = 'metrics' %}
+
+{% block title %}Token Usage & Context Analytics - Deep Research System{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="/static/css/context_overflow.css">
+{% endblock %}
+
+{% block content %}
+<div class="ldr-page active" id="context-overflow">
+    <div class="ldr-page-header" style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <h1>Token Usage & Context Analytics</h1>
+            <a href="/metrics" style="background: var(--primary-color); color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 0.875rem;">
+                ← Back to Metrics
+            </a>
+        </div>
+        <div class="ldr-time-range-selector">
+            <span style="color: var(--text-secondary); margin-right: 0.5rem; font-size: 0.875rem;">Time Range:</span>
+            <button class="ldr-time-range-btn active" data-period="30d">30D</button>
+            <button class="ldr-time-range-btn" data-period="7d">7D</button>
+            <button class="ldr-time-range-btn" data-period="3m">3M</button>
+            <button class="ldr-time-range-btn" data-period="1y">1Y</button>
+            <button class="ldr-time-range-btn" data-period="all">All</button>
+        </div>
+    </div>
+
+    <!-- Understanding Context Limits Help Panel -->
+    {% call help_panel('context-how', 'Understanding Context Limits', icon='exclamation-triangle', collapsed=true, dismissible=true) %}
+    <div class="ldr-help-steps">
+        {{ help_step(1, "Context Window", "Every AI model has a limit on how much text it can process at once (measured in tokens). This is the 'context window'.") }}
+        {{ help_step(2, "Truncation", "When your input exceeds the limit, text is cut off (truncated). High truncation means lost information.") }}
+        {{ help_step(3, "Prevention", "Use larger-context models, reduce query size, or be more specific in your research questions.") }}
+    </div>
+    {{ help_tip("<strong>Color guide:</strong> Per-model <em>truncation rate</em> uses Green (&lt;10%) / Orange (10–20%) / Red (&gt;20%). The scatter chart instead colours each request by its <em>context utilisation</em> (prompt tokens ÷ limit): Green circle (&lt;50%) / Amber triangle (50–80% or unknown) / Red diamond (&gt;80%) / Grey triangle (no context limit reported by the provider). Shapes give a redundant signal for colourblind users; lower opacity marks requests served by local providers.") }}
+    {% endcall %}
+
+    <div id="loading" class="ldr-loading-spinner" style="text-align: center; padding: 3rem;" role="status">
+        <i aria-hidden="true" class="fas fa-spinner fa-spin fa-2x"></i>
+        <p>Loading token usage data...</p>
+    </div>
+
+    <div id="content" style="display: none;">
+        <!-- Empty state: brand-new user with zero TokenUsage rows -->
+        <div id="empty-no-data" class="ldr-empty-state" style="display: none; padding: 3rem 2rem; text-align: center;">
+            <i aria-hidden="true" class="fas fa-inbox" style="font-size: 2.5rem; color: var(--text-muted); margin-bottom: 1rem;"></i>
+            <h2 style="margin: 0.5rem 0;">No token usage data yet</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+                Run your first research to see context-overflow metrics.
+            </p>
+            <a href="/" class="btn btn-primary">
+                <i aria-hidden="true" class="fas fa-play"></i> Start research
+            </a>
+        </div>
+
+        <!-- Empty state: provider doesn't report context_limit (OpenRouter, hosted models without echo) -->
+        <div id="empty-no-context-data" class="ldr-empty-state" style="display: none; padding: 2rem; text-align: center;">
+            <i aria-hidden="true" class="fas fa-database" style="font-size: 2rem; color: var(--text-muted); margin-bottom: 1rem;"></i>
+            <p style="color: var(--text-secondary);">
+                Your provider doesn't report context window size in its response.
+                Truncation tracking is unavailable for these calls — see the request log below for raw token usage.
+            </p>
+        </div>
+
+        <!-- Empty state: has context data but no truncation events (positive signal) -->
+        <div id="empty-no-truncation" class="ldr-empty-state" style="display: none; padding: 2rem; text-align: center;">
+            <i aria-hidden="true" class="fas fa-check-circle" style="font-size: 2rem; color: var(--success-color); margin-bottom: 1rem;"></i>
+            <p style="color: var(--text-secondary);">
+                <strong>No context truncation detected.</strong>
+                All your requests fit within configured limits.
+            </p>
+        </div>
+
+        <!-- Warning Banner if high truncation rate -->
+        <div id="warning-banner" class="ldr-warning-banner" style="display: none;" role="alert">
+            <i aria-hidden="true" class="fas fa-exclamation-triangle"></i>
+            <div>
+                <strong>High Context Truncation Detected!</strong>
+                <p style="margin: 0.25rem 0 0 0; font-size: 0.875rem;">
+                    <span id="warning-rate"></span>% of your requests are hitting context limits.
+                    Consider adjusting your context window settings or using shorter prompts.
+                </p>
+            </div>
+        </div>
+
+        <!-- Context Overflow Section (truncation-focused; rendered when requests_with_context_data > 0) -->
+        <div id="context-overflow-section">
+            <!-- Populated dynamically -->
+        </div>
+
+        <!-- All Requests Detailed Table -->
+        <div class="ldr-card" style="margin-top: 2rem;">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                <h2><i aria-hidden="true" class="fas fa-table"></i> All Requests Details</h2>
+                <input type="text" id="requests-search" class="ldr-table-search" placeholder="Search by model, query, phase...">
+            </div>
+            <div class="ldr-card-content">
+                <div style="overflow-x: auto;">
+                    <table id="requests-table" class="ldr-data-table" style="width: 100%; font-size: 0.9rem;">
+                        <thead>
+                            <tr>
+                                <th scope="col" class="ldr-sortable" data-sort="timestamp">Timestamp</th>
+                                <th scope="col" class="ldr-sortable" data-sort="research_id">Research ID</th>
+                                <th scope="col" class="ldr-sortable" data-sort="model">Model</th>
+                                <th scope="col" class="ldr-sortable" data-sort="provider">Provider</th>
+                                <th scope="col" class="ldr-sortable" data-sort="research_phase">Phase</th>
+                                <th scope="col" class="ldr-sortable" data-sort="prompt_tokens">Prompt Tokens</th>
+                                <th scope="col" class="ldr-sortable" data-sort="completion_tokens">Completion Tokens</th>
+                                <th scope="col" class="ldr-sortable" data-sort="total_tokens">Total Tokens</th>
+                                <th scope="col" class="ldr-sortable" data-sort="context_limit">Context Limit</th>
+                                <th scope="col" class="ldr-sortable" data-sort="context_truncated">Truncated</th>
+                                <th scope="col" class="ldr-sortable" data-sort="tokens_truncated">Tokens Lost</th>
+                                <th scope="col">Query</th>
+                            </tr>
+                        </thead>
+                        <tbody id="requests-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="ldr-pagination" id="requests-pagination">
+                    <button class="ldr-pagination-btn" id="pagination-prev" disabled>← Previous</button>
+                    <span class="ldr-pagination-info" id="pagination-info">Page 1 of 1</span>
+                    <button class="ldr-pagination-btn" id="pagination-next" disabled>Next →</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block component_scripts %}
+<script defer src="/static/js/components/context-overflow-shared.js"></script>
+<script defer src="/static/js/components/context-overflow.js"></script>
+{% endblock %}

@@ -1,0 +1,1100 @@
+/**
+ * Socket Service
+ * Manages WebSocket communication using Socket.IO
+ */
+
+// escapeHtmlFallback is provided globally by services/ui.js (loaded via base.html)
+
+window.socket = (function() {
+    let socket = null;
+    let researchEventHandlers = {};
+    let reconnectCallback = null;
+    let connectionAttempts = 0;
+    const MAX_CONNECTION_ATTEMPTS = 3;
+
+    // Keep track of the research we're currently subscribed to
+    let currentResearchId = null;
+
+    // Track if we're using polling fallback
+    let usingPolling = false;
+    let pollingResearchId = null;
+    let pollingGeneration = 0;
+    let pagePollingFallback = null;
+
+    // Pages with resource-specific or always-on polling retain ownership of
+    // it. The generic research endpoint is only a fallback for other callers.
+    function setPollingFallback(callback) {
+        pagePollingFallback = callback;
+    }
+
+    /**
+     * Initialize the Socket.IO connection
+     */
+    function initializeSocket() {
+        if (socket) {
+            // Already initialized
+            return socket;
+        }
+
+        // Only initialize socket.io on research pages. The primary research
+        // form is served at `/`; `/research` is not a browser page.
+        // `/chat/` must include the trailing slash so we match the page
+        // route (e.g. `/chat/<session-id>`) but not API paths that happen
+        // to contain `/chat` as a substring (e.g. `/api/chat/sessions`).
+        const currentPath = window.location.pathname;
+        const isResearchPage = currentPath === '/' ||
+                              currentPath.includes('/progress') ||
+                              currentPath.includes('/benchmark') ||
+                              currentPath.includes('/chat/');
+
+        if (!isResearchPage) {
+            SafeLogger.log('Socket.IO not needed on this page:', currentPath);
+            return null;
+        }
+
+        // Get the base URL from the current page
+        const baseUrl = window.location.protocol + '//' + window.location.host;
+
+        // Create a new socket instance
+        try {
+            // Prefer WebSocket with polling fallback for lower latency
+            // and reduced server load vs polling-only
+            socket = io(baseUrl, {
+                path: '/ws/socket.io',
+                reconnection: true,
+                reconnectionDelay: 1000,
+                reconnectionAttempts: 5,
+                transports: ['websocket', 'polling']
+            });
+
+            setupSocketEvents();
+            SafeLogger.log('Socket.IO initialized with websocket+polling strategy');
+        } catch (error) {
+            SafeLogger.error('Error initializing Socket.IO:', error.message || error);
+            // Set a flag that we're not connected - will use polling for updates
+            usingPolling = true;
+        }
+
+        return socket;
+    }
+
+    /**
+     * Set up the socket event handlers
+     */
+    function setupSocketEvents() {
+        socket.on('connect', () => {
+            SafeLogger.log('Socket connected');
+            connectionAttempts = 0;
+            usingPolling = false;
+            pollingResearchId = null;
+            pollingGeneration++;
+
+            // Clear any polling intervals left over from fallback paths.
+            // The websocket is now the authoritative transport.
+            if (window.pollIntervals) {
+                Object.keys(window.pollIntervals).forEach((id) => {
+                    clearInterval(window.pollIntervals[id]);
+                    delete window.pollIntervals[id];
+                });
+            }
+
+            // Re-subscribe to current research if any
+            if (currentResearchId) {
+                subscribeToResearch(currentResearchId);
+            }
+
+            // Call reconnect callback if exists
+            if (reconnectCallback) {
+                reconnectCallback();
+            }
+        });
+
+        socket.on('connect_error', (error) => {
+            SafeLogger.warn('Socket connection error:', error);
+            connectionAttempts++;
+
+            if (connectionAttempts >= MAX_CONNECTION_ATTEMPTS) {
+                SafeLogger.warn(`Failed to connect after ${MAX_CONNECTION_ATTEMPTS} attempts, falling back to polling`);
+
+                // If we can't establish a socket connection, use polling for any active research
+                if (currentResearchId) {
+                    fallbackToPolling(currentResearchId);
+                } else {
+                    usingPolling = true;
+                }
+            }
+        });
+
+        socket.on('subscribe_error', (data) => {
+            const rejectedResearchId = data && data.research_id;
+
+            // FastAPI scopes every subscribe_error to the requested research_id.
+            // An unscoped error cannot safely claim whichever run happens to be
+            // active when a delayed packet arrives, so ignore it as malformed.
+            // A delayed rejection for a research the page has already left
+            // must not switch the currently active run to polling.
+            if (
+                !currentResearchId ||
+                rejectedResearchId === undefined ||
+                rejectedResearchId === null ||
+                String(rejectedResearchId) !== String(currentResearchId)
+            ) {
+                SafeLogger.warn('Ignoring subscription error for inactive research:', rejectedResearchId);
+                return;
+            }
+
+            SafeLogger.warn('Research subscription failed, falling back to polling:', data.error || 'Unknown error');
+            fallbackToPolling(currentResearchId);
+        });
+
+        // Add handler for search engine selection events
+        socket.on('search_engine_selected', (data) => {
+            SafeLogger.log('Received search_engine_selected event:', data);
+            if (data && data.engine) {
+                const engineName = data.engine;
+                const resultCount = data.result_count || 0;
+
+                // Add to log panel
+                if (typeof window.addConsoleLog === 'function') {
+                    // Format engine name - capitalize first letter
+                    const displayEngineName = engineName.charAt(0).toUpperCase() + engineName.slice(1);
+                    const message = `Search engine selected: ${displayEngineName} (found ${resultCount} results)`;
+                    window.addConsoleLog(message, 'info', {
+                        type: 'info',
+                        phase: 'engine_selected',
+                        engine: engineName,
+                        result_count: resultCount,
+                        is_engine_selection: true
+                    });
+                }
+            }
+        });
+
+        socket.on('disconnect', (reason) => {
+            SafeLogger.log('Socket disconnected:', reason);
+
+            // Fall back to polling on disconnect
+            if (currentResearchId) {
+                fallbackToPolling(currentResearchId);
+            }
+        });
+
+        socket.on('reconnect', (attemptNumber) => {
+            SafeLogger.log('Socket reconnected after', attemptNumber, 'attempts');
+            connectionAttempts = 0;
+        });
+
+        socket.on('reconnect_attempt', (attemptNumber) => {
+            SafeLogger.log('Socket reconnection attempt:', attemptNumber);
+        });
+
+        socket.on('error', (error) => {
+            SafeLogger.error('Socket error:', error);
+
+            // Fall back to polling on any error
+            if (currentResearchId) {
+                fallbackToPolling(currentResearchId);
+            }
+        });
+    }
+
+    /**
+     * Subscribe to research events
+     * @param {string} researchId - The research ID to subscribe to
+     * @param {function} callback - Optional callback for progress updates
+     */
+    function subscribeToResearch(researchId, callback) {
+        if (!researchId) {
+            SafeLogger.error('No research ID provided');
+            return;
+        }
+
+        SafeLogger.log('Subscribing to research:', researchId);
+
+        // Remember the current research ID so the connect handler can re-subscribe
+        currentResearchId = researchId;
+
+        // Add the callback if provided
+        if (callback && typeof callback === 'function') {
+            addResearchEventHandler(researchId, callback);
+        }
+
+        // If we have no socket connection yet, initialize it. The connect
+        // handler re-subscribes once the websocket is ready, so don't fall
+        // back to polling here.
+        if (!socket && !usingPolling) {
+            SafeLogger.warn('Socket not initialized, initializing now');
+            initializeSocket();
+
+            // io() can fail synchronously (for example when the client bundle
+            // did not load). initializeSocket records that failure by setting
+            // usingPolling; start the fallback for this first subscription
+            // instead of waiting for a second subscribe that may never come.
+            if (!socket && usingPolling) {
+                fallbackToPolling(researchId);
+            }
+            return;
+        }
+
+        // If we have a socket connection, subscribe to the research room
+        if (socket && socket.connected) {
+            try {
+                socket.emit('subscribe_to_research', { research_id: researchId });
+
+                // Remove any existing listener first to prevent duplicates
+                socket.off(`research_progress_${researchId}`);
+
+                // Setup direct event handler for progress updates
+                socket.on(`research_progress_${researchId}`, (data) => {
+                    handleProgressUpdate(researchId, data);
+                });
+            } catch (error) {
+                SafeLogger.error('Error subscribing to research:', error);
+                fallbackToPolling(researchId);
+            }
+        } else if (usingPolling) {
+            // Connection has already failed — keep polling.
+            fallbackToPolling(researchId);
+        }
+        // else: socket exists but not yet connected — connect handler re-subscribes.
+    }
+
+    /**
+     * Handle progress updates from research
+     * @param {string} researchId - The research ID this update is for
+     * @param {Object} data - The progress data
+     */
+    function handleProgressUpdate(researchId, data) {
+        SafeLogger.log('Progress update for research', researchId, ':', data);
+
+        // Special handling for synthesis errors to make them more visible to users
+        if (data.metadata && (data.metadata.phase === 'synthesis_error' || data.metadata.error_type)) {
+            const errorType = data.metadata.error_type || 'unknown';
+            let errorMessage;
+            let detailedMessage;
+
+            // Format user-friendly error messages based on error type
+            switch(errorType) {
+                case 'timeout':
+                    errorMessage = 'LLM Timeout Error';
+                    detailedMessage = 'The AI model took too long to respond. This may be due to server load or the complexity of your query.';
+                    break;
+                case 'token_limit':
+                    errorMessage = 'Token Limit Exceeded';
+                    detailedMessage = 'Your research query generated too much data for the AI model to process. Try a more specific query.';
+                    break;
+                case 'connection':
+                    errorMessage = 'LLM Connection Error';
+                    detailedMessage = 'Could not connect to the AI service. Please check that your LLM service is running.';
+                    break;
+                case 'rate_limit':
+                    errorMessage = 'API Rate Limit Reached';
+                    detailedMessage = 'The AI service API rate limit was reached. Please wait a few minutes and try again.';
+                    break;
+                case 'llm_error':
+                default:
+                    errorMessage = 'LLM Synthesis Error';
+                    detailedMessage = 'The AI model encountered an error during final answer synthesis. A fallback response will be provided.';
+            }
+
+            // Add prominent error notification
+            try {
+                // If we have a UI notification function available
+                if (typeof window.showNotification === 'function') {
+                    window.showNotification(errorMessage, detailedMessage, 'error', 10000); // Show for 10 seconds
+                }
+
+                // Log to console
+                SafeLogger.error(`Research error (${errorType}): ${errorMessage} - ${detailedMessage}`);
+
+                // Add to log panel with the error status
+                if (typeof window.addConsoleLog === 'function') {
+                    window.addConsoleLog(`${errorMessage}: ${detailedMessage}`, 'error', {
+                        phase: 'synthesis_error',
+                        error_type: errorType
+                    });
+
+                    // Add explanation about fallback mode as a separate log entry
+                    window.addConsoleLog(
+                        'Switching to fallback mode. Research will continue with available data.',
+                        'milestone',
+                        {phase: 'synthesis_fallback'}
+                    );
+                }
+            } catch (notificationError) {
+                SafeLogger.error('Error showing notification:', notificationError);
+            }
+        }
+
+        // Continue with normal progress update handling
+        // NOTE: We defer calling handlers until after we've processed log_entry data
+        // so that handlers can see the complete data including any log entries
+
+        // Handle special engine selection events
+        if (data.event === 'search_engine_selected' || (data.engine && data.result_count !== undefined)) {
+            // Extract engine information
+            const engineName = data.engine || 'unknown';
+            const resultCount = data.result_count || 0;
+
+            // Log the event
+            SafeLogger.log(`Search engine selected: ${engineName} (found ${resultCount} results)`);
+
+            // Add to log panel as an info message with special metadata
+            if (typeof window.addConsoleLog === 'function') {
+                // Format engine name - capitalize first letter
+                const displayEngineName = engineName.charAt(0).toUpperCase() + engineName.slice(1);
+                const message = `Search engine selected: ${displayEngineName} (found ${resultCount} results)`;
+                window.addConsoleLog(message, 'info', {
+                    type: 'info',
+                    phase: 'engine_selected',
+                    engine: engineName,
+                    result_count: resultCount,
+                    is_engine_selection: true
+                });
+            }
+        }
+
+        // Initialize message tracking if not exists
+        window._processedSocketMessages ||= new Map();
+
+        // Process logs from progress_log if available
+        if (data.progress_log && typeof data.progress_log === 'string') {
+            try {
+                const progressLogs = JSON.parse(data.progress_log);
+                if (Array.isArray(progressLogs) && progressLogs.length > 0) {
+                    SafeLogger.log(`Socket received ${progressLogs.length} logs in progress_log`);
+
+                    // Process each log entry
+                    progressLogs.forEach(logItem => {
+                        // Skip if no message or time
+                        if (!logItem.message || !logItem.time) return;
+
+                        // Generate a unique key for this message
+                        const messageKey = `${logItem.time}-${logItem.message}`;
+
+                        // Skip if we've seen this exact message before
+                        if (window._processedSocketMessages.has(messageKey)) {
+                            SafeLogger.log('Skipping duplicate socket message:', logItem.message);
+                            return;
+                        }
+
+                        // Record that we've processed this message
+                        window._processedSocketMessages.set(messageKey, Date.now());
+
+                        // Determine log type based on metadata
+                        let logType = 'info';
+                        if (logItem.metadata) {
+                            if (logItem.metadata.phase === 'iteration_complete' ||
+                                logItem.metadata.phase === 'report_complete' ||
+                                logItem.metadata.phase === 'complete' ||
+                                logItem.metadata.phase === 'search_complete' ||
+                                logItem.metadata.is_milestone === true ||
+                                logItem.metadata.type === 'milestone' ||
+                                logItem.metadata.type === 'MILESTONE') {
+                                logType = 'MILESTONE';
+                            } else if (logItem.metadata.phase === 'error' ||
+                                       logItem.metadata.type === 'error') {
+                                logType = 'error';
+                            }
+                        }
+
+                        // Also check for keywords in the message for better milestone detection
+                        if (logType !== 'milestone' && logItem.message) {
+                            const msg = logItem.message.toLowerCase();
+                            if (msg.includes('complete') ||
+                                msg.includes('finished') ||
+                                msg.includes('starting phase') ||
+                                msg.includes('generated report')) {
+                                logType = 'milestone';
+                            } else if (msg.includes('error') || msg.includes('failed')) {
+                                logType = 'error';
+                            }
+                        }
+
+                        // Send to log panel
+                        if (typeof window.addConsoleLog === 'function') {
+                            // Use the main console log function if available
+                            window.addConsoleLog(logItem.message, logType, logItem.metadata);
+                        } else if (typeof window._socketAddLogEntry === 'function') {
+                            // Fallback to the direct connector if needed
+                            const logEntry = {
+                                time: logItem.time,
+                                message: logItem.message,
+                                type: logType,
+                                metadata: logItem.metadata || {}
+                            };
+                            window._socketAddLogEntry(logEntry);
+                        } else {
+                            SafeLogger.warn('No log handler function available for log:', logItem);
+                        }
+                    });
+
+                    // Clean up old entries from message tracking (keep only last 5 minutes)
+                    const now = Date.now();
+                    for (const [key, timestamp] of window._processedSocketMessages.entries()) {
+                        if (now - timestamp > 5 * 60 * 1000) { // 5 minutes
+                            window._processedSocketMessages.delete(key);
+                        }
+                    }
+                }
+            } catch (error) {
+                SafeLogger.error('Error processing progress_log:', error);
+            }
+        }
+
+        // If the event contains log data, add it to the console
+        if (data.log_entry) {
+            SafeLogger.log('Adding log entry from socket event:', data.log_entry);
+
+            // Debug: Check if this is a milestone
+            if (data.log_entry.type === 'milestone' || data.log_entry.type === 'MILESTONE') {
+                SafeLogger.log('MILESTONE LOG received:', data.log_entry.message);
+            }
+
+            // Make sure global tracking is initialized
+            window._processedSocketMessages ||= new Map();
+
+            // Generate a message key
+            const messageKey = `${data.log_entry.time || new Date().toISOString()}-${data.log_entry.message}`;
+
+            // Skip if we've seen this message before
+            if (window._processedSocketMessages.has(messageKey)) {
+                SafeLogger.log('Skipping duplicate individual log entry:', data.log_entry.message);
+                // Don't return here - we still need to call handlers in case this is a milestone
+                // that should update the current task
+            } else {
+                // Record that we've processed this message
+                window._processedSocketMessages.set(messageKey, Date.now());
+
+                if (typeof window.addConsoleLog === 'function') {
+                    window.addConsoleLog(
+                        data.log_entry.message,
+                        data.log_entry.type ||
+                        (data.log_entry.metadata && data.log_entry.metadata.type) ||
+                        'info',
+                        data.log_entry.metadata
+                    );
+                } else if (typeof window._socketAddLogEntry === 'function') {
+                    window._socketAddLogEntry(data.log_entry);
+                } else {
+                    SafeLogger.warn('No log handler function available for direct log entry');
+                }
+            }
+        } else if (data.message && typeof window.addConsoleLog === 'function') {
+            // Use the message field if no specific log entry
+            SafeLogger.log('Adding message from socket event:', data.message);
+
+            // Skip duplicate general messages too
+            const messageKey = `${new Date().toISOString()}-${data.message}`;
+            if (window._processedSocketMessages.has(messageKey)) {
+                SafeLogger.log('Skipping duplicate message:', data.message);
+                // Don't return - still call handlers
+            } else {
+                // Record this message
+                window._processedSocketMessages.set(messageKey, Date.now());
+
+                window.addConsoleLog(data.message, ResearchStates.logLevel(data.status));
+            }
+        }
+
+        // Call all registered event handlers for this research AFTER processing all data
+        // This ensures handlers see the complete data including any log entries
+        if (researchEventHandlers[researchId]) {
+            SafeLogger.log(`Calling ${researchEventHandlers[researchId].length} handlers for research ${researchId} with data:`, {
+                hasLogEntry: !!data.log_entry,
+                logType: data.log_entry?.type,
+                message: data.log_entry?.message?.substring(0, 50) + '...'
+            });
+            researchEventHandlers[researchId].forEach(handler => {
+                try {
+                    handler(data);
+                } catch (error) {
+                    SafeLogger.error('Error in progress update handler:', error);
+                }
+            });
+        } else {
+            SafeLogger.log(`No handlers registered for research ${researchId}`);
+        }
+    }
+
+    /**
+     * Add a log entry to the console log container
+     * @param {Object} logEntry - The log entry data
+     */
+    function addLogEntry(logEntry) {
+        // If the logpanel's log function is available, use it
+        if (typeof window._socketAddLogEntry === 'function' && window._socketAddLogEntry !== addLogEntry) {
+            SafeLogger.log('Using logpanel\'s _socketAddLogEntry for log:', logEntry.message);
+            window._socketAddLogEntry(logEntry);
+            return;
+        }
+
+        // If window.addConsoleLog is available, use it
+        if (typeof window.addConsoleLog === 'function') {
+            SafeLogger.log('Using window.addConsoleLog for log:', logEntry.message);
+            let logLevel = 'info';
+            if (logEntry.type) {
+                logLevel = logEntry.type;
+            } else if (logEntry.metadata && logEntry.metadata.type) {
+                logLevel = logEntry.metadata.type;
+            }
+            window.addConsoleLog(logEntry.message, logLevel, logEntry.metadata);
+            return;
+        }
+
+        // Fallback implementation if none of the above is available.
+        // On research pages (progress/results/chat) logpanel.js sets
+        // both window._socketAddLogEntry and window.addConsoleLog before
+        // socket.js events arrive, so this branch is unreachable in
+        // practice. It exists for non-research pages (e.g. library)
+        // that include the log-panel markup without loading logpanel.js.
+        //
+        // The previous version of this branch directly mutated
+        // #log-indicator with `+1`, bypassing the prune / dedup /
+        // per-category-counts machinery in addLogEntryToPanel. That
+        // path is the source of the "-1" / counter-drift symptom on
+        // /results/<id> when the loadLogsForResearch hasLiveEntries
+        // branch races with socket inserts. We now log + bail rather
+        // than risk writing a stale +1 to the indicator.
+        SafeLogger.warn(
+            'socket.js: no log routing function registered; dropping log entry to avoid indicator drift:',
+            logEntry.message
+        );
+    }
+
+    /**
+     * Fall back to polling for research updates
+     * @param {string} researchId - The research ID
+     */
+    function fallbackToPolling(researchId) {
+        if (
+            pollingResearchId !== null &&
+            String(pollingResearchId) === String(researchId)
+        ) {
+            SafeLogger.log('Polling already active for research', researchId);
+            return;
+        }
+
+        SafeLogger.log('Falling back to polling for research', researchId);
+        usingPolling = true;
+        pollingResearchId = researchId;
+
+        if (typeof pagePollingFallback === 'function') {
+            pagePollingFallback(researchId);
+            return;
+        }
+
+        // Start polling if the global polling function exists
+        if (typeof window.pollResearchStatus === 'function') {
+            window.pollResearchStatus(researchId);
+        } else {
+            // Define a simple polling function if it doesn't exist
+            window.pollResearchStatus = function(id) {
+                if (!window.api || !window.api.getResearchStatus) {
+                    SafeLogger.error('API service not available for polling');
+                    return;
+                }
+
+                const ownerGeneration = ++pollingGeneration;
+                let nextRequestGeneration = 0;
+                let latestAppliedRequestGeneration = 0;
+
+                const pollInterval = setInterval(async () => {
+                    const requestGeneration = ++nextRequestGeneration;
+                    try {
+                        const data = await window.api.getResearchStatus(id);
+                        const isTerminalSnapshot = Boolean(
+                            data && ResearchStates.isTerminal(data.status)
+                        );
+                        if (
+                            ownerGeneration !== pollingGeneration ||
+                            window.pollIntervals?.[id] !== pollInterval ||
+                            (
+                                !isTerminalSnapshot &&
+                                requestGeneration < latestAppliedRequestGeneration
+                            )
+                        ) {
+                            return;
+                        }
+                        latestAppliedRequestGeneration = Math.max(
+                            latestAppliedRequestGeneration,
+                            requestGeneration
+                        );
+                        if (data) {
+                            handleProgressUpdate(id, data);
+
+                            // Stop polling if the research is complete
+                            if (isTerminalSnapshot) {
+                                const ownsPollingGeneration = (
+                                    ownerGeneration === pollingGeneration &&
+                                    pollingResearchId !== null &&
+                                    String(pollingResearchId) === String(id)
+                                );
+
+                                clearInterval(pollInterval);
+                                if (window.pollIntervals?.[id] === pollInterval) {
+                                    delete window.pollIntervals[id];
+                                }
+                                if (ownsPollingGeneration) {
+                                    // A terminal callback may synchronously
+                                    // move polling to another research. Only
+                                    // retire the generation this interval still
+                                    // owns after those callbacks have run.
+                                    usingPolling = !socket || !socket.connected;
+                                    pollingResearchId = null;
+                                    pollingGeneration++;
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        SafeLogger.error('Error polling research status:', error);
+                    }
+                }, 3000);
+
+                // Store the interval ID for later cleanup
+                window.pollIntervals ||= {};
+                window.pollIntervals[id] = pollInterval;
+            };
+
+            // Start polling for this research
+            window.pollResearchStatus(researchId);
+        }
+    }
+
+    /**
+     * Unsubscribe from research events
+     * @param {string} researchId - The research ID to unsubscribe from
+     */
+    function unsubscribeFromResearch(researchId) {
+        if (!researchId) return;
+
+        SafeLogger.log('Unsubscribing from research:', researchId);
+
+        const ownsPollingGeneration = (
+            pollingResearchId !== null &&
+            String(pollingResearchId) === String(researchId)
+        );
+
+        // Clear any polling intervals
+        if (window.pollIntervals && window.pollIntervals[researchId]) {
+            clearInterval(window.pollIntervals[researchId]);
+            delete window.pollIntervals[researchId];
+        }
+
+        if (ownsPollingGeneration) {
+            // Only the room that owns the active fallback generation may
+            // retire it. Delayed cleanup for an older room must not invalidate
+            // the newer room's in-flight/current polling responses.
+            pollingGeneration++;
+            // No active poll remains for this research. Keep fallback mode
+            // armed while the transport itself is still unavailable so the
+            // next research starts polling immediately.
+            usingPolling = !socket || !socket.connected;
+            pollingResearchId = null;
+        }
+
+        // If we have a socket connection, leave the research room
+        if (socket && socket.connected) {
+            try {
+                // Leave the research room
+                socket.emit('unsubscribe_from_research', { research_id: researchId });
+
+                // Remove the event handler
+                socket.off(`research_progress_${researchId}`);
+            } catch (error) {
+                SafeLogger.error('Error unsubscribing from research:', error);
+            }
+        }
+
+        // Clear handlers
+        if (
+            currentResearchId !== null &&
+            String(researchId) === String(currentResearchId)
+        ) {
+            currentResearchId = null;
+        }
+
+        // Clear event handlers
+        if (researchEventHandlers[researchId]) {
+            delete researchEventHandlers[researchId];
+        }
+    }
+
+    /**
+     * Add a research event handler
+     * @param {string} researchId - The research ID to handle events for
+     * @param {function} callback - The function to call when an event occurs
+     */
+    function addResearchEventHandler(researchId, callback) {
+        if (!researchId || typeof callback !== 'function') {
+            SafeLogger.error('Invalid research event handler');
+            return;
+        }
+
+        // Initialize the handlers array if needed
+        if (!researchEventHandlers[researchId]) {
+            researchEventHandlers[researchId] = [];
+        }
+
+        // Add the handler if it's not already in the array
+        if (!researchEventHandlers[researchId].includes(callback)) {
+            researchEventHandlers[researchId].push(callback);
+        }
+    }
+
+    /**
+     * Remove a research event handler
+     * @param {string} researchId - The research ID to remove handler for
+     * @param {function} callback - The function to remove
+     */
+    function removeResearchEventHandler(researchId, callback) {
+        if (!researchId || !researchEventHandlers[researchId]) return;
+
+        if (callback) {
+            // Find the handler index
+            const index = researchEventHandlers[researchId].indexOf(callback);
+
+            // Remove if found
+            if (index !== -1) {
+                researchEventHandlers[researchId].splice(index, 1);
+            }
+        } else {
+            // Remove all handlers for this research
+            delete researchEventHandlers[researchId];
+        }
+    }
+
+    /**
+     * Set a callback for socket reconnection
+     * @param {function} callback - The function to call on reconnection
+     */
+    function setReconnectCallback(callback) {
+        reconnectCallback = callback;
+    }
+
+    /**
+     * Disconnect the socket
+     */
+    function disconnectSocket() {
+        pollingGeneration++;
+        // Clear any polling intervals
+        if (window.pollIntervals) {
+            Object.keys(window.pollIntervals).forEach(id => {
+                clearInterval(window.pollIntervals[id]);
+            });
+            window.pollIntervals = {};
+        }
+
+        if (socket) {
+            try {
+                socket.disconnect();
+            } catch (error) {
+                SafeLogger.error('Error disconnecting socket:', error);
+            }
+            socket = null;
+        }
+
+        researchEventHandlers = {};
+        reconnectCallback = null;
+        currentResearchId = null;
+        connectionAttempts = 0;
+        usingPolling = false;
+        pollingResearchId = null;
+    }
+
+    /**
+     * Filter logs by type
+     * @param {string} type - The log type to filter by ('all', 'info', 'error', 'milestone')
+     */
+    function filterLogsByType(type) {
+        // If the logpanel's filter function is available, use it
+        if (
+            typeof window.filterLogsByType === 'function' &&
+            window.filterLogsByType !== filterLogsByType
+        ) {
+            SafeLogger.log('Using logpanel\'s filterLogsByType for filter:', type);
+            window.filterLogsByType(type);
+            return;
+        }
+
+        SafeLogger.log('Using socket.js filtering implementation for:', type);
+
+        // Update button UI
+        const buttons = document.querySelectorAll('.ldr-filter-buttons .ldr-small-btn');
+        buttons.forEach(button => {
+            button.classList.remove('ldr-selected');
+            if (button.textContent.toLowerCase() === type ||
+                (type === 'all' && button.textContent.toLowerCase() === 'all')) {
+                button.classList.add('ldr-selected');
+            }
+        });
+
+        // Get all log entries
+        const logEntries = document.querySelectorAll('.ldr-console-log-entry');
+
+        logEntries.forEach(entry => {
+            // Use dataset for type if available (new way)
+            if (entry.dataset && entry.dataset.logType) {
+                if (type === 'all' || entry.dataset.logType === type) {
+                    entry.style.display = '';
+                } else {
+                    entry.style.display = 'none';
+                }
+                return;
+            }
+
+            // Fallback to badge content (old way)
+            const badge = entry.querySelector('.ldr-log-badge');
+            const logType = badge ? badge.textContent.toLowerCase() : 'info';
+
+            if (type === 'all' || logType === type) {
+                entry.style.display = '';
+            } else {
+                entry.style.display = 'none';
+            }
+        });
+
+        // Update empty state message if needed
+        const logContainer = document.getElementById('console-log-container');
+        if (logContainer) {
+            const visibleEntries = logContainer.querySelectorAll('.ldr-console-log-entry[style="display: ;"], .ldr-console-log-entry:not([style])');
+            const emptyMessage = logContainer.querySelector('.ldr-empty-log-message');
+
+            if (visibleEntries.length === 0 && !emptyMessage) {
+                const escapeHtml = window.escapeHtml || escapeHtmlFallback;
+                const typeText = type === 'all' ? '' : escapeHtml(type) + ' ';
+                // bearer:disable javascript_lang_dangerous_insert_html
+                // eslint-disable-next-line no-unsanitized/property -- audited 2026-03-28: all interpolations use escapeHtml/esc, numeric coercion, or hardcoded strings
+                logContainer.innerHTML = `<div class="ldr-empty-log-message">No ${typeText}logs available.</div>` + logContainer.innerHTML;
+            } else if (visibleEntries.length > 0 && emptyMessage) {
+                emptyMessage.remove();
+            }
+        }
+    }
+
+    /**
+     * Check if socket is connected
+     * @returns {boolean} True if connected
+     */
+    function isConnected() {
+        return socket && socket.connected;
+    }
+
+    /**
+     * Check if we're using polling fallback
+     * @returns {boolean} True if using polling
+     */
+    function isUsingPolling() {
+        return usingPolling;
+    }
+
+    // Auto-connect on page load for realtime pages — EXCEPT the chat page,
+    // which connects lazily (on the first subscribeToResearch) instead.
+    //
+    // Why chat is special (#4431): the chat tests, and real users, navigate
+    // to/from /chat/ frequently. Eagerly opening a Socket.IO connection on
+    // every /chat/ load creates a churn of engine.io connect/disconnect
+    // cycles. On the werkzeug dev server (Flask-SocketIO threading mode, no
+    // eventlet/gevent) that churn, under CPU pressure, freezes the whole
+    // WSGI request pipeline for ~60s — the flaky UI-shard navigation
+    // timeouts. Chat doesn't need the socket until a research actually
+    // streams: chat.js calls subscribeToResearch (which lazily initializes
+    // the socket) on send and when resuming an in-progress research, and
+    // has an HTTP polling backup either way. Other realtime pages
+    // (/, /progress, /benchmark) keep eager connect — they aren't
+    // navigated in the same churny way.
+    function autoInitSocket() {
+        // Match the chat page (/chat/ and /chat/<session_id>) precisely —
+        // not a loose substring that would also catch hypothetical paths
+        // like /chat-archive/.
+        const path = window.location.pathname;
+        if (path === '/chat' || path.startsWith('/chat/')) {
+            SafeLogger.log('Socket.IO: deferring connect on chat page (lazy on subscribe)');
+            return;
+        }
+        initializeSocket();
+    }
+
+    // Initialize socket only after DOM is ready to avoid blocking DOMContentLoaded detection
+    // This is important for Puppeteer tests that use waitUntil: 'domcontentloaded'
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(autoInitSocket, 100);
+        });
+    } else {
+        // DOM already ready
+        setTimeout(autoInitSocket, 100);
+    }
+
+    // Expose functions globally
+    window.filterLogsByType = filterLogsByType;
+    window._socketAddLogEntry = addLogEntry; // Expose the addLogEntry function
+
+    // Public API
+    return {
+        init: initializeSocket,
+        subscribeToResearch,
+        setPollingFallback,
+        unsubscribeFromResearch,
+        onReconnect: setReconnectCallback,
+        disconnect: disconnectSocket,
+        getSocketInstance: () => socket,
+        isConnected,
+        isUsingPolling
+    };
+})();
+
+/**
+ * Register global functions for filtering logs - ONLY if they don't already exist
+ */
+if (!window.filterLogsByType) {
+    window.filterLogsByType = function(type) {
+        SafeLogger.log('Filter logs by type (socket.js fallback):', type);
+        // If the socket object exists and has the function
+        if (window.socket && typeof window.socket.filterLogsByType === 'function') {
+            window.socket.filterLogsByType(type);
+            return;
+        }
+
+        // Otherwise do basic filtering
+        const logEntries = document.querySelectorAll('.ldr-console-log-entry');
+        logEntries.forEach(entry => {
+            // Try using dataset first (new way)
+            if (entry.dataset && entry.dataset.logType) {
+                if (type === 'all' || entry.dataset.logType === type.toLowerCase()) {
+                    entry.style.display = '';
+                } else {
+                    entry.style.display = 'none';
+                }
+                return;
+            }
+
+            // Fallback to badge (old way)
+            const badge = entry.querySelector('.ldr-log-badge');
+            const logType = badge ? badge.textContent.toLowerCase() : 'info';
+
+            if (type === 'all' || logType === type.toLowerCase()) {
+                entry.style.display = '';
+            } else {
+                entry.style.display = 'none';
+            }
+        });
+    };
+}
+
+/**
+ * Function to add a log entry to the console - Only create if it doesn't exist
+ * @param {string} message - Log message
+ * @param {string} level - Log level (info, milestone, error)
+ * @param {Object} metadata - Optional metadata
+ */
+if (!window.addConsoleLog) {
+    const socketLogConnector = window._socketAddLogEntry;
+    window.addConsoleLog = function(message, level = 'info', metadata = null) {
+        SafeLogger.log(`Adding console log (socket.js fallback): ${message} (${level})`);
+
+        // Create a log entry object
+        const logEntry = {
+            time: new Date().toISOString(),
+            message,
+            type: level,
+            metadata: metadata || { type: level }
+        };
+
+        // Try to use the log panel's direct function first
+        if (window.logPanel && typeof window.logPanel.addLog === 'function') {
+            SafeLogger.log('Using logPanel.addLog to add log entry');
+            window.logPanel.addLog(message, level, metadata);
+            return;
+        }
+
+        // Only delegate to a replacement connector. The socket's own
+        // connector calls addConsoleLog and would recurse back into this shim.
+        if (typeof window._socketAddLogEntry === 'function') {
+            if (window._socketAddLogEntry === socketLogConnector) {
+                SafeLogger.warn('LogPanel is not available; dropping socket log entry:', message);
+                return;
+            }
+            SafeLogger.log('Using _socketAddLogEntry to add log entry');
+            window._socketAddLogEntry(logEntry);
+            return;
+        }
+
+        SafeLogger.warn('LogPanel functions not available, using fallback implementation');
+
+        // FALLBACK IMPLEMENTATION
+        const consoleLogContainer = document.getElementById('console-log-container');
+        if (!consoleLogContainer) {
+            SafeLogger.warn('Console log container not found, log will be lost');
+            return;
+        }
+
+        // Clear empty message if present
+        const emptyMessage = consoleLogContainer.querySelector('.ldr-empty-log-message');
+        if (emptyMessage) {
+            emptyMessage.remove();
+        }
+
+        // Get or create a new log entry
+        const template = document.getElementById('console-log-entry-template');
+        let entry;
+
+        if (template) {
+            entry = document.importNode(template.content, true);
+
+            // Set content
+            entry.querySelector('.ldr-log-timestamp').textContent = new Date().toLocaleTimeString();
+            entry.querySelector('.ldr-log-badge').textContent = level.charAt(0).toUpperCase() + level.slice(1);
+            entry.querySelector('.ldr-log-message').textContent = message;
+
+            // Add data attribute for filtering
+            const entryEl = entry.querySelector('.ldr-console-log-entry');
+            if (entryEl) {
+                entryEl.dataset.logType = level.toLowerCase();
+                entryEl.classList.add(`ldr-log-${level.toLowerCase()}`);
+            }
+        } else {
+            // Create a simple log entry without template
+            entry = document.createElement('div');
+            entry.className = 'ldr-console-log-entry';
+            entry.dataset.logType = level.toLowerCase();
+            entry.classList.add(`ldr-log-${level.toLowerCase()}`);
+
+            // Create log content with XSS protection
+            const escapeHtml = window.escapeHtml || escapeHtmlFallback;
+            // bearer:disable javascript_lang_dangerous_insert_html
+            // eslint-disable-next-line no-unsanitized/property -- audited 2026-03-28: all interpolations use escapeHtml/esc, numeric coercion, or hardcoded strings
+            entry.innerHTML = `
+                <span class="ldr-log-timestamp">${new Date().toLocaleTimeString()}</span>
+                <span class="ldr-log-badge">${escapeHtml(level.charAt(0).toUpperCase() + level.slice(1))}</span>
+                <span class="ldr-log-message">${escapeHtml(message)}</span>
+            `;
+        }
+
+        // DOM order is oldest -> newest. The log container uses
+        // column-reverse so appending a live log renders it at the visual top.
+        consoleLogContainer.appendChild(entry);
+
+        // Update log count
+        const logIndicator = document.getElementById('log-indicator');
+        if (logIndicator) {
+            const currentCount = parseInt(logIndicator.textContent, 10) || 0;
+            logIndicator.textContent = currentCount + 1;
+        }
+
+        // Show log panel if hidden
+        const logPanelToggle = document.getElementById('log-panel-toggle');
+        const logPanelContent = document.getElementById('log-panel-content');
+
+        if (logPanelContent && logPanelContent.classList.contains('collapsed') && logPanelToggle) {
+            // Auto-expand after a few logs
+            if (!window._logAutoExpandTimer) {
+                window._logAutoExpandTimer = setTimeout(() => {
+                    SafeLogger.log('Auto-expanding log panel due to accumulated logs');
+                    logPanelToggle.click();
+                    window._logAutoExpandTimer = null;
+                }, 500);
+            }
+        }
+    };
+}

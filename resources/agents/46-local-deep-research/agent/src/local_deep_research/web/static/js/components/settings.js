@@ -1,0 +1,5588 @@
+/**
+ * Settings component for managing application settings
+ * Note: URLValidator is available globally via /static/js/security/url-validator.js
+ */
+(function() {
+    'use strict';
+
+    // Shared value helpers extracted to utils/value-helpers.js for testability
+    const {
+        areValuesEqual,
+        areObjectsEqual,
+        formatPropertyName,
+        formatValueForDisplay,
+    } = window.LdrValueHelpers;
+
+    // Provider-dropdown option resolution, extracted to utils/provider-options.js
+    // for testability (see resolveProviderOptions there).
+    const { resolveProviderOptions } = window.LdrProviderOptions;
+
+    // The sentinel /settings/api substitutes for the stored value of every
+    // sensitive setting (DataSanitizer.REDACTION_TEXT, PR #3947). It must
+    // never be written back: the route handlers treat an exact match as a
+    // no-op and reject anything that merely *contains* it, so a control
+    // that renders the sentinel turns any edit into a failed or silently
+    // dropped save. Single source of truth for the JS side.
+    const REDACTED_SENTINEL = '[REDACTED]';
+
+    // Keys whose value the settings API redacted on the current load. Used
+    // to mask values in save confirmations for sensitive settings that are
+    // not password inputs (e.g. the notifications.service_url textarea),
+    // and, with the matching data-redacted attribute, to decide whether a
+    // blank control is a withheld secret (see isRedactedControl).
+    const redactedSettingKeys = new Set();
+
+    // The one setting with a dedicated test button; its control is looked
+    // up by several ids because the JS render and the Jinja macro name it
+    // differently.
+    const NOTIFICATION_SERVICE_URL_KEY = 'notifications.service_url';
+    let notificationTestInProgress = false;
+
+    /**
+     * True when the settings API redacted this value instead of returning it.
+     * @param {*} value - The value as delivered by /settings/api
+     * @returns {boolean}
+     */
+    function isRedactedValue(value) {
+        return value === REDACTED_SENTINEL;
+    }
+
+    /**
+     * True when a control must render blank because its stored value is a
+     * secret we either never receive or must not echo. Password inputs
+     * always qualify (the server render does the same); every other
+     * sensitive control qualifies once the API has redacted it.
+     * @param {Object} setting - The setting object
+     * @returns {boolean}
+     */
+    function rendersBlankForSecrecy(setting) {
+        return setting.ui_element === 'password' || isRedactedValue(setting.value);
+    }
+
+    // Placeholders the render templates put on a control that hides its
+    // stored value. Constants because syncRedactedControlState reapplies
+    // them after a save without re-rendering: two copies of the wording
+    // would let the post-save control and a re-rendered one disagree.
+    const SECRET_CLEARABLE_PLACEHOLDER =
+        'Saved — type to replace, or press Enter while empty to clear';
+    const PASSWORD_CONFIGURED_PLACEHOLDER = '(saved — type to change)';
+    const PASSWORD_UNSET_PLACEHOLDER = '(not configured)';
+
+    /**
+     * The placeholder a control gets from its (possibly redacted) value.
+     * Used by the render templates and by the post-save re-sync, so both
+     * produce the same control for the same setting.
+     * @param {Object} setting - The setting object
+     * @returns {string}
+     */
+    function secrecyPlaceholder(setting) {
+        if (setting.ui_element === 'password') {
+            // The sentinel is a positive "is configured" signal: we know
+            // the value is set, we just don't know its plaintext.
+            const isConfigured =
+                isRedactedValue(setting.value) ||
+                (setting.value !== null && setting.value !== '');
+            return isConfigured
+                ? PASSWORD_CONFIGURED_PLACEHOLDER
+                : PASSWORD_UNSET_PLACEHOLDER;
+        }
+        return isRedactedValue(setting.value) ? SECRET_CLEARABLE_PLACEHOLDER : '';
+    }
+
+    /**
+     * True when this control is the blank-rendered face of a redacted
+     * secret, i.e. the field is empty because the value is withheld rather
+     * than because nothing is stored.
+     *
+     * Two pieces of state say so, and both are required: the module's
+     * redactedSettingKeys set (rebuilt by loadSettings, kept current by the
+     * post-save re-sync) and the control's own data-redacted attribute
+     * (written by the render templates and by the same re-sync). They are
+     * deliberately kept in agreement — see syncRedactedControlState — so
+     * requiring both means neither a stale attribute on a node that
+     * outlived its data nor a set entry for a control the render never
+     * marked (a password input) can drive the clear gesture or the Test
+     * Notification button on its own.
+     * @param {string} key - The setting key
+     * @param {HTMLElement|null} input - The control, if it exists
+     * @returns {boolean}
+     */
+    function isRedactedControl(key, input) {
+        return Boolean(input) &&
+            input.dataset.redacted === 'true' &&
+            redactedSettingKeys.has(key);
+    }
+
+    /**
+     * Re-apply a saved setting's redaction state to its live control.
+     *
+     * A save response carries a render's worth of new truth that never
+     * reaches the DOM: nothing re-renders after a save, so the node the
+     * user is looking at keeps whatever the last render gave it. Three
+     * pieces describe a secret control — the dirty-check baseline in
+     * originalSettings, membership of redactedSettingKeys, and the
+     * control's data-redacted attribute — and the clear gesture and the
+     * Test Notification button read combinations of them, so any two
+     * drifting apart produces a control that cannot be cleared or a button
+     * that is enabled for a setting that is no longer configured.
+     * Applying exactly what a render would have produced (blank body, the
+     * matching placeholder, the attribute) keeps all three in step until
+     * the next render, which derives from the allSettings entry updated by
+     * the same write-back.
+     * @param {string} key - The setting key
+     * @param {Object} setting - The setting as echoed by the save response
+     * @param {*} submittedValue - The value this save sent for the key
+     */
+    function syncRedactedControlState(key, setting, submittedValue) {
+        if (isRedactedValue(setting.value)) {
+            redactedSettingKeys.add(key);
+        } else {
+            redactedSettingKeys.delete(key);
+        }
+
+        const blankForSecrecy = rendersBlankForSecrecy(setting);
+        Array.from(document.getElementsByName(key)).forEach(control => {
+            if (control.tagName !== 'INPUT' && control.tagName !== 'TEXTAREA') return;
+            const wasRedacted = control.dataset.redacted === 'true';
+            // Only the controls a render marks get the attribute: a
+            // password input renders blank without it (its emptiness is
+            // unconditional, so an empty write there is a no-op the route
+            // handlers swallow rather than a clear gesture).
+            const markable = control.type !== 'password';
+            if (isRedactedValue(setting.value) && markable) {
+                control.dataset.redacted = 'true';
+            } else {
+                delete control.dataset.redacted;
+            }
+            // Only secrecy-blank controls have a placeholder this owns;
+            // an ordinary control (a dropdown's "Select a provider", say)
+            // keeps whatever its own render gave it.
+            if (blankForSecrecy || wasRedacted) {
+                control.placeholder = secrecyPlaceholder(setting);
+            }
+            // Blank it for the same reason the render does — and only if
+            // it still holds what this save submitted, so typing that
+            // started while the request was in flight is never discarded
+            // (that control is then legitimately dirty against the blank
+            // baseline and saves on its own).
+            if (blankForSecrecy && control.value === String(submittedValue)) {
+                control.value = '';
+            }
+        });
+    }
+
+    /**
+     * Enable/disable the Test Notification button from live DOM lookups.
+     *
+     * The notifications.service_url control is re-created whenever the
+     * settings list re-renders (the render replaces settingsContent's
+     * innerHTML wholesale), so a closure captured in setupRefreshButtons
+     * holds a detached node. Resolving both nodes on every call keeps the
+     * rule stable: the button is usable when the field has a value OR when
+     * it renders blank because the saved value is redacted — the stored
+     * URL is what gets tested then.
+     */
+    function updateTestNotificationButtonState() {
+        const btn = document.getElementById('test-notification-button');
+        const input = document.getElementById('notifications-service-url') ||
+            document.querySelector('input[name="notifications.service_url"], textarea[name="notifications.service_url"]');
+        if (!btn) return;
+        const hasValue = Boolean(input) && input.value.trim() !== '';
+        btn.disabled = notificationTestInProgress ||
+            !(hasValue || isRedactedControl(NOTIFICATION_SERVICE_URL_KEY, input));
+    }
+
+    // DOM elements and global variables
+    let settingsForm;
+    let settingsContent;
+    let settingsSearch;
+    let settingsTabs;
+    let settingsAlert;
+    let resetButton;
+    let rawConfigToggle;
+    let rawConfigSection;
+    let rawConfigEditor;
+    const originalSettings = {};
+    let allSettings = [];
+    let activeTab = 'all';
+    let searchDebounceTimer = null;
+
+    // Model and search engine dropdown variables
+    let modelOptions = [];
+    let searchEngineOptions = [];
+    let nextModelProvidersRequestGeneration = 0;
+    let latestModelProvidersRequest = null;
+    let nextSearchEnginesRequestGeneration = 0;
+    let latestSearchEnginesRequest = null;
+    // Provider options surfaced by the backend auto-discovery endpoint
+    // (/settings/api/available-models). Preferred over the static fallback
+    // lists below so the provider dropdown stays in sync with the registry and
+    // can't drift (e.g. silently miss xai/ionos/deepseek/google/openrouter).
+    let discoveredProviderOptions = [];
+
+    // Store save timers for each setting key
+    let saveTimers = {};
+    let pendingSaveData = {};
+    let nextSettingsSaveGeneration = 0;
+    let latestUnscopedSettingsSaveGeneration = 0;
+    const latestSettingsSaveGenerationByKey = new Map();
+    const latestSettingsSaveBySource = new WeakMap();
+    // Each entry owns the write slot for one or more setting keys until its
+    // request has fully settled. Response generations protect browser state,
+    // but they cannot stop two server transactions from committing in the
+    // opposite order. Queue only requests whose key sets overlap; unrelated
+    // settings can still save concurrently.
+    const pendingSettingsSaveByKey = new Map();
+    let settingsResetInProgress = false;
+
+    /**
+     * Fallback HTML escape function (used if xss-protection.js fails to load).
+     * NOTE: This declaration is safe because it is INSIDE an IIFE (function scope).
+     * Do NOT move it to top-level scope — it would conflict with the global
+     * escapeHtmlFallback in services/ui.js and crash the page.
+     */
+    const escapeHtmlFallback = (str) => {
+        if (str === null || str === undefined) return '';
+        return String(str).replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]);
+    };
+
+    // Use global escapeHtml from xss-protection.js with fallback
+    const escapeHtml = window.escapeHtml || escapeHtmlFallback;
+
+    /**
+     * Helper function to generate custom dropdown HTML (similar to Jinja macro)
+     * @param {object} params - Parameters for the dropdown
+     * @returns {string} HTML string for the custom dropdown input part
+     */
+    function renderCustomDropdownHTML(params) {
+        // Basic structure with input and list container
+        let dropdownHTML = `
+            <div class="ldr-custom-dropdown" id="${params.dropdown_id}">
+                <input type="text"
+                       id="${params.input_id}"
+                       data-key="${params.data_setting_key || params.input_id}"
+                       class="ldr-custom-dropdown-input"
+                       placeholder="${params.placeholder}"
+                       autocomplete="off"
+                       role="combobox"
+                       aria-haspopup="listbox"
+                       aria-expanded="false"
+                       aria-autocomplete="list"
+                       aria-controls="${params.dropdown_id}-list"
+                       ${params.label_id ? `aria-labelledby="${params.label_id}"` : ''}
+                       ${params.disabled ? "disabled" : ""}>
+                <!-- Hidden input that will be included in form submission -->
+                <input type="hidden" name="${params.input_id}" id="${params.input_id}_hidden" value="">
+                <div class="ldr-custom-dropdown-list" id="${params.dropdown_id}-list" role="listbox"${params.label_id ? ` aria-labelledby="${params.label_id}"` : ''}></div>
+            </div>
+        `;
+
+        // Add refresh button if needed
+        const refreshButtonHTML = params.show_refresh ? `
+            <button type="button"
+                    class="ldr-custom-dropdown-refresh-btn"
+                    id="${params.input_id}-refresh"
+                    aria-label="${params.refresh_aria_label || 'Refresh options'}">
+                <i class="fas fa-sync-alt" aria-hidden="true"></i>
+            </button>
+        ` : '';
+
+        // Wrap with refresh container if needed
+        if (params.show_refresh) {
+            dropdownHTML = `
+                <div class="ldr-custom-dropdown-with-refresh">
+                    ${dropdownHTML} ${refreshButtonHTML}
+                </div>
+            `;
+        }
+
+        // Note: This returns only the input element part. Label and help text are handled outside.
+        return dropdownHTML;
+    }
+
+    /**
+     * Set up refresh buttons for model and search engine dropdowns
+     */
+    function setupRefreshButtons() {
+        SafeLogger.log('Setting up refresh buttons...');
+
+        // Handle test notification button
+        let testNotificationBtn = document.getElementById('test-notification-button');
+
+        // If the button doesn't exist, create it dynamically for the notifications service URL field
+        if (!testNotificationBtn) {
+            const serviceUrlInput = document.getElementById('notifications-service-url') ||
+                                   document.querySelector('input[name="notifications.service_url"], textarea[name="notifications.service_url"]');
+            if (serviceUrlInput) {
+                // Find the parent container for the setting
+                const settingContainer = serviceUrlInput.closest('.ldr-settings-item');
+                if (settingContainer) {
+                    // Check if button container already exists to avoid duplicates
+                    let buttonContainer = settingContainer.querySelector('.ldr-settings-test-button-container');
+                    if (!buttonContainer) {
+                        // Create button container
+                        buttonContainer = document.createElement('div');
+                        buttonContainer.className = 'ldr-settings-test-button-container';
+                        buttonContainer.innerHTML = `
+                            <input type="button"
+                                   id="test-notification-button"
+                                   class="btn btn-secondary btn-sm"
+                                   value="Test Notification">
+                            <div id="test-notification-result" class="ldr-test-result" style="display: none;"></div>
+                        `;
+
+                        // Add the button container right after the input field
+                        serviceUrlInput.parentNode.insertBefore(buttonContainer, serviceUrlInput.nextSibling);
+
+                        SafeLogger.log('Dynamically created test notification button');
+                    }
+
+                    // Now get the button (either newly created or existing)
+                    testNotificationBtn = document.getElementById('test-notification-button');
+                }
+            }
+        }
+
+        if (testNotificationBtn) {
+            SafeLogger.log('Found and set up test notification button');
+            testNotificationBtn.addEventListener('click', function() {
+                testNotification();
+            });
+
+            // Also enable/disable button based on input value
+            const serviceUrlInput = document.getElementById('notifications-service-url') ||
+                                   document.querySelector('input[name="notifications.service_url"], textarea[name="notifications.service_url"]');
+            if (serviceUrlInput) {
+                serviceUrlInput.addEventListener('input', updateTestNotificationButtonState);
+                serviceUrlInput.addEventListener('change', updateTestNotificationButtonState);
+                // Initial check — the module helper re-resolves both nodes,
+                // so it also covers the redacted-blank (data-redacted) case.
+                updateTestNotificationButtonState();
+            }
+        }
+
+        // Handle provider refresh button. The template renders it
+        // (settings_form.html, show_refresh=True) and nothing bound it, so it
+        // was inert in every state (#6407). Same work the model button does:
+        // the provider list and the model list come from one fetch.
+        const providerRefreshBtn = document.getElementById('llm.provider-refresh');
+        if (providerRefreshBtn) {
+            // `onclick`, not addEventListener: this function runs on every
+            // render AND from the tab listener, and a second listener on one
+            // node doubles the forced fetches per click. An assignment is one
+            // handler per node by definition (#6407).
+            providerRefreshBtn.onclick = function() {
+                const icon = providerRefreshBtn.querySelector('i');
+                if (icon) icon.className = 'fas fa-spinner fa-spin';
+                providerRefreshBtn.classList.add('ldr-loading');
+                window.modelDropdownsInitialized = false;
+                fetchModelProviders(true)
+                    .then(() => {
+                        if (icon) icon.className = 'fas fa-sync-alt';
+                        providerRefreshBtn.classList.remove('ldr-loading');
+                        initializeModelDropdowns();
+                        showAlert('Provider list refreshed', 'success');
+                    })
+                    .catch(error => {
+                        SafeLogger.error('Error refreshing providers:', error);
+                        if (icon) icon.className = 'fas fa-sync-alt';
+                        providerRefreshBtn.classList.remove('ldr-loading');
+                        showAlert('Failed to refresh providers', 'error');
+                    });
+            };
+        }
+
+        // Handle model refresh button
+        const modelRefreshBtn = document.getElementById('llm.model-refresh');
+        if (modelRefreshBtn) {
+            SafeLogger.log('Found and set up model refresh button:', modelRefreshBtn.id);
+            modelRefreshBtn.onclick = function() {
+                const icon = modelRefreshBtn.querySelector('i');
+                if (icon) icon.className = 'fas fa-spinner fa-spin';
+                modelRefreshBtn.classList.add('ldr-loading');
+
+                // Reset the initialization flag to allow reinitializing the dropdown
+                window.modelDropdownsInitialized = false;
+
+                // Force refresh models and reinitialize
+                fetchModelProviders(true)
+                    .then(() => {
+                        if (icon) icon.className = 'fas fa-sync-alt';
+                        modelRefreshBtn.classList.remove('ldr-loading');
+
+                        // Re-initialize model dropdowns with the new data
+                        initializeModelDropdowns();
+
+                        // Show success message
+                        showAlert('Model list refreshed', 'success');
+                    })
+                    .catch(error => {
+                        SafeLogger.error('Error refreshing models:', error);
+                        if (icon) icon.className = 'fas fa-sync-alt';
+                        modelRefreshBtn.classList.remove('ldr-loading');
+                        showAlert('Failed to refresh models', 'error');
+                    });
+            };
+        } else {
+            SafeLogger.log('Could not find model refresh button');
+        }
+
+        // Handle search engine refresh button
+        const searchEngineRefreshBtn = document.getElementById('search.tool-refresh');
+        if (searchEngineRefreshBtn) {
+            SafeLogger.log('Found and set up search engine refresh button:', searchEngineRefreshBtn.id);
+            searchEngineRefreshBtn.onclick = function() {
+                const icon = searchEngineRefreshBtn.querySelector('i');
+                if (icon) icon.className = 'fas fa-spinner fa-spin';
+                searchEngineRefreshBtn.classList.add('ldr-loading');
+
+                // Reset the initialization flag to allow reinitializing the dropdown
+                window.searchEngineDropdownInitialized = false;
+
+                // Force refresh search engines and reinitialize
+                fetchSearchEngines(true)
+                    .then(() => {
+                        if (icon) icon.className = 'fas fa-sync-alt';
+                        searchEngineRefreshBtn.classList.remove('ldr-loading');
+
+                        // Re-initialize search engine dropdowns with the new data
+                        initializeSearchEngineDropdowns();
+
+                        // Show success message
+                        showAlert('Search engine list refreshed', 'success');
+                    })
+                    .catch(error => {
+                        SafeLogger.error('Error refreshing search engines:', error);
+                        if (icon) icon.className = 'fas fa-sync-alt';
+                        searchEngineRefreshBtn.classList.remove('ldr-loading');
+                        showAlert('Failed to refresh search engines', 'error');
+                    });
+            };
+        } else {
+            SafeLogger.log('Could not find search engine refresh button');
+
+            // Try to create refresh button if it doesn't exist for search engine
+            createRefreshButton('search.tool', fetchSearchEngines);
+        }
+    }
+
+    /**
+     * Initialize auto-save handlers for settings inputs
+     */
+    function initAutoSaveHandlers() {
+        // Only run this for the main settings dashboard
+        if (!settingsContent) {
+            SafeLogger.log('[initAutoSaveHandlers] No settingsContent found, exiting');
+            return;
+        }
+
+        // Get all inputs in settings form
+        const inputs = settingsForm.querySelectorAll('input, textarea, select');
+        let checkboxCount = 0;
+        // Set up event handlers for each input
+        inputs.forEach(input => {
+            // Skip if this is a button or submit input
+            if (input.type === 'button' || input.type === 'submit') return;
+
+            // Expanded JSON controls have parent-aware handlers below. Wiring
+            // the generic handler too would submit a synthetic child key such
+            // as report.options_limit in addition to report.options.
+            if (input.classList.contains('ldr-json-property-control')) return;
+
+            // Skip if this input already has auto-save handlers attached
+            // (prevents duplicate listeners when initAutoSaveHandlers is called multiple times)
+            if (input.hasAttribute('data-autosave-initialized')) return;
+            input.setAttribute('data-autosave-initialized', 'true');
+
+            // Set data-key attribute from name if not already set
+            if (!input.getAttribute('data-key') && input.getAttribute('name')) {
+                input.setAttribute('data-key', input.getAttribute('name'));
+            }
+
+            // For checkboxes, we use change event
+            if (input.type === 'checkbox') {
+                checkboxCount++;
+                input.addEventListener('change', function(e) {
+                    // For checkboxes, pass custom event type parameter to avoid issues
+                    handleInputChange(e, 'change');
+                });
+            }
+            // For selects, we use change event
+            else if (input.tagName.toLowerCase() === 'select') {
+                input.addEventListener('change', function(e) {
+                    // Create a custom parameter instead of modifying e.type
+                    handleInputChange(e, 'change');
+                });
+
+                input.addEventListener('blur', function(e) {
+                    // Create a custom parameter instead of modifying e.type
+                    handleInputChange(e, 'blur');
+                });
+            }
+            // For text, number, etc. we monitor for changes but only save
+            // on blur or Enter. We don't do anything with custom drop-downs
+            // (we use the hidden input instead).
+            else if (!input.classList.contains("ldr-custom-dropdown-input")) {
+                // Listen for input events to track changes and validate in real-time
+                input.addEventListener('input', function(e) {
+                    // Create a custom parameter instead of modifying e.type
+                    handleInputChange(e, 'input');
+                });
+
+                // Handle Enter key press for immediate saving
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        // Create a custom parameter instead of modifying e.type
+                        handleInputChange(e, 'keydown');
+                    }
+                });
+
+                // Save on blur if changes were made.
+                if (input.id.endsWith("_hidden")) {
+                    //  We can't use this for custom dropdowns, because it
+                    //  will fire before the value has been changed, causing
+                    //  it to read the wrong value.
+                    input.addEventListener('change', function(e) {
+                        // Create a custom parameter instead of modifying e.type
+                        handleInputChange(e, 'change');
+                    });
+                } else {
+                    input.addEventListener('blur', function(e) {
+                        // Create a custom parameter instead of modifying e.type
+                        handleInputChange(e, 'blur');
+                    });
+                }
+            }
+        });
+
+
+        // Set up special handlers for JSON property controls
+        const jsonPropertyControls = settingsForm.querySelectorAll('.ldr-json-property-control');
+
+        jsonPropertyControls.forEach(control => {
+            // Skip if this control already has handlers attached
+            if (control.hasAttribute('data-json-control-initialized')) return;
+            control.setAttribute('data-json-control-initialized', 'true');
+
+            if (control.type === 'checkbox') {
+                control.addEventListener('change', function() {
+                    updateJsonFromControls(control, true); // true = force save
+                });
+            } else {
+                control.addEventListener('input', function() {
+                    updateJsonFromControls(control, false); // false = don't save yet
+                });
+
+                // Handle Enter key for JSON property controls
+                control.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        updateJsonFromControls(control, true); // true = force save
+                        control.blur();
+                    }
+                });
+
+                control.addEventListener('blur', function() {
+                    updateJsonFromControls(control, true); // true = force save
+                });
+            }
+        });
+
+        initRawConfigHandlers();
+    }
+
+    function initRawConfigHandlers() {
+        if (
+            !rawConfigEditor ||
+            rawConfigEditor.hasAttribute('data-raw-config-initialized')
+        ) return;
+
+        rawConfigEditor.setAttribute('data-raw-config-initialized', 'true');
+        rawConfigEditor.addEventListener('input', handleRawJsonInput);
+        rawConfigEditor.addEventListener('blur', function(e) {
+            if (rawConfigEditor.getAttribute('data-modified') === 'true') {
+                handleRawJsonInput(e, true); // Force save on blur
+            }
+        });
+    }
+
+    /**
+     * Handle input change for autosave
+     * @param {Event} e - The input change event
+     * @param {string} [customEventType] - Optional event type parameter
+     */
+    function handleInputChange(e, customEventType) {
+        // --- MODIFICATION START: Simplified handleInputChange ---
+        const input = e.target;
+        const eventType = customEventType || e.type;
+        const key = input.dataset.key || input.name; // Get key using data-key first
+
+        if (!key || input.disabled) return;
+
+        let value;
+        let shouldSaveImmediately = false;
+
+        // Handle hidden inputs for custom dropdowns
+        if (input.type === 'hidden' && input.id.endsWith('_hidden')) {
+            value = input.value;
+            shouldSaveImmediately = true; // Save immediately on hidden input change
+            SafeLogger.log(`[Hidden Input Change] Key: ${key}, Value: ${value}`);
+        }
+        // Handle checkboxes
+        else if (input.type === 'checkbox') {
+            value = input.checked;
+            shouldSaveImmediately = true; // Checkboxes save immediately
+
+            // Sync with hidden fallback if it exists
+            const hiddenFallback = input.dataset.hiddenFallback;
+            if (hiddenFallback) {
+                const hiddenInput = document.getElementById(hiddenFallback);
+                if (hiddenInput) {
+                    hiddenInput.disabled = input.checked;
+                }
+            }
+        }
+        // Handle standard selects
+        else if (input.tagName.toLowerCase() === 'select') {
+            value = input.value;
+            // Save on change or blur if changed
+            if (eventType === 'change' || eventType === 'blur') {
+                shouldSaveImmediately = true;
+            }
+        }
+        // Handle range/slider (save on change/input or blur)
+        else if (input.type === 'range') {
+            value = input.value;
+            if (eventType === 'change' || eventType === 'input' || eventType === 'blur') {
+                shouldSaveImmediately = true;
+            }
+        }
+        // Handle other inputs (text, number, textarea) - Save on Enter or Blur
+        else {
+            value = input.value;
+
+            // Handle JSON.
+            if (input.classList.contains('ldr-json-content'))  {
+                try {
+                    // Validate
+                    value = JSON.parse(input.value);
+                } catch {
+                    markInvalidInput(input, 'Invalid JSON');
+                    return;
+                }
+            }
+
+            // Basic validation for number
+            if (input.type === 'number') {
+               try {
+                   const numValue = parseFloat(value);
+                   const min = input.min ? parseFloat(input.min) : null;
+                   const max = input.max ? parseFloat(input.max) : null;
+                   if ((min !== null && numValue < min) || (max !== null && numValue > max)) {
+                        markInvalidInput(input, `Value must be between ${min ?? '-∞'} and ${max ?? '∞'}`);
+                        return; // Don't save invalid number
+                   }
+                   value = numValue; // Use parsed number
+               } catch {
+                    markInvalidInput(input, 'Invalid number');
+                    return;
+               }
+            }
+            // Save on Enter or Blur
+            if ((eventType === 'keydown' && e.key === 'Enter' && !e.shiftKey) || eventType === 'blur') {
+                shouldSaveImmediately = true;
+                 if (eventType === 'keydown') e.preventDefault(); // Prevent form submission on enter
+            }
+        }
+
+        // Clear previous errors
+        markInvalidInput(input, null);
+
+        // Compare with original value
+        const originalValue = Object.hasOwn(originalSettings, key) ? originalSettings[key] : undefined;
+        // A redacted control renders blank with a blank baseline, so
+        // "delete the contents" is neither visible nor detectable by the
+        // dirty-check — yet the stored secret is still there. Enter on an
+        // empty redacted control is the explicit clear gesture, advertised
+        // in the placeholder. Without it, a redacted non-password setting
+        // (notifications.service_url) would stop being clearable from the
+        // UI, which the route handlers deliberately allow.
+        const isExplicitClear =
+            isRedactedControl(key, input) &&
+            eventType === 'keydown' &&
+            e.key === 'Enter' &&
+            !e.shiftKey &&
+            value === '';
+        // The value this key already has on its way to the server. Saves
+        // for one key are serialized, so the latest queued intent is what
+        // the stored value ends up being: submitting that same value again
+        // is a pure duplicate. The Enter path used to queue exactly that —
+        // its programmatic input.blur() below re-enters this function with
+        // the value just submitted — and the duplicate kept the key
+        // "pending" across the first response's write-back, which is the
+        // window in which a stray blur could clear a secret.
+        const pendingSave = pendingSettingsSaveByKey.get(key);
+        const matchesPendingSave = Boolean(pendingSave) &&
+            Object.hasOwn(pendingSave.values, key) &&
+            areValuesEqual(value, pendingSave.values[key]);
+        // An empty redacted control carries no intent: it renders blank
+        // whether or not a secret is stored, and the post-save re-sync
+        // blanks it again. So nothing may turn it into an empty submit
+        // except the explicit clear gesture above — neither the
+        // dirty-check (blank value against blank baseline) nor the
+        // pending-save disjunct, which stays true for as long as any save
+        // for the key is queued or in flight.
+        const isBlankRedactedControl = isRedactedControl(key, input) && value === '';
+        // A reversal still needs saving if an earlier value can commit later.
+        const hasChanged = !matchesPendingSave && (
+            isBlankRedactedControl
+                ? isExplicitClear
+                : Boolean(pendingSave) || !areValuesEqual(value, originalValue)
+        );
+
+        if (hasChanged) {
+            // Mark parent item as modified
+            const item = input.closest('.ldr-settings-item');
+            if (item) item.classList.add('ldr-settings-modified');
+
+            // Save if needed
+            if (shouldSaveImmediately) {
+                const formData = { [key]: value };
+                submitSettingsData(formData, input); // Direct submit might be better than debouncing here
+
+                // If saved on Enter, blur the input
+                if (eventType === 'keydown' && e.key === 'Enter') {
+                    input.blur();
+                }
+            }
+        } else if (eventType === 'blur') {
+            // If blur event and no changes, remove modified indicator maybe?
+            const item = input.closest('.ldr-settings-item');
+            if (item) item.classList.remove('ldr-settings-modified');
+        }
+        // --- MODIFICATION END ---
+    }
+
+    /**
+     * Handle input to raw JSON fields for validation
+     * @param {Event} e - The input event
+     */
+    function handleRawJsonInput(e) {
+        const input = e.target;
+
+        if (e.type === 'input') {
+            input.setAttribute('data-modified', 'true');
+        }
+
+        try {
+            // Try to parse the JSON
+            JSON.parse(input.value);
+
+            // Valid JSON, remove any error styling
+            const settingsItem = input.closest('.ldr-settings-item');
+            if (settingsItem) {
+                settingsItem.classList.remove('ldr-settings-error');
+
+                // Remove any error message
+                const errorMsg = settingsItem.querySelector('.ldr-settings-error-message');
+                if (errorMsg) {
+                    errorMsg.remove();
+                }
+            }
+            input.classList.remove('ldr-settings-error');
+        } catch {
+            // Invalid JSON, mark as error but don't prevent typing
+            input.classList.add('ldr-settings-error');
+
+            // Don't show error message while actively typing, only on blur
+            input.addEventListener('blur', function onBlur() {
+                try {
+                    JSON.parse(input.value);
+                    // Valid JSON on blur, clear any error
+                    markInvalidInput(input, null);
+                } catch (err) {
+                    // Still invalid on blur, show error
+                    markInvalidInput(input, 'Invalid JSON format: ' + err.message);
+                }
+            }, { once: true });
+        }
+    }
+
+    /**
+     * Mark an input as invalid with error styling
+     * @param {HTMLElement} input - The input element
+     * @param {string|null} errorMessage - The error message or null to clear error
+     */
+    function markInvalidInput(input, errorMessage) {
+        const settingsItem = input.closest('.ldr-settings-item');
+        if (!settingsItem) return;
+
+        // Clear existing error message
+        const existingMsg = settingsItem.querySelector('.ldr-settings-error-message');
+        if (existingMsg) {
+            existingMsg.remove();
+        }
+
+        if (errorMessage) {
+            // Add error class
+            settingsItem.classList.add('ldr-settings-error');
+            input.classList.add('ldr-settings-error');
+
+            // Create error message
+            const errorMsg = document.createElement('div');
+            errorMsg.className = 'ldr-settings-error-message';
+            errorMsg.textContent = errorMessage;
+            settingsItem.appendChild(errorMsg);
+        } else {
+            // Remove error class
+            settingsItem.classList.remove('ldr-settings-error');
+            input.classList.remove('ldr-settings-error');
+        }
+    }
+
+    /**
+     * How many per-setting failures the banner spells out before the rest
+     * are summarised as "+N more". The banner is a fixed, dismiss-less
+     * overlay with no max-height, so an unbounded join can cover the page
+     * for its read window — but the inline marks only reach the keys the
+     * settings page actually rendered (a hidden setting, a brand-new key
+     * the namespace guard rejects before it reaches the form, or a key
+     * outside the active tab/search never gets a control), so for those
+     * the banner is the only surface. The slice below is biased so an
+     * entry with no inline mark is shown first, and only bumped off the
+     * banner once there are more than this many of them.
+     */
+    const MAX_BANNER_SETTING_ERRORS = 5;
+
+    const SETTING_CONTROL_SELECTOR = 'input, select, textarea';
+
+    /**
+     * Resolve a `[data-key]` element down to the form control it names:
+     * itself when it already is one, otherwise the first descendant
+     * control (see renderSettingItem's `.ldr-settings-item` markup and the
+     * `[data-key]` copy initAutoSaveHandlers stamps from `[name]` at
+     * ~329-331).
+     * @param {string} escaped - A `CSS.escape()`-d setting key
+     * @returns {HTMLElement|null}
+     */
+    function findKeyedControl(escaped) {
+        const keyed = document.querySelector(`[data-key="${escaped}"]`);
+        if (!keyed) return null;
+        if (keyed.matches(SETTING_CONTROL_SELECTOR)) return keyed;
+        return keyed.querySelector(SETTING_CONTROL_SELECTOR);
+    }
+
+    /**
+     * Resolve the form control for a setting key. `[name]` is carried by
+     * the control itself, while `[data-key]` sits on the
+     * `.ldr-settings-item` wrapper (renderSettingItem) as well as on some
+     * controls directly — so a combined `[data-key], [name]` selector
+     * returns the wrapper in document order and the control never picks up
+     * the error styling. Query `[name]` first, preferring a control the
+     * user can see over a hidden companion (a checkbox's hidden fallback,
+     * or a custom dropdown's value mirror — for `llm.provider`,
+     * `llm.model` and `search.tool` the mirror is the *only* `[name]`
+     * match, so when every named match is hidden we fall through to the
+     * `[data-key]` control — the visible `.ldr-custom-dropdown-input` —
+     * before settling for the mirror). Resolve a `[data-key]` wrapper down
+     * to the control it contains.
+     * @param {string} key - The setting key
+     * @returns {HTMLElement|null} The control, or null when not rendered
+     */
+    function findSettingControl(key) {
+        if (!key) return null;
+        const escaped = CSS.escape(key);
+        const named = Array.from(
+            document.querySelectorAll(`[name="${escaped}"]`)
+        );
+        // Prefer a control the user can see over a hidden companion input
+        // (checkbox fallbacks, custom-dropdown value mirrors).
+        const visible = named.find(el => el.type !== 'hidden');
+        if (visible) return visible;
+        if (named.length > 0) {
+            const keyed = findKeyedControl(escaped);
+            if (keyed && keyed.type !== 'hidden') return keyed;
+            return named[0];
+        }
+        return findKeyedControl(escaped);
+    }
+
+    /**
+     * The `.ldr-settings-item` wrapper for a setting key, resolved through
+     * the control when there is one and through `[data-key]` otherwise.
+     * @param {string} key - The setting key
+     * @returns {HTMLElement|null}
+     */
+    function findSettingItem(key) {
+        if (!key) return null;
+        const control = findSettingControl(key);
+        const item = control && control.closest('.ldr-settings-item');
+        if (item) return item;
+        const keyed = document.querySelector(`[data-key="${CSS.escape(key)}"]`);
+        return keyed ? keyed.closest('.ldr-settings-item') : null;
+    }
+
+    /**
+     * Human label for a setting key, read off the rendered form. The
+     * egress guards return `{key, error}` with no display name, so without
+     * this the banner falls back to the raw dotted key.
+     * @param {string} key - The setting key
+     * @returns {string} The label text, or '' when the key is not rendered
+     */
+    function findSettingLabel(key) {
+        const item = findSettingItem(key);
+        const label = item && item.querySelector('label');
+        if (!label) return '';
+        return label.textContent.replace(/\s+/g, ' ').trim();
+    }
+
+    /**
+     * Normalize the structured per-setting validation details the settings
+     * save routes return with a 400 "Validation errors" response (see
+     * web/routers/settings.py). Covers both producer shapes: per-key
+     * validation entries ({key, name, error}) and egress-guard rejections
+     * ({key, error}), whose message already opens with the key itself.
+     * @param {Array|undefined} errors - The raw `errors` array from the response body
+     * @returns {Array<{key: string, label: string, error: string, message: string}>}
+     */
+    function formatServerSettingErrors(errors) {
+        if (!Array.isArray(errors)) return [];
+        return errors
+            .map(err => {
+                if (!err || typeof err !== 'object') return null;
+                if (err.error === undefined || err.error === null) return null;
+                const key = typeof err.key === 'string' ? err.key : '';
+                // A present-but-falsy error ('' / 0) still names a setting
+                // the server refused; dropping it would restore the bare
+                // "Validation errors" banner this code exists to replace.
+                const error = (err.error ? String(err.error) : '').trim()
+                    || 'Validation error';
+                // Prefer the label the user actually sees over the dotted
+                // key; `name` is only present on the per-key shape.
+                const name = typeof err.name === 'string' ? err.name : '';
+                const label = findSettingLabel(key) || name || key || 'Setting';
+                // The egress guards open their message with the key, so
+                // prefixing would print the setting's name twice in a row.
+                const alreadyNamed = [label, key].some(
+                    prefix => prefix
+                        && error.toLowerCase().startsWith(prefix.toLowerCase())
+                );
+                return {
+                    key,
+                    label,
+                    error,
+                    message: alreadyNamed ? error : `${label}: ${error}`,
+                };
+            })
+            .filter(Boolean);
+    }
+
+    /**
+     * Render server-side save validation failures on the offending
+     * controls. The banner message alone cannot say WHICH setting failed;
+     * the inline .ldr-settings-error-message block — the same one
+     * client-side validation uses — can, and it persists until the user
+     * edits the field (handleInputChange clears it on the next change).
+     * @param {Array<{key: string, error: string}>} errorDetails
+     * @returns {Set<string>} The keys that had a rendered control to mark
+     */
+    function markInvalidSettingsFromServer(errorDetails) {
+        const markedKeys = new Set();
+        errorDetails.forEach(({ key, error }) => {
+            const control = findSettingControl(key);
+            if (control) {
+                markInvalidInput(control, error);
+                markedKeys.add(key);
+            }
+        });
+        return markedKeys;
+    }
+
+    /**
+     * Toggle the inline "no model selected" warning shown under the
+     * Language Model dropdown. The element itself lives in the settings
+     * template; this just flips its visibility.
+     * @param {boolean} isEmpty - true when the model field is empty
+     */
+    function updateModelEmptyWarning(isEmpty) {
+        const warningEl = document.getElementById('llm.model-empty-warning');
+        if (!warningEl) return;
+        warningEl.style.display = isEmpty ? '' : 'none';
+        warningEl.setAttribute('aria-hidden', isEmpty ? 'false' : 'true');
+    }
+
+    /**
+     * Schedule a debounced save operation
+     * @param {Object} formData - The form data to save
+     * @param {HTMLElement} sourceElement - The element that triggered the save
+     */
+    function scheduleSave(formData, sourceElement) {
+        // Merge the form data with any existing pending save data
+        Object.entries(formData).forEach(([key, value]) => {
+            pendingSaveData[key] = value;
+
+            // Clear any existing timer for this specific key
+            if (saveTimers[key]) {
+                clearTimeout(saveTimers[key]);
+            }
+
+            // Set loading state on the source element
+            if (sourceElement) {
+                sourceElement.classList.add('ldr-saving');
+            }
+
+            // Create a new timer for this specific key
+            saveTimers[key] = setTimeout(() => {
+                // Create a single-key form data object with just this setting
+                const singleSettingData = { [key]: pendingSaveData[key] };
+
+                // Submit just this setting's data
+                submitSettingsData(singleSettingData, sourceElement);
+
+                // Clear this key from pending saves
+                delete pendingSaveData[key];
+                delete saveTimers[key];
+            }, 800); // 800ms debounce
+        });
+    }
+
+    /**
+     * Initialize expanded JSON controls
+     * This sets up event listeners for the individual form controls that represent JSON properties
+     */
+    function initExpandedJsonControls() {
+        // Find all JSON property controls
+        document.querySelectorAll('.ldr-json-property-control').forEach(control => {
+            // initAutoSaveHandlers owns dashboard controls and supplies the
+            // blur/Enter force-save behavior. Do not add a second listener set.
+            if (
+                control.hasAttribute('data-json-control-initialized')
+                || control.hasAttribute('data-json-expanded-initialized')
+            ) return;
+            control.setAttribute('data-json-expanded-initialized', 'true');
+            // When the control changes, update the hidden JSON field
+            control.addEventListener('change', function() {
+                updateJsonFromControls(this);
+            });
+
+            // For text and number inputs, also listen for input events
+            if (control.tagName === 'INPUT' && (control.type === 'text' || control.type === 'number')) {
+                control.addEventListener('input', function() {
+                    updateJsonFromControls(this);
+                });
+            }
+        });
+
+        initCheckboxWrappers();
+    }
+
+    /**
+     * Update JSON data from individual controls
+     * @param {HTMLElement} changedControl - The control that triggered the update
+     * @param {boolean} forceSave - Whether to force an update to the server
+     */
+    function updateJsonFromControls(changedControl, forceSave = false) {
+        const parentKey = changedControl.dataset.parentKey;
+        const property = changedControl.dataset.property;
+
+        if (!parentKey || !property) return;
+
+        // Find all controls for this parent JSON
+        const controls = document.querySelectorAll(`.ldr-json-property-control[data-parent-key="${parentKey}"]`);
+
+        // Create an object to hold the JSON data
+        const jsonData = {};
+
+        // Populate the object with values from all controls
+        controls.forEach(control => {
+            const prop = control.dataset.property;
+            let value;
+
+            if (control.type === 'checkbox') {
+                value = control.checked;
+                // Note: Hidden fallback sync is handled automatically by checkbox_handler.js
+            } else if (control.type === 'number') {
+                value = parseFloat(control.value);
+            } else if (control.tagName === 'SELECT') {
+                value = control.value;
+            } else {
+                value = control.value;
+                // Try to convert to number if it's numeric
+                if (!isNaN(value) && value !== '') {
+                    value = parseFloat(value);
+                }
+            }
+
+            jsonData[prop] = value;
+        });
+
+        // Find the hidden input that stores the original JSON
+        const originalInput = document.getElementById(`${parentKey.replace(/\./g, '-')}_original`);
+        let originalJson = {};
+
+        if (originalInput) {
+            // Get the original JSON
+            try {
+                originalJson = JSON.parse(originalInput.value);
+            } catch (e) {
+                SafeLogger.error('Error parsing original JSON:', e);
+                // Create an empty object if parsing fails
+                originalJson = {};
+            }
+        }
+
+        // Compare against the last server-owned value, not the hidden field we
+        // update live below. Otherwise an input event makes a later blur look
+        // unchanged and number/text edits never persist their parent object.
+        let savedJson = originalJson;
+        if (Object.hasOwn(originalSettings, parentKey)) {
+            savedJson = originalSettings[parentKey];
+            if (typeof savedJson === 'string') {
+                try {
+                    savedJson = JSON.parse(savedJson);
+                } catch {
+                    savedJson = originalJson;
+                }
+            }
+        }
+        // Returning to the acknowledged value is still a write when another
+        // value is queued: that older save may commit before this reversal.
+        const hasChanged = pendingSettingsSaveByKey.has(parentKey) ||
+            !areObjectsEqual(jsonData, savedJson);
+
+        // Mark the parent container as modified if there's a change
+        const settingItem = changedControl.closest('.ldr-settings-item');
+        if (settingItem && hasChanged) {
+            settingItem.classList.add('ldr-settings-modified');
+        }
+
+        // Update the UI even if we're not saving to the server
+        if (originalInput) {
+            // Update the original JSON with new values
+            Object.assign(originalJson, jsonData);
+            originalInput.value = JSON.stringify(originalJson);
+        }
+
+        // Also update any textarea that might display this JSON
+        const jsonTextarea = document.getElementById(parentKey.replace(/\./g, '-'));
+        if (jsonTextarea && jsonTextarea.tagName === 'TEXTAREA') {
+            jsonTextarea.value = JSON.stringify(jsonData, null, 2);
+        }
+
+        // If we have a raw config editor, update it as well
+        if (rawConfigEditor) {
+            try {
+                const rawConfig = JSON.parse(rawConfigEditor.value);
+                const parts = parentKey.split('.');
+                const prefix = parts[0]; // app, llm, search, etc.
+
+                if (rawConfig[prefix]) {
+                    const subKey = parentKey.substring(prefix.length + 1);
+                    rawConfig[prefix][subKey] = jsonData;
+                    rawConfigEditor.value = JSON.stringify(rawConfig, null, 2);
+                }
+            } catch (e) {
+                SafeLogger.log('Error updating raw config:', e);
+            }
+        }
+
+        // Only save to the server if forced or there's a change
+        if ((forceSave && hasChanged) || (changedControl.type === 'checkbox' && hasChanged)) {
+            // Auto-save this setting
+            const formData = {};
+            formData[parentKey] = jsonData;
+            submitSettingsData(formData, changedControl);
+        }
+    }
+
+    /**
+     * Initialize specific settings page form handlers
+     */
+    function initSpecificSettingsForm() {
+        // Get the form ID to determine which specific page we're on
+        const specificForm = document.getElementById('report-settings-form') ||
+                             document.getElementById('llm-settings-form') ||
+                             document.getElementById('search-settings-form') ||
+                             document.getElementById('app-settings-form');
+
+        if (specificForm) {
+            // Add form submission handler
+            specificForm.addEventListener('submit', function(e) {
+                // Handle checkbox values - only for checkboxes without hidden fallbacks
+                const checkboxes = specificForm.querySelectorAll('input[type="checkbox"]');
+                checkboxes.forEach(checkbox => {
+                    if (!checkbox.checked && !checkbox.dataset.hiddenFallback) {
+                        // Only create hidden input for unchecked boxes that don't have fallback inputs
+                        const hidden = document.createElement('input');
+                        hidden.type = 'hidden';
+                        hidden.name = checkbox.name;
+                        hidden.value = 'false';
+                        specificForm.appendChild(hidden);
+                    }
+                });
+
+                // Check for validation errors in JSON textareas
+                let hasInvalidJson = false;
+
+                document.querySelectorAll('.ldr-json-content').forEach(textarea => {
+                    try {
+                        // Try to parse JSON to validate
+                        JSON.parse(textarea.value);
+                    } catch {
+                        // If it's not valid JSON, show an error
+                        // Cancel form submission via the outer submit event
+                        e.preventDefault();
+                        hasInvalidJson = true;
+
+                        // Find the closest settings-item
+                        const settingsItem = textarea.closest('.ldr-settings-item');
+                        if (settingsItem) {
+                            settingsItem.classList.add('ldr-settings-error');
+
+                            // Add error message if it doesn't exist
+                            let errorMsg = settingsItem.querySelector('.ldr-settings-error-message');
+                            if (!errorMsg) {
+                                errorMsg = document.createElement('div');
+                                errorMsg.className = 'ldr-settings-error-message';
+                                settingsItem.appendChild(errorMsg);
+                            }
+                            errorMsg.textContent = 'Invalid JSON format';
+                        }
+                    }
+                });
+
+                // Handle JSON from expanded controls
+                document.querySelectorAll('input[id$="_original"]').forEach(input => {
+                    if (input.name.endsWith('_original')) {
+                        const actualName = input.name.replace('_original', '');
+
+                        // Create a hidden input with the actual name
+                        const hiddenInput = document.createElement('input');
+                        hiddenInput.type = 'hidden';
+                        hiddenInput.name = actualName;
+                        hiddenInput.value = input.value;
+                        specificForm.appendChild(hiddenInput);
+                    }
+                });
+
+                if (hasInvalidJson) {
+                    // preventDefault blocks submission for addEventListener-style
+                    // handlers; the legacy `return false` only worked with
+                    // inline onsubmit="..." attributes.
+                    e.preventDefault();
+                }
+            });
+        }
+    }
+
+    /**
+     * Initialize range inputs to display their values
+     */
+    function initRangeInputs() {
+        const rangeInputs = document.querySelectorAll('input[type="range"]');
+
+        rangeInputs.forEach(range => {
+            const valueDisplay = document.getElementById(`${range.id}-value`) || range.nextElementSibling;
+
+            if (valueDisplay &&
+                (valueDisplay.classList.contains('ldr-settings-range-value') ||
+                 valueDisplay.classList.contains('ldr-range-value'))) {
+                // Set initial value
+                valueDisplay.textContent = range.value;
+
+                // Update on input change
+                range.addEventListener('input', () => {
+                    valueDisplay.textContent = range.value;
+                });
+            }
+        });
+    }
+
+    /**
+     * Mobile breakpoint (px). Kept as a constant so JS callers and the
+     * Playwright spec read from one place; CSS still hardcodes 767 in its
+     * own `@media` rules because CSS can't read JS values. If you change
+     * this, also update the `@media (max-width: 767px)` blocks in
+     * settings.css and settings-mobile-fix.css.
+     */
+    const MOBILE_BREAKPOINT_PX = 767;
+    if (typeof window !== 'undefined') {
+        window.__LDR_MOBILE_BREAKPOINT_PX = MOBILE_BREAKPOINT_PX;
+    }
+
+    /**
+     * Returns true when the viewport is in the mobile breakpoint that the rest
+     * of the app uses (matches the `@media (max-width: 767px)` rules in CSS).
+     */
+    function isMobileSettingsViewport() {
+        return typeof window !== 'undefined'
+            && typeof window.matchMedia === 'function'
+            && window.matchMedia('(max-width: ' + MOBILE_BREAKPOINT_PX + 'px)').matches;
+    }
+
+    /**
+     * Initialize accordion behavior.
+     *
+     * Settings has ~400 controls split across many categories. On mobile that
+     * is unusable — the page renders past 16384px tall and the user has to
+     * scroll forever. So on mobile we start every section collapsed; the user
+     * taps a section header to drill in. Desktop keeps the previous "all
+     * expanded" default so power-user workflows don't change.
+     *
+     * Callers can override with `{ defaultCollapsed: false }` (e.g. the search
+     * filter rebuild — when the user is actively searching, surviving matches
+     * must be visible regardless of viewport).
+     *
+     * Chevron rotation is driven entirely by the `collapsed` class on the
+     * header — see the `.ldr-settings-section-header.collapsed
+     * .ldr-settings-toggle-icon` rule in settings.css. Do not toggle the
+     * icon transform inline; CSS is the single source of truth for the
+     * rotation, and setting transform on the inner <i> would compound
+     * with the container's rotation.
+     */
+    function initAccordions(options) {
+        const opts = options || {};
+        const defaultCollapsed = typeof opts.defaultCollapsed === 'boolean'
+            ? opts.defaultCollapsed
+            : isMobileSettingsViewport();
+
+        document.querySelectorAll('.ldr-settings-section-header').forEach(header => {
+            const targetId = header.dataset.target;
+            const target = document.getElementById(targetId);
+
+            if (target) {
+                // Set initial state per viewport / caller override. The
+                // `collapsed` class is the single source of truth: on the
+                // header it drives chevron rotation, and on the body it
+                // drives panel visibility via the
+                // `.ldr-settings-section-body.collapsed { display: none }`
+                // rule in settings.css — no inline style.display.
+                if (defaultCollapsed) {
+                    header.classList.add('collapsed');
+                    target.classList.add('collapsed');
+                } else {
+                    header.classList.remove('collapsed');
+                    target.classList.remove('collapsed');
+                }
+
+                header.addEventListener('click', () => {
+                    header.classList.toggle('collapsed');
+                    target.classList.toggle('collapsed');
+                });
+            }
+        });
+    }
+
+    /**
+     * Format JSON in textareas
+     */
+    function initJsonFormatting() {
+        document.querySelectorAll('.ldr-json-content').forEach(textarea => {
+            const value = textarea.value.trim();
+
+            if (value && (value.startsWith('{') || value.startsWith('['))) {
+                try {
+                    const formatted = JSON.stringify(JSON.parse(value), null, 2);
+                    textarea.value = formatted;
+                } catch (e) {
+                    // Not valid JSON, leave as is
+                    SafeLogger.log('Error formatting JSON:', e);
+                }
+            }
+
+            // Add event listener to format on input
+            textarea.addEventListener('input', function() {
+                if (this.value.trim() && (this.value.trim().startsWith('{') || this.value.trim().startsWith('['))) {
+                    try {
+                        const obj = JSON.parse(this.value);
+                        const formatted = JSON.stringify(obj, null, 2);
+
+                        // Only update if actually different (to avoid cursor jumping)
+                        if (this.value !== formatted) {
+                            // Remember cursor position
+                            const selectionStart = this.selectionStart;
+                            const selectionEnd = this.selectionEnd;
+
+                            this.value = formatted;
+
+                            // Try to restore cursor
+                            this.setSelectionRange(selectionStart, selectionEnd);
+                        }
+                    } catch {
+                        // Invalid JSON, just leave it alone
+                    }
+                }
+            });
+        });
+
+        // Convert text inputs with JSON content to textareas
+        document.querySelectorAll('.ldr-settings-input').forEach(input => {
+            const value = input.value.trim();
+
+            // Skip if the value is "[object Object]" which isn't valid JSON
+            if (value === "[object Object]") {
+                // Replace with an empty object
+                input.value = "{}";
+                SafeLogger.log('Fixed [object Object] string in input:', input.name);
+                return;
+            }
+
+            if (value && (value.startsWith('{') || value.startsWith('['))) {
+                try {
+                    // Try to parse as JSON to validate
+                    JSON.parse(value);
+
+                    // Create a new textarea
+                    const textarea = document.createElement('textarea');
+                    textarea.id = input.id;
+                    textarea.name = input.name;
+                    textarea.className = 'ldr-settings-textarea ldr-json-content';
+                    textarea.disabled = input.disabled;
+
+                    try {
+                        textarea.value = JSON.stringify(JSON.parse(value), null, 2);
+                    } catch {
+                        textarea.value = value;
+                    }
+
+                    // Replace the input with textarea
+                    input.parentNode.replaceChild(textarea, input);
+                } catch (e) {
+                    // Not valid JSON, leave as is
+                    SafeLogger.log('Error converting JSON input to textarea:', e);
+                }
+            }
+        });
+    }
+
+    /**
+     * Load settings from the API
+     */
+    function loadSettings() {
+        // Only run this for the main settings dashboard
+        if (!settingsContent) return;
+
+        window.api.fetchWithErrorHandling(URLS.SETTINGS_API.BASE)
+            .then(data => {
+                if (data.status === 'success') {
+                    // Process settings to handle object values and check for corruption
+                    allSettings = processSettings(data.settings);
+
+                    // Store original values for the auto-save dirty-check.
+                    // Every control the render leaves empty for secrecy
+                    // (see rendersBlankForSecrecy) must get an empty
+                    // baseline too — otherwise the first keystroke would
+                    // compare against "[REDACTED]" (the redacted sentinel
+                    // from /settings/api per PR #3947) instead of "" and
+                    // the save semantics get weird, and merely focusing
+                    // and leaving an untouched blank control would look
+                    // like "the user emptied this" and save "". Treating
+                    // the redacted sentinel as "we don't know the real
+                    // value" is the right model.
+                    redactedSettingKeys.clear();
+                    allSettings.forEach(setting => {
+                        if (isRedactedValue(setting.value)) {
+                            redactedSettingKeys.add(setting.key);
+                        }
+                        originalSettings[setting.key] =
+                            rendersBlankForSecrecy(setting)
+                                ? ''
+                                : setting.value;
+                    });
+
+                    // Render settings by tab
+                    renderSettingsByTab(activeTab);
+
+                    // Initialize auto-save handlers
+                    setTimeout(initAutoSaveHandlers, 300);
+
+                    // Initialize the dropdowns after the settings are loaded
+                    if (activeTab === 'llm' || activeTab === 'all') {
+                        setTimeout(initializeModelDropdowns, 300);
+                    }
+                    if (activeTab === 'search' || activeTab === 'all') {
+                        setTimeout(initializeSearchEngineDropdowns, 300);
+                    }
+
+                    // Prepare the raw JSON editor if it exists
+                    prepareRawJsonEditor();
+
+                    // Initialize expanded JSON controls
+                    setTimeout(() => {
+                        initExpandedJsonControls();
+                    }, 100);
+                } else {
+                    showAlert('Error loading settings: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showAlert('Error loading settings: ' + error, 'error');
+            });
+    }
+
+    /**
+     * Format category names to be more user-friendly
+     * @param {string} key - The setting key
+     * @param {string} category - The category name
+     * @returns {string} - The formatted category name
+     */
+    function formatCategoryName(key, category) {
+        // Special cases for known categories
+        if (category === 'app_interface') return 'App Interface';
+        if (category === 'app_parameters') return 'App Parameters';
+        if (category === 'llm_general') return 'LLM General';
+        if (category === 'llm_parameters') return 'LLM Parameters';
+        if (category === 'report_parameters') return 'Report Parameters';
+        if (category === 'search_general') return 'Search General';
+        if (category === 'notifications') return 'Notifications';
+        if (category === 'search_parameters') return 'Search Parameters';
+        if (category === 'warnings') return 'Warnings';
+
+        // Remove any underscores and capitalize each word
+        let formattedCategory = category.replace(/_/g, ' ');
+
+        // Capitalize first letter of each word
+        formattedCategory = formattedCategory.split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+
+        return formattedCategory;
+    }
+
+    /**
+     * Organize settings to avoid duplicate group names and improve organization
+     * @param {Array} settings - The settings array
+     * @param {string} tab - The current tab
+     * @returns {Object} - The organized settings
+     */
+    function organizeSettings(settings, tab) {
+        const providerSetting = (
+            settings.find(setting => setting.key === 'llm.provider')
+            || allSettings.find(setting => setting.key === 'llm.provider')
+        );
+
+        const selectedProvider = String(
+            providerSetting?.value || ''
+        ).toLowerCase();
+
+        const providerSettingPrefixes = new Set(
+            Array.isArray(providerSetting?.options)
+                ? providerSetting.options
+                    .map(option => String(option?.value || '').toLowerCase())
+                    .filter(Boolean)
+                : []
+        );
+
+        // Create a mapping of types
+        const typeMap = {
+            'app': 'Application',
+            'llm': 'Language Models',
+            'search': 'Search Engines',
+            'report': 'Reports'
+        };
+
+        // Map auxiliary key prefixes onto the tab that should render
+        // them. egress-policy keys live under their own prefixes
+        // (policy.*, embeddings.*) but conceptually belong to existing
+        // tabs — without this remap the settings dashboard silently
+        // hides them since no 'policy' / 'embeddings' tab exists.
+        const prefixToTab = {
+            'policy': 'search',
+            'embeddings': 'search'
+        };
+
+        // Define settings that should only appear in specific tabs
+        const tabSpecificSettings = {
+            'llm': [
+                'provider',
+                'model',
+                'temperature',
+                'max_tokens',
+                'openai_endpoint_url',
+                'lmstudio_url',
+                'llamacpp_url',
+                'api_key',
+                'require_local_endpoint',
+                'allowed_local_hostnames'
+            ],
+            'search': [
+                'iterations',
+                'max_filtered_results',
+                'max_results',
+                'quality_check_urls',
+                'questions_per_iteration',
+                'region',
+                'search_engine',
+                'searches_per_section',
+                'skip_relevance_filter',
+                'safe_search',
+                'search_language',
+                'time_period',
+                'tool',
+                'snippets_only',
+                'egress_scope',
+                'require_local'
+            ],
+            'report': [
+                'knowledge_accumulation',
+                'knowledge_accumulation_context_limit'
+            ],
+            'app': [
+                'debug',
+                'host',
+                'port',
+                'enable_notifications',
+                'web_interface',
+                'enable_web',
+                'dark_mode',
+                'default_theme',
+                'theme',
+                'warnings',
+                'allow_registrations'
+            ]
+        };
+
+        // Priority settings that should appear at the top of each tab
+        const prioritySettings = {
+            'app': ['enable_web', 'enable_notifications', 'web_interface', 'theme', 'default_theme', 'dark_mode', 'debug', 'host', 'port', 'warnings'],
+            'llm': ['provider', 'model', 'temperature', 'max_tokens', 'api_key', 'openai_endpoint_url', 'lmstudio_url', 'llamacpp_url'],
+            'search': ['tool', 'iterations', 'questions_per_iteration', 'max_results', 'region', 'search_engine'],
+            'report': ['knowledge_accumulation']
+        };
+
+        // Group by prefix and category
+        const grouped = {};
+
+        // Filter settings based on current tab
+        const filteredSettings = settings.filter(setting => {
+            const parts = setting.key.split('.');
+            const prefix = parts[0]; // app, llm, search, etc.
+            const subKey = parts[1]; // The actual key name without prefix
+            const effectivePrefix = prefixToTab[prefix] || prefix;
+
+            // Filter out nested settings like app.llm, app.search, app.general, app.web, etc.
+            if (prefix === 'app' && (subKey === 'llm' || subKey === 'search' || subKey === 'general' || subKey === 'web')) {
+                return false;
+            }
+
+            // Filter out knowledge_accumulation duplicates - only keep in report tab
+            if (prefix !== 'report' && (subKey === 'knowledge_accumulation' || subKey === 'knowledge_accumulation_context_limit')) {
+                return false;
+            }
+
+            // Filter out settings that are not marked as visible.
+            if (!setting.visible) {
+                return false;
+            }
+            if (!selectedProvider) {
+                return true;
+            }
+
+            const providerParts = setting.key.split('.');
+            const providerPrefix = providerParts[0];
+            const providerSubKey = providerParts[1];
+
+            if (
+                providerPrefix === 'llm' &&
+                providerSettingPrefixes.has(providerSubKey) &&
+                providerSubKey !== selectedProvider
+            ) {
+                return false;
+            }
+
+            // If we're on a specific tab, only show settings for that tab
+            if (tab !== 'all') {
+                // Treat aliased prefixes (e.g. policy.* shown under
+                // search tab) as if they belonged to the target tab.
+                // Only show settings in tab-specific lists for that tab
+                if (tab === effectivePrefix) {
+                    // For tab-specific settings, make sure they're in the list
+                    if (tabSpecificSettings[tab] && tabSpecificSettings[tab].includes(subKey)) {
+                        return true;
+                    }
+                    // For settings not in any tab-specific list, allow showing them in their own tab
+                    for (const otherTab in tabSpecificSettings) {
+                        if (otherTab !== tab && tabSpecificSettings[otherTab].includes(subKey)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+                return false;
+            }
+
+            // For "all" tab, filter out duplicates and specialized settings
+            // Check if this setting belongs exclusively to a specific tab
+            for (const tabName in tabSpecificSettings) {
+                if (
+                    tabSpecificSettings[tabName].includes(subKey)
+                    && effectivePrefix !== tabName
+                ) {
+                    // Don't show this setting if it belongs to a different tab
+                    return false;
+                }
+            }
+
+            // Include all remaining settings in the "all" tab
+            return true;
+        });
+
+        // First pass: group settings by prefix and category
+        filteredSettings.forEach(setting => {
+            const parts = setting.key.split('.');
+            const prefix = parts[0]; // app, llm, search, etc.
+            const subKey = parts[1]; // The setting key without prefix
+
+            // Create namespace if needed
+            if (!grouped[prefix]) {
+                grouped[prefix] = {};
+            }
+
+            // Use category or create one based on subkey
+            let category = setting.category || 'general';
+
+            // Format the category name to be user-friendly
+            category = formatCategoryName(prefix, category);
+
+            // For duplicate "general" categories, prefix with the type
+            if (category.toLowerCase() === 'general') {
+                category = `${typeMap[prefix] || prefix.charAt(0).toUpperCase() + prefix.slice(1)} General`;
+            }
+
+            // Create category array if needed
+            if (!grouped[prefix][category]) {
+                grouped[prefix][category] = [];
+            }
+
+            // Add setting to category
+            grouped[prefix][category].push(setting);
+        });
+
+        // Second pass: sort settings within each category by priority and sort categories
+        for (const prefix in grouped) {
+            // Get existing categories for this prefix
+            const categories = Object.keys(grouped[prefix]);
+
+            // --- MODIFICATION START: Prioritize categories containing specific dropdowns ---
+            // Identify high-priority categories
+            const highPriorityCategories = [];
+            const otherCategories = [];
+            const priorityKeysForPrefix = prioritySettings[prefix] || [];
+            const highestPriorityKeys = ['provider', 'model', 'tool']; // Keys whose *containing category* should be first
+
+            categories.forEach(category => {
+                const containsHighestPriority = grouped[prefix][category].some(setting => {
+                    const subKey = setting.key.split('.')[1];
+                    // Ensure the setting key itself is also in the general priority list for the prefix
+                    return highestPriorityKeys.includes(subKey) && priorityKeysForPrefix.includes(subKey);
+                });
+                if (containsHighestPriority) {
+                    highPriorityCategories.push(category);
+                } else {
+                    otherCategories.push(category);
+                }
+            });
+
+            // Sort the high-priority categories (e.g., alphabetically or by specific order if needed)
+            highPriorityCategories.sort((a, b) => {
+                // Simple sort for now, could be more specific if needed
+                // Example: ensure "Provider" comes before "Model" if both are high priority
+                const order = ['Provider', 'Model', 'Tool'];
+                const aIndex = order.findIndex(word => a.includes(word));
+                const bIndex = order.findIndex(word => b.includes(word));
+                if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+                if (aIndex !== -1) return -1;
+                if (bIndex !== -1) return 1;
+                return a.localeCompare(b);
+            });
+
+            // Sort other categories based on existing logic (e.g., using categoryOrder)
+            const categoryOrder = ['General', 'Interface', 'Connection', 'API', 'Parameters']; // Adjusted order slightly
+            otherCategories.sort((a, b) => {
+                const aIndex = categoryOrder.findIndex(word => a.includes(word));
+                const bIndex = categoryOrder.findIndex(word => b.includes(word));
+                if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+                if (aIndex !== -1) return -1;
+                if (bIndex !== -1) return 1;
+                return a.localeCompare(b);
+            });
+
+            // Combine sorted categories
+            const sortedCategoryNames = [...highPriorityCategories, ...otherCategories];
+
+            // Create new object with sorted categories and sorted settings within each
+            const sortedPrefixedCategories = {};
+            sortedCategoryNames.forEach(category => {
+                sortedPrefixedCategories[category] = grouped[prefix][category];
+
+                // Sort settings within this category (existing logic seems okay)
+                sortedPrefixedCategories[category].sort((a, b) => {
+                    const aKey = a.key.split('.')[1];
+                    const bKey = b.key.split('.')[1];
+                    const priorities = prioritySettings[prefix] || [];
+                    const aIndex = priorities.indexOf(aKey);
+                    const bIndex = priorities.indexOf(bKey);
+                    if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+                    if (aIndex !== -1) return -1;
+                    if (bIndex !== -1) return 1;
+                    return aKey.localeCompare(bKey);
+                });
+            });
+
+            // Replace original categories with sorted ones
+            grouped[prefix] = sortedPrefixedCategories;
+            // --- MODIFICATION END ---
+        }
+
+        return grouped;
+    }
+
+    /**
+     * Render the data location information section
+     * @returns {string} HTML for the data location section
+     */
+    function renderDataLocationSection() {
+        // Fetch data location info and create the section
+        // This will be populated asynchronously
+        const sectionId = 'section-data-location';
+
+        const html = `
+        <div class="ldr-settings-section ldr-data-location-section">
+            <div class="ldr-settings-section-header" data-target="${sectionId}">
+                <div class="ldr-settings-section-title">
+                    <i class="fas fa-database"></i> Database & Encryption
+                </div>
+                <div class="ldr-settings-toggle-icon">
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+            </div>
+            <div id="${sectionId}" class="ldr-settings-section-body">
+                <div id="data-location-content" class="ldr-data-location-info">
+                    <div class="ldr-loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i> Loading data location information...
+                    </div>
+                </div>
+            </div>
+        </div>
+        `;
+
+        // Fetch the data location info asynchronously
+        setTimeout(() => fetchDataLocationInfo(), 100);
+
+        return html;
+    }
+
+    /**
+     * Fetch and display data location information
+     */
+    function fetchDataLocationInfo() {
+        const contentElement = document.getElementById('data-location-content');
+        if (!contentElement) return;
+
+        window.api.fetchWithErrorHandling('/settings/api/data-location')
+            .then(data => {
+                let html = '<div class="ldr-data-location-details">';
+
+                // Security and storage info with all settings
+                if (data.security_notice.encrypted) {
+                    // Get encryption details
+                    const settings = data.encryption_settings || {};
+                    const kdfIter = settings.kdf_iterations || 256000;
+                    const kdfIterDisplay = kdfIter >= 1000 ? `${kdfIter/1000}k` : kdfIter;
+
+                    // Sanitize data directory path to prevent XSS
+                    const safeDataDir = window.escapeHtml(data.data_directory);
+
+                    html += `
+                    <div class="ldr-data-location-detailed">
+                        <div class="ldr-data-path">
+                            <i class="fas fa-folder"></i>
+                            <code>${safeDataDir}</code>
+                        </div>
+
+                        <div class="ldr-security-status encrypted">
+                            <i class="fas fa-shield-alt"></i>
+                            <span><strong>Database encrypted</strong> with AES-256-GCM</span>
+                        </div>
+
+                        <div class="ldr-encryption-settings">
+                            <div class="ldr-settings-grid">
+                                <div class="ldr-setting-item">
+                                    <span class="ldr-setting-label">KDF Iterations:</span>
+                                    <code>${kdfIterDisplay}</code>
+                                </div>
+                                <div class="ldr-setting-item">
+                                    <span class="ldr-setting-label">Page Size:</span>
+                                    <code>${settings.page_size || 16384}</code>
+                                </div>
+                                <div class="ldr-setting-item">
+                                    <span class="ldr-setting-label">HMAC Algorithm:</span>
+                                    <code>${settings.hmac_algorithm || 'HMAC_SHA512'}</code>
+                                </div>
+                                <div class="ldr-setting-item">
+                                    <span class="ldr-setting-label">KDF Algorithm:</span>
+                                    <code>${settings.kdf_algorithm || 'PBKDF2_HMAC_SHA512'}</code>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="ldr-env-variables-info">
+                            <details class="ldr-env-details">
+                                <summary><i class="fas fa-terminal"></i> Configuration via Environment Variables</summary>
+                                <div class="ldr-env-content">
+                                    <div class="ldr-env-list">
+                                        <div class="ldr-env-item">
+                                            <code>LDR_DATA_DIR</code>
+                                            <span>Data directory location</span>
+                                        </div>
+                                        <div class="ldr-env-item">
+                                            <code>LDR_DB_CONFIG_KDF_ITERATIONS</code>
+                                            <span>Key derivation iterations (current: ${kdfIter})</span>
+                                        </div>
+                                        <div class="ldr-env-item">
+                                            <code>LDR_DB_CONFIG_PAGE_SIZE</code>
+                                            <span>Database page size (current: ${settings.page_size || 16384})</span>
+                                        </div>
+                                        <div class="ldr-env-item">
+                                            <code>LDR_DB_CONFIG_HMAC_ALGORITHM</code>
+                                            <span>HMAC algorithm</span>
+                                        </div>
+                                        <div class="ldr-env-item">
+                                            <code>LDR_DB_CONFIG_KDF_ALGORITHM</code>
+                                            <span>KDF algorithm</span>
+                                        </div>
+                                        <div class="ldr-env-item">
+                                            <code>LDR_DB_CONFIG_CACHE_SIZE_MB</code>
+                                            <span>Cache size in MB</span>
+                                        </div>
+                                        <div class="ldr-env-item">
+                                            <code>LDR_DB_CONFIG_JOURNAL_MODE</code>
+                                            <span>Journal mode (WAL, DELETE, etc.)</span>
+                                        </div>
+                                        <div class="ldr-env-item">
+                                            <code>LDR_DB_CONFIG_SYNCHRONOUS</code>
+                                            <span>Synchronous mode (NORMAL, FULL, OFF)</span>
+                                        </div>
+                                    </div>
+                                    <div class="ldr-migration-warning">
+                                        <i class="fas fa-exclamation-triangle"></i>
+                                        <strong>Warning:</strong> Changing encryption settings requires deleting existing databases and creating new ones. There is no migration path.
+                                    </div>
+                                    <div class="ldr-sqlcipher-link">
+                                        <i class="fas fa-external-link-alt"></i>
+                                        <a href="https://www.zetetic.net/sqlcipher/sqlcipher-api/#cipher_default_kdf_iter" target="_blank" rel="noopener noreferrer">
+                                            SQLCipher Configuration Documentation
+                                        </a>
+                                    </div>
+                                </div>
+                            </details>
+                        </div>
+                    </div>
+                    `;
+                } else {
+                    // Sanitize data directory path to prevent XSS
+                    // Use escapeHtml (defined at top of IIFE with fallback)
+                    const safeDataDirCompact = escapeHtml(data.data_directory);
+
+                    html += `
+                    <div class="ldr-data-location-compact">
+                        <div class="ldr-data-path">
+                            <i class="fas fa-folder"></i>
+                            <code>${safeDataDirCompact}</code>
+                        </div>
+                        <div class="ldr-security-status unencrypted">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <span><strong>Warning:</strong> Database not encrypted</span>
+                        </div>
+                        <div class="ldr-env-info">
+                            <small>Install SQLCipher for encryption. Set <code>LDR_DATA_DIR</code> to change location.</small>
+                        </div>
+                    </div>
+                    `;
+                }
+
+                html += '</div>';
+
+                // Add styles for the data location section
+                if (!document.getElementById('data-location-styles')) {
+                    const style = document.createElement('style');
+                    style.id = 'data-location-styles';
+                    style.textContent = `
+                        .ldr-data-location-section {
+                            margin-bottom: 1.5rem;
+                            border: 1px solid var(--border-color, #ddd);
+                            border-radius: 8px;
+                            background: var(--bg-secondary);
+                        }
+
+                        .ldr-data-location-info {
+                            padding: 1rem;
+                        }
+
+                        .ldr-data-location-compact, .ldr-data-location-detailed {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 0.75rem;
+                        }
+
+                        .ldr-security-status {
+                            display: flex;
+                            align-items: center;
+                            gap: 0.5rem;
+                            font-size: 0.95rem;
+                        }
+
+                        .ldr-security-status.encrypted {
+                            color: var(--success-color);
+                        }
+
+                        .ldr-security-status.unencrypted {
+                            color: var(--warning-color);
+                        }
+
+                        .ldr-data-path {
+                            display: flex;
+                            align-items: center;
+                            gap: 0.5rem;
+                            color: var(--text-secondary);
+                            padding-bottom: 0.5rem;
+                            border-bottom: 1px solid var(--border-color);
+                            margin-bottom: 0.5rem;
+                        }
+
+                        .ldr-data-path code {
+                            background: var(--bg-tertiary);
+                            padding: 0.35rem 0.75rem;
+                            border-radius: 4px;
+                            font-family: monospace;
+                            font-size: 0.9em;
+                            color: var(--text-primary);
+                            font-weight: 500;
+                        }
+
+                        .ldr-encryption-settings {
+                            background: var(--bg-tertiary);
+                            padding: 0.75rem;
+                            border-radius: 6px;
+                            margin-top: 0.5rem;
+                        }
+
+                        .ldr-settings-grid {
+                            display: grid;
+                            grid-template-columns: repeat(2, auto);
+                            gap: 0.75rem 2rem;
+                            width: fit-content;
+                        }
+
+                        .ldr-setting-item {
+                            display: flex;
+                            align-items: center;
+                            gap: 0.75rem;
+                            font-size: 0.85rem;
+                        }
+
+                        .ldr-setting-label {
+                            color: var(--text-secondary);
+                            white-space: nowrap;
+                        }
+
+                        .ldr-setting-item code {
+                            background: var(--bg-primary);
+                            padding: 0.125rem 0.375rem;
+                            border-radius: 3px;
+                            font-size: 0.85em;
+                            color: var(--text-primary);
+                            white-space: nowrap;
+                        }
+
+                        .ldr-env-variables-info {
+                            margin-top: 0.5rem;
+                        }
+
+                        .ldr-env-details {
+                            background: var(--bg-tertiary);
+                            padding: 0.75rem;
+                            border-radius: 6px;
+                            cursor: pointer;
+                        }
+
+                        .ldr-env-details summary {
+                            font-size: 0.9rem;
+                            color: var(--text-secondary);
+                            outline: none;
+                            font-weight: 500;
+                        }
+
+                        .ldr-env-details summary:hover {
+                            color: var(--text-primary);
+                        }
+
+                        .ldr-env-content {
+                            margin-top: 1rem;
+                        }
+
+                        .ldr-env-list {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 0.5rem;
+                            margin-bottom: 1rem;
+                        }
+
+                        .ldr-env-item {
+                            display: flex;
+                            align-items: baseline;
+                            gap: 1rem;
+                            font-size: 0.9rem;
+                            line-height: 1.5;
+                        }
+
+                        .ldr-env-item code {
+                            background: var(--bg-primary);
+                            padding: 0.25rem 0.5rem;
+                            border-radius: 3px;
+                            font-size: 0.85em;
+                            color: var(--accent-primary);
+                            font-weight: 600;
+                            min-width: 220px;
+                            flex-shrink: 0;
+                        }
+
+                        .ldr-env-item span {
+                            color: var(--text-secondary);
+                        }
+
+                        .ldr-migration-warning {
+                            margin-top: 0.75rem;
+                            padding: 0.5rem;
+                            background: rgba(var(--warning-color-rgb), 0.1);
+                            border-radius: 4px;
+                            font-size: 0.8rem;
+                            color: var(--warning-color);
+                            border: 1px solid rgba(var(--warning-color-rgb), 0.3);
+                        }
+
+                        .ldr-migration-warning i {
+                            margin-right: 0.25rem;
+                        }
+
+                        .ldr-sqlcipher-link {
+                            margin-top: 0.75rem;
+                            font-size: 0.9rem;
+                        }
+
+                        .ldr-sqlcipher-link i {
+                            margin-right: 0.5rem;
+                            font-size: 0.8em;
+                            color: var(--text-secondary);
+                        }
+
+                        .ldr-sqlcipher-link a {
+                            color: var(--accent-primary);
+                            text-decoration: none;
+                        }
+
+                        .ldr-sqlcipher-link a:hover {
+                            text-decoration: underline;
+                        }
+
+                        .ldr-env-info {
+                            color: var(--text-secondary);
+                            font-size: 0.85rem;
+                            opacity: 0.8;
+                        }
+
+                        .ldr-env-info code {
+                            background: var(--bg-tertiary);
+                            padding: 0.125rem 0.25rem;
+                            border-radius: 3px;
+                            font-size: 0.9em;
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
+
+                // eslint-disable-next-line no-unsanitized/property -- audited 2026-03-28: variable built from escaped/numeric values above
+                contentElement.innerHTML = html;
+            })
+            .catch(error => {
+                SafeLogger.error('Error fetching data location:', error);
+                // Clear content safely
+                contentElement.innerHTML = '';
+
+                // Create error alert
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-danger';
+
+                const icon = document.createElement('i');
+                icon.className = 'fas fa-exclamation-circle';
+                alertDiv.appendChild(icon);
+
+                const errorText = document.createTextNode(' Failed to load data location information: ' + (error.message || 'Unknown error'));
+                alertDiv.appendChild(errorText);
+
+                contentElement.appendChild(alertDiv);
+            });
+    }
+
+    /**
+     * Render backup status info section
+     */
+    function renderBackupStatusSection() {
+        const sectionId = 'section-ldr-backup-status';
+
+        const html = `
+        <div class="ldr-settings-section ldr-backup-status-section">
+            <div class="ldr-settings-section-header" data-target="${sectionId}">
+                <div class="ldr-settings-section-title">
+                    <i class="fas fa-shield-alt"></i> Backup Status
+                </div>
+                <div class="ldr-settings-toggle-icon">
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+            </div>
+            <div id="${sectionId}" class="ldr-settings-section-body">
+                <div id="ldr-backup-status-content" class="ldr-backup-status-info">
+                    <div class="ldr-loading-spinner">
+                        <i class="fas fa-spinner fa-spin"></i> Loading backup status...
+                    </div>
+                </div>
+            </div>
+        </div>
+        `;
+
+        setTimeout(() => fetchBackupStatusInfo(), 150);
+
+        return html;
+    }
+
+    /**
+     * Fetch and display backup status information
+     */
+    function fetchBackupStatusInfo() {
+        const contentElement = document.getElementById('ldr-backup-status-content');
+        if (!contentElement) return;
+
+        window.api.fetchWithErrorHandling(URLS.SETTINGS_API.BACKUP_STATUS)
+            .then(data => {
+                const esc = window.escapeHtml || (s => String(s || ''));
+
+                let statusIcon, statusText, statusClass;
+                if (!data.enabled) {
+                    statusIcon = 'fa-times-circle';
+                    statusText = 'Backups disabled';
+                    statusClass = 'ldr-backup-disabled';
+                } else if (data.count === 0) {
+                    statusIcon = 'fa-exclamation-triangle';
+                    statusText = 'No backups yet';
+                    statusClass = 'ldr-backup-warning';
+                } else {
+                    statusIcon = 'fa-check-circle';
+                    statusText = `${data.count} backup${data.count > 1 ? 's' : ''} (${esc(data.total_size_human)})`;
+                    statusClass = 'ldr-backup-ok';
+                }
+
+                let html = '<div class="ldr-backup-status-details">';
+
+                html += `
+                    <div class="ldr-backup-status-row ${statusClass}">
+                        <i class="fas ${statusIcon}"></i>
+                        <span><strong>${esc(statusText)}</strong></span>
+                    </div>
+                `;
+
+                if (data.backups && data.backups.length > 0) {
+                    const latest = data.backups[0];
+                    const date = new Date(latest.created_at);
+                    const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+
+                    html += `
+                        <div class="ldr-backup-detail-grid">
+                            <div class="ldr-backup-detail-item">
+                                <span class="ldr-backup-detail-label">Last backup:</span>
+                                <span>${esc(dateStr)}</span>
+                            </div>
+                            <div class="ldr-backup-detail-item">
+                                <span class="ldr-backup-detail-label">Size:</span>
+                                <span>${esc(latest.size_human)}</span>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                if (!data.enabled) {
+                    html += `
+                        <div class="ldr-backup-hint">
+                            <small>Enable backups below to protect your data. Each backup uses disk space equal to your database size.</small>
+                        </div>
+                    `;
+                } else if (data.count === 0) {
+                    html += `
+                        <div class="ldr-backup-hint">
+                            <small>A backup will be created automatically on your next login.</small>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="ldr-backup-hint">
+                            <small>Backups are created once per day on login. Encrypted backups cannot be compressed. Configure retention below.</small>
+                        </div>
+                    `;
+                }
+
+                html += '</div>';
+
+                // Add styles
+                if (!document.getElementById('ldr-backup-status-styles')) {
+                    const style = document.createElement('style');
+                    style.id = 'ldr-backup-status-styles';
+                    style.textContent = `
+                        .ldr-backup-status-section {
+                            margin-bottom: 1.5rem;
+                            border: 1px solid var(--border-color, #ddd);
+                            border-radius: 8px;
+                            background: var(--bg-secondary);
+                        }
+
+                        .ldr-backup-status-details {
+                            padding: 1rem;
+                        }
+
+                        .ldr-backup-status-row {
+                            display: flex;
+                            align-items: center;
+                            gap: 0.75rem;
+                            padding: 0.5rem 0;
+                            font-size: 1rem;
+                        }
+
+                        .ldr-backup-status-row.ldr-backup-ok i { color: var(--success-color, #22c55e); }
+                        .ldr-backup-status-row.ldr-backup-warning i { color: var(--warning-color, #f59e0b); }
+                        .ldr-backup-status-row.ldr-backup-disabled i { color: var(--error-color, #ef4444); }
+
+                        .ldr-backup-detail-grid {
+                            display: grid;
+                            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                            gap: 0.5rem;
+                            margin-top: 0.75rem;
+                            padding: 0.75rem;
+                            background: var(--bg-tertiary);
+                            border-radius: 6px;
+                        }
+
+                        .ldr-backup-detail-item {
+                            display: flex;
+                            gap: 0.5rem;
+                            font-size: 0.9rem;
+                        }
+
+                        .ldr-backup-detail-label {
+                            color: var(--text-secondary);
+                            font-weight: 500;
+                        }
+
+                        .ldr-backup-hint {
+                            margin-top: 0.75rem;
+                            color: var(--text-secondary);
+                            font-size: 0.85rem;
+                            opacity: 0.8;
+                        }
+                    `;
+                    document.head.appendChild(style);
+                }
+
+                contentElement.innerHTML = html;
+            })
+            .catch(error => {
+                SafeLogger.error('Error fetching backup status:', error);
+                contentElement.innerHTML = '';
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'ldr-backup-hint';
+                alertDiv.textContent = 'Could not load backup status.';
+                contentElement.appendChild(alertDiv);
+            });
+    }
+
+    /**
+     * Render settings based on active tab
+     * @param {string} tab - The active tab
+     */
+    function renderSettingsByTab(tab) {
+        // Only run this for the main settings dashboard
+        if (!settingsContent) return;
+
+        // Reset dropdown initialization state when switching tabs
+        window.modelDropdownsInitialized = false;
+        window.searchEngineDropdownInitialized = false;
+
+        // Let organizeSettings perform the tab filtering. It also maps
+        // auxiliary policy/embeddings prefixes onto the Search tab; eagerly
+        // filtering by `${tab}.` here would discard those settings before
+        // that mapping can run.
+        const groupedSettings = organizeSettings(allSettings, tab);
+
+        // Build HTML
+        let html = '';
+
+        // Add data location and backup status sections on app or all tab
+        if (tab === 'app' || tab === 'all') {
+            html += renderDataLocationSection();
+            html += renderBackupStatusSection();
+        }
+
+        // Define the order for the types in "all" tab
+        const typeOrder = ['llm', 'search', 'report', 'app', 'notifications'];
+        const prefixTypes = Object.keys(groupedSettings);
+
+        // Sort prefixes by the defined order for the "all" tab
+        if (tab === 'all') {
+            prefixTypes.sort((a, b) => {
+                const aIndex = typeOrder.indexOf(a);
+                const bIndex = typeOrder.indexOf(b);
+
+                // If both are in the ordered list, sort by that order
+                if (aIndex !== -1 && bIndex !== -1) {
+                    return aIndex - bIndex;
+                }
+
+                // If only one is in the list, it comes first
+                if (aIndex !== -1) return -1;
+                if (bIndex !== -1) return 1;
+
+                // Alphabetically for anything else
+                return a.localeCompare(b);
+            });
+        }
+
+        // For each type (app, llm, search, etc.)
+        for (const type of prefixTypes) {
+            // For each category in this type
+            for (const category in groupedSettings[type]) {
+                const sectionId = `section-${type}-${category.replace(/\s+/g, '-').toLowerCase()}`;
+
+                html += `
+                <div class="ldr-settings-section">
+                    <div class="ldr-settings-section-header" data-target="${sectionId}">
+                        <div class="ldr-settings-section-title" title="${category}">
+                            ${category}
+                        </div>
+                        <div class="ldr-settings-toggle-icon">
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                    </div>
+                    <div id="${sectionId}" class="ldr-settings-section-body">
+                `;
+
+                // Add all settings in this category (for-of, not forEach, so the
+                // synchronous body doesn't get flagged as a closure over `html`)
+                for (const setting of groupedSettings[type][category]) {
+                    html += renderSettingItem(setting);
+                }
+
+                html += `
+                    </div>
+                </div>
+                `;
+            }
+        }
+
+        if (html === '') {
+            html = '<div class="ldr-empty-state"><p>No settings found for this category</p></div>';
+        }
+
+        // Update the content
+        // eslint-disable-next-line no-unsanitized/property -- audited 2026-03-28: variable built from escaped/numeric values above
+        settingsContent.innerHTML = html;
+
+        // Check if the element exists immediately after setting innerHTML
+        SafeLogger.log('Checking for llm.model after render:', document.getElementById('llm.model'));
+
+        // Initialize accordion behavior
+        initAccordions();
+
+        // Initialize JSON handling
+        initJsonFormatting();
+
+        // Initialize range inputs
+        initRangeInputs();
+
+        // Initialize expanded JSON controls
+        setTimeout(() => {
+            initExpandedJsonControls();
+        }, 100);
+
+        // Initialize dropdowns AFTER content is rendered
+        initializeModelDropdowns();
+        initializeSearchEngineDropdowns();
+        // Also initialize the main setup which finds all dropdowns
+        setupCustomDropdowns();
+
+        // The refresh buttons live in the markup this render just produced, and
+        // the only other caller is the tab-switch listener — so on a fresh
+        // /settings/ load the model and provider buttons were inert until the
+        // user switched tabs at least once (#6407). Safe to call twice: every
+        // refresh button is bound by assigning `onclick`, so a later call
+        // replaces the handler instead of stacking a second one.
+        setupRefreshButtons();
+
+        // Reflect the scope→local-inference coupling in the checkboxes.
+        applyEgressScopeLock();
+
+    }
+
+    /**
+     * Visibly reflect the scope→inference coupling. When the egress scope is
+     * "private_only" the backend forces local LLM + embeddings regardless of
+     * these checkboxes (context_from_snapshot coupling), so show that truth:
+     * force-check + disable the two require-local checkboxes with a tooltip.
+     *
+     * Visual only — it does NOT persist (no change event is dispatched and the
+     * disabled controls don't submit), so the user's stored preference is
+     * restored from originalSettings when they pick a non-private scope.
+     */
+    function applyEgressScopeLock() {
+        const scopeSelect = document.getElementById('setting-policy-egress_scope');
+        if (!scopeSelect) return;
+        const boxes = [
+            { id: 'setting-llm-require_local_endpoint', key: 'llm.require_local_endpoint' },
+            { id: 'setting-embeddings-require_local', key: 'embeddings.require_local' },
+        ];
+        const LOCK_TITLE = 'Forced on by the Private-only egress scope — local inference is required so data stays on this machine.';
+        const apply = () => {
+            const locked = scopeSelect.value === 'private_only';
+            boxes.forEach(({ id, key }) => {
+                const cb = document.getElementById(id);
+                if (!cb) return;
+                const fallbackId = cb.getAttribute('data-hidden-fallback');
+                const fallback = fallbackId ? document.getElementById(fallbackId) : null;
+                if (locked) {
+                    cb.checked = true;
+                    cb.disabled = true;
+                    cb.title = LOCK_TITLE;
+                    // Disabled controls don't submit; keep the hidden fallback
+                    // disabled too so it can't override with 'false'. The scope
+                    // setting is what's saved; the backend derives the coupling.
+                    if (fallback) fallback.disabled = true;
+                } else {
+                    cb.disabled = false;
+                    cb.title = '';
+                    // Restore the latest intent if a save is still pending.
+                    // Its acknowledgement may not have reached originalSettings
+                    // yet, even though this is the value the user just chose.
+                    const pendingSave = pendingSettingsSaveByKey.get(key);
+                    const stored = pendingSave
+                        ? pendingSave.values[key]
+                        : originalSettings[key];
+                    cb.checked = stored === true || stored === 'true';
+                    if (fallback) fallback.disabled = cb.checked;
+                }
+            });
+        };
+        if (!scopeSelect.dataset.lockWired) {
+            scopeSelect.addEventListener('change', apply);
+            scopeSelect.dataset.lockWired = '1';
+        }
+        apply();
+    }
+
+    /**
+     * Render a single setting item
+     * @param {Object} setting - The setting object
+     * @returns {string} - The HTML for the setting item
+     */
+    function renderSettingItem(setting) {
+        // Log the setting being processed
+        SafeLogger.log('Processing Setting:', setting.key, 'UI Element:', setting.ui_element);
+
+        const settingId = `setting-${setting.key.replace(/\./g, '-')}`;
+        let inputElement;
+
+        // Generate the appropriate input element based on UI element type
+        switch(setting.ui_element) {
+            case 'textarea': {
+                // A redacted textarea renders blank for the same reason a
+                // password input does: writing "[REDACTED]" into the field
+                // means an untouched save persists the sentinel. The
+                // textarea case is worse than the password case, because
+                // editing is the *normal* workflow for the one setting
+                // that uses it (notifications.service_url is a
+                // comma-separated URL list). A partial edit such as
+                // "[REDACTED],discord://webhook/tok" is not an exact
+                // sentinel match, so the route's no-op does not fire, and
+                // the corrupted list silently breaks every notification.
+                const isRedacted = isRedactedValue(setting.value);
+                const textareaBody = isRedacted || setting.value === null
+                    ? ''
+                    : escapeHtml(String(setting.value));
+                // "press Enter while empty to clear" is the explicit clear
+                // gesture: the control renders blank, so deleting its
+                // contents is not a visible change and the dirty-check
+                // cannot see it (handleInputChange honours this).
+                const textareaPlaceholder = secrecyPlaceholder(setting);
+                inputElement = `
+                    <textarea id="${settingId}" name="${setting.key}"
+                        class="ldr-settings-textarea"
+                        placeholder="${escapeHtml(textareaPlaceholder)}"
+                        ${isRedacted ? 'data-redacted="true"' : ''}
+                        ${!setting.editable ? 'disabled' : ''}
+                    >${textareaBody}</textarea>
+                `;
+                break;
+            }
+
+            case 'json': {
+                const jsonClass = ' ldr-json-content';
+
+                // Try to format the JSON for better display
+                try {
+                    setting.value = JSON.stringify(JSON.parse(setting.value), null, 2);
+                } catch (e) {
+                    // If parsing fails, keep the original value
+                    SafeLogger.log('Error formatting JSON:', e);
+                }
+
+                // If it's an object (not an array), render individual controls
+                if (setting.value.startsWith('{')) {
+                    try {
+                        const jsonObj = JSON.parse(setting.value);
+                        return renderExpandedJsonControls(setting, settingId, jsonObj);
+                    } catch (e) {
+                        SafeLogger.log('Error parsing JSON for controls:', e);
+                    }
+                }
+
+                inputElement = `
+                    <textarea id="${settingId}" name="${setting.key}"
+                        class="ldr-settings-textarea${jsonClass}"
+                        ${!setting.editable ? 'disabled' : ''}
+                    >${setting.value !== null ? escapeHtml(String(setting.value)) : ''}</textarea>
+                `;
+                break;
+            }
+
+            case 'select':
+                // Handle specific keys that should use custom dropdowns
+                if (setting.key === 'llm.provider') {
+                    const dropdownParams = {
+                        input_id: setting.key,
+                        dropdown_id: settingId + "-dropdown",
+                        placeholder: "Select a provider",
+                        label: null, // Label handled outside
+                        label_id: settingId + "-label",
+                        help_text: setting.description || null,
+                        allow_custom: false,
+                        show_refresh: true, // Set to true for provider
+                        data_setting_key: setting.key,
+                        disabled: !setting.editable
+                    };
+                    inputElement = renderCustomDropdownHTML(dropdownParams);
+                } else if (setting.key === 'search.tool') {
+                    const dropdownParams = {
+                        input_id: setting.key,
+                        dropdown_id: settingId + "-dropdown",
+                        placeholder: "Select a search tool",
+                        label: null,
+                        label_id: settingId + "-label",
+                        help_text: setting.description || null,
+                        allow_custom: false,
+                        show_refresh: false, // No refresh for search tool
+                        data_setting_key: setting.key,
+                        disabled: !setting.editable
+                    };
+                    inputElement = renderCustomDropdownHTML(dropdownParams);
+                } else if (setting.key === 'llm.model') { // ADD THIS ELSE IF
+                    // Handle llm.model specifically within the 'select' case
+                    const dropdownParams = {
+                        input_id: setting.key,
+                        dropdown_id: settingId + "-dropdown",
+                        placeholder: "Select or enter a model",
+                        label: null,
+                        label_id: settingId + "-label",
+                        help_text: setting.description || null,
+                        allow_custom: true, // Allow custom for model
+                        show_refresh: true, // Show refresh for model
+                        refresh_aria_label: "Refresh model list",
+                        data_setting_key: setting.key,
+                        disabled: !setting.editable
+                    };
+                    inputElement = renderCustomDropdownHTML(dropdownParams);
+                } else {
+                    // Standard select for other keys
+                    const selectOptions = [];
+                    let valueMatched = false;
+                    if (setting.options) {
+                        setting.options.forEach(option => {
+                            // Handle both string options and object options
+                            let optionValue, optionLabel;
+                            if (typeof option === 'object' && option !== null) {
+                                // Object format: {value: "basic", label: "Basic"}
+                                optionValue = option.value;
+                                optionLabel = option.label || option.value;
+                            } else {
+                                // String format: "basic"
+                                optionValue = option;
+                                optionLabel = option;
+                            }
+                            const isSelected = optionValue === setting.value;
+                            if (isSelected) {
+                                valueMatched = true;
+                            }
+                            const selected = isSelected ? 'selected' : '';
+                            // Escape HTML to prevent XSS attacks
+                            selectOptions.push(
+                                `<option value="${escapeHtml(optionValue)}" ${selected}>${escapeHtml(optionLabel)}</option>`
+                            );
+                        });
+                    }
+                    // If the stored value isn't among the current options (e.g. a
+                    // deprecated value like the removed "both" egress scope),
+                    // surface it as a selected option. Otherwise the control shows
+                    // the first option while a different value is still enforced,
+                    // and "Save All" would silently rewrite it. Only when a real
+                    // options list exists — a select with no catalog (options
+                    // null) shouldn't get a lone synthetic "(current)" entry.
+                    if (setting.options && !valueMatched && setting.value !== undefined
+                        && setting.value !== null && setting.value !== '') {
+                        selectOptions.push(
+                            `<option value="${escapeHtml(setting.value)}" selected>${escapeHtml(setting.value)} (current)</option>`
+                        );
+                    }
+                    inputElement = `
+                        <select id="${settingId}" name="${setting.key}"
+                            class="ldr-settings-select ldr-form-control"
+                            ${!setting.editable ? 'disabled' : ''}
+                        >
+                            ${selectOptions.join('')}
+                        </select>
+                    `;
+                }
+                break;
+
+            case 'checkbox': {
+                const checked = setting.value === true || setting.value === 'true' ? 'checked' : '';
+                const hiddenFallbackId = `${settingId}_hidden_fallback`;
+                inputElement = `
+                    <div class="ldr-settings-checkbox-container">
+                        <label class="ldr-checkbox-label" for="${settingId}">
+                            <!-- Hidden input ensures unchecked state is submitted -->
+                            <input type="hidden"
+                                   name="${setting.key}"
+                                   id="${hiddenFallbackId}"
+                                   value="false"
+                                   class="ldr-checkbox-hidden-fallback">
+                            <!-- Actual checkbox overrides hidden input when checked -->
+                            <input type="checkbox" id="${settingId}" name="${setting.key}"
+                                class="ldr-settings-checkbox"
+                                data-hidden-fallback="${hiddenFallbackId}"
+                                ${checked}
+                                ${!setting.editable ? 'disabled' : ''}
+                            >
+                            <span class="ldr-checkbox-text">${escapeHtml(setting.name)}</span>
+                        </label>
+                    </div>
+                `;
+                break;
+            }
+
+            case 'slider':
+            case 'range': {
+                const min = setting.min_value !== null ? setting.min_value : 0;
+                const max = setting.max_value !== null ? setting.max_value : 100;
+                const step = setting.step !== null ? setting.step : 1;
+
+                inputElement = `
+                    <div class="ldr-settings-range-container">
+                        <input type="range" id="${settingId}" name="${setting.key}"
+                            class="ldr-settings-range ldr-form-control"
+                            value="${escapeHtml(String(setting.value !== null ? setting.value : min))}"
+                            min="${min}" max="${max}" step="${step}"
+                            ${!setting.editable ? 'disabled' : ''}
+                        >
+                        <span class="ldr-settings-range-value">${escapeHtml(String(setting.value !== null ? setting.value : min))}</span>
+                    </div>
+                `;
+                break;
+            }
+
+            case 'number': {
+                const numMin = setting.min_value !== null ? setting.min_value : '';
+                const numMax = setting.max_value !== null ? setting.max_value : '';
+                const numStep = setting.step !== null ? setting.step : 1;
+
+                inputElement = `
+                    <input type="number" id="${settingId}" name="${setting.key}"
+                        class="ldr-settings-input ldr-form-control"
+                        value="${escapeHtml(String(setting.value !== null ? setting.value : ''))}"
+                        min="${numMin}" max="${numMax}" step="${numStep}"
+                        ${!setting.editable ? 'disabled' : ''}
+                    >
+                `;
+                break;
+            }
+
+            // Add a case for explicit custom dropdown if needed, or handle in default
+            // case 'custom_dropdown':
+
+            default:
+                if (setting.ui_element === 'password') {
+                    // Render password inputs empty regardless of stored
+                    // value. Reasons:
+                    //   1. The Jinja2 server render does the same — keeps
+                    //      both paths consistent.
+                    //   2. /settings/api now returns "[REDACTED]" for
+                    //      password fields (PR #3947). If we wrote that
+                    //      string into the input, a save without typing
+                    //      would persist "[REDACTED]" as the API key.
+                    //   3. The placeholder telegraphs configuration state
+                    //      without leaking the value or its length.
+                    // secrecyPlaceholder's "is configured" check accepts
+                    // the redacted sentinel as a positive signal — we know
+                    // the value is set, we just don't know its plaintext.
+                    const placeholder = secrecyPlaceholder(setting);
+                    inputElement = `
+                        <input type="password"
+                            id="${settingId}" name="${setting.key}"
+                            class="ldr-settings-input ldr-form-control"
+                            value=""
+                            autocomplete="new-password"
+                            placeholder="${escapeHtml(placeholder)}"
+                            ${!setting.editable ? 'disabled' : ''}
+                        >
+                    `;
+                } else if (isRedactedValue(setting.value)) {
+                    // Sensitive setting rendered by a non-password control.
+                    // Same contract as the password branch: never write the
+                    // sentinel into the field, since an edit would persist
+                    // it (or, once it merely *contains* the sentinel, be
+                    // rejected by the route handler).
+                    inputElement = `
+                        <input type="text"
+                            id="${settingId}" name="${setting.key}"
+                            class="ldr-settings-input ldr-form-control"
+                            value=""
+                            placeholder="${escapeHtml(secrecyPlaceholder(setting))}"
+                            data-redacted="true"
+                            ${!setting.editable ? 'disabled' : ''}
+                        >
+                    `;
+                } else {
+                    // Default to text input
+                    inputElement = `
+                        <input type="text"
+                            id="${settingId}" name="${setting.key}"
+                            class="ldr-settings-input ldr-form-control"
+                            value="${escapeHtml(String(setting.value !== null ? setting.value : ''))}"
+                            ${!setting.editable ? 'disabled' : ''}
+                        >
+                    `;
+                }
+                break;
+        }
+
+        // Format the setting name to be more user-friendly if it contains underscores
+        let settingName = setting.name;
+        if (settingName.includes('_')) {
+            settingName = formatCategoryName('', settingName);
+        }
+
+        // For checkboxes, we've already handled the label in the inputElement
+        if (setting.ui_element === 'checkbox') {
+            return `
+                <div class="ldr-settings-item form-group" data-key="${setting.key}">
+                    ${inputElement}
+                    ${setting.description ? `
+                    <div class="ldr-input-help">
+                        ${escapeHtml(setting.description)}
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        // For non-checkbox elements, use the standard layout without info icons
+        // Ensure help text is appended correctly AFTER the input element is generated
+        const helpTextHTML = setting.description ? `<div class="ldr-input-help">${escapeHtml(setting.description)}</div>` : '';
+
+        return `
+            <div class="ldr-settings-item form-group" data-key="${setting.key}">
+                <div class="ldr-settings-item-header">
+                    <label for="${settingId}" id="${settingId}-label" title="${escapeHtml(settingName)}">
+                        ${escapeHtml(settingName)}
+                    </label>
+                </div>
+                ${inputElement}
+                ${helpTextHTML}
+            </div>
+        `;
+    }
+
+    /**
+     * Render expanded JSON controls for a JSON object setting
+     * @param {Object} setting - The setting object
+     * @param {string} settingId - The ID for the setting
+     * @param {Object} jsonObj - The parsed JSON object
+     * @returns {string} - The HTML for the expanded JSON controls
+     */
+    function renderExpandedJsonControls(setting, settingId, jsonObj) {
+        let html = `
+         <div class="ldr-settings-item form-group" data-key="${setting.key}">
+             <div class="ldr-settings-item-header">
+                 <label for="${settingId}" title="${escapeHtml(setting.name)}">
+                     ${escapeHtml(setting.name)}
+                 </label>
+             </div>
+             <div class="ldr-json-expanded-controls">
+                 <input type="hidden" id="${settingId}_original" name="${setting.key}_original"
+                     value="${escapeHtml(JSON.stringify(jsonObj))}">
+
+                 <div class="ldr-json-property-controls">
+        `;
+
+        // Create individual form controls for each JSON property
+        for (const key in jsonObj) {
+            const value = jsonObj[key];
+            const controlId = `${settingId}_${key}`;
+            const formattedName = formatPropertyName(key);
+            let controlHtml;
+
+            // Create appropriate control based on value type
+            if (typeof value === 'boolean') {
+                const hiddenFallbackId = `${controlId}_hidden_fallback`;
+                controlHtml = `
+                    <div class="ldr-json-property-item ldr-boolean-property" data-checkboxid="${controlId}">
+                        <div class="ldr-checkbox-wrapper">
+                            <label class="ldr-checkbox-label" for="${controlId}">
+                                <!-- Hidden input ensures unchecked state is submitted -->
+                                <input type="hidden"
+                                       name="${setting.key}_${key}"
+                                       id="${hiddenFallbackId}"
+                                       value="false"
+                                       class="ldr-checkbox-hidden-fallback">
+                                <!-- Actual checkbox overrides hidden input when checked -->
+                                <input type="checkbox"
+                                       id="${controlId}"
+                                       name="${setting.key}_${key}"
+                                       class="ldr-json-property-control ldr-settings-checkbox"
+                                       data-property="${key}"
+                                       data-parent-key="${setting.key}"
+                                       data-hidden-fallback="${hiddenFallbackId}"
+                                       ${value ? 'checked' : ''}
+                                       ${!setting.editable ? 'disabled' : ''}>
+                                <span class="ldr-checkbox-text">${formattedName}</span>
+                            </label>
+                        </div>
+                    </div>
+                `;
+            } else if (typeof value === 'number') {
+                controlHtml = `
+                    <div class="ldr-json-property-item">
+                        <label for="${controlId}" class="ldr-property-label" title="${formattedName}">${formattedName}</label>
+                        <input type="number"
+                               id="${controlId}"
+                               name="${setting.key}_${key}"
+                               class="ldr-settings-input ldr-form-control ldr-json-property-control"
+                               data-property="${key}"
+                               data-parent-key="${setting.key}"
+                               value="${value}"
+                               ${!setting.editable ? 'disabled' : ''}>
+                    </div>
+                `;
+            } else if (typeof value === 'string' && (value === 'ITERATION' || value === 'NONE')) {
+                controlHtml = `
+                    <div class="ldr-json-property-item">
+                        <label for="${controlId}" class="ldr-property-label" title="${formattedName}">${formattedName}</label>
+                        <select id="${controlId}"
+                                name="${setting.key}_${key}"
+                                class="ldr-settings-select ldr-form-control ldr-json-property-control"
+                                data-property="${key}"
+                                data-parent-key="${setting.key}"
+                                ${!setting.editable ? 'disabled' : ''}>
+                            <option value="ITERATION" ${value === 'ITERATION' ? 'selected' : ''}>Iteration</option>
+                            <option value="NONE" ${value === 'NONE' ? 'selected' : ''}>None</option>
+                        </select>
+                    </div>
+                `;
+            } else {
+                controlHtml = `
+                    <div class="ldr-json-property-item">
+                        <label for="${controlId}" class="ldr-property-label" title="${formattedName}">${formattedName}</label>
+                        <input type="text"
+                               id="${controlId}"
+                               name="${setting.key}_${key}"
+                               class="ldr-settings-input ldr-form-control ldr-json-property-control"
+                               data-property="${key}"
+                               data-parent-key="${setting.key}"
+                               value="${escapeHtml(String(value))}"
+                               ${!setting.editable ? 'disabled' : ''}>
+                    </div>
+                `;
+            }
+
+            html += controlHtml;
+        }
+
+        html += `
+                </div>
+            </div>
+            ${setting.description ? `
+            <div class="ldr-input-help">
+                ${escapeHtml(setting.description)}
+            </div>
+            ` : ''}
+        </div>
+        `;
+
+        return html;
+    }
+
+    /**
+     * Handle settings form submission (for the entire form)
+     * @param {Event} e - The submit event
+     */
+    function handleSettingsSubmit(e) {
+        e.preventDefault();
+
+        // Cancel any pending auto-save timers to prevent stale overwrites
+        Object.keys(saveTimers).forEach(key => {
+            clearTimeout(saveTimers[key]);
+        });
+        saveTimers = {};
+        pendingSaveData = {};
+
+        // Clear any previous errors
+        document.querySelectorAll('.ldr-settings-error').forEach(element => {
+            element.classList.remove('ldr-settings-error');
+        });
+
+        document.querySelectorAll('.ldr-settings-error-message').forEach(element => {
+            element.remove();
+        });
+
+        // Collect form data
+        const formData = {};
+
+        // Get values from inputs
+        document.querySelectorAll('.ldr-settings-input, .ldr-settings-textarea, .ldr-settings-select, .ldr-settings-range').forEach(input => {
+            // Skip inputs that are part of expanded JSON controls
+            if (input.classList.contains('ldr-json-property-control')) return;
+
+            if (input.name) {
+                // Check if value is a JSON object (textarea)
+                if (input.tagName === 'TEXTAREA' && input.classList.contains('ldr-settings-textarea')) {
+                    try {
+                        const jsonValue = JSON.parse(input.value);
+                        formData[input.name] = jsonValue;
+                    } catch (err) {
+                        // Mark as invalid and don't include
+                        markInvalidInput(input, 'Invalid JSON format: ' + err.message);
+                    }
+                } else {
+                    formData[input.name] = input.value;
+                }
+            }
+        });
+
+        // Get values from checkboxes (AJAX mode - reads checkbox.checked directly)
+        document.querySelectorAll('.ldr-settings-checkbox').forEach(checkbox => {
+            // Skip checkboxes that are part of expanded JSON controls
+            if (checkbox.classList.contains('ldr-json-property-control')) return;
+
+            if (checkbox.name) {
+                // Ensure boolean type for consistency with server-side validation
+                formData[checkbox.name] = Boolean(checkbox.checked);
+            }
+        });
+
+        // Process expanded JSON controls
+        document.querySelectorAll('input[id$="_original"]').forEach(input => {
+            if (input.name && input.name.endsWith('_original')) {
+                const actualName = input.name.replace('_original', '');
+
+                // Get all controls for this setting
+                const jsonData = {};
+                const controls = document.querySelectorAll(`.ldr-json-property-control[data-parent-key="${actualName}"]`);
+
+                controls.forEach(control => {
+                    const propName = control.dataset.property;
+
+                    if (propName) {
+                        if (control.type === 'checkbox') {
+                            jsonData[propName] = control.checked;
+                        } else if (control.tagName === 'SELECT') {
+                            jsonData[propName] = control.value;
+                        } else if (!isNaN(control.value) && control.value !== '') {
+                            // Attempt to convert to number — float if it has a dot, else int
+                            if (control.value.includes('.')) {
+                                jsonData[propName] = parseFloat(control.value);
+                            } else {
+                                jsonData[propName] = parseInt(control.value, 10);
+                            }
+                        } else {
+                            jsonData[propName] = control.value;
+                        }
+                    }
+                });
+
+                // Special handling for corrupted JSON values (check for empty objects, single characters, etc.)
+                if (Object.keys(jsonData).length === 0) {
+                    // Use the original JSON if it's non-empty and valid
+                    try {
+                        const originalJson = JSON.parse(input.value);
+                        if (originalJson && typeof originalJson === 'object' && Object.keys(originalJson).length > 0) {
+                            formData[actualName] = originalJson;
+                        } else {
+                            // Skip empty JSON
+                            SafeLogger.log(`Skipping empty JSON object for ${actualName}`);
+                        }
+                    } catch (err) {
+                        SafeLogger.log(`Error parsing original JSON for ${actualName}:`, err);
+                    }
+                } else {
+                    // Use the collected data
+                    formData[actualName] = jsonData;
+                }
+            }
+        });
+
+        // For report nested values that might be corrupted, ensure they're proper objects
+        Object.keys(formData).forEach(key => {
+            // Check for various forms of corrupted data
+            if (
+                (typeof formData[key] === 'string' &&
+                (formData[key] === '{' ||
+                 formData[key] === '[' ||
+                 formData[key] === '' ||
+                 formData[key] === null ||
+                 formData[key] === "[object Object]")) ||
+                formData[key] === null
+            ) {
+                // This is likely a corrupted setting
+                SafeLogger.log(`Detected corrupted setting: ${key} with value: ${formData[key]}`);
+
+                if (key.startsWith('report.')) {
+                    // For report settings, replace with empty object
+                    formData[key] = {};
+                } else {
+                    // For other settings, delete to let defaults take over
+                    delete formData[key];
+                }
+            }
+        });
+
+        // Get raw config from editor if visible
+        if (rawConfigSection.style.display !== 'none' && rawConfigEditor) {
+            try {
+                const rawConfig = JSON.parse(rawConfigEditor.value);
+
+                // Process raw config and flatten the structure
+                const flattenedConfig = {};
+
+                // Process each namespace in the config (app, llm, search, report)
+                Object.keys(rawConfig).forEach(namespace => {
+                    const section = rawConfig[namespace];
+
+                    // Each key in the section should be added to form data with namespace prefix
+                    Object.keys(section).forEach(key => {
+                        const fullKey = `${namespace}.${key}`;
+                        flattenedConfig[fullKey] = section[key];
+                    });
+                });
+
+                // Merge with form data, giving precedence to the raw JSON config
+                Object.assign(formData, flattenedConfig);
+            } catch (err) {
+                showAlert('Invalid JSON in raw config editor: ' + err.message, 'error');
+                return;
+            }
+        }
+
+        // Show saving state for the form
+        if (settingsForm) {
+            settingsForm.classList.add('ldr-saving');
+        }
+
+        // Submit data to API
+        submitSettingsData(formData, settingsForm);
+    }
+
+    /**
+     * Show a success indicator on an input
+     * @param {HTMLElement} element - The input element
+     */
+    function showSaveSuccess(element) {
+        if (!element) return;
+
+        // Add success class
+        element.classList.add('ldr-save-success');
+
+        // Remove it after a short delay
+        setTimeout(() => {
+            element.classList.remove('ldr-save-success');
+        }, 1500);
+    }
+
+    /**
+     * Validates user-specified JSON data and shows and error if it is not
+     * valid JSON.
+     * @param content The content to validate.
+     * @return True if the content is valid.
+     */
+    function validateJsonContent(content) {
+        try {
+            JSON.parse(content);
+            return true;
+        } catch {
+            showMessage('Setting value must be valid JSON.', 'error', 5000);
+            return false;
+        }
+    }
+
+    /**
+     * Render a settings-save failure: mark every rejected setting the user
+     * can see, then hang the per-setting details off the generic headline.
+     * The backend puts the actionable text — e.g. the private-URL remedies
+     * — in `errors[]`, which the flattened message on its own discards.
+     *
+     * Shared by the 2xx-with-error-status branch of the success handler and
+     * by the fetch-rejection handler, since save_all_settings reports
+     * validation failures as a non-2xx (400/403) response and
+     * fetchWithErrorHandling turns those into a rejection carrying the
+     * parsed body on `error.details`.
+     *
+     * @param {Object|null} body - shape {message|error, errors: [{key, name, error}]}
+     * @param {string} baseMessage - The generic headline the details hang off
+     * @param {string[]} supersededKeys - Keys this request no longer owns
+     *     because a newer save took them over. Their verdict is already
+     *     stale, so it must reach neither the banner nor the field a newer
+     *     request is writing.
+     */
+    function renderSettingsSaveError(body, baseMessage, supersededKeys) {
+        const errorDetails = formatServerSettingErrors(
+            body ? body.errors : undefined
+        ).filter(detail => !supersededKeys.includes(detail.key));
+        const markedKeys = markInvalidSettingsFromServer(errorDetails);
+        // Cap what reaches the banner: a raw-config save can reject
+        // dozens of keys at once. An entry with no inline mark (the
+        // key isn't rendered — hidden, rejected by the namespace
+        // guard before it reaches the form, or outside the active
+        // tab/search) has no other surface, so those are sorted to
+        // the front and only fall off the banner past the cap.
+        const orderedDetails = [...errorDetails].sort((a, b) => {
+            const aMarked = markedKeys.has(a.key) ? 1 : 0;
+            const bMarked = markedKeys.has(b.key) ? 1 : 0;
+            return aMarked - bMarked;
+        });
+        const shownDetails = orderedDetails.slice(0, MAX_BANNER_SETTING_ERRORS);
+        const hiddenCount = orderedDetails.length - shownDetails.length;
+        let detailMessage = shownDetails
+            .map(detail => detail.message)
+            .join(' • ');
+        if (detailMessage && hiddenCount > 0) {
+            detailMessage += ` • +${hiddenCount} more`;
+        }
+        const fullMessage = detailMessage
+            ? `${baseMessage} — ${detailMessage}`
+            : baseMessage;
+
+        // Show error message; give detailed failures a longer read window.
+        // window.ui.showMessage sets textContent (not innerHTML) and
+        // showAlert HTML-escapes before inserting, so fullMessage is safe
+        // from XSS even though it originates from server-controlled text.
+        const errorDuration = detailMessage ? 10000 : 5000;
+        if (window.ui && window.ui.showMessage) {
+            window.ui.showMessage(fullMessage, 'error', errorDuration);
+            showAlert(fullMessage, 'error', true);
+        } else {
+            showAlert(fullMessage, 'error', false);
+        }
+    }
+
+    /**
+     * Submit settings data to the API
+     * @param {Object} formData - The settings to save
+     * @param {HTMLElement} sourceElement - The input element that triggered the save
+     */
+    function submitSettingsData(formData, sourceElement) {
+        if (settingsResetInProgress) return;
+        // Show loading indicator
+        let loadingContainer = sourceElement;
+
+        // If it's a specific input element, find its container to position the spinner correctly
+        if (sourceElement && sourceElement.tagName) {
+            if (sourceElement.type === 'checkbox') {
+                // For checkboxes, use the checkbox label
+                loadingContainer = sourceElement.closest('.ldr-checkbox-label') || sourceElement;
+            } else if (sourceElement.classList.contains('ldr-json-property-control')) {
+                // For JSON property controls, use the property item
+                loadingContainer = sourceElement.closest('.ldr-json-property-item') || sourceElement;
+            } else if (sourceElement.classList.contains('ldr-json-content')) {
+                // For JSON content, validate it before saving.
+                if (!validateJsonContent(sourceElement.value)) {
+                    return;
+                }
+            } else {
+                // For other inputs, use the form-group or settings-item
+                loadingContainer = sourceElement.closest('.form-group') ||
+                                  sourceElement.closest('.ldr-settings-item') ||
+                                  sourceElement;
+            }
+        }
+
+        // Add the saving class to show the spinner
+        if (loadingContainer) {
+            loadingContainer.classList.add('ldr-saving');
+        }
+
+        // Get the keys being saved for reference
+        const savingKeys = Object.keys(formData);
+
+        // Store original values to show what changed (use originalSettings cache, not allSettings)
+        const originalValues = {};
+        savingKeys.forEach(key => {
+            // originalSettings stores the values from when the page was loaded
+            originalValues[key] = Object.hasOwn(originalSettings, key) ? originalSettings[key] : null;
+        });
+
+        // Whether each key is a secret as things stand BEFORE the save.
+        // The response write-back moves redactedSettingKeys to the NEW
+        // state, so reading that set alone describes only half of the
+        // transition: clearing a secret drops its key, and the save
+        // confirmation would then print values for a setting that was
+        // secret a moment ago. Masking on "secret before OR after" covers
+        // both directions — configuring one and clearing one.
+        const sensitiveBeforeSave = new Set(
+            savingKeys.filter(key => {
+                const setting = allSettings.find(s => s.key === key);
+                return Boolean(
+                    (setting && setting.ui_element === 'password') ||
+                    redactedSettingKeys.has(key)
+                );
+            })
+        );
+
+        // Track the latest request per setting key. Date.now() is not a
+        // safe request token: rapid submits can share a millisecond and let an
+        // older response overwrite newer state. Key ownership also covers a
+        // field auto-save that crosses a later full-form save (or vice versa).
+        // Source ownership is kept separately so an obsolete request cannot
+        // clear a newer spinner attached to the same form/input.
+        const requestGeneration = ++nextSettingsSaveGeneration;
+        savingKeys.forEach(key => {
+            latestSettingsSaveGenerationByKey.set(key, requestGeneration);
+        });
+        if (sourceElement) {
+            latestSettingsSaveBySource.set(sourceElement, requestGeneration);
+        } else {
+            latestUnscopedSettingsSaveGeneration = requestGeneration;
+        }
+        const isLatestSourceRequest = () => (
+            sourceElement
+                ? latestSettingsSaveBySource.get(sourceElement) === requestGeneration
+                : latestUnscopedSettingsSaveGeneration === requestGeneration
+        );
+        const getCurrentSavingKeys = () => savingKeys.filter(
+            key => latestSettingsSaveGenerationByKey.get(key) === requestGeneration
+        );
+        // The complement: keys a newer save has taken over. Their verdict
+        // from this response is already stale.
+        const getSupersededKeys = () => savingKeys.filter(
+            key => latestSettingsSaveGenerationByKey.get(key) !== requestGeneration
+        );
+        const clearOwnedLoadingState = () => {
+            if (isLatestSourceRequest() && loadingContainer) {
+                loadingContainer.classList.remove('ldr-saving');
+            }
+        };
+
+        const blockingSaves = new Set();
+        savingKeys.forEach(key => {
+            const pendingSave = pendingSettingsSaveByKey.get(key);
+            if (pendingSave) blockingSaves.add(pendingSave.finished);
+        });
+
+        let resolveSaveFinished;
+        const saveOwnership = {
+            // Scope locks temporarily override the visible checkbox. Keep the
+            // queued intent available so unlocking does not restore stale data.
+            values: { ...formData },
+            finished: new Promise(resolve => {
+                resolveSaveFinished = resolve;
+            }),
+        };
+        savingKeys.forEach(key => {
+            pendingSettingsSaveByKey.set(key, saveOwnership);
+        });
+        const releaseSettingsSave = () => {
+            savingKeys.forEach(key => {
+                if (pendingSettingsSaveByKey.get(key) === saveOwnership) {
+                    pendingSettingsSaveByKey.delete(key);
+                }
+            });
+            resolveSaveFinished();
+        };
+
+        const runSaveRequest = () => window.api.fetchWithErrorHandling(URLS.SETTINGS_API.SAVE_ALL_SETTINGS, {
+            method: 'POST',
+            body: JSON.stringify(formData),
+        })
+        .then(data => {
+            // Overlapping writes are serialized, so every successful write is
+            // the newest confirmed server value for its submitted keys, even
+            // if a later intent is queued. Keep this rollback baseline when
+            // that later write fails; only visible feedback is intent-owned.
+            if (data.status === 'success' && data.settings) {
+                savingKeys.forEach(key => {
+                    const updatedSetting = data.settings[key];
+                    if (!updatedSetting) return;
+
+                    const settingMap = { [key]: { ...updatedSetting } };
+                    const processedSetting = processSettings(settingMap)[0];
+                    const settingIndex = allSettings.findIndex(s => s.key === key);
+                    if (settingIndex === -1) {
+                        allSettings.push(processedSetting);
+                    } else {
+                        allSettings[settingIndex] = processedSetting;
+                    }
+                    // Mirror the load-time baseline rule (see
+                    // loadSettings): the server echoes "[REDACTED]" for
+                    // sensitive settings, but the control renders blank,
+                    // so the baseline must be '' too — otherwise the next
+                    // dirty-check sees an untouched blank field as dirty
+                    // and a spurious submit can clear the stored value.
+                    originalSettings[key] = rendersBlankForSecrecy(processedSetting)
+                        ? ''
+                        : processedSetting.value;
+                    // The blank baseline above only holds if the control
+                    // is blank too, and nothing re-renders after a save —
+                    // so bring the live node, the redaction marker and the
+                    // baseline to the same state in one place.
+                    syncRedactedControlState(key, processedSetting, formData[key]);
+                });
+                // The service-url control may have just become (or stopped
+                // being) a configured-but-blank field.
+                updateTestNotificationButtonState();
+            }
+
+            const currentSavingKeys = getCurrentSavingKeys();
+
+            if (currentSavingKeys.includes('llm.provider')) {
+                if (settingsSearch?.value) {
+                    handleSearchInput();
+                } else {
+                    renderSettingsByTab(activeTab);
+                }
+                setTimeout(initAutoSaveHandlers, 300);
+            }
+
+            if (savingKeys.length > 0 && currentSavingKeys.length === 0) {
+                clearOwnedLoadingState();
+                return;
+            }
+
+            if (data.status === 'success') {
+                // Show success indicator on the source element
+                if (sourceElement && isLatestSourceRequest()) {
+                    showSaveSuccess(sourceElement);
+                }
+
+                // Remove loading state
+                clearOwnedLoadingState();
+
+                // Keep the raw editor synchronized without erasing dirty keys
+                // that were not part of this response. A hidden dirty editor
+                // represents a raw-config save that is still settling, so it
+                // must be reconciled too before the user opens it again.
+                if (
+                    rawConfigEditor &&
+                    (
+                        rawConfigSection?.style.display === 'block' ||
+                        rawConfigEditor.getAttribute('data-modified') === 'true'
+                    )
+                ) {
+                    prepareRawJsonEditor(currentSavingKeys);
+                }
+
+                // Format a more informative message showing what changed
+                let successMessage;
+                try {
+                    if (currentSavingKeys.length >= 1) {
+                        const key = currentSavingKeys[0];
+                        const oldValue = originalValues[key];
+                        // Get new value from formData (what we sent) since allSettings might not be updated yet
+                        const newValue = formData[key];
+
+                        // Format the display name for better readability
+                        const displayName = key.split('.').pop().replace(/_/g, ' ');
+                        const capitalizedName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
+
+                        // Check if this is a sensitive field (password/api_key,
+                        // or any setting the API redacted on load — e.g. the
+                        // notifications.service_url textarea, whose value is
+                        // an apprise URL with embedded credentials).
+                        const setting = allSettings.find(s => s.key === key);
+                        const isSensitive = Boolean(
+                            (setting && setting.ui_element === 'password') ||
+                            redactedSettingKeys.has(key) ||
+                            sensitiveBeforeSave.has(key)
+                        );
+
+                        // Format the values for display - mask sensitive values
+                        const oldDisplay = isSensitive ? '[hidden]' : formatValueForDisplay(oldValue);
+                        const newDisplay = isSensitive ? '[hidden]' : formatValueForDisplay(newValue);
+
+                        if (currentSavingKeys.length === 1) {
+                            if (isSensitive) {
+                                // For sensitive fields, just confirm the update without showing values
+                                successMessage = `${capitalizedName} updated`;
+                            } else {
+                                successMessage = `${capitalizedName}: ${oldDisplay} → ${newDisplay}`;
+                            }
+                        } else {
+                            successMessage = `${currentSavingKeys.length} settings saved`;
+                        }
+                    } else {
+                        successMessage = 'Settings saved';
+                    }
+                } catch (formatError) {
+                    SafeLogger.error('Error formatting settings change message:', formatError);
+                    successMessage = 'Settings saved';
+                }
+
+                // Clear any stale inline validation errors for keys that
+                // just saved successfully and are still owned by this request.
+                currentSavingKeys.forEach(key => {
+                    const control = findSettingControl(key);
+                    if (control) {
+                        markInvalidInput(control, null);
+                    }
+                });
+
+                // Show banner notification if ui.showMessage is available
+                if (window.ui && window.ui.showMessage) {
+                    window.ui.showMessage(successMessage, 'success', 6000);
+                    // We're showing banner, so we pass true to skip showing the regular alert
+                    showAlert(successMessage, 'success', true);
+                } else {
+                    // Fallback to regular alert
+                    showAlert(successMessage, 'success', false);
+                }
+            } else {
+                // A 2xx body that still reports failure carries the same
+                // per-setting `errors` shape as the 400 the catch below
+                // handles, so give it the same inline marks and banner
+                // detail instead of only the flattened top-level message.
+                renderSettingsSaveError(
+                    data,
+                    data.message || data.error || 'Error saving settings',
+                    getSupersededKeys()
+                );
+                clearOwnedLoadingState();
+            }
+        })
+        .catch(error => {
+            const currentSavingKeys = getCurrentSavingKeys();
+            if (savingKeys.length > 0 && currentSavingKeys.length === 0) {
+                clearOwnedLoadingState();
+                return;
+            }
+
+            SafeLogger.error('[submitSettingsData] AJAX Error:', error);
+            SafeLogger.error('[submitSettingsData] Error details:', error.message);
+
+            // Surface the structured per-setting details a 400
+            // "Validation errors" response carries (error.details is
+            // attached by fetchWithErrorHandling). save_all_settings
+            // reports every failure this way — 403 locked, 400
+            // egress-validation, 400 field-validation — so this is the
+            // branch the remedy text actually arrives on. The banner
+            // spells out which setting failed and why; the same text also
+            // lands inline on the offending control so it outlives the
+            // banner.
+            renderSettingsSaveError(
+                error && error.details ? error.details : null,
+                'Error saving settings: ' + error.message,
+                getSupersededKeys()
+            );
+
+            // Remove loading state
+            clearOwnedLoadingState();
+        })
+        .finally(releaseSettingsSave);
+
+        if (blockingSaves.size > 0) {
+            Promise.allSettled([...blockingSaves]).then(runSaveRequest);
+        } else {
+            runSaveRequest();
+        }
+    }
+
+    /**
+     * Handle search input for filtering settings
+     */
+    function handleSearchInput() {
+        // Only run this for the main settings dashboard
+        if (!settingsContent || !settingsSearch) return;
+
+        const searchValue = settingsSearch.value.toLowerCase();
+
+        if (searchValue === '') {
+            // If search is empty, just re-render based on active tab
+            renderSettingsByTab(activeTab);
+            return;
+        }
+
+        // Filter settings based on search
+        const filteredSettings = allSettings.filter(setting => {
+            return (
+                setting.key.toLowerCase().includes(searchValue) ||
+                setting.name.toLowerCase().includes(searchValue) ||
+                (setting.description && setting.description.toLowerCase().includes(searchValue)) ||
+                (setting.category && setting.category.toLowerCase().includes(searchValue))
+            );
+        });
+
+        // Organize settings to avoid duplicate groups
+        const groupedSettings = organizeSettings(filteredSettings, 'all');
+
+        // Build HTML
+        let html = '';
+
+        // Define the order for the types
+        const typeOrder = ['app', 'llm', 'search', 'report'];
+        const prefixTypes = Object.keys(groupedSettings);
+
+        // Sort prefixes by the defined order
+        prefixTypes.sort((a, b) => {
+            const aIndex = typeOrder.indexOf(a);
+            const bIndex = typeOrder.indexOf(b);
+
+            // If both are in the ordered list, sort by that order
+            if (aIndex !== -1 && bIndex !== -1) {
+                return aIndex - bIndex;
+            }
+
+            // If only one is in the list, it comes first
+            if (aIndex !== -1) return -1;
+            if (bIndex !== -1) return 1;
+
+            // Alphabetically for anything else
+            return a.localeCompare(b);
+        });
+
+        // For each type (app, llm, search, etc.)
+        for (const type of prefixTypes) {
+            // For each category in this type
+            for (const category in groupedSettings[type]) {
+                const sectionId = `section-${type}-${category.replace(/\s+/g, '-').toLowerCase()}`;
+
+                html += `
+                <div class="ldr-settings-section">
+                    <div class="ldr-settings-section-header" data-target="${sectionId}">
+                        <div class="ldr-settings-section-title" title="${category}">
+                            ${category}
+                        </div>
+                        <div class="ldr-settings-toggle-icon">
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                    </div>
+                    <div id="${sectionId}" class="ldr-settings-section-body">
+                `;
+
+                // Add all settings in this category (for-of, not forEach, so the
+                // synchronous body doesn't get flagged as a closure over `html`)
+                for (const setting of groupedSettings[type][category]) {
+                    html += renderSettingItem(setting);
+                }
+
+                html += `
+                    </div>
+                </div>
+                `;
+            }
+        }
+
+        if (html === '') {
+            html = '<div class="ldr-empty-state"><p>No settings found matching your search</p></div>';
+        }
+
+        // Add a container for alerts that will maintain proper positioning
+        html = '<div id="filtered-settings-alert" class="ldr-settings-alert-container"></div>' + html;
+
+        // Update the content
+        // eslint-disable-next-line no-unsanitized/property -- audited 2026-03-28: variable built from escaped/numeric values above
+        settingsContent.innerHTML = html;
+
+        // Initialize accordion behavior - all expanded for search results.
+        // Even on mobile, when the user is actively searching, every surviving
+        // section must be visible so matches aren't hidden behind a tap.
+        initAccordions({ defaultCollapsed: false });
+
+        // Initialize JSON handling
+        initJsonFormatting();
+
+        // Initialize range inputs
+        initRangeInputs();
+
+        // Initialize auto-save handlers after re-rendering
+        initAutoSaveHandlers();
+
+        // Initialize expanded JSON controls
+        setTimeout(() => {
+            initExpandedJsonControls();
+        }, 100);
+    }
+
+    /**
+     * Handle the reset button click
+     */
+    function handleReset() {
+        // Reset to original values
+        document.querySelectorAll('.ldr-settings-input, .ldr-settings-textarea, .ldr-settings-select').forEach(input => {
+            // Skip inputs that are part of expanded JSON controls
+            if (input.classList.contains('ldr-json-property-control')) return;
+
+            const originalValue = originalSettings[input.name];
+
+            if (typeof originalValue === 'object' && originalValue !== null) {
+                input.value = JSON.stringify(originalValue, null, 2);
+            } else {
+                input.value = originalValue !== undefined ? originalValue : '';
+            }
+        });
+
+        document.querySelectorAll('.ldr-settings-checkbox').forEach(checkbox => {
+            // Skip checkboxes that are part of expanded JSON controls
+            if (checkbox.classList.contains('ldr-json-property-control')) return;
+
+            const originalValue = originalSettings[checkbox.name];
+            checkbox.checked = originalValue === true || originalValue === 'true';
+        });
+
+        document.querySelectorAll('.ldr-settings-range').forEach(range => {
+            const originalValue = originalSettings[range.name];
+            range.value = originalValue !== undefined ? originalValue : range.min;
+
+            // Update value display
+            const valueDisplay = range.nextElementSibling;
+            if (valueDisplay && valueDisplay.classList.contains('ldr-settings-range-value')) {
+                valueDisplay.textContent = range.value;
+            }
+        });
+
+        // Reset expanded JSON controls
+        document.querySelectorAll('input[id$="_original"]').forEach(input => {
+            if (input.name.endsWith('_original')) {
+                const actualName = input.name.replace('_original', '');
+                const originalValue = originalSettings[actualName];
+
+                if (originalValue) {
+                    // Check for corrupted JSON (single character values like "{")
+                    if (typeof originalValue === 'string' && originalValue.length < 3) {
+                        SafeLogger.log(`Skipping corrupted JSON value for ${actualName}`);
+                        return;
+                    }
+
+                    let jsonData = originalValue;
+                    if (typeof jsonData === 'string') {
+                        try {
+                            jsonData = JSON.parse(jsonData);
+                        } catch (e) {
+                            SafeLogger.log('Error parsing JSON during reset:', e);
+                            return;
+                        }
+                    }
+
+                    // Update the hidden input
+                    input.value = JSON.stringify(jsonData);
+
+                    // Update individual controls
+                    for (const prop in jsonData) {
+                        const control = document.querySelector(`.ldr-json-property-control[data-parent-key="${actualName}"][data-property="${prop}"]`);
+                        if (control) {
+                            if (control.type === 'checkbox') {
+                                control.checked = !!jsonData[prop];
+                            } else if (control.tagName === 'SELECT') {
+                                control.value = jsonData[prop];
+                            } else {
+                                control.value = jsonData[prop];
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Format JSON values
+        initJsonFormatting();
+
+        showAlert('Settings reset to last saved values', 'info');
+    }
+
+    /**
+     * Handle the reset to defaults button click
+     */
+    function handleResetToDefaults() {
+        if (settingsResetInProgress) return Promise.resolve();
+        // Show confirmation dialog
+        if (confirm('Are you sure you want to reset ALL settings to their default values? This cannot be undone.')) {
+            // Flush edits still in the debounce window, then drain every key's
+            // queued writes before resetting. Otherwise an older queued save
+            // can reach the server after a successful reset.
+            const unsentSettings = { ...pendingSaveData };
+            Object.values(saveTimers).forEach(clearTimeout);
+            saveTimers = {};
+            pendingSaveData = {};
+            if (Object.keys(unsentSettings).length) {
+                submitSettingsData(unsentSettings, null);
+            }
+            settingsResetInProgress = true;
+            const formWasInert = settingsForm?.inert;
+            if (settingsForm) settingsForm.inert = true;
+            const resetControls = Array.from(document.querySelectorAll(
+                '#settings-form input, #settings-form textarea, #settings-form select, #settings-form button, #reset-to-defaults-button'
+            )).filter(control => !control.disabled);
+            resetControls.forEach(control => { control.disabled = true; });
+            const restoreControls = () => {
+                settingsResetInProgress = false;
+                if (settingsForm) settingsForm.inert = formWasInert;
+                resetControls.forEach(control => { control.disabled = false; });
+            };
+            const pendingSaves = Array.from(new Set(
+                Array.from(pendingSettingsSaveByKey.values(), save => save.finished)
+            ));
+            // Call the reset to defaults API
+            return Promise.allSettled(pendingSaves).then(() => window.api.fetchWithErrorHandling(URLS.SETTINGS_API.RESET_TO_DEFAULTS, {
+                method: 'POST'
+            }))
+            .then(data => {
+                if (data.status === 'success') {
+                    showAlert('Settings have been reset to defaults. Reloading page...', 'success');
+
+                    // Reload the page after a brief delay to show the success message
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    restoreControls();
+                    showAlert('Error resetting settings: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                restoreControls();
+                showAlert('Error resetting settings: ' + error, 'error');
+            });
+        }
+        return Promise.resolve();
+    }
+
+    /**
+     * Toggle the display of raw configuration
+     */
+    function toggleRawConfig() {
+        if (rawConfigSection && rawConfigEditor) {
+            const isVisible = rawConfigSection.style.display !== 'none';
+
+            // If hiding the editor, try to apply changes
+            if (isVisible) {
+                try {
+                    // Parse the JSON to validate it
+                    const rawConfig = JSON.parse(rawConfigEditor.value);
+
+                    // Process and flatten the JSON
+                    const flattenedConfig = {};
+
+                    Object.keys(rawConfig).forEach(namespace => {
+                        const section = rawConfig[namespace];
+
+                        Object.keys(section).forEach(key => {
+                            const fullKey = `${namespace}.${key}`;
+                            flattenedConfig[fullKey] = section[key];
+                        });
+                    });
+
+                    // Save the changes to apply them to UI
+                    submitSettingsData(flattenedConfig, null);
+                } catch (e) {
+                    // Show error and prevent hiding the editor
+                    showAlert('Invalid JSON in editor: ' + e.message, 'error');
+                    return;
+                }
+            }
+
+            // Toggle visibility
+            rawConfigSection.style.display = isVisible ? 'none' : 'block';
+
+            // Update aria-expanded state
+            const toggleBtn = document.getElementById('toggle-raw-config');
+            if (toggleBtn) toggleBtn.setAttribute('aria-expanded', String(!isVisible));
+
+            // Update toggle text
+            const toggleText = document.getElementById('toggle-text');
+            if (toggleText) {
+                toggleText.textContent = isVisible ? 'Show JSON Configuration' : 'Hide JSON Configuration';
+            }
+
+            // If showing the config, prepare it
+            if (!isVisible) {
+                prepareRawJsonEditor();
+            }
+        }
+    }
+
+    /**
+     * Prepare the raw JSON editor with all settings
+     */
+    function prepareRawJsonEditor(updatedKeys = []) {
+        if (rawConfigEditor && allSettings.length > 0) {
+            const updatedKeySet = new Set(updatedKeys);
+            const preserveDirtyValues =
+                rawConfigEditor.getAttribute('data-modified') === 'true';
+            // Try to parse existing JSON from editor if it exists
+            let existingConfig = {};
+            try {
+                if (rawConfigEditor.value) {
+                    existingConfig = JSON.parse(rawConfigEditor.value);
+                }
+            } catch {
+                // A background save must never erase a user's in-progress
+                // invalid buffer. Leave it untouched until they repair it.
+                if (preserveDirtyValues) return;
+                SafeLogger.warn('Could not parse existing JSON config, starting fresh');
+                existingConfig = {};
+            }
+
+            // Prepare settings as a JSON object
+            const settingsObj = {};
+
+            // Group by prefix (app, llm, search, report)
+            allSettings.forEach(setting => {
+                const key = setting.key;
+                const parts = key.split('.');
+                const prefix = parts[0];
+
+                // Initialize namespace if needed
+                if (!settingsObj[prefix]) {
+                    settingsObj[prefix] = {};
+                }
+
+                // Parse JSON values
+                let value = setting.value;
+                if (typeof value === 'string' && (value.startsWith('{') || value.startsWith('['))) {
+                    try {
+                        value = JSON.parse(value);
+                    } catch {
+                        // Leave as string if not valid JSON
+                    }
+                }
+
+                // Add to settings object
+                settingsObj[prefix][key.substring(prefix.length + 1)] = value;
+            });
+
+            // Merge with existing config to preserve unknown parameters. If
+            // the user is actively editing raw JSON, preserve known keys too
+            // unless this response saved that exact key. This lets an
+            // unrelated field auto-save refresh its own value without
+            // destroying the raw editor's unsaved work.
+            let preservedDirtyValue = false;
+            Object.keys(existingConfig).forEach(prefix => {
+                if (!settingsObj[prefix]) {
+                    settingsObj[prefix] = {};
+                }
+
+                Object.keys(existingConfig[prefix]).forEach(key => {
+                    // Only keep parameters that don't exist in our known settings
+                    const fullKey = `${prefix}.${key}`;
+                    const exists = allSettings.some(s => s.key === fullKey);
+
+                    if (
+                        !exists ||
+                        (preserveDirtyValues && !updatedKeySet.has(fullKey))
+                    ) {
+                        settingsObj[prefix][key] = existingConfig[prefix][key];
+                        if (preserveDirtyValues && !updatedKeySet.has(fullKey)) {
+                            preservedDirtyValue = true;
+                        }
+                    }
+                });
+            });
+
+            // Format as pretty JSON
+            rawConfigEditor.value = JSON.stringify(settingsObj, null, 2);
+            if (!preservedDirtyValue) {
+                rawConfigEditor.removeAttribute('data-modified');
+            }
+        }
+    }
+
+    /**
+     * Function to open file location (for collections config)
+     * @param {string} filePath - The file path to open
+     */
+    function openFileLocation(filePath) {
+        // Create a hidden form and submit it to a route that will open
+        // the file location. The canonical route is
+        // /settings/open_file_location (the older /api/open_file_location
+        // path was a Flask-era guess and 404s). The endpoint itself is
+        // a no-op in server mode (returns 403); kept for desktop builds.
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = "/settings/open_file_location";
+
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrf_token';
+        csrfInput.value = getCsrfToken();
+        form.appendChild(csrfInput);
+
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'file_path';
+        input.value = filePath;
+
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+    /**
+     * Initialize click handlers for checkbox wrappers
+     */
+    function initCheckboxWrappers() {
+        document.querySelectorAll('.ldr-boolean-property[data-checkboxid]').forEach(wrapper => {
+            if (wrapper.hasAttribute('data-checkbox-wrapper-initialized')) return;
+            wrapper.setAttribute('data-checkbox-wrapper-initialized', 'true');
+
+            wrapper.addEventListener('click', (event) => {
+                // Inputs and labels already have native checkbox behavior. Only
+                // fill the otherwise inert space in the surrounding row.
+                if (event.target.closest('input, label, button, a')) return;
+
+                const checkbox = document.getElementById(wrapper.dataset.checkboxid);
+                if (checkbox && !checkbox.disabled) checkbox.click();
+            });
+        });
+    }
+
+    /**
+     * Get CSRF token from meta tag
+     */
+    function getCsrfToken() {
+        return window.api ? window.api.getCsrfToken() : '';
+    }
+
+    /**
+     * Handle the fix corrupted settings button click
+     */
+    function handleFixCorruptedSettings() {
+        // Call the fix corrupted settings API
+        window.api.fetchWithErrorHandling(URLS.SETTINGS_API.FIX_CORRUPTED_SETTINGS, {
+            method: 'POST'
+        })
+        .then(data => {
+            if (data.status === 'success') {
+                if (data.fixed_settings && data.fixed_settings.length > 0) {
+                    showAlert(`Fixed ${data.fixed_settings.length} corrupted settings. Reloading page...`, 'success');
+
+                    // Reload the page after a brief delay to show the success message
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    showAlert('No corrupted settings were found.', 'info');
+                }
+            } else {
+                showAlert('Error fixing corrupted settings: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            showAlert('Error fixing corrupted settings: ' + error, 'error');
+        });
+    }
+
+    /**
+     * Check if Ollama service is running
+     * @returns {Promise<boolean>} True if Ollama is running
+     */
+    async function isOllamaRunning() {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+            const response = await fetch(URLS.SETTINGS_API.OLLAMA_STATUS, {
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+                const data = await response.json();
+                return data.running === true;
+            }
+            return false;
+        } catch (error) {
+            SafeLogger.error('Ollama check failed:', error.name === 'AbortError' ? 'Request timed out' : error);
+            return false;
+        }
+    }
+
+    /**
+     * Fetch model providers from API
+     * @param {boolean} forceRefresh - Whether to force refresh the data
+     * @returns {Promise} - A promise that resolves with the model providers
+     */
+    function fetchModelProviders(forceRefresh = false) {
+        // Use a debounce mechanism to prevent multiple calls in quick succession
+        if (window.modelProvidersRequestInProgress && !forceRefresh) {
+            SafeLogger.log('Model providers request already in progress, using existing promise');
+            return window.modelProvidersRequestInProgress;
+        }
+
+        SafeLogger.log('Fetching model providers from API');
+
+        // Create a promise and store it
+        const url = forceRefresh
+            ? `${URLS.SETTINGS_API.AVAILABLE_MODELS}?force_refresh=true`
+            : URLS.SETTINGS_API.AVAILABLE_MODELS;
+
+        const requestGeneration = ++nextModelProvidersRequestGeneration;
+        const request = fetch(url)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`API returned status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // A forced refresh may replace an in-flight request. Let the
+                // newest request own both the dropdown data and every caller's
+                // completion instead of allowing a late, stale response to
+                // overwrite it.
+                if (requestGeneration !== nextModelProvidersRequestGeneration) {
+                    return latestModelProvidersRequest;
+                }
+
+                SafeLogger.log('Got model data from API:', data);
+
+                // Process the data
+                return processModelData(data);
+            })
+            .catch(error => {
+                if (requestGeneration !== nextModelProvidersRequestGeneration) {
+                    return latestModelProvidersRequest;
+                }
+
+                SafeLogger.error('Error fetching model providers:', error);
+                throw error;
+            })
+            .finally(() => {
+                if (window.modelProvidersRequestInProgress === request) {
+                    window.modelProvidersRequestInProgress = null;
+                }
+            });
+
+        latestModelProvidersRequest = request;
+        window.modelProvidersRequestInProgress = request;
+        return request;
+    }
+
+    /**
+     * Fetch search engines from API
+     * @param {boolean} forceRefresh - Whether to force refresh the data
+     * @returns {Promise} - A promise that resolves with the search engines
+     */
+    function fetchSearchEngines(forceRefresh = false) {
+        // Use a debounce mechanism to prevent multiple calls in quick succession
+        if (window.searchEnginesRequestInProgress && !forceRefresh) {
+            SafeLogger.log('Search engines request already in progress, using existing promise');
+            return window.searchEnginesRequestInProgress;
+        }
+
+        SafeLogger.log('Fetching search engines from API');
+
+        // Create a promise and store it
+        const requestGeneration = ++nextSearchEnginesRequestGeneration;
+        const request = fetch(URLS.SETTINGS_API.AVAILABLE_SEARCH_ENGINES)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`API returned status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (requestGeneration !== nextSearchEnginesRequestGeneration) {
+                    return latestSearchEnginesRequest;
+                }
+
+                SafeLogger.log('Received search engine data:', data);
+
+                // Process the data
+                return processSearchEngineData(data);
+            })
+            .catch(error => {
+                if (requestGeneration !== nextSearchEnginesRequestGeneration) {
+                    return latestSearchEnginesRequest;
+                }
+
+                SafeLogger.error('Error fetching search engines:', error);
+                throw error;
+            })
+            .finally(() => {
+                if (window.searchEnginesRequestInProgress === request) {
+                    window.searchEnginesRequestInProgress = null;
+                }
+            });
+
+        latestSearchEnginesRequest = request;
+        window.searchEnginesRequestInProgress = request;
+        return request;
+    }
+
+    /**
+     * Process model data from API or cache
+     * @param {Object} data - The model data
+     */
+    function processModelData(data) {
+        SafeLogger.log('Processing model data:', data);
+
+        // Create a new array to store all formatted models
+        const formattedModels = [];
+
+        // Process provider options first. Capture the auto-discovered list so
+        // the provider dropdown is sourced from the backend registry rather
+        // than a hardcoded fallback (keeps it in sync with auto-discovery).
+        if (
+            Array.isArray(data.provider_options) &&
+            data.provider_options.length > 0
+        ) {
+            SafeLogger.log(
+                'Found provider options:',
+                data.provider_options.length,
+            );
+            discoveredProviderOptions = data.provider_options.map(opt => ({
+                value: opt.value,
+                label: opt.label,
+                // Preserve the disabled flag + reason the route attaches
+                // when the egress policy blocks a provider — the
+                // custom-dropdown widget renders greyed entries with the
+                // reason on hover / inline so the user can see why a
+                // configured cloud provider isn't selectable right now.
+                disabled: opt.disabled === true,
+                disabled_reason: opt.disabled_reason || null,
+            }));
+        }
+
+        // Lift every <provider>_models array the backend returned. Each
+        // auto-discovered provider stores results under
+        // f"{normalize_provider(provider_key)}_models" (lowercase) at
+        // settings_routes.py:1513, so the key suffix is always
+        // "_models". Derive the provider tag by stripping that suffix
+        // and uppercasing — matches the backend's uppercase
+        // provider_key convention (LMSTUDIO, LLAMACPP, OPENAI_ENDPOINT,
+        // …) used elsewhere in the frontend.
+        if (data.providers) {
+            const SUFFIX = '_models';
+            Object.keys(data.providers).forEach(key => {
+                if (!key.endsWith(SUFFIX)) return;
+                const models = data.providers[key];
+                if (!Array.isArray(models) || models.length === 0) return;
+                const providerTag = key.slice(0, -SUFFIX.length).toUpperCase();
+                SafeLogger.log(`Found ${providerTag} models:`, models.length);
+                models.forEach(model => {
+                    formattedModels.push({
+                        value: model.value,
+                        label: model.label,
+                        provider: providerTag,
+                    });
+                });
+            });
+        }
+
+        // Update the global modelOptions array
+        modelOptions = formattedModels;
+        SafeLogger.log('Final modelOptions:', modelOptions.length, 'models');
+
+        // Return the processed models
+        return formattedModels;
+    }
+
+    /**
+     * Process search engine data from API or cache
+     * @param {Object} data - The search engine data
+     */
+    function processSearchEngineData(data) {
+        SafeLogger.log('Processing search engine data:', data);
+        if (data.engine_options && data.engine_options.length > 0) {
+            searchEngineOptions = data.engine_options;
+            SafeLogger.log('Updated search engine options:', searchEngineOptions);
+
+            // Always initialize search engine dropdowns when receiving new data
+            initializeSearchEngineDropdowns();
+        } else {
+            SafeLogger.warn('No engine options found in search engine data');
+        }
+    }
+
+    /**
+     * Initialize custom model dropdowns in the LLM section
+     */
+    function initializeModelDropdowns() {
+        SafeLogger.log('Initializing model dropdowns');
+
+        // Use getElementById for direct access
+        const settingsProviderInput = document.getElementById('llm.provider');
+        const settingsModelInput = document.getElementById('llm.model');
+        const providerHiddenInput = document.getElementById('llm.provider_hidden');
+        const modelHiddenInput = document.getElementById('llm.model_hidden');
+        const providerDropdownList = document.getElementById('setting-llm-provider-dropdown-list');
+        const modelDropdownList = document.getElementById('setting-llm-model-dropdown-list');
+
+        // Skip if already initialized (avoid redundant calls)
+        if (window.modelDropdownsInitialized) {
+            SafeLogger.log('Model dropdowns already initialized, skipping');
+            return;
+        }
+
+        SafeLogger.log('Found model elements:', {
+            settingsProviderInput: !!settingsProviderInput,
+            settingsModelInput: !!settingsModelInput,
+            providerHiddenInput: !!providerHiddenInput,
+            modelHiddenInput: !!modelHiddenInput,
+            providerDropdownList: !!providerDropdownList,
+            modelDropdownList: !!modelDropdownList
+        });
+
+        // Check if elements exist before proceeding
+        if (!settingsProviderInput || !providerDropdownList || !providerHiddenInput) {
+            SafeLogger.warn('LLM Provider input, dropdown list, or hidden input element not found. Skipping provider initialization.');
+            return; // Don't proceed if required elements are missing
+        }
+
+        if (!settingsModelInput || !modelDropdownList || !modelHiddenInput) {
+            SafeLogger.warn('LLM Model input, dropdown list, or hidden input element not found. Skipping model initialization.');
+            return; // Don't proceed if required elements are missing
+        }
+
+        // Mark as initialized to prevent redundant setup
+        window.modelDropdownsInitialized = true;
+
+        // Load model options first
+        loadModelOptions().then(() => {
+            SafeLogger.log(`Models loaded, available options: ${modelOptions.length}`);
+
+            // Get current settings from hidden inputs
+            const currentProvider = providerHiddenInput.value || 'ollama'
+            const currentModel = modelHiddenInput.value || '';
+
+            SafeLogger.log('Current settings:', { provider: currentProvider, model: currentModel });
+
+            // Setup provider dropdown
+            if (settingsProviderInput && providerDropdownList && window.setupCustomDropdown) {
+                // Set hidden input value first for provider (prevents race conditions)
+                if (providerHiddenInput) {
+                    SafeLogger.log('Set provider hidden input value:', currentProvider);
+                    providerHiddenInput.value = currentProvider;
+                }
+
+                // Set hidden input value for model too
+                if (modelHiddenInput) {
+                    SafeLogger.log('Set model hidden input value:', currentModel);
+                    modelHiddenInput.value = currentModel;
+                }
+
+                // If there are available options, create or update the dropdowns
+                if (MODEL_PROVIDERS && MODEL_PROVIDERS.length > 0) {
+                    // Cache references to DOM elements to prevent lookups
+                    const providerList = providerDropdownList;
+
+                    // Create provider dropdown
+                    const providerDropdown = window.setupCustomDropdown(
+                        settingsProviderInput,
+                        providerList,
+                        () =>
+                            resolveProviderOptions(
+                                discoveredProviderOptions,
+                                allSettings,
+                                MODEL_PROVIDERS,
+                            ),
+                        (value) => {
+                            SafeLogger.log('Provider selected:', value);
+
+                            // Update hidden input
+                            if (providerHiddenInput) {
+                                providerHiddenInput.value = value;
+
+                                // Trigger filtering of model options
+                                filterModelOptionsForProvider(value);
+
+                                // Save to localStorage
+                                // Provider saved to DB
+
+                                // Trigger save
+                                const changeEvent = new Event('change', { bubbles: true });
+                                providerHiddenInput.dispatchEvent(changeEvent);
+                            }
+                        },
+                        false // Don't allow custom values
+                    );
+
+                    // Set initial value
+                    if (currentProvider && providerDropdown.setValue) {
+                        SafeLogger.log('Setting initial provider:', currentProvider);
+                        providerDropdown.setValue(currentProvider, false); // Don't fire event
+                        // Explicitly set hidden input value on init
+                        providerHiddenInput.value = currentProvider.toLowerCase();
+                    }
+
+                    // --- ADD CHANGE LISTENER TO HIDDEN INPUT ---
+                    providerHiddenInput.removeEventListener('change', handleInputChange); // Remove old listener first
+                    providerHiddenInput.addEventListener('change', handleInputChange);
+                    SafeLogger.log('Added change listener to hidden provider input:', providerHiddenInput.id);
+                    // --- END OF ADDED LISTENER ---
+                }
+            }
+
+            // Create model dropdown with full list of models first
+            if (settingsModelInput && modelDropdownList && modelHiddenInput && window.setupCustomDropdown) {
+                // Initialize the dropdown with ALL models first, don't filter yet
+                const modelDropdownControl = window.setupCustomDropdown(
+                    settingsModelInput,
+                    modelDropdownList,
+                    () => (modelOptions.length > 0 ? modelOptions : [
+                        { value: 'gpt-4o', label: 'GPT-4o (OpenAI)' },
+                        { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo (OpenAI)' },
+                        { value: 'claude-3-5-sonnet-latest', label: 'Claude 3.5 Sonnet (Anthropic)' },
+                        { value: 'llama3', label: 'Llama 3 (Ollama)' }
+                    ]),
+                    (value) => {
+                        SafeLogger.log('Model selected:', value);
+
+                        // Update hidden input
+                        if (modelHiddenInput) {
+                            modelHiddenInput.value = value;
+
+                            // Save to localStorage
+                            // Model saved to DB
+                        }
+                    },
+                    true // Allow custom values
+                );
+
+                // Set initial model value
+                if (modelDropdownControl) {
+                    // Set the current model without filtering first
+                    if (currentModel) {
+                        SafeLogger.log('Setting initial model:', currentModel);
+                        modelDropdownControl.setValue(currentModel, false); // Don't fire event
+                        // Explicitly set hidden input value on init
+                        modelHiddenInput.value = currentModel;
+                    }
+
+                    // Now filter models for the current provider - AFTER setting the initial value
+                    setTimeout(() => {
+                        filterModelOptionsForProvider(currentProvider);
+                    }, 100); // Small delay to ensure value is set first
+
+                    // --- ADD CHANGE LISTENER TO HIDDEN INPUT ---
+                    modelHiddenInput.removeEventListener('change', handleInputChange); // Remove old listener first
+                    modelHiddenInput.addEventListener('change', handleInputChange);
+                    SafeLogger.log('Added change listener to hidden model input:', modelHiddenInput.id);
+                    // --- END OF ADDED LISTENER ---
+
+                    // Inline "no model selected" warning — toggled live by
+                    // both the hidden input (dropdown selection) and the
+                    // visible input (free-text typing).
+                    updateModelEmptyWarning(!modelHiddenInput.value || !modelHiddenInput.value.trim());
+                    modelHiddenInput.addEventListener('change', () => {
+                        updateModelEmptyWarning(!modelHiddenInput.value || !modelHiddenInput.value.trim());
+                    });
+                    if (settingsModelInput) {
+                        settingsModelInput.addEventListener('input', () => {
+                            updateModelEmptyWarning(!settingsModelInput.value || !settingsModelInput.value.trim());
+                        });
+                    }
+                }
+
+                // The `#llm-model-refresh` handler that stood here never ran: the
+                // template emits `llm.model-refresh` with a DOT
+                // (custom_dropdown.html, `id="{{ input_id }}-refresh"`), so the
+                // hyphenated selector was always null. Correcting the id would have
+                // bound a SECOND full handler and doubled the fetches per click, so
+                // the block is removed rather than repaired — setupRefreshButtons()
+                // owns that button (#6407).
+            }
+
+        }).catch(err => {
+            SafeLogger.error('Error initializing model dropdowns:', err);
+            // Show a warning to the user
+            showAlert('Failed to load model options. Using fallback values.', 'warning');
+        });
+    }
+
+    /**
+     * Add fallback model based on provider
+     */
+    function addFallbackModel(provider, hiddenInput, visibleInput) {
+        let fallbackModel;
+        let displayName;
+
+        if (provider === 'OLLAMA') {
+            fallbackModel = 'llama3';
+            displayName = 'Llama 3 (Ollama)';
+        } else if (provider === 'OPENAI') {
+            fallbackModel = 'gpt-3.5-turbo';
+            displayName = 'GPT-3.5 Turbo (OpenAI)';
+        } else if (provider === 'ANTHROPIC') {
+            fallbackModel = 'claude-3-5-sonnet-latest';
+            displayName = 'Claude 3.5 Sonnet (Anthropic)';
+        } else {
+            fallbackModel = 'gpt-3.5-turbo';
+            displayName = 'GPT-3.5 Turbo';
+        }
+
+        if (hiddenInput) {
+            hiddenInput.value = fallbackModel;
+        }
+
+        if (visibleInput) {
+            visibleInput.value = displayName;
+        }
+    }
+
+    /**
+     * Initialize custom search engine dropdowns
+     */
+    function initializeSearchEngineDropdowns() {
+        SafeLogger.log('Initializing search engine dropdown');
+        // Check for the search engine input field
+        const searchEngineInput = document.getElementById('search.tool');
+        const searchEngineHiddenInput = document.getElementById('search.tool_hidden');
+        const dropdownList = document.getElementById('setting-search-tool-dropdown-list');
+
+        // Skip if already initialized (avoid redundant calls)
+        if (window.searchEngineDropdownInitialized) {
+            SafeLogger.log('Search engine dropdown already initialized, skipping');
+            return;
+        }
+
+        SafeLogger.log('Found search engine elements:', {
+            searchEngineInput: !!searchEngineInput,
+            searchEngineHiddenInput: !!searchEngineHiddenInput,
+            dropdownList: !!dropdownList
+        });
+
+        if (!searchEngineInput || !dropdownList || !searchEngineHiddenInput) {
+            SafeLogger.warn('Search engine input, hidden input, or dropdown list not found. Skipping initialization.');
+            return; // Exit early if required elements are missing
+        }
+
+        // Mark as initialized to prevent redundant calls
+        window.searchEngineDropdownInitialized = true;
+
+        // Set up the dropdown
+        if (window.setupCustomDropdown) {
+            const dropdown = window.setupCustomDropdown(
+                searchEngineInput,
+                dropdownList,
+                () => (searchEngineOptions.length > 0 ? searchEngineOptions : [{ value: 'searxng', label: 'SearXNG' }]),
+                (value) => {
+                    SafeLogger.log('Search engine selected:', value);
+                    // Update the hidden input value
+                    searchEngineHiddenInput.value = value;
+                    // Trigger a change event on the hidden input to save
+                    const changeEvent = new Event('change', { bubbles: true });
+                    searchEngineHiddenInput.dispatchEvent(changeEvent);
+                    // Save to localStorage
+                    // Search engine saved to DB
+                },
+                false, // Don't allow custom values
+                'No search engines available.'
+            );
+
+            // Get current value
+            let currentValue = '';
+            if (typeof allSettings !== 'undefined' && Array.isArray(allSettings)) {
+                const currentSetting = allSettings.find(s => s.key === 'search.tool');
+                if (currentSetting) {
+                    currentValue = currentSetting.value || '';
+                }
+            }
+            if (!currentValue) {
+                currentValue = 'searxng'; // Default value, actual value comes from DB
+            }
+
+            // Set initial value
+            if (currentValue && dropdown.setValue) {
+                SafeLogger.log('Setting initial search engine value:', currentValue);
+                dropdown.setValue(currentValue, false);
+                searchEngineHiddenInput.value = currentValue;
+            }
+
+            // --- ADD CHANGE LISTENER TO HIDDEN INPUT ---
+            searchEngineHiddenInput.removeEventListener('change', handleInputChange); // Remove old listener first
+            searchEngineHiddenInput.addEventListener('change', handleInputChange);
+            SafeLogger.log('Added change listener to hidden search engine input:', searchEngineHiddenInput.id);
+            // --- END OF ADDED LISTENER ---
+        }
+    }
+
+    /**
+     * Process settings to handle object values
+     */
+    function processSettings(settings) {
+        // Convert to a list.
+        const settingsList = [];
+        for (const key in settings) {
+            const setting = settings[key];
+            setting["key"] = key
+            settingsList.push(setting);
+        }
+
+        return settingsList.map(setting => {
+            const processedSetting = {...setting};
+
+            // Convert object values to JSON strings for display
+            if (typeof processedSetting.value === 'object' && processedSetting.value !== null) {
+                processedSetting.value = JSON.stringify(processedSetting.value, null, 2);
+            }
+
+            // Handle corrupted JSON values (e.g., just "{" or "[" or "[object Object]")
+            if (typeof processedSetting.value === 'string' &&
+                (processedSetting.value === '{' ||
+                 processedSetting.value === '[' ||
+                 processedSetting.value === '{}' ||
+                 processedSetting.value === '[]' ||
+                 processedSetting.value === '[object Object]')) {
+
+                SafeLogger.log(`Detected corrupted JSON value for ${processedSetting.key}: ${processedSetting.value}`);
+
+                // Initialize with empty object for corrupted JSON values
+                if (processedSetting.key.startsWith('report.')) {
+                    processedSetting.value = '{}';
+                }
+            }
+
+            return processedSetting;
+        });
+    }
+
+    /**
+     * Add CSS styles for loading indicators and saved state
+     */
+    function addDynamicStyles() {
+        // Create a style element if it doesn't exist
+        let styleEl = document.getElementById('settings-dynamic-styles');
+        if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = 'settings-dynamic-styles';
+            document.head.appendChild(styleEl);
+        }
+
+        // Add CSS for saving and success states
+        styleEl.textContent = `
+            .saving {
+                opacity: 0.7;
+                pointer-events: none;
+                position: relative;
+            }
+
+            .saving::after {
+                content: '';
+                position: absolute;
+                top: 50%;
+                right: 10px;
+                width: 16px;
+                height: 16px;
+                margin-top: -8px;
+                border: 2px solid rgba(var(--accent-primary-rgb), 0.1);
+                border-top-color: var(--accent-primary);
+                border-radius: 50%;
+                animation: spinner 0.8s linear infinite;
+                z-index: 10;
+            }
+
+            .save-success {
+                border-color: var(--success-color) !important;
+                transition: border-color 0.3s;
+            }
+
+            @keyframes spinner {
+                to { transform: rotate(360deg); }
+            }
+
+            .spinner {
+                width: 40px;
+                height: 40px;
+                border: 3px solid rgba(var(--border-color-rgb), 0.3);
+                border-radius: 50%;
+                border-top-color: var(--accent-primary);
+                animation: spin 1s ease-in-out infinite;
+                margin: 0 auto 1rem auto;
+                display: block;
+            }
+
+            .ldr-settings-item .ldr-checkbox-label {
+                margin-top: 8px;
+                padding-left: 0;
+            }
+        `;
+    }
+
+    // Initialize dynamic styles
+    addDynamicStyles();
+
+    /**
+     * Initialize the settings component
+     */
+    function initializeSettings() {
+        // Get DOM elements
+        settingsForm = document.getElementById('settings-form');
+        settingsContent = document.getElementById('settings-content');
+        settingsSearch = document.getElementById('settings-search');
+        settingsTabs = document.querySelectorAll('.ldr-settings-tab');
+        settingsAlert = document.getElementById('settings-alert');
+        rawConfigToggle = document.getElementById('toggle-raw-config');
+        rawConfigSection = document.getElementById('raw-config');
+        rawConfigEditor = document.getElementById('raw_config_editor');
+        initRawConfigHandlers();
+
+
+        // Add dynamic styles immediately
+        addDynamicStyles();
+
+        // Initialize range inputs to display their values
+        initRangeInputs();
+
+        // Initialize accordion behavior
+        initAccordions();
+
+        // Initialize JSON handling
+        initJsonFormatting();
+
+        // Load settings from API if on settings dashboard
+        if (settingsContent) {
+            // Load settings immediately (doesn't depend on providers/engines)
+            loadSettings();
+
+            // Pre-fetch model and search engine data in background
+            // These will be cached for later dropdown initialization
+            fetchModelProviders().catch(err => {
+                SafeLogger.error("Error fetching model providers", err);
+            });
+            fetchSearchEngines().catch(err => {
+                SafeLogger.error("Error fetching search engines", err);
+            });
+        }
+
+        // Handle tab switching
+        if (settingsTabs) {
+            settingsTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Remove active class from all tabs
+                    settingsTabs.forEach(t => t.classList.remove('active'));
+
+                    // Add active class to clicked tab
+                    tab.classList.add('active');
+
+                    // Update active tab and re-render
+                    activeTab = tab.dataset.tab;
+                    renderSettingsByTab(activeTab);
+
+                    // Set a small timeout to ensure DOM is ready before initializing
+                    setTimeout(() => {
+                        // Initialize dropdowns after rendering content
+                        // Moved dropdown init inside loadSettings success callback
+                        // if (activeTab === 'llm' || activeTab === 'all') {
+                        //     initializeModelDropdowns();
+                        // }
+                        // if (activeTab === 'search' || activeTab === 'all') {
+                        //     initializeSearchEngineDropdowns();
+                        // }
+
+                        // Re-initialize auto-save handlers after tab switch and render
+                        initAutoSaveHandlers();
+                        // Setup refresh buttons after dropdowns might have been created
+                        setupRefreshButtons();
+                    }, 100); // Reduced timeout slightly
+                });
+            });
+        }
+
+        // Handle search filtering
+        if (settingsSearch) {
+            settingsSearch.addEventListener('input', () => {
+                clearTimeout(searchDebounceTimer);
+                searchDebounceTimer = setTimeout(handleSearchInput, 250);
+            });
+        }
+
+        // Handle reset to defaults button
+        const resetToDefaultsButton = document.getElementById('reset-to-defaults-button');
+        if (resetToDefaultsButton) {
+            resetToDefaultsButton.addEventListener('click', handleResetToDefaults);
+        }
+
+        // Add a fix corrupted settings button
+        const fixCorruptedButton = document.createElement('button');
+        fixCorruptedButton.setAttribute('type', 'button');
+        fixCorruptedButton.setAttribute('id', 'fix-corrupted-button');
+        fixCorruptedButton.className = 'btn btn-info';
+        fixCorruptedButton.innerHTML = '<i class="fas fa-wrench"></i> Fix Corrupted Settings';
+        fixCorruptedButton.addEventListener('click', handleFixCorruptedSettings);
+
+        // Insert it after the reset to defaults button
+        if (resetToDefaultsButton) {
+            resetToDefaultsButton.insertAdjacentElement('afterend', fixCorruptedButton);
+        }
+
+        // Handle raw config toggle
+        if (rawConfigToggle) {
+            rawConfigToggle.addEventListener('click', toggleRawConfig);
+        }
+
+        // Initialize specific settings page form handlers
+        initSpecificSettingsForm();
+
+        // Handle form submission
+        if (settingsForm) {
+            settingsForm.addEventListener('submit', handleSettingsSubmit);
+        }
+
+        // Add click handler for the logo to navigate home
+        const logoLink = document.getElementById('logo-link');
+        if (logoLink) {
+            logoLink.addEventListener('click', () => {
+                window.location.href = URLS.PAGES.HOME;
+            });
+        }
+
+        // Auto-save handlers are initialized inside loadSettings() success callback
+        // via setTimeout, after settingsContent is populated. No call needed here.
+    }
+
+    // Initialize on DOM content loaded
+    // --- MODIFICATION START: Ensure initialization order ---
+    // Ensure initialization happens after DOM content is loaded
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeSettings);
+    } else {
+        // DOM is already loaded, run initialize
+        initializeSettings();
+    }
+    // --- MODIFICATION END ---
+
+    // Expose the setupCustomDropdowns function for other modules to use
+    window.setupSettingsDropdowns = initializeModelDropdowns;
+
+    /**
+     * Show an alert message at the top of the settings form
+     * @param {string} message - The message to display
+     * @param {string} type - The alert type: success, error, warning, info
+     * @param {boolean} skipIfToastShown - Whether to skip showing this alert if a toast was already shown
+     */
+    function showAlert(message, type, skipIfToastShown = true) {
+        // If window.ui.showAlert exists, use it
+        if (window.ui && window.ui.showAlert) {
+            window.ui.showAlert(message, type, skipIfToastShown);
+            return;
+        }
+
+        // Otherwise fallback to old implementation (this shouldn't happen once ui.js is loaded)
+        // If we're showing a toast and we want to skip the regular alert, just return
+        if (skipIfToastShown && window.ui && window.ui.showMessage) {
+            return;
+        }
+
+        // Find the alert container - look for filtered settings alert first
+        let alertContainer = document.getElementById('filtered-settings-alert');
+
+        // If not found, fall back to the regular alert
+        if (!alertContainer) {
+            alertContainer = document.getElementById('settings-alert');
+        }
+
+        if (!alertContainer) return;
+
+        // Clear any existing alerts
+        alertContainer.innerHTML = '';
+
+        // Create alert element
+        const alert = document.createElement('div');
+        const alertType = window.LdrAlertHelpers.mapAlertType(type);
+        alert.className = `alert alert-${alertType}`;
+
+        // Create icon element
+        const icon = document.createElement('i');
+        icon.className = `fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}`;
+        alert.appendChild(icon);
+
+        // Create text node for message (safe from XSS)
+        const messageText = document.createTextNode(' ' + message);
+        alert.appendChild(messageText);
+
+        // Add a close button
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'ldr-alert-close';
+        closeBtn.type = 'button';
+        closeBtn.setAttribute('aria-label', 'Dismiss alert');
+        closeBtn.textContent = '×';
+        closeBtn.addEventListener('click', () => {
+            alert.remove();
+            alertContainer.style.display = 'none';
+        });
+
+        alert.appendChild(closeBtn);
+
+        // Add to container
+        alertContainer.appendChild(alert);
+        alertContainer.style.display = 'block';
+
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            alert.remove();
+            if (alertContainer.children.length === 0) {
+                alertContainer.style.display = 'none';
+            }
+        }, 5000);
+    }
+
+    /**
+     * Set up custom dropdowns for settings
+     */
+    function setupCustomDropdowns() {
+        // Find all custom dropdowns in the settings form
+        const customDropdowns = document.querySelectorAll('.ldr-custom-dropdown');
+
+        // Process each dropdown
+        customDropdowns.forEach(dropdown => {
+            const dropdownInput = dropdown.querySelector('.ldr-custom-dropdown-input');
+            const dropdownList = dropdown.querySelector('.ldr-custom-dropdown-list');
+
+            if (!dropdownInput || !dropdownList) return;
+
+            // Get the setting key from the data attribute or input ID
+            const settingKey = dropdownInput.getAttribute('data-setting-key') || dropdownInput.id;
+            if (!settingKey) return;
+
+            SafeLogger.log('Setting up custom dropdown for:', settingKey);
+
+            // Get current setting value from settings or localStorage
+            let currentValue = '';
+
+            // Try to get from allSettings first if available
+            if (typeof allSettings !== 'undefined' && Array.isArray(allSettings)) {
+            const currentSetting = allSettings.find(s => s.key === settingKey);
+                if (currentSetting) {
+                    currentValue = currentSetting.value || '';
+                }
+            }
+
+            // Fallback to localStorage values if we don't have a value yet
+            if (!currentValue) {
+                if (settingKey === 'llm.model') {
+                    currentValue = ''; // Value comes from DB
+                } else if (settingKey === 'llm.provider') {
+                    currentValue = ''; // Value comes from DB
+                } else if (settingKey === 'search.tool') {
+                    currentValue = ''; // Value comes from DB
+                }
+            }
+
+            // Get the hidden input
+            const hiddenInput = document.getElementById(`${dropdownInput.id}_hidden`);
+            if (!hiddenInput) {
+                SafeLogger.warn(`Hidden input not found for dropdown: ${dropdownInput.id}`);
+                return; // Skip if hidden input doesn't exist
+            }
+
+            // Set up options source based on setting key
+            let optionsSource = [];
+            let allowCustom = false;
+
+            if (settingKey === 'llm.model') {
+                // For model dropdown, use the model options from cache or fallback
+                optionsSource = typeof modelOptions !== 'undefined' && modelOptions.length > 0 ?
+                    modelOptions : [
+                        { value: 'gpt-4o', label: 'GPT-4o (OpenAI)' },
+                        { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo (OpenAI)' },
+                        { value: 'claude-3-5-sonnet-latest', label: 'Claude 3.5 Sonnet (Anthropic)' },
+                        { value: 'llama3', label: 'Llama 3 (Ollama)' }
+                    ];
+                allowCustom = true;
+
+                // Set up refresh button if it exists
+                const refreshBtn = dropdown.querySelector('.ldr-custom-dropdown-refresh-btn');
+                if (refreshBtn) {
+                    refreshBtn.addEventListener('click', function() {
+                        const icon = refreshBtn.querySelector('i');
+                        if (icon) icon.className = 'fas fa-spinner fa-spin';
+
+                        // Force refresh of model options
+                        if (typeof loadModelOptions === 'function') {
+                            loadModelOptions(true).then(() => {
+                                if (icon) icon.className = 'fas fa-sync-alt';
+
+                                // Force dropdown update
+                                const event = new Event('click', { bubbles: true });
+                                dropdownInput.dispatchEvent(event);
+                            }).catch(error => {
+                                SafeLogger.error('Error refreshing models:', error);
+                                if (icon) icon.className = 'fas fa-sync-alt';
+                                if (typeof showAlert === 'function') {
+                                    showAlert('Failed to refresh models: ' + error.message, 'error');
+                                }
+                            });
+                        } else if (icon) icon.className = 'fas fa-sync-alt';
+                    });
+                }
+            } else if (settingKey === 'llm.provider') {
+                // Special handling for provider dropdown
+                // Single source of truth for the provider list (see
+                // resolveProviderOptions): auto-discovery → settings → static.
+                optionsSource = resolveProviderOptions(
+                    discoveredProviderOptions,
+                    allSettings,
+                    MODEL_PROVIDERS,
+                );
+            } else if (settingKey === 'search.tool') {
+                optionsSource = typeof searchEngineOptions !== 'undefined' && searchEngineOptions.length > 0 ?
+                    searchEngineOptions : [
+                        { value: 'google_pse', label: 'Google Programmable Search' },
+                        { value: 'duckduckgo', label: 'DuckDuckGo' },
+                        { value: 'searxng', label: 'SearXNG' }
+                    ];
+            }
+
+            SafeLogger.log(`Setting up dropdown for ${settingKey} with ${optionsSource.length} options`);
+
+            // Initialize the dropdown
+            if (window.setupCustomDropdown) {
+                const dropdownInstance = window.setupCustomDropdown(
+                    dropdownInput,
+                    dropdownList,
+                    () => optionsSource,
+                    (value) => {
+                        SafeLogger.log(`Dropdown ${settingKey} selected:`, value);
+                        // --- MODIFICATION START: Removed hiddenInput retrieval, already have it ---
+                        const hidden = document.getElementById(`${dropdownInput.id}_hidden`);
+                        // --- MODIFICATION END ---
+
+                        // --- MODIFICATION START: Update hidden input and trigger change ---
+                        if (hidden) {
+                            hidden.value = value;
+                            const changeEvent = new Event('change', { bubbles: true });
+                            hidden.dispatchEvent(changeEvent);
+                        }
+                        // --- MODIFICATION END ---
+
+                        // For provider changes, update model options
+                        if (settingKey === 'llm.provider' && typeof filterModelOptionsForProvider === 'function') {
+                            filterModelOptionsForProvider(value);
+                        }
+
+                        // Save to localStorage for persistence
+                        if (settingKey === 'llm.model') {
+                            // Model saved to DB
+                        } else if (settingKey === 'llm.provider') {
+                            localStorage.setItem('lastUsedProvider', value);
+                        } else if (settingKey === 'search.tool') {
+                            // Search engine saved to DB
+                        }
+                    },
+                    allowCustom
+                );
+
+                // Set initial value
+                if (currentValue && dropdownInstance && dropdownInstance.setValue) {
+                    SafeLogger.log(`Setting initial value for ${settingKey}:`, currentValue);
+                    dropdownInstance.setValue(currentValue, false); // Don't fire event on init
+                    // --- MODIFICATION START: Set hidden input initial value ---
+                    if (hiddenInput) {
+                        hiddenInput.value = currentValue;
+                        SafeLogger.log('Set initial hidden input value for', settingKey, 'to', currentValue);
+                    }
+                    // --- MODIFICATION END ---
+                }
+
+                // --- MODIFICATION START: Add listener to hidden input in initAutoSaveHandlers ---
+                // The listener is added globally in initAutoSaveHandlers now.
+                // Ensure initAutoSaveHandlers is called *after* setupCustomDropdowns.
+                // --- MODIFICATION END ---
+            }
+        });
+
+        // --- MODIFICATION START: Call initAutoSaveHandlers after setup ---
+        // Ensure initAutoSaveHandlers is called after dropdowns are set up
+        // It might be better to call initAutoSaveHandlers once after all rendering and setup is done.
+        // Let's move the call within initializeSettings() to ensure order.
+        initAutoSaveHandlers();
+        // --- MODIFICATION END ---
+    }
+
+    /**
+     * Filter model options based on the selected provider
+     * @param {string} provider - The provider to filter models by
+     */
+    function filterModelOptionsForProvider(provider) {
+        const providerUpper = provider ? provider.toUpperCase() : ''; // Handle potential null/undefined
+        SafeLogger.log('Filtering models for provider:', providerUpper);
+
+        // Get model dropdown elements using ID
+        const modelInput = document.getElementById('llm.model');
+        const modelDropdownList = document.getElementById('setting-llm-model-dropdown-list'); // Correct ID based on template generation
+        const modelHiddenInput = document.getElementById('llm.model_hidden');
+
+        if (!modelInput || !modelDropdownList) { // Use correct variable name
+            SafeLogger.warn('Model input or list not found when filtering.');
+            return;
+        }
+
+        // Check if dropdown is currently open
+        const isDropdownOpen = window.getComputedStyle(modelDropdownList).display !== 'none';
+        SafeLogger.log('Dropdown is currently:', isDropdownOpen ? 'open' : 'closed');
+
+        // Filter the models based on provider
+        const filteredModels = modelOptions.filter(model => {
+            if (!model || typeof model !== 'object') return false;
+
+            // For Ollama, use more flexible matching due to model name variations
+            if (providerUpper === 'OLLAMA') {
+                // Check model provider property first
+                if (model.provider && model.provider.toUpperCase() === 'OLLAMA') {
+                    return true;
+                }
+
+                // Check label for Ollama mentions
+                if (model.label && model.label.toUpperCase().includes('OLLAMA')) {
+                    return true;
+                }
+
+                // Check value for common Ollama model name patterns
+                if (model.value) {
+                    const value = model.value.toLowerCase();
+                    // Common Ollama model name patterns
+                    if (value.includes('llama') || value.includes('mistral') ||
+                        value.includes('gemma') || value.includes('falcon') ||
+                        value.includes('codellama') || value.includes('phi')) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            if (providerUpper === 'OPENAI_ENDPOINT') {
+                if (model.provider && model.provider.toUpperCase() === 'OPENAI_ENDPOINT') {
+                    return true;
+                }
+
+                if (model.label && model.label.toLowerCase().includes('custom')) {
+                    return true;
+                }
+
+                return false;
+            }
+
+            // For other providers, use standard matching
+            if (model.provider) {
+                return model.provider.toUpperCase() === providerUpper;
+            }
+
+            // If provider is missing, check label for provider hints
+            if (model.label) {
+                const label = model.label.toUpperCase();
+                if (providerUpper === 'OPENAI' && label.includes('OPENAI'))
+                    return true;
+                if (providerUpper === 'ANTHROPIC' && (label.includes('ANTHROPIC') || label.includes('CLAUDE')))
+                    return true;
+            }
+
+            return false;
+        });
+
+        SafeLogger.log(`Filtered models for ${providerUpper}:`, filteredModels.length, 'models');
+
+        // Try to update the dropdown options without reinitializing if possible
+        if (window.updateDropdownOptions && typeof window.updateDropdownOptions === 'function') {
+            SafeLogger.log('Using updateDropdownOptions to preserve dropdown state');
+            window.updateDropdownOptions(modelInput, filteredModels);
+
+            // Try to maintain the current selection if applicable
+            const currentModel = modelHiddenInput ? modelHiddenInput.value : null;
+            if (currentModel) {
+                // Check if current model is valid for this provider
+                const isValid = filteredModels.some(m => m.value === currentModel);
+                if (!isValid && filteredModels.length > 0) {
+                    // Select first available model if current is not valid
+                    const firstModel = filteredModels[0].value;
+                    SafeLogger.log(`Current model ${currentModel} invalid for provider ${providerUpper}. Setting to first available: ${firstModel}`);
+                    modelHiddenInput.value = firstModel;
+                    modelInput.value = filteredModels[0].label || firstModel;
+                    // Direct value-set bypasses change listener, so update
+                    // the empty-warning explicitly to keep UI in sync.
+                    updateModelEmptyWarning(!firstModel || !firstModel.trim());
+                }
+            }
+            // Mirror the backup path: if no models are available for this
+            // provider, clear the hidden input and surface the warning so
+            // the UI doesn't keep showing a now-invalid stored value.
+            if (filteredModels.length === 0 && modelHiddenInput) {
+                modelHiddenInput.value = '';
+                if (modelInput) modelInput.value = '';
+                updateModelEmptyWarning(true);
+            }
+
+            // If dropdown was open, ensure it stays open
+            if (isDropdownOpen) {
+                setTimeout(() => {
+                    if (modelDropdownList.style.display === 'none') {
+                        SafeLogger.log('Reopening dropdown that was closed during update');
+                        modelDropdownList.style.display = 'block';
+                    }
+                }, 50);
+            }
+
+            return;
+        }
+
+        // Backup method - reinitialize the dropdown but try to preserve open state
+        if (window.setupCustomDropdown) {
+            SafeLogger.log('Reinitializing model dropdown with filtered models');
+
+            // Store the returned control object
+            const modelDropdownControl = window.setupCustomDropdown(
+                modelInput,
+                modelDropdownList, // Use correct variable name
+                () => (filteredModels.length > 0 ? filteredModels : [
+                    { value: 'no-models', label: 'No models available for this provider' }
+                ]),
+                (value) => {
+                    SafeLogger.log('Selected model:', value);
+                    // Save the selection
+                    if (modelHiddenInput) { // Use the variable we already have
+                        modelHiddenInput.value = value;
+
+                        // Trigger change event to save
+                        const changeEvent = new Event('change', { bubbles: true });
+                        modelHiddenInput.dispatchEvent(changeEvent);
+                    }
+                },
+                true // Allow custom values
+            );
+
+            // Try to maintain the current selection if applicable
+            const currentModel = modelHiddenInput ? modelHiddenInput.value : null;
+
+            if (currentModel && modelDropdownControl && modelDropdownControl.setValue) {
+                // Check if current model is valid for this provider
+                const isValid = filteredModels.some(m => m.value === currentModel);
+                if (isValid) {
+                    SafeLogger.log(`Setting model value to currently selected: ${currentModel}`);
+                    modelDropdownControl.setValue(currentModel, false);
+                } else if (filteredModels.length > 0) {
+                    // Select first available model
+                    const firstModel = filteredModels[0].value;
+                    SafeLogger.log(`Current model ${currentModel} invalid for provider ${providerUpper}. Setting to first available: ${firstModel}`);
+                    modelDropdownControl.setValue(firstModel, false); // DON'T fire event, avoid loop
+                    updateModelEmptyWarning(!firstModel || !firstModel.trim());
+                } else {
+                    // No models available, clear the input
+                    SafeLogger.log(`No models found for provider ${providerUpper}. Clearing model selection.`);
+                    modelDropdownControl.setValue("", false);
+                    updateModelEmptyWarning(true);
+                }
+            }
+
+            // If dropdown was open, force it to reopen
+            if (isDropdownOpen) {
+                setTimeout(() => {
+                    SafeLogger.log('Reopening dropdown that was closed during reinitialization');
+                    modelDropdownList.style.display = 'block';
+                }, 100);
+            }
+        }
+
+        // Also update any provider-dependent UI
+        updateProviderDependentUI(providerUpper);
+    }
+
+    /**
+     * Update any UI elements that depend on the provider selection
+     */
+    function updateProviderDependentUI(provider) {
+        // Show/hide custom endpoint input if needed
+        const endpointContainer = document.querySelector('#endpoint-container');
+        if (endpointContainer) {
+            if (provider === 'OPENAI_ENDPOINT') {
+                endpointContainer.style.display = 'block';
+            } else {
+                endpointContainer.style.display = 'none';
+            }
+        }
+    }
+
+    /**
+     * Constants - model providers
+     */
+    const MODEL_PROVIDERS = [
+        { value: 'OLLAMA', label: 'Ollama (Local)' },
+        { value: 'OPENAI', label: 'OpenAI (Cloud)' },
+        { value: 'ANTHROPIC', label: 'Anthropic (Cloud)' },
+        { value: 'OPENAI_ENDPOINT', label: 'OpenAI-Compatible Endpoint (llama.cpp, vLLM, etc.)' },
+        { value: 'ANTHROPIC_ENDPOINT', label: 'Anthropic-Compatible Endpoint (Messages API)' },
+        { value: 'LMSTUDIO', label: 'LM Studio (Local)' },
+        { value: 'LLAMACPP', label: 'Llama.cpp (Local GGUF files only)' }
+    ];
+
+    /**
+     * Load model options for the dropdown
+     * @param {boolean} forceRefresh - Force refresh of model options
+     * @returns {Promise} Promise that resolves with model options
+     */
+    function loadModelOptions(forceRefresh = false) {
+        SafeLogger.log('Loading model options from API' + (forceRefresh ? ' (forced refresh)' : ''));
+
+        return fetchModelProviders(forceRefresh)
+            .then(data => {
+                // Don't overwrite our model options if the result is empty
+                if (data && Array.isArray(data) && data.length > 0) {
+                    modelOptions = data;
+                    SafeLogger.log('Stored model options, count:', data.length);
+                } else {
+                    SafeLogger.warn('API returned empty model data, keeping existing options');
+                }
+                return modelOptions;
+            })
+            .catch(error => {
+                SafeLogger.error('Error loading model options:', error.message || error);
+                // Log but don't throw, so we can continue with default models if needed
+                if (!modelOptions || modelOptions.length === 0) {
+                    SafeLogger.log('Using fallback model options due to error');
+                    modelOptions = [
+                        { value: 'gpt-4o', label: 'GPT-4o (OpenAI)', provider: 'openai' },
+                        { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo (OpenAI)', provider: 'openai' },
+                        { value: 'claude-3-5-sonnet-latest', label: 'Claude 3.5 Sonnet (Anthropic)', provider: 'anthropic' },
+                        { value: 'llama3', label: 'Llama 3 (Ollama)', provider: 'ollama' },
+                        { value: 'mistral', label: 'Mistral (Ollama)', provider: 'ollama' },
+                        { value: 'gemma3:12b', label: 'Gemma 3 (Ollama)', provider: 'ollama' }
+                    ];
+                }
+                return modelOptions;
+            });
+    }
+
+    /**
+     * Test notification functionality
+     */
+    function testNotification() {
+        if (notificationTestInProgress) return;
+        const testBtn = document.getElementById('test-notification-button');
+        const resultDiv = document.getElementById('test-notification-result');
+
+        if (!testBtn || !resultDiv) {
+            SafeLogger.error('Test notification elements not found');
+            return;
+        }
+
+        // Get the service URL from the input field - try multiple possible selectors.
+        // serviceUrlInput tracks the control the value came from (or the last
+        // existing candidate) so the redaction check below can inspect it.
+        let serviceUrl = '';
+
+        // Try the standard ID formats
+        let serviceUrlInput = document.getElementById('notifications-service-url');
+        if (serviceUrlInput) {
+            serviceUrl = serviceUrlInput.value.trim();
+        }
+
+        // Try the alt format if still empty
+        if (!serviceUrl) {
+            const altInput = document.getElementById('notifications.service_url');
+            if (altInput) {
+                serviceUrlInput = altInput;
+                serviceUrl = altInput.value.trim();
+            }
+        }
+
+        // Try the dynamically generated format (e.g., setting-notifications-service_url) if still empty
+        if (!serviceUrl) {
+            const dynamicInput = document.getElementById('setting-notifications-service_url');
+            if (dynamicInput) {
+                serviceUrlInput = dynamicInput;
+                serviceUrl = dynamicInput.value.trim();
+            }
+        }
+
+        // Also try to find by name attribute if still empty
+        if (!serviceUrl) {
+            const nameInput = document.querySelector('input[name="notifications.service_url"], textarea[name="notifications.service_url"]');
+            if (nameInput) {
+                serviceUrlInput = nameInput;
+                serviceUrl = nameInput.value.trim();
+            }
+        }
+
+        // A blank field whose stored value is redacted (data-redacted) still
+        // counts as configured: the endpoint treats an empty service_url as
+        // "test the stored URL" (routers/settings.py), so allow it through
+        // instead of erroring.
+        const emptyButConfigured = serviceUrl === '' &&
+            isRedactedControl(NOTIFICATION_SERVICE_URL_KEY, serviceUrlInput);
+        if (!serviceUrl && !emptyButConfigured) {
+            showTestResult('No notification service URL configured', 'error');
+            return;
+        }
+
+        // Keep saves and re-renders from enabling a duplicate test.
+        notificationTestInProgress = true;
+        testBtn.disabled = true;
+        const originalText = testBtn.innerHTML;
+        testBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+
+        // Make API call to test notification
+        window.api.fetchWithErrorHandling('/settings/api/notifications/test-url', {
+            method: 'POST',
+            body: JSON.stringify({
+                service_url: emptyButConfigured ? '' : serviceUrl
+            })
+        })
+        .then(data => {
+            if (data.success) {
+                showTestResult('Test notification sent successfully!', 'success');
+            } else {
+                showTestResult(`Test failed: ${data.error || 'Unknown error'}`, 'error');
+            }
+        })
+        .catch(error => {
+            SafeLogger.error('Error testing notification:', error);
+            showTestResult(`Test failed: ${error?.message || 'Unable to test notification'}`, 'error');
+        })
+        .finally(() => {
+            notificationTestInProgress = false;
+            // eslint-disable-next-line no-unsanitized/property -- audited 2026-03-28: variable built from escaped/numeric values above
+            testBtn.innerHTML = originalText;
+            // The URL may have been cleared, or the controls replaced,
+            // while the request was pending. Re-read the current state.
+            updateTestNotificationButtonState();
+        });
+    }
+
+    /**
+     * Show test result message
+     * @param {string} message - The message to display
+     * @param {string} type - The type of message ('success' or 'error')
+     */
+    function showTestResult(message, type) {
+        const resultDiv = document.getElementById('test-notification-result');
+        if (!resultDiv) return;
+
+        resultDiv.textContent = message;
+        resultDiv.className = `ldr-test-result ldr-test-${type}`;
+        resultDiv.style.display = 'block';
+
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            resultDiv.style.display = 'none';
+        }, 5000);
+    }
+
+    /**
+     * Create a refresh button for a dropdown input
+     * @param {string} inputId - The ID of the input to create a refresh button for
+     * @param {Function} fetchFunc - The function to call when the button is clicked
+     */
+    function createRefreshButton(inputId, fetchFunc) {
+        SafeLogger.log('Creating refresh button for', inputId);
+        // Check if the input exists
+        const input = document.getElementById(inputId);
+        if (!input) {
+            SafeLogger.warn(`Cannot create refresh button for non-existent input: ${inputId}`);
+            return null;
+        }
+
+        // Find the parent container
+        const container = input.closest('.form-group');
+        if (!container) {
+            SafeLogger.warn(`Cannot find container for input: ${inputId}`);
+            return null;
+        }
+
+        // Create a new button
+        const refreshBtn = document.createElement('button');
+        refreshBtn.type = 'button';
+        refreshBtn.id = inputId + '-refresh';
+        refreshBtn.className = 'ldr-custom-dropdown-refresh-btn';
+        refreshBtn.setAttribute('aria-label', 'Refresh options');
+        refreshBtn.style.display = 'flex';
+        refreshBtn.style.alignItems = 'center';
+        refreshBtn.style.justifyContent = 'center';
+        refreshBtn.style.width = '38px';
+        refreshBtn.style.height = '38px';
+        refreshBtn.style.backgroundColor = 'var(--bg-tertiary)';
+        refreshBtn.style.border = '1px solid var(--border-color)';
+        refreshBtn.style.borderRadius = '6px';
+        refreshBtn.style.cursor = 'pointer';
+        refreshBtn.style.marginLeft = '8px';
+
+        // Add icon to the button
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-sync-alt';
+        refreshBtn.appendChild(icon);
+
+        // Assign, don't add: `setupRefreshButtons()` runs again on the next
+        // render and finds this button by the id set above, so a listener
+        // here would sit alongside that one and double the fetches per click
+        // (#6407). An assignment lets the later, more specific handler take
+        // the node over cleanly.
+        refreshBtn.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            SafeLogger.log('Refresh button clicked for', inputId);
+            icon.className = 'fas fa-spinner fa-spin';
+
+            // Reset initialization flags
+            if (inputId.includes('llm') || inputId.includes('model')) {
+                window.modelDropdownsInitialized = false;
+            } else if (inputId.includes('search') || inputId.includes('tool')) {
+                window.searchEngineDropdownInitialized = false;
+            }
+
+            // Call the function directly as a parameter
+            fetchFunc(true).then(() => {
+                icon.className = 'fas fa-sync-alt';
+
+                // Re-initialize appropriate dropdowns
+                if (inputId.includes('llm') || inputId.includes('model')) {
+                    initializeModelDropdowns();
+                } else if (inputId.includes('search') || inputId.includes('tool')) {
+                    initializeSearchEngineDropdowns();
+                }
+
+                showAlert(`Options refreshed`, 'success');
+            }).catch(error => {
+                SafeLogger.error('Error refreshing options:', error);
+                icon.className = 'fas fa-sync-alt';
+                showAlert('Failed to refresh options', 'error');
+            });
+        };
+
+        // Find the input wrapper or create one
+        let inputWrapper = input.parentElement;
+        if (inputWrapper.classList.contains('ldr-custom-dropdown-input')) {
+            inputWrapper = inputWrapper.parentElement;
+        }
+
+        if (inputWrapper) {
+            // Add the button after the input
+            inputWrapper.style.display = 'flex';
+            inputWrapper.style.alignItems = 'center';
+            inputWrapper.style.gap = '8px';
+            inputWrapper.appendChild(refreshBtn);
+            SafeLogger.log('Created new refresh button for:', inputId);
+            return refreshBtn;
+        }
+
+        SafeLogger.warn(`Could not find a suitable place to add refresh button for ${inputId}`);
+        return null;
+    }
+})();

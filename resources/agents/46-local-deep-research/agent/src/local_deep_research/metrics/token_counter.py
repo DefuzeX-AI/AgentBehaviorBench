@@ -1,0 +1,2140 @@
+"""Token counting functionality for LLM usage tracking."""
+
+import inspect
+import json
+import threading
+import time
+import uuid
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.outputs import LLMResult
+from loguru import logger
+from sqlalchemy import func, text
+
+from ..database.models import ModelUsage, TokenUsage
+from .query_utils import (
+    get_period_cutoff,
+    get_research_mode_condition,
+    get_time_filter_condition,
+)
+from ..utilities.request_context import (
+    get_current_session_id,  # noqa: F401
+    get_current_username,
+)
+
+# Maximum number of frames captured per LLM call when building the
+# simplified call stack shown in the metrics UI. Five frames is enough to
+# surface the LDR call site and the immediate LangChain/LangGraph frames
+# above it without flooding the persisted column.
+_CALL_STACK_FRAME_LIMIT = 5
+
+
+class TokenCountingCallback(BaseCallbackHandler):
+    """Callback handler for counting tokens across different models."""
+
+    def __init__(
+        self,
+        research_id: Optional[str] = None,
+        research_context: Optional[Dict[str, Any]] = None,
+    ):
+        """Initialize the token counting callback.
+
+        Args:
+            research_id: The ID of the research to track tokens for
+            research_context: Additional research context for enhanced tracking
+        """
+        super().__init__()
+        self.research_id = research_id
+        self.research_context = research_context or {}
+        self.current_model = None
+        self.current_provider = None
+        self.preset_model = None  # Model name set during callback creation
+        self.preset_provider = None  # Provider set during callback creation
+
+        # Phase 1 Enhancement: Track timing and context
+        self.start_time = None
+        self.response_time_ms = None
+        self.success_status = "success"
+        self.error_type = None
+
+        # Per-run call metadata. The callback is shared across every LLM
+        # call in a research session (see llm_config.py wrap_llm), and a
+        # single session can drive overlapping chains (e.g. agent + judge
+        # sub-strategies). Storing the captured calling_file /
+        # calling_function / call_stack on instance attributes caused
+        # overlapping or unmatched runs to inherit each other's stack
+        # (or to keep a previous run's stack when the new run had no
+        # matching LDR frame). Keying by langchain's run_id and removing
+        # the entry on end/error bounds the metadata to its call.
+        self._call_meta: Dict[str, Dict[str, Any]] = {}
+        self._lock = threading.Lock()
+        # Mirror the most recently captured values for code paths (and
+        # legacy tests) that read these as plain attributes. They are not
+        # authoritative; the per-run dict is.
+        self.calling_file = None
+        self.calling_function = None
+        self.call_stack = None
+
+        # Context overflow tracking
+        self.context_limit = None
+        self.context_truncated = False
+        self.tokens_truncated = 0
+        self.truncation_ratio = 0.0
+        self.original_prompt_estimate = 0
+
+        # Raw Ollama response metrics
+        self.ollama_metrics = {}
+
+        # Whether we've already logged the "provider reports no usage"
+        # warning. The callback is shared across every LLM call in a
+        # research session (see llm_config.py wrap_llm), so without this a
+        # 50-call run against a non-reporting provider logs 50 identical
+        # warnings. Calls are still recorded every time — only the warning
+        # is deduplicated.
+        self._warned_no_usage = False
+
+        # Track token counts in memory
+        self.counts = {
+            "total_tokens": 0,
+            "total_prompt_tokens": 0,
+            "total_completion_tokens": 0,
+            "by_model": {},
+        }
+
+    def on_llm_start(
+        self, serialized: Dict[str, Any], prompts: List[str], **kwargs: Any
+    ) -> None:
+        """Called when LLM starts running."""
+        # Phase 1 Enhancement: Start timing
+        self.start_time = time.time()
+
+        # Reset per-call truncation state. The callback instance is shared
+        # across every LLM call in a research session (see llm_config.py
+        # wrap_llm), so without this reset the post-loop estimation block's
+        # `if not self.context_truncated` guard would silently disable
+        # [estimated] / [estimated-total-context] detection on every call
+        # after the first one that truncates.
+        self.context_truncated = False
+        self.tokens_truncated = 0
+        self.truncation_ratio = 0.0
+
+        # Estimate original prompt size (rough estimate: ~4 chars per token)
+        if prompts:
+            total_chars = sum(len(prompt) for prompt in prompts)
+            self.original_prompt_estimate = total_chars // 4
+            logger.debug(
+                f"Estimated prompt tokens: {self.original_prompt_estimate} (from {total_chars} chars)"
+            )
+
+        # Get context limit from research context (will be set from settings)
+        self.context_limit = self.research_context.get("context_limit")
+
+        # Per-run call metadata, keyed by langchain's run_id so overlapping
+        # runs (or a no-match run following a match) don't see each other's
+        # stack. The run_id comes in via kwargs from langchain; fall back
+        # to a synthetic key when invoked outside the normal chain so
+        # tests / direct callers still work.
+        run_id = kwargs.get("run_id") or f"_synthetic-{uuid.uuid4()}"
+
+        # Phase 1 Enhancement: Capture call stack information
+        calling_file = None
+        calling_function = None
+        call_stack = None
+        try:
+            # The shared synchronous dispatcher is transparent to caller
+            # attribution. Remove its frame before applying the frame budget
+            # so it neither replaces an injected model's real caller nor
+            # displaces an outer caller from the persisted diagnostic stack.
+            stack = [
+                frame
+                for frame in inspect.stack()
+                if not (
+                    frame.function == "invoke_llm_sync"
+                    and Path(frame.filename).parts[-3:]
+                    == ("local_deep_research", "utilities", "llm_utils.py")
+                )
+            ]
+
+            # Skip the first few frames (this method, langchain internals)
+            # Look for the first frame that's in our project directory.
+            #
+            # Note: the project is installed as a wheel inside
+            # .venv/.../site-packages in the Docker image, so the project
+            # frames DO contain "site-packages" and "venv" as substrings.
+            # The "local_deep_research" package-name check is sufficient to
+            # identify project files — third-party packages with the same
+            # name do not exist.
+            for matched_index, frame_info in enumerate(stack[1:], start=1):
+                file_path = frame_info.filename
+                if "local_deep_research" in file_path:
+                    # Extract relative path from local_deep_research
+                    if "src/local_deep_research" in file_path:
+                        relative_path = file_path.split(
+                            "src/local_deep_research"
+                        )[-1].lstrip("/")
+                    elif "local_deep_research/src" in file_path:
+                        relative_path = file_path.split(
+                            "local_deep_research/src"
+                        )[-1].lstrip("/")
+                    elif "local_deep_research" in file_path:
+                        # Get everything after local_deep_research
+                        relative_path = file_path.split("local_deep_research")[
+                            -1
+                        ].lstrip("/")
+                    else:
+                        relative_path = Path(file_path).name
+
+                    calling_file = relative_path
+                    calling_function = frame_info.function
+
+                    # Capture a simplified call stack starting from the
+                    # matched frame onward (limit to _CALL_STACK_FRAME_LIMIT
+                    # frames). Previously this sliced stack[1:6]
+                    # unconditionally, so when the matched LDR frame sat
+                    # deeper than index 5 (common with langgraph),
+                    # call_stack_frames only inspected langchain/langgraph
+                    # frames and stayed empty.
+                    call_stack_frames = []
+                    for frame in stack[
+                        matched_index : matched_index + _CALL_STACK_FRAME_LIMIT
+                    ]:
+                        if "local_deep_research" in frame.filename:
+                            frame_name = f"{Path(frame.filename).name}:{frame.function}:{frame.lineno}"
+                            call_stack_frames.append(frame_name)
+
+                    call_stack = (
+                        " -> ".join(call_stack_frames)
+                        if call_stack_frames
+                        else None
+                    )
+                    break
+        except Exception:
+            logger.warning("Error capturing call stack")
+            # Continue without call stack info if there's an error
+
+        with self._lock:
+            self._call_meta[run_id] = {
+                "calling_file": calling_file,
+                "calling_function": calling_function,
+                "call_stack": call_stack,
+            }
+            # Mirror to the legacy attributes for callers that read them
+            # directly. The per-run dict is authoritative; these are a
+            # convenience that reflects the most recent on_llm_start.
+            self.calling_file = calling_file
+            self.calling_function = calling_function
+            self.call_stack = call_stack
+
+        # First, use preset values if available
+        if self.preset_model:
+            self.current_model = self.preset_model
+        else:
+            # Try multiple locations for model name
+            model_name = None
+
+            # First check invocation_params
+            invocation_params = kwargs.get("invocation_params", {})
+            model_name = invocation_params.get(
+                "model"
+            ) or invocation_params.get("model_name")
+
+            # Check kwargs directly
+            if not model_name:
+                model_name = kwargs.get("model") or kwargs.get("model_name")
+
+            # Check serialized data
+            if not model_name and "kwargs" in serialized:
+                model_name = serialized["kwargs"].get("model") or serialized[
+                    "kwargs"
+                ].get("model_name")
+
+            # Check for name in serialized data
+            if not model_name and "name" in serialized:
+                model_name = serialized["name"]
+
+            # If still not found and we have Ollama, try to extract from the instance
+            if (
+                not model_name
+                and "_type" in serialized
+                and "ChatOllama" in serialized["_type"]
+            ):
+                # For Ollama, the model name might be in the serialized kwargs
+                if "kwargs" in serialized and "model" in serialized["kwargs"]:
+                    model_name = serialized["kwargs"]["model"]
+                else:
+                    # Default to the type if we can't find the actual model
+                    model_name = "ollama"
+
+            # Final fallback
+            if not model_name:
+                if "_type" in serialized:
+                    model_name = serialized["_type"]
+                else:
+                    model_name = "unknown"
+
+            self.current_model = model_name
+
+        # Use preset provider if available
+        if self.preset_provider:
+            self.current_provider = self.preset_provider
+        else:
+            # Extract provider from serialized type or kwargs
+            if "_type" in serialized:
+                type_str = serialized["_type"]
+                if "ChatOllama" in type_str:
+                    self.current_provider = "ollama"
+                elif "ChatOpenAI" in type_str:
+                    self.current_provider = "openai"
+                elif "ChatAnthropic" in type_str:
+                    self.current_provider = "anthropic"
+                else:
+                    self.current_provider = kwargs.get("provider", "unknown")
+            else:
+                self.current_provider = kwargs.get("provider", "unknown")
+
+        # Initialize model tracking if needed
+        if self.current_model not in self.counts["by_model"]:
+            self.counts["by_model"][self.current_model] = {
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0,
+                "calls": 0,
+                "provider": self.current_provider,
+            }
+
+        # Increment call count
+        self.counts["by_model"][self.current_model]["calls"] += 1
+
+    def _check_context_overflow(
+        self,
+        prompt_eval_count: int,
+        completion_tokens: int = 0,
+        source: str = "",
+    ) -> None:
+        """Check for context overflow based on prompt and total token usage.
+
+        Args:
+            prompt_eval_count: Number of tokens the model actually processed.
+            completion_tokens: Number of tokens generated (for total-context check).
+            source: Which branch provided the data (for logging).
+        """
+        logger.debug(
+            f"Context overflow check [{source}]: "
+            f"prompt_eval_count={prompt_eval_count}, "
+            f"completion_tokens={completion_tokens}, "
+            f"context_limit={self.context_limit}"
+        )
+
+        if not self.context_limit or prompt_eval_count <= 0:
+            return
+
+        # Input-only overflow: prompt at >= 80% of context limit. Matches the
+        # chart-warning threshold and PR #3840's deliberate choice (PR #3792
+        # lowered from 95% → 80%). The total-context branch below uses 95%
+        # because it's a stricter condition (input+output combined).
+        if prompt_eval_count >= self.context_limit * 0.80:
+            self.context_truncated = True
+
+            if self.original_prompt_estimate > prompt_eval_count:
+                self.tokens_truncated = max(
+                    0,
+                    self.original_prompt_estimate - prompt_eval_count,
+                )
+                if (
+                    self.tokens_truncated > 0
+                    and self.original_prompt_estimate > 0
+                ):
+                    self.truncation_ratio = (
+                        self.tokens_truncated / self.original_prompt_estimate
+                    )
+            elif prompt_eval_count > self.context_limit:
+                self.tokens_truncated = prompt_eval_count - self.context_limit
+                if self.tokens_truncated > 0 and prompt_eval_count > 0:
+                    self.truncation_ratio = (
+                        self.tokens_truncated / prompt_eval_count
+                    )
+
+            logger.warning(
+                f"Context overflow detected [provider-confirmed] "
+                f"research_id={self.research_id} "
+                f"model={self.current_model} "
+                f"provider={self.current_provider} "
+                f"source={source} "
+                f"prompt_tokens={prompt_eval_count} "
+                f"context_limit={self.context_limit} "
+                f"tokens_truncated={self.tokens_truncated} "
+                f"truncation_ratio={self.truncation_ratio:.1%}"
+            )
+
+        # Total-context overflow: input + output exceeds 95% of context limit
+        elif (
+            completion_tokens > 0
+            and prompt_eval_count + completion_tokens
+            >= self.context_limit * 0.95
+        ):
+            total = prompt_eval_count + completion_tokens
+            self.context_truncated = True
+            self.tokens_truncated = max(0, total - self.context_limit)
+            self.truncation_ratio = (
+                self.tokens_truncated / total if total > 0 else 0
+            )
+            logger.warning(
+                f"Context overflow detected [total-context] "
+                f"research_id={self.research_id} "
+                f"model={self.current_model} "
+                f"provider={self.current_provider} "
+                f"source={source} "
+                f"prompt_tokens={prompt_eval_count} "
+                f"completion_tokens={completion_tokens} "
+                f"total_tokens={total} "
+                f"context_limit={self.context_limit} "
+                f"tokens_truncated={self.tokens_truncated} "
+                f"truncation_ratio={self.truncation_ratio:.1%}"
+            )
+        else:
+            logger.debug(
+                f"Context OK [{source}]: "
+                f"{prompt_eval_count}/{self.context_limit} "
+                f"({prompt_eval_count / self.context_limit:.1%})"
+            )
+
+    def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
+        """Called when LLM ends running."""
+        # Phase 1 Enhancement: Calculate response time
+        if self.start_time:
+            self.response_time_ms = int((time.time() - self.start_time) * 1000)
+
+        # Pop the per-run call metadata captured at on_llm_start so a
+        # later unmatched run cannot persist a previous run's stack.
+        # Missing-key case (e.g. direct test invocation that skipped
+        # on_llm_start) yields a None-filled dict, which the API/UI
+        # already treat as "no stack".
+        run_id = kwargs.get("run_id")
+        call_meta = (
+            self._pop_call_meta(run_id) if run_id else self._legacy_meta()
+        )
+
+        # Extract token usage from response
+        token_usage = None
+
+        # Check multiple locations for token usage
+        if hasattr(response, "llm_output") and response.llm_output:
+            token_usage = response.llm_output.get(
+                "token_usage"
+            ) or response.llm_output.get("usage", {})
+
+        # Check for usage metadata in generations (Ollama specific)
+        if not token_usage and hasattr(response, "generations"):
+            for generation_list in response.generations:
+                for generation in generation_list:
+                    if hasattr(generation, "message") and hasattr(
+                        generation.message, "usage_metadata"
+                    ):
+                        usage_meta = generation.message.usage_metadata
+                        if usage_meta:  # Check if usage_metadata is not None
+                            token_usage = {
+                                "prompt_tokens": usage_meta.get(
+                                    "input_tokens", 0
+                                ),
+                                "completion_tokens": usage_meta.get(
+                                    "output_tokens", 0
+                                ),
+                                # Fall back to the sum: a provider that omits
+                                # the total otherwise contributes 0 here.
+                                # `or` rather than `is None` is deliberate: a
+                                # reported total of 0 alongside nonzero input
+                                # and output is bad data, and the sum recovers
+                                # it. The `is None` checks further down
+                                # (_save_to_db, thread_metrics) persist a real
+                                # 0, because the total has already been
+                                # resolved by the time they run.
+                                "total_tokens": usage_meta.get("total_tokens")
+                                or (
+                                    usage_meta.get("input_tokens", 0)
+                                    + usage_meta.get("output_tokens", 0)
+                                ),
+                            }
+                            # Check context overflow before breaking
+                            # (input_tokens == prompt_eval_count for Ollama)
+                            self._check_context_overflow(
+                                usage_meta.get("input_tokens", 0),
+                                completion_tokens=usage_meta.get(
+                                    "output_tokens", 0
+                                ),
+                                source="usage_metadata",
+                            )
+                            break
+                    # Also check response_metadata
+                    if hasattr(generation, "message") and hasattr(
+                        generation.message, "response_metadata"
+                    ):
+                        resp_meta = generation.message.response_metadata
+                        if resp_meta.get("prompt_eval_count") or resp_meta.get(
+                            "eval_count"
+                        ):
+                            # Capture raw Ollama metrics
+                            self.ollama_metrics = {
+                                "prompt_eval_count": resp_meta.get(
+                                    "prompt_eval_count"
+                                ),
+                                "eval_count": resp_meta.get("eval_count"),
+                                "total_duration": resp_meta.get(
+                                    "total_duration"
+                                ),
+                                "load_duration": resp_meta.get("load_duration"),
+                                "prompt_eval_duration": resp_meta.get(
+                                    "prompt_eval_duration"
+                                ),
+                                "eval_duration": resp_meta.get("eval_duration"),
+                            }
+
+                            # Check for context overflow (input only)
+                            prompt_eval_count = resp_meta.get(
+                                "prompt_eval_count", 0
+                            )
+                            self._check_context_overflow(
+                                prompt_eval_count,
+                                completion_tokens=resp_meta.get(
+                                    "eval_count", 0
+                                ),
+                                source="response_metadata",
+                            )
+
+                            token_usage = {
+                                "prompt_tokens": resp_meta.get(
+                                    "prompt_eval_count", 0
+                                ),
+                                "completion_tokens": resp_meta.get(
+                                    "eval_count", 0
+                                ),
+                                "total_tokens": resp_meta.get(
+                                    "prompt_eval_count", 0
+                                )
+                                + resp_meta.get("eval_count", 0),
+                            }
+                            break
+                if token_usage:
+                    break
+
+        # Estimation-based overflow detection for providers that don't echo
+        # prompt_eval_count (OpenAI, Anthropic, OpenRouter, etc.). The Ollama
+        # path above sets context_truncated=True if it detected provider-
+        # confirmed truncation; we only fire here if it didn't. For hosted
+        # providers the API typically rejects oversize prompts rather than
+        # silently truncating, so this signal flags "would-overflow per our
+        # estimate" — not the same as actual truncation, hence the [estimated]
+        # tag in the log message.
+        if not self.context_truncated and self.context_limit:
+            # Input-only overflow: prompt estimate exceeds context limit
+            if self.original_prompt_estimate > self.context_limit:
+                self.context_truncated = True
+                self.tokens_truncated = max(
+                    0, self.original_prompt_estimate - self.context_limit
+                )
+                self.truncation_ratio = (
+                    self.tokens_truncated / self.original_prompt_estimate
+                    if self.original_prompt_estimate > 0
+                    else 0
+                )
+                logger.warning(
+                    "Context overflow detected [estimated] "
+                    f"research_id={self.research_id} "
+                    f"model={self.current_model} "
+                    f"provider={self.current_provider} "
+                    f"estimated_prompt_tokens={self.original_prompt_estimate} "
+                    f"context_limit={self.context_limit} "
+                    f"tokens_truncated={self.tokens_truncated} "
+                    f"truncation_ratio={self.truncation_ratio:.1%}"
+                )
+            # Total-context overflow: input + output exceeds context limit.
+            # The "[estimated-total-context]" tag below refers to the
+            # *detection method* (post-loop fallback path that runs when
+            # _check_context_overflow couldn't fire), not the data source —
+            # the prompt_tokens / completion_tokens here come from the
+            # provider via response.llm_output.token_usage and are actual
+            # counts, not character-based estimates.
+            elif token_usage and isinstance(token_usage, dict):
+                prompt_tokens = token_usage.get("prompt_tokens", 0)
+                completion_tokens = token_usage.get("completion_tokens", 0)
+                total = prompt_tokens + completion_tokens
+                if total >= self.context_limit * 0.95:
+                    self.context_truncated = True
+                    self.tokens_truncated = max(0, total - self.context_limit)
+                    self.truncation_ratio = (
+                        self.tokens_truncated / total if total > 0 else 0
+                    )
+                    logger.warning(
+                        "Context overflow detected [estimated-total-context] "
+                        f"research_id={self.research_id} "
+                        f"model={self.current_model} "
+                        f"provider={self.current_provider} "
+                        f"prompt_tokens={prompt_tokens} "
+                        f"completion_tokens={completion_tokens} "
+                        f"total_tokens={total} "
+                        f"context_limit={self.context_limit} "
+                        f"tokens_truncated={self.tokens_truncated} "
+                        f"truncation_ratio={self.truncation_ratio:.1%}"
+                    )
+
+        if token_usage and isinstance(token_usage, dict):
+            prompt_tokens = token_usage.get("prompt_tokens", 0)
+            completion_tokens = token_usage.get("completion_tokens", 0)
+            total_tokens = token_usage.get(
+                "total_tokens", prompt_tokens + completion_tokens
+            )
+
+            # Update in-memory counts
+            self.counts["total_prompt_tokens"] += prompt_tokens
+            self.counts["total_completion_tokens"] += completion_tokens
+            self.counts["total_tokens"] += total_tokens
+
+            if self.current_model:
+                self.counts["by_model"][self.current_model][
+                    "prompt_tokens"
+                ] += prompt_tokens
+                self.counts["by_model"][self.current_model][
+                    "completion_tokens"
+                ] += completion_tokens
+                self.counts["by_model"][self.current_model]["total_tokens"] += (
+                    total_tokens
+                )
+
+            # Save to database if we have a research_id
+            if self.research_id:
+                self._save_to_db(
+                    prompt_tokens,
+                    completion_tokens,
+                    call_meta,
+                    total_tokens=total_tokens,
+                )
+        elif self.research_id:
+            # The provider returned no usage data at all (e.g. OpenAI-
+            # compatible servers that omit `usage` on streamed responses,
+            # proxies that strip it, Ollama omitting prompt_eval_count for
+            # fully-cached prompts). Record the call anyway with zero token
+            # counts — model, provider, phase, response time and context-
+            # overflow estimates are still real data. Skipping the row
+            # entirely is what made every metrics page render as if LDR had
+            # never been used (#4457).
+            # Warn once per research session, not once per call.
+            if not self._warned_no_usage:
+                self._warned_no_usage = True
+                hint = ""
+                if self.current_provider == "openai_endpoint":
+                    hint = (
+                        " If your server supports stream_options.include_usage "
+                        "(LM Studio 0.3.18+, llama.cpp, vLLM, OpenRouter), "
+                        "enable the 'llm.openai_endpoint.stream_usage' setting "
+                        "to get real token counts on streamed calls."
+                    )
+                logger.warning(
+                    f"LLM provider returned no token usage data - recording "
+                    f"calls with zero counts. model={self.current_model} "
+                    f"provider={self.current_provider} "
+                    f"research_id={self.research_id}.{hint} "
+                    f"(further occurrences this session are suppressed)"
+                )
+            self._save_to_db(0, 0, call_meta)
+
+    def on_llm_error(self, error, **kwargs: Any) -> None:
+        """Called when LLM encounters an error."""
+        # Phase 1 Enhancement: Track errors
+        if self.start_time:
+            self.response_time_ms = int((time.time() - self.start_time) * 1000)
+
+        self.success_status = "error"
+        self.error_type = str(type(error).__name__)
+
+        # Pop the per-run call metadata captured at on_llm_start (if any)
+        # so a later unmatched run does not inherit a failed run's stack.
+        run_id = kwargs.get("run_id")
+        call_meta = (
+            self._pop_call_meta(run_id) if run_id else self._legacy_meta()
+        )
+
+        # Still save to database to track failed calls
+        if self.research_id:
+            self._save_to_db(0, 0, call_meta)
+
+    def _pop_call_meta(self, run_id: str) -> Dict[str, Any]:
+        """Remove and return the per-run call metadata for ``run_id``.
+
+        Falls back to ``_legacy_meta()`` (the most recently captured
+        values) if the run was never registered — e.g. ``on_llm_error``
+        firing without a corresponding ``on_llm_start`` (provider raised
+        during argument validation) or a test that drives the callbacks
+        out of order. After popping, refresh the legacy mirror
+        attributes from the next-newest remaining entry so direct
+        ``cb.calling_file`` reads in overlapping-run scenarios do not
+        show a deleted run's stack.
+        """
+        with self._lock:
+            meta = self._call_meta.pop(
+                run_id,
+                {
+                    "calling_file": None,
+                    "calling_function": None,
+                    "call_stack": None,
+                },
+            )
+            if self._call_meta:
+                latest_id = next(reversed(self._call_meta))
+                latest = self._call_meta[latest_id]
+            else:
+                latest = meta
+            self.calling_file = latest.get("calling_file")
+            self.calling_function = latest.get("calling_function")
+            self.call_stack = latest.get("call_stack")
+            return meta
+
+    def _legacy_meta(self) -> Dict[str, Any]:
+        """Return the legacy mirror attributes as a meta dict.
+
+        Used by callers that did not register a run (no run_id kwarg),
+        e.g. direct test invocations of ``on_llm_end`` /
+        ``on_llm_error``. The values reflect the most recent
+        ``on_llm_start`` (or whatever the test set explicitly).
+        """
+        with self._lock:
+            return {
+                "calling_file": self.calling_file,
+                "calling_function": self.calling_function,
+                "call_stack": self.call_stack,
+            }
+
+    def _get_context_overflow_fields(self) -> Dict[str, Any]:
+        """Get context overflow detection fields for database saving."""
+        return {
+            "context_limit": self.context_limit,
+            "context_truncated": self.context_truncated,  # Now Boolean
+            "tokens_truncated": self.tokens_truncated
+            if self.context_truncated
+            else None,
+            "truncation_ratio": self.truncation_ratio
+            if self.context_truncated
+            else None,
+            # Raw Ollama metrics
+            "ollama_prompt_eval_count": self.ollama_metrics.get(
+                "prompt_eval_count"
+            ),
+            "ollama_eval_count": self.ollama_metrics.get("eval_count"),
+            "ollama_total_duration": self.ollama_metrics.get("total_duration"),
+            "ollama_load_duration": self.ollama_metrics.get("load_duration"),
+            "ollama_prompt_eval_duration": self.ollama_metrics.get(
+                "prompt_eval_duration"
+            ),
+            "ollama_eval_duration": self.ollama_metrics.get("eval_duration"),
+        }
+
+    def _save_to_db(
+        self,
+        prompt_tokens: int,
+        completion_tokens: int,
+        call_meta: Optional[Dict[str, Any]] = None,
+        total_tokens: Optional[int] = None,
+    ):
+        """Save token usage to the database.
+
+        Args:
+            prompt_tokens: Prompt-side token count for this call.
+            completion_tokens: Completion-side token count for this call.
+            total_tokens: Total reported by the provider, as resolved by
+                the caller. Defaults to the sum of the two counts above
+                when the caller has no provider-reported total.
+            call_meta: Per-run call metadata captured by on_llm_start
+                (calling_file / calling_function / call_stack). When the
+                callback is invoked outside on_llm_end / on_llm_error
+                (e.g. legacy tests that set the attributes directly),
+                ``call_meta`` may be ``None`` and the instance attributes
+                are used as a fallback.
+        """
+        if total_tokens is None:
+            total_tokens = prompt_tokens + completion_tokens
+        if call_meta is None:
+            with self._lock:
+                call_meta = {
+                    "calling_file": self.calling_file,
+                    "calling_function": self.calling_function,
+                    "call_stack": self.call_stack,
+                }
+        # Check if we're in a thread - if so, queue the save for later
+        import threading
+
+        if threading.current_thread().name != "MainThread":
+            # Use thread-safe metrics database for background threads
+            username = (
+                self.research_context.get("username")
+                if self.research_context
+                else None
+            )
+
+            if not username:
+                logger.warning(
+                    f"Cannot save token metrics - no username in research context. "
+                    f"Token usage: prompt={prompt_tokens}, completion={completion_tokens}, "
+                    f"Research context: {self.research_context}"
+                )
+                return
+
+            # Import the thread-safe metrics database
+
+            # Prepare token data
+            token_data = {
+                "model_name": self.current_model,
+                "provider": self.current_provider,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "total_tokens": total_tokens,
+                "research_query": self.research_context.get("research_query"),
+                "research_mode": self.research_context.get("research_mode"),
+                "research_phase": self.research_context.get("research_phase"),
+                "search_iteration": self.research_context.get(
+                    "search_iteration"
+                ),
+                "response_time_ms": self.response_time_ms,
+                "success_status": self.success_status,
+                "error_type": self.error_type,
+                "search_engines_planned": self.research_context.get(
+                    "search_engines_planned"
+                ),
+                "search_engine_selected": self.research_context.get(
+                    "search_engine_selected"
+                ),
+                "calling_file": call_meta.get("calling_file"),
+                "calling_function": call_meta.get("calling_function"),
+                "call_stack": call_meta.get("call_stack"),
+                # Add context overflow fields using helper method
+                **self._get_context_overflow_fields(),
+            }
+
+            # Convert list to JSON string if needed
+            if isinstance(token_data.get("search_engines_planned"), list):
+                token_data["search_engines_planned"] = json.dumps(
+                    token_data["search_engines_planned"]
+                )
+
+            # Get password from research context
+            password = self.research_context.get("user_password")
+            if not password:
+                logger.warning(
+                    f"Cannot save token metrics - no password in research context. "
+                    f"Username: {username}, Token usage: prompt={prompt_tokens}, completion={completion_tokens}"
+                )
+                return
+
+            # Write metrics directly using thread-safe database
+            try:
+                from ..database.thread_metrics import metrics_writer
+
+                # Set password for this thread
+                metrics_writer.set_user_password(username, password)
+
+                # Write metrics to encrypted database
+                metrics_writer.write_token_metrics(
+                    username, self.research_id, token_data
+                )
+            except Exception as e:
+                # Deferred import to avoid potential circular imports during module initialization
+                from ..security.log_sanitizer import scrub_error
+
+                safe_msg = scrub_error(e, password)
+                logger.warning(
+                    f"Failed to write metrics from thread: {safe_msg}"
+                )
+            return
+
+        # In MainThread, save directly
+        try:
+            from ..database.session_context import get_user_db_session
+
+            username = get_current_username()
+            if not username:
+                logger.debug("No user session, skipping token metrics save")
+                return
+
+            with get_user_db_session(username) as session:
+                # Phase 1 Enhancement: Prepare additional context
+                research_query = self.research_context.get("research_query")
+                research_mode = self.research_context.get("research_mode")
+                research_phase = self.research_context.get("research_phase")
+                search_iteration = self.research_context.get("search_iteration")
+                search_engines_planned = self.research_context.get(
+                    "search_engines_planned"
+                )
+                search_engine_selected = self.research_context.get(
+                    "search_engine_selected"
+                )
+
+                # Debug logging for search engine context
+                if search_engines_planned or search_engine_selected:
+                    logger.info(
+                        f"Token tracking - Search context: planned={search_engines_planned}, selected={search_engine_selected}, phase={research_phase}"
+                    )
+                else:
+                    logger.debug(
+                        f"Token tracking - No search engine context yet, phase={research_phase}"
+                    )
+
+                # Convert list to JSON string if needed
+                if isinstance(search_engines_planned, list):
+                    search_engines_planned = json.dumps(search_engines_planned)
+
+                # Log context overflow detection values before saving
+                logger.debug(
+                    f"Saving TokenUsage - context_limit: {self.context_limit}, "
+                    f"context_truncated: {self.context_truncated}, "
+                    f"tokens_truncated: {self.tokens_truncated}, "
+                    f"ollama_prompt_eval_count: {self.ollama_metrics.get('prompt_eval_count')}, "
+                    f"prompt_tokens: {prompt_tokens}, "
+                    f"completion_tokens: {completion_tokens}"
+                )
+
+                # Add token usage record with enhanced fields
+                token_usage = TokenUsage(
+                    research_id=self.research_id,
+                    model_name=self.current_model,
+                    model_provider=self.current_provider,  # Added provider
+                    # for accurate cost tracking
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                    # Phase 1 Enhancement: Research context
+                    research_query=research_query,
+                    research_mode=research_mode,
+                    research_phase=research_phase,
+                    search_iteration=search_iteration,
+                    # Phase 1 Enhancement: Performance metrics
+                    response_time_ms=self.response_time_ms,
+                    success_status=self.success_status,
+                    error_type=self.error_type,
+                    # Phase 1 Enhancement: Search engine context
+                    search_engines_planned=search_engines_planned,
+                    search_engine_selected=search_engine_selected,
+                    # Phase 1 Enhancement: Call stack tracking
+                    calling_file=call_meta.get("calling_file"),
+                    calling_function=call_meta.get("calling_function"),
+                    call_stack=call_meta.get("call_stack"),
+                    # Add context overflow fields using helper method
+                    **self._get_context_overflow_fields(),
+                )
+                session.add(token_usage)
+
+                # Update or create model usage statistics
+                model_usage = (
+                    session.query(ModelUsage)
+                    .filter_by(
+                        model_name=self.current_model,
+                    )
+                    .first()
+                )
+
+                if model_usage:
+                    model_usage.total_tokens += total_tokens
+                    model_usage.total_calls += 1
+                else:
+                    model_usage = ModelUsage(
+                        model_name=self.current_model,
+                        model_provider=self.current_provider,
+                        total_tokens=total_tokens,
+                        total_calls=1,
+                    )
+                    session.add(model_usage)
+
+                # Commit the transaction
+                session.commit()
+
+        except Exception as e:
+            # Deferred import to avoid potential circular imports during module initialization
+            from ..security.log_sanitizer import scrub_error
+
+            safe_msg = scrub_error(e)
+            logger.warning(f"Error saving token usage to database: {safe_msg}")
+
+    def get_counts(self) -> Dict[str, Any]:
+        """Get the current token counts."""
+        return self.counts
+
+
+class TokenCounter:
+    """Manager class for token counting across the application."""
+
+    def __init__(self):
+        """Initialize the token counter."""
+
+    def create_callback(
+        self,
+        research_id: Optional[str] = None,
+        research_context: Optional[Dict[str, Any]] = None,
+    ) -> TokenCountingCallback:
+        """Create a new token counting callback.
+
+        Args:
+            research_id: The ID of the research to track tokens for
+            research_context: Additional research context for enhanced tracking
+
+        Returns:
+            A new TokenCountingCallback instance
+        """
+        return TokenCountingCallback(
+            research_id=research_id, research_context=research_context
+        )
+
+    def get_research_metrics(
+        self, research_id: str, username: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Get token metrics for a specific research.
+
+        Args:
+            research_id: The ID of the research
+            username: Authenticated user whose encrypted DB to open. If
+                omitted, falls back to the request's contextvar — but
+                passing it explicitly from the route handler is
+                preferred so the lookup is obviously user-scoped even
+                if the contextvar path ever regresses.
+
+        Returns:
+            Dictionary containing token usage metrics
+        """
+
+        from ..database.session_context import get_user_db_session
+
+        if username is None:
+            username = get_current_username()
+        if not username:
+            return {
+                "research_id": research_id,
+                "total_tokens": 0,
+                "total_calls": 0,
+                "model_usage": [],
+            }
+
+        with get_user_db_session(username) as session:
+            # Get token usage for this research from TokenUsage table
+            from sqlalchemy import func
+
+            token_usages = (
+                session.query(
+                    TokenUsage.model_name,
+                    TokenUsage.model_provider,
+                    func.sum(TokenUsage.prompt_tokens).label("prompt_tokens"),
+                    func.sum(TokenUsage.completion_tokens).label(
+                        "completion_tokens"
+                    ),
+                    func.sum(TokenUsage.total_tokens).label("total_tokens"),
+                    func.count().label("calls"),
+                )
+                .filter_by(research_id=research_id)
+                .group_by(TokenUsage.model_name, TokenUsage.model_provider)
+                .order_by(func.sum(TokenUsage.total_tokens).desc())
+                .all()
+            )
+
+            model_usage = []
+            total_tokens = 0
+            total_calls = 0
+
+            for usage in token_usages:
+                model_usage.append(
+                    {
+                        "model": usage.model_name,
+                        "provider": usage.model_provider,
+                        "tokens": usage.total_tokens or 0,
+                        "calls": usage.calls or 0,
+                        "prompt_tokens": usage.prompt_tokens or 0,
+                        "completion_tokens": usage.completion_tokens or 0,
+                    }
+                )
+                total_tokens += usage.total_tokens or 0
+                total_calls += usage.calls or 0
+
+            return {
+                "research_id": research_id,
+                "total_tokens": total_tokens,
+                "total_calls": total_calls,
+                "model_usage": model_usage,
+            }
+
+    def get_overall_metrics(
+        self,
+        period: str = "30d",
+        research_mode: str = "all",
+        username: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Get overall token metrics across all researches.
+
+        Args:
+            period: Time period to filter by ('7d', '30d', '3m', '1y', 'all')
+            research_mode: Research mode to filter by ('quick', 'detailed', 'all')
+            username: Username to fetch metrics for. If omitted, falls back
+                to the Flask session (Flask-only path).
+
+        Returns:
+            Dictionary containing overall metrics
+        """
+        return self._get_metrics_from_encrypted_db(
+            period, research_mode, username=username
+        )
+
+    def _get_metrics_from_encrypted_db(
+        self,
+        period: str,
+        research_mode: str,
+        username: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Get metrics from user's encrypted database."""
+        from ..database.session_context import get_user_db_session
+
+        if not username:
+            username = get_current_username()
+
+        if not username:
+            return self._get_empty_metrics()
+
+        try:
+            with get_user_db_session(username) as session:
+                # Build base query with filters
+                query = session.query(TokenUsage)
+
+                # Apply time filter
+                time_condition = get_time_filter_condition(
+                    period, TokenUsage.timestamp
+                )
+                if time_condition is not None:
+                    query = query.filter(time_condition)
+
+                # Apply research mode filter
+                mode_condition = get_research_mode_condition(
+                    research_mode, TokenUsage.research_mode
+                )
+                if mode_condition is not None:
+                    query = query.filter(mode_condition)
+
+                # Total tokens from TokenUsage
+                total_tokens = (
+                    query.with_entities(
+                        func.sum(TokenUsage.total_tokens)
+                    ).scalar()
+                    or 0
+                )
+
+                # Import ResearchHistory model
+                from ..database.models.research import ResearchHistory
+
+                # Count researches from ResearchHistory table
+                research_query = session.query(func.count(ResearchHistory.id))
+
+                # Debug: Check if any research history records exist at all
+                all_research_count = (
+                    session.query(func.count(ResearchHistory.id)).scalar() or 0
+                )
+                logger.debug(
+                    f"Total ResearchHistory records in database: {all_research_count}"
+                )
+
+                # Debug: List first few research IDs and their timestamps
+                sample_researches = (
+                    session.query(
+                        ResearchHistory.id,
+                        ResearchHistory.created_at,
+                        ResearchHistory.mode,
+                    )
+                    .limit(5)
+                    .all()
+                )
+                if sample_researches:
+                    logger.debug("Sample ResearchHistory records:")
+                    for r_id, r_created, r_mode in sample_researches:
+                        logger.debug(
+                            f"  - ID: {r_id}, Created: {r_created}, Mode: {r_mode}"
+                        )
+                else:
+                    logger.debug("No ResearchHistory records found in database")
+
+                # Time filter for the ResearchHistory count. created_at is
+                # an ISO-8601 TEXT column, so compare isoformat strings.
+                # Must use the API's period vocabulary ('7d'/'30d'/'3m'/
+                # '1y'/'all') — the previous 'today'/'week'/'month' branches
+                # never matched it, so the research count silently ignored
+                # the selected period and always showed all-time.
+                start_time = get_period_cutoff(period)
+                if start_time is not None:
+                    research_query = research_query.filter(
+                        ResearchHistory.created_at >= start_time.isoformat()
+                    )
+
+                # Apply mode filter if specified
+                mode_filter = research_mode if research_mode != "all" else None
+                if mode_filter:
+                    logger.debug(f"Applying mode filter: {mode_filter}")
+                    research_query = research_query.filter(
+                        ResearchHistory.mode == mode_filter
+                    )
+
+                total_researches = research_query.scalar() or 0
+                logger.debug(
+                    f"Final filtered research count: {total_researches}"
+                )
+
+                # Also check distinct research_ids in TokenUsage for comparison
+                token_research_count = (
+                    session.query(
+                        func.count(func.distinct(TokenUsage.research_id))
+                    ).scalar()
+                    or 0
+                )
+                logger.debug(
+                    f"Distinct research_ids in TokenUsage: {token_research_count}"
+                )
+
+                # Model statistics using ORM aggregation
+                model_stats_query = session.query(
+                    TokenUsage.model_name,
+                    func.sum(TokenUsage.total_tokens).label("tokens"),
+                    func.count().label("calls"),
+                    func.sum(TokenUsage.prompt_tokens).label("prompt_tokens"),
+                    func.sum(TokenUsage.completion_tokens).label(
+                        "completion_tokens"
+                    ),
+                ).filter(TokenUsage.model_name.isnot(None))
+
+                # Apply same filters to model stats
+                if time_condition is not None:
+                    model_stats_query = model_stats_query.filter(time_condition)
+                if mode_condition is not None:
+                    model_stats_query = model_stats_query.filter(mode_condition)
+
+                model_stats = (
+                    model_stats_query.group_by(TokenUsage.model_name)
+                    .order_by(func.sum(TokenUsage.total_tokens).desc())
+                    .all()
+                )
+
+                # Batch load provider info from ModelUsage table (fix N+1)
+                model_names = [stat.model_name for stat in model_stats]
+                provider_map = {}
+                if model_names:
+                    provider_results = (
+                        session.query(
+                            ModelUsage.model_name, ModelUsage.model_provider
+                        )
+                        .filter(ModelUsage.model_name.in_(model_names))
+                        .order_by(ModelUsage.id)
+                        .all()
+                    )
+                    for model_name, model_provider in provider_results:
+                        provider_map.setdefault(model_name, model_provider)
+
+                by_model = []
+                for stat in model_stats:
+                    provider = provider_map.get(stat.model_name, "unknown")
+
+                    by_model.append(
+                        {
+                            "model": stat.model_name,
+                            "provider": provider,
+                            "tokens": stat.tokens,
+                            "calls": stat.calls,
+                            "prompt_tokens": stat.prompt_tokens,
+                            "completion_tokens": stat.completion_tokens,
+                        }
+                    )
+
+                # Get recent researches with token usage
+                # Note: This requires research_history table - for now we'll use available data
+                recent_research_query = session.query(
+                    TokenUsage.research_id,
+                    func.sum(TokenUsage.total_tokens).label("token_count"),
+                    func.max(TokenUsage.timestamp).label("latest_timestamp"),
+                ).filter(TokenUsage.research_id.isnot(None))
+
+                if time_condition is not None:
+                    recent_research_query = recent_research_query.filter(
+                        time_condition
+                    )
+                if mode_condition is not None:
+                    recent_research_query = recent_research_query.filter(
+                        mode_condition
+                    )
+
+                recent_research_data = (
+                    recent_research_query.group_by(TokenUsage.research_id)
+                    .order_by(func.max(TokenUsage.timestamp).desc())
+                    .limit(10)
+                    .all()
+                )
+
+                # Batch load research queries for recent researches (fix N+1)
+                recent_research_ids = [
+                    r.research_id for r in recent_research_data
+                ]
+                research_query_map = {}
+                if recent_research_ids:
+                    # Get first non-null research_query for each research_id
+                    query_results = (
+                        session.query(
+                            TokenUsage.research_id, TokenUsage.research_query
+                        )
+                        .filter(
+                            TokenUsage.research_id.in_(recent_research_ids),
+                            TokenUsage.research_query.isnot(None),
+                        )
+                        .order_by(TokenUsage.id)
+                        .all()
+                    )
+                    for research_id, research_query in query_results:
+                        if research_id not in research_query_map:
+                            research_query_map[research_id] = research_query
+
+                recent_researches = []
+                for research_data in recent_research_data:
+                    query_text = research_query_map.get(
+                        research_data.research_id,
+                        f"Research {research_data.research_id}",
+                    )
+
+                    recent_researches.append(
+                        {
+                            "id": research_data.research_id,
+                            "query": query_text,
+                            "tokens": research_data.token_count or 0,
+                            "created_at": research_data.latest_timestamp,
+                        }
+                    )
+
+                # Token breakdown statistics
+                breakdown_query = query.with_entities(
+                    func.sum(TokenUsage.prompt_tokens).label(
+                        "total_input_tokens"
+                    ),
+                    func.sum(TokenUsage.completion_tokens).label(
+                        "total_output_tokens"
+                    ),
+                    func.avg(TokenUsage.prompt_tokens).label(
+                        "avg_input_tokens"
+                    ),
+                    func.avg(TokenUsage.completion_tokens).label(
+                        "avg_output_tokens"
+                    ),
+                    func.avg(TokenUsage.total_tokens).label("avg_total_tokens"),
+                )
+                token_breakdown = breakdown_query.first()
+
+                # Get rate limiting metrics
+                from ..database.models import (
+                    RateLimitAttempt,
+                    RateLimitEstimate,
+                )
+
+                # Get rate limit attempts
+                rate_limit_query = session.query(RateLimitAttempt)
+
+                # Apply time filter
+                if time_condition is not None:
+                    # RateLimitAttempt uses timestamp as float, not datetime
+                    if period == "7d":
+                        cutoff_time = time.time() - (7 * 24 * 3600)
+                    elif period == "30d":
+                        cutoff_time = time.time() - (30 * 24 * 3600)
+                    elif period == "3m":
+                        cutoff_time = time.time() - (90 * 24 * 3600)
+                    elif period == "1y":
+                        cutoff_time = time.time() - (365 * 24 * 3600)
+                    else:  # all
+                        cutoff_time = 0
+
+                    if cutoff_time > 0:
+                        rate_limit_query = rate_limit_query.filter(
+                            RateLimitAttempt.timestamp >= cutoff_time
+                        )
+
+                # Get rate limit statistics
+                total_attempts = rate_limit_query.count()
+                successful_attempts = rate_limit_query.filter(
+                    RateLimitAttempt.success
+                ).count()
+                failed_attempts = total_attempts - successful_attempts
+
+                # Count rate limiting events (failures with RateLimitError)
+                rate_limit_events = rate_limit_query.filter(
+                    ~RateLimitAttempt.success,
+                    RateLimitAttempt.error_type == "RateLimitError",
+                ).count()
+
+                logger.debug(
+                    f"Rate limit attempts in database: total={total_attempts}, successful={successful_attempts}"
+                )
+
+                # Get all attempts for detailed calculations
+                attempts = rate_limit_query.all()
+
+                # Calculate average wait times
+                if attempts:
+                    avg_wait_time = sum(a.wait_time for a in attempts) / len(
+                        attempts
+                    )
+                    successful_wait_times = [
+                        a.wait_time for a in attempts if a.success
+                    ]
+                    avg_successful_wait = (
+                        sum(successful_wait_times) / len(successful_wait_times)
+                        if successful_wait_times
+                        else 0
+                    )
+                else:
+                    avg_wait_time = 0
+                    avg_successful_wait = 0
+
+                # Get tracked engines - count distinct engine types from attempts
+                tracked_engines_query = session.query(
+                    func.count(func.distinct(RateLimitAttempt.engine_type))
+                )
+                if cutoff_time > 0:
+                    tracked_engines_query = tracked_engines_query.filter(
+                        RateLimitAttempt.timestamp >= cutoff_time
+                    )
+                tracked_engines = tracked_engines_query.scalar() or 0
+
+                # Get engine-specific stats from attempts
+                engine_stats = []
+
+                # Get distinct engine types from attempts
+                engine_types_query = session.query(
+                    RateLimitAttempt.engine_type
+                ).distinct()
+                if cutoff_time > 0:
+                    engine_types_query = engine_types_query.filter(
+                        RateLimitAttempt.timestamp >= cutoff_time
+                    )
+                engine_types = [
+                    row.engine_type for row in engine_types_query.all()
+                ]
+
+                # Batch-load all estimates (fix N+1 query)
+                estimates_map = {}
+                if engine_types:
+                    all_estimates = (
+                        session.query(RateLimitEstimate)
+                        .filter(RateLimitEstimate.engine_type.in_(engine_types))
+                        .all()
+                    )
+                    estimates_map = {e.engine_type: e for e in all_estimates}
+
+                for engine_type in engine_types:
+                    engine_attempts_list = [
+                        a for a in attempts if a.engine_type == engine_type
+                    ]
+                    engine_attempts = len(engine_attempts_list)
+                    engine_success = len(
+                        [a for a in engine_attempts_list if a.success]
+                    )
+
+                    # Get estimate if exists
+                    estimate = estimates_map.get(engine_type)
+
+                    # Calculate recent success rate
+                    recent_success_rate = (
+                        (engine_success / engine_attempts * 100)
+                        if engine_attempts > 0
+                        else 0
+                    )
+
+                    # Determine status based on success rate
+                    if estimate:
+                        status = (
+                            "healthy"
+                            if estimate.success_rate > 0.8
+                            else "degraded"
+                            if estimate.success_rate > 0.5
+                            else "poor"
+                        )
+                    else:
+                        status = (
+                            "healthy"
+                            if recent_success_rate > 80
+                            else "degraded"
+                            if recent_success_rate > 50
+                            else "poor"
+                        )
+
+                    engine_stat = {
+                        "engine": engine_type,
+                        "base_wait": estimate.base_wait_seconds
+                        if estimate
+                        else 0.0,
+                        "base_wait_seconds": round(
+                            estimate.base_wait_seconds if estimate else 0.0, 2
+                        ),
+                        "min_wait_seconds": round(
+                            estimate.min_wait_seconds if estimate else 0.0, 2
+                        ),
+                        "max_wait_seconds": round(
+                            estimate.max_wait_seconds if estimate else 0.0, 2
+                        ),
+                        "success_rate": round(estimate.success_rate * 100, 1)
+                        if estimate
+                        else recent_success_rate,
+                        "total_attempts": estimate.total_attempts
+                        if estimate
+                        else engine_attempts,
+                        "recent_attempts": engine_attempts,
+                        "recent_success_rate": round(recent_success_rate, 1),
+                        "attempts": engine_attempts,
+                        "status": status,
+                    }
+
+                    if estimate:
+                        # Pass UTC explicitly: web/routers/metrics.py renders
+                        # this same RateLimitEstimate.last_updated field with
+                        # ``fromtimestamp(..., UTC)`` (lines ~700 and ~967).
+                        # Without the tz argument this is server-local, so the
+                        # two surfaces showed the same timestamp shifted by the
+                        # host's UTC offset.
+                        engine_stat["last_updated"] = datetime.fromtimestamp(
+                            estimate.last_updated, UTC
+                        ).strftime("%Y-%m-%d %H:%M:%S")
+                    else:
+                        engine_stat["last_updated"] = "Never"
+
+                    engine_stats.append(engine_stat)
+
+                logger.debug(
+                    f"Tracked engines: {tracked_engines}, engine_stats: {engine_stats}"
+                )
+
+                result = {
+                    "total_tokens": total_tokens,
+                    "total_researches": total_researches,
+                    "by_model": by_model,
+                    "recent_researches": recent_researches,
+                    "token_breakdown": {
+                        "total_input_tokens": int(
+                            token_breakdown.total_input_tokens or 0
+                        ),
+                        "total_output_tokens": int(
+                            token_breakdown.total_output_tokens or 0
+                        ),
+                        "avg_input_tokens": int(
+                            token_breakdown.avg_input_tokens or 0
+                        ),
+                        "avg_output_tokens": int(
+                            token_breakdown.avg_output_tokens or 0
+                        ),
+                        "avg_total_tokens": int(
+                            token_breakdown.avg_total_tokens or 0
+                        ),
+                    },
+                    "rate_limiting": {
+                        "total_attempts": total_attempts,
+                        "successful_attempts": successful_attempts,
+                        "failed_attempts": failed_attempts,
+                        "success_rate": (
+                            successful_attempts / total_attempts * 100
+                        )
+                        if total_attempts > 0
+                        else 0,
+                        "rate_limit_events": rate_limit_events,
+                        "avg_wait_time": round(float(avg_wait_time), 2),
+                        "avg_successful_wait": round(
+                            float(avg_successful_wait), 2
+                        ),
+                        "tracked_engines": tracked_engines,
+                        "engine_stats": engine_stats,
+                        "total_engines_tracked": tracked_engines,
+                        "healthy_engines": len(
+                            [
+                                s
+                                for s in engine_stats
+                                if s["status"] == "healthy"
+                            ]
+                        ),
+                        "degraded_engines": len(
+                            [
+                                s
+                                for s in engine_stats
+                                if s["status"] == "degraded"
+                            ]
+                        ),
+                        "poor_engines": len(
+                            [s for s in engine_stats if s["status"] == "poor"]
+                        ),
+                    },
+                }
+
+                logger.debug(
+                    f"Returning from _get_metrics_from_encrypted_db - total_researches: {result['total_researches']}"
+                )
+                return result
+        except Exception:
+            logger.exception(
+                "CRITICAL ERROR accessing encrypted database for metrics"
+            )
+            return self._get_empty_metrics()
+
+    def _get_empty_metrics(self) -> Dict[str, Any]:
+        """Return empty metrics structure when no data is available."""
+        return {
+            "total_tokens": 0,
+            "total_researches": 0,
+            "by_model": [],
+            "recent_researches": [],
+            "token_breakdown": {
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "avg_prompt_tokens": 0,
+                "avg_completion_tokens": 0,
+                "avg_total_tokens": 0,
+            },
+        }
+
+    def get_enhanced_metrics(
+        self,
+        period: str = "30d",
+        research_mode: str = "all",
+        username: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Get enhanced Phase 1 tracking metrics.
+
+        Args:
+            period: Time period to filter by ('7d', '30d', '3m', '1y', 'all')
+            research_mode: Research mode to filter by ('quick', 'detailed', 'all')
+            username: Authenticated user whose encrypted DB to open. If
+                omitted, falls back to the request's contextvar — route
+                handlers should pass it explicitly so the lookup is
+                obviously user-scoped.
+
+        Returns:
+            Dictionary containing enhanced metrics data including time series
+        """
+
+        from ..database.session_context import get_user_db_session
+
+        if username is None:
+            username = get_current_username()
+        if not username:
+            # Return empty metrics structure when no user session
+            return {
+                "recent_enhanced_data": [],
+                "performance_stats": {
+                    "avg_response_time": 0,
+                    "min_response_time": 0,
+                    "max_response_time": 0,
+                    "success_rate": 0,
+                    "error_rate": 0,
+                    "total_enhanced_calls": 0,
+                },
+                "mode_breakdown": [],
+                "search_engine_stats": [],
+                "phase_breakdown": [],
+                "time_series_data": [],
+                "call_stack_analysis": {
+                    "by_file": [],
+                    "by_function": [],
+                },
+            }
+
+        try:
+            with get_user_db_session(username) as session:
+                # Build base query with filters
+                query = session.query(TokenUsage)
+
+                # Apply time filter
+                time_condition = get_time_filter_condition(
+                    period, TokenUsage.timestamp
+                )
+                if time_condition is not None:
+                    query = query.filter(time_condition)
+
+                # Apply research mode filter
+                mode_condition = get_research_mode_condition(
+                    research_mode, TokenUsage.research_mode
+                )
+                if mode_condition is not None:
+                    query = query.filter(mode_condition)
+
+                # Get time series data for the chart - most important for "Token Consumption Over Time"
+                time_series_query = query.filter(
+                    TokenUsage.timestamp.isnot(None),
+                    TokenUsage.total_tokens > 0,
+                ).order_by(TokenUsage.timestamp.asc())
+
+                # Limit to recent data for performance
+                if period != "all":
+                    time_series_query = time_series_query.limit(200)
+
+                time_series_data = time_series_query.all()
+
+                # Format time series data with cumulative calculations
+                time_series = []
+                cumulative_tokens = 0
+                cumulative_prompt_tokens = 0
+                cumulative_completion_tokens = 0
+
+                for usage in time_series_data:
+                    cumulative_tokens += usage.total_tokens or 0
+                    cumulative_prompt_tokens += usage.prompt_tokens or 0
+                    cumulative_completion_tokens += usage.completion_tokens or 0
+
+                    time_series.append(
+                        {
+                            "timestamp": str(usage.timestamp)
+                            if usage.timestamp
+                            else None,
+                            "tokens": usage.total_tokens or 0,
+                            "prompt_tokens": usage.prompt_tokens or 0,
+                            "completion_tokens": usage.completion_tokens or 0,
+                            "cumulative_tokens": cumulative_tokens,
+                            "cumulative_prompt_tokens": cumulative_prompt_tokens,
+                            "cumulative_completion_tokens": cumulative_completion_tokens,
+                            "research_id": usage.research_id,
+                        }
+                    )
+
+                # Basic performance stats using ORM
+                performance_query = query.filter(
+                    TokenUsage.response_time_ms.isnot(None)
+                )
+                total_calls = performance_query.count()
+
+                if total_calls > 0:
+                    avg_response_time = (
+                        performance_query.with_entities(
+                            func.avg(TokenUsage.response_time_ms)
+                        ).scalar()
+                        or 0
+                    )
+                    min_response_time = (
+                        performance_query.with_entities(
+                            func.min(TokenUsage.response_time_ms)
+                        ).scalar()
+                        or 0
+                    )
+                    max_response_time = (
+                        performance_query.with_entities(
+                            func.max(TokenUsage.response_time_ms)
+                        ).scalar()
+                        or 0
+                    )
+                    success_count = performance_query.filter(
+                        TokenUsage.success_status == "success"
+                    ).count()
+                    error_count = performance_query.filter(
+                        TokenUsage.success_status == "error"
+                    ).count()
+
+                    perf_stats = {
+                        "avg_response_time": round(avg_response_time),
+                        "min_response_time": min_response_time,
+                        "max_response_time": max_response_time,
+                        "success_rate": (
+                            round((success_count / total_calls * 100), 1)
+                            if total_calls > 0
+                            else 0
+                        ),
+                        "error_rate": (
+                            round((error_count / total_calls * 100), 1)
+                            if total_calls > 0
+                            else 0
+                        ),
+                        "total_enhanced_calls": total_calls,
+                    }
+                else:
+                    perf_stats = {
+                        "avg_response_time": 0,
+                        "min_response_time": 0,
+                        "max_response_time": 0,
+                        "success_rate": 0,
+                        "error_rate": 0,
+                        "total_enhanced_calls": 0,
+                    }
+
+                # Research mode breakdown using ORM
+                mode_stats = (
+                    query.filter(TokenUsage.research_mode.isnot(None))
+                    .with_entities(
+                        TokenUsage.research_mode,
+                        func.count().label("count"),
+                        func.avg(TokenUsage.total_tokens).label("avg_tokens"),
+                        func.avg(TokenUsage.response_time_ms).label(
+                            "avg_response_time"
+                        ),
+                    )
+                    .group_by(TokenUsage.research_mode)
+                    .all()
+                )
+
+                modes = [
+                    {
+                        "mode": stat.research_mode,
+                        "count": stat.count,
+                        "avg_tokens": round(stat.avg_tokens or 0),
+                        "avg_response_time": round(stat.avg_response_time or 0),
+                    }
+                    for stat in mode_stats
+                ]
+
+                # Recent enhanced data (simplified)
+                recent_enhanced_query = (
+                    query.filter(TokenUsage.research_query.isnot(None))
+                    .order_by(TokenUsage.timestamp.desc())
+                    .limit(50)
+                )
+
+                recent_enhanced_data = recent_enhanced_query.all()
+                recent_enhanced = [
+                    {
+                        "research_query": usage.research_query,
+                        "research_mode": usage.research_mode,
+                        "research_phase": usage.research_phase,
+                        "search_iteration": usage.search_iteration,
+                        "response_time_ms": usage.response_time_ms,
+                        "success_status": usage.success_status,
+                        "error_type": usage.error_type,
+                        "search_engines_planned": usage.search_engines_planned,
+                        "search_engine_selected": usage.search_engine_selected,
+                        "total_tokens": usage.total_tokens,
+                        "prompt_tokens": usage.prompt_tokens,
+                        "completion_tokens": usage.completion_tokens,
+                        "timestamp": str(usage.timestamp)
+                        if usage.timestamp
+                        else None,
+                        "research_id": usage.research_id,
+                        "calling_file": usage.calling_file,
+                        "calling_function": usage.calling_function,
+                        "call_stack": usage.call_stack,
+                    }
+                    for usage in recent_enhanced_data
+                ]
+
+                # Search engine breakdown using ORM
+                search_engine_stats = (
+                    query.filter(TokenUsage.search_engine_selected.isnot(None))
+                    .with_entities(
+                        TokenUsage.search_engine_selected,
+                        func.count().label("count"),
+                        func.avg(TokenUsage.total_tokens).label("avg_tokens"),
+                        func.avg(TokenUsage.response_time_ms).label(
+                            "avg_response_time"
+                        ),
+                    )
+                    .group_by(TokenUsage.search_engine_selected)
+                    .all()
+                )
+
+                search_engines = [
+                    {
+                        "search_engine": stat.search_engine_selected,
+                        "count": stat.count,
+                        "avg_tokens": round(stat.avg_tokens or 0),
+                        "avg_response_time": round(stat.avg_response_time or 0),
+                    }
+                    for stat in search_engine_stats
+                ]
+
+                # Research phase breakdown using ORM
+                phase_stats = (
+                    query.filter(TokenUsage.research_phase.isnot(None))
+                    .with_entities(
+                        TokenUsage.research_phase,
+                        func.count().label("count"),
+                        func.avg(TokenUsage.total_tokens).label("avg_tokens"),
+                        func.avg(TokenUsage.response_time_ms).label(
+                            "avg_response_time"
+                        ),
+                    )
+                    .group_by(TokenUsage.research_phase)
+                    .all()
+                )
+
+                phases = [
+                    {
+                        "phase": stat.research_phase,
+                        "count": stat.count,
+                        "avg_tokens": round(stat.avg_tokens or 0),
+                        "avg_response_time": round(stat.avg_response_time or 0),
+                    }
+                    for stat in phase_stats
+                ]
+
+                # Call stack analysis using ORM
+                file_stats = (
+                    query.filter(TokenUsage.calling_file.isnot(None))
+                    .with_entities(
+                        TokenUsage.calling_file,
+                        func.count().label("count"),
+                        func.avg(TokenUsage.total_tokens).label("avg_tokens"),
+                    )
+                    .group_by(TokenUsage.calling_file)
+                    .order_by(func.count().desc())
+                    .limit(10)
+                    .all()
+                )
+
+                files = [
+                    {
+                        "file": stat.calling_file,
+                        "count": stat.count,
+                        "avg_tokens": round(stat.avg_tokens or 0),
+                    }
+                    for stat in file_stats
+                ]
+
+                function_stats = (
+                    query.filter(TokenUsage.calling_function.isnot(None))
+                    .with_entities(
+                        TokenUsage.calling_function,
+                        func.count().label("count"),
+                        func.avg(TokenUsage.total_tokens).label("avg_tokens"),
+                    )
+                    .group_by(TokenUsage.calling_function)
+                    .order_by(func.count().desc())
+                    .limit(10)
+                    .all()
+                )
+
+                functions = [
+                    {
+                        "function": stat.calling_function,
+                        "count": stat.count,
+                        "avg_tokens": round(stat.avg_tokens or 0),
+                    }
+                    for stat in function_stats
+                ]
+
+                return {
+                    "recent_enhanced_data": recent_enhanced,
+                    "performance_stats": perf_stats,
+                    "mode_breakdown": modes,
+                    "search_engine_stats": search_engines,
+                    "phase_breakdown": phases,
+                    "time_series_data": time_series,
+                    "call_stack_analysis": {
+                        "by_file": files,
+                        "by_function": functions,
+                    },
+                }
+        except Exception:
+            logger.exception("Error in get_enhanced_metrics")
+            # Return simplified response without non-existent columns
+            return {
+                "recent_enhanced_data": [],
+                "performance_stats": {
+                    "avg_response_time": 0,
+                    "min_response_time": 0,
+                    "max_response_time": 0,
+                    "success_rate": 0,
+                    "error_rate": 0,
+                    "total_enhanced_calls": 0,
+                },
+                "mode_breakdown": [],
+                "search_engine_stats": [],
+                "phase_breakdown": [],
+                "time_series_data": [],
+                "call_stack_analysis": {
+                    "by_file": [],
+                    "by_function": [],
+                },
+            }
+
+    def get_research_timeline_metrics(
+        self, research_id: str, username: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Get timeline metrics for a specific research.
+
+        Args:
+            research_id: The ID of the research
+            username: Authenticated user whose encrypted DB to open. If
+                omitted, falls back to the request's contextvar.
+
+        Returns:
+            Dictionary containing timeline metrics for the research
+        """
+
+        from ..database.session_context import get_user_db_session
+
+        if username is None:
+            username = get_current_username()
+        if not username:
+            return {
+                "research_id": research_id,
+                "research_details": {},
+                "timeline": [],
+                "summary": {
+                    "total_calls": 0,
+                    "total_tokens": 0,
+                    "total_prompt_tokens": 0,
+                    "total_completion_tokens": 0,
+                    "avg_response_time": 0,
+                    "success_rate": 0,
+                },
+                "phase_stats": {},
+            }
+
+        with get_user_db_session(username) as session:
+            # Get all token usage for this research ordered by time including call stack
+            timeline_data = session.execute(
+                text(
+                    """
+                SELECT
+                    timestamp,
+                    total_tokens,
+                    prompt_tokens,
+                    completion_tokens,
+                    response_time_ms,
+                    success_status,
+                    error_type,
+                    research_phase,
+                    search_iteration,
+                    search_engine_selected,
+                    model_name,
+                    calling_file,
+                    calling_function,
+                    call_stack
+                FROM token_usage
+                WHERE research_id = :research_id
+                ORDER BY timestamp ASC
+            """
+                ),
+                {"research_id": research_id},
+            ).fetchall()
+
+            # Format timeline data with cumulative tokens
+            timeline = []
+            cumulative_tokens = 0
+            cumulative_prompt_tokens = 0
+            cumulative_completion_tokens = 0
+
+            for row in timeline_data:
+                cumulative_tokens += row[1] or 0
+                cumulative_prompt_tokens += row[2] or 0
+                cumulative_completion_tokens += row[3] or 0
+
+                # call_stack is a JSON column. Depending on the
+                # SQLAlchemy/SQLite/driver combo the raw text() SELECT may
+                # either hand back the raw JSON-encoded TEXT or already
+                # the decoded Python value. Normalise to the API/UI
+                # contract (`string | null`): pass through None and
+                # strings; re-serialise any other stored JSON shape
+                # (number / bool / list / object) so a Python int/bool/
+                # list never leaks to the browser. Legacy unparseable
+                # strings pass through as-is.
+                raw_call_stack = row[13]
+                if raw_call_stack is None or raw_call_stack == "":
+                    decoded_call_stack = None
+                elif isinstance(raw_call_stack, str):
+                    try:
+                        decoded = json.loads(raw_call_stack)
+                    except (TypeError, ValueError):
+                        decoded_call_stack = raw_call_stack
+                    else:
+                        decoded_call_stack = (
+                            decoded
+                            if decoded is None or isinstance(decoded, str)
+                            else json.dumps(decoded)
+                        )
+                else:
+                    decoded_call_stack = (
+                        raw_call_stack
+                        if isinstance(raw_call_stack, str)
+                        else json.dumps(raw_call_stack)
+                    )
+
+                timeline.append(
+                    {
+                        "timestamp": str(row[0]) if row[0] else None,
+                        "tokens": row[1] or 0,
+                        "prompt_tokens": row[2] or 0,
+                        "completion_tokens": row[3] or 0,
+                        "cumulative_tokens": cumulative_tokens,
+                        "cumulative_prompt_tokens": cumulative_prompt_tokens,
+                        "cumulative_completion_tokens": cumulative_completion_tokens,
+                        "response_time_ms": row[4],
+                        "success_status": row[5],
+                        "error_type": row[6],
+                        "research_phase": row[7],
+                        "search_iteration": row[8],
+                        "search_engine_selected": row[9],
+                        "model_name": row[10],
+                        "calling_file": row[11],
+                        "calling_function": row[12],
+                        "call_stack": decoded_call_stack,
+                    }
+                )
+
+            # Get research basic info
+            research_info = session.execute(
+                text(
+                    """
+                SELECT query, mode, status, created_at, completed_at
+                FROM research_history
+                WHERE id = :research_id
+            """
+                ),
+                {"research_id": research_id},
+            ).fetchone()
+
+            research_details = {}
+            if research_info:
+                research_details = {
+                    "query": research_info[0],
+                    "mode": research_info[1],
+                    "status": research_info[2],
+                    "created_at": str(research_info[3])
+                    if research_info[3]
+                    else None,
+                    "completed_at": str(research_info[4])
+                    if research_info[4]
+                    else None,
+                }
+
+            # Calculate summary stats
+            total_calls = len(timeline_data)
+            total_tokens = cumulative_tokens
+            avg_response_time = sum(row[4] or 0 for row in timeline_data) / max(
+                total_calls, 1
+            )
+            success_rate = (
+                sum(1 for row in timeline_data if row[5] == "success")
+                / max(total_calls, 1)
+                * 100
+            )
+
+            # Phase breakdown for this research
+            phase_stats = {}
+            for row in timeline_data:
+                phase = row[7] or "unknown"
+                if phase not in phase_stats:
+                    phase_stats[phase] = {
+                        "count": 0,
+                        "tokens": 0,
+                        "avg_response_time": 0,
+                    }
+                phase_stats[phase]["count"] += 1
+                phase_stats[phase]["tokens"] += row[1] or 0
+                if row[4]:
+                    phase_stats[phase]["avg_response_time"] += row[4]
+
+            # Calculate averages for phases
+            for phase in phase_stats:
+                if phase_stats[phase]["count"] > 0:
+                    phase_stats[phase]["avg_response_time"] = round(
+                        phase_stats[phase]["avg_response_time"]
+                        / phase_stats[phase]["count"]
+                    )
+
+            return {
+                "research_id": research_id,
+                "research_details": research_details,
+                "timeline": timeline,
+                "summary": {
+                    "total_calls": total_calls,
+                    "total_tokens": total_tokens,
+                    "total_prompt_tokens": cumulative_prompt_tokens,
+                    "total_completion_tokens": cumulative_completion_tokens,
+                    "avg_response_time": round(avg_response_time),
+                    "success_rate": round(success_rate, 1),
+                },
+                "phase_stats": phase_stats,
+            }

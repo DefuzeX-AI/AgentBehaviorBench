@@ -1,0 +1,1280 @@
+{% extends "base.html" %}
+{% from "components/help_macros.html" import tooltip, help_panel, help_step, help_tip, help_card %}
+{% set active_page = 'library' %}
+
+{% block title %}Research Library{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="/static/css/library.css">
+<link rel="stylesheet" href="/static/css/components/pagination.css">
+<link rel="stylesheet" href="/static/css/components/semantic-search.css">
+{% endblock %}
+
+{% block content %}
+<div class="ldr-library-container">
+    <div class="ldr-library-header">
+        <h1>Research Library</h1>
+        <div class="ldr-header-actions">
+            <button class="btn btn-secondary" onclick="showSyncModal()" title="Check if files exist and sync with filesystem">
+                <i class="fas fa-sync"></i> Sync Library
+            </button>
+            <div class="btn-group">
+                <button class="btn btn-success"
+                        {% if not enable_pdf_storage %}
+                        disabled
+                        title="PDF storage is disabled. Click the storage mode button above to enable."
+                        data-toggle="tooltip"
+                        {% else %}
+                        onclick="downloadAllNew()"
+                        title="Download PDF files from all your research sources and save to library"
+                        {% endif %}>
+                    <i class="fas fa-file-pdf"></i> Get All Research PDFs
+                </button>
+                <button class="btn btn-info"
+                        onclick="downloadAllAsText()"
+                        title="Extract text from all research sources without saving PDF files">
+                    <i class="fas fa-file-alt"></i> Text Only (from PDFs)
+                </button>
+            </div>
+            <div class="ldr-library-stats">
+                <span class="ldr-stat-item">
+                    <i class="fas fa-file-pdf"></i>
+                    <span id="total-pdfs">{{ stats.total_pdfs }}</span> PDFs
+                </span>
+                <span class="ldr-stat-item">
+                    <i class="fas fa-hdd"></i>
+                    <span id="total-size">{{ stats.total_size_mb|round(1) }}</span> MB
+                </span>
+                <span class="ldr-stat-item">
+                    <i class="fas fa-folder"></i>
+                    <span id="storage-path" title="{{ storage_path }}">{{ storage_path|truncate(30) }}</span>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Library Status Bar -->
+    <div class="ldr-library-status-bar">
+        <div class="ldr-status-item">
+            <span class="ldr-status-label">Storage Mode:</span>
+            {% if shared_library %}
+                <span class="ldr-badge ldr-badge-warning">
+                    <i class="fas fa-users"></i> Shared Library
+                </span>
+            {% else %}
+                <span class="ldr-badge ldr-badge-success">
+                    <i class="fas fa-user-lock"></i> Private Library
+                </span>
+            {% endif %}
+        </div>
+
+        <div class="ldr-status-item">
+            <span class="ldr-status-label">{{ tooltip("PDF Storage:", "Database: Encrypted, most secure. Filesystem: Unencrypted files on disk - use only if you need external tool access. Text Only: Smallest footprint, no original PDFs kept.") }}</span>
+            {% if pdf_storage_mode == 'database' %}
+                <button class="btn btn-sm btn-success" onclick="showStorageModeModal()" title="Click to change storage mode">
+                    <i class="fas fa-database"></i> Database (Encrypted)
+                </button>
+            {% elif pdf_storage_mode == 'filesystem' %}
+                <button class="btn btn-sm btn-warning" onclick="showStorageModeModal()" title="Click to change storage mode">
+                    <i class="fas fa-hdd"></i> Filesystem (Unencrypted)
+                </button>
+            {% else %}
+                <button class="btn btn-sm btn-secondary" onclick="showStorageModeModal()" title="Click to change storage mode">
+                    <i class="fas fa-file-alt"></i> Text Only
+                </button>
+            {% endif %}
+        </div>
+
+        <div class="ldr-status-item">
+            <a href="/settings#research-library" class="btn btn-sm btn-outline-primary">
+                <i class="fas fa-cog"></i> Configure Settings
+            </a>
+        </div>
+    </div>
+
+    <!-- How Library Works Help Panel -->
+    {% call help_panel('library-how', 'How the Research Library Works', icon='book', collapsed=true, dismissible=true) %}
+    <div class="ldr-help-steps">
+        {{ help_step(1, "Research Sources", "When you run research, all discovered sources (PDFs, papers, articles) are automatically tracked.") }}
+        {{ help_step(2, "Download to Library", "Use 'Get All Research PDFs' to download PDFs from tracked sources. Use 'Text Only' for just searchable text.") }}
+        {{ help_step(3, "Organize with Collections", "Create collections to group documents by topic. The Library shows all documents; Collections are custom groupings.") }}
+        {{ help_step(4, "Search via RAG", "Index collections to enable semantic search. When researching, select a collection as your search engine to search your documents.") }}
+    </div>
+    <div class="ldr-help-cards">
+        {{ help_card("Database Storage", "PDFs encrypted in your database. Most secure and portable.", icon="database", variant="success") }}
+        {{ help_card("Filesystem Storage", "PDFs stored on disk. Faster for large files but unencrypted.", icon="hdd", variant="warning") }}
+        {{ help_card("Text Only", "Only extracted text is stored. Smallest footprint, no PDF viewing.", icon="file-alt", variant="neutral") }}
+    </div>
+    {{ help_tip("<strong>Tip:</strong> Use 'Sync Library' after moving or deleting files manually to update the database.") }}
+    {% endcall %}
+
+    <!-- Search Section — Collection + Search bar prominent on top -->
+    <div class="ldr-filters-section">
+        <div class="ldr-filter-row ldr-library-search-row">
+            <!-- Collection Filter -->
+            <div class="ldr-filter-group">
+                <label for="filter-collection">Collection</label>
+                <select id="filter-collection" class="form-control" aria-label="Filter by collection">
+                    <option value="">All Collections</option>
+                    {% for collection in collections %}
+                    <option value="{{ collection.id }}" {% if selected_collection == collection.id %}selected{% endif %}>
+                        {{ collection.name }}{% if collection.is_default %} (Default){% endif %} ({{ collection.document_count }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Search with mode toggle — large and prominent -->
+            <div class="ldr-filter-group ldr-library-search-group">
+                <label for="search-documents">Search</label>
+                <div class="ldr-search-row">
+                    <input type="text" id="search-documents" class="form-control ldr-library-search-input"
+                           placeholder="AI Hybrid: titles & authors + AI content search..." aria-label="Search documents" style="flex: 1;">
+                    <div class="dropdown d-inline-block">
+                        <button class="btn btn-sm ldr-btn-outline dropdown-toggle" type="button"
+                                id="search-mode-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-brain" aria-hidden="true"></i> AI Hybrid
+                        </button>
+                        <ul class="dropdown-menu" aria-label="Search mode" id="search-mode-menu">
+                            <li><a class="dropdown-item active" href="#" data-mode="hybrid">
+                                <i class="fas fa-brain" aria-hidden="true"></i> AI Hybrid <small class="text-muted">— titles + AI content</small>
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" data-mode="text">
+                                <i class="fas fa-font" aria-hidden="true"></i> Text Only <small class="text-muted">— titles, authors, DOI</small>
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" data-mode="semantic">
+                                <i class="fas fa-brain" aria-hidden="true"></i> AI Only <small class="text-muted">— content search</small>
+                            </a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Secondary filters row -->
+        <div class="ldr-filter-row ldr-library-filters-row">
+            <!-- Domain Filter -->
+            <div class="ldr-filter-group">
+                <label for="filter-domain">Domain</label>
+                <select id="filter-domain" class="form-control" aria-label="Filter by domain">
+                    <option value="">All Domains</option>
+                    {% for domain in unique_domains %}
+                    <option value="{{ domain }}" {% if selected_domain == domain %}selected{% endif %}>{{ domain }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Research Filter -->
+            <div class="ldr-filter-group">
+                <label for="filter-research">Research</label>
+                <select id="filter-research" class="form-control" aria-label="Filter by research">
+                    <option value="">All Research</option>
+                    {% for research in research_list %}
+                    <option value="{{ research.id }}" {% if selected_research == research.id|string %}selected{% endif %}>{{ research.title or research.query[:50] }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Date Filter -->
+            <div class="ldr-filter-group">
+                <label for="filter-date">Downloaded</label>
+                <select id="filter-date" class="form-control" aria-label="Filter by download date">
+                    <option value="">All Time</option>
+                    <option value="today" {% if selected_date == "today" %}selected{% endif %}>Today</option>
+                    <option value="week" {% if selected_date == "week" %}selected{% endif %}>This Week</option>
+                    <option value="month" {% if selected_date == "month" %}selected{% endif %}>This Month</option>
+                </select>
+            </div>
+
+            <!-- View Toggle -->
+            <div class="ldr-filter-group" style="margin-left: auto;">
+                <label>&nbsp;</label>
+                <div class="btn-group ldr-view-toggle">
+                    <button class="btn btn-sm active" data-view="grid" aria-label="Grid view" aria-pressed="true">
+                        <i class="fas fa-th" aria-hidden="true"></i>
+                    </button>
+                    <button class="btn btn-sm" data-view="list" aria-label="List view" aria-pressed="false">
+                        <i class="fas fa-list" aria-hidden="true"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documents Grid/List -->
+    <div id="documents-container" class="ldr-documents-grid">
+        {% for doc in documents %}
+        <div class="ldr-document-card" data-domain="{{ doc.domain }}"
+             data-research="{{ doc.research_id }}" data-doc-id="{{ doc.id }}">
+
+            <!-- Card Header with badges -->
+            <div class="card-header">
+                {% if doc.is_arxiv %}
+                    <span class="ldr-badge ldr-badge-arxiv">arXiv</span>
+                {% elif doc.is_pubmed %}
+                    <span class="ldr-badge ldr-badge-pubmed">PubMed</span>
+                {% elif doc.file_type == 'pdf' %}
+                    <i class="fas fa-file-pdf text-danger"></i>
+                {% else %}
+                    <i class="fas fa-file-alt"></i>
+                {% endif %}
+            </div>
+
+            <!-- Card Body -->
+            <div class="card-body" onclick="window.location.href='/library/document/{{ doc.id }}'">
+                <!-- Large action buttons -->
+                <div class="ldr-action-buttons" onclick="event.stopPropagation()">
+                    {% if doc.has_pdf %}
+                    <a href="/library/document/{{ doc.id }}/pdf" target="_blank" rel="noopener noreferrer" class="ldr-action-btn ldr-action-btn-pdf">
+                        <i class="fas fa-file-pdf"></i> View PDF
+                    </a>
+                    {% endif %}
+                    {% if doc.has_text_db %}
+                    <a href="/library/document/{{ doc.id }}/txt" target="_blank" rel="noopener noreferrer" class="ldr-action-btn ldr-action-btn-txt">
+                        <i class="fas fa-file-alt"></i> View Text
+                    </a>
+                    {% endif %}
+                    {% if doc.has_rag_indexed %}
+                    <a href="/library/document/{{ doc.id }}/chunks" class="ldr-action-btn ldr-action-btn-rag" title="{{ doc.rag_chunk_count }} chunks indexed">
+                        <i class="fas fa-brain"></i> RAG Indexed
+                    </a>
+                    {% endif %}
+                    {% if not doc.has_pdf and not doc.has_text_db %}
+                    <div class="ldr-action-btn ldr-action-btn-none">
+                        <i class="fas fa-exclamation-triangle"></i> Not Downloaded
+                    </div>
+                    {% endif %}
+                </div>
+                <h3 class="ldr-doc-title" title="{{ doc.document_title }}">
+                    {{ doc.document_title or doc.file_name }}
+                </h3>
+
+                {% if doc.authors %}
+                <p class="ldr-doc-authors">{{ doc.authors|join(', ')|truncate(50) }}</p>
+                {% endif %}
+
+                <div class="ldr-doc-metadata">
+                    <span class="ldr-meta-item">
+                        <i class="fas fa-calendar"></i>
+                        <span class="ldr-download-date" data-date="{{ doc.downloaded_at }}">{{ doc.downloaded_at }}</span>
+                    </span>
+                    <span class="ldr-meta-item">
+                        <i class="fas fa-file"></i>
+                        {{ (doc.file_size / 1024 / 1024)|round(1) }} MB
+                    </span>
+                    {% if doc.doi %}
+                    <span class="ldr-meta-item">
+                        <i class="fas fa-fingerprint"></i>
+                        DOI: {{ doc.doi|truncate(20) }}
+                    </span>
+                    {% endif %}
+                </div>
+
+                <!-- Research Info -->
+                <div class="ldr-research-info">
+                    <span class="ldr-research-link">
+                        From: <a href="/results/{{ doc.research_id }}" onclick="event.stopPropagation()">
+                            {{ doc.research_title|truncate(40) }}
+                        </a>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card Footer -->
+            <div class="card-footer">
+                <div class="ldr-doc-tags">
+                    {% if doc.domain_category %}
+                    <span class="ldr-tag">{{ doc.domain_category }}</span>
+                    {% endif %}
+                    <span class="ldr-tag">{{ doc.domain|truncate(20) }}</span>
+                </div>
+                <div class="ldr-doc-actions" onclick="event.stopPropagation()">
+                    {% if doc.has_pdf %}
+                    <button class="ldr-btn-delete-blob" onclick="DeleteManager.deleteDocumentBlob('{{ doc.id }}', {onSuccess: () => location.reload()})"
+                            title="Remove PDF only (keep text). Text content will be preserved for searching.">
+                        <i class="fas fa-file-pdf"></i><i class="fas fa-times" style="font-size: 0.6em; margin-left: -2px;"></i>
+                    </button>
+                    {% endif %}
+                    <button class="ldr-btn-delete-doc" onclick="DeleteManager.deleteDocument('{{ doc.id }}', {onSuccess: () => location.reload()})"
+                            title="Permanently delete this document, including PDF and text content. This cannot be undone.">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 and documents %}
+    {% set filter_params = "" %}
+    {% if request.query_params.get('collection') %}{% set filter_params = filter_params ~ "&collection=" ~ (request.query_params.get('collection') | urlencode) %}{% endif %}
+    {% if request.query_params.get('research') %}{% set filter_params = filter_params ~ "&research=" ~ (request.query_params.get('research') | urlencode) %}{% endif %}
+    {% if request.query_params.get('domain') %}{% set filter_params = filter_params ~ "&domain=" ~ (request.query_params.get('domain') | urlencode) %}{% endif %}
+    {% if request.query_params.get('date') %}{% set filter_params = filter_params ~ "&date=" ~ (request.query_params.get('date') | urlencode) %}{% endif %}
+    <nav class="ldr-pagination" aria-label="Document list pagination">
+        <a class="ldr-page-link {% if page <= 1 %}disabled{% endif %}"
+           href="?page={{ page - 1 }}{{ filter_params }}"
+           {% if page <= 1 %}tabindex="-1" aria-disabled="true"{% endif %}>
+            <i aria-hidden="true" class="fas fa-chevron-left"></i> Previous
+        </a>
+
+        {% set start_page = [1, page - 2] | max %}
+        {% set end_page = [total_pages, page + 2] | min %}
+
+        {% if start_page > 1 %}
+        <a class="ldr-page-link" href="?page=1{{ filter_params }}">1</a>
+        {% if start_page > 2 %}<span class="ldr-page-ellipsis">&hellip;</span>{% endif %}
+        {% endif %}
+
+        {% for p in range(start_page, end_page + 1) %}
+        <a class="ldr-page-link {% if p == page %}active{% endif %}" href="?page={{ p }}{{ filter_params }}">{{ p }}</a>
+        {% endfor %}
+
+        {% if end_page < total_pages %}
+        {% if end_page < total_pages - 1 %}<span class="ldr-page-ellipsis">&hellip;</span>{% endif %}
+        <a class="ldr-page-link" href="?page={{ total_pages }}{{ filter_params }}">{{ total_pages }}</a>
+        {% endif %}
+
+        <a class="ldr-page-link {% if page >= total_pages %}disabled{% endif %}"
+           href="?page={{ page + 1 }}{{ filter_params }}"
+           {% if page >= total_pages %}tabindex="-1" aria-disabled="true"{% endif %}>
+            Next <i aria-hidden="true" class="fas fa-chevron-right"></i>
+        </a>
+    </nav>
+    {% endif %}
+
+    <!-- Semantic Search Results (shown in SEMANTIC mode, hidden by default) -->
+    <div id="semantic-results-container" style="display: none;" aria-live="polite"></div>
+
+    <!-- Search Notice (indexing status, multi-collection info) -->
+    <div id="library-search-notice" class="ldr-search-notice" style="display: none;" role="status" aria-live="polite"></div>
+
+    <!-- Empty State -->
+    {% if not documents %}
+    <div class="ldr-empty-state">
+        {% if load_error %}
+        {# The document query failed. Say so: the branches below assert the
+           library is empty, which we do not actually know. #}
+        <i class="fas fa-exclamation-triangle fa-3x"></i>
+        <h3>Your library could not be loaded</h3>
+        <p>Something went wrong reading your documents, so this page cannot show them right now. Your documents have not been deleted.</p>
+        <a class="btn btn-primary" href="{{ url_for('library.library_page') }}">
+            <i class="fas fa-rotate-right"></i> Try Again
+        </a>
+        {% elif selected_domain or selected_research or selected_collection %}
+        <i class="fas fa-filter fa-3x"></i>
+        <h3>No documents match the current filters</h3>
+        <p>Try changing or clearing your collection, domain, or research filters</p>
+        <a class="btn btn-secondary" href="{{ url_for('library.library_page') }}">
+            <i class="fas fa-times"></i> Clear All Filters
+        </a>
+        {% else %}
+        <i class="fas fa-book fa-3x"></i>
+        <h3>No documents in your library yet</h3>
+        {% if not enable_pdf_storage %}
+        <div class="ldr-empty-state-info">
+            <p><strong>PDF storage is set to Text Only mode.</strong></p>
+            <p>Choose how to store your research PDFs:</p>
+            <ul style="text-align: left; margin: 10px auto; max-width: 500px;">
+                <li><strong>Database (Recommended):</strong> PDFs encrypted in your personal database. Secure, portable, isolated per-user.</li>
+                <li><strong>Filesystem:</strong> Faster for large files, but stored unencrypted on disk.</li>
+                <li><strong>Text Only:</strong> Current mode - only extracted text is stored.</li>
+            </ul>
+            <p>Text content is always stored encrypted in your personal database.</p>
+        </div>
+        <div class="ldr-empty-state-actions">
+            <button class="btn btn-primary" onclick="window.location.href='/settings#research-library'">
+                <i class="fas fa-cog"></i> Configure Library Settings
+            </button>
+            <button class="btn btn-secondary" onclick="window.location.href='/library/download-manager'">
+                <i class="fas fa-download"></i> Download Manager
+            </button>
+        </div>
+        {% else %}
+        <p>Start downloading PDFs from your research to build your library</p>
+        <button class="btn btn-primary" onclick="window.location.href='/library/download-manager'">
+            <i class="fas fa-download"></i> Go to Download Manager
+        </button>
+        {% endif %}
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- PDF Viewer Modal -->
+<div id="ldr-pdf-modal" class="ldr-pdf-modal">
+    <div class="ldr-pdf-modal-content">
+        <div class="ldr-pdf-modal-header">
+            <h2 id="ldr-pdf-title" class="ldr-pdf-title">PDF Viewer</h2>
+            <div class="ldr-pdf-header-actions">
+                <button class="ldr-pdf-action-btn"
+                        {% if enable_pdf_storage %}
+                        onclick="downloadCurrentPDF()"
+                        title="Download PDF"
+                        {% else %}
+                        disabled
+                        title="PDF downloads are disabled. Enable in Settings → Research Library"
+                        data-toggle="tooltip"
+                        {% endif %}>
+                    <i class="fas fa-download"></i>
+                </button>
+                <button class="ldr-pdf-action-btn" onclick="openPDFInNewTab()" title="Open in new tab">
+                    <i class="fas fa-external-link-alt"></i>
+                </button>
+                <button class="ldr-pdf-close-btn" onclick="closePDFModal()" title="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <div class="ldr-pdf-modal-body">
+            <iframe id="pdf-viewer" class="ldr-pdf-viewer-frame"></iframe>
+        </div>
+    </div>
+</div>
+
+<!-- Text Viewer Modal -->
+<div id="text-modal" class="ldr-pdf-modal">
+    <div class="ldr-pdf-modal-content">
+        <div class="ldr-pdf-modal-header">
+            <h2 id="text-title" class="ldr-pdf-title">Text Viewer</h2>
+            <div class="ldr-pdf-header-actions">
+                <button class="ldr-pdf-action-btn" onclick="copyTextContent()" title="Copy to clipboard">
+                    <i class="fas fa-copy"></i>
+                </button>
+                <button class="ldr-pdf-action-btn" onclick="downloadTextContent()" title="Download as .txt">
+                    <i class="fas fa-download"></i>
+                </button>
+                <button class="ldr-pdf-close-btn" onclick="closeTextModal()" title="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+        <div class="ldr-pdf-modal-body">
+            <div id="text-viewer" class="ldr-text-viewer-content"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Download Progress Modal -->
+<div id="download-progress-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Download Progress</h2>
+        </div>
+        <div class="modal-body">
+            <div class="ldr-overall-progress">
+                <div class="progress-bar">
+                    <div class="ldr-progress-fill" id="ldr-overall-progress" style="width: 0%"></div>
+                </div>
+                <p><span id="current-count">0</span> / <span id="total-count">0</span> files</p>
+            </div>
+            <div class="ldr-download-log" id="ldr-download-log">
+                <!-- Download entries will be added here -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeProgressModal()">Close</button>
+            <button class="btn btn-danger" onclick="cancelDownloads()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+{% include 'components/storage_mode_modal.html' %}
+
+<!-- Sync Library Modal -->
+<div id="sync-library-modal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+            <h2><i class="fas fa-sync"></i> Sync Library with Filesystem</h2>
+            <button class="close" onclick="closeSyncModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="ldr-sync-explanation">
+                <h3>What does Library Sync do?</h3>
+                <p>The sync feature ensures your database stays consistent with the actual PDF files on your disk. It performs a comprehensive check to:</p>
+                <ul>
+                    <li><strong>Verify file existence:</strong> Checks if all PDFs referenced in the database still exist on disk</li>
+                    <li><strong>Update file status:</strong> Marks missing files so they can be re-downloaded if needed</li>
+                    <li><strong>Clean up database:</strong> Removes references to permanently deleted files</li>
+                    <li><strong>Detect external changes:</strong> Finds files that were moved, renamed, or deleted outside the app</li>
+                </ul>
+
+                <h3>When should you use this?</h3>
+                <ul>
+                    <li>After manually deleting PDF files from the storage folder</li>
+                    <li>After moving the library folder to a different location</li>
+                    <li>If you're experiencing "file not found" errors when opening PDFs</li>
+                    <li>After a system crash or unexpected shutdown</li>
+                    <li>Periodically to ensure database integrity</li>
+                </ul>
+
+                <div class="ldr-sync-warning ldr-alert ldr-alert-warning" style="margin-top: 15px;">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Note:</strong> This operation only checks files - it doesn't modify or delete any PDFs. Missing files can be re-downloaded using the Download Manager.
+                </div>
+            </div>
+
+            <div id="sync-progress" style="display: none; margin-top: 20px;">
+                <div class="progress-bar">
+                    <div class="ldr-progress-fill" style="width: 0%"></div>
+                </div>
+                <p id="sync-status">Checking files...</p>
+            </div>
+
+            <div id="sync-results" style="display: none; margin-top: 20px;">
+                <h3>Sync Results</h3>
+                <div class="ldr-sync-stats" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+                    <div class="ldr-alert ldr-alert-success" style="padding: 10px;">
+                        <i class="fas fa-check-circle"></i>
+                        <strong>Files Found:</strong> <span id="files-found">0</span>
+                    </div>
+                    <div class="ldr-alert ldr-alert-danger" style="padding: 10px;">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <strong>Files Missing:</strong> <span id="files-missing">0</span>
+                    </div>
+                </div>
+                <div id="missing-files-action" class="ldr-alert ldr-alert-info" style="display: none; margin-top: 15px;">
+                    <p><strong>Missing files detected!</strong> These files have been marked in the database and can be re-downloaded.</p>
+                    <button class="btn btn-primary" onclick="goToDownloadManager()">Go to Download Manager</button>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button id="sync-start-btn" class="btn btn-primary" onclick="performSync()">
+                <i class="fas fa-play"></i> Start Sync
+            </button>
+            <button id="sync-close-btn" class="btn btn-secondary" onclick="closeSyncModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+
+<script>
+// Store current PDF data globally
+let currentPDFData = null;
+let documentViewerRequestId = 0;
+
+// Route to appropriate viewer based on availability
+function openDocument(docId, hasPdf, hasTextDb) {
+    // Prefer PDF if available, otherwise fall back to text
+    if (hasPdf) {
+        return openPDF(docId);
+    } else if (hasTextDb) {
+        return openText(docId);
+    } else {
+        console.error('No content available for document', docId);
+        alert('No content available for this document');
+    }
+}
+
+// Open PDF in modal
+function openPDF(docId) {
+    const requestId = ++documentViewerRequestId;
+    return fetch(`/library/api/document/${docId}/pdf-url`)
+        .then(res => {
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+            return res.json();
+        })
+        .then(data => {
+            if (requestId !== documentViewerRequestId) return;
+            currentPDFData = data;
+            document.getElementById('pdf-viewer').src = data.url;
+            document.getElementById('ldr-pdf-title').textContent = data.title;
+            document.getElementById('ldr-pdf-modal').style.display = 'block';
+
+            // Add escape key listener
+            document.addEventListener('keydown', handleEscapeKey);
+        })
+        .catch(err => {
+            if (requestId !== documentViewerRequestId) return;
+            console.error('Error loading PDF:', err);
+            alert('Failed to load PDF content');
+        });
+}
+
+// Close PDF modal
+function closePDFModal() {
+    documentViewerRequestId++;
+    document.getElementById('ldr-pdf-modal').style.display = 'none';
+    document.getElementById('pdf-viewer').src = '';
+    currentPDFData = null;
+
+    // Remove escape key listener
+    document.removeEventListener('keydown', handleEscapeKey);
+}
+
+// Handle escape key
+function handleEscapeKey(e) {
+    if (e.key === 'Escape') {
+        closePDFModal();
+    }
+}
+
+// Download current PDF
+function downloadCurrentPDF() {
+    if (currentPDFData && currentPDFData.url) {
+        const link = document.createElement('a');
+        link.href = currentPDFData.url;
+        link.download = currentPDFData.title + '.pdf';
+        link.click();
+    }
+}
+
+// Open PDF in new tab
+function openPDFInNewTab() {
+    if (currentPDFData && currentPDFData.url) {
+        window.open(currentPDFData.url, '_blank');
+    }
+}
+
+// Close modal when clicking outside
+document.getElementById('ldr-pdf-modal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closePDFModal();
+    }
+});
+
+// Text viewer functions
+let currentTextData = null;
+
+function openText(docId) {
+    const requestId = ++documentViewerRequestId;
+    return fetch(`/library/api/document/${docId}/text`)
+        .then(res => {
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+            return res.json();
+        })
+        .then(data => {
+            if (requestId !== documentViewerRequestId) return;
+            currentTextData = data;
+            document.getElementById('text-viewer').textContent = data.text_content;
+            document.getElementById('text-title').textContent = data.title;
+            document.getElementById('text-modal').style.display = 'block';
+
+            // Add escape key listener
+            document.addEventListener('keydown', handleTextEscapeKey);
+        })
+        .catch(err => {
+            if (requestId !== documentViewerRequestId) return;
+            console.error('Error loading text:', err);
+            alert('Failed to load text content');
+        });
+}
+
+function closeTextModal() {
+    documentViewerRequestId++;
+    document.getElementById('text-modal').style.display = 'none';
+    document.getElementById('text-viewer').textContent = '';
+    currentTextData = null;
+
+    // Remove escape key listener
+    document.removeEventListener('keydown', handleTextEscapeKey);
+}
+
+function handleTextEscapeKey(e) {
+    if (e.key === 'Escape') {
+        closeTextModal();
+    }
+}
+
+function copyTextContent() {
+    if (currentTextData && currentTextData.text_content) {
+        navigator.clipboard.writeText(currentTextData.text_content)
+            .then(() => {
+                // Show toast notification
+                const btn = event.target.closest('button');
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i>';
+                setTimeout(() => {
+                    btn.innerHTML = originalHTML;
+                }, 2000);
+            })
+            .catch(err => {
+                console.error('Failed to copy:', err);
+                alert('Failed to copy to clipboard');
+            });
+    }
+}
+
+function downloadTextContent() {
+    if (currentTextData && currentTextData.text_content) {
+        const blob = new Blob([currentTextData.text_content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = (currentTextData.title || 'document') + '.txt';
+        link.click();
+        URL.revokeObjectURL(url);
+    }
+}
+
+// Close text modal when clicking outside (wait for DOM to load)
+document.addEventListener('DOMContentLoaded', function() {
+    const textModal = document.getElementById('text-modal');
+    if (textModal) {
+        textModal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeTextModal();
+            }
+        });
+    }
+});
+
+// Copy path to clipboard
+function copyPath(path) {
+    navigator.clipboard.writeText(path);
+    // Show toast notification
+}
+
+// Current download controller for cancellation
+let currentDownloadController = null;
+let currentDownloadRunId = 0;
+
+function resetDownloadProgress() {
+    const progressBar = document.getElementById('ldr-overall-progress');
+    progressBar.style.removeProperty('background-color');
+    progressBar.style.width = '0%';
+    document.getElementById('current-count').textContent = '0';
+    document.getElementById('total-count').textContent = '0';
+    document.getElementById('ldr-download-log').innerHTML = '';
+}
+
+// Download all as text for RAG
+async function downloadAllAsText() {
+    const btn = event.target.closest('button');
+    const originalContent = btn.innerHTML;
+    const downloadRunId = ++currentDownloadRunId;
+    if (currentDownloadController) {
+        currentDownloadController.abort();
+    }
+    const downloadController = new AbortController();
+    currentDownloadController = downloadController;
+    resetDownloadProgress();
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Extracting...';
+    btn.disabled = true;
+
+    try {
+        // Get CSRF token
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+        // Show progress modal
+        showDownloadProgressModal();
+        document.querySelector('#download-progress-modal h2').textContent = 'Text Extraction to Database';
+
+        // Start streaming text extraction
+        const response = await fetch('/library/api/download-all-text', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({}),
+            signal: downloadController.signal
+        });
+
+        if (
+            downloadRunId !== currentDownloadRunId ||
+            currentDownloadController !== downloadController
+        ) return;
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const reader = response.body.getReader();
+        let terminalSeen = false;
+        const parser = createSSEJsonParser((data) => {
+            if (
+                downloadRunId !== currentDownloadRunId ||
+                currentDownloadController !== downloadController
+            ) return;
+
+            if (data.complete) terminalSeen = true;
+            updateTextExtractionProgress(data);
+
+            // Check if extraction is complete
+            if (handleSSECompletion(
+                data,
+                (d) => {
+                    alert(`Text extraction complete! Extracted ${d.total} documents to encrypted database.`);
+                },
+                () => downloadRunId === currentDownloadRunId
+            )) {
+                if (currentDownloadController === downloadController) {
+                    currentDownloadController = null;
+                }
+            }
+        });
+
+        while (true) {
+            if (
+                downloadRunId !== currentDownloadRunId ||
+                currentDownloadController !== downloadController
+            ) return;
+            const {done, value} = await reader.read();
+            if (
+                downloadRunId !== currentDownloadRunId ||
+                currentDownloadController !== downloadController
+            ) return;
+            if (done) {
+                parser.finish();
+                if (!terminalSeen) {
+                    throw new Error('Text extraction stream ended before completion');
+                }
+                break;
+            }
+            parser.push(value);
+        }
+
+    } catch (error) {
+        if (
+            downloadRunId !== currentDownloadRunId ||
+            currentDownloadController !== downloadController
+        ) return;
+
+        if (error.name === 'AbortError') {
+            console.log('Text extraction cancelled by user');
+            const log = document.getElementById('ldr-download-log');
+            const entry = document.createElement('div');
+            entry.className = 'ldr-download-entry ldr-cancelled';
+            entry.innerHTML = '<strong>Text extraction cancelled by user</strong>';
+            log.appendChild(entry);
+        } else {
+            console.error('Failed to start text extraction:', error);
+            alert('Failed to start text extraction. Please try again.');
+        }
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+    } finally {
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+        if (currentDownloadController === downloadController) {
+            currentDownloadController = null;
+        }
+    }
+}
+
+// Update text extraction progress
+function updateTextExtractionProgress(data) {
+    const progressBar = document.getElementById('ldr-overall-progress');
+    const currentCount = document.getElementById('current-count');
+    const totalCount = document.getElementById('total-count');
+    const log = document.getElementById('ldr-download-log');
+
+    progressBar.style.width = `${data.progress}%`;
+    currentCount.textContent = data.current;
+    totalCount.textContent = data.total;
+
+    if (data.file) {
+        const entry = document.createElement('div');
+        entry.className = `ldr-download-entry ldr-${data.status}`;
+
+        let statusIcon = '';
+        let statusText = '';
+
+        if (data.status === 'success') {
+            statusIcon = '✓';
+            statusText = 'Text extracted';
+        } else if (data.status === 'failed') {
+            statusIcon = '✗';
+            statusText = data.error || 'Extraction failed';
+        }
+
+        entry.innerHTML = `
+            <span class="ldr-status-icon">${statusIcon}</span>
+            <div class="ldr-entry-details">
+                <strong>${window.escapeHtml(data.file)}</strong>
+                <span class="ldr-entry-url">${window.escapeHtml(data.url)}</span>
+                <span class="ldr-status-text">${window.escapeHtml(statusText)}</span>
+            </div>
+        `;
+
+        log.appendChild(entry);
+        log.scrollTop = log.scrollHeight;
+    }
+}
+
+// Download all new articles with progress
+async function downloadAllNew() {
+    const btn = event.target.closest('button');
+    if (btn.disabled) return;
+
+    const originalContent = btn.innerHTML;
+    const downloadRunId = ++currentDownloadRunId;
+    if (currentDownloadController) {
+        currentDownloadController.abort();
+    }
+    const downloadController = new AbortController();
+    currentDownloadController = downloadController;
+    resetDownloadProgress();
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparing...';
+    btn.disabled = true;
+
+    try {
+        // Get CSRF token
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+        // First, queue all undownloaded articles to get the list
+        const queueResponse = await fetch('/library/api/queue-all-undownloaded', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            signal: downloadController.signal
+        });
+
+        if (
+            downloadRunId !== currentDownloadRunId ||
+            currentDownloadController !== downloadController
+        ) return;
+
+        if (!queueResponse.ok) {
+            throw new Error(`HTTP error! status: ${queueResponse.status}`);
+        }
+
+        const queueResult = await queueResponse.json();
+        if (
+            downloadRunId !== currentDownloadRunId ||
+            currentDownloadController !== downloadController
+        ) return;
+
+        if (queueResult.queued === 0) {
+            alert('No new articles to download. All available articles have already been downloaded.');
+            btn.innerHTML = originalContent;
+            btn.disabled = false;
+            return;
+        }
+
+        // Show progress modal
+        showDownloadProgressModal();
+
+        document.getElementById('total-count').textContent = queueResult.queued;
+
+        // Start the bulk download with the research IDs
+        btn.innerHTML = originalContent;
+
+        // Start streaming download
+        const downloadResponse = await fetch('/library/api/download-bulk', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({research_ids: queueResult.research_ids || []}),
+            signal: downloadController.signal
+        });
+
+        if (
+            downloadRunId !== currentDownloadRunId ||
+            currentDownloadController !== downloadController
+        ) return;
+
+        if (!downloadResponse.ok) {
+            throw new Error(`HTTP error! status: ${downloadResponse.status}`);
+        }
+
+        const reader = downloadResponse.body.getReader();
+        let terminalSeen = false;
+        const parser = createSSEJsonParser((data) => {
+            if (
+                downloadRunId !== currentDownloadRunId ||
+                currentDownloadController !== downloadController
+            ) return;
+
+            if (data.complete) terminalSeen = true;
+            updateDownloadProgress(data);
+
+            // Check if download is complete
+            if (handleSSECompletion(
+                data,
+                () => location.reload(),
+                () => downloadRunId === currentDownloadRunId
+            )) {
+                if (currentDownloadController === downloadController) {
+                    currentDownloadController = null;
+                }
+            }
+        });
+
+        while (true) {
+            if (
+                downloadRunId !== currentDownloadRunId ||
+                currentDownloadController !== downloadController
+            ) return;
+            const {done, value} = await reader.read();
+            if (
+                downloadRunId !== currentDownloadRunId ||
+                currentDownloadController !== downloadController
+            ) return;
+            if (done) {
+                parser.finish();
+                if (!terminalSeen) {
+                    throw new Error('Download stream ended before completion');
+                }
+                break;
+            }
+            parser.push(value);
+        }
+
+    } catch (error) {
+        if (
+            downloadRunId !== currentDownloadRunId ||
+            currentDownloadController !== downloadController
+        ) return;
+
+        if (error.name === 'AbortError') {
+            console.log('Download cancelled by user');
+            const log = document.getElementById('ldr-download-log');
+            const entry = document.createElement('div');
+            entry.className = 'ldr-download-entry ldr-cancelled';
+            entry.innerHTML = '<strong>Download cancelled by user</strong>';
+            log.appendChild(entry);
+        } else {
+            console.error('Failed to start downloads:', error);
+            alert('Failed to start downloads. Please try again.');
+        }
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+    } finally {
+        if (currentDownloadController === downloadController) {
+            currentDownloadController = null;
+        }
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+    }
+}
+
+// Show download progress modal
+function showDownloadProgressModal() {
+    document.getElementById('download-progress-modal').style.display = 'block';
+}
+
+// Update download progress
+function updateDownloadProgress(data) {
+    const progressBar = document.getElementById('ldr-overall-progress');
+    const currentCount = document.getElementById('current-count');
+    const totalCount = document.getElementById('total-count');
+    const log = document.getElementById('ldr-download-log');
+
+    // Fix negative total count
+    const actualTotal = Math.abs(data.total);
+
+    progressBar.style.width = `${data.progress}%`;
+    currentCount.textContent = data.current;
+    totalCount.textContent = actualTotal;
+
+    if (data.file) {
+        const entry = document.createElement('div');
+        entry.className = `ldr-download-entry ldr-${data.status}`;
+
+        let statusIcon = '';
+        let statusText = '';
+
+        if (data.status === 'success') {
+            statusIcon = '✓';
+            statusText = 'Downloaded';
+        } else if (data.status === 'skipped') {
+            statusIcon = '⊘';
+            // Use the error field which contains the skip reason
+            statusText = data.error || data.skip_reason || 'Skipped';
+        } else if (data.status === 'failed') {
+            statusIcon = '✗';
+            statusText = data.error || data.skip_reason || 'Failed';
+        }
+
+        entry.innerHTML = `
+            <span class="ldr-status-icon">${statusIcon}</span>
+            <div class="ldr-entry-details">
+                <strong>${window.escapeHtml(data.file)}</strong>
+                <span class="ldr-status-text">${window.escapeHtml(statusText)}</span>
+            </div>
+        `;
+
+        log.appendChild(entry);
+        log.scrollTop = log.scrollHeight;
+    }
+}
+
+// Close progress modal
+function closeProgressModal() {
+    document.getElementById('download-progress-modal').style.display = 'none';
+}
+
+// Cancel downloads
+function cancelDownloads() {
+    const downloadController = currentDownloadController;
+    // Completion already owns its delayed close/reload once the controller
+    // is cleared. A late Cancel click must not invalidate that callback.
+    if (!downloadController) {
+        closeProgressModal();
+        return;
+    }
+    const cancellationRunId = ++currentDownloadRunId;
+    currentDownloadController = null;
+
+    if (downloadController) {
+        downloadController.abort();
+
+        // Update UI to show cancellation
+        const progressBar = document.getElementById('ldr-overall-progress');
+        progressBar.style.backgroundColor = 'var(--error-color)';
+
+        // Close modal after a delay
+        setTimeout(() => {
+            if (cancellationRunId !== currentDownloadRunId) return;
+            closeProgressModal();
+            location.reload();
+        }, 1500);
+    }
+}
+
+// Show sync modal
+function showSyncModal() {
+    document.getElementById('sync-library-modal').style.display = 'block';
+    // Reset modal state
+    document.getElementById('sync-progress').style.display = 'none';
+    document.getElementById('sync-results').style.display = 'none';
+    document.querySelector('.ldr-sync-explanation').style.display = 'block';
+    document.getElementById('sync-start-btn').style.display = 'inline-block';
+    document.getElementById('sync-start-btn').disabled = false;
+    document.getElementById('sync-start-btn').innerHTML = '<i class="fas fa-play"></i> Start Sync';
+}
+
+// Close sync modal
+function closeSyncModal() {
+    document.getElementById('sync-library-modal').style.display = 'none';
+}
+
+// Go to download manager
+function goToDownloadManager() {
+    window.location.href = '/library/download-manager';
+}
+
+// Perform the actual sync
+async function performSync() {
+    const btn = document.getElementById('sync-start-btn');
+    const originalContent = btn.innerHTML;
+
+    // Update UI to show progress
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Syncing...';
+    btn.disabled = true;
+    document.querySelector('.ldr-sync-explanation').style.display = 'none';
+    document.getElementById('sync-progress').style.display = 'block';
+    document.getElementById('sync-status').textContent = 'Checking files in your library...';
+
+    try {
+        // Get CSRF token
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        const response = await fetch('/library/api/sync-library', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const stats = await response.json();
+
+        // Show results
+        document.getElementById('sync-progress').style.display = 'none';
+        document.getElementById('sync-results').style.display = 'block';
+        document.getElementById('files-found').textContent = stats.files_found;
+        document.getElementById('files-missing').textContent = stats.files_missing;
+
+        // Show action for missing files if any
+        if (stats.files_missing > 0) {
+            document.getElementById('missing-files-action').style.display = 'block';
+        } else {
+            document.getElementById('missing-files-action').style.display = 'none';
+        }
+
+        // Hide start button, only show close
+        btn.style.display = 'none';
+
+        // Update the library stats if sync completed successfully
+        if (stats.files_found >= 0) {
+            // Optionally reload to refresh the document list
+            setTimeout(() => {
+                if (stats.files_missing === 0) {
+                    location.reload();
+                }
+            }, 2000);
+        }
+
+    } catch (error) {
+        console.error('Sync failed:', error);
+        document.getElementById('sync-progress').style.display = 'none';
+        document.getElementById('sync-status').textContent = 'Sync failed. Please try again.';
+        alert('Failed to sync library. Please check your connection and try again.');
+
+        // Reset button
+        btn.innerHTML = originalContent;
+        btn.disabled = false;
+        document.querySelector('.ldr-sync-explanation').style.display = 'block';
+    }
+}
+
+// Format dates on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize date formatting
+    document.querySelectorAll('.ldr-download-date').forEach(span => {
+        const dateStr = span.dataset.date;
+        if (dateStr) {
+            const date = new Date(dateStr);
+            if (!isNaN(date)) {
+                span.textContent = date.toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                });
+            }
+        }
+    });
+});
+
+// View toggle
+document.querySelectorAll('.ldr-view-toggle button').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const view = btn.dataset.view;
+        const container = document.getElementById('documents-container');
+
+        document.querySelectorAll('.ldr-view-toggle button').forEach(b => {
+            b.classList.remove('active');
+            b.setAttribute('aria-pressed', 'false');
+        });
+        btn.classList.add('active');
+        btn.setAttribute('aria-pressed', 'true');
+
+        if (view === 'list') {
+            container.classList.remove('ldr-documents-grid');
+            container.classList.add('ldr-documents-list');
+        } else {
+            container.classList.remove('ldr-documents-list');
+            container.classList.add('ldr-documents-grid');
+        }
+    });
+});
+</script>
+
+<!-- Delete Confirmation Modal -->
+{% include "components/delete_confirmation_modal.html" %}
+
+<!-- Deletion JS Module -->
+<script defer src="/static/js/deletion/confirmation_modal.js"></script>
+<script defer src="/static/js/deletion/delete_manager.js"></script>
+
+<!-- Semantic Search -->
+<script>
+    var DEFAULT_LIBRARY_COLLECTION_ID = {{ (default_collection_id or '')|tojson }};
+    var COLLECTIONS_DATA = {{ collections|tojson }};
+</script>
+<script defer src="/static/js/components/semantic_search.js"></script>
+<script defer src="/static/js/components/library_search.js"></script>
+<script defer src="/static/js/components/library_search_ui.js"></script>
+{% endblock %}

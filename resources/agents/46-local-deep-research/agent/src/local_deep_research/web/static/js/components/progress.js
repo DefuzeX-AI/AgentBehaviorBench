@@ -1,0 +1,1510 @@
+/**
+ * Progress Component
+ * Manages research progress display and updates via Socket.IO
+ */
+(function() {
+    // Component state
+    let currentResearchId = null;
+    let pollInterval = null;
+    let isCompleted = false;
+    let socketErrorShown = false;
+    let nextProgressUpdateGeneration = 0;
+    let latestAppliedProgressUpdateGeneration = 0;
+    // Keeps track of whether we've set a specific progress message or just
+    // a generic one based on the status.
+    let specificProgressMessage = false;
+
+    // DOM Elements
+    let progressBar = null;
+    let progressPercentage = null;
+    let statusText = null;
+    let currentTaskText = null;
+    let cancelButton = null;
+    let viewResultsButton = null;
+
+    // Socket instance
+    const socket = null;
+    let reconnectAttempts = 0;
+    const MAX_RECONNECT_ATTEMPTS = 5;
+    const RECONNECT_DELAY = 3000;
+
+    // Current research info
+    let researchCompleted = false;
+    let notificationsEnabled = false;
+
+    /**
+     * Initialize the progress component
+     */
+    function initializeProgress() {
+        // Get research ID from URL or localStorage
+        currentResearchId = getResearchIdFromUrl(); // Only from URL, not localStorage
+
+        if (!currentResearchId) {
+            SafeLogger.error('No research ID found');
+            if (window.ui) window.ui.showError('No active research found. Please start a new research.');
+            setTimeout(() => {
+                URLValidator.safeAssign(window.location, 'href', '/');
+            }, 3000);
+            return;
+        }
+
+        // Get DOM elements
+        progressBar = document.getElementById('progress-bar');
+        progressPercentage = document.getElementById('progress-percentage');
+        statusText = document.getElementById('status-text');
+        currentTaskText = document.getElementById('current-task');
+        cancelButton = document.getElementById('cancel-research-btn');
+        viewResultsButton = document.getElementById('view-results-btn');
+
+        // Log available elements for debugging
+        SafeLogger.log('Progress DOM elements:', {
+            progressBar: !!progressBar,
+            progressPercentage: !!progressPercentage,
+            statusText: !!statusText,
+            currentTaskText: !!currentTaskText,
+            cancelButton: !!cancelButton,
+            viewResultsButton: !!viewResultsButton
+        });
+
+        // Check for required elements
+        const missingElements = [];
+        if (!progressBar) missingElements.push('progress-bar');
+        if (!statusText) missingElements.push('status-text');
+        if (!currentTaskText) missingElements.push('current-task');
+
+        if (missingElements.length > 0) {
+            SafeLogger.error('Required DOM elements not found for progress component:', missingElements.join(', '));
+            // Try to create fallback elements if not found
+            createFallbackElements(missingElements);
+        }
+
+        // Set up event listeners
+        if (cancelButton) {
+            cancelButton.addEventListener('click', handleCancelResearch);
+        }
+
+        // Keyboard navigation is now handled by the global keyboard service
+        // The Enter key shortcut for viewing results is automatically registered
+
+        // Note: Log panel is now automatically initialized by logpanel.js
+        // No need to manually initialize it here
+
+        // Make sure navigation stays working even if Socket.IO fails
+        setupSafeNavigationHandling();
+
+        // Initialize socket connection if available
+        if (window.socket) {
+            initializeSocket();
+        } else {
+            SafeLogger.warn('Socket service not available, falling back to polling');
+            // Set up polling as fallback
+            pollInterval = setInterval(checkProgress, 3000);
+        }
+
+        // Initial progress check
+        checkProgress();
+
+        SafeLogger.log('Progress component initialized for research ID:', currentResearchId);
+
+        // Get notification preference
+        notificationsEnabled = true; // Default to enabled
+
+        // Get initial research status
+        getInitialStatus();
+    }
+
+    /**
+     * Set up safe navigation handling to prevent WebSocket errors from blocking navigation
+     */
+    function setupSafeNavigationHandling() {
+        // Find all navigation links
+        const navLinks = document.querySelectorAll('a, .ldr-sidebar-nav li, .ldr-mobile-tab-bar li');
+
+        navLinks.forEach(link => {
+            // Don't override existing click handlers, add our handler
+            const originalClickHandler = link.onclick;
+
+            link.onclick = function(event) {
+                // If socket has errors, disconnect it before navigation
+                if (window.socket && typeof window.socket.isUsingPolling === 'function' && window.socket.isUsingPolling()) {
+                    SafeLogger.log('Navigation with polling fallback active, ensuring clean state');
+                    try {
+                        // Clean up any polling intervals
+                        if (window.pollIntervals) {
+                            Object.keys(window.pollIntervals).forEach(id => {
+                                clearInterval(window.pollIntervals[id]);
+                            });
+                        }
+                    } catch (e) {
+                        SafeLogger.error('Error cleaning up before navigation:', e);
+                    }
+                }
+
+                // Call the original click handler if it exists
+                if (typeof originalClickHandler === 'function') {
+                    return originalClickHandler.call(this, event);
+                }
+
+                // Default behavior
+                return true;
+            };
+        });
+    }
+
+    /**
+     * Create fallback elements if they're missing
+     * @param {Array} missingElements - Array of missing element IDs
+     */
+    function createFallbackElements(missingElements) {
+        const progressContainer = document.querySelector('.ldr-progress-container');
+        const statusContainer = document.querySelector('.ldr-status-container');
+        const taskContainer = document.querySelector('.ldr-task-container');
+
+        if (missingElements.includes('progress-bar') && progressContainer) {
+            SafeLogger.log('Creating fallback progress bar');
+            const progressBarContainer = document.createElement('div');
+            progressBarContainer.className = 'ldr-progress-bar';
+            progressBarContainer.setAttribute('role', 'progressbar');
+            progressBarContainer.setAttribute('aria-valuemin', '0');
+            progressBarContainer.setAttribute('aria-valuemax', '100');
+            progressBarContainer.setAttribute('aria-valuenow', '0');
+            progressBarContainer.setAttribute('aria-label', 'Research progress');
+            progressBarContainer.innerHTML = '<div id="progress-bar" class="ldr-progress-fill" style="width: 0%"></div>';
+            progressContainer.prepend(progressBarContainer);
+            progressBar = document.getElementById('progress-bar');
+
+            if (!progressPercentage) {
+                const percentEl = document.createElement('div');
+                percentEl.id = 'progress-percentage';
+                percentEl.className = 'ldr-progress-percentage';
+                percentEl.textContent = '0%';
+                percentEl.setAttribute('aria-hidden', 'true');
+                progressContainer.appendChild(percentEl);
+                progressPercentage = percentEl;
+            }
+        }
+
+        if (missingElements.includes('status-text') && statusContainer) {
+            SafeLogger.log('Creating fallback status text');
+            const statusEl = document.createElement('div');
+            statusEl.id = 'status-text';
+            statusEl.className = 'ldr-status-indicator';
+            statusEl.textContent = 'Initializing';
+            statusContainer.appendChild(statusEl);
+            statusText = statusEl;
+        }
+
+        if (missingElements.includes('current-task') && taskContainer) {
+            SafeLogger.log('Creating fallback task text');
+            const taskEl = document.createElement('div');
+            taskEl.id = 'current-task';
+            taskEl.className = 'ldr-task-text';
+            taskEl.textContent = 'Starting research...';
+            taskContainer.appendChild(taskEl);
+            currentTaskText = taskEl;
+        }
+    }
+
+    /**
+     * Extract research ID from URL
+     * @returns {string|null} The research ID or null if not found
+     */
+    function getResearchIdFromUrl() {
+        return URLBuilder.extractResearchIdFromPattern('progress');
+    }
+
+    /**
+     * Initialize Socket.IO connection and listeners
+     */
+    function initializeSocket() {
+        try {
+            SafeLogger.log('Initializing socket connection for research ID:', currentResearchId);
+
+            // Check if socket service is available
+            if (!window.socket) {
+                SafeLogger.warn('Socket service not available, falling back to polling');
+                // Set up polling as fallback
+                fallbackToPolling();
+                return;
+            }
+
+            // Subscribe to research events
+            window.socket.setPollingFallback?.(fallbackToPolling);
+            window.socket.subscribeToResearch(currentResearchId, handleProgressUpdate);
+
+            // Handle socket reconnection
+            window.socket.onReconnect(() => {
+                if (isCompleted || researchCompleted) return;
+                SafeLogger.log('Socket reconnected, resubscribing to research events');
+                window.socket.subscribeToResearch(currentResearchId, handleProgressUpdate);
+            });
+
+            // Check socket status after a short delay to see if we're connected
+            setTimeout(() => {
+                if (window.socket.isUsingPolling && window.socket.isUsingPolling()) {
+                    SafeLogger.log('Socket using polling fallback');
+                    if (!socketErrorShown) {
+                        socketErrorShown = true;
+                        // Add an info message to the console log if it exists
+                        if (window.addConsoleLog) {
+                            window.addConsoleLog('Using polling for updates due to WebSocket connection issues', 'info');
+                        }
+                    }
+
+                    // Ensure we check for updates right away
+                    checkProgress();
+                } else {
+                    SafeLogger.log('Socket using WebSockets successfully');
+                }
+            }, 2000);
+        } catch (error) {
+            SafeLogger.error('Error initializing socket:', error);
+            // Fall back to polling
+            fallbackToPolling();
+        }
+    }
+
+    /**
+     * Fall back to polling for updates
+     */
+    function fallbackToPolling() {
+        if (isCompleted || researchCompleted) return;
+        SafeLogger.log('Setting up polling fallback for research updates');
+
+        if (!pollInterval) {
+            pollInterval = setInterval(checkProgress, 3000);
+
+            // Add a log entry about polling
+            if (window.addConsoleLog) {
+                window.addConsoleLog('Using polling for research updates instead of WebSockets', 'info');
+            }
+        }
+    }
+
+    /**
+     * Claim an HTTP status snapshot for the progress UI.
+     *
+     * Non-terminal snapshots use latest-applied ownership so a delayed poll
+     * cannot regress a newer socket frame. Terminal state is monotonic for a
+     * research ID, however, so a completed/failed/cancelled HTTP snapshot must
+     * still win when transports deliver it after a newer non-terminal frame.
+     * @param {number} requestGeneration - Generation captured by the request
+     * @param {Object} snapshot - Research status returned by the API
+     * @returns {boolean} Whether the caller owns the progress UI
+     */
+    function claimProgressSnapshot(requestGeneration, snapshot) {
+        if (isCompleted || researchCompleted) return false;
+
+        const hasStatus = (
+            typeof snapshot?.status === 'string' && snapshot.status.trim() !== ''
+        );
+        const hasProgress = (
+            typeof snapshot?.progress === 'number' &&
+            Number.isFinite(snapshot.progress)
+        );
+        if (!hasStatus && !hasProgress) return false;
+
+        const isTerminalSnapshot = ResearchStates.isTerminal(snapshot.status);
+        if (
+            !isTerminalSnapshot &&
+            requestGeneration < latestAppliedProgressUpdateGeneration
+        ) {
+            return false;
+        }
+
+        latestAppliedProgressUpdateGeneration = Math.max(
+            latestAppliedProgressUpdateGeneration,
+            requestGeneration
+        );
+        return true;
+    }
+
+    /**
+     * Handle progress update from socket
+     * @param {Object} data - The progress data
+     */
+    function handleProgressUpdate(data) {
+        SafeLogger.log('Received progress update:', data);
+
+        // Debug: Log if this is a log_entry update
+        if (data && data.log_entry) {
+            SafeLogger.log('Progress update contains log_entry:', {
+                type: data.log_entry.type,
+                message: data.log_entry.message,
+                hasOtherFields: Object.keys(data).filter(k => k !== 'log_entry').length > 0
+            });
+        }
+
+        if (!data) return;
+
+        // A socket status snapshot is a newer owner than any status request
+        // already in flight. Logger events are also delivered on this channel
+        // as `{log_entry}` only; those must not suppress bootstrap hydration
+        // because they carry no progress/status state of their own.
+        const ownsProgressState = (
+            (typeof data.status === 'string' && data.status.trim() !== '') ||
+            (typeof data.progress === 'number' && Number.isFinite(data.progress))
+        );
+        if (ownsProgressState) {
+            latestAppliedProgressUpdateGeneration = ++nextProgressUpdateGeneration;
+        }
+
+        // Once a terminal state has rendered, ignore late socket frames.
+        if (isCompleted || researchCompleted) return;
+
+        // Handle agent thinking updates for MCP/ReAct strategy
+        if (data.phase && (data.phase === 'thought' || data.phase === 'tool_call' ||
+            data.phase === 'observation' || data.phase === 'error' || data.phase === 'react' ||
+            data.phase === 'synthesis' || data.phase === 'sub_research' ||
+            data.phase === 'init' || data.phase === 'complete')) {
+            updateAgentThinking(data);
+        }
+
+        // Process progress_log if available and add to logs
+        // NOTE: This is now handled by the logpanel component directly
+        // We'll just ensure the panel is visible and let it manage logs
+        if (data.progress_log && typeof data.progress_log === 'string') {
+            try {
+                // Validate that the progress_log is valid JSON
+                const progressLogsCheck = JSON.parse(data.progress_log);
+                if (Array.isArray(progressLogsCheck) && progressLogsCheck.length > 0) {
+                    SafeLogger.log(`Found ${progressLogsCheck.length} logs in progress update - forwarding to log panel`);
+
+                    // Make the log panel visible if it exists
+                    const logPanel = document.querySelector('.ldr-collapsible-log-panel');
+                    if (logPanel && window.getComputedStyle(logPanel).display === 'none') {
+                        logPanel.style.display = 'flex';
+                    }
+
+                    // The actual log processing is now handled by socket.js and logpanel.js
+                    // We don't need to process logs here anymore
+                }
+            } catch (e) {
+                SafeLogger.error('Error checking progress_log format:', e);
+            }
+        }
+
+        // Check if this is a milestone log that should update the current task
+        let milestoneTask = null;
+        if (data.log_entry && (data.log_entry.type === 'milestone' || data.log_entry.type === 'MILESTONE') && data.log_entry.message) {
+            // Milestone logs should always update the current task
+            milestoneTask = data.log_entry.message;
+            SafeLogger.log('Milestone task detected:', milestoneTask);
+        }
+
+        // Update progress UI (but preserve milestone task)
+        updateProgressUI(data);
+
+        // If we have a milestone task, make sure it's set after updateProgressUI
+        if (milestoneTask && currentTaskText) {
+            SafeLogger.log('Setting milestone task:', milestoneTask);
+            currentTaskText.textContent = milestoneTask;
+            currentTaskText.dataset.lastMessage = milestoneTask;
+            currentTaskText.dataset.isMilestone = 'true';
+        }
+
+        // Check if research is completed
+        if (ResearchStates.isTerminal(data.status)) {
+            handleResearchCompletion(data);
+        }
+
+        // Update the current query text if available
+        const currentQueryEl = document.getElementById('current-query');
+        if (currentQueryEl && data.query) {
+            currentQueryEl.textContent = data.query;
+        }
+
+        // If no task info was provided, leave the current task as is
+        // This prevents tasks from being overwritten by empty updates
+    }
+
+    /**
+     * Check research progress via API
+     */
+    async function checkProgress() {
+        if (isCompleted || researchCompleted) return;
+
+        const requestGeneration = ++nextProgressUpdateGeneration;
+        try {
+            if (!window.api || !window.api.getResearchStatus) {
+                SafeLogger.error('API service not available');
+                return;
+            }
+
+            SafeLogger.log('Checking research progress for ID:', currentResearchId);
+            const data = await window.api.getResearchStatus(currentResearchId);
+
+            if (!claimProgressSnapshot(requestGeneration, data)) {
+                if (
+                    requestGeneration >= latestAppliedProgressUpdateGeneration &&
+                    !isCompleted &&
+                    !researchCompleted &&
+                    data &&
+                    typeof data === 'object'
+                ) {
+                    SafeLogger.warn('Invalid research status received from API');
+                    if (statusText) {
+                        statusText.textContent = 'Error checking research status';
+                    }
+                }
+                return;
+            }
+
+            if (data) {
+                SafeLogger.log('Got research status update:', data);
+
+                // Update progress UI
+                updateProgressUI(data);
+
+                // Check if research is completed
+                if (ResearchStates.isTerminal(data.status)) {
+                    handleResearchCompletion(data);
+                } else {
+                    // Set up polling for status updates as backup for socket
+                    if (!pollInterval && (!window.socket || (window.socket.isUsingPolling && window.socket.isUsingPolling()))) {
+                        SafeLogger.log('Setting up polling interval for progress updates');
+                        pollInterval = setInterval(checkProgress, 5000);
+                    }
+
+                    // Log a message every 5th poll to show activity
+                    if (reconnectAttempts % 5 === 0) {
+                        SafeLogger.log('Still monitoring research progress...');
+                    }
+                    reconnectAttempts++; // Just using this as a counter for logging
+                }
+            } else {
+                SafeLogger.warn('No data received from API');
+            }
+        } catch (error) {
+            if (
+                requestGeneration < latestAppliedProgressUpdateGeneration ||
+                isCompleted ||
+                researchCompleted
+            ) {
+                return;
+            }
+            SafeLogger.error('Error checking research progress:', error);
+            if (statusText) {
+                statusText.textContent = 'Error checking research status';
+            }
+        }
+    }
+
+    /**
+     * Update progress bar
+     * @param {HTMLElement} bar - The progress bar element
+     * @param {number} progress - Progress percentage (0-100)
+     */
+    function updateProgressBar(bar, progress) {
+        if (!bar) return;
+
+        // Ensure progress is between 0-100
+        const percentage = Math.max(0, Math.min(100, Math.floor(progress)));
+
+        // Update progress bar width with transition for smooth animation
+        bar.style.transition = 'width 0.3s ease-in-out';
+        bar.style.width = `${percentage}%`;
+
+        // Update aria-valuenow on the container element (which has role="progressbar")
+        const progressContainer = bar.parentElement;
+        if (progressContainer && progressContainer.getAttribute('role') === 'progressbar') {
+            progressContainer.setAttribute('aria-valuenow', percentage);
+        }
+
+        // Update percentage text if available
+        if (progressPercentage) {
+            progressPercentage.textContent = `${percentage}%`;
+        }
+    }
+
+    /**
+     * Update the progress UI with data
+     * @param {Object} data - The progress data
+     */
+    function updateProgressUI(data) {
+        SafeLogger.log('Updating progress UI with data:', data);
+
+        // Update progress bar
+        if (data.progress !== undefined && data.progress !== null && progressBar) {
+            updateProgressBar(progressBar, data.progress);
+        }
+
+        // Update status text with better formatting
+        if (data.status && statusText) {
+            let formattedStatus;
+            if (ResearchStates.isInProgress(data.status)) {
+                // Don't show "In Progress" at all in status text
+                formattedStatus = null;
+            } else if (window.formatting && typeof window.formatting.formatStatus === 'function') {
+                formattedStatus = window.formatting.formatStatus(data.status);
+            } else {
+                formattedStatus = ResearchStates.formatStatus(data.status);
+            }
+
+            // Only update status text if we have a non-empty formatted status
+            if (formattedStatus && formattedStatus.trim() !== '') {
+                statusText.textContent = formattedStatus;
+
+                // Add status class for styling
+                document.querySelectorAll('.ldr-status-indicator').forEach(el => {
+                    el.className = 'ldr-status-indicator';
+                    el.classList.add(`ldr-status-${data.status}`);
+                });
+            }
+        }
+
+        // Extract current task from progress_log
+        if (currentTaskText) {
+            let taskMessage = null;
+
+            // Try to parse progress_log to get the latest task
+            if (data.progress_log && typeof data.progress_log === 'string') {
+                try {
+                    const progressLogs = JSON.parse(data.progress_log);
+                    if (Array.isArray(progressLogs) && progressLogs.length > 0) {
+                        // Get the latest log entry with a non-null message
+                        for (let i = progressLogs.length - 1; i >= 0; i--) {
+                            if (progressLogs[i].message && progressLogs[i].message.trim() !== '') {
+                                taskMessage = progressLogs[i].message;
+                                specificProgressMessage = true;
+                                break;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    SafeLogger.error('Error parsing progress_log for task message:', e);
+                }
+            }
+
+            // Check various fields that might contain the current task message
+            if (!taskMessage) {
+                // First check for milestone in log_entry
+                if (data.log_entry && data.log_entry.message && (data.log_entry.type === "milestone" || data.log_entry.type === "MILESTONE")) {
+                    taskMessage = data.log_entry.message;
+                    specificProgressMessage = true;
+                } else if (data.current_task) {
+                    taskMessage = data.current_task;
+                    specificProgressMessage = true;
+                } else if (data.message) {
+                    taskMessage = data.message;
+                    specificProgressMessage = true;
+                } else if (data.task) {
+                    taskMessage = data.task;
+                    specificProgressMessage = true;
+                } else if (data.step) {
+                    taskMessage = data.step;
+                    specificProgressMessage = true;
+                } else if (data.phase) {
+                    taskMessage = `Phase: ${data.phase}`;
+                    specificProgressMessage = true;
+                } else {
+                    specificProgressMessage = false;
+                }
+            }
+
+            // Update the task text if we found a message AND it's not just "In Progress"
+            if (taskMessage && taskMessage.trim() !== 'In Progress' && taskMessage.trim() !== 'in progress') {
+                SafeLogger.log('Updating current task text to:', taskMessage);
+                currentTaskText.textContent = taskMessage;
+                // Remember this message to avoid overwriting with generic messages
+                currentTaskText.dataset.lastMessage = taskMessage;
+            }
+
+            // If no message but we have a status, generate a more descriptive message
+            // BUT ONLY if we don't already have a meaningful message displayed
+            if (!specificProgressMessage && data.status &&
+                (!currentTaskText.dataset.lastMessage || currentTaskText.textContent === 'In Progress')) {
+                let statusMsg;
+                switch (data.status) {
+                    case 'starting':
+                        statusMsg = 'Starting research process...';
+                        break;
+                    case 'searching':
+                        statusMsg = 'Searching for information...';
+                        break;
+                    case 'processing':
+                        statusMsg = 'Processing search results...';
+                        break;
+                    case 'analyzing':
+                        statusMsg = 'Analyzing gathered information...';
+                        break;
+                    case 'writing':
+                        statusMsg = 'Writing research report...';
+                        break;
+                    case 'reviewing':
+                        statusMsg = 'Reviewing and finalizing report...';
+                        break;
+                    case window.RESEARCH_STATUS.IN_PROGRESS:
+                        // Don't overwrite existing content with generic "In Progress" message
+                        if (!currentTaskText.dataset.lastMessage || currentTaskText.textContent === '') {
+                            statusMsg = 'Performing research...';
+                        } else {
+                            statusMsg = null; // Skip update
+                        }
+                        break;
+                    case window.RESEARCH_STATUS.QUEUED:
+                        statusMsg = data.queue_position
+                            ? `Waiting in queue (position ${data.queue_position})...`
+                            : 'Waiting in queue...';
+                        break;
+                    default:
+                        statusMsg = `${data.status.charAt(0).toUpperCase() + data.status.slice(1).replace('_', ' ')}...`;
+                }
+
+                // Only update if we have a new message
+                if (statusMsg) {
+                    SafeLogger.log('Using enhanced status-based message:', statusMsg);
+                    currentTaskText.textContent = statusMsg;
+                    // Don't remember generic messages
+                    delete currentTaskText.dataset.lastMessage;
+                }
+            }
+        }
+
+        // Update page title with progress
+        if (data.progress !== undefined) {
+            // Ensure progress is capped at 100% for page title
+            const cappedProgress = Math.max(0, Math.min(100, Math.floor(data.progress)));
+            document.title = `Research (${cappedProgress}%) - Local Deep Research`;
+        }
+
+        // Update favicon based on status
+        if (window.ui && typeof window.ui.updateFavicon === 'function') {
+            window.ui.updateFavicon(data.status || window.RESEARCH_STATUS.IN_PROGRESS);
+        }
+
+        // Show notification if enabled
+        if (ResearchStates.isCompleted(data.status) && notificationsEnabled) {
+            showNotification('Research Completed', 'Your research has been completed successfully.');
+        }
+
+        // Ensure log entry is added if message exists but no specific log_entry
+        if (data.message && window.addConsoleLog && !data.log_entry) {
+            SafeLogger.log('Adding message to console log:', data.message);
+            window.addConsoleLog(data.message, ResearchStates.logLevel(data.status));
+        }
+    }
+
+    /**
+     * Handle research completion
+     * @param {Object} data - The completion data
+     */
+    function handleResearchCompletion(data) {
+        if (isCompleted) return;
+        isCompleted = true;
+
+        // Clear polling interval
+        if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+        }
+
+        // Update UI for completion
+        if (ResearchStates.isCompleted(data.status)) {
+            // Show view results button
+            if (viewResultsButton) {
+                showResultsButton();
+                URLValidator.safeAssign(viewResultsButton, 'href', URLBuilder.resultsPage(currentResearchId));
+            }
+
+            // Hide cancel button
+            if (cancelButton) {
+                cancelButton.style.display = 'none';
+            }
+
+            // Check for context overflow and show warning toast
+            checkContextOverflowOnCompletion();
+        } else if (ResearchStates.isFailed(data.status) || ResearchStates.isCancelled(data.status)) {
+            // For failed research, try to show the error report if available
+            if (ResearchStates.isFailed(data.status)) {
+                if (viewResultsButton) {
+                    viewResultsButton.textContent = 'View Error Report';
+                    URLValidator.safeAssign(viewResultsButton, 'href', URLBuilder.resultsPage(currentResearchId));
+                    viewResultsButton.style.display = 'inline-block';
+                }
+            } else if (viewResultsButton) {
+                // For cancelled research, go back to home
+                viewResultsButton.textContent = 'Start New Research';
+                URLValidator.safeAssign(viewResultsButton, 'href', '/');
+                viewResultsButton.style.display = 'inline-block';
+            }
+
+            // Hide cancel button
+            if (cancelButton) {
+                cancelButton.style.display = 'none';
+            }
+        }
+    }
+
+    /**
+     * Check for context overflow after research completion and show toast if detected
+     */
+    async function checkContextOverflowOnCompletion() {
+        try {
+            // The context-overflow router has no prefix, so the canonical
+            // path is /api/research/{id}/context-overflow. The previous
+            // /metrics/api/... was a Flask-era guess and returned 404 —
+            // the SafeLogger.warn below was firing on every completion.
+            const response = await fetch(`/api/research/${currentResearchId}/context-overflow`);
+            if (!response.ok) {
+                SafeLogger.warn('Context overflow API not available');
+                return;
+            }
+
+            const data = await response.json();
+            if (data.status === 'success' && data.data?.overview?.truncation_occurred) {
+                const overview = data.data.overview;
+                const tokensLost = overview.tokens_lost || 0;
+                const truncatedCount = overview.truncated_count || 0;
+
+                let message = `Context truncated ${truncatedCount} time(s) during research.`;
+                if (tokensLost > 0) {
+                    message += ` ~${tokensLost.toLocaleString()} tokens lost.`;
+                }
+                message += ' Consider increasing context window.';
+
+                showNotification(
+                    'Context Overflow Warning',
+                    message,
+                    'warning',
+                    12000,
+                    {
+                        label: 'View overflow details',
+                        url: `/details/${currentResearchId}#context-overflow-section`
+                    }
+                );
+                SafeLogger.log('Context overflow toast shown:', overview);
+            }
+        } catch (error) {
+            SafeLogger.error('Error checking context overflow:', error);
+        }
+    }
+
+    /**
+     * Handle research cancellation
+     */
+    async function handleCancelResearch() {
+        if (isCompleted || researchCompleted) return;
+        if (!confirm('Are you sure you want to cancel this research?')) {
+            return;
+        }
+
+        // Disable cancel button
+        if (cancelButton) {
+            cancelButton.disabled = true;
+            cancelButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cancelling...';
+        }
+
+        try {
+            if (!window.api || !window.api.terminateResearch) {
+                throw new Error('API service not available');
+            }
+
+            const result = await window.api.terminateResearch(currentResearchId);
+
+            // Completion may win while terminate is in flight. A successful
+            // terminate response can also mean the server was already done,
+            // even if its final socket frame never reached this page.
+            if (isCompleted || researchCompleted) return;
+            if (
+                result?.research_status &&
+                ResearchStates.isTerminal(result.research_status) &&
+                !ResearchStates.isCancelled(result.research_status)
+            ) {
+                handleProgressUpdate({
+                    research_id: currentResearchId,
+                    status: result.research_status,
+                    progress: 100,
+                });
+                return;
+            }
+
+            // Cancellation is terminal for this page. Retire every status
+            // request already in flight before updating the DOM so a late
+            // poll or socket frame cannot repaint the cancelled state.
+            isCompleted = true;
+            researchCompleted = true;
+            latestAppliedProgressUpdateGeneration = ++nextProgressUpdateGeneration;
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+            if (typeof window.socket?.unsubscribeFromResearch === 'function') {
+                try {
+                    window.socket.unsubscribeFromResearch(currentResearchId);
+                } catch (unsubscribeError) {
+                    SafeLogger.warn(
+                        'Research was cancelled, but socket cleanup failed:',
+                        unsubscribeError
+                    );
+                }
+            }
+
+            // Update status manually (in case socket fails)
+            if (statusText) {
+                statusText.textContent = 'Cancelled';
+                document.querySelectorAll('.ldr-status-indicator').forEach(el => {
+                    el.className = 'ldr-status-indicator ldr-status-cancelled';
+                });
+            }
+
+            // Show message
+            if (window.ui) {
+                window.ui.showMessage('Research has been cancelled.');
+            }
+
+            // Update cancel button
+            if (cancelButton) {
+                cancelButton.style.display = 'none';
+            }
+
+            // Show go home button
+            if (viewResultsButton) {
+                viewResultsButton.textContent = 'Start New Research';
+                viewResultsButton.href = '/';
+                viewResultsButton.style.display = 'inline-block';
+            }
+
+        } catch (error) {
+            if (isCompleted || researchCompleted) return;
+            SafeLogger.error('Error cancelling research:', error);
+
+            // Re-enable cancel button
+            if (cancelButton) {
+                cancelButton.disabled = false;
+                cancelButton.innerHTML = '<i class="fas fa-stop-circle"></i> Cancel Research';
+            }
+
+            // Show error message
+            if (window.ui) {
+                window.ui.showError('Failed to cancel research. Please try again.');
+            }
+        }
+    }
+
+    /**
+     * Show a notification to the user
+     * @param {string} title - Notification title
+     * @param {string} message - Notification message
+     * @param {string} type - Notification type ('info', 'warning', 'error')
+     * @param {number} duration - Duration in ms to show in-app notification (0 to not auto-hide)
+     * @param {{label: string, url: string}|null} action - Optional action button { label, url } (url must start with "/")
+     */
+    function showNotification(title, message, type = 'info', duration = 5000, action = null) {
+        // First attempt browser notification if enabled
+        if ('Notification' in window) {
+            // Check if permission is already granted
+            if (Notification.permission === 'granted') {
+                try {
+                    const notification = new Notification(title, {
+                        body: message,
+                        icon: type === 'error' ? '/static/img/error-icon.png' : '/static/img/favicon.png'
+                    });
+
+                    // Auto-close after 10 seconds
+                    setTimeout(() => notification.close(), 10000);
+                } catch (e) {
+                    SafeLogger.warn('Browser notification failed, falling back to in-app notification', e);
+                }
+            }
+            // Otherwise, request permission (only if it's not been denied)
+            else if (Notification.permission !== 'denied') {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        new Notification(title, {
+                            body: message,
+                            icon: type === 'error' ? '/static/img/error-icon.png' : '/static/img/favicon.png'
+                        });
+                    }
+                });
+            }
+        }
+
+        // Also show in-app notification
+        try {
+            // Create or get notification container
+            let notificationContainer = document.getElementById('notification-container');
+            if (!notificationContainer) {
+                notificationContainer = document.createElement('div');
+                notificationContainer.id = 'notification-container';
+                notificationContainer.style.position = 'fixed';
+                notificationContainer.style.top = '20px';
+                notificationContainer.style.right = '20px';
+                notificationContainer.style.zIndex = '9999';
+                notificationContainer.style.width = '350px';
+                notificationContainer.setAttribute('aria-live', 'polite');
+                notificationContainer.setAttribute('aria-atomic', 'true');
+                document.body.appendChild(notificationContainer);
+            }
+
+            // Create notification element
+            const notificationEl = document.createElement('div');
+            notificationEl.className = 'ldr-alert ldr-alert-dismissible fade show';
+
+            // Set type-specific styling
+            switch(type) {
+                case 'error':
+                    notificationEl.classList.add('ldr-alert-danger');
+                    break;
+                case 'warning':
+                    notificationEl.classList.add('ldr-alert-warning');
+                    break;
+                default:
+                    notificationEl.classList.add('ldr-alert-info');
+            }
+
+            // Errors get assertive alert role for screen readers
+            if (type === 'error' || type === 'warning') {
+                notificationEl.setAttribute('role', 'alert');
+            } else {
+                notificationEl.setAttribute('role', 'status');
+            }
+
+            const strong = document.createElement('strong');
+            strong.textContent = title;
+
+            const closeBtn = document.createElement('button');
+            closeBtn.type = 'button';
+            closeBtn.className = 'btn-close';
+            closeBtn.setAttribute('aria-label', 'Close');
+            closeBtn.setAttribute('data-bs-dismiss', 'alert');
+
+            const hr = document.createElement('hr');
+
+            const p = document.createElement('p');
+            p.textContent = message;
+
+            notificationEl.appendChild(strong);
+            notificationEl.appendChild(closeBtn);
+            notificationEl.appendChild(hr);
+            notificationEl.appendChild(p);
+
+            // Optional action button — only render for safe internal paths
+            if (action && typeof action.url === 'string'
+                && action.url.startsWith('/') && !action.url.startsWith('//')) {
+                const actionBtn = document.createElement('button');
+                actionBtn.type = 'button';
+                actionBtn.className = 'btn btn-primary btn-sm';
+                actionBtn.style.marginTop = '8px';
+                actionBtn.textContent = action.label || 'View details';
+                actionBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    URLValidator.safeAssign(window.location, 'href', action.url);
+                });
+                notificationEl.appendChild(actionBtn);
+            }
+
+            // Add to container
+            notificationContainer.appendChild(notificationEl);
+
+            // Set up auto-dismiss if duration is provided
+            if (duration > 0) {
+                setTimeout(() => {
+                    notificationEl.classList.remove('show');
+                    setTimeout(() => {
+                        if (notificationContainer.contains(notificationEl)) {
+                            notificationContainer.removeChild(notificationEl);
+                        }
+                    }, 300); // Wait for fade animation
+                }, duration);
+            }
+
+            // Set up click to dismiss
+            notificationEl.querySelector('.btn-close').addEventListener('click', () => {
+                notificationEl.classList.remove('show');
+                setTimeout(() => {
+                    if (notificationContainer.contains(notificationEl)) {
+                        notificationContainer.removeChild(notificationEl);
+                    }
+                }, 300);
+            });
+
+        } catch (e) {
+            SafeLogger.error('Failed to show in-app notification', e);
+        }
+
+        // Also log via SafeLogger
+        const logMethod = type === 'error' ? SafeLogger.error :
+                          type === 'warning' ? SafeLogger.warn : SafeLogger.log;
+        logMethod(`${title}: ${message}`);
+    }
+
+    /**
+     * Get initial research status from API
+     */
+    async function getInitialStatus() {
+        const requestGeneration = ++nextProgressUpdateGeneration;
+        try {
+            const status = await window.api.getResearchStatus(currentResearchId);
+
+            if (!claimProgressSnapshot(requestGeneration, status)) {
+                if (
+                    requestGeneration >= latestAppliedProgressUpdateGeneration &&
+                    !isCompleted &&
+                    !researchCompleted
+                ) {
+                    SafeLogger.warn('Invalid initial research status received from API');
+                    setErrorState('Error loading research status. Please refresh the page to try again.');
+                }
+                return;
+            }
+
+            // Process status
+            if (status) {
+                // If complete, show complete UI
+                if (ResearchStates.isCompleted(status.status)) {
+                    handleResearchComplete({ research_id: currentResearchId });
+                }
+                // If failed/error, show error UI
+                else if (ResearchStates.isFailed(status.status)) {
+                    handleResearchError({
+                        research_id: currentResearchId,
+                        // The FastAPI status route exposes persisted failure
+                        // details under metadata.error_info; socket frames may
+                        // still supply a top-level message/error.
+                        error: status.metadata?.error_info?.message
+                            || status.message
+                            || status.error
+                            || 'Unknown error'
+                    });
+                }
+                // FastAPI persists user-terminated research as "suspended"
+                // (and older callers may still report "cancelled"). Render
+                // the final snapshot before retiring every later transport.
+                else if (ResearchStates.isCancelled(status.status)) {
+                    updateProgressUI(status);
+                    handleResearchCompletion(status);
+                }
+                // If queued, show queue status and set up polling
+                else if (status.status === window.RESEARCH_STATUS.QUEUED) {
+                    updateProgressUI(status);
+                    if (!pollInterval) {
+                        pollInterval = setInterval(checkProgress, 5000);
+                    }
+                }
+                // Otherwise update progress
+                else {
+                    updateProgressUI(status);
+                }
+            }
+        } catch (error) {
+            if (
+                requestGeneration < latestAppliedProgressUpdateGeneration ||
+                isCompleted ||
+                researchCompleted
+            ) {
+                return;
+            }
+            SafeLogger.error('Error getting initial status:', error);
+            setErrorState('Error loading research status. Please refresh the page to try again.');
+        }
+    }
+
+    /**
+     * Handle research complete event
+     * @param {Object} data - Complete event data
+     */
+    function handleResearchComplete(data) {
+        SafeLogger.log('Research complete received:', data);
+
+        if (data.research_id !== currentResearchId) {
+            SafeLogger.warn('Received complete event for different research ID');
+            return;
+        }
+
+        // Hydrating a page whose research already completed must take the
+        // same terminal path as a live HTTP/socket completion.  The former
+        // bespoke UI updates exposed the result button without assigning its
+        // href (the template anchor has none), skipped context-overflow
+        // recovery, and left the document title in its in-progress state.
+        const completionData = {
+            ...data,
+            status: window.RESEARCH_STATUS.COMPLETED,
+            progress: 100,
+            current_task: data.current_task || 'Research completed successfully'
+        };
+        updateProgressUI(completionData);
+        handleResearchCompletion(completionData);
+
+        // Update favicon
+        updateFavicon(100);
+
+        // Keep the secondary terminal flag in sync with the shared completion
+        // path.  `handleResearchCompletion` already owns isCompleted and poll
+        // cleanup.
+        researchCompleted = true;
+    }
+
+    /**
+     * Handle research error event
+     * @param {Object} data - Error event data
+     */
+    function handleResearchError(data) {
+        SafeLogger.error('Research error received:', data);
+
+        if (data.research_id !== currentResearchId) {
+            SafeLogger.warn('Received error event for different research ID');
+            return;
+        }
+
+        isCompleted = true;
+        if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+        }
+
+        // Update UI to error state
+        setProgressValue(100);
+        setStatus(window.RESEARCH_STATUS.ERROR);
+        setCurrentTask(`Error: ${data.error || 'Unknown error'}`);
+
+        // Add error class to progress bar
+        if (progressBar) {
+            progressBar.classList.remove('bg-primary', 'bg-success');
+            progressBar.classList.add('bg-danger');
+        }
+
+        // Hide cancel button
+        if (cancelButton) {
+            cancelButton.style.display = 'none';
+        }
+
+        // Show error report button
+        if (viewResultsButton) {
+            viewResultsButton.textContent = 'View Error Report';
+            viewResultsButton.href = URLBuilder.resultsPage(currentResearchId);
+            viewResultsButton.style.display = 'inline-block';
+        }
+
+        // Show notification if enabled
+        showNotification('Research Error', `There was an error with your research: ${data.error}`);
+
+        // Update favicon
+        updateFavicon(100, true);
+    }
+
+    /**
+     * Set progress bar value
+     * @param {number} value - Progress value (0-100)
+     */
+    function setProgressValue(value) {
+        if (!progressBar) return;
+
+        // Ensure value is in range
+        value = Math.min(Math.max(value, 0), 100);
+
+        // Update progress bar
+        progressBar.style.width = `${value}%`;
+
+        // Update aria-valuenow on the container element (which has role="progressbar")
+        const progressContainer = progressBar.parentElement;
+        if (progressContainer && progressContainer.getAttribute('role') === 'progressbar') {
+            progressContainer.setAttribute('aria-valuenow', value);
+        }
+
+        // Update visible percentage text
+        if (progressPercentage) {
+            progressPercentage.textContent = `${value}%`;
+        }
+
+        // Update classes based on progress
+        if (value >= 100) {
+            progressBar.classList.remove('bg-primary');
+            progressBar.classList.add('bg-success');
+        } else {
+            progressBar.classList.remove('bg-success', 'bg-danger');
+            progressBar.classList.add('bg-primary');
+        }
+    }
+
+    /**
+     * Set status text
+     * @param {string} status - Status string
+     */
+    function setStatus(status) {
+        if (!statusText) return;
+
+        const statusDisplay = ResearchStates.formatStatus(status) || 'Unknown';
+
+        statusText.textContent = statusDisplay;
+    }
+
+    /**
+     * Set current task text
+     * @param {string} task - Current task description
+     */
+    function setCurrentTask(task) {
+        if (!currentTaskText) return;
+        currentTaskText.textContent = task || 'No active task';
+    }
+
+    /**
+     * Set error state for the UI
+     * @param {string} message - Error message
+     */
+    function setErrorState(message) {
+        // Update progress UI
+        setProgressValue(100);
+        setStatus(window.RESEARCH_STATUS.ERROR);
+        setCurrentTask(`Error: ${message}`);
+
+        // Add error class to progress bar
+        if (progressBar) {
+            progressBar.classList.remove('bg-primary', 'bg-success');
+            progressBar.classList.add('bg-danger');
+        }
+
+        // Hide cancel button
+        if (cancelButton) {
+            cancelButton.style.display = 'none';
+        }
+    }
+
+    /**
+     * Show results button
+     */
+    function showResultsButton() {
+        if (!viewResultsButton) return;
+
+        viewResultsButton.style.display = 'inline-block';
+        viewResultsButton.disabled = false;
+    }
+
+    /**
+     * Update favicon with progress
+     * @param {number} progress - Progress value (0-100)
+     * @param {boolean} isError - Whether there is an error
+     */
+    function updateFavicon(progress, isError = false) {
+        try {
+            // Find favicon link or create it if it doesn't exist
+            const link = document.querySelector("link[rel='icon']") ||
+                       document.querySelector("link[rel='shortcut icon']");
+
+            if (!link) {
+                // If no favicon link exists, don't try to create it
+                // This avoids error spam in the console
+                SafeLogger.debug('Favicon link not found, skipping dynamic favicon update');
+                return;
+            }
+
+            // Create canvas for drawing the favicon
+            const canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 32;
+
+            const ctx = canvas.getContext('2d');
+
+            // Get theme colors from CSS variables (fallbacks match LDR dark theme)
+            const style = getComputedStyle(document.documentElement);
+            const bgColor = style.getPropertyValue('--bg-tertiary').trim() || '#2a2a3a';
+            const errorColor = style.getPropertyValue('--error-color').trim() || '#fa5c7c';
+            const successColor = style.getPropertyValue('--success-color').trim() || '#0acf97';
+            const accentColor = style.getPropertyValue('--accent-primary').trim() || '#6e4ff6';
+            const textColor = style.getPropertyValue('--text-primary').trim() || '#f5f5f5';
+
+            // Draw background
+            ctx.fillStyle = bgColor;
+            ctx.beginPath();
+            ctx.arc(16, 16, 16, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Draw progress arc
+            ctx.beginPath();
+            ctx.moveTo(16, 16);
+            ctx.arc(16, 16, 14, -0.5 * Math.PI, (-0.5 + 2 * progress / 100) * Math.PI);
+            ctx.lineTo(16, 16);
+
+            // Color based on status
+            if (isError) {
+                ctx.fillStyle = errorColor;
+            } else if (progress >= 100) {
+                ctx.fillStyle = successColor;
+            } else {
+                ctx.fillStyle = accentColor;
+            }
+
+            ctx.fill();
+
+            // Draw center circle
+            ctx.fillStyle = bgColor;
+            ctx.beginPath();
+            ctx.arc(16, 16, 8, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Draw letter R
+            ctx.fillStyle = textColor;
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('R', 16, 16);
+
+            // Update favicon
+            URLValidator.safeAssign(link, 'href', canvas.toDataURL('image/png'));
+
+        } catch (error) {
+            SafeLogger.error('Error updating favicon:', error);
+            // Failure to update favicon is not critical, so we just log the error
+        }
+    }
+
+    /**
+     * Update the agent thinking panel with ReAct steps
+     * @param {Object} data - The progress data with phase info
+     */
+    function updateAgentThinking(data) {
+        const panel = document.getElementById('agent-thinking-panel');
+        const content = document.getElementById('agent-thinking-content');
+
+        if (!panel || !content) return;
+
+        // Show the panel
+        panel.style.display = 'block';
+
+        // Determine step type and content
+        let stepType;
+        let label;
+        let stepContent;
+
+        switch (data.phase) {
+            case 'react':
+                // Iteration start - add a separator
+                stepType = 'info';
+                label = `CYCLE ${data.iteration || '?'}`;
+                stepContent = data.message || 'Agent is reasoning...';
+                break;
+            case 'thought':
+                stepType = 'thought';
+                label = '💭 THINKING';
+                stepContent = data.thought || data.message || '';
+                break;
+            case 'tool_call': {
+                stepType = 'action';
+                label = '🔧 ACTION';
+                const tool = data.tool || 'unknown';
+                const args = data.arguments || {};
+                // Prefer the human-readable message the strategy already
+                // built (e.g. LangGraph emits `🔍 Searching DuckDuckGo:
+                // "..."`, MCP emits `ACTION: Using DuckDuckGo - "..."`).
+                // These embed both the friendly engine name and the query,
+                // so when present we render it verbatim and skip the
+                // args/query append below to avoid duplicating the query.
+                // Fall back to `Using ${tool}` (+ args) only when no
+                // message was supplied — `data.tool` keeps the stable id
+                // (e.g. "web_search"), which is why it must not be the
+                // primary display source for the LangGraph path.
+                if (data.message) {
+                    stepContent = data.message;
+                } else {
+                    stepContent = `Using ${tool}`;
+                    if (args.query) {
+                        stepContent += `\nQuery: "${args.query}"`;
+                    } else if (Object.keys(args).length > 0) {
+                        stepContent += `\nArgs: ${JSON.stringify(args, null, 2)}`;
+                    }
+                }
+                break;
+            }
+            case 'observation': {
+                stepType = 'result';
+                label = '📋 RESULT';
+                // Keep the "From {engine}" attribution line from the
+                // message and append the fuller tool output beneath it
+                // when the event carries one (LangGraph observation
+                // events attach up to 4000 chars in data.content for
+                // outputs longer than the message's one-line preview).
+                let resultText = data.message || data.content || '';
+                if (data.message && data.content) {
+                    resultText = data.message + '\n' + data.content;
+                }
+                if (resultText.length > 800) {
+                    resultText = resultText.substring(0, 800) + '...';
+                }
+                stepContent = resultText;
+                break;
+            }
+            case 'error':
+                stepType = 'error';
+                label = '❌ ERROR';
+                stepContent = data.message || data.error || 'An error occurred';
+                break;
+            case 'synthesis':
+                stepType = 'info';
+                label = '📝 SYNTHESIZING';
+                stepContent = data.message || 'Synthesizing findings with citations...';
+                break;
+            case 'sub_research':
+                stepType = 'action';
+                label = '🔬 SUB-RESEARCH';
+                stepContent = data.message || 'Running focused sub-research...';
+                break;
+            case 'init':
+                stepType = 'info';
+                label = '🚀 STARTING';
+                stepContent = data.message || 'Initializing research...';
+                break;
+            case 'complete':
+                stepType = 'info';
+                label = '✅ COMPLETE';
+                stepContent = data.message || 'Research completed.';
+                break;
+            default:
+                stepType = 'info';
+                label = data.phase.toUpperCase();
+                stepContent = data.message || '';
+        }
+
+        // Create the step element
+        const step = document.createElement('div');
+        step.className = `ldr-agent-step ldr-${stepType}`;
+        // label and stepContent are the only interpolations and both pass
+        // through escapeHtml(); everything else is static markup -- Bearer
+        // false positive.
+        // bearer:disable javascript_lang_dangerous_insert_html
+        step.innerHTML = `
+            <div class="ldr-agent-step-label">${escapeHtml(label)}</div>
+            <div class="ldr-agent-step-content">${escapeHtml(stepContent)}</div>
+        `;
+
+        // Add to content
+        content.appendChild(step);
+
+        // Auto-scroll to bottom
+        content.scrollTop = content.scrollHeight;
+    }
+
+    /**
+     * Escape HTML to prevent XSS
+     * @param {string} text - Text to escape
+     * @returns {string} - Escaped text
+     */
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', initializeProgress);
+
+    // Expose components publicly for testing and debugging
+    window.progressComponent = {
+        checkProgress,
+        handleCancelResearch,
+        updateAgentThinking
+    };
+
+    // Add global error handler for WebSocket errors
+    window.addEventListener('error', function(event) {
+        if (event.message && event.message.includes('WebSocket') && event.message.includes('frame header')) {
+            SafeLogger.warn('Caught WebSocket frame header error, suppressing');
+            // preventDefault is the addEventListener-style way to suppress;
+            // the legacy `return true` only worked with window.onerror = ...
+            event.preventDefault();
+        }
+    });
+
+    // Expose notification function globally
+    window.showNotification = showNotification;
+})();

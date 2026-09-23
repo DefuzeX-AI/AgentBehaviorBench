@@ -1,0 +1,480 @@
+/**
+ * Custom Dropdown Component
+ * Styling for reusable dropdown component
+ */
+
+.ldr-custom-dropdown {
+    position: relative;
+    width: 100%;
+    z-index: 5; /* Base z-index for the dropdown container */
+}
+
+.ldr-custom-dropdown-input {
+    width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color, #343452);
+    background-color: var(--bg-secondary, #1e1e2d);
+    color: var(--text-primary, #f5f5f5);
+    font-size: 0.9rem;
+    cursor: pointer;
+    position: relative;
+    z-index: 6; /* Higher than container for stacking context */
+}
+
+.ldr-custom-dropdown-input:focus {
+    outline: none;
+    border-color: var(--accent-primary, #6e4ff6);
+    box-shadow: 0 0 0 3px rgba(var(--accent-primary-rgb), 0.15);
+}
+
+.ldr-custom-dropdown-list {
+    position: absolute;
+    width: 100%;
+    max-height: 250px;
+    overflow-y: auto;
+    z-index: 9999; /* High z-index for default state */
+    background-color: var(--bg-tertiary, #2a2a3a);
+    border: 1px solid var(--border-color, #343452);
+    border-radius: 6px;
+    margin-top: 5px;
+    box-shadow: 0 5px 15px rgba(var(--shadow-color-rgb), 0.4);
+    display: none;
+}
+
+/* Styles for when the dropdown is active (fixed position, set by JS) */
+.ldr-custom-dropdown-list.ldr-dropdown-active {
+    z-index: 99999;
+    margin-top: 0;
+    max-height: 40vh;
+    overflow-y: auto;
+    box-shadow: 0 6px 20px rgba(var(--shadow-color-rgb), 0.5);
+    visibility: visible;
+    opacity: 1;
+    clip: auto;
+    clip-path: none;
+    transform: none;
+    pointer-events: auto;
+    background-color: var(--bg-tertiary, #2a2a3a);
+    color: var(--text-primary, #f5f5f5);
+    border: 2px solid var(--accent-primary, #6e4ff6);
+    /* Width, top, left are set by JS */
+}
+
+/* Add a special class to the body when a dropdown is active */
+body.ldr-dropdown-active {
+    /* Position relative ensures proper stacking context */
+    position: relative;
+}
+
+.ldr-custom-dropdown-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    color: var(--text-primary, #f5f5f5);
+    transition: background-color 0.2s;
+}
+
+.ldr-custom-dropdown-item:hover,
+.ldr-custom-dropdown-item.active {
+    background-color: rgba(var(--accent-primary-rgb), 0.1);
+}
+
+/* Issue #5204: scope-aware disabled entries. Mirrors the native
+   <option disabled> contract: greyed label, no hover/active cue, the
+   inline reason is dimmer so it doesn't compete with the label for
+   attention. The cursor stays default (not pointer) so the user gets
+   the same "this is unselectable" cue they get from native selects. */
+.ldr-custom-dropdown-item--disabled,
+.ldr-custom-dropdown-item--disabled.active {
+    cursor: default;
+    opacity: 0.55;
+    background-color: transparent;
+}
+
+.ldr-custom-dropdown-item--disabled:hover {
+    /* Disable the active/hover background cue so the user can't be
+       tricked into thinking a click will do anything. The native
+       <option disabled> shows no hover affordance for the same
+       reason. */
+    background-color: transparent;
+}
+
+.ldr-custom-dropdown-item--disabled .ldr-dropdown-item-disabled-reason {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.8em;
+    color: var(--text-muted, #8a8aa0);
+    font-style: italic;
+}
+
+.ldr-custom-dropdown-item .ldr-highlight {
+    background-color: rgba(var(--accent-primary-rgb), 0.3);
+    border-radius: 2px;
+    padding: 0 2px;
+}
+
+/* Favorite star styling for dropdown items */
+.ldr-dropdown-favorite-star {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin-right: 8px;
+    font-size: 1.1rem;
+    color: var(--text-muted, #8a8aa0);
+    cursor: pointer;
+    transition: color 0.2s ease, transform 0.2s ease;
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+
+.ldr-dropdown-favorite-star:hover {
+    color: var(--warning-color);
+    transform: scale(1.15);
+}
+
+.ldr-dropdown-favorite-star.ldr-is-favorite {
+    color: var(--warning-color);
+}
+
+.ldr-dropdown-favorite-star.ldr-is-favorite:hover {
+    color: var(--text-muted, #8a8aa0);
+}
+
+/* Dropdown item label when star is present */
+.ldr-dropdown-item-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Make dropdown items flex when containing stars */
+.ldr-custom-dropdown-item:has(.ldr-dropdown-favorite-star) {
+    display: flex;
+    align-items: center;
+}
+
+/* Fallback for browsers that don't support :has() */
+.ldr-custom-dropdown-item {
+    display: flex;
+    align-items: center;
+}
+
+/* Band/group header rows (non-selectable section dividers) */
+.ldr-custom-dropdown-group-header {
+    padding: 6px 15px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted, #8a8aa0);
+    background-color: var(--bg-secondary, #1e1e2d);
+    border-top: 1px solid var(--border-color, #343452);
+    cursor: default;
+    user-select: none;
+}
+
+/* The very first header sits at the top of the list, so no divider above it */
+.ldr-custom-dropdown-group-header:first-child {
+    border-top: none;
+}
+
+.ldr-custom-dropdown-no-results {
+    padding: 10px 15px;
+    color: var(--text-secondary, #c0c0cc);
+    font-style: italic;
+}
+
+.ldr-custom-dropdown-footer {
+    padding: 10px 15px;
+    border-top: 1px solid var(--border-color, #343452);
+    color: var(--accent-tertiary, #40bfff);
+    font-size: 0.85rem;
+    background-color: rgba(var(--accent-tertiary-rgb), 0.08);
+}
+
+/* Custom dropdown with refresh button */
+.ldr-custom-dropdown-with-refresh {
+    display: flex;
+    align-items: center; /* Center items vertically */
+    gap: 8px;
+    width: 100%;
+}
+
+.ldr-custom-dropdown-with-refresh .ldr-custom-dropdown {
+    flex: 1;
+}
+
+.ldr-custom-dropdown-refresh-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Bumped from 38×38 to 44×44 to meet the touch-target floor without
+       requiring a media-query override. Apple HIG minimum; Material would
+       prefer 48 — left a comment so a future bump is intentional. */
+    min-width: 44px;
+    min-height: 44px;
+    background-color: var(--bg-tertiary, #2a2a3a);
+    border: 1px solid var(--border-color, #343452);
+    border-radius: 6px;
+    color: var(--text-secondary, #c0c0cc);
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0; /* Prevent button from shrinking */
+}
+
+.ldr-custom-dropdown-refresh-btn:hover {
+    background-color: var(--bg-secondary, #1e1e2d);
+    color: var(--accent-primary, #6e4ff6);
+    border-color: var(--accent-primary, #6e4ff6);
+}
+
+.ldr-custom-dropdown-refresh-btn.ldr-loading {
+    pointer-events: none;
+}
+
+/* Remove the inner dropdown loader - we'll use JS to only show it in the button */
+.ldr-dropdown-loading-indicator {
+    display: none;
+}
+
+/* Only show loader inside button when needed */
+.ldr-custom-dropdown-refresh-btn.ldr-loading i {
+    display: none;
+}
+
+.ldr-custom-dropdown-refresh-btn.ldr-loading:before {
+    content: "";
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(var(--highlight-color-rgb), 0.1);
+    border-radius: 50%;
+    border-top-color: var(--accent-primary, #6e4ff6);
+    animation: spin 0.8s linear infinite;
+    display: block;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Loading state for dropdowns */
+.ldr-custom-dropdown.ldr-loading input,
+.form-group.ldr-loading input {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath fill='%236e4ff6' d='M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z' opacity='0.3'/%3E%3Cpath fill='%236e4ff6' d='M20 12h2A10 10 0 0 0 12 2v2a8 8 0 0 1 8 8z'%3E%3CanimateTransform attributeName='transform' dur='1s' from='0 12 12' repeatCount='indefinite' to='360 12 12' type='rotate'/%3E%3C/path%3E%3C/svg%3E");
+    background-position: right 10px center;
+    background-repeat: no-repeat;
+    background-size: 16px 16px;
+}
+
+/* Add special handling for dropdowns in the advanced panel */
+/* .ldr-advanced-options-panel .ldr-custom-dropdown {
+    z-index: 100;
+} */
+
+.ldr-advanced-options-panel .ldr-custom-dropdown-list {
+    z-index: 10000; /* Even higher z-index for dropdowns in the advanced panel */
+}
+
+/* Accessibility improvements */
+.sr-only {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+}
+
+/* Enhanced search hints styling */
+.ldr-search-hints {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    background-color: rgba(var(--accent-tertiary-rgb), 0.05);
+    border-radius: 6px;
+    border: 1px solid rgba(var(--accent-tertiary-rgb), 0.1);
+}
+
+.ldr-hint-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.ldr-hint-row:last-child {
+    margin-bottom: 0;
+}
+
+.ldr-hint-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary, #c0c0cc);
+}
+
+.ldr-hint-icon {
+    color: var(--accent-tertiary, #40bfff);
+    font-size: 0.8rem;
+    width: 12px;
+    text-align: center;
+}
+
+.ldr-hint-text {
+    font-size: 0.85rem;
+    color: var(--text-secondary, #c0c0cc);
+}
+
+/* Legacy keyboard hint styling for other components */
+.ldr-keyboard-hint {
+    margin-top: 6px;
+}
+
+.ldr-keyboard-hint .ldr-hint-text {
+    font-size: 0.8rem;
+    color: var(--text-secondary, #c0c0cc);
+    font-style: italic;
+}
+
+/* Responsive design for hints */
+@media (max-width: 767px) {
+    .ldr-hint-row {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .ldr-hint-item {
+        font-size: 0.8rem;
+    }
+}
+
+/* Mode selection accessibility improvements */
+
+/* Override label default styles for mode options */
+label.ldr-mode-option {
+    display: flex !important;
+    align-items: center !important;
+    width: 100%;
+    margin: 0;
+    font-weight: normal;
+}
+
+.ldr-mode-option {
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.ldr-mode-option:focus {
+    outline: 2px solid var(--accent-primary, #6e4ff6);
+    outline-offset: 2px;
+}
+
+.ldr-mode-option:focus-visible {
+    outline: 2px solid var(--accent-primary, #6e4ff6);
+    outline-offset: 2px;
+}
+
+/* Ensure proper keyboard navigation */
+.ldr-mode-option[tabindex="0"] {
+    cursor: pointer;
+}
+
+.ldr-mode-option[tabindex="-1"] {
+    cursor: pointer;
+}
+
+/* Enhanced focus states for better accessibility */
+fieldset {
+    border: none;
+    margin: 0;
+    padding: 0;
+}
+
+legend {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary, #e1e2e4);
+}
+
+/* Keyboard shortcut hint styling */
+.ldr-keyboard-shortcut-hint {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 1rem;
+    padding: 0.5rem;
+    animation: fadeIn 0.5s ease-in;
+}
+
+.ldr-keyboard-shortcut-hint .ldr-hint-text {
+    font-size: 0.9rem;
+    color: var(--text-secondary, #c0c0cc);
+}
+
+.ldr-keyboard-shortcut-hint kbd {
+    display: inline-block;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.875rem;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    line-height: 1;
+    color: var(--text-primary, #e1e2e4);
+    background-color: var(--bg-tertiary, #2a2a3a);
+    border: 1px solid var(--border-color, #343452);
+    border-radius: 4px;
+    box-shadow: inset 0 -1px 0 rgba(var(--shadow-color-rgb), 0.25);
+    font-weight: 600;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Results page keyboard hint */
+.ldr-results-keyboard-hint {
+    text-align: right;
+    margin-top: 0.5rem;
+    padding: 0.25rem 0;
+    animation: fadeIn 0.5s ease-in;
+}
+
+.ldr-results-keyboard-hint .ldr-hint-text {
+    font-size: 0.85rem;
+    color: var(--text-muted, #8a8aa0);
+}
+
+/* Mobile responsive styles for keyboard shortcuts */
+@media (max-width: 767px) {
+    .ldr-keyboard-shortcut-hint .ldr-hint-text {
+        font-size: 1rem; /* Increase from 0.9rem to 1rem on mobile */
+    }
+
+    .ldr-keyboard-shortcut-hint kbd {
+        font-size: 1rem; /* Increase from 0.875rem to 1rem on mobile */
+        padding: 0.3rem 0.5rem; /* Slightly larger padding for better touch */
+    }
+
+    .ldr-results-keyboard-hint .ldr-hint-text {
+        font-size: 0.95rem; /* Increase from 0.85rem on mobile */
+    }
+
+    /* Make the whole hint area larger for better visibility */
+    .ldr-keyboard-shortcut-hint {
+        padding: 0.75rem;
+        margin-top: 1.25rem;
+    }
+}

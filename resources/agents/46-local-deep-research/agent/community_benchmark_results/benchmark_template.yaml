@@ -1,0 +1,80 @@
+# Benchmark Result Template
+# Please copy this file and rename it to: [model_name]_[date].yaml
+# Example: llama3.3-70b-q4_2025-01-23.yaml
+
+# Model Information
+model: # e.g., Llama-3.3-70B-Q4_K_M
+model_provider: # ollama, llamacpp, openai_endpoint, etc.
+quantization: # e.g., Q4_K_M, Q5_K_S, FP16, etc.
+
+# Search Engine (critical for benchmark reproducibility)
+search_engine: # e.g., searxng, tavily, duckduckgo, google
+search_provider_version: # if known, e.g., "latest", "2024.1.0"
+average_results_per_query: # optional, e.g., 10
+
+# Hardware
+hardware:
+  gpu: # e.g., RTX 4090 24GB, 2x A100 80GB
+  ram: # e.g., 64GB DDR5
+  cpu: # e.g., AMD Ryzen 9 7950X
+
+# Benchmark Results
+results:
+  dataset: SimpleQA
+  total_questions: # e.g., 50
+
+  focused_iteration:
+    accuracy: # e.g., 87% (43/50)
+    iterations: # e.g., 8
+    questions_per_iteration: # e.g., 5
+    avg_time_per_question: # e.g., 95s
+    total_tokens_used: # if available
+
+  source_based:
+    accuracy: # e.g., 82% (41/50)
+    iterations: # e.g., 5
+    questions_per_iteration: # e.g., 3
+    avg_time_per_question: # e.g., 65s
+    total_tokens_used: # if available
+
+# Configuration
+configuration:
+  context_window: # e.g., 32768
+  temperature: # e.g., 0.1
+  max_tokens: # e.g., 4096
+  local_provider_context_window_size: # from settings
+
+# Evaluator / Grader
+evaluator:
+  model: # e.g., anthropic/claude-3.7-sonnet
+  provider: # e.g., openai_endpoint
+  endpoint_url: # e.g., https://openrouter.ai/api/v1
+  temperature: # e.g., 0
+
+# Versions
+versions:
+  ldr_version: # e.g., 0.6.0
+  ollama_version: # if applicable
+  searxng_version: # if known
+
+# Test Details
+test_details:
+  date_tested: # YYYY-MM-DD
+  rate_limiting_issues: # yes/no
+  search_failures: # number of failed searches, if any
+
+# Notes
+notes: |
+  # Add any observations, errors, or insights here
+  # Example: Model struggled with recent events post-2023
+  # Example: Source-based strategy worked better for complex multi-hop questions
+
+# Individual Examples (optional, auto-generated when "Include examples" is selected)
+# IMPORTANT: Review for PII before submitting as a PR
+# examples:
+#   - question: "What is the capital of France?"
+#     correct_answer: "Paris"
+#     model_answer: "Paris"
+#     result: correct
+#     dataset: simpleqa
+#     processing_time_seconds: 45.3

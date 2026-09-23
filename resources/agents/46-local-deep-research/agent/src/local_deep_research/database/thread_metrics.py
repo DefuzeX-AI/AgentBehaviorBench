@@ -1,0 +1,208 @@
+"""
+Thread-safe metrics database access.
+
+This module provides a way for background threads to write metrics
+to the user's encrypted database by creating thread-local connections
+with the provided password.
+"""
+
+import threading
+from contextlib import contextmanager
+from typing import Optional
+
+from loguru import logger
+from sqlalchemy.orm import Session
+
+from .encrypted_db import db_manager
+from ..utilities.request_context import get_current_username  # noqa: F401
+
+
+class ThreadSafeMetricsWriter:
+    """
+    Thread-safe writer for metrics to encrypted user databases.
+    Creates encrypted connections per thread using provided passwords.
+    """
+
+    def __init__(self):
+        self._thread_local = threading.local()
+
+    def set_user_password(self, username: str, password: str):
+        """
+        Store user password for the current thread.
+        This allows the thread to create its own encrypted connection.
+
+        IMPORTANT: This is safe because:
+        1. Password is already in memory (user is logged in)
+        2. It's only stored thread-locally
+        3. It's explicitly cleared by `clear_passwords()` (invoked from
+           `cleanup_current_thread()`) so pooled worker threads do not
+           retain credentials between tasks.
+        """
+
+        if not hasattr(self._thread_local, "passwords"):
+            self._thread_local.passwords = {}
+        self._thread_local.passwords[username] = password
+
+    def clear_passwords(self):
+        """Remove all passwords cached on the current thread's local store.
+
+        Called by `cleanup_current_thread()` so that pooled worker threads
+        don't retain plaintext credentials between tasks.
+        """
+        if hasattr(self._thread_local, "passwords"):
+            self._thread_local.passwords.clear()
+
+    @contextmanager
+    def get_session(self, username: str = None) -> Session:
+        """
+        Get a database session for metrics in the current thread.
+        Creates a new encrypted connection if needed.
+
+        Args:
+            username: The username for database access. If not provided,
+                     will attempt to get it from Flask session.
+        """
+        # If username not provided, get it from request context.
+        # ValueError is the right exception type here — this is a database
+        # service called from threadpools, schedulers, and worker threads,
+        # not from an HTTP handler. werkzeug.exceptions.Unauthorized used
+        # to be raised here, but its 401-meaning is meaningless outside an
+        # HTTP context, and the surrounding try/except (which caught
+        # ImportError/RuntimeError) was structurally broken — the import
+        # never raised the exceptions the except clause caught.
+        if username is None:
+            username = get_current_username()
+            if not username:
+                raise ValueError("No username in request context")
+
+        # Get password for this user in this thread
+        if not hasattr(self._thread_local, "passwords"):
+            raise ValueError("No password set for thread metrics access")
+
+        password = self._thread_local.passwords.get(username)
+
+        if not password:
+            raise ValueError(
+                f"No password available for user {username} in this thread"
+            )
+
+        # Create a thread-safe session for this user
+        session = None
+        try:
+            session = db_manager.create_thread_safe_session_for_metrics(
+                username, password
+            )
+            if not session:
+                raise ValueError(  # noqa: TRY301 — except does session rollback before re-raise
+                    f"Failed to create session for user {username}"
+                )
+            yield session
+            session.commit()
+        except Exception:
+            # ``logger.warning`` (no traceback) rather than
+            # ``logger.exception``: ``password`` is a live local in this
+            # frame, so rendering a traceback under ``diagnose=True``
+            # would dump the plaintext SQLCipher master password
+            # (unrecoverable — TRUST.md §5). The exception still
+            # propagates via the ``raise`` below, so no detail is
+            # swallowed for the caller (#4182).
+            logger.warning(f"Session error for {username}")
+            if session:
+                session.rollback()
+            raise
+        finally:
+            if session:
+                from ..utilities.resource_utils import safe_close
+
+                safe_close(session, "thread metrics session")
+
+    def write_token_metrics(
+        self, username: str, research_id: Optional[int], token_data: dict
+    ):
+        """
+        Write token metrics from any thread.
+
+        Args:
+            username: The username (for database access)
+            research_id: The research ID
+            token_data: Dictionary with token metrics data
+        """
+        with self.get_session(username) as session:
+            # Import here to avoid circular imports
+            from .models import ModelUsage, TokenUsage
+
+            # The caller resolves the provider-reported total; fall back to
+            # the sum only when it did not supply one.
+            total_tokens = token_data.get("total_tokens")
+            if total_tokens is None:
+                total_tokens = token_data.get(
+                    "prompt_tokens", 0
+                ) + token_data.get("completion_tokens", 0)
+
+            # Create TokenUsage record
+            token_usage = TokenUsage(
+                research_id=research_id,
+                model_name=token_data.get("model_name"),
+                model_provider=token_data.get("provider"),
+                prompt_tokens=token_data.get("prompt_tokens", 0),
+                completion_tokens=token_data.get("completion_tokens", 0),
+                total_tokens=total_tokens,
+                # Research context
+                research_query=token_data.get("research_query"),
+                research_mode=token_data.get("research_mode"),
+                research_phase=token_data.get("research_phase"),
+                search_iteration=token_data.get("search_iteration"),
+                # Performance metrics
+                response_time_ms=token_data.get("response_time_ms"),
+                success_status=token_data.get("success_status", "success"),
+                error_type=token_data.get("error_type"),
+                # Search engine context
+                search_engines_planned=token_data.get("search_engines_planned"),
+                search_engine_selected=token_data.get("search_engine_selected"),
+                # Call stack tracking
+                calling_file=token_data.get("calling_file"),
+                calling_function=token_data.get("calling_function"),
+                call_stack=token_data.get("call_stack"),
+                # Context overflow detection
+                context_limit=token_data.get("context_limit"),
+                context_truncated=token_data.get("context_truncated", False),
+                tokens_truncated=token_data.get("tokens_truncated"),
+                truncation_ratio=token_data.get("truncation_ratio"),
+                # Raw Ollama metrics
+                ollama_prompt_eval_count=token_data.get(
+                    "ollama_prompt_eval_count"
+                ),
+                ollama_eval_count=token_data.get("ollama_eval_count"),
+                ollama_total_duration=token_data.get("ollama_total_duration"),
+                ollama_load_duration=token_data.get("ollama_load_duration"),
+                ollama_prompt_eval_duration=token_data.get(
+                    "ollama_prompt_eval_duration"
+                ),
+                ollama_eval_duration=token_data.get("ollama_eval_duration"),
+            )
+            session.add(token_usage)
+
+            # Update or create model usage statistics (matches MainThread
+            # path in token_counter.py _save_to_db).
+            model_name = token_data.get("model_name")
+            model_usage = (
+                session.query(ModelUsage)
+                .filter_by(model_name=model_name)
+                .first()
+            )
+
+            if model_usage:
+                model_usage.total_tokens += total_tokens
+                model_usage.total_calls += 1
+            else:
+                model_usage = ModelUsage(
+                    model_name=model_name,
+                    model_provider=token_data.get("provider"),
+                    total_tokens=total_tokens,
+                    total_calls=1,
+                )
+                session.add(model_usage)
+
+
+# Global instance for thread-safe metrics
+metrics_writer = ThreadSafeMetricsWriter()

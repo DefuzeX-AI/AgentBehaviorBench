@@ -1,0 +1,1864 @@
+"""Citation formatter for adding hyperlinks and alternative citation styles."""
+
+import html
+import re
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlparse, urlsplit
+
+from loguru import logger
+from slugify import slugify
+
+from ..content_fetcher.url_classifier import URLClassifier, URLType
+
+# Schemes a citation may carry into a markdown link. An allowlist rather than a
+# list of known-bad schemes: the formatter's job here is deciding what may be
+# rendered, and `javascript:`, `data:`, `vbscript:`, `blob:` and whatever comes
+# next all fail the same test without having to be enumerated. A relative URL
+# stays allowed, because a library document is cited as `/library/...`. A
+# destination that only looks scheme-less is still checked: its HTML-character-
+# reference-decoded form must pass too (`javascript&colon;` renders as a live
+# `javascript:` href), and one that names a host (`//host/x`) is refused.
+_LINKABLE_URL_SCHEMES = frozenset({"http", "https"})
+
+# A scheme check alone is not enough. The destination is interpolated into
+# `](...)`, so anything markdown would read as the end of that destination
+# lets a source URL reopen markdown and write its own link past the gate.
+# Percent-encoding keeps the link resolvable, since a server decodes `%20`
+# back to a space. `[` and `]` are deliberately NOT encoded: they do not end a
+# destination, and encoding them would break IPv6 literals (`http://[::1]/x`).
+_DESTINATION_ESCAPES = {
+    " ": "%20",
+    "<": "%3C",
+    ">": "%3E",
+    '"': "%22",
+    "'": "%27",
+    "\\": "%5C",
+    "`": "%60",
+}
+
+# Parentheses are the exception, and they are why this is two tables rather
+# than one. CommonMark ends a bare destination at the first *unbalanced* `)`
+# and carries balanced pairs through unharmed, so encoding them unconditionally
+# rewrites ordinary URLs that nothing was wrong with -- Wikipedia alone titles
+# thousands of articles `..._(disambiguation)` -- and the reader is shown a URL
+# that is not the one the source served. A balanced destination is therefore
+# left verbatim, and only an unbalanced one is encoded, which is exactly the
+# case that would otherwise end early.
+_PARENTHESIS_ESCAPES = {"(": "%28", ")": "%29"}
+
+
+def _parentheses_are_balanced(url: str) -> bool:
+    """Whether markdown will carry every `(`/`)` in ``url`` inside the link."""
+    depth = 0
+    for character in url:
+        if character == "(":
+            depth += 1
+        elif character == ")":
+            depth -= 1
+            if depth < 0:
+                return False
+    return depth == 0
+
+
+def _destination_is_refused(form: str) -> bool:
+    """Whether one spelling of a destination fails the control or scheme rule."""
+    if any(
+        ord(character) < 0x20 or ord(character) == 0x7F for character in form
+    ):
+        return True
+    try:
+        scheme = urlsplit(form).scheme
+    except ValueError:
+        return True
+    if scheme:
+        return scheme not in _LINKABLE_URL_SCHEMES
+    # No scheme reads as relative, except where a browser takes the host from
+    # it: `//host/x`, and equally `///host/x` or `/\host/x`, which it resolves
+    # the same way and ``urlsplit`` does not. Rendered from a file on disk,
+    # an exported report resolves it to `file://host/x`.
+    return form.lstrip().replace("\\", "/").startswith("//")
+
+
+def _safe_link_destination(url: str) -> str:
+    """Return ``url`` ready to be interpolated into ``](...)``, or "" to refuse.
+
+    Three things have to hold, and what comes back is the string that was
+    checked rather than the one that came in:
+
+    1. No control character survives. ``urlsplit`` removes tabs and newlines
+       and strips leading C0 controls only in order to *parse*; they stay in
+       the string. A destination carrying a newline ends there and the rest is
+       emitted as document body. NUL is not stripped at all, so
+       ``java\x00script:`` parses as scheme-less and would otherwise pass.
+    2. The scheme is ``http``, ``https``, or absent. Looser than
+       ``CitationFormatter._is_linkable_url``, which requires a scheme and is
+       what SOURCE_TAGGED uses to decide whether to render a link at all; the
+       other modes keep linking the relative URLs a library document uses. A
+       scheme-less destination that names a host (``//host/x``) is refused.
+    3. What markdown would read as syntax is percent-encoded, so the gate
+       cannot be walked around by ending the destination early.
+
+    Rules 1 and 2 are checked on the character-reference-decoded form too.
+    marked and Python-Markdown copy the destination into ``href`` as written,
+    and the HTML parser then decodes ``javascript&colon;alert(1)`` into a live
+    ``javascript:`` URL. The decoded form is only checked, never emitted:
+    rewriting ``&`` would break every query string with more than one
+    parameter.
+
+    The rendered markdown reaches the browser through DOMPurify, which strips a
+    ``javascript:`` href before it reaches the DOM. That is one layer, and it is
+    the only one today: an exported .md / .qmd / .tex and every other markdown
+    consumer gets whatever this returns.
+
+    Callers already skip sources whose URL is empty, so a refused destination
+    leaves the citation as a plain ``[N]`` bracket instead of dropping it.
+    """
+    candidate = url.strip()
+    if not candidate:
+        return ""
+    if _destination_is_refused(candidate) or _destination_is_refused(
+        html.unescape(candidate)
+    ):
+        return ""
+    escapes = dict(_DESTINATION_ESCAPES)
+    if not _parentheses_are_balanced(candidate):
+        escapes.update(_PARENTHESIS_ESCAPES)
+    return "".join(escapes.get(character, character) for character in candidate)
+
+
+# Marker emitted by ``IntegratedReportGenerator._format_final_report``
+# around the ``## Sources`` block it appends to the end of a detailed-mode
+# report. Looked up by ``find_sources_section`` so the splitter can locate
+# the appended sources section unambiguously, even when the LLM has
+# emitted its own ``## Sources`` (or ``References:`` etc.) header earlier
+# in the prose. The sentinel is a markdown HTML comment so it round-trips
+# through markdown renderers without affecting the displayed output.
+LDR_APPENDED_SOURCES_SENTINEL = "<!-- LDR_APPENDED_SOURCES_START -->"
+
+_SOURCES_SECTION_PATTERNS = [
+    re.compile(
+        r"^#{1,3}\s*(?:Sources|References|Bibliography|Citations)",
+        re.MULTILINE | re.IGNORECASE,
+    ),
+    re.compile(
+        r"^(?:Sources|References|Bibliography|Citations):?\s*$",
+        re.MULTILINE | re.IGNORECASE,
+    ),
+]
+
+
+def find_sources_section(
+    content: str, *, trust_sentinel: bool = True
+) -> Tuple[int, bool]:
+    """Locate the sources/references section in *content*.
+
+    Returns ``(position, on_sentinel)``. ``position`` is the character
+    offset of the section start, or ``-1`` if no section is found.
+    ``on_sentinel`` is ``True`` iff the unique sentinel emitted by the
+    report generator was matched (in which case the boundary is correct
+    by construction); ``False`` if the position came from the legacy
+    regex patterns (which can match an early ``## Sources`` line inside
+    the answer body and need an over-strip safety check downstream).
+
+    The sentinel is matched at its **last** occurrence (``rfind``) so a
+    spoofed earlier occurrence inside LLM-generated prose — e.g. the
+    LLM quoting the marker string verbatim while summarizing the
+    codebase — cannot silently truncate the answer body or disable the
+    over-strip safety check. Only a sentinel on its own line is trusted;
+    inline occurrences are skipped while searching backwards. The report
+    generator only ever emits the sentinel once at the end of the assembled
+    report, so the last standalone occurrence is the trusted one.
+
+    When ``trust_sentinel`` is ``False`` (e.g. raw LLM output from the
+    quick-mode save path, which never adds the sentinel itself), the
+    sentinel branch is skipped — only the legacy regex patterns run, so
+    a spurious ``on_sentinel=True`` cannot arise from the LLM quoting
+    the marker.
+    """
+    if trust_sentinel:
+        sentinel_pos = content.rfind(LDR_APPENDED_SOURCES_SENTINEL)
+        while sentinel_pos != -1:
+            preceded = sentinel_pos == 0 or content[sentinel_pos - 1] in (
+                "\n",
+                "\r",
+            )
+            after = content[sentinel_pos + len(LDR_APPENDED_SOURCES_SENTINEL) :]
+            followed = not after or after[0] in ("\n", "\r")
+            if preceded and followed:
+                return sentinel_pos, True
+            sentinel_pos = content.rfind(
+                LDR_APPENDED_SOURCES_SENTINEL, 0, sentinel_pos
+            )
+    for pattern in _SOURCES_SECTION_PATTERNS:
+        match = pattern.search(content)
+        if match:
+            return match.start(), False
+    return -1, False
+
+
+_BIB_SOURCES_PATTERN = re.compile(
+    r"^\[(\d+(?:,\s*\d+)*)\]\s*(.+?)(?:\n\s*URL:\s*(.+?))?$",
+    re.MULTILINE,
+)
+
+
+# Single-pass character map. A sequential replace() chain would re-escape
+# the braces its own replacements introduce — the same class of bug that
+# _escape_latex_text's single regex pass avoids below, where "\\" becomes
+# "\textbackslash{}" without a later brace rule mangling it again.
+_BIBTEX_ESCAPES = {
+    "\\": r"\textbackslash{}",
+    # Balanced pairs, not backslash escapes: BibTeX's field scanner counts
+    # brace CHARACTERS and has no escape mechanism, so "\{" is still an open
+    # brace to it. A backslashed brace left the value unbalanced, and the
+    # scanner ran to EOF swallowing the rest of the .bib.
+    "{": r"{\textbraceleft}",
+    "}": r"{\textbraceright}",
+    "&": r"\&",
+    "%": r"\%",
+    "$": r"\$",
+    "#": r"\#",
+    "_": r"\_",
+    "~": r"\textasciitilde{}",
+    "^": r"\textasciicircum{}",
+    '"': "'",
+}
+
+
+# U+0085 NEL already falls inside the 0x7F-0x9F range below; only these two
+# separators sit outside it.
+_UNICODE_LINE_SEPARATORS = "\u2028\u2029"
+
+
+def is_line_breaking_char(char: str) -> bool:
+    """True if *char* can begin a new line for some consumer of our output.
+
+    ONE definition, imported by every producer. The recurring bug in this
+    area has been fixing one instance and leaving a sibling — CR handled
+    but not NEL, the URL sanitised but not the citation index — so the
+    union is deliberately wider than any single consumer needs: C0 and DEL
+    for everything, C1 because such a codepoint is never legitimate text,
+    and U+2028/U+2029 because CSS Text makes them mandatory breaks in
+    rendered HTML even though Python's ``re`` and ``str.splitlines()``
+    ignore them.
+
+    Imported by ``search_utilities._sanitize_sources_field``;
+    ``test_bibliography_escaping`` asserts the two agree on every BMP
+    codepoint, so the claim cannot rot into a comment again.
+    """
+    code = ord(char)
+    return (
+        code < 0x20 or 0x7F <= code <= 0x9F or char in _UNICODE_LINE_SEPARATORS
+    )
+
+
+def _escape_bibtex(value: str) -> str:
+    r"""Escape a value for interpolation into a BibTeX field.
+
+    Titles come from search-result metadata — whatever a page calls itself
+    — and were previously written into ``title = "{...}"`` raw. A title
+    ending the field and opening another (``Benign}", url = "...", note =
+    "{x``) injected an attacker-controlled ``url`` that BibTeX preferred,
+    and an unbalanced brace ran the parser on into the rest of the file.
+    """
+    return "".join(
+        # Control characters are flattened, not escaped. The .bib is
+        # embedded in a ```bibtex markdown fence by the Quarto exporter,
+        # and a bare CR — which ``_BIB_SOURCES_PATTERN``'s ``.`` matches,
+        # since only ``\n`` is excluded — closes that fence once a reader
+        # normalises CRLF, turning the remainder into live markup.
+        # ``_safe_bibtex_url`` already rejects these; this matches it.
+        " " if is_line_breaking_char(ch) else _BIBTEX_ESCAPES.get(ch, ch)
+        for ch in value
+    )
+
+
+_LATEX_TEXT_SPECIALS: dict[str, str] = {
+    "\\": r"\textbackslash{}",
+    "&": r"\&",
+    "%": r"\%",
+    "$": r"\$",
+    "#": r"\#",
+    "_": r"\_",
+    "{": r"\{",
+    "}": r"\}",
+    "~": r"\textasciitilde{}",
+    "^": r"\textasciicircum{}",
+}
+_LATEX_TEXT_SPECIALS_RE = re.compile(
+    "[" + re.escape("".join(_LATEX_TEXT_SPECIALS)) + "]"
+)
+
+
+def _escape_latex_text(text: str) -> str:
+    r"""Escape every LaTeX-special character in one pass.
+
+    One regex pass is load-bearing. Sequential ``str.replace`` passes
+    re-process their own output: the braces in ``\textbackslash{}`` get
+    escaped again and a literal backslash comes out as the invalid
+    ``\textbackslash\{\}``. ``re.sub`` never rescans replacement text,
+    so each special character is replaced exactly once.
+    """
+    return _LATEX_TEXT_SPECIALS_RE.sub(
+        lambda m: _LATEX_TEXT_SPECIALS[m.group()], text
+    )
+
+
+# Matches the leading '#' markers of an ATX heading so the heading TEXT
+# can be escaped while the marker itself survives for the
+# heading-conversion pass in export_to_latex.
+_HEADING_PREFIX_RE = re.compile(r"^(\s*#+\s+)(.*)$")
+
+
+def _safe_bibtex_url(value: str) -> str:
+    r"""Return *value* if it is safe to place in ``url = {...}``, else "".
+
+    Escaping is wrong for a URL — a ``\%`` would corrupt a percent-encoded
+    octet. Nor may the offending characters simply be DROPPED: removing a
+    backslash from ``//trusted.example\@evil.example/p`` turns the trusted
+    host into userinfo, so the exported link points at a different host
+    than the one the reader vetted in the report. A URL containing a
+    breakout character is not a URL to repair — it is omitted, and the
+    caller falls through to its existing URL-less branch.
+    """
+    if any(ch in '{}"\\ ' or is_line_breaking_char(ch) for ch in value):
+        # Local-document sources legitimately trip this: a LangChain
+        # retriever sets a result's url from its ``source`` metadata, which
+        # is often a filesystem path carrying spaces or backslashes.
+        # Dropping the link silently would leave the user guessing why a
+        # bibliography entry has none, so record it.
+        # Truncated: a hostile result can carry a megabyte-long URL, and
+        # this fires once per affected entry — and the Quarto exporter
+        # builds the bibliography twice per export, so it fires twice per
+        # entry in practice. ``!r`` keeps control characters escaped.
+        logger.debug(
+            "Omitting unsafe bibliography URL: {!r}{}",
+            value[:200],
+            "…" if len(value) > 200 else "",
+        )
+        return ""
+    return value
+
+
+def _iter_citation_group(group: str):
+    r"""Yield each index on one Sources line (``"1, 2, 3"`` -> "1", "2", "3").
+
+    ``format_links_to_markdown`` collapses every citation of one source
+    onto a single line carrying all of its indices, so a single-index
+    pattern drops such a source from the bibliography entirely. Exporters
+    emit one entry per index so each ``[N]`` in the body resolves.
+
+    Indices are yielded as STRINGS, exactly as written: the body citations
+    are rewritten from the same text, so converting ``007`` to ``7`` here
+    would key the entry ``ref7`` while the body still cites ``ref007``.
+    No digit filtering either — the pattern's ``\d`` matches only decimal
+    digits (category ``Nd``), which ``int()`` always accepts, so filtering
+    could only discard valid indices such as Arabic-Indic ones.
+    """
+    for part in group.split(","):
+        part = part.strip()
+        if part:
+            yield part
+
+
+def _sort_key(index: str):
+    """Order bibliography entries numerically where possible."""
+    try:
+        return (0, int(index), "")
+    except ValueError:
+        return (1, 0, index)
+
+
+def _collect_bibliography_entries(content: str) -> dict:
+    """Map each citation index to the ``(title, url)`` it names.
+
+    Selection rule: a URL-bearing entry never loses to a URL-less one, and
+    among URL-bearing entries the LATER occurrence wins.
+
+    Both halves matter. A report repeats its Sources block once per section
+    and then again as a combined block, and the combined block is both last
+    and authoritative — so later-wins. And the group-aware pattern can match
+    a line of prose that opens with ``[1, 2]`` where a single-index pattern
+    could not; such a line carries no ``URL:``, whereas every line
+    ``format_links_to_markdown`` renders does, so the URL preference is what
+    keeps prose from taking a citation key.
+
+    Deliberately NOT scoped to a Sources section. Bounding the block at
+    markers like ``\n---`` looked safer but silently emptied the
+    bibliography whenever a thematic break, a setext underline or a table
+    delimiter row came first — while the body was still rewritten to cite
+    entries that no longer existed.
+    """
+    entries: dict[str, tuple[str, str]] = {}
+    for match in _BIB_SOURCES_PATTERN.finditer(content):
+        title = match.group(2).strip()
+        url = match.group(3).strip() if match.group(3) else ""
+        for index in _iter_citation_group(match.group(1)):
+            # Prefer an entry carrying a URL: a real Sources line has one,
+            # a prose false positive does not.
+            if url or index not in entries:
+                entries[index] = (title, url)
+    return entries
+
+
+class CitationMode(Enum):
+    """Available citation formatting modes."""
+
+    NUMBER_HYPERLINKS = "number_hyperlinks"  # [1] with hyperlinks
+    DOMAIN_HYPERLINKS = "domain_hyperlinks"  # [arxiv.org] with hyperlinks
+    DOMAIN_ID_HYPERLINKS = (
+        "domain_id_hyperlinks"  # [arxiv.org] or [arxiv.org-1] with smart IDs
+    )
+    DOMAIN_ID_ALWAYS_HYPERLINKS = (
+        "domain_id_always_hyperlinks"  # [arxiv.org-1] always with IDs
+    )
+    SOURCE_TAGGED_HYPERLINKS = "source_tagged_hyperlinks"
+    """Preserve the global citation number and prefix it with a short source
+    tag derived from the URL: known academic sources via ``URLClassifier``
+    (``arxiv-7``, ``pubmed-3``), domain otherwise (``nytimes.com-9``), and
+    ``local-N`` for empty / local URLs. Unlike DOMAIN_ID_* modes the
+    suffix is the original citation number, so labels never collide and
+    match the bibliography order: ``[1]`` arxiv + ``[2]`` openai + ``[3]``
+    arxiv -> ``arxiv-1``, ``openai-2``, ``arxiv-3``."""
+    NO_HYPERLINKS = "no_hyperlinks"  # [1] without hyperlinks
+
+
+class CitationFormatter:
+    """Formats citations in markdown documents with various styles."""
+
+    def __init__(self, mode: CitationMode = CitationMode.NUMBER_HYPERLINKS):
+        self.mode = mode
+        # Use negative lookbehind and lookahead to avoid matching already formatted citations
+        # Also match Unicode lenticular brackets 【】 (U+3010 and U+3011) that LLMs sometimes generate
+        self.citation_pattern = re.compile(
+            r"(?<![\[【])[\[【](\d+)[\]】](?![\]】])"
+        )
+        self.comma_citation_pattern = re.compile(
+            r"[\[【](\d+(?:,\s*\d+)+)[\]】]"
+        )
+        # Also match "Source X" or "source X" patterns
+        self.source_word_pattern = re.compile(r"\b[Ss]ource\s+(\d+)\b")
+        self.sources_pattern = re.compile(
+            r"^\[(\d+(?:,\s*\d+)*)\]\s*(.+?)(?:\n\s*URL:\s*(.+?))?$",
+            re.MULTILINE,
+        )
+
+    def _create_source_word_replacer(self, formatter_func):
+        """Create a replacement function for 'Source X' patterns.
+
+        Args:
+            formatter_func: A function that takes citation_num and returns formatted text
+
+        Returns:
+            A replacement function for use with regex sub
+        """
+
+        def replace_source_word(match):
+            citation_num = match.group(1)
+            return formatter_func(citation_num)
+
+        return replace_source_word
+
+    def _create_citation_formatter(self, sources_dict, format_pattern):
+        """Create a formatter function for citations.
+
+        Args:
+            sources_dict: Dictionary mapping citation numbers to data
+            format_pattern: A callable that takes (citation_num, data) and returns formatted string
+
+        Returns:
+            A function that formats citations or returns fallback
+        """
+
+        def formatter(citation_num):
+            if citation_num in sources_dict:
+                data = sources_dict[citation_num]
+                return format_pattern(citation_num, data)
+            return f"[{citation_num}]"
+
+        return formatter
+
+    def _replace_comma_citations(self, content, lookup, format_one):
+        """Replace comma-separated citations like [1, 2, 3] using *lookup* and *format_one*.
+
+        Args:
+            content: Text to process
+            lookup: Dict mapping citation number (str) to data
+            format_one: ``(num, data) -> str`` callback that formats a single citation
+        """
+
+        def _replacer(match):
+            nums = [n.strip() for n in match.group(1).split(",")]
+            parts = []
+            for num in nums:
+                if num in lookup:
+                    parts.append(format_one(num, lookup[num]))
+                else:
+                    parts.append(f"[{num}]")
+            return "".join(parts)
+
+        return self.comma_citation_pattern.sub(_replacer, content)
+
+    def format_document(self, content: str) -> str:
+        """Format citations in *content* and return the full document.
+
+        This is the legacy single-string entry point: it concatenates
+        the answer half and the sources half produced by
+        :meth:`format_document_split`. New code that needs to know
+        where the boundary between answer and sources actually fell
+        should use :meth:`format_document_split` instead so the boundary
+        is returned explicitly (no re-parsing of the concatenated output).
+        """
+        formatted_answer, sources_md, _on_sentinel = self.format_document_split(
+            content
+        )
+        return formatted_answer + sources_md
+
+    def format_document_split(
+        self, content: str, *, trust_sentinel: bool = True
+    ) -> Tuple[str, str, bool]:
+        """Format citations and return ``(answer, sources_md, on_sentinel)``.
+
+        The boundary between the LLM's answer and the trailing Sources
+        section is computed inside this method. Callers that only want
+        the answer (e.g. the chat-mode save site) get a clean split
+        without re-applying a regex on concatenated output downstream.
+        ``on_sentinel`` mirrors the second element of
+        :func:`find_sources_section`'s return — ``True`` iff the split
+        boundary came from the appended-sources sentinel emitted by
+        ``IntegratedReportGenerator``, in which case the boundary is
+        correct by construction and downstream over-strip safety checks
+        should be skipped. Pass ``trust_sentinel=False`` for raw LLM
+        output (quick-mode save path) where the sentinel would only
+        appear if the LLM quoted the marker itself.
+
+        Returns ``(content, "", False)`` when the formatter is in
+        NO_HYPERLINKS mode or when no Sources section can be found in
+        ``content``.
+        """
+        if self.mode == CitationMode.NO_HYPERLINKS:
+            return content, "", False
+
+        sources_start, on_sentinel = find_sources_section(
+            content, trust_sentinel=trust_sentinel
+        )
+        if sources_start == -1:
+            return content, "", False
+
+        document_content = content[:sources_start]
+        sources_content = content[sources_start:]
+
+        sources = self._parse_sources(sources_content)
+
+        if self.mode == CitationMode.NUMBER_HYPERLINKS:
+            formatted_content = self._format_number_hyperlinks(
+                document_content, sources
+            )
+        elif self.mode == CitationMode.DOMAIN_HYPERLINKS:
+            formatted_content = self._format_domain_hyperlinks(
+                document_content, sources
+            )
+        elif self.mode == CitationMode.DOMAIN_ID_HYPERLINKS:
+            formatted_content = self._format_domain_id_hyperlinks(
+                document_content, sources
+            )
+        elif self.mode == CitationMode.DOMAIN_ID_ALWAYS_HYPERLINKS:
+            formatted_content = self._format_domain_id_always_hyperlinks(
+                document_content, sources
+            )
+        elif self.mode == CitationMode.SOURCE_TAGGED_HYPERLINKS:
+            formatted_content = self._format_source_tagged_hyperlinks(
+                document_content,
+                sources,
+                self._parse_collections(sources_content),
+            )
+        else:
+            formatted_content = document_content
+
+        return formatted_content, sources_content, on_sentinel
+
+    def apply_inline_hyperlinks(
+        self, content: str, sources: List[Dict[str, Any]]
+    ) -> str:
+        """Hyperlink ``[N]`` refs using a structured source list.
+
+        Dispatches on ``self.mode`` so the user's chosen citation
+        format (Settings → Report → Citation Format) is honored on
+        the fallback path the same way it is in
+        :meth:`format_document_split`. Inherits all the existing
+        per-mode guards (lookbehind/lookahead against ``[[1]]``,
+        comma-list handling like ``[1,2,3]``, ``Source N`` word form,
+        missing-index pass-through, lenticular bracket support).
+
+        Used as the safe fallback at save time when the LLM does NOT
+        emit a Sources section in its prose — the structured source
+        list (e.g. ``search_system.all_links_of_system``) is the
+        canonical source of URLs and indices.
+        """
+        if not content or not sources:
+            return content or ""
+        if self.mode == CitationMode.NO_HYPERLINKS:
+            return content
+
+        # Search-engine result dicts use either "url" or "link" for the
+        # destination — Searxng emits {"link": ..., "title": ..., "snippet": ...}
+        # (search_engine_searxng.py:538) and other engines use "url".
+        # Looking up only `s["url"]` silently dropped every Searxng-sourced
+        # citation, leaving the answer body with plain `[N]` brackets even
+        # though the Sources section beneath was fully populated. Accept
+        # both keys so the hyperlink fallback works regardless of engine.
+        def _src_url(s):
+            return _safe_link_destination(s.get("url") or s.get("link") or "")
+
+        adapted: Dict[str, Tuple[str, str]] = {
+            str(s["index"]): (s.get("title", "Untitled"), _src_url(s))
+            for s in sources
+            if _src_url(s) and s.get("index") is not None
+        }
+        if not adapted:
+            return content
+
+        # Per-mode dispatch — mirrors format_document_split so the user's
+        # chosen citation format applies on this fallback path too.
+        # Previously this was hard-coded to _format_number_hyperlinks,
+        # which meant chat-mode answers (which always hit this fallback
+        # because the langgraph-agent synthesis doesn't emit a ## Sources
+        # block in its prose) ignored the report.citation_format setting
+        # entirely — every chat answer came out as [[N]](url) even when
+        # the user picked domain-based or source-tagged formatting.
+        if self.mode == CitationMode.DOMAIN_HYPERLINKS:
+            return self._format_domain_hyperlinks(content, adapted)
+        if self.mode == CitationMode.DOMAIN_ID_HYPERLINKS:
+            return self._format_domain_id_hyperlinks(content, adapted)
+        if self.mode == CitationMode.DOMAIN_ID_ALWAYS_HYPERLINKS:
+            return self._format_domain_id_always_hyperlinks(content, adapted)
+        if self.mode == CitationMode.SOURCE_TAGGED_HYPERLINKS:
+            # Pull collection names off the structured source dicts
+            # (format_links_to_markdown uses the same shape:
+            # link["metadata"]["collection_name"]) so the SOURCE_TAGGED
+            # formatter can surface library/RAG tags as the citation
+            # label when present.
+            collections: Dict[str, str] = {}
+            for s in sources:
+                idx = s.get("index")
+                if idx is None:
+                    continue
+                meta = s.get("metadata") or {}
+                coll = meta.get("collection_name")
+                if coll:
+                    collections.setdefault(str(idx), str(coll))
+            return self._format_source_tagged_hyperlinks(
+                content, adapted, collections
+            )
+        # NUMBER_HYPERLINKS is the default and the catch-all for any
+        # mode added later that doesn't have an explicit branch above.
+        return self._format_number_hyperlinks(content, adapted)
+
+    def _find_sources_section(
+        self, content: str, trust_sentinel: bool = True
+    ) -> Tuple[int, bool]:
+        """Find the start of the sources/references section.
+
+        Returns ``(position, on_sentinel)`` — see
+        :func:`find_sources_section` for the semantics. ``on_sentinel``
+        is True iff the boundary came from the unique sentinel emitted
+        by the report generator (i.e. it is correct by construction).
+        """
+        return find_sources_section(content, trust_sentinel=trust_sentinel)
+
+    def _parse_sources(
+        self, sources_content: str
+    ) -> Dict[str, Tuple[str, str]]:
+        """
+        Parse sources section to extract citation numbers, titles, and URLs.
+
+        Returns:
+            Dictionary mapping citation number to (title, url) tuple
+        """
+        sources = {}
+        matches = list(self.sources_pattern.finditer(sources_content))
+
+        for match in matches:
+            citation_nums_str = match.group(1)
+            title = match.group(2).strip()
+            url = _safe_link_destination(match.group(3) or "")
+
+            # Handle comma-separated citation numbers like [36, 3]
+            # Split by comma and strip whitespace
+            individual_nums = [
+                num.strip() for num in citation_nums_str.split(",")
+            ]
+
+            # Add an entry for each individual number
+            for num in individual_nums:
+                sources[num] = (title, url)
+
+        return sources
+
+    def _format_number_hyperlinks(
+        self, content: str, sources: Dict[str, Tuple[str, str]]
+    ) -> str:
+        """Replace [1] with hyperlinked version where only the number is linked."""
+        # Filter sources that have URLs
+        url_sources = {
+            num: (title, url) for num, (title, url) in sources.items() if url
+        }
+
+        # Create formatter for citations with number hyperlinks
+        def format_number_link(citation_num, data):
+            _, url = data
+            return f"[[{citation_num}]]({url})"
+
+        # Handle comma-separated citations like [1, 2, 3]
+        content = self._replace_comma_citations(
+            content, url_sources, format_number_link
+        )
+
+        formatter = self._create_citation_formatter(
+            url_sources, format_number_link
+        )
+
+        # Handle individual citations
+        def replace_citation(match):
+            return (
+                formatter(match.group(1))
+                if match.group(1) in url_sources
+                else match.group(0)
+            )
+
+        content = self.citation_pattern.sub(replace_citation, content)
+
+        # Also handle "Source X" patterns
+        return self.source_word_pattern.sub(
+            self._create_source_word_replacer(formatter), content
+        )
+
+    def _format_domain_hyperlinks(
+        self, content: str, sources: Dict[str, Tuple[str, str]]
+    ) -> str:
+        """Replace [1] with [domain.com] hyperlinked version."""
+
+        # Filter sources that have URLs
+        url_sources = {
+            num: (title, url) for num, (title, url) in sources.items() if url
+        }
+
+        # Pre-compute labels so [1, 2, 3] lists and standalone [N] refs
+        # use the same string for a given citation. Previously this
+        # closure called _extract_domain on every match, so a relative
+        # URL (``/library/document/...``) produced ``[[]]`` for every
+        # occurrence. _citation_label falls back to a slugified title
+        # for relative URLs, keeping the label non-empty and readable.
+        label_cache: Dict[str, str] = {
+            num: self._citation_label(num, title, url)
+            for num, (title, url) in url_sources.items()
+        }
+
+        # Create formatter for citations with domain hyperlinks
+        def format_domain_link(citation_num, data):
+            _, url = data
+            label = label_cache[citation_num]
+            return f"[[{label}]]({url})"
+
+        # Handle comma-separated citations like [1, 2, 3]
+        content = self._replace_comma_citations(
+            content, url_sources, format_domain_link
+        )
+
+        formatter = self._create_citation_formatter(
+            url_sources, format_domain_link
+        )
+
+        # Handle individual citations
+        def replace_citation(match):
+            return (
+                formatter(match.group(1))
+                if match.group(1) in url_sources
+                else match.group(0)
+            )
+
+        content = self.citation_pattern.sub(replace_citation, content)
+
+        # Also handle "Source X" patterns
+        return self.source_word_pattern.sub(
+            self._create_source_word_replacer(formatter), content
+        )
+
+    def _format_domain_id_hyperlinks(
+        self, content: str, sources: Dict[str, Tuple[str, str]]
+    ) -> str:
+        """Replace [1] with [domain.com-1] hyperlinked version with hyphen-separated IDs."""
+        # First, create a mapping of domains to their citation numbers.
+        # _citation_label (vs raw _extract_domain) means relative URLs
+        # like ``/library/document/...`` get a slugified title as the
+        # "domain" instead of an empty string. Without this, a RAG
+        # result with one citation rendered as ``[[]](url)`` (the
+        # label disappeared), and a multi-citation set rendered as
+        # ``[[-1]](url)`` (the orphaned ``-N`` suffix leaked through).
+        domain_citations: dict[str, list[Any]] = {}
+
+        for citation_num, (title, url) in sources.items():
+            if url:
+                domain = self._citation_label(citation_num, title, url)
+                if domain not in domain_citations:
+                    domain_citations[domain] = []
+                domain_citations[domain].append((citation_num, url))
+
+        # Create a mapping from citation number to domain with ID
+        citation_to_domain_id = {}
+        for domain, citations in domain_citations.items():
+            if len(citations) > 1:
+                # Multiple citations from same domain - add hyphen and number
+                for idx, (citation_num, url) in enumerate(citations, 1):
+                    citation_to_domain_id[citation_num] = (
+                        f"{domain}-{idx}",
+                        url,
+                    )
+            else:
+                # Single citation from domain - no ID needed
+                citation_num, url = citations[0]
+                citation_to_domain_id[citation_num] = (domain, url)
+
+        # Create formatter for citations with domain_id hyperlinks
+        def format_domain_id_link(citation_num, data):
+            domain_id, url = data
+            return f"[[{domain_id}]]({url})"
+
+        # Handle comma-separated citations
+        content = self._replace_comma_citations(
+            content, citation_to_domain_id, format_domain_id_link
+        )
+
+        formatter = self._create_citation_formatter(
+            citation_to_domain_id, format_domain_id_link
+        )
+
+        # Handle individual citations
+        def replace_citation(match):
+            return (
+                formatter(match.group(1))
+                if match.group(1) in citation_to_domain_id
+                else match.group(0)
+            )
+
+        content = self.citation_pattern.sub(replace_citation, content)
+
+        # Also handle "Source X" patterns
+        return self.source_word_pattern.sub(
+            self._create_source_word_replacer(formatter), content
+        )
+
+    def _format_domain_id_always_hyperlinks(
+        self, content: str, sources: Dict[str, Tuple[str, str]]
+    ) -> str:
+        """Replace [1] with [domain.com-1] hyperlinked version, always with IDs."""
+        # Use _citation_label so relative URLs (e.g. RAG /library/document/...
+        # results) produce a slugified-title prefix instead of an empty
+        # string. Without this, every label here collapses to ``-N``
+        # (e.g. ``[[-1]](url)``) and the user has no idea what the link
+        # references. See _format_domain_id_hyperlinks for the same fix.
+        domain_citations: dict[str, list[Any]] = {}
+
+        for citation_num, (title, url) in sources.items():
+            if url:
+                domain = self._citation_label(citation_num, title, url)
+                if domain not in domain_citations:
+                    domain_citations[domain] = []
+                domain_citations[domain].append((citation_num, url))
+
+        # Create a mapping from citation number to domain with ID
+        citation_to_domain_id = {}
+        for domain, citations in domain_citations.items():
+            # Always add hyphen and number for consistency
+            for idx, (citation_num, url) in enumerate(citations, 1):
+                citation_to_domain_id[citation_num] = (f"{domain}-{idx}", url)
+
+        # Create formatter for citations with domain_id hyperlinks
+        def format_domain_id_link(citation_num, data):
+            domain_id, url = data
+            return f"[[{domain_id}]]({url})"
+
+        # Handle comma-separated citations
+        content = self._replace_comma_citations(
+            content, citation_to_domain_id, format_domain_id_link
+        )
+
+        formatter = self._create_citation_formatter(
+            citation_to_domain_id, format_domain_id_link
+        )
+
+        # Handle individual citations
+        def replace_citation(match):
+            return (
+                formatter(match.group(1))
+                if match.group(1) in citation_to_domain_id
+                else match.group(0)
+            )
+
+        content = self.citation_pattern.sub(replace_citation, content)
+
+        # Also handle "Source X" patterns
+        return self.source_word_pattern.sub(
+            self._create_source_word_replacer(formatter), content
+        )
+
+    # Sources section may carry a "Collection: <name>" line for RAG /
+    # library hits (emitted by ``utilities/search_utilities.format_links_to_markdown``).
+    # The line sits between this ``[N]`` entry's ``URL:`` line and the
+    # next ``[N+1]`` entry. We anchor the match on a non-greedy span up
+    # to the next citation header (or end of string) to scope correctly.
+    _collection_line_pattern = re.compile(
+        r"^\[(\d+(?:,\s*\d+)*)\][^\n]*\n"  # the [N] header line
+        r"(?:[^\n\[]*\n)*?"  # any non-[ lines (typically URL: ...)
+        r"\s*Collection:\s*(.+?)\s*$",
+        re.MULTILINE,
+    )
+
+    def _parse_collections(self, sources_content: str) -> Dict[str, str]:
+        """Extract ``{citation_num: collection_name}`` from a sources
+        block. Returns an empty dict when no ``Collection:`` lines exist
+        — the absence of collection info is the common case (web URLs)
+        and must never raise."""
+        collections: Dict[str, str] = {}
+        for match in self._collection_line_pattern.finditer(sources_content):
+            citation_nums_str = match.group(1)
+            collection = match.group(2).strip()
+            if not collection:
+                continue
+            for num in (n.strip() for n in citation_nums_str.split(",")):
+                collections[num] = collection
+        return collections
+
+    def _format_source_tagged_hyperlinks(
+        self,
+        content: str,
+        sources: Dict[str, Tuple[str, str]],
+        collections: Dict[str, str],
+    ) -> str:
+        """Replace ``[N]`` with ``[[source-N]](url)``.
+
+        ``source`` resolves to (in order): the RAG ``Collection:``
+        tag for library hits, the short URLClassifier tag for known
+        academic sources (``arxiv``, ``pubmed``, ...), the cleaned
+        domain otherwise, or ``local`` for empty/file URLs. ``N`` is
+        the original global citation number — labels never collide and
+        the suffix always matches the bibliography ordering.
+
+        Args:
+            content: Document body (sources section already split off).
+            sources: ``{citation_num: (title, url)}`` parsed from the
+                sources block.
+            collections: ``{citation_num: collection_name}`` parsed from
+                optional ``Collection:`` lines in the sources block
+                (empty dict when no library/RAG hits are cited). Wins
+                over URL-derived tags when present for a given citation.
+        """
+
+        # Pre-compute tags so each URL-having source resolves its label
+        # once, however many [N] / [1, 2, 3] refs cite it.
+        tag_cache: Dict[str, str] = {
+            num: self._extract_source_label(
+                url, collection=collections.get(num)
+            )
+            for num, (_, url) in sources.items()
+            if url
+        }
+
+        def format_link(citation_num, data):
+            _, url = data
+            label = tag_cache.get(citation_num)
+            if label is None:
+                # Only URL-less sources are absent from tag_cache. Don't
+                # pass this as dict.get()'s default — that would evaluate
+                # the expensive lookup eagerly on every cache hit too.
+                label = self._extract_source_label(
+                    url, collection=collections.get(citation_num)
+                )
+            tag = f"{label}-{citation_num}"
+            # Only emit a hyperlink for http(s) URLs — local/file URLs are
+            # rendered as plain bracketed tags so the markdown stays clean
+            # and viewers don't try to navigate to a server-local path.
+            return (
+                f"[[{tag}]]({url})"
+                if self._is_linkable_url(url)
+                else f"[{tag}]"
+            )
+
+        # Handle comma-separated citations like [1, 2, 3]
+        content = self._replace_comma_citations(content, sources, format_link)
+
+        formatter = self._create_citation_formatter(sources, format_link)
+
+        # Handle individual citations
+        def replace_citation(match):
+            return (
+                formatter(match.group(1))
+                if match.group(1) in sources
+                else match.group(0)
+            )
+
+        content = self.citation_pattern.sub(replace_citation, content)
+
+        # Also handle "Source X" patterns
+        return self.source_word_pattern.sub(
+            self._create_source_word_replacer(formatter), content
+        )
+
+    @staticmethod
+    def _slugify_collection(name: str) -> str:
+        """Make a user-set collection name safe for inline citations.
+
+        Collection names are free-form strings (``"My Papers"``,
+        ``"team/finance"``). Citations need a compact token that won't
+        break markdown — strip whitespace, lowercase, replace runs of
+        non-alphanumeric chars with a single hyphen, trim leading and
+        trailing hyphens, and fall back to ``"local"`` if the result is
+        empty. ``-N`` is appended downstream so we strip trailing
+        hyphens to keep the join clean.
+        """
+        slug = re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-")
+        return slug or "local"
+
+    @staticmethod
+    def _slugify_title(title: str, max_length: int = 32) -> Optional[str]:
+        """Generate a slug from a document title using python-slugify.
+
+        Returns ``None`` when ``title`` is empty / whitespace / pure
+        punctuation, or when ``slugify`` produces an empty result. The
+        ``None`` sentinel lets callers distinguish "no meaningful slug"
+        from "slug happens to be a real word" (e.g. a document literally
+        titled ``"Doc"`` must yield ``"doc"`` as its label, not fall
+        through to the citation-number fallback).
+        """
+        if not title:
+            return None
+        slug = slugify(title, max_length=max_length, separator="-")
+        return slug if slug else None
+
+    def _citation_label(self, citation_num: str, title: str, url: str) -> str:
+        """Return the inline-citation label for a source.
+
+        Order of preference:
+        1. The URL's domain (``arxiv.org``, ``example.com``) — used by
+           web citations. Falls through when the URL is relative or
+           empty, as is common for RAG / library documents.
+        2. A slugified version of the document title (truncated to
+           keep labels compact) — gives users a readable label for
+           local-library hits.
+        3. The citation number itself — last-resort guarantee the
+           label is never empty (an empty label produces ``[[]]``
+           which renders as an uninformative ``[]`` link).
+        """
+        domain = self._extract_domain(url) if url else ""
+        if domain:
+            return domain
+        slug = self._slugify_title(title)
+        if slug:
+            return slug
+        return str(citation_num)
+
+    @staticmethod
+    def _is_linkable_url(url: str) -> bool:
+        """Return True iff ``url`` is a http(s) URL safe to wrap in a
+        markdown hyperlink. Empty strings and file:// / local: schemes
+        are not linkable.
+
+        Built on ``_safe_link_destination`` so the scheme and control-character
+        rules live in one place; the only thing added here is that a scheme has
+        to be PRESENT. SOURCE_TAGGED uses that to decide whether to render a
+        link at all, which is why it, alone among the modes, does not link a
+        relative URL.
+        """
+        if not _safe_link_destination(url):
+            return False
+        try:
+            return urlsplit(url.strip()).scheme in _LINKABLE_URL_SCHEMES
+        except ValueError:
+            return False
+
+    def _extract_source_label(
+        self, url: str, collection: str | None = None
+    ) -> str:
+        """Return a short source tag for ``url``.
+
+        Resolution order:
+        1. ``collection`` (when supplied) wins outright — RAG / library
+           hits surface their collection name as the citation tag
+           (``mypapers``, ``personal-notes``, ...). The renderer in
+           ``utilities/search_utilities.format_links_to_markdown``
+           emits a ``Collection:`` line per source for library results,
+           which the formatter parses back into this argument.
+        2. Empty URL or non-http(s) scheme (``file://``, ``local:``, ...) →
+           ``"local"``. Uniform fallback when no collection name is
+           available.
+        3. ``URLClassifier`` matches a known academic source → use the
+           enum value (``arxiv``, ``pubmed``, ``pmc``, ``biorxiv``,
+           ``medrxiv``, ``semantic_scholar``, ``doi``).
+        4. Otherwise → fall back to ``_extract_domain`` (e.g.
+           ``arxiv.org``, ``nytimes.com``).
+        """
+        if collection:
+            return self._slugify_collection(collection)
+        if not url:
+            return "local"
+        try:
+            parsed = urlparse(url)
+        except (ValueError, AttributeError):
+            return "local"
+        scheme = (parsed.scheme or "").lower()
+        if scheme not in ("http", "https"):
+            return "local"
+
+        url_type = URLClassifier.classify(url)
+        # Generic HTML/PDF/INVALID → fall back to domain. Everything else
+        # is a known academic source whose enum value is the short tag.
+        if url_type in (URLType.HTML, URLType.PDF, URLType.INVALID):
+            return self._extract_domain(url)
+        return str(url_type.value)
+
+    def _extract_domain(self, url: str) -> str:
+        """Extract domain name from URL."""
+        try:
+            parsed = urlparse(url)
+            domain = parsed.netloc
+            # Remove www. prefix if present
+            if domain.startswith("www."):
+                domain = domain[4:]
+            # Keep known domains as-is
+            known_domains = {
+                "arxiv.org": "arxiv.org",
+                "github.com": "github.com",
+                "reddit.com": "reddit.com",
+                "youtube.com": "youtube.com",
+                "pypi.org": "pypi.org",
+                "milvus.io": "milvus.io",
+                "medium.com": "medium.com",
+            }
+
+            for known, display in known_domains.items():
+                if known in domain:
+                    return display
+
+            # For other domains, extract main domain
+            parts = domain.split(".")
+            if len(parts) >= 2:
+                return ".".join(parts[-2:])
+            return domain
+        except (ValueError, AttributeError):
+            return "source"
+
+
+# What counts as an executable cell is decided by Quarto's own splitter, so
+# this mirrors that grammar rather than CommonMark's. From quarto-cli
+# ``src/core/lib/break-quarto-md.ts``:
+#
+#   startCodeCellRegEx  ^\s*(```+)\s*\{([=A-Za-z][=A-Za-z0-9._]*)( *[ ,].*)?\}\s*$
+#   startCodeRegEx      ^```
+#   endCodeRegEx        ^\s*(```+)\s*$      closing on an EXACT tick match
+#
+# Every difference from CommonMark is one a fence can be written to exploit: a
+# cell may be indented arbitrarily while a display fence may not be indented at
+# all, whitespace is allowed between the fence and the brace, cell options are
+# unrestricted text (backticks and ``}`` included), the closer must match the
+# opener's tick count exactly, and ``~~~`` is not a fence to Quarto at all.
+#
+# Pandoc's attribute form carries a leading marker — ``{.python}`` (class),
+# ``{#id}`` — and is excluded by the ``[=A-Za-z]`` first character, which is
+# also why ``{=html}`` raw blocks are in scope: Quarto reads them as cells.
+_QUARTO_CELL_FENCE = re.compile(
+    r"^(?P<indent>\s*)(?P<fence>`{3,})\s*"
+    r"\{(?P<lang>[=A-Za-z][=A-Za-z0-9._]*)(?P<rest> *[ ,].*)?\}\s*$"
+)
+_QUARTO_DISPLAY_FENCE = re.compile(r"^`{3,}")
+_QUARTO_FENCE_CLOSE = re.compile(r"^\s*(?P<fence>`{3,})\s*$")
+
+
+def _quarto_tick_count(line: str) -> int:
+    """Backticks in the first space-separated token, as Quarto counts them."""
+    return line.split(" ")[0].count("`")
+
+
+def _defuse_quarto_cells_once(body: str) -> tuple[str, bool]:
+    """One pass of the cell demotion. Returns the body and whether it changed."""
+    out: list[str] = []
+    changed = False
+    open_ticks = 0
+
+    for line in body.split("\n"):
+        if open_ticks:
+            # Only an exact tick match closes: a longer fence inside a shorter
+            # block is content to Quarto, and treating it as a closer would
+            # hand the rest of the block back to plain text.
+            closing = _QUARTO_FENCE_CLOSE.match(line)
+            if closing and len(closing.group("fence")) == open_ticks:
+                open_ticks = 0
+            out.append(line)
+            continue
+
+        cell = _QUARTO_CELL_FENCE.match(line)
+        if cell:
+            open_ticks = len(cell.group("fence"))
+            out.append(
+                f"{cell.group('indent')}{cell.group('fence')}{cell.group('lang')}"
+            )
+            changed = True
+            continue
+
+        if _QUARTO_DISPLAY_FENCE.match(line):
+            # Column 0 only. An indented ``` is prose to Quarto, so treating it
+            # as an open fence would shield a cell further down.
+            open_ticks = _quarto_tick_count(line)
+        out.append(line)
+
+    return "\n".join(out), changed
+
+
+def _defuse_quarto_cells(body: str) -> str:
+    """Turn executable Quarto cells in report prose into display fences.
+
+    Markdown to ``.qmd`` is not format-preserving: a ```` ```{python} ````
+    fence is inert text in a markdown report and an EXECUTABLE cell in a
+    Quarto document, which ``quarto render`` — the only reason to ask for this
+    format — runs. Report bodies carry web-influenced content, so the fence
+    that arrives need not have been written by the user reading it.
+
+    Dropping the braces keeps the code visible and stops it being a cell. A
+    plain ```` ```python ```` fence is display-only already and is untouched,
+    and so is anything inside an open fence: a cell tag quoted inside a code
+    block is content, not syntax.
+
+    The pass repeats to a fixed point. Demoting an *indented* cell leaves a
+    line Quarto does not read as a fence at all, which returns the lines after
+    it to plain text — where a tag that was content a moment ago becomes a cell
+    in its own right. Each pass only ever removes braces, so the set of
+    cell-shaped lines shrinks and the loop settles; it is bounded by that count
+    so an unforeseen shape cannot spin.
+
+    Front matter is deliberately not modelled. Quarto reads a ``---`` block as
+    raw YAML, and a mid-document ``---`` surrounded by blank lines as a
+    horizontal rule, so tracking it here would only ever *stop* a defusion.
+    """
+    passes = (
+        sum(1 for line in body.split("\n") if _QUARTO_CELL_FENCE.match(line))
+        + 1
+    )
+    for _ in range(passes):
+        body, changed = _defuse_quarto_cells_once(body)
+        if not changed:
+            break
+    return body
+
+
+# Characters that must be escaped inside a YAML double-quoted scalar: the
+# quote and backslash the double-quoted form itself requires, plus the
+# control/line-break range ``is_line_breaking_char()`` above defines once
+# for every producer in this module (C0, DEL, C1, and the Unicode line
+# separators U+2028/U+2029).
+_YAML_DQ_SPECIALS_RE = re.compile(r'["\\\x00-\x1f\x7f-\x9f\u2028\u2029]')
+
+
+def _yaml_double_quote(value: str) -> str:
+    r"""Render *value* as a YAML double-quoted scalar.
+
+    Report titles derive from web-influenced content, so a bare
+    interpolation into ``title: "..."`` lets a quote end the scalar
+    early (front matter stops parsing) or a newline inject further
+    front-matter keys. Escaping to YAML double-quoted rules keeps the
+    value a single scalar that parses back exactly.
+    """
+
+    def _escape(match: re.Match) -> str:
+        ch = match.group()
+        if ch == '"':
+            return '\\"'
+        if ch == "\\":
+            return "\\\\"
+        if ch == "\n":
+            return "\\n"
+        if ch == "\r":
+            return "\\r"
+        if ch == "\t":
+            return "\\t"
+        code = ord(ch)
+        return f"\\x{code:02x}" if code <= 0xFF else f"\\u{code:04x}"
+
+    return '"' + _YAML_DQ_SPECIALS_RE.sub(_escape, value) + '"'
+
+
+class QuartoExporter:
+    """Export markdown documents to Quarto (.qmd) format."""
+
+    def __init__(self):
+        # Also match Unicode lenticular brackets 【】 (U+3010 and U+3011) that LLMs sometimes generate
+        self.citation_pattern = re.compile(
+            r"(?<![\[【])[\[【](\d+)[\]】](?![\]】])"
+        )
+        self.comma_citation_pattern = re.compile(
+            r"[\[【](\d+(?:,\s*\d+)+)[\]】]"
+        )
+
+    def export_to_quarto(self, content: str, title: str | None = None) -> str:
+        """
+        Convert markdown document to Quarto format.
+
+        Args:
+            content: Markdown content
+            title: Document title (if None, will extract from content)
+
+        Returns:
+            Quarto formatted content
+        """
+        # Extract title from markdown if not provided
+        if not title:
+            title_match = re.search(r"^#\s+(.+)$", content, re.MULTILINE)
+            title = title_match.group(1) if title_match else "Research Report"
+
+        # Create Quarto YAML header
+        from datetime import UTC, datetime
+
+        current_date = datetime.now(UTC).strftime("%Y-%m-%d")
+        yaml_header = f"""---
+title: {_yaml_double_quote(title)}
+author: "Local Deep Research"
+date: "{current_date}"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+  pdf:
+    toc: true
+    number-sections: true
+    colorlinks: true
+bibliography: references.bib
+csl: apa.csl
+---
+
+"""
+
+        # Process content
+        processed_content = content
+
+        # First handle comma-separated citations like [1, 2, 3]
+        def replace_comma_citations(match):
+            citation_nums = match.group(1)
+            # Split by comma and strip whitespace
+            nums = [num.strip() for num in citation_nums.split(",")]
+            refs = [f"@ref{num}" for num in nums]
+            return f"[{', '.join(refs)}]"
+
+        processed_content = self.comma_citation_pattern.sub(
+            replace_comma_citations, processed_content
+        )
+
+        # Then convert individual citations to Quarto format [@citation]
+        def replace_citation(match):
+            citation_num = match.group(1)
+            return f"[@ref{citation_num}]"
+
+        processed_content = self.citation_pattern.sub(
+            replace_citation, processed_content
+        )
+
+        # Generate bibliography file content
+        bib_content = self._generate_bibliography(content)
+
+        # Add note about bibliography file
+        bibliography_note = (
+            "\n\n::: {.callout-note}\n## Bibliography File Required\n\nThis document requires a `references.bib` file in the same directory with the following content:\n\n```bibtex\n"
+            + bib_content
+            + "\n```\n:::\n"
+        )
+
+        # The callout and its bibtex fence below are the exporter's own
+        # markup, so only the report body is defused.
+        return (
+            yaml_header
+            + _defuse_quarto_cells(processed_content)
+            + bibliography_note
+        )
+
+    def _generate_bibliography(self, content: str) -> str:
+        """Generate BibTeX bibliography from sources."""
+        entries = _collect_bibliography_entries(content)
+
+        bibliography = ""
+        for citation_num in sorted(entries, key=_sort_key):
+            title, url = entries[citation_num]
+            safe_title = _escape_bibtex(title)
+            safe_url = _safe_bibtex_url(url)
+            bib_entry = f"@misc{{ref{citation_num},\n"
+            bib_entry += f'  title = "{{{safe_title}}}",\n'
+            if safe_url:
+                bib_entry += f"  url = {{{safe_url}}},\n"
+                bib_entry += f'  howpublished = "\\url{{{safe_url}}}",\n'
+            bib_entry += f"  year = {{{2024}}},\n"
+            bib_entry += '  note = "Accessed: \\today"\n'
+            bib_entry += "}\n"
+
+            bibliography += bib_entry + "\n"
+
+        return bibliography.strip()
+
+
+class RISExporter:
+    """Export references to RIS format for reference managers like Zotero."""
+
+    def __init__(self):
+        self.sources_pattern = re.compile(
+            r"^\[(\d+(?:,\s*\d+)*)\]\s*(.+?)(?:\n\s*URL:\s*(.+?))?$",
+            re.MULTILINE,
+        )
+
+    def export_to_ris(self, content: str) -> str:
+        """
+        Extract references from markdown and convert to RIS format.
+
+        Args:
+            content: Markdown content with sources
+
+        Returns:
+            RIS formatted references
+        """
+        # Find sources section
+        sources_start, _on_sentinel = find_sources_section(content)
+        if sources_start == -1:
+            return ""
+
+        # Find the end of the first sources section (before any other major section)
+        sources_content = content[sources_start:]
+
+        # Look for the next major section to avoid duplicates
+        next_section_markers = [
+            "\n## ALL SOURCES",
+            "\n### ALL SOURCES",
+            "\n## Research Metrics",
+            "\n### Research Metrics",
+            "\n## SEARCH QUESTIONS",
+            "\n### SEARCH QUESTIONS",
+            "\n## DETAILED FINDINGS",
+            "\n### DETAILED FINDINGS",
+            "\n---",  # Horizontal rule often separates sections
+        ]
+
+        sources_end = len(sources_content)
+        for marker in next_section_markers:
+            pos = sources_content.find(marker)
+            if pos != -1 and pos < sources_end:
+                sources_end = pos
+
+        sources_content = sources_content[:sources_end]
+
+        # Parse sources and generate RIS entries
+        ris_entries = []
+        seen_refs = set()  # Track which references we've already processed
+
+        # Split sources into individual entries
+        import re
+
+        # Pattern to match each source entry. The opener is GROUP-AWARE
+        # (``\d+(?:,\s*\d+)*``, the spelling used by
+        # ``comma_citation_pattern`` and ``_BIB_SOURCES_PATTERN`` above):
+        # ``format_links_to_markdown`` collapses every citation of one source
+        # onto a single merged ``[1, 3] Title`` line, which is routine for
+        # library documents since per-document keying (#5685). A single-index
+        # ``(\d+)`` capture did not merely drop such a line — it MIS-CITED
+        # (#5687), because the lookahead did not terminate at a merged opener
+        # either, so the PRECEDING entry swallowed the merged line and the
+        # last-wins ``URL:`` scan below then handed that entry the merged
+        # line's URL: one source's title against another source's link. Hence
+        # the group spelling appears TWICE — once in the capture, once in the
+        # lookahead — and the loop emits one record PER INDEX so that every
+        # ``[N]`` in the body resolves to a reference of its own.
+        #
+        # Four properties here are deliberate; keep them when editing:
+        #   1. This parser stays bounded to the FIRST Sources section by the
+        #      ``next_section_markers`` scan above. Do not swap in the
+        #      module-level ``_collect_bibliography_entries`` — that helper
+        #      is deliberately not section-scoped, which is why #5687 notes
+        #      RIS is not a mechanical swap even though BibTeX, Quarto and
+        #      LaTeX were fixed by adopting it.
+        #   2. Lenticular "【N】" openers/closers are accepted alongside
+        #      ASCII "[N]": the inline citation patterns in this file already
+        #      handle them (some LLMs emit them), so the source-list parser
+        #      must stay consistent or it would silently drop those entries.
+        #   3. Entries are split by LOOKAHEAD under ``DOTALL`` so continuation
+        #      lines (``URL:``, ``DOI:``, ``Published in``) stay attached to
+        #      the entry they belong to; a line-anchored ``$`` split would
+        #      strip them.
+        #   4. ``self.sources_pattern`` above is group-aware but UNUSED, and
+        #      is not this fix — it is single-line and section-unaware, so
+        #      wiring it in would lose properties 1 and 3.
+        source_entry_pattern = re.compile(
+            r"^[\[【](\d+(?:,\s*\d+)*)[\]】]\s*(.+?)"
+            r"(?=^[\[【]\d+(?:,\s*\d+)*[\]】]|\Z)",
+            re.MULTILINE | re.DOTALL,
+        )
+
+        for match in source_entry_pattern.finditer(sources_content):
+            citation_group = match.group(1)
+            entry_text = match.group(2).strip()
+
+            # Extract the title (first line)
+            lines = entry_text.split("\n")
+            title = lines[0].strip()
+
+            # Extract URL, DOI, and other metadata from subsequent lines
+            url = ""
+            metadata = {}
+            for line in lines[1:]:
+                line = line.strip()
+                if line.startswith("URL:"):
+                    url = line[4:].strip()
+                elif line.startswith("DOI:"):
+                    metadata["doi"] = line[4:].strip()
+                elif line.startswith("Published in"):
+                    metadata["journal"] = line[12:].strip()
+                # Add more metadata parsing as needed
+                elif line:
+                    # Store other lines as additional metadata
+                    if "additional" not in metadata:
+                        metadata["additional"] = []
+                    additional = metadata["additional"]
+                    if isinstance(additional, list):
+                        additional.append(line)
+
+            # Combine title with additional metadata lines for full context
+            full_text = entry_text
+
+            # One record per index, keyed on the INDIVIDUAL index rather than
+            # the group text: a report repeats its Sources block, and the same
+            # source may be written ``[1]`` in one block and ``[1, 3]`` in
+            # another, so keying on the raw group would let ``ref1`` be emitted
+            # twice. ``metadata`` is shared across the indices of one line;
+            # ``_create_ris_entry`` only reads it.
+            for citation_num in _iter_citation_group(citation_group):
+                ref_key = (citation_num, title, url)
+                if ref_key not in seen_refs:
+                    seen_refs.add(ref_key)
+                    # Create RIS entry with full text for metadata extraction
+                    ris_entry = self._create_ris_entry(
+                        citation_num, full_text, url, metadata
+                    )
+                    ris_entries.append(ris_entry)
+
+        return "\n".join(ris_entries)
+
+    def _create_ris_entry(
+        self,
+        ref_id: str,
+        full_text: str,
+        url: str = "",
+        metadata: dict | None = None,
+    ) -> str:
+        """Create a single RIS entry."""
+        lines = []
+
+        # Parse metadata from full text
+        import re
+
+        if metadata is None:
+            metadata = {}
+
+        # Extract title from first line. NB: split into a *separate* variable —
+        # ``lines`` is the RIS-output accumulator initialized above and appended
+        # to below; reusing it here previously overwrote it with the source
+        # text, so every entry emitted the raw source body before the mandatory
+        # leading ``TY  - `` tag and reference managers rejected the file.
+        text_lines = full_text.split("\n")
+        title = text_lines[0].strip()
+
+        # Extract year from full text (looks for 4-digit year)
+        year_match = re.search(r"\b(19\d{2}|20\d{2})\b", full_text)
+        year = year_match.group(1) if year_match else None
+
+        # Extract authors if present (looks for "by Author1, Author2")
+        authors_match = re.search(
+            r"\bby\s+([^.\n]+?)(?:\.|\n|$)", full_text, re.IGNORECASE
+        )
+        authors = []
+        if authors_match:
+            authors_text = authors_match.group(1)
+            # Split by 'and' or ','
+            author_parts = re.split(r"\s*(?:,|\sand\s|&)\s*", authors_text)
+            authors = [a.strip() for a in author_parts if a.strip()]
+
+        # Extract DOI from metadata or text
+        doi = metadata.get("doi")
+        if not doi:
+            doi_match = re.search(
+                r"DOI:\s*([^\s\n]+)", full_text, re.IGNORECASE
+            )
+            doi = doi_match.group(1) if doi_match else None
+
+        # Clean title - remove author and metadata info for cleaner title
+        clean_title = title
+        if authors_match and authors_match.start() < len(title):
+            clean_title = (
+                title[: authors_match.start()] + title[authors_match.end() :]
+                if authors_match.end() < len(title)
+                else title[: authors_match.start()]
+            )
+        clean_title = re.sub(
+            r"\s*DOI:\s*[^\s]+", "", clean_title, flags=re.IGNORECASE
+        )
+        clean_title = re.sub(
+            r"\s*Published in.*", "", clean_title, flags=re.IGNORECASE
+        )
+        clean_title = re.sub(
+            r"\s*Volume.*", "", clean_title, flags=re.IGNORECASE
+        )
+        clean_title = re.sub(
+            r"\s*Pages.*", "", clean_title, flags=re.IGNORECASE
+        )
+        clean_title = clean_title.strip()
+
+        # TY - Type of reference (ELEC for electronic source/website)
+        lines.append("TY  - ELEC")
+
+        # ID - Reference ID
+        lines.append(f"ID  - ref{ref_id}")
+
+        # TI - Title
+        lines.append(f"TI  - {clean_title if clean_title else title}")
+
+        # AU - Authors
+        for author in authors:
+            lines.append(f"AU  - {author}")
+
+        # DO - DOI
+        if doi:
+            lines.append(f"DO  - {doi}")
+
+        # PY - Publication year (if found in title)
+        if year:
+            lines.append(f"PY  - {year}")
+
+        # UR - URL
+        if url:
+            lines.append(f"UR  - {url}")
+
+            # Try to extract domain as publisher
+            try:
+                from urllib.parse import urlparse
+
+                parsed = urlparse(url)
+                domain = parsed.netloc
+                if domain.startswith("www."):
+                    domain = domain[4:]
+                # Extract readable publisher name from domain
+                if domain == "github.com" or domain.endswith(".github.com"):
+                    lines.append("PB  - GitHub")
+                elif domain == "arxiv.org" or domain.endswith(".arxiv.org"):
+                    lines.append("PB  - arXiv")
+                elif domain == "reddit.com" or domain.endswith(".reddit.com"):
+                    lines.append("PB  - Reddit")
+                elif (
+                    domain == "youtube.com"
+                    or domain == "m.youtube.com"
+                    or domain.endswith(".youtube.com")
+                ):
+                    lines.append("PB  - YouTube")
+                elif domain == "medium.com" or domain.endswith(".medium.com"):
+                    lines.append("PB  - Medium")
+                elif domain == "pypi.org" or domain.endswith(".pypi.org"):
+                    lines.append("PB  - Python Package Index (PyPI)")
+                else:
+                    # Use domain as publisher
+                    lines.append(f"PB  - {domain}")
+            except (ValueError, AttributeError):
+                pass
+
+        # Y1 - Year accessed (current year)
+        from datetime import UTC, datetime
+
+        current_year = datetime.now(UTC).year
+        lines.append(f"Y1  - {current_year}")
+
+        # DA - Date accessed
+        current_date = datetime.now(UTC).strftime("%Y/%m/%d")
+        lines.append(f"DA  - {current_date}")
+
+        # LA - Language
+        lines.append("LA  - en")
+
+        # ER - End of reference
+        lines.append("ER  - ")
+
+        return "\n".join(lines)
+
+
+class LaTeXExporter:
+    """Export markdown documents to LaTeX format."""
+
+    def __init__(self):
+        # Also match Unicode lenticular brackets 【】 (U+3010 and U+3011) that LLMs sometimes generate
+        self.citation_pattern = re.compile(r"[\[【](\d+)[\]】]")
+        self.heading_patterns = [
+            (re.compile(r"^# (.+)$", re.MULTILINE), r"\\section{\1}"),
+            (re.compile(r"^## (.+)$", re.MULTILINE), r"\\subsection{\1}"),
+            (re.compile(r"^### (.+)$", re.MULTILINE), r"\\subsubsection{\1}"),
+        ]
+        self.emphasis_patterns = [
+            (re.compile(r"\*\*(.+?)\*\*"), r"\\textbf{\1}"),
+            (re.compile(r"\*(.+?)\*"), r"\\textit{\1}"),
+            (re.compile(r"`(.+?)`"), r"\\texttt{\1}"),
+        ]
+
+    def export_to_latex(self, content: str) -> str:
+        """
+        Convert markdown document to LaTeX format.
+
+        Args:
+            content: Markdown content
+
+        Returns:
+            LaTeX formatted content
+        """
+        latex_content = self._create_latex_header()
+
+        # Convert markdown to LaTeX
+        body_content = content
+
+        # Escape special LaTeX characters but preserve math mode
+        # Split by $ to preserve math sections
+        parts = body_content.split("$")
+        for i in range(len(parts)):
+            # Even indices are outside math mode
+            if i % 2 == 0:
+                # Only escape if not inside $$
+                if not (
+                    i > 0
+                    and parts[i - 1] == ""
+                    and i < len(parts) - 1
+                    and parts[i + 1] == ""
+                ):
+                    # Preserve certain patterns that will be processed later
+                    # like headings (#), emphasis (*), and citations ([n])
+                    lines = parts[i].split("\n")
+                    for j, line in enumerate(lines):
+                        # Escape every LaTeX-special character outside math
+                        # mode. Markdown markers (*, `, [n]) are not
+                        # LaTeX-special and survive for their own
+                        # conversions below.
+                        heading = _HEADING_PREFIX_RE.match(line)
+                        if heading:
+                            # Keep the '#' markers intact for the heading
+                            # conversion; escape the text after them so
+                            # \section{...} receives literal text only.
+                            lines[j] = heading.group(1) + _escape_latex_text(
+                                heading.group(2)
+                            )
+                        else:
+                            lines[j] = _escape_latex_text(line)
+                    parts[i] = "\n".join(lines)
+        body_content = "$".join(parts)
+
+        # Convert headings
+        for pattern, replacement in self.heading_patterns:
+            body_content = pattern.sub(replacement, body_content)
+
+        # Convert emphasis
+        for pattern, replacement in self.emphasis_patterns:
+            body_content = pattern.sub(replacement, body_content)
+
+        # Convert citations to LaTeX \cite{} format
+        body_content = self.citation_pattern.sub(r"\\cite{\1}", body_content)
+
+        # Convert lists
+        body_content = self._convert_lists(body_content)
+
+        # Add body content
+        latex_content += body_content
+
+        # Add bibliography section
+        latex_content += self._create_bibliography(content)
+
+        # Add footer
+        latex_content += self._create_latex_footer()
+
+        return latex_content
+
+    def _create_latex_header(self) -> str:
+        """Create LaTeX document header."""
+        return r"""\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{hyperref}
+\usepackage{cite}
+\usepackage{url}
+
+\title{Research Report}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+"""
+
+    def _create_latex_footer(self) -> str:
+        """Create LaTeX document footer."""
+        return "\n\\end{document}\n"
+
+    def _escape_latex(self, text: str) -> str:
+        """Escape special LaTeX characters in text."""
+        return _escape_latex_text(text)
+
+    def _convert_lists(self, content: str) -> str:
+        """Convert markdown lists to LaTeX format."""
+        # Simple conversion for bullet points
+        content = re.sub(r"^- (.+)$", r"\\item \1", content, flags=re.MULTILINE)
+
+        # Add itemize environment around list items
+        lines = content.split("\n")
+        result = []
+        in_list = False
+
+        for line in lines:
+            if line.strip().startswith("\\item"):
+                if not in_list:
+                    result.append("\\begin{itemize}")
+                    in_list = True
+                result.append(line)
+            else:
+                if in_list and line.strip():
+                    result.append("\\end{itemize}")
+                    in_list = False
+                result.append(line)
+
+        if in_list:
+            result.append("\\end{itemize}")
+
+        return "\n".join(result)
+
+    def _create_bibliography(self, content: str) -> str:
+        """Extract sources and create LaTeX bibliography."""
+        sources_start, _on_sentinel = find_sources_section(content)
+        if sources_start == -1:
+            return ""
+
+        sources_content = content[sources_start:]
+        entries = _collect_bibliography_entries(sources_content)
+
+        bibliography = "\n\\begin{thebibliography}{99}\n"
+
+        for citation_num in sorted(entries, key=_sort_key):
+            title, url = entries[citation_num]
+            escaped_title = self._escape_latex(title)
+
+            # NOTE: thebibliography numbers entries by POSITION, so a gap
+            # in the index sequence makes \\cite{5} print [3]. That is
+            # pre-existing and unchanged here — an explicit
+            # ``\\bibitem[label]{key}`` would fix it but changes an output
+            # format existing tests pin, so it belongs in its own PR.
+            # Sorting at least keeps the common contiguous case correct.
+            item = f"\\bibitem{{{citation_num}}}"
+            safe_url = _safe_bibtex_url(url)
+            if safe_url:
+                bibliography += f"{item} {escaped_title}. \\url{{{safe_url}}}\n"
+            else:
+                bibliography += f"{item} {escaped_title}.\n"
+
+        bibliography += "\\end{thebibliography}\n"
+
+        return bibliography

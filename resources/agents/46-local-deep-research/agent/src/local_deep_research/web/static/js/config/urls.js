@@ -1,0 +1,354 @@
+/**
+ * Centralized URL configuration for the Local Deep Research application
+ * This prevents hardcoded URLs scattered throughout the codebase
+ */
+
+// Prevent redeclaration if URLS already exists
+if (typeof URLS !== 'undefined') {
+    SafeLogger.warn('URLS already defined, skipping redeclaration');
+} else {
+    const URLS = {
+    // API endpoints
+    API: {
+        START_RESEARCH: '/api/start_research',
+        RESEARCH_STATUS: '/api/research/{id}/status',
+        RESEARCH_DETAILS: '/api/research/{id}',
+        RESEARCH_LOGS: '/api/research/{id}/logs',
+        RESEARCH_LOGS_EXPORT: '/api/research/{id}/logs/export',
+        RESEARCH_REPORT: '/api/report/{id}',
+        TERMINATE_RESEARCH: '/api/terminate/{id}',
+        DELETE_RESEARCH: '/api/delete/{id}',
+        CLEAR_HISTORY: '/api/clear_history',
+        SAVE_RAW_CONFIG: '/api/save_raw_config',
+        // The 5 SAVE_*_CONFIG aliases below all hit the same bulk-save
+        // endpoint. The per-section endpoints don't exist on the server;
+        // routing them all to /settings/save_all_settings keeps the
+        // imports working without 404s on hypothetical future callers.
+        SAVE_MAIN_CONFIG: '/settings/save_all_settings',
+        SAVE_SEARCH_ENGINES_CONFIG: '/settings/save_all_settings',
+        SAVE_COLLECTIONS_CONFIG: '/settings/save_all_settings',
+        SAVE_API_KEYS_CONFIG: '/settings/save_all_settings',
+        SAVE_LLM_CONFIG: '/settings/save_all_settings',
+        // Same logical resource as HISTORY_API.MARKDOWN below — kept here
+        // for the URLBuilder.markdownExport() shortcut. The /api/markdown
+        // path was the Flask-era URL and is gone; the canonical FastAPI
+        // route lives under the /history router (web/routers/history.py).
+        MARKDOWN_EXPORT: '/history/markdown/{id}',
+        HISTORY: '/history/api',  // Changed to match backend route
+        HEALTH: '/api/v1/health',  // Added health check endpoint
+        UPLOAD_PDF: '/api/upload/pdf',  // PDF upload endpoint
+        CONFIG_LIMITS: '/api/config/limits'  // Upload limits configuration
+    },
+
+    // Page routes
+    PAGES: {
+        HOME: '/',
+        PROGRESS: '/progress/{id}',
+        RESULTS: '/results/{id}',
+        DETAILS: '/details/{id}',
+        HISTORY: '/history/',
+        SETTINGS: '/settings/',
+        METRICS: '/metrics/',
+        METRICS_COSTS: '/metrics/costs',  // Added metrics subpage
+        METRICS_STAR_REVIEWS: '/metrics/star-reviews',  // Added metrics subpage
+        METRICS_CONTEXT_OVERFLOW: '/metrics/context-overflow',  // Context overflow diagnostics
+        JOURNAL_QUALITY: '/metrics/journals',
+        LIBRARY: '/library/',
+        NOTES: '/notes/',
+        COLLECTIONS: '/library/collections',
+        COLLECTION_DETAILS: '/library/collections/{id}',
+        NEWS: '/news/',
+        NEWS_SUBSCRIPTIONS: '/news/subscriptions',
+        BENCHMARK: '/benchmark/',
+        BENCHMARK_RESULTS: '/benchmark/results',
+        EMBEDDING_SETTINGS: '/library/embedding-settings',
+        DOCUMENT: '/library/document/{id}'
+    },
+
+    // History API routes
+    HISTORY_API: {
+        STATUS: '/history/status/{id}',
+        DETAILS: '/history/details/{id}',
+        LOGS: '/history/logs/{id}',
+        REPORT: '/history/report/{id}',
+        MARKDOWN: '/history/markdown/{id}',
+        LOG_COUNT: '/history/log_count/{id}'
+    },
+
+    // Settings API routes
+    SETTINGS_API: {
+        BASE: '/settings/api',
+        GET_SETTING: '/settings/api/{key}',
+        UPDATE_SETTING: '/settings/api/{key}',
+        DELETE_SETTING: '/settings/api/{key}',
+        IMPORT_SETTINGS: '/settings/api/import',
+        CATEGORIES: '/settings/api/categories',
+        TYPES: '/settings/api/types',
+        UI_ELEMENTS: '/settings/api/ui_elements',
+        AVAILABLE_MODELS: '/settings/api/available-models',
+        AVAILABLE_SEARCH_ENGINES: '/settings/api/available-search-engines',
+        WARNINGS: '/settings/api/warnings',
+        BACKUP_STATUS: '/settings/api/backup-status',
+        OLLAMA_STATUS: '/settings/api/ollama-status',
+        LLM_PROVIDER: '/settings/api/llm.provider',
+        SEARCH_TOOL: '/settings/api/search.tool',
+        SEARCH_FAVORITES: '/settings/api/search-favorites',
+        SEARCH_FAVORITES_TOGGLE: '/settings/api/search-favorites/toggle',
+        SAVE_ALL_SETTINGS: '/settings/save_all_settings',
+        RESET_TO_DEFAULTS: '/settings/reset_to_defaults',
+        FIX_CORRUPTED_SETTINGS: '/settings/fix_corrupted_settings'
+    },
+
+    // Metrics API routes
+    METRICS_API: {
+        BASE: '/metrics/api/metrics',
+        RESEARCH: '/metrics/api/metrics/research/{id}',
+        RESEARCH_TIMELINE: '/metrics/api/metrics/research/{id}/timeline',
+        RESEARCH_SEARCH: '/metrics/api/metrics/research/{id}/search',
+        COST_ANALYTICS: '/metrics/api/cost-analytics',
+        PRICING: '/metrics/api/pricing',
+        RATINGS_GET: '/metrics/api/ratings/{id}',
+        RATINGS_SAVE: '/metrics/api/ratings/{id}',
+        RESEARCH_COSTS: '/metrics/api/research-costs/{id}'
+    },
+
+    // Library & Collections API routes
+    LIBRARY_API: {
+        // Collections management
+        COLLECTIONS: '/library/api/collections',
+        COLLECTION_CREATE: '/library/api/collections',
+        COLLECTION_DETAILS: '/library/api/collections/{id}',
+        COLLECTION_DOCUMENTS: '/library/api/collections/{id}/documents',
+        COLLECTION_UPLOAD: '/library/api/collections/{id}/upload',
+        COLLECTION_INDEX_START: '/library/api/collections/{id}/index/start',
+        COLLECTION_INDEX_STATUS: '/library/api/collections/{id}/index/status',
+
+        // RAG management
+        RAG_DOCUMENTS: '/library/api/rag/documents',
+
+        // Config
+        SUPPORTED_FORMATS: '/library/api/config/supported-formats',
+
+        // Semantic search
+        RESEARCH_HISTORY_COLLECTION: '/library/api/research-history/collection',
+        RESEARCH_HISTORY_CONVERT_ALL: '/library/api/research-history/convert-all',
+        COLLECTION_SEARCH: '/library/api/collections/{id}/search',
+        RESEARCH_ADD_TO_COLLECTION: '/library/api/research/{id}/add-to-collection'
+    }
+};
+
+/**
+ * URL builder utility functions
+ */
+const URLBuilder = {
+    /**
+     * Build a URL by replacing {id} placeholders with actual values
+     * @param {string} urlTemplate - URL template with {id} placeholders
+     * @param {string|number} id - The ID to substitute
+     * @returns {string} - The built URL
+     */
+    build(urlTemplate, id) {
+        return urlTemplate.replace('{id}', id);
+    },
+
+    /**
+     * Build a URL with custom replacements
+     * @param {string} urlTemplate - URL template with placeholders
+     * @param {Object} replacements - Object with key-value pairs for replacement
+     * @returns {string} - The built URL
+     */
+    buildWithReplacements(urlTemplate, replacements) {
+        let url = urlTemplate;
+        for (const [key, value] of Object.entries(replacements)) {
+            url = url.replace(`{${key}}`, value);
+        }
+        return url;
+    },
+
+    // Convenience methods for common URL patterns
+    progressPage(researchId) {
+        return this.build(URLS.PAGES.PROGRESS, researchId);
+    },
+
+    resultsPage(researchId) {
+        return this.build(URLS.PAGES.RESULTS, researchId);
+    },
+
+    detailsPage(researchId) {
+        return this.build(URLS.PAGES.DETAILS, researchId);
+    },
+
+    journalQualityPage(researchId) {
+        return `${URLS.PAGES.JOURNAL_QUALITY}?research_id=${encodeURIComponent(researchId)}`;
+    },
+
+    documentPage(documentId) {
+        return this.build(URLS.PAGES.DOCUMENT, documentId);
+    },
+
+    researchStatus(researchId) {
+        return this.build(URLS.API.RESEARCH_STATUS, researchId);
+    },
+
+    researchDetails(researchId) {
+        return this.build(URLS.API.RESEARCH_DETAILS, researchId);
+    },
+
+    researchLogs(researchId, limit) {
+        const base = this.build(URLS.API.RESEARCH_LOGS, researchId);
+        if (limit === undefined || limit === null) return base;
+        return `${base}?limit=${encodeURIComponent(limit)}`;
+    },
+
+    researchLogsExport(researchId) {
+        return this.build(URLS.API.RESEARCH_LOGS_EXPORT, researchId);
+    },
+
+    researchReport(researchId) {
+        return this.build(URLS.API.RESEARCH_REPORT, researchId);
+    },
+
+    terminateResearch(researchId) {
+        return this.build(URLS.API.TERMINATE_RESEARCH, researchId);
+    },
+
+    deleteResearch(researchId) {
+        return this.build(URLS.API.DELETE_RESEARCH, researchId);
+    },
+
+    // History API convenience methods
+    historyStatus(researchId) {
+        return this.build(URLS.HISTORY_API.STATUS, researchId);
+    },
+
+    historyDetails(researchId) {
+        return this.build(URLS.HISTORY_API.DETAILS, researchId);
+    },
+
+    historyLogs(researchId) {
+        return this.build(URLS.HISTORY_API.LOGS, researchId);
+    },
+
+    markdownExport(researchId) {
+        return this.build(URLS.API.MARKDOWN_EXPORT, researchId);
+    },
+
+    historyReport(researchId) {
+        return this.build(URLS.HISTORY_API.REPORT, researchId);
+    },
+
+    // URL Pattern Extraction Methods
+    /**
+     * Extract research ID from current URL path
+     * @returns {string|null} Research ID or null if not found
+     */
+    extractResearchId() {
+        const path = window.location.pathname;
+
+        // Try different URL patterns
+        const patterns = [
+            /\/results\/(\d+)/,      // /results/123
+            /\/details\/(\d+)/,      // /details/123
+            /\/progress\/(\d+)/      // /progress/123
+        ];
+
+        for (const pattern of patterns) {
+            const match = path.match(pattern);
+            if (match) {
+                return match[1];
+            }
+        }
+
+        return null;
+    },
+
+    /**
+     * Extract research ID from a specific URL pattern
+     * @param {string} pattern - The pattern to match ('results', 'details', 'progress')
+     * @returns {string|null} Research ID or null if not found
+     */
+    extractResearchIdFromPattern(pattern) {
+        const path = window.location.pathname;
+        // Match both integer IDs and UUIDs
+        const regex = new RegExp(`\\/${pattern}\\/([a-zA-Z0-9-]+)`);
+        const match = path.match(regex);
+        return match ? match[1] : null;
+    },
+
+    /**
+     * Get current page type based on URL
+     * @returns {string} Page type ('home', 'results', 'details', 'progress', 'history', 'settings', 'metrics', 'unknown')
+     */
+    getCurrentPageType() {
+        const path = window.location.pathname;
+
+        if (path === '/' || path === '/index' || path === '/home') return 'home';
+        if (path.startsWith('/results/')) return 'results';
+        if (path.startsWith('/details/')) return 'details';
+        if (path.startsWith('/progress/')) return 'progress';
+        if (path.startsWith('/history')) return 'history';
+        if (path.startsWith('/settings')) return 'settings';
+        if (path.startsWith('/metrics')) return 'metrics';
+
+        return 'unknown';
+    },
+
+    historyMarkdown(researchId) {
+        return this.build(URLS.HISTORY_API.MARKDOWN, researchId);
+    },
+
+    historyLogCount(researchId) {
+        return this.build(URLS.HISTORY_API.LOG_COUNT, researchId);
+    },
+
+    // Settings API convenience methods
+    getSetting(key) {
+        return this.buildWithReplacements(URLS.SETTINGS_API.GET_SETTING, { key });
+    },
+
+    updateSetting(key) {
+        return this.buildWithReplacements(URLS.SETTINGS_API.UPDATE_SETTING, { key });
+    },
+
+    deleteSetting(key) {
+        return this.buildWithReplacements(URLS.SETTINGS_API.DELETE_SETTING, { key });
+    },
+
+    // Metrics API convenience methods
+    researchMetrics(researchId) {
+        return this.build(URLS.METRICS_API.RESEARCH, researchId);
+    },
+
+    researchTimelineMetrics(researchId) {
+        return this.build(URLS.METRICS_API.RESEARCH_TIMELINE, researchId);
+    },
+
+    researchSearchMetrics(researchId) {
+        return this.build(URLS.METRICS_API.RESEARCH_SEARCH, researchId);
+    },
+
+    getRating(researchId) {
+        return this.build(URLS.METRICS_API.RATINGS_GET, researchId);
+    },
+
+    saveRating(researchId) {
+        return this.build(URLS.METRICS_API.RATINGS_SAVE, researchId);
+    },
+
+    researchCosts(researchId) {
+        return this.build(URLS.METRICS_API.RESEARCH_COSTS, researchId);
+    }
+};
+
+// Export for module systems first (before window assignment)
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { URLS, URLBuilder };
+}
+
+// Make URLs and URLBuilder available globally
+if (typeof window !== 'undefined') {
+    window.URLS = URLS;
+    window.URLBuilder = URLBuilder;
+}
+
+} // Close the if (typeof URLS !== 'undefined') else block

@@ -1,0 +1,817 @@
+import enum
+import json
+from typing import Any, Dict, List, Optional
+
+import requests
+from langchain_core.language_models import BaseLLM
+
+from ...security import redact_url_for_log
+from ...security.safe_requests import safe_get
+
+from ..search_engine_base import BaseSearchEngine, Exposure, Sensitivity
+from ...security.secure_logging import logger
+from ._searxng_rate_limiter import respect_rate_limit
+
+# The operator-approval resolver lives in security/egress/validators.py next
+# to the allowlist matcher it consults (dependency direction: engine →
+# security, same as everything else here). Re-exported under the historical
+# private name so this module's call sites and the existing test imports
+# keep their import path (the signature itself gained the instance-URL
+# argument when the resolver was generalized).
+from ...security.egress.validators import (
+    resolve_searxng_allow_private_ips as _resolve_searxng_allow_private_ips,
+)
+
+
+@enum.unique
+class SafeSearchSetting(enum.IntEnum):
+    """
+    Acceptable settings for safe search.
+    """
+
+    OFF = 0
+    MODERATE = 1
+    STRICT = 2
+
+
+class SearXNGSearchEngine(BaseSearchEngine):
+    """
+    SearXNG search engine implementation that requires an instance URL provided via
+    environment variable or configuration. Designed for ethical usage with proper
+    rate limiting and single-instance approach.
+    """
+
+    # Mark as public search engine
+    is_public = True
+    egress_sensitivity = Sensitivity.NON_SENSITIVE
+    egress_exposure = Exposure.EXPOSING
+    # Mark as generic search engine (general web search)
+    is_generic = True
+    # The egress engine-selection gate uses the static is_public flag above —
+    # SearXNG always queries the internet regardless of where it's hosted, so
+    # a localhost instance_url does NOT reclassify it as private (the PDP's
+    # URL override is fail-up only and never relaxes a public nature).
+    url_setting = "search.engine.web.searxng.default_params.instance_url"
+
+    @staticmethod
+    def _normalize_list(value, *, setting_name: str = "list setting"):
+        """Ensure *value* is a ``list[str]`` or ``None``.
+
+        Settings saved via the web UI may arrive as raw JSON strings
+        (e.g. ``'[\\r\\n  "general"\\r\\n]'``) instead of parsed lists.
+        This helper decodes such strings so that ``",".join()`` later
+        works on list items rather than individual characters (issue #1030).
+
+        Input that is neither valid JSON nor a plain comma-separated list
+        still produces a list, because the comma fallback splits whatever it
+        is given. That is right for ``kagi,brave`` and wrong for
+        ``['kagi', 'brave']``, which yields ``["['kagi'", "'brave']"]`` --
+        names no engine matches, so the filter silently selects nothing while
+        looking configured. Warn when the input was evidently meant to be
+        JSON, so the failure is visible rather than inferred from empty
+        results.
+        """
+        if value is None:
+            return None
+        if isinstance(value, list):
+            return value
+        if isinstance(value, str):
+            stripped = value.strip()
+            if stripped:
+                try:
+                    parsed = json.loads(stripped)
+                    if isinstance(parsed, list):
+                        return [str(item) for item in parsed]
+                except (json.JSONDecodeError, ValueError, RecursionError):
+                    # Only a bracketed/braced value was *trying* to be JSON.
+                    # Genuine comma-separated input takes this path too and
+                    # is not a mistake, so it must not warn.
+                    if stripped[0] in "[{":
+                        logger.warning(
+                            "{} is not valid JSON ({!r}); falling back to "
+                            "comma-splitting, which keeps brackets and quotes "
+                            "as part of each entry. Use double-quoted JSON, "
+                            'e.g. ["kagi", "brave"].',
+                            setting_name,
+                            stripped[:100],
+                        )
+                # Comma-separated fallback
+                return [
+                    item.strip() for item in stripped.split(",") if item.strip()
+                ]
+        return None
+
+    def _is_valid_search_result(self, url: str) -> bool:
+        """
+        Check if a parsed result is a valid search result vs an error page.
+
+        When SearXNG's backend engines fail or get rate-limited, it returns
+        error/stats pages that shouldn't be treated as search results.
+
+        Returns False for:
+        - Relative URLs (don't start with http:// or https://, case-insensitive)
+        - URLs pointing to the SearXNG instance itself (catches /stats, /preferences, etc.)
+        """
+        # Must have an absolute URL (case-insensitive scheme check)
+        if not url or not url.lower().startswith(("http://", "https://")):
+            return False
+
+        # Reject URLs pointing back to the SearXNG instance itself
+        # This catches all internal pages like /stats?engine=, /preferences, /about
+        if url.startswith(self.instance_url):
+            return False
+
+        return True
+
+    def _private_url_blocked_by_gate(self) -> bool:
+        """Whether the instance URL was refused *only* because it is
+        private/loopback/link-local with no operator approval active
+        (no allowlist match, no blanket opt-in, no env-locked URL).
+
+        Used to decide whether to surface the operator-remediation hint
+        (allowlist / blanket opt-in / env-lock). Detects
+        the case precisely so the hint fires for the common localhost
+        self-host misconfiguration but NOT for unrelated failures (DNS /
+        timeout / a genuinely-public URL) nor for an ALWAYS-blocked
+        cloud-metadata address — which the operator opt-in would never lift,
+        so pointing at that flag would be misleading.
+
+        Returns True when the URL is blocked under the current (gate-OFF)
+        posture yet WOULD pass with private egress allowed: that difference
+        is exactly the private-URL gate, and the opt-in is the fix. Fails
+        CLOSED (False) on any error so hint detection can never break init.
+        """
+        if self._allow_private_ips:
+            return False
+        try:
+            from ...security.ssrf_validator import validate_url
+
+            return not validate_url(
+                self.instance_url, allow_private_ips=False
+            ) and validate_url(self.instance_url, allow_private_ips=True)
+        except Exception:  # noqa: BLE001 - hint detection is best-effort
+            return False
+
+    def __init__(
+        self,
+        max_results: int = 15,
+        instance_url: str = "http://localhost:8080",
+        categories: Optional[List[str]] = None,
+        engines: Optional[List[str]] = None,
+        language: str = "en",
+        safe_search: str = SafeSearchSetting.OFF.name,
+        time_range: Optional[str] = None,
+        result_format: str = "html",
+        delay_between_requests: float = 0.0,
+        llm: Optional[BaseLLM] = None,
+        max_filtered_results: Optional[int] = None,
+        include_full_content: bool = True,
+        settings_snapshot: Optional[Dict[str, Any]] = None,
+        search_snippets_only: bool = True,
+        **kwargs,
+    ):  # API key is actually the instance URL
+        """
+        Initialize the SearXNG search engine with ethical usage patterns.
+
+        Args:
+            max_results: Maximum number of search results
+            instance_url: URL of your SearXNG instance (preferably self-hosted)
+            categories: List of SearXNG categories to search in (general, images, videos, news, etc.)
+            engines: List of engines to use (google, bing, duckduckgo, etc.)
+            language: Language code for search results
+            safe_search: Safe search level (0=off, 1=moderate, 2=strict)
+            time_range: Time range for results (day, week, month, year)
+            result_format: Response format to request from SearXNG, either
+                "html" (default, scraped) or "json". Use "json" for instances
+                whose ``search.formats`` enables JSON but not HTML.
+            delay_between_requests: Seconds to wait between requests
+            llm: Language model for relevance filtering
+            max_filtered_results: Maximum number of results to keep after filtering
+            include_full_content: Retained for backward compatibility; full-content
+                retrieval is handled via the factory wrapper.
+            search_snippets_only: Whether to return only search snippets
+        """
+
+        # Initialize the BaseSearchEngine with LLM, max_filtered_results, and max_results
+        super().__init__(
+            llm=llm,
+            max_filtered_results=max_filtered_results,
+            max_results=max_results,
+            include_full_content=include_full_content,
+            settings_snapshot=settings_snapshot,
+            search_snippets_only=search_snippets_only,
+            **kwargs,
+        )
+
+        # Validate and normalize the instance URL if provided
+        self.instance_url = instance_url.rstrip("/")
+        logger.info(
+            f"SearXNG initialized with instance URL: {redact_url_for_log(self.instance_url)}"
+        )
+        # Whether this instance's private/loopback URL may be reached. Derived
+        # from the operator opt-in (``LDR_SEARCH_ALLOW_PRIVATE_ENGINE_URLS``)
+        # or an env-locked instance URL only — NOT from the user-editable
+        # egress scope — rather than hard-coded True, so under the default
+        # PUBLIC_ONLY posture a user-editable instance_url pointed at an
+        # internal host is NOT fetched. Cloud-metadata IPs remain blocked
+        # either way. See ``_resolve_searxng_allow_private_ips`` for the rules.
+        self._allow_private_ips = _resolve_searxng_allow_private_ips(
+            self.instance_url
+        )
+        try:
+            # Make sure it's accessible.
+            response = safe_get(
+                self.instance_url,
+                timeout=5,
+                allow_private_ips=self._allow_private_ips,
+            )
+            if response.status_code == 200:
+                logger.info("SearXNG instance is accessible.")
+                self._is_available = True
+            else:
+                self._is_available = False
+                logger.error(
+                    f"Failed to access SearXNG instance at {redact_url_for_log(self.instance_url)}. Status code: {response.status_code}"
+                )
+        except (requests.RequestException, ValueError) as e:
+            self._is_available = False
+            safe_msg = self._scrub_error(e)
+            logger.exception(
+                f"Error while trying to access SearXNG instance at {redact_url_for_log(self.instance_url)} ({type(e).__name__}): {safe_msg}"
+            )
+            private_url_hint = self._private_url_blocked_by_gate()
+        else:
+            private_url_hint = False
+        if private_url_hint:
+            # The dominant self-host case: default localhost:8080 SearXNG
+            # with no operator opt-in. The generic exception above never
+            # names the fix, so surface it explicitly on this runtime
+            # path — at ERROR, so the actionable message is at least as
+            # loud as the generic one preceding it. (Emitted outside the
+            # handler: there is no second traceback to attach, and the
+            # logger.exception-in-handler rule stays satisfied.)
+            logger.error(
+                "SearXNG engine disabled: instance URL "
+                f"{redact_url_for_log(self.instance_url)} is a private / "
+                "loopback / link-local address, which is not fetched by "
+                "default. To use a self-hosted SearXNG on localhost/LAN, "
+                "the server operator must approve it in the server "
+                "environment and restart: add the URL origin to "
+                "LDR_SEARCH_PRIVATE_ENGINE_URL_ALLOWLIST, or env-lock "
+                "the URL via "
+                "LDR_SEARCH_ENGINE_WEB_SEARXNG_DEFAULT_PARAMS_INSTANCE_URL "
+                "(as the bundled docker-compose does), or set "
+                "LDR_SEARCH_ALLOW_PRIVATE_ENGINE_URLS=true. Only one of "
+                "these is needed. Cloud-metadata addresses stay blocked "
+                "regardless. See docs/SearXNG-Setup.md."
+            )
+
+        # Add debug logging for all parameters
+        logger.info(
+            f"SearXNG init params: max_results={max_results}, language={language}, "
+            f"max_filtered_results={max_filtered_results}, is_available={self._is_available}"
+        )
+
+        self.max_results = max_results
+        self.categories = self._normalize_list(
+            categories, setting_name="SearXNG categories"
+        ) or ["general"]
+        self.engines = self._normalize_list(
+            engines, setting_name="SearXNG engines"
+        )
+        self.language = language
+        try:
+            # Handle both string names and integer values
+            if isinstance(safe_search, int) or (
+                isinstance(safe_search, str) and str(safe_search).isdigit()
+            ):
+                self.safe_search = SafeSearchSetting(int(safe_search))
+            else:
+                self.safe_search = SafeSearchSetting[safe_search]
+        except (ValueError, KeyError) as e:
+            safe_msg = self._scrub_error(e)
+            logger.exception(
+                f"'{safe_search}' is not a valid safe search setting ({type(e).__name__}). Disabling safe search: {safe_msg}"
+            )
+            self.safe_search = SafeSearchSetting.OFF
+        self.time_range = time_range
+
+        normalized_format = str(result_format).strip().lower()
+        if normalized_format not in ("html", "json"):
+            logger.warning(
+                f"'{result_format}' is not a supported SearXNG result_format "
+                "('html' or 'json'). Falling back to 'html'."
+            )
+            normalized_format = "html"
+        self.result_format = normalized_format
+
+        self.delay_between_requests = float(delay_between_requests)
+
+        if self._is_available:
+            self.search_url = f"{self.instance_url}/search"
+            logger.info(
+                f"SearXNG engine initialized with instance: {redact_url_for_log(self.instance_url)}"
+            )
+            logger.info(
+                f"Rate limiting set to {self.delay_between_requests} seconds between requests"
+            )
+
+            # Full-content retrieval is the factory wrapper's job — see
+            # ``search_engine_factory._create_full_search_wrapper``. The
+            # wrapper fetches pages via ``batch_fetch_and_extract`` and
+            # populates ``full_content`` on each result; the inner engine
+            # only emits snippets from ``_get_previews``.
+
+    def _respect_rate_limit(self):
+        """Apply self-imposed rate limiting between requests.
+
+        Rate-limit state is shared across all `SearXNGSearchEngine`
+        instances targeting the same ``instance_url`` (see
+        ``_searxng_rate_limiter.py``) so the configured delay applies
+        even when the research agent constructs a fresh engine for
+        every tool call.
+        """
+        respect_rate_limit(self.instance_url, self.delay_between_requests)
+
+    def _get_search_results(
+        self, query: str, max_results: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get search results from SearXNG with ethical rate limiting.
+
+        Args:
+            query: The search query
+            max_results: Optional per-request result limit. Uses the engine's
+                configured limit when omitted.
+
+        Returns:
+            List of search results from SearXNG
+        """
+        raw_limit = self.max_results if max_results is None else max_results
+        result_limit = max(0, raw_limit)
+
+        if not self._is_available:
+            logger.error(
+                "SearXNG engine is disabled (no instance URL provided) - cannot run search"
+            )
+            return []
+
+        logger.info("SearXNG running search")
+
+        try:
+            self._respect_rate_limit()
+
+            initial_headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+            }
+
+            try:
+                initial_response = safe_get(
+                    self.instance_url,
+                    headers=initial_headers,
+                    timeout=10,
+                    allow_private_ips=self._allow_private_ips,
+                )
+                cookies = initial_response.cookies
+            except Exception as e:
+                safe_msg = self._scrub_error(e)
+                logger.exception(
+                    f"Failed to get initial cookies ({type(e).__name__}): {safe_msg}"
+                )
+                cookies = None
+
+            params = {
+                "q": query,
+                "categories": ",".join(self.categories),
+                "language": self.language,
+                "format": self.result_format,
+                "pageno": 1,
+                "safesearch": self.safe_search.value,
+                "count": result_limit,
+            }
+
+            if self.engines:
+                params["engines"] = ",".join(self.engines)
+
+            if self.time_range:
+                params["time_range"] = self.time_range
+
+            # Browser-like headers
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+                "Referer": self.instance_url + "/",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1",
+            }
+
+            logger.info(
+                f"Sending request to SearXNG instance at {redact_url_for_log(self.instance_url)}"
+            )
+            response = safe_get(
+                self.search_url,
+                params=params,
+                headers=headers,
+                cookies=cookies,
+                timeout=15,
+                allow_private_ips=self._allow_private_ips,
+            )
+
+            if response.status_code == 200:
+                if self.result_format == "json":
+                    return self._parse_json_results(
+                        response, query, result_limit
+                    )
+
+                try:
+                    from bs4 import BeautifulSoup
+
+                    soup = BeautifulSoup(response.text, "html.parser")
+                    results: List[Dict[str, Any]] = []
+
+                    result_elements = soup.select(".result-item")
+
+                    if not result_elements:
+                        result_elements = soup.select(".result")
+
+                    if not result_elements:
+                        result_elements = soup.select("article")
+
+                    if not result_elements:
+                        logger.debug(
+                            f"Classes found in HTML: {[c['class'] for c in soup.select('[class]') if 'class' in c.attrs][:10]}"
+                        )
+                        result_elements = soup.select('div[id^="result"]')
+
+                    logger.info(
+                        f"Found {len(result_elements)} search result elements"
+                    )
+
+                    for idx, result_element in enumerate(result_elements):
+                        if len(results) >= result_limit:
+                            break
+
+                        title_element = (
+                            result_element.select_one(".result-title")
+                            or result_element.select_one(".title")
+                            or result_element.select_one("h3")
+                            or result_element.select_one("a[href]")
+                        )
+
+                        url_element = (
+                            result_element.select_one(".result-url")
+                            or result_element.select_one(".url")
+                            or result_element.select_one("a[href]")
+                        )
+
+                        content_element = (
+                            result_element.select_one(".result-content")
+                            or result_element.select_one(".content")
+                            or result_element.select_one(".snippet")
+                            or result_element.select_one("p")
+                        )
+
+                        title = (
+                            title_element.get_text(" ", strip=True)
+                            if title_element
+                            else ""
+                        )
+
+                        url = ""
+                        if url_element and url_element.has_attr("href"):
+                            url = self._clean_result_url(url_element["href"])
+                        elif url_element:
+                            url = url_element.get_text(strip=True)
+
+                        content = (
+                            content_element.get_text(" ", strip=True)
+                            if content_element
+                            else ""
+                        )
+
+                        if (
+                            not url
+                            and title_element
+                            and title_element.has_attr("href")
+                        ):
+                            url = self._clean_result_url(title_element["href"])
+
+                        logger.debug(
+                            f"Extracted result {idx}: title={title[:30]}..., url={redact_url_for_log(url)}, content={content[:30]}..."
+                        )
+
+                        # Add to results only if it's a valid search result
+                        # (not an error page or internal SearXNG page)
+                        if self._is_valid_search_result(url):
+                            results.append(
+                                {
+                                    "title": title,
+                                    "url": url,
+                                    "content": content,
+                                    "engine": "searxng",
+                                    "category": "general",
+                                }
+                            )
+                        else:
+                            # Check if this is a backend engine failure
+                            if url and "/stats?engine=" in url:
+                                try:
+                                    engine_name = url.split("/stats?engine=")[
+                                        1
+                                    ].split("&")[0]
+                                    logger.warning(
+                                        f"SearXNG backend engine failed or rate-limited: {engine_name}"
+                                    )
+                                except (IndexError, AttributeError):
+                                    pass  # Couldn't parse engine name
+                            logger.debug(
+                                f"Filtered invalid SearXNG result: title={title!r}, url={redact_url_for_log(url)}"
+                            )
+
+                    if results:
+                        logger.info(
+                            f"SearXNG returned {len(results)} valid results from HTML parsing"
+                        )
+                    else:
+                        logger.warning(
+                            "SearXNG returned no valid results. "
+                            "This may indicate SearXNG backend engine issues or rate limiting."
+                        )
+                    return results
+
+                except ImportError as e:
+                    safe_msg = self._scrub_error(e)
+                    logger.exception(
+                        f"BeautifulSoup not available for HTML parsing ({type(e).__name__}): {safe_msg}"
+                    )
+                    return []
+                except Exception as e:
+                    safe_msg = self._scrub_error(e)
+                    logger.exception(
+                        f"Error parsing HTML results ({type(e).__name__}): {safe_msg}"
+                    )
+                    return []
+            else:
+                logger.error(
+                    f"SearXNG returned status code {response.status_code}"
+                )
+                return []
+
+        except Exception as e:
+            safe_msg = self._scrub_error(e)
+            logger.exception(
+                f"Error getting SearXNG results ({type(e).__name__}): {safe_msg}"
+            )
+            return []
+
+    def _parse_json_results(
+        self, response: Any, query: str, max_results: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """Parse SearXNG's ``format=json`` response.
+
+        SearXNG returns a JSON document whose ``results`` array already
+        carries structured ``url``/``title``/``content`` fields, so no HTML
+        scraping is needed. The output shape matches the HTML parse path
+        (``title``, ``url``, ``content``, ``engine``, ``category``) and the
+        same ``_is_valid_search_result`` filter is applied so both paths
+        reject SearXNG's own internal/stats pages identically.
+
+        Args:
+            response: HTTP response object containing JSON payload
+            query: The search query string
+            max_results: Optional per-request result limit. Uses the engine's
+                configured limit when omitted.
+
+        Returns:
+            List of search results from SearXNG
+        """
+        raw_limit = self.max_results if max_results is None else max_results
+        result_limit = max(0, raw_limit)
+
+        try:
+            data = response.json()
+        except (json.JSONDecodeError, ValueError) as e:
+            safe_msg = self._scrub_error(e)
+            logger.exception(
+                f"Error parsing JSON results ({type(e).__name__}): {safe_msg}. "
+                "Ensure the SearXNG instance enables the 'json' format."
+            )
+            return []
+
+        # Surface backend engine failures the same way the HTML path does.
+        unresponsive = data.get("unresponsive_engines") or []
+        if unresponsive:
+            logger.warning(
+                f"SearXNG reported unresponsive engines: {unresponsive}"
+            )
+
+        results: List[Dict[str, Any]] = []
+        for item in data.get("results", []):
+            if len(results) >= result_limit:
+                break
+            if not isinstance(item, dict):
+                continue
+
+            url = self._clean_result_url(item.get("url"))
+            if not self._is_valid_search_result(url):
+                logger.debug(
+                    f"Filtered invalid SearXNG result: url={redact_url_for_log(url)}"
+                )
+                continue
+
+            results.append(
+                {
+                    "title": item.get("title") or "",
+                    "url": url,
+                    "content": item.get("content") or "",
+                    "engine": item.get("engine") or "searxng",
+                    "category": item.get("category") or "general",
+                }
+            )
+
+        if results:
+            logger.info(
+                f"SearXNG returned {len(results)} valid results from JSON parsing"
+            )
+        else:
+            logger.warning(
+                "SearXNG returned no valid results. "
+                "This may indicate SearXNG backend engine issues or rate limiting."
+            )
+        return results
+
+    def _get_previews(self, query: str) -> List[Dict[str, Any]]:
+        """
+        Get preview information for SearXNG search results.
+
+        Args:
+            query: The search query
+
+        Returns:
+            List of preview dictionaries
+        """
+        if not self._is_available:
+            logger.warning(
+                "SearXNG engine is disabled (no instance URL provided)"
+            )
+            return []
+
+        logger.info("Getting SearXNG previews")
+
+        results = self._get_search_results(query)
+
+        if not results:
+            logger.warning("No SearXNG results found")
+            return []
+
+        previews = []
+        for i, result in enumerate(results):
+            title = result.get("title", "")
+            url = self._clean_result_url(result.get("url"))
+            content = result.get("content", "")
+
+            preview = {
+                "id": url or f"searxng-result-{i}",
+                "title": title,
+                "link": url,
+                "snippet": content,
+                "engine": result.get("engine", ""),
+                "category": result.get("category", ""),
+            }
+
+            previews.append(preview)
+
+        return previews
+
+    def _get_full_content(
+        self, relevant_items: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Return items unchanged.
+
+        Full-content retrieval is the factory wrapper's job. The wrapper
+        fetches pages via ``batch_fetch_and_extract`` and populates
+        ``full_content`` on each result; the inner engine never fetches
+        pages itself.
+        """
+        return relevant_items
+
+    def invoke(self, query: str) -> List[Dict[str, Any]]:
+        """Compatibility method for LangChain tools"""
+        return self.run(query)
+
+    def results(
+        self, query: str, max_results: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Get search results in a format compatible with other search engines.
+
+        Args:
+            query: The search query
+            max_results: Optional override for maximum results
+
+        Returns:
+            List of search result dictionaries
+        """
+        if not self._is_available:
+            return []
+
+        results = self._get_search_results(query, max_results=max_results)
+
+        formatted_results = []
+        for result in results:
+            formatted_results.append(
+                {
+                    "title": result.get("title", ""),
+                    "link": self._clean_result_url(result.get("url")),
+                    "snippet": result.get("content", ""),
+                }
+            )
+
+        return formatted_results
+
+    @staticmethod
+    def get_self_hosting_instructions() -> str:
+        """
+        Get instructions for self-hosting a SearXNG instance.
+
+        Returns:
+            String with installation instructions
+        """
+        return """
+# SearXNG Self-Hosting Instructions
+
+The most ethical way to use SearXNG is to host your own instance. Here's how:
+
+## Using Docker (easiest method)
+
+1. Install Docker if you don't have it already
+2. Run these commands:
+
+```bash
+# Pull the SearXNG Docker image
+docker pull searxng/searxng
+
+# Run SearXNG (will be available at http://localhost:8080)
+docker run -d -p 8080:8080 --name searxng searxng/searxng
+```
+
+## Using Docker Compose (recommended for production)
+
+1. Create a file named `docker-compose.yml` with the following content:
+
+```yaml
+version: '3'
+services:
+  searxng:
+    container_name: searxng
+    image: searxng/searxng
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./searxng:/etc/searxng
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+    restart: unless-stopped
+```
+
+2. Run with Docker Compose:
+
+```bash
+docker-compose up -d
+```
+
+For more detailed instructions and configuration options, visit:
+https://searxng.github.io/searxng/admin/installation.html
+"""
+
+    def run(
+        self, query: str, research_context: Dict[str, Any] | None = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Override BaseSearchEngine run method to add SearXNG-specific error handling.
+        """
+        if not self._is_available:
+            logger.error(
+                "SearXNG run method called but engine is not available (missing instance URL)"
+            )
+            return []
+
+        logger.info(
+            f"SearXNG instance URL: {redact_url_for_log(self.instance_url)}"
+        )
+
+        try:
+            # Call the parent class's run method
+            results = super().run(query, research_context=research_context)
+            logger.info(f"SearXNG search completed with {len(results)} results")
+            return results
+        except Exception as e:
+            safe_msg = self._scrub_error(e)
+            logger.exception(
+                f"Error in SearXNG run method ({type(e).__name__}): {safe_msg}"
+            )
+            # Return empty results on error
+            return []
