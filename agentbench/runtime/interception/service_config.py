@@ -5,11 +5,14 @@ from .providers import resolve_model_provider
 
 
 def prepare_service_config(interception, *, agent_id, max_trace_bytes, secret_dir,
-                           secret_resolver, environ, model_provider=None):
+                           secret_resolver, environ, model_provider=None, egress_proxy=None):
     """Return service JSON data and explicitly declared Agent credential env.
 
     Observe never resolves a model target, reads a replacement secret or creates
     fake credentials. Native credentials remain in the Agent's declared runtime.
+    ``egress_proxy`` is the ``(host, port)`` of the egress observer that receives
+    traffic matching neither a model nor a tool route; without it that traffic is
+    denied by the interceptor.
     """
     data = {'agent_id': agent_id, 'max_trace_bytes': max_trace_bytes,
             'mode': interception.mode, 'credentials': [],
@@ -18,6 +21,8 @@ def prepare_service_config(interception, *, agent_id, max_trace_bytes, secret_di
             'routes': [_route_data(r) for r in interception.routes],
             'tool_routes': [asdict(r) for r in interception.tool_routes],
             'token_counting': dict(interception.token_counting)}
+    if egress_proxy is not None:
+        data['egress_proxy'] = {'host': egress_proxy[0], 'port': egress_proxy[1]}
     token_environment = {}
     if interception.mode == 'observe':
         data['token_counting'] = {}

@@ -68,6 +68,9 @@ class ServiceConfig:
     mode: str = 'replace'
     observation_headers: Mapping[str, str] = field(default_factory=dict)
     observation_tool_purposes: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
+    # Upstream proxy for traffic that is neither a model nor a tool route (the egress
+    # observer service). Without it such traffic is denied here, as before.
+    egress_proxy: tuple[str, int] | None = None
 
     @classmethod
     def load(cls, path: str | Path) -> "ServiceConfig":
@@ -100,6 +103,7 @@ class ServiceConfig:
             routes=routes,
             tool_routes=_tool_routes(raw.get("tool_routes", [])),
             token_counting=_object(raw.get('token_counting', {}), 'token_counting') if mode == 'replace' else {},
+            egress_proxy=_egress_proxy(raw.get('egress_proxy')),
         )
 
 
@@ -172,6 +176,16 @@ def _tool_routes(value: object) -> tuple[ToolRoute, ...]:
         result.append(ToolRoute(tuple(h.lower().rstrip(".") for h in hosts), ports,
                                 tuple(m.upper() for m in _strings(data, "methods")), paths, purpose, required))
     return tuple(result)
+
+
+def _egress_proxy(value: object) -> tuple[str, int] | None:
+    if value is None:
+        return None
+    data = _object(value, "egress_proxy")
+    port = data.get("port")
+    if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
+        raise ServiceConfigurationError("egress_proxy port must be a valid port")
+    return _string(data, "host"), port
 
 
 def _read_secret(path: str) -> str:

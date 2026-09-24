@@ -86,6 +86,25 @@ class CommonInterceptor:
                 else 'tool_error' if tool else 'llm_error')
         events.emit(name, **redact(fields, self.secrets))
 
+    def _hand_off_egress(self, flow):
+        """Send traffic that is neither a model nor a tool route to the egress observer.
+
+        The observer decides, forwards and records it on its own event stream, so no
+        model or tool event is emitted here and model trace acceptance never sees it.
+        Returns False when no observer is configured, keeping the local denial.
+        """
+        proxy = self.config.egress_proxy
+        if proxy is None:
+            return False
+        for key in ("defuzex_call_id", "defuzex_started"):
+            flow.metadata.pop(key, None)
+        flow.metadata["abb_egress"] = True
+        # Bind the upstream to the requested name, not the transparent destination
+        # IP, so the observer's allowlist judges the host that is actually contacted.
+        flow.request.host = flow.request.pretty_host.rstrip(".").lower()
+        flow.server_conn.via = ("http", proxy)
+        return True
+
     def _error(self, flow, message, status, *, code):
         self._emit_error(flow, message, code=code, local_status=status)
         flow.metadata.pop("wire", None)
@@ -113,7 +132,10 @@ class CommonInterceptor:
         # run. Killing the flow closes the client connection without a response,
         # so the client sees the same transport failure a direct connection would
         # and applies its own retry policy.
-        if flow.killable:
+        # Handed-off egress is the exception: the observer already recorded the
+        # decision, and mitmproxy's 502 names the refusal ("403 Forbidden") to the
+        # Agent's tool instead of an unexplained reset.
+        if flow.killable and not flow.metadata.get("abb_egress"):
             flow.kill()
 
 

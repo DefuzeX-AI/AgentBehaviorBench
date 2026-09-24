@@ -31,7 +31,8 @@ class ObserveInterceptor(CommonInterceptor):
         tool = next((r for r in self.config.tool_routes if self.policy.matches(r, request)), None)
         # A familiar API path does not authorize an arbitrary destination.
         if route is None and tool is None:
-            self._error(flow, 'Undeclared network request blocked', 403, code=ErrorCode.EGRESS_DENIED)
+            if not self._hand_off_egress(flow):
+                self._error(flow, 'Undeclared network request blocked', 403, code=ErrorCode.EGRESS_DENIED)
             return
         request.host = request.pretty_host.rstrip('.').lower()
         protocol = route.protocol_plugin if route else None

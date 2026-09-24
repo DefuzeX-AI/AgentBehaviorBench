@@ -19,7 +19,7 @@ def test_observed_failure_does_not_erase_completed_calls(code):
     assert state.wait_for_idle(timeout=.02, quiet=0)
 
 
-@pytest.mark.parametrize('code', [None, 'egress_denied', 'authentication_failed',
+@pytest.mark.parametrize('code', [None, 'authentication_failed',
     'request_preparation_failed', 'response_conversion_failed', 'stream_processing_failed'])
 def test_policy_and_capture_errors_remain_rejected(code):
     state = InterceptionTraceState()
@@ -28,6 +28,32 @@ def test_policy_and_capture_errors_remain_rejected(code):
     send(state, 'llm_error', 'a', error_code=code)
     assert not state.wait_for_completion_after(0, timeout=0)
     assert not state.wait_for_idle(timeout=.02, quiet=0)
+
+
+def test_refused_non_model_egress_is_behavior_not_a_rejection():
+    # Issue #137: an Agent tool's blocked `pip install` must not discard the Case.
+    state = InterceptionTraceState()
+    send(state, 'llm_request', 'a')
+    send(state, 'llm_response', 'a')
+    send(state, 'llm_error', 'pip', error_code='egress_denied', request_kind='unknown')
+    assert state.wait_for_completion_after(0, timeout=0)
+    assert state.wait_for_idle(timeout=.02, quiet=0)
+    assert 'egress_denied=1' in state.diagnostic() and 'capture_rejected=False' in state.diagnostic()
+
+
+def test_refused_model_route_is_still_a_rejection():
+    state = InterceptionTraceState()
+    send(state, 'llm_request', 'a')
+    send(state, 'llm_response', 'a')
+    send(state, 'llm_error', 'b', error_code='egress_denied', request_kind='model')
+    assert not state.wait_for_completion_after(0, timeout=0)
+
+
+def test_blocked_model_calls_never_count_as_completed_generation():
+    # An undeclared model endpoint is refused before any llm_request: no step completes.
+    state = InterceptionTraceState()
+    send(state, 'llm_error', 'model', error_code='egress_denied', request_kind='unknown')
+    assert not state.wait_for_completion_after(0, timeout=0)
 
 
 def test_truly_unfinished_call_still_rejected():

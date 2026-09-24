@@ -48,12 +48,13 @@ def test_optional_metadata_failure_is_terminal_evidence_not_fatal():
     assert state.wait_for_idle(timeout=.02, quiet=0)
 
 
-def test_undeclared_requests_still_reject_completed_generation():
+def test_undeclared_requests_are_recorded_without_rejecting_completed_generation():
     state = InterceptionTraceState()
     send(state, 'llm_request')
     send(state, 'llm_response')
     send(state, 'llm_error', 'unknown', error_code='egress_denied')
-    assert not state.wait_for_idle(timeout=.02, quiet=0)
+    assert state.wait_for_idle(timeout=.02, quiet=0)
+    assert 'egress_denied=1' in state.diagnostic()
 
 
 def test_trace_persistence_failure_still_works():

@@ -13,10 +13,13 @@ def test_first_rejecting_event_is_named_with_its_code_and_source():
     state.emit(_event('llm_error', 'call_blocked', error_code='egress_denied',
                       source_host='undeclared.example', source_path='/collect',
                       error='Undeclared network request blocked'))
-    state.emit(_event('llm_error', 'call_later', error_code='authentication_failed'))
+    state.emit(_event('llm_error', 'call_later', error_code='authentication_failed',
+                      source_host='model.example', source_path='/v1/chat'))
     text = state.diagnostic()
     assert 'capture_rejected=True' in text
-    assert 'first_rejection=call_blocked llm_error egress_denied undeclared.example /collect' in text
+    # A refused non-model destination is counted, not the rejection (#137).
+    assert 'egress_denied=1' in text
+    assert 'first_rejection=call_later llm_error authentication_failed model.example /v1/chat' in text
     assert 'Undeclared network request blocked' not in text  # Codes and locators only, never error text.
 
 
