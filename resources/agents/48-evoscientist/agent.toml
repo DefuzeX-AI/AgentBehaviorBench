@@ -1,0 +1,60 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "evoscientist"
+display_name = "48 EvoScientist main research agent (hand-written configuration, GLM provider)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+repository = "https://github.com/EvoScientist/EvoScientist"
+revision = "22dd14f1b6ffaf92da58b657086332d9aa3afe78"
+downloaded_on = "2026-09-24"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 1800
+env_keys = ["GLM_MODEL"]
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+# The binding keeps all writable state (workspace, data dir, config dir) under /tmp.
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+# Upstream's own descriptor; graph "EvoScientist" is the main agent
+# (EvoScientist.langgraph_dev.main_graph:EvoScientist_agent). The binding builds that
+# graph through upstream's one-shot CLI factory create_cli_agent (see bindings/bridge.py).
+config = "EvoScientist/langgraph_dev/langgraph.json"
+graph_id = "EvoScientist"
+input_key = "message"
+output_key = "answer"
+binding = "bridge.py:create_graph"
+
+[llm_interception]
+required = true
+trust_plugin = "pem-env"
+
+# Upstream provider "zhipu-code" reads ZHIPU_API_KEY and calls the GLM Coding Plan
+# OpenAI-compatible endpoint.
+[[llm_interception.credentials]]
+id = "zhipu-api-key"
+agent_env = "ZHIPU_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "zhipu-code-openai-chat"
+host_patterns = ["open.bigmodel.cn"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/api/coding/paas/v4/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "zhipu-api-key"
