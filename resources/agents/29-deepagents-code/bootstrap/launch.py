@@ -85,6 +85,25 @@ def prepare(environ: dict[str, str]) -> tuple[list[str], dict[str, str], str]:
     return [AGENT_BIN, "--acp"], child, config_toml(base_url, model)
 
 
+# Target of certifi's cacert.pem link in the image (see Dockerfile).
+CERTIFI_BUNDLE = Path("/tmp/abb-deepagents-certifi.pem")
+
+
+def write_certifi_bundle(environ: dict[str, str]) -> None:
+    """Write certifi's linked bundle: its own roots plus the runtime CA, if any.
+
+    fetch_url's requests Session sets trust_env=False, so REQUESTS_CA_BUNDLE /
+    SSL_CERT_FILE, which the runtime sets for its TLS-intercepting CA, do not
+    reach it. Without this every fetch fails certificate verification.
+    """
+    original = next(Path("/opt/agent-venv/lib").glob("python3*/site-packages/certifi/cacert.orig.pem"))
+    bundle = original.read_bytes()
+    extra = environ.get("SSL_CERT_FILE", "")
+    if extra and Path(extra).is_file():
+        bundle += b"\n" + Path(extra).read_bytes()
+    CERTIFI_BUNDLE.write_bytes(bundle)
+
+
 def main() -> int:
     try:
         command, environ, config = prepare(dict(os.environ))
@@ -101,6 +120,7 @@ def main() -> int:
                           ("XDG_STATE_HOME", ".local/state"), ("XDG_CACHE_HOME", ".cache")):
             (home / sub).mkdir(parents=True, exist_ok=True)
             environ[name] = str(home / sub)
+        write_certifi_bundle(environ)
         os.execvpe(command[0], command, environ)
     except (OSError, ValueError) as exc:
         message = str(exc).replace(os.environ.get(KEY_ENV) or "\0", "[REDACTED]")
