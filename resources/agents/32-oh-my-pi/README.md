@@ -53,7 +53,8 @@ disposable `HOME` under `/tmp` and writes omp's native config there
 - `config.yml` sets `modelRoles.default: glm/$GLM_MODEL`, because ACP
   `session/new` does not select a model, and `disabledProviders` to every
   built-in provider id from `builtin-providers.json` plus the implicit local
-  providers (`ollama`, `llama.cpp`, `lm-studio`).
+  providers (`ollama`, `llama.cpp`, `lm-studio`), except the built-in `web`
+  provider, whose models (`web/tavily`, `web/exa`, …) are the `web_search` backends.
 
 Why `disabledProviders`: after each session is created omp starts a background
 model-catalog refresh that probes keyless provider endpoints and the models.dev

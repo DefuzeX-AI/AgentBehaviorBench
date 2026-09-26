@@ -21,10 +21,14 @@ BUILTIN_PROVIDERS_FILE = Path(__file__).resolve().parents[1] / "builtin-provider
 # omp also registers keyless local providers (Ollama, llama.cpp, LM Studio)
 # whenever they are not configured and probes them on loopback.
 IMPLICIT_LOCAL_PROVIDERS = ["ollama", "llama.cpp", "lm-studio"]
+# omp's web_search backends are models of the built-in `web` provider
+# (web/tavily, web/exa, ...); disabling it leaves web_search with no candidate
+# ("No web search model configured").
+WEB_SEARCH_PROVIDER = "web"
 
 
 def disabled_providers(builtin: list[str]) -> list[str]:
-    """Every built-in provider except the configured one.
+    """Every built-in provider except the configured one and the web-search provider.
 
     After each session is created omp starts a background model refresh that
     probes keyless provider endpoints (e.g. hyper.charm.land, api.kilo.ai,
@@ -33,7 +37,7 @@ def disabled_providers(builtin: list[str]) -> list[str]:
     the trace on undeclared egress, so all of them are disabled via omp's own
     `disabledProviders` setting instead of being allowlisted.
     """
-    return sorted((set(builtin) | set(IMPLICIT_LOCAL_PROVIDERS)) - {PROVIDER})
+    return sorted((set(builtin) | set(IMPLICIT_LOCAL_PROVIDERS)) - {PROVIDER, WEB_SEARCH_PROVIDER})
 
 
 def prepare(environ: dict[str, str], builtin: list[str]) -> tuple[list[str], dict[str, str], dict[str, dict]]:
