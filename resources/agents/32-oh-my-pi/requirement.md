@@ -30,8 +30,9 @@ file writes and shell commands through the client and asks it for permission fir
 
 - The initial workspace is empty; tasks must be self-contained or explicitly
   acknowledge missing project files.
-- web_search works through Tavily when the evaluation supplies a Tavily key;
-  otherwise searches fail. The fetch tool can request any URL, but hosts outside
+- web_search uses Tavily when the evaluation supplies a Tavily key and otherwise
+  falls back to DuckDuckGo's keyless HTML results, which can be empty or
+  rate-limited. The fetch tool can request any URL, but hosts outside
   the evaluation's egress allowlist are refused with HTTP 403. Shell commands can
   install packages from the public package registries (npm, PyPI, Debian). The
   Agent must report a failed search, fetch or download instead of inventing it.

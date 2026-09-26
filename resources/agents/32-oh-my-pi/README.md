@@ -77,8 +77,10 @@ chooses, and isolates Cases.
 omp's `web_search` and `fetch` tools are on by default and run natively. With
 `TAVILY_API_KEY` supplied (`optional_secret_env_keys`), `web_search` uses Tavily
 (`POST https://api.tavily.com/search`), declared in `network/rules.toml` as a tool
-route. Without it, omp falls back to keyless scrapers, which are refused by the
-egress observer. `fetch` contacts the URL the model chooses. Non-model traffic
+route. Without it (or when Tavily fails), omp falls back to keyless scrapers; the
+DuckDuckGo HTML provider (`POST https://html.duckduckgo.com/html/`) is declared as a
+tool route too, so search works without a key. The other scrapers are refused by
+the egress observer. `fetch` contacts the URL the model chooses. Non-model traffic
 without a route goes to ABB's egress observer, which forwards allowlisted hosts
 (including `registry.npmjs.org`, so `npm install` in the bash tool works), refuses
 the rest with 403 and records every attempt in `egress.jsonl`. A refusal is Agent
