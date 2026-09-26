@@ -65,9 +65,10 @@ def prepare(environ: dict[str, str]) -> tuple[list[str], dict[str, str], dict]:
     child = {
         **environ,
         # Skips the npm registry version check (autoUpdater.assertMinVersion);
-        # registry.npmjs.org is not on the admitted route.
+        # it only gates the auto-updater, not any tool.
         "KODE_OFFLINE": "1",
-        "npm_config_offline": "true",
+        # npm stays online for `npm install` in the Agent's shell: the registry is
+        # on ABB's egress-observer allowlist. Only npm's own update check is off.
         "npm_config_update_notifier": "false",
     }
     # Same entry point `kode-acp` falls back to when no native binary was
