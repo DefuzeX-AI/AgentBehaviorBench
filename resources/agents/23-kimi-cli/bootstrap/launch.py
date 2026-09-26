@@ -31,16 +31,6 @@ PLACEHOLDER_TOKEN = {
     "token_type": "Bearer",
 }
 
-# FetchURL cannot be removed from the default ACP agent without an agent file
-# (which `kimi acp` does not accept), and it would issue direct HTTP requests
-# outside the admitted model route. A PreToolUse hook (exit code 2 = block)
-# refuses it locally and returns the reason to the model as a tool error.
-FETCH_BLOCK_HOOK = (
-    "echo 'FetchURL is unavailable in this environment: network access is limited "
-    "to the model endpoint.' >&2; exit 2"
-)
-
-
 def _toml_str(value: str) -> str:
     # JSON string escaping is valid TOML basic-string syntax for these values.
     return json.dumps(value)
@@ -68,12 +58,6 @@ def render_config(base_url: str, model: str) -> str:
             'provider = "zhipu"',
             f"model = {_toml_str(model)}",
             "max_context_size = 200000",
-            "",
-            "[[hooks]]",
-            'event = "PreToolUse"',
-            'matcher = "^FetchURL$"',
-            f"command = {_toml_str(FETCH_BLOCK_HOOK)}",
-            "timeout = 10",
             "",
         ]
     )
