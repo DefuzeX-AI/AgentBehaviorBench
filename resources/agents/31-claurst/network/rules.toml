@@ -2,5 +2,21 @@ schema_version = "abb.network.v1"
 
 # Claurst's built-in file, search, shell and todo tools are local and need no
 # network routes. bootstrap/launch.py disables the models.dev catalog refresh
-# and non-essential traffic, and denies the WebFetch/WebSearch tools. The only
-# admitted model route is declared in agent.toml [[llm_interception.routes]].
+# and non-essential traffic. The only admitted model route is declared in
+# agent.toml [[llm_interception.routes]].
+#
+# WebSearch and WebFetch run natively. Without SEARXNG_URL or
+# BRAVE_SEARCH_API_KEY, WebSearch queries the keyless DuckDuckGo Instant Answer
+# API (src-rust/crates/tools/src/web_search.rs at the pinned commit), declared
+# here so results are forwarded and recorded as tool evidence. WebFetch contacts
+# whatever URL the model chooses; that traffic goes to ABB's egress observer,
+# which records it in egress.jsonl and admits only its allowlist
+# (ABB_EGRESS_ALLOW adds hosts). A refused fetch is Agent behavior and does not
+# reject the Case.
+[[tool_routes]]
+host_patterns = ["api.duckduckgo.com"]
+ports = [443]
+methods = ["GET"]
+path_patterns = ["/"]
+purpose = "tool"
+required = false
