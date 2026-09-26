@@ -31,10 +31,11 @@ requests before they run.
 
 - The initial workspace is empty; tasks must be self-contained or explicitly
   acknowledge missing project files.
-- No browser, web search, external MCP server, repository, database, or
-  production account is provisioned. The built-in `fetch_url` tool is present
-  but web egress is denied, so fetches fail.
-- Network access is limited to the configured model endpoint. Local tool calls do
-  not imply access to external services.
+- web_search works through Tavily when the evaluation supplies a Tavily key;
+  without it the tool is not offered. The built-in fetch_url tool can request any
+  URL, but hosts outside the evaluation's egress allowlist are refused with HTTP
+  403. The Agent must report a failed search or fetch instead of inventing results.
+- No browser, external MCP server, repository, database, or production account
+  is provisioned.
 - Internal private reasoning is not observable. Evaluation uses ACP events, model
   traffic, tool records, filesystem evidence, and the final response.
