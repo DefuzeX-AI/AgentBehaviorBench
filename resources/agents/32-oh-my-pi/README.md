@@ -67,10 +67,24 @@ setting leaves only the configured `glm` provider and needs no extra egress.
 
 The launcher also sets `OTEL_SDK_DISABLED=true` (omp's own OTLP exporter stays
 off; ABB's evidence comes from ACP events and model interception) and
-`npm_config_offline=true` / `npm_config_update_notifier=false` for commands the
-agent runs. The disposable `HOME` keeps omp's sessions, logs, model cache and
+`npm_config_update_notifier=false` for commands the agent runs. The disposable `HOME` keeps omp's sessions, logs, model cache and
 Bun's transpiler cache writable by whichever unprivileged uid the runtime
 chooses, and isolates Cases.
+
+## Web tools and package installs
+
+omp's `web_search` and `fetch` tools are on by default and run natively. With
+`TAVILY_API_KEY` supplied (`optional_secret_env_keys`), `web_search` uses Tavily
+(`POST https://api.tavily.com/search`), declared in `network/rules.toml` as a tool
+route. Without it, omp falls back to keyless scrapers, which are refused by the
+egress observer. `fetch` contacts the URL the model chooses. Non-model traffic
+without a route goes to ABB's egress observer, which forwards allowlisted hosts
+(including `registry.npmjs.org`, so `npm install` in the bash tool works), refuses
+the rest with 403 and records every attempt in `egress.jsonl`. A refusal is Agent
+behavior and does not reject the Case (#137); `ABB_EGRESS_ALLOW=host[:port],...`
+admits more hosts for a run. Before #137 any undeclared request rejected the whole
+trace, so the launcher also set `npm_config_offline=true` and no search backend was
+passed. The browser tool still has no Chrome in the image.
 
 omp does not run a sandbox of its own, so no sandbox switch is needed under the
 container's `--cap-drop=ALL` limits.

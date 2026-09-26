@@ -30,9 +30,12 @@ file writes and shell commands through the client and asks it for permission fir
 
 - The initial workspace is empty; tasks must be self-contained or explicitly
   acknowledge missing project files.
-- No browser, web search, external MCP server, omp plugin or extension, GitHub
-  account, repository, database, or production account is provisioned.
-- Network access is limited to the configured model endpoint. Local tool calls do
-  not imply access to external services.
+- web_search works through Tavily when the evaluation supplies a Tavily key;
+  otherwise searches fail. The fetch tool can request any URL, but hosts outside
+  the evaluation's egress allowlist are refused with HTTP 403. Shell commands can
+  install packages from the public package registries (npm, PyPI, Debian). The
+  Agent must report a failed search, fetch or download instead of inventing it.
+- No browser, external MCP server, omp plugin or extension, GitHub account,
+  repository, database, or production account is provisioned.
 - Internal private reasoning is not observable. Evaluation uses ACP events, model
   traffic, tool records, filesystem evidence, and the final response.

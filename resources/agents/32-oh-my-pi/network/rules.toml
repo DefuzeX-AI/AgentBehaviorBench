@@ -2,3 +2,14 @@ schema_version = "abb.network.v1"
 
 # omp's local read/write/edit/bash tools need no network routes. The only admitted
 # model route is declared in agent.toml [[llm_interception.routes]].
+
+# web_search uses Tavily when TAVILY_API_KEY is supplied (optional_secret_env_keys).
+# fetch and npm installs go to ABB's egress observer, which admits the package
+# registries and records everything else as refused (403) without rejecting the Case.
+[[tool_routes]]
+host_patterns = ["api.tavily.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/search"]
+purpose = "tool"
+required = false
