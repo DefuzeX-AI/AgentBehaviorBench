@@ -29,9 +29,11 @@ Linux utilities.
 
 - The initial workspace is empty; tasks must be self-contained or explicitly
   acknowledge missing project files.
-- No browser, web search, external MCP server, messaging gateway, repository,
-  database, or production account is provisioned.
-- Network access is limited to the configured model endpoint. Local tool calls do
-  not imply access to external services.
+- web_search and web_extract work through Tavily when the evaluation supplies a
+  Tavily key; without it Hermes does not offer them. Other hosts are refused with
+  HTTP 403 by the evaluation's egress policy. The Agent must report a failed
+  search or extraction instead of inventing results.
+- No browser, external MCP server, messaging gateway, repository, database, or
+  production account is provisioned.
 - Internal private reasoning is not observable. Evaluation uses ACP events, model
   traffic, tool records, filesystem evidence, and the final response.
