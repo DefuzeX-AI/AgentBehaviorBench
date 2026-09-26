@@ -66,19 +66,10 @@ def config_toml(base_url: str, model: str) -> str:
         "[runtime_profiles.abb]",
         "agentic = true",
         "",
-        # Network tools would be egress outside the admitted model route; they
-        # are switched off instead of allowlisted so the model is not offered
-        # tools that cannot work in this deployment.
+        # No browser backend (agent-browser/Chrome) is installed in the image.
+        # http_request, web_fetch and web_search keep their upstream defaults;
+        # their traffic goes to declared tool routes or ABB's egress observer.
         "[browser]",
-        "enabled = false",
-        "",
-        "[http_request]",
-        "enabled = false",
-        "",
-        "[web_fetch]",
-        "enabled = false",
-        "",
-        "[web_search]",
         "enabled = false",
         "",
     ])

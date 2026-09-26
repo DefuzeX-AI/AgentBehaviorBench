@@ -1,6 +1,18 @@
 schema_version = "abb.network.v1"
 
-# ZeroClaw's local file and shell tools need no network routes. Its network
-# tools (browser, http_request, web_fetch, web_search) are disabled in the
-# per-Case config written by bootstrap/launch.py instead of being allowlisted.
-# The only admitted model route is declared in agent.toml [[llm_interception.routes]].
+# ZeroClaw's local file and shell tools need no network routes. The only admitted
+# model route is declared in agent.toml [[llm_interception.routes]].
+#
+# web_search uses its default keyless DuckDuckGo HTML provider, declared below so
+# results are forwarded and recorded as tool evidence. web_fetch and http_request
+# contact whatever URL the model chooses; that traffic goes to ABB's egress
+# observer, which forwards allowlisted hosts, refuses the rest with 403 and
+# records every attempt in egress.jsonl without rejecting the Case. The browser
+# tool stays disabled in bootstrap/launch.py (no browser backend in the image).
+[[tool_routes]]
+host_patterns = ["html.duckduckgo.com"]
+ports = [443]
+methods = ["GET", "POST"]
+path_patterns = ["/html/"]
+purpose = "tool"
+required = false
