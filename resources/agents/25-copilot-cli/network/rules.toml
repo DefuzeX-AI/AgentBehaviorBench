@@ -1,6 +1,9 @@
 schema_version = "abb.network.v1"
 
-# Copilot CLI's local filesystem and shell tools need no network routes. The
-# launcher sets COPILOT_OFFLINE=true, which disables GitHub authentication,
-# telemetry, web tools, the GitHub MCP server and auto-update. The only admitted
-# model route is declared in agent.toml [[llm_interception.routes]].
+# Copilot CLI's local filesystem and shell tools need no network routes. The only
+# admitted model route is declared in agent.toml [[llm_interception.routes]].
+#
+# The launcher no longer sets COPILOT_OFFLINE, so web_fetch is available. Its
+# requests, and any GitHub/telemetry calls the CLI attempts without a token, go
+# to ABB's egress observer, which forwards allowlisted hosts, refuses the rest
+# with 403 and records every attempt in egress.jsonl without rejecting the Case.

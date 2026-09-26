@@ -43,10 +43,15 @@ documented environment contract (`copilot help environment`), never onto argv:
 - `COPILOT_PROVIDER_MAX_PROMPT_TOKENS=128000`, `COPILOT_PROVIDER_MAX_OUTPUT_TOKENS=16384`
   — `glm-5.1` is not in Copilot's model catalog; without these the CLI warns and
   uses generic defaults.
-- `COPILOT_OFFLINE=true` — skips GitHub authentication, telemetry, web tools, the
-  GitHub MCP server and auto-update. Each of those would otherwise be network egress
-  outside the declared route, which the interceptor rejects. `COPILOT_AUTO_UPDATE=false`
-  and `--no-auto-update` are set as well.
+- `COPILOT_AUTO_UPDATE=false` and `--no-auto-update` — no self-update.
+- `COPILOT_OFFLINE` is not set, so the `web_fetch` tool is available. Its requests go
+  to ABB's egress observer: allowlisted hosts are forwarded, others are refused with 403,
+  and every attempt is written to `egress.jsonl` without rejecting the Case (#137).
+  `ABB_EGRESS_ALLOW=host[:port],...` admits more hosts for a run. Without a GitHub
+  token, GitHub-backed features (GitHub MCP server, web search) stay unavailable and
+  any calls they attempt are recorded as refused. Before #137 undeclared egress
+  rejected the whole trace, so this unit ran Copilot with `COPILOT_OFFLINE=true`,
+  which also removed `web_fetch`.
 - `COPILOT_GITHUB_TOKEN`, `GH_TOKEN` and `GITHUB_TOKEN` are removed from the child
   environment, and OTel export variables are dropped (Copilot only exports OTel when
   they are set).
