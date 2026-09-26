@@ -13,6 +13,9 @@ from urllib.parse import urlsplit
 
 
 KEY_ENV = "GLM_API_KEY"
+# Target of certifi's cacert.pem link in the image (see Dockerfile).
+CERTIFI_BUNDLE = Path("/tmp/abb-kimi-certifi.pem")
+CERTIFI_ORIGINAL = "cacert.orig.pem"
 BASE_URL_ENV = "GLM_API_BASE_URL"
 MODEL_ENV = "GLM_MODEL"
 KIMI = "/opt/kimi/bin/kimi"
@@ -116,6 +119,22 @@ def hide_client_terminal(line: bytes) -> bytes:
     return json.dumps(message, separators=(",", ":")).encode() + b"\n"
 
 
+def write_certifi_bundle(environ: dict[str, str]) -> None:
+    """Write certifi's linked bundle: its own roots plus the runtime CA, if any.
+
+    Kimi's aiohttp session (FetchURL, kimi_cli/utils/aiohttp.py) builds its SSL
+    context from certifi.where() only, so SSL_CERT_FILE, which the runtime sets
+    for its TLS-intercepting CA, does not reach it. Without this every fetch
+    fails certificate verification before leaving the container.
+    """
+    original = next(Path("/opt/kimi/lib").glob(f"python3*/site-packages/certifi/{CERTIFI_ORIGINAL}"))
+    bundle = original.read_bytes()
+    extra = environ.get("SSL_CERT_FILE", "")
+    if extra and Path(extra).is_file():
+        bundle += b"\n" + Path(extra).read_bytes()
+    CERTIFI_BUNDLE.write_bytes(bundle)
+
+
 def relay_stdin(child: subprocess.Popen) -> None:
     """Forward the client's newline-delimited JSON-RPC stream to Kimi."""
     try:
@@ -144,6 +163,7 @@ def main() -> int:
         token_file.write_text(json.dumps(PLACEHOLDER_TOKEN))
         token_file.chmod(0o600)
         environ["HOME"] = str(home)
+        write_certifi_bundle(environ)
         # Kimi writes ACP to our stdout and logs to our stderr directly; only the
         # client-to-agent direction passes through this process (see above).
         child = subprocess.Popen(command, env=environ, stdin=subprocess.PIPE)

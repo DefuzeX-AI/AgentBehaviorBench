@@ -3,6 +3,9 @@
 FROM python:3.13-bookworm
 # ripgrep is preinstalled because Kimi's Grep tool otherwise downloads rg from
 # cdn.kimi.com on first use, which is outside the admitted model route.
+# Kimi's aiohttp client (FetchURL) verifies TLS only against certifi's bundle,
+# ignoring SSL_CERT_FILE. certifi's cacert.pem is a link to a per-container file
+# that bootstrap/launch.py writes from the original bundle plus the runtime CA.
 RUN apt-get update && apt-get install -y --no-install-recommends ripgrep \
     && rm -rf /var/lib/apt/lists/* \
     && python -m venv /opt/venv && python -m venv /opt/kimi
@@ -13,6 +16,8 @@ WORKDIR /opt/agent
 COPY agent/ ./agent/
 RUN /opt/kimi/bin/python -m pip install --no-cache-dir --require-hashes --no-deps -r agent/requirements.txt \
     && /opt/kimi/bin/kimi --version \
+    && cert=$(/opt/kimi/bin/python -c 'import certifi; print(certifi.where())') \
+    && mv "$cert" "${cert%.pem}.orig.pem" && ln -s /tmp/abb-kimi-certifi.pem "$cert" \
     && python -m pip install --no-cache-dir 'opentelemetry-sdk>=1.30,<2' 'jsonschema>=4.23,<5' 'python-dotenv>=1,<2' \
     && useradd --create-home --uid 10001 agent \
     && mkdir -p /home/agent/workspace \
