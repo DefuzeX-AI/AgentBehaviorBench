@@ -9,12 +9,17 @@ tools; ``research_subtopic`` spawns parallel ``create_agent`` sub-agents. The up
 Deployment settings (all upstream settings keys, applied through ``create_settings_snapshot``):
 - ``llm.provider = openai``: ChatOpenAI against api.openai.com, which ABB intercepts and routes to
   the configured target model.
-- ``search.tool = wikipedia``, ``policy.egress_scope = public_only`` and every other
-  ``search.engine.web.<engine>.agent_enabled = false``: the only search source is the keyless
-  Wikipedia engine; no other engines are offered to the agent as specialized tools. (``strict``
-  scope is not usable here: upstream denies every public host under it, including Wikipedia.)
-- ``search.fetch.mode = disabled``: the upstream switch that removes the ``fetch_content`` tool
-  (arbitrary-URL page fetches are outside this deployment's egress allow-list).
+- ``search.tool = wikipedia`` and ``policy.egress_scope = public_only``: the primary
+  ``web_search`` tool uses the keyless Wikipedia engine (upstream's default primary, SearXNG, needs
+  a self-hosted instance). The other engines keep their upstream ``agent_enabled`` defaults and are
+  offered as specialized tools when usable: keyless arXiv, PubMed, OpenAlex, Semantic Scholar,
+  Wikinews and Wayback, plus Tavily when ``TAVILY_API_KEY`` is supplied. Upstream drops keyed
+  engines without a key. (``strict`` scope is not usable here: upstream denies every public host
+  under it.)
+- ``search.fetch.mode`` keeps the upstream default (``summary_focus_query``), so the agent has the
+  ``fetch_content`` tool. Hosts declared in agent.toml tool routes are forwarded and recorded;
+  other URLs go to ABB's egress observer, which refuses them with 403 unless allowlisted. A refused
+  fetch is reported to the agent as a tool error and does not reject the Case.
 - Research budget lowered (agent iterations 15, sub-agent iterations 5, 2 parallel sub-agents,
   10 results per search) so one Case step completes within the container timeout.
 
@@ -31,7 +36,6 @@ SETTINGS_OVERRIDES = {
     "search.tool": "wikipedia",
     "search.search_strategy": "langgraph-agent",
     "policy.egress_scope": "public_only",
-    "search.fetch.mode": "disabled",
     # Bounded research budget (upstream defaults: 50 / 8 / 4 / 50 / 20) so one Case step fits the
     # container timeout; same settings a user lowers in the LDR settings page.
     "langgraph_agent.max_iterations": 15,
@@ -69,11 +73,9 @@ class LocalDeepResearchGraph:
         overrides = dict(SETTINGS_OVERRIDES)
         overrides["llm.model"] = os.environ.get("LDR_LLM_MODEL", "gpt-4o-mini")
         overrides["llm.openai.api_key"] = os.environ["OPENAI_API_KEY"]
+        if os.environ.get("TAVILY_API_KEY"):
+            overrides["search.engine.web.tavily.api_key"] = os.environ["TAVILY_API_KEY"]
         snapshot = create_settings_snapshot(overrides=overrides)
-        for key, setting in snapshot.items():
-            if (key.startswith("search.engine.web.") and key.endswith(".agent_enabled")
-                    and key != "search.engine.web.wikipedia.agent_enabled" and isinstance(setting, dict)):
-                setting["value"] = False
         result = quick_summary(
             query,
             research_id=str(uuid.uuid4()),
