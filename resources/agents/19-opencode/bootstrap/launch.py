@@ -20,9 +20,12 @@ DISTRIBUTION = Path(__file__).resolve().parents[1] / "agent"
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = "4096"
 
-# Every switch below closes a startup network call outside the admitted model
-# route; the interceptor rejects the whole trace on any undeclared egress.
+# Every OPENCODE_DISABLE_* switch below closes a startup/background network call
+# that is not an agent tool (catalog, updates, sharing, plugin discovery).
 FLAGS = {
+    # Offer the websearch tool (keyless Exa MCP endpoint, a declared tool route in
+    # network/rules.toml); upstream enables it by default only for its own provider.
+    "OPENCODE_ENABLE_EXA": "1",
     "OPENCODE_DISABLE_MODELS_FETCH": "1",  # models.dev catalog download
     "OPENCODE_DISABLE_AUTOUPDATE": "1",  # release check
     "OPENCODE_DISABLE_SHARE": "1",  # session sharing service
@@ -47,9 +50,6 @@ def config(base_url: str, model: str) -> dict:
         # The title agent starts a second, background model call after the
         # first turn; the one-shot worker closes ACP before it finishes.
         "agent": {"title": {"disable": True}},
-        # webfetch would reach arbitrary hosts outside the admitted route; a
-        # denied tool is hidden from the model instead of failing at egress.
-        "permission": {"webfetch": "deny"},
         "provider": {
             PROVIDER_ID: {
                 # Bundled in the OpenCode binary, so no provider package is fetched.
