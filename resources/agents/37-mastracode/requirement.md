@@ -30,9 +30,11 @@ and standard Linux utilities.
 
 - The initial workspace is empty; tasks must be self-contained or explicitly
   acknowledge missing project files.
-- No browser automation, web search, voice, external MCP server, GitHub account,
-  database server, or production account is provisioned.
-- Network access is limited to the configured model endpoint and two public
-  model-catalog lookups. Local tool calls do not imply access to external services.
+- web_search and web_extract work through Tavily when the evaluation supplies a
+  Tavily key; without it Mastra Code does not offer them. Other hosts are refused
+  with HTTP 403 by the evaluation's egress policy. The Agent must report a failed
+  search or extraction instead of inventing results.
+- No browser automation, voice, external MCP server, GitHub account, database
+  server, or production account is provisioned.
 - Internal private reasoning is not observable. Evaluation uses ACP events, model
   traffic, filesystem evidence, and the final response.
