@@ -52,12 +52,14 @@ def load_authentication() -> dict[str, AuthenticationPlugin]:
     return _load(AUTH_GROUP, plugins)
 
 
-def load_targets() -> dict[str, TargetProviderPlugin]:
-    target = create_openrouter_target()
+def create_compatible_json_target():
+    from .targets.compatible_json import CompatibleJSONTarget
+    return CompatibleJSONTarget(load_wires())
 
-    plugins: dict[str, TargetProviderPlugin] = {
-        target.name: target,
-    }
+
+def load_targets() -> dict[str, TargetProviderPlugin]:
+    targets = (create_openrouter_target(), create_compatible_json_target())
+    plugins: dict[str, TargetProviderPlugin] = {target.name: target for target in targets}
     return _load(TARGET_GROUP, plugins)
 
 

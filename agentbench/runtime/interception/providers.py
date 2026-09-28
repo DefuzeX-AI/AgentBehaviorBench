@@ -5,11 +5,13 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from importlib.metadata import entry_points
+from functools import partial
 from types import MappingProxyType
 from typing import Mapping, Protocol, runtime_checkable
 from urllib.parse import urlsplit
 
 from .config import InterceptionConfigurationError
+from .provider_catalog import load_provider_catalog
 
 
 OPENROUTER_API_KEY_ENV = "OPENROUTER_API_KEY"
@@ -29,6 +31,8 @@ class ModelTargetConfig:
         default_factory=lambda: MappingProxyType({})
     )
 
+    endpoint_paths: Mapping[str, str] | None = None
+
 
 @runtime_checkable
 class ModelTargetProvider(Protocol):
@@ -37,47 +41,56 @@ class ModelTargetProvider(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
+class ConfiguredModelProvider:
+    """Resolve a target using provider data, without provider-specific branches."""
+
+    provider_id: str
+    model: str | None = None
+
+    def resolve(self, environ: Mapping[str, str]) -> ModelTargetConfig:
+        definitions = load_provider_catalog(environ)["providers"]
+        if self.provider_id not in definitions:
+            raise InterceptionConfigurationError(f"Provider is not configured: {self.provider_id!r}")
+        definition = definitions[self.provider_id]
+        model_env = definition["model_env"]
+        model = (self.model or environ.get("ABB_MODEL", "") or environ.get(model_env, "")).strip()
+        if not model:
+            raise InterceptionConfigurationError(
+                f"{self.provider_id} model is required; pass --model or set {model_env}"
+            )
+        if any(character.isspace() for character in model):
+            raise InterceptionConfigurationError("Model must not contain whitespace")
+        base_env = definition["base_url_env"]
+        base_url = environ.get(base_env, definition["base_url"]).strip()
+        parsed = urlsplit(base_url)
+        if (parsed.scheme != "https" or not parsed.hostname or parsed.username
+                or parsed.password or parsed.query or parsed.fragment):
+            raise InterceptionConfigurationError(
+                f"{base_env} must be an absolute HTTPS URL without credentials, query or fragment"
+            )
+        headers = {header: environ[variable].strip()
+                   for header, variable in definition.get("header_env", {}).items()
+                   if environ.get(variable, "").strip()}
+        endpoints = definition.get("endpoint_paths")
+        return ModelTargetConfig(
+            provider_id=self.provider_id,
+            target_plugin=definition["target_plugin"],
+            base_url=base_url.rstrip("/"),
+            model=model,
+            credential_env=definition["credential_env"],
+            headers=MappingProxyType(headers),
+            endpoint_paths=MappingProxyType(endpoints) if endpoints is not None else None,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class OpenRouterProvider:
-    """Resolve one model-controlled OpenRouter target for a benchmark run."""
+    """Compatibility entry point for callers explicitly requesting OpenRouter."""
 
     model: str | None = None
 
     def resolve(self, environ: Mapping[str, str]) -> ModelTargetConfig:
-        model = (self.model or environ.get(OPENROUTER_MODEL_ENV, "")).strip()
-        if not model:
-            raise InterceptionConfigurationError(
-                "OpenRouter model is required; pass --model or set OPENROUTER_MODEL"
-            )
-        if any(character.isspace() for character in model):
-            raise InterceptionConfigurationError(
-                f"OpenRouter model must not contain whitespace: {model!r}"
-            )
-
-        base_url = environ.get(
-            OPENROUTER_BASE_URL_ENV, DEFAULT_OPENROUTER_BASE_URL
-        ).strip()
-        parsed = urlsplit(base_url)
-        if parsed.scheme != "https" or not parsed.hostname:
-            raise InterceptionConfigurationError(
-                "OPENROUTER_BASE_URL must be an absolute HTTPS URL"
-            )
-
-        headers: dict[str, str] = {}
-        referer = environ.get("OPENROUTER_HTTP_REFERER", "").strip()
-        title = environ.get("OPENROUTER_APP_TITLE", "").strip()
-        if referer:
-            headers["HTTP-Referer"] = referer
-        if title:
-            headers["X-OpenRouter-Title"] = title
-
-        return ModelTargetConfig(
-            provider_id="openrouter",
-            target_plugin="openrouter",
-            base_url=base_url.rstrip("/"),
-            model=model,
-            credential_env=OPENROUTER_API_KEY_ENV,
-            headers=MappingProxyType(headers),
-        )
+        return ConfiguredModelProvider("openrouter", self.model).resolve(environ)
 
 
 MODEL_PROVIDER_ENTRY_POINT_GROUP = "defuzex_agentbench.model_providers"
@@ -93,14 +106,23 @@ def resolve_model_provider(
 ) -> ModelTargetProvider:
     """Construct the host model target provider selected by name.
 
-    The name comes from ``name``, else ``ABB_MODEL_PROVIDER``, else ``openrouter``.
-    Providers other than the built-in one register a factory accepting ``model=``
-    under the ``defuzex_agentbench.model_providers`` entry-point group, like the
-    interceptor's other plugin layers; a plugin cannot replace a built-in name.
+    Explicit names win; otherwise inspect non-empty keys in catalog priority order.
+    With no key, retain the first provider for the existing startup validation.
+    Entry-point plugins remain available by explicit name; configured names win.
     """
     values = os.environ if environ is None else environ
-    selected = (name or values.get(MODEL_PROVIDER_ENV, "") or DEFAULT_MODEL_PROVIDER).strip().lower()
-    factories: dict[str, object] = {DEFAULT_MODEL_PROVIDER: OpenRouterProvider}
+    catalog = load_provider_catalog(values)
+    definitions, priority = catalog["providers"], catalog["priority"]
+    selected = (name or values.get(MODEL_PROVIDER_ENV, "")).strip().lower()
+    if not selected:
+        selected = next((key for key in priority
+                         if values.get(definitions[key]["credential_env"], "").strip()), priority[0])
+    factories: dict[str, object] = {
+        key: partial(ConfiguredModelProvider, key) for key in definitions
+    }
+    # Preserve the public entry-point class for existing explicit OpenRouter callers.
+    if DEFAULT_MODEL_PROVIDER in factories:
+        factories[DEFAULT_MODEL_PROVIDER] = OpenRouterProvider
     registered = [entry for entry in entry_points(group=MODEL_PROVIDER_ENTRY_POINT_GROUP)
                   if entry.name.strip().lower() not in factories]
     if selected not in factories:

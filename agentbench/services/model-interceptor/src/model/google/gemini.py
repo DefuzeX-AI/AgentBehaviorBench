@@ -6,7 +6,7 @@ Google GAPIC REST streaming expects a JSON array; alt=sse clients expect SSE.
 
 
 from defuzex_model_interceptor.transport.json import json_bytes, json_request
-from defuzex_model_interceptor.transport.sse import SSEDecoder
+from defuzex_model_interceptor.transport.sse import DEFAULT_MAX_EVENT_BYTES, SSEDecoder
 from defuzex_model_interceptor.contracts import SourceSignature
 
 
@@ -87,7 +87,7 @@ def response_from_chat(payload, *, status=200):
 
 class GeminiStream:
     """Backward-compatible facade over the shared framing/translation engine."""
-    def __init__(self, *, sse=False, max_event_bytes=1048576):
+    def __init__(self, *, sse=False, max_event_bytes=DEFAULT_MAX_EVENT_BYTES):
         wire = GeminiWire()
         wire.sse = sse
         self._stream = GeminiWireStream(wire)

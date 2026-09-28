@@ -1,9 +1,11 @@
 """Incremental SSE framing; retain UTF-8 bytes until an entire event arrives."""
 import json
 
+DEFAULT_MAX_EVENT_BYTES = 16 * 1024 * 1024
+
 
 class SSEDecoder:
-    def __init__(self, terminal="done", maximum=4 * 1024 * 1024):
+    def __init__(self, terminal="done", maximum=DEFAULT_MAX_EVENT_BYTES):
         self.buffer = bytearray()
         self.terminal = terminal
         self.maximum = maximum

@@ -127,9 +127,9 @@ def test_kuma_factory_isolates_case_state_and_forwards_shared_control(echo_agent
     assert not hasattr(first, '_case_fingerprints')
     assert first.control is second.control is control
     assert first.runtime_services is second.runtime_services
-    assert first.environ == {'KUMA_API_KEY': 'offline', 'OPENROUTER_MODEL': 'test-model'}
-    first.environ['OPENROUTER_MODEL'] = 'modified'
-    assert second.environ['OPENROUTER_MODEL'] == 'test-model'
+    assert first.environ == {'KUMA_API_KEY': 'offline', 'ABB_MODEL': 'test-model'}
+    first.environ['ABB_MODEL'] = 'modified'
+    assert second.environ['ABB_MODEL'] == 'test-model'
     suite.close()
 
 

@@ -51,8 +51,8 @@ def configure_parser(parser: ArgumentParser) -> None:
     )
     parser.add_argument(
         "--model",
-        metavar="OPENROUTER_MODEL",
-        help="OpenRouter model slug; defaults to OPENROUTER_MODEL.",
+        metavar="MODEL",
+        help="Target model ID; defaults to the selected provider model environment variable.",
     )
     parser.add_argument(
         "--llm-trace-max-bytes",

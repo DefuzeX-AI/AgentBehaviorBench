@@ -63,7 +63,7 @@ def configure_parser(parser: ArgumentParser) -> None:
     add.add_argument("--agent-timeout", type=float, help="With -b, override the generated Agent timeout (default: 300 seconds).")
     add.add_argument("--adapter-context", type=Path, help="With -b, explicit deployment overrides as a JSON object; omitted by default.")
     add.add_argument("--env-file", type=Path, help="Host environment file; never included in source context.")
-    add.add_argument("--model", help="OpenRouter model for certification, independent of --build-model.")
+    add.add_argument("--model", help="Target provider model for certification, independent of --build-model.")
     add.add_argument("--output", type=Path, help="Certification result path.")
     add.add_argument("--no-view", action="store_true", help="Certify without starting the live viewer.")
     add.add_argument("-y", "--yes", action="store_true", help="Confirm certification without prompting.")
