@@ -1,0 +1,10 @@
+schema_version = "abb.network.v1"
+
+# Nanocoder's built-in tools (read/write/edit files, search, list, git, bash,
+# task list) run locally inside its process and need no network routes.
+# bootstrap/launch.py pre-seeds an empty models.dev metadata cache, so the
+# context-limit and pricing lookups never fetch https://models.dev/api.json.
+# web_search is unregistered upstream when no Brave Search key is configured
+# (none is). The only admitted route is the model route declared in agent.toml
+# [[llm_interception.routes]]; fetch_url or package installs requested by a task
+# are not admitted.
