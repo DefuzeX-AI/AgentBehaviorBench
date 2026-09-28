@@ -66,9 +66,9 @@ the environment, never argv or a file. `model` and `small_model` are
 `glm/$GLM_MODEL`, so the model is selected at startup; `enabled_providers` is
 limited to `glm`.
 
-Each remaining setting removes a network call outside the admitted route, or a
-background model call, because the interceptor rejects a trace with any
-undeclared egress:
+Each remaining setting removes a startup or background network call that is not an
+agent tool, or a background model call (these switches predate #137, when any
+undeclared egress rejected the whole trace):
 
 - `OPENCODE_DISABLE_MODELS_FETCH=1`: no models.dev catalog download
   (`models.opencode.ai` was contacted at startup on the host probe).
@@ -86,11 +86,20 @@ undeclared egress:
 - `OPENCODE_DISABLE_LSP_DOWNLOAD=1`: language servers are not downloaded on demand.
 - `OPENCODE_DISABLE_CLAUDE_CODE=1`, `OPENCODE_DISABLE_EXTERNAL_SKILLS=1`: no
   prompts or skills are imported from outside the disposable HOME.
-- `permission.webfetch: "deny"`: the web fetch tool would reach arbitrary hosts, so
-  it is hidden from the model. Web search is already off for non-OpenCode providers.
 - `agent.title.disable: true`: OpenCode otherwise starts a separate background
   model call on the small model to title the session after the first turn; the
   one-shot worker closes ACP before it finishes, which cut the request.
+
+## Web tools
+
+`webfetch` and `websearch` are available to the model. `OPENCODE_ENABLE_EXA=1` turns on
+`websearch`, which upstream otherwise offers only with its own provider; it posts to the
+keyless Exa MCP endpoint `https://mcp.exa.ai/mcp`, declared as a tool route in
+`network/rules.toml`. `webfetch` contacts the URL the model chooses. That traffic goes to
+ABB's egress observer: allowlisted hosts are forwarded, others are refused with 403, and
+every attempt is written to `egress.jsonl`. A refusal is Agent behavior and does not
+reject the Case (#137). `ABB_EGRESS_ALLOW=host[:port],...` admits more hosts for a run.
+Before #137 this unit denied `webfetch` in the config to avoid undeclared egress.
 
 `opencode acp` starts its own HTTP server inside the container and talks to it
 locally; the launcher pins it to `--hostname 127.0.0.1 --port 4096` (the default

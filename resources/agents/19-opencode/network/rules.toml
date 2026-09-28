@@ -1,6 +1,11 @@
 schema_version = "abb.network.v1"
 
 # OpenCode's local filesystem and shell tools need no external network routes.
+# websearch (enabled by OPENCODE_ENABLE_EXA=1 in launch.py) posts to the keyless
+# Exa MCP endpoint below. webfetch contacts whatever URL the model chooses; that
+# traffic goes to ABB's egress observer, which records it in egress.jsonl and
+# refuses hosts outside its allowlist with 403 (ABB_EGRESS_ALLOW adds hosts). A
+# refused fetch is Agent behavior and does not reject the Case.
 # The only admitted model route is declared in agent.toml [[llm_interception.routes]].
 # Startup downloads (models.dev catalog, @opencode-ai/plugin npm install,
 # ripgrep release) are prevented in the image/launcher instead of allowlisted.
@@ -23,5 +28,13 @@ path_patterns = [
   "/global/event", "/event", "/mcp", "/permission/*",
   "/session", "/session/*",
 ]
+purpose = "tool"
+required = false
+
+[[tool_routes]]
+host_patterns = ["mcp.exa.ai"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/mcp"]
 purpose = "tool"
 required = false
