@@ -104,3 +104,9 @@ def test_package_install_after_copy_with_quoted_bounds_is_valid():
     from agentbench.onboarding.build_agent_env.build_dockerfile.validation import validate_dockerfile
     validate_dockerfile("FROM python:3.11\nCOPY agent/ ./agent/\n"
                         "RUN python -m pip install ./agent 'opentelemetry-sdk>=1.30,<2'\nUSER agent\n")
+
+
+def test_agent_model_override_does_not_change_builder_model():
+    client = OpenRouterClient(load_settings(), {
+        "ABB_MODEL": "agent-model", "OPENROUTER_MODEL": "builder-model", "OPENROUTER_API_KEY": "test-only"})
+    assert client.target.model == "builder-model"

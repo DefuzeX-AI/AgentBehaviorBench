@@ -33,6 +33,8 @@ def prepare_service_config(interception, *, agent_id, max_trace_bytes, secret_di
     (secret_dir / 'target.secret').write_text(upstream_secret, encoding='utf-8')
     data['target'] = {'provider_id': target.provider_id, 'target_plugin': target.target_plugin,
                       'base_url': target.base_url, 'model': target.model, 'headers': dict(target.headers)}
+    if getattr(target, 'endpoint_paths', None) is not None:
+        data['target']['endpoint_paths'] = dict(target.endpoint_paths)
     for credential in interception.credentials:
         token = secrets.token_urlsafe(32)
         token_file = secret_dir / f'{credential.credential_id}.token'

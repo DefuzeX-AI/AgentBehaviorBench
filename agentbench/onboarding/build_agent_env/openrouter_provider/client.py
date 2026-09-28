@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from agentbench.runtime.interception.providers import OpenRouterProvider
+from agentbench.runtime.interception.config import InterceptionConfigurationError
 
 from .settings import ASSETS, BuildSettings
 from .http_errors import describe_http_error
@@ -26,7 +27,12 @@ class _NoRedirect(HTTPRedirectHandler):
 class OpenRouterClient:
     def __init__(self, settings: BuildSettings, environ: Mapping[str, str], *, model=None):
         chosen = model or settings.model or environ.get("OPENROUTER_BUILD_MODEL")
-        self.target = OpenRouterProvider(model=chosen).resolve(environ)
+        try:
+            # Agent model overrides must not select the onboarding builder model.
+            build_environ = {key: value for key, value in environ.items() if key != "ABB_MODEL"}
+            self.target = OpenRouterProvider(model=chosen).resolve(build_environ)
+        except InterceptionConfigurationError as exc:
+            raise BuildError(str(exc)) from exc
         parsed = urlsplit(self.target.base_url)
         if parsed.username or parsed.password or parsed.query or parsed.fragment:
             raise BuildError("OpenRouter base URL must not include credentials, query or fragment")

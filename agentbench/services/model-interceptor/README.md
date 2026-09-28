@@ -8,7 +8,7 @@ namespace. Adapter registration selects the behavior without a user mode switch:
   The Agent receives its declared native credentials. The service needs no
   replacement provider or secret. Token counting also stays native.
 - **LangGraph / replace:** retain existing protocol recognition and credential
-  substitution. The target plugin selects the OpenRouter URL, model and upstream
+  substitution. The target plugin selects the configured provider URL, model and upstream
   key; the Agent receives an isolated temporary key.
 
 Both paths enforce explicit egress policy and redact recorded evidence. Observe
@@ -22,6 +22,11 @@ Streaming responses are relayed immediately and recorded completely. The legacy
 `max_trace_bytes` setting is an in-memory spool threshold, not a capture limit:
 larger streams spill to temporary storage. Storage failures fail visibly.
 
+Replacement-mode SSE parsing allows up to 16 MiB per event by default, including
+the Gemini compatibility stream adapter. This is a per-event framing limit, not
+a total response or trace limit. Oversized events fail explicitly; they are not
+silently truncated. Larger events may require more memory per concurrent stream.
+
 Events retain decoded `payload` and complete `raw_body` text (including SSE
 termination and usage events). Replacement requests also retain `source_raw_body` before
 protocol/model rewriting. Known credentials are still redacted. Existing truncated
@@ -32,6 +37,53 @@ does not promise unlimited capacity beyond container memory and temporary storag
 The service is configured only through the JSON file mounted at
 `/run/secrets/interceptor_config`. It emits machine-readable trace events to
 stdout with the `DEFUZEX_TRACE ` prefix.
+
+## Replacement providers
+
+The host [provider catalog](../../runtime/interception/model-providers.toml) declares
+provider priority, credential/model/base-URL environment variable names, default
+URLs, optional headers and endpoint paths. Defaults check **OpenRouter → DeepSeek
+→ GLM**, selecting the first non-empty API key. Whitespace-only keys are absent.
+`ABB_MODEL_PROVIDER` (or an explicit provider name in the host API) overrides this
+selection. This checks configuration presence, not remote key validity: request
+failures do not silently retry against another provider.
+
+| Provider | API key | Model | Base URL override |
+| --- | --- | --- | --- |
+| OpenRouter | `OPENROUTER_API_KEY` | `OPENROUTER_MODEL` | `OPENROUTER_BASE_URL` |
+| DeepSeek | `DEEPSEEK_API_KEY` | `DEEPSEEK_MODEL` | `DEEPSEEK_BASE_URL` |
+| GLM | `GLM_API_KEY` | `GLM_MODEL` | `GLM_API_BASE_URL` |
+
+Models have no new built-in defaults. `--model` overrides `ABB_MODEL`, which
+otherwise overrides the selected provider's model variable. An available key with
+missing model configuration fails startup instead of falling through to a different
+provider. With no key, the first configured provider is used for normal startup
+validation, which reports the missing model or credential.
+
+Copy the catalog and set `ABB_MODEL_PROVIDERS_CONFIG=/absolute/path/providers.toml`
+to replace its declarations. Change `priority`, add providers, or change the
+credential/model variable names, URLs and endpoint mappings there; no provider
+selection branches in Python are needed. Files contain environment variable names,
+not credentials. The selected real key is mounted only into the interceptor;
+Agents still receive isolated per-run tokens.
+
+DeepSeek defaults to `https://api.deepseek.com`, with Chat Completions, Responses
+and Anthropic Messages endpoint mappings. GLM defaults to the standard
+`https://open.bigmodel.cn/api/paas/v4` Chat Completions endpoint. The existing
+`GLM_API_BASE_URL` setting takes precedence (including a Coding Plan deployment).
+Gemini/Ollama text bridges use the target's Chat Completions endpoint. Protocols
+absent from a target's `endpoint_paths` table fail before forwarding; this does not
+add cross-protocol conversion for GLM Responses or Anthropic Messages. Change the
+catalog only to match the capabilities of the actual deployment.
+
+Endpoint references: [DeepSeek Chat](https://api-docs.deepseek.com/api/create-chat-completion/),
+[DeepSeek Responses](https://api-docs.deepseek.com/guides/responses_api/),
+[DeepSeek Anthropic](https://api-docs.deepseek.com/guides/anthropic_api/),
+[GLM API example](https://docs.bigmodel.cn/cn/best-practice/case/ai-search-engine).
+
+This selection applies to replacement-mode Agent model calls. ACP observe mode
+retains native provider credentials. The onboarding builder (`agent add -b`)
+continues to use its separate OpenRouter configuration.
 
 ## Source layout
 
@@ -51,7 +103,8 @@ src/
 │   ├── replace/handler.py      # Provider/auth/protocol replacement
 │   ├── routing/automatic.py    # Adapter-owned model request recognition
 │   ├── routing/policy.py       # Explicit route and tool egress matching
-│   ├── targets/openrouter.py  # Upstream URL, model and request preparation
+│   ├── targets/compatible_json.py # Shared configured JSON target preparation
+│   ├── targets/openrouter.py  # Compatibility target name
 │   ├── security/
 │   │   ├── auth.py             # Shared bearer and isolated-network auth
 │   │   └── redaction.py        # Credential sanitization
@@ -82,7 +135,7 @@ src/
 - `model/` contains source API semantics, not a file for each model version.
   Adapters can use shared contracts, errors, security and transport helpers.
   They must not import proxy orchestration, the registry, targets or observation.
-- `targets/` owns the destination service. OpenRouter receives per-call wire
+- `targets/` owns the destination service. The shared JSON target receives per-call wire
   factories from the registry; it does not discover adapters itself.
 - `transport/` is provider-independent. Google protobuf imports belong in
   `model/google/grpc.py`; generic status mapping belongs in `transport/grpc.py`.
@@ -103,8 +156,9 @@ their own unary protobuf envelope; the proxy does not import Google codecs.
 
 For a new source API, put its conversion and any provider-specific credentials
 under `model/`, then register its wire factory and authentication implementation.
-For a new destination service, add an adapter under `targets/`. Reuse shared
-auth, JSON and SSE behavior when the protocol actually matches it.
+For a compatible destination service, add a provider declaration to the host
+catalog. Add an adapter under `targets/` only when destination semantics differ.
+Reuse shared auth, JSON and SSE behavior when the protocol actually matches it.
 
 Model requests no longer require a per-Agent `llm_interception.routes` entry.
 An explicit route still takes precedence for custom endpoints. Otherwise the
@@ -162,7 +216,7 @@ remain unchanged. Reinstall the service after updating plugin metadata.
 
 Gemini and Ollama bridges currently support text, not tools, images, audio,
 cached content or provider-specific controls. Unsupported fields fail closed.
-The target is configurable OpenRouter, not a hard-coded DeepSeek model.
+The replacement target and model are selected from deployment configuration.
 32 original-client cases and separate fault checks are available in
 `tests/acceptance/interception`; see `docs/interception/acceptance.md`.
 

@@ -95,7 +95,7 @@ def test_explicit_name_wins_over_environment(monkeypatch):
 def test_unknown_provider_names_the_available_ones(monkeypatch):
     _install(monkeypatch, providers, MODEL_PROVIDER_ENTRY_POINT_GROUP, fixture='FixtureProvider')
     with pytest.raises(InterceptionConfigurationError,
-                       match=r"Unknown model target provider 'missing'; available: fixture, openrouter"):
+                       match=r"Unknown model target provider 'missing'; available: deepseek, fixture, glm, openrouter"):
         resolve_model_provider(environ={'ABB_MODEL_PROVIDER': 'missing'})
 
 

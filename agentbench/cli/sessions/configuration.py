@@ -17,16 +17,22 @@ def runner_configuration(runner):
     reference = getattr(getattr(plan, 'selection', None), 'reference', None)
     if reference is None or reference.source != 'directory':
         return None
-    from agentbench.runtime.interception.providers import (
-        OPENROUTER_BASE_URL_ENV, DEFAULT_OPENROUTER_BASE_URL)
+    from agentbench.runtime.interception.providers import resolve_model_provider
+    from agentbench.runtime.interception.config import InterceptionConfigurationError
     from agentbench.harness.session.plan import source_digest
+    try:
+        target = resolve_model_provider(model=factory.model, environ=factory.environ).resolve(factory.environ)
+    except InterceptionConfigurationError:
+        # Native observe-only runs need no replacement target; runtime validates replace runs.
+        target = None
     return {'sdk': reference.name, 'sdk_options': dict(plan.options),
-            'model': factory.model or factory.environ.get('OPENROUTER_MODEL'),
+            'model': target.model if target else factory.model,
+            'model_provider': target.provider_id if target else None,
             'trace_max_bytes': factory.trace_max_bytes,
             'workers': runner.concurrency.max_parallel_cases,
             'retry_policy': asdict(runner.retry_policy),
             'sdk_distributions': installed_sdk_distributions(reference),
-            'provider_base_url': factory.environ.get(OPENROUTER_BASE_URL_ENV, DEFAULT_OPENROUTER_BASE_URL),
+            'provider_base_url': target.base_url if target else None,
             'runtime_source_sha256': source_digest(Path(__file__).resolve().parents[2])}
 
 

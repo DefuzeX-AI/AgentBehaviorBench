@@ -61,7 +61,7 @@ class KumaEvaluationSDK:
         environment = dict(context.environ)
 
         if context.model is not None:
-            environment["OPENROUTER_MODEL"] = context.model
+            environment["ABB_MODEL"] = context.model
 
         return KumaContainerRunner(
             environ=environment,

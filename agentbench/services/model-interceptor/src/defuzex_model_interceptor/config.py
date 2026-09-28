@@ -54,6 +54,7 @@ class Target:
     base_url: str
     model: str
     headers: Mapping[str, str]
+    endpoint_paths: Mapping[str, str] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,7 +142,16 @@ def _target(value: object) -> Target:
         for key, item in headers.items()
     ):
         raise ServiceConfigurationError("target headers must be a string object")
+    endpoints = data.get("endpoint_paths")
+    if endpoints is not None and (not isinstance(endpoints, dict) or not endpoints or any(
+        not isinstance(key, str) or not key.startswith("/")
+        or not isinstance(path, str) or not path.startswith("/") or path.startswith("//")
+        or "?" in path or "#" in path or ".." in path.split("/")
+        for key, path in endpoints.items()
+    )):
+        raise ServiceConfigurationError("target endpoint_paths must map endpoints to relative API paths")
     return Target(
+        endpoint_paths=MappingProxyType(endpoints) if endpoints is not None else None,
         provider_id=_string(data, "provider_id"),
         target_plugin=_string(data, "target_plugin"),
         base_url=_string(data, "base_url"),

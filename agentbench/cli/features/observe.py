@@ -25,7 +25,7 @@ def configure_parser(parser):
     parser.add_argument("--output", type=Path, default=Path("results/observe"))
     parser.add_argument("--env-file", type=Path)
     parser.add_argument("--model", type=model_name, metavar="MODEL",
-                        help="OpenRouter model name (not an Agent number); defaults to OPENROUTER_MODEL")
+                        help="Target model name (not an Agent number); defaults to the selected provider model")
     parser.add_argument("--timeout", type=float, help="Positive execution timeout in seconds")
     parser.add_argument("--show", type=Path, help="Review a saved observe run directory offline")
 
@@ -95,7 +95,7 @@ def execute(args):
         load_project_environment(args.env_file)
         environ = dict(os.environ)
         if args.model:
-            environ["OPENROUTER_MODEL"] = args.model
+            environ["ABB_MODEL"] = args.model
         observe(agent, value, output=args.output, environ=environ, timeout=args.timeout)
         return 0
     except (KeyboardInterrupt, EOFError):
