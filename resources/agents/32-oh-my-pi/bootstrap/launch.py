@@ -21,10 +21,14 @@ BUILTIN_PROVIDERS_FILE = Path(__file__).resolve().parents[1] / "builtin-provider
 # omp also registers keyless local providers (Ollama, llama.cpp, LM Studio)
 # whenever they are not configured and probes them on loopback.
 IMPLICIT_LOCAL_PROVIDERS = ["ollama", "llama.cpp", "lm-studio"]
+# omp's web_search backends are models of the built-in `web` provider
+# (web/tavily, web/exa, ...); disabling it leaves web_search with no candidate
+# ("No web search model configured").
+WEB_SEARCH_PROVIDER = "web"
 
 
 def disabled_providers(builtin: list[str]) -> list[str]:
-    """Every built-in provider except the configured one.
+    """Every built-in provider except the configured one and the web-search provider.
 
     After each session is created omp starts a background model refresh that
     probes keyless provider endpoints (e.g. hyper.charm.land, api.kilo.ai,
@@ -33,7 +37,7 @@ def disabled_providers(builtin: list[str]) -> list[str]:
     the trace on undeclared egress, so all of them are disabled via omp's own
     `disabledProviders` setting instead of being allowlisted.
     """
-    return sorted((set(builtin) | set(IMPLICIT_LOCAL_PROVIDERS)) - {PROVIDER})
+    return sorted((set(builtin) | set(IMPLICIT_LOCAL_PROVIDERS)) - {PROVIDER, WEB_SEARCH_PROVIDER})
 
 
 def prepare(environ: dict[str, str], builtin: list[str]) -> tuple[list[str], dict[str, str], dict[str, dict]]:
@@ -82,8 +86,8 @@ def prepare(environ: dict[str, str], builtin: list[str]) -> tuple[list[str], dic
         # omp's own OTLP exporter only starts when an OTEL_* endpoint is set;
         # keep it off explicitly so no exporter traffic leaves the container.
         "OTEL_SDK_DISABLED": "true",
-        # The bash tool must not trigger npm/bun registry update checks.
-        "npm_config_offline": "true",
+        # npm's own update check is noise. npm itself stays online for the bash
+        # tool: the registry is on ABB's egress-observer allowlist.
         "npm_config_update_notifier": "false",
     }
     command = [str(BIN_DIR / "bun"), str(OMP_CLI), "acp"]
