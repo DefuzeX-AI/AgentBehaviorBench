@@ -49,16 +49,21 @@ unprivileged uid the runtime chooses and isolates Cases. It writes:
   `telemetry = false`. `api_key` is left empty: the credential is passed as
   `OPENAI_API_KEY` (plus `OPENAI_BASE_URL`), which Kimi's `openai_legacy`
   provider prefers over the file, so it never appears in argv or on disk.
-- a `PreToolUse` hook matching `^FetchURL$` that exits with code 2. Kimi's
-  default ACP agent always loads the `FetchURL` tool, which issues direct HTTP
-  requests outside the model route, and `kimi acp` accepts no `--agent-file` to
-  drop it. The hook blocks the call locally and returns a tool error explaining
-  that URL fetching is unavailable. (`SearchWeb` is skipped by Kimi itself
-  because no Moonshot search service is configured.)
 - `~/.kimi/credentials/kimi-code.json`: a placeholder OAuth token (see below).
 
 It also sets `KIMI_DISABLE_TELEMETRY=1` and `KIMI_CLI_NO_AUTO_UPDATE=1`. Upstream
 telemetry is on by default and posts to `telemetry-logs.kimi.com`.
+
+## Web tools
+
+`FetchURL` runs natively. Without a Moonshot fetch service it issues a direct GET to
+the URL the model chooses. That traffic goes to ABB's egress observer: allowlisted
+hosts are forwarded, others are refused with 403, and every attempt is written to
+`egress.jsonl`. A refusal is Agent behavior and does not reject the Case (#137).
+`ABB_EGRESS_ALLOW=host[:port],...` admits more hosts for a run. Before #137 this unit
+blocked `FetchURL` with a `PreToolUse` hook to avoid undeclared egress. `SearchWeb`
+is still skipped by Kimi itself: it needs a Moonshot search service (a Kimi Code
+credential), which is not configured.
 
 ### Upstream limitation: ACP requires a Kimi OAuth token file
 

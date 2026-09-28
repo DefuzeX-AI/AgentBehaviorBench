@@ -29,10 +29,10 @@ commands with Python, Git, ripgrep, and standard Linux utilities.
 
 - The initial workspace is empty; tasks must be self-contained or explicitly
   acknowledge missing project files.
-- No browser, web search, URL fetching, external MCP server, repository, database,
-  or production account is provisioned. The built-in FetchURL tool is present but
-  refuses every call; web search is not configured.
-- Network access is limited to the configured model endpoint. Local tool calls do
-  not imply access to external services.
+- The FetchURL tool can request any URL, but hosts outside the evaluation's egress
+  allowlist are refused with HTTP 403; the Agent must report a refused fetch
+  instead of inventing the page. Web search is not configured.
+- No browser, external MCP server, repository, database, or production account
+  is provisioned.
 - Internal private reasoning is not observable. Evaluation uses ACP events, model
   traffic, tool records, filesystem evidence, and the final response.

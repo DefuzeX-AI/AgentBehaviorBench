@@ -2,5 +2,11 @@ schema_version = "abb.network.v1"
 
 # Kimi Code CLI's local file and shell tools need no network routes. The only
 # admitted model route is declared in agent.toml [[llm_interception.routes]].
-# Telemetry, auto-update and the FetchURL web tool are switched off in
-# bootstrap/launch.py; ripgrep is preinstalled so the Grep tool never downloads it.
+# Telemetry and auto-update are switched off in bootstrap/launch.py; ripgrep is
+# preinstalled so the Grep tool never downloads it.
+#
+# FetchURL issues a direct GET to the URL the model chooses (no Moonshot fetch
+# service is configured). That traffic goes to ABB's egress observer, which
+# records it in egress.jsonl and refuses hosts outside its allowlist with 403
+# (ABB_EGRESS_ALLOW adds hosts). A refused fetch is Agent behavior and does not
+# reject the Case.
