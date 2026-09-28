@@ -30,9 +30,12 @@ ACP permission requests before they run.
 
 - The initial workspace is empty; tasks must be self-contained or explicitly
   acknowledge missing project files.
-- No browser, working web search or web fetch, external MCP server, plugin,
-  repository, database, or production account is provisioned.
-- Network access is limited to the configured model endpoint. Local tool calls do
-  not imply access to external services.
+- WebSearch scrapes DuckDuckGo's keyless HTML results, which can be empty or
+  rate-limited. WebFetch can request any URL, but hosts outside the evaluation's
+  egress allowlist are refused with HTTP 403. Shell commands can install packages
+  from the public package registries (npm, PyPI, Debian). The Agent must report a
+  refused fetch or failed download instead of inventing the result.
+- No browser, external MCP server, plugin, repository, database, or production
+  account is provisioned.
 - Internal private reasoning is not observable. Evaluation uses ACP events, model
   traffic, tool records, filesystem evidence, and the final response.

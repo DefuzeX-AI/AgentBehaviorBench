@@ -57,15 +57,28 @@ into the image, placed in argv or committed; under ABB interception the value
 the container sees is the runtime's surrogate credential.
 
 The launcher also sets `KODE_OFFLINE=1`, which makes Kode skip its npm registry
-version check (`registry.npmjs.org` is not on the admitted route), and
-`npm_config_offline=true` / `npm_config_update_notifier=false` for commands the
-agent runs. The disposable `HOME` keeps Kode's ACP session files and logs
+version check (it only gates the auto-updater), and `npm_config_update_notifier=false`
+for commands the agent runs. The disposable `HOME` keeps Kode's ACP session files and logs
 writable by whichever unprivileged uid the runtime chooses, and isolates Cases.
 
 Kode's optional system sandbox needs `bwrap`, which is not installed; commands
-run directly under the container's `--cap-drop=ALL` limits. Kode also ships
-`WebSearch`/`WebFetch` tools; they have no admitted route here, so the profile
-states that web access is unavailable.
+run directly under the container's `--cap-drop=ALL` limits. 
+
+## Web tools and package installs
+
+Kode's `WebSearch` and `WebFetch` tools run natively. `WebSearch` scrapes the keyless
+DuckDuckGo HTML endpoint (`GET https://html.duckduckgo.com/html/?q=…`), declared in
+`network/rules.toml` as a tool route, so results are forwarded and recorded.
+`WebFetch` contacts the URL the model chooses; that traffic goes to ABB's egress
+observer, which forwards allowlisted hosts, refuses the rest with 403 and records every
+attempt in `egress.jsonl`. `npm install` in the Agent's shell reaches
+`registry.npmjs.org`, which is on the observer's default allowlist. A refusal is Agent
+behavior and does not reject the Case (#137); `ABB_EGRESS_ALLOW=host[:port],...` admits
+more hosts for a run.
+
+Before #137 any undeclared request made the interceptor reject the whole trace, so the
+launcher also set `npm_config_offline=true` and the profile declared web access
+unavailable.
 
 ## Installation inputs
 
