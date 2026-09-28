@@ -39,7 +39,7 @@ def test_evidence_reader_is_bounded_to_unit(tmp_path):
 def test_pinned_native_reader_exports_only_ids(tmp_path, monkeypatch):
     from pathlib import Path
     import base64, importlib.util
-    source=Path(__file__).parents[1]/'resources/agents/16-minimax-code/bootstrap/native_evidence.py'
+    source=Path(__file__).parents[1]/'resources/agents/12-minimax-code/bootstrap/native_evidence.py'
     spec=importlib.util.spec_from_file_location('minimax_reader_test',source)
     module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
     session=tmp_path/'abb-byok-profile/v2/sessions/2026/session';folder=session/'llm-context-inspector'

@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from agentbench.runtime.agentcontainer.config import tomllib
 
-ROOT = Path(__file__).resolve().parents[1] / 'resources/agents/18-qwen-code'
+ROOT = Path(__file__).resolve().parents[1] / 'resources/agents/14-qwen-code'
 spec = importlib.util.spec_from_file_location('qwen_launcher', ROOT / 'bootstrap/launch.py')
 launcher = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(launcher)
