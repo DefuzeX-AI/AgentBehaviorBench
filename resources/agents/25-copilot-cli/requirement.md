@@ -30,9 +30,10 @@ features are unavailable.
 
 - The initial workspace is empty; tasks must be self-contained or explicitly
   acknowledge missing project files.
-- No browser, web fetch or search, GitHub MCP server, external MCP server,
-  repository, database, or production account is provisioned.
-- Network access is limited to the configured model endpoint. Local tool calls do
-  not imply access to external services.
+- The web_fetch tool can request any URL, but hosts outside the evaluation's
+  egress allowlist are refused with HTTP 403; the Agent must report a refused
+  fetch instead of inventing the page.
+- No browser, web search, GitHub account or GitHub MCP server, external MCP
+  server, repository, database, or production account is provisioned.
 - Internal private reasoning is not observable. Evaluation uses ACP events, model
   traffic, tool records, filesystem evidence, and the final response.

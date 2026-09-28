@@ -61,9 +61,10 @@ def prepare(environ: dict[str, str]) -> tuple[list[str], dict[str, str]]:
         "COPILOT_PROVIDER_MAX_OUTPUT_TOKENS": MAX_OUTPUT_TOKENS,
         # ACP session/new does not pick a model; select GLM at startup.
         "COPILOT_MODEL": model,
-        # Offline mode skips GitHub auth, telemetry, web tools, the GitHub MCP
-        # server and auto-update; all of these would be undeclared egress.
-        "COPILOT_OFFLINE": "true",
+        # Not offline: COPILOT_OFFLINE would also remove the web_fetch tool.
+        # Non-model traffic (web_fetch, GitHub/telemetry calls without a token)
+        # goes to ABB's egress observer, which records refusals without
+        # rejecting the Case. Auto-update stays off.
         "COPILOT_AUTO_UPDATE": "false",
         "NO_COLOR": "1",
     })
