@@ -10,7 +10,7 @@ from agentbench.runtime.interception.config import InterceptionConfig
 from agentbench.runtime.agentcontainer.config import AgentContainerConfig
 from agentbench.runtime.contracts.secrets import EnvironmentSecretResolver, MissingSecretError
 
-UNIT = Path(__file__).resolve().parents[1] / 'resources/agents/16-minimax-code'
+UNIT = Path(__file__).resolve().parents[1] / 'resources/agents/12-minimax-code'
 
 
 @pytest.fixture

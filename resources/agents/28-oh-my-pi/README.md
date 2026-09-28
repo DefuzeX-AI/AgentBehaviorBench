@@ -3,7 +3,7 @@
 This unit installs the pinned [oh-my-pi](https://github.com/can1357/oh-my-pi)
 release `18.2.11` (npm `@oh-my-pi/pi-coding-agent`, tag `v18.2.11`, commit
 `e4151593`, MIT) and drives its **native** ACP server (`omp acp`) over stdio.
-oh-my-pi is a large fork of the Pi coding agent (unit `24-pi-coding-agent`), but
+oh-my-pi is a large fork of the Pi coding agent (unit `20-pi-coding-agent`), but
 unlike upstream Pi it needs no `pi-acp` bridge. ABB keeps each Case in a separate
 empty workspace. No upstream source is vendored or modified.
 

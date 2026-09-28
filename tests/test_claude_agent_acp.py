@@ -9,7 +9,7 @@ from agentbench.runtime.interception.config import InterceptionConfig
 
 
 ROOT = Path(__file__).parents[1]
-UNIT = ROOT / "resources/agents/17-claude-agent-acp"
+UNIT = ROOT / "resources/agents/13-claude-agent-acp"
 
 
 def launch_module():
