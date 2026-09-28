@@ -122,6 +122,16 @@ KUMA path requires to be complete, so a Case whose Agent uses these tools is not
 host-accepted even when every step succeeds. The local SDK path accepts `partial`
 traces. This is an upstream Hermes behavior; the unit does not patch it.
 
+## Web tools
+
+Hermes picks its web backend automatically (`tools/web_tools.py`) and uses Tavily when `TAVILY_API_KEY` is set; `ddgs` is not installed. `TAVILY_API_KEY` is an optional secret (`optional_secret_env_keys`); when it is
+supplied, `web_search` and `web_extract` are offered and call `api.tavily.com` (`POST /search, /extract`),
+declared as a tool route in `network/rules.toml`, so requests and results are forwarded
+and recorded as tool evidence. Without the key the tools are not offered, as before.
+Other non-model traffic goes to ABB's egress observer, which forwards allowlisted hosts
+(the package registries by default), refuses the rest with 403 and records every attempt
+in `egress.jsonl`; a refusal does not reject the Case (#137).
+
 ## Installation inputs
 
 Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.
