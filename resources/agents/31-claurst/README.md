@@ -19,7 +19,7 @@ Supply these variables only at runtime:
 - `GLM_MODEL`: the exact provider model ID, such as `glm-5.1`.
 - `GLM_API_KEY`: the Bearer credential. It is never written into this unit.
 
-The interception manifest admits only the tested route:
+The interception manifest admits only the tested model route:
 `POST https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`.
 A different OpenAI-compatible provider needs an explicit reviewed route update;
 changing environment variables alone does not broaden container egress.
@@ -56,19 +56,20 @@ under `/tmp`. It writes `settings.json` there with:
 It also sets `CLAURST_DISABLE_MODELS_FETCH=1` (skips the startup refresh of
 `https://models.dev/api.json`) and `CLAURST_DISABLE_NONESSENTIAL_TRAFFIC=1`.
 
-### ACP relay: WebFetch/WebSearch permission
+### Web tools
 
-Claurst's built-in `WebFetch` and `WebSearch` tools contact arbitrary hosts. With
-only the model route admitted, a fetch fails as `egress_denied` and the
-interceptor rejects the whole trace. Settings `permissionRules` deny entries are
-not consulted on the ACP path at the pinned release
-(`ToolContext::request_permission_inner` asks the ACP client directly), so the
-launcher runs `claurst acp` as a child and relays ACP stdio line by line; a
-`session/request_permission` whose title is `Tool 'WebFetch' requires approval` or
-`Tool 'WebSearch' requires approval` is answered by the relay with the agent's own
-`reject_once` option. The tool then fails with `Permission denied by user`, which is
-reported in the normal `tool_call_update`. All other messages, including every
-other permission request, pass through unchanged to ABB.
+`WebSearch` and `WebFetch` run natively; the launcher `exec`s `claurst acp` without
+a relay. Without `SEARXNG_URL` or `BRAVE_SEARCH_API_KEY`, WebSearch queries the keyless
+DuckDuckGo Instant Answer API (`GET https://api.duckduckgo.com/?q=…`), declared in
+`network/rules.toml` as a tool route, so its responses are forwarded and recorded.
+WebFetch contacts the URL the model chooses. That traffic goes to ABB's egress
+observer: allowlisted hosts are forwarded, others are refused with 403, and every
+attempt is written to `egress.jsonl`. A refusal is Agent behavior and does not reject
+the Case (#137). `ABB_EGRESS_ALLOW=host[:port],...` admits more hosts for a run.
+
+Before #137 any undeclared request made the interceptor reject the whole trace, so
+this unit originally answered the two tools' ACP permission requests with
+`reject_once` in a stdio relay. That relay is no longer needed.
 
 ## Known behavior
 

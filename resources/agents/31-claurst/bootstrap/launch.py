@@ -4,12 +4,8 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-import re
-import signal
-import subprocess
 import sys
 import tempfile
-import threading
 from urllib.parse import urlsplit
 
 
@@ -22,11 +18,6 @@ CLAURST_BIN = "/opt/claurst/bin/claurst"
 # `<api_base>/chat/completions`, which is exactly the admitted GLM route.
 PROVIDER_ID = "custom-openai"
 PROVIDER_KEY_ENV = "CUSTOM_OPENAI_API_KEY"
-# Built-in tools that call arbitrary external hosts. Only the model route is
-# admitted, so their permission requests are rejected at the ACP boundary
-# instead of letting the call fail as undeclared egress (see relay()).
-DENIED_TOOLS = ("WebFetch", "WebSearch")
-DENIED_TITLE = re.compile(r"^Tool '(%s)' requires approval$" % "|".join(DENIED_TOOLS))
 
 
 def settings(base_url: str, model: str) -> dict[str, object]:
@@ -83,75 +74,6 @@ def prepare(environ: dict[str, str]) -> tuple[list[str], dict[str, str], dict[st
     return [CLAURST_BIN, "acp"], child, settings(base_url, model)
 
 
-def denied_permission_reply(line: bytes) -> bytes | None:
-    """Return a reject reply for a WebFetch/WebSearch permission request, else None.
-
-    Claurst's settings ``permissionRules`` are not consulted on the ACP path
-    (``ToolContext::request_permission_inner`` asks the ACP client directly),
-    so a deny rule cannot be configured upstream. The relay answers these two
-    tools' ``session/request_permission`` with the agent's own ``reject_once``
-    option; the tool then fails with "Permission denied by user" and the
-    failure is reported in the normal ``tool_call_update``.
-    """
-    if b'"session/request_permission"' not in line:
-        return None
-    try:
-        message = json.loads(line)
-        params = message["params"]
-        title = params["toolCall"].get("title") or ""
-        options = params.get("options") or []
-    except (ValueError, KeyError, TypeError, AttributeError):
-        return None
-    if message.get("method") != "session/request_permission" or not DENIED_TITLE.match(title):
-        return None
-    reject = next((o.get("optionId") for o in options if o.get("kind") == "reject_once"), None)
-    if reject is None or "id" not in message:
-        return None
-    return json.dumps({"jsonrpc": "2.0", "id": message["id"],
-                       "result": {"outcome": {"outcome": "selected", "optionId": reject}}},
-                      separators=(",", ":")).encode() + b"\n"
-
-
-def relay(command: list[str], environ: dict[str, str]) -> int:
-    """Run the ACP server as a child and relay stdio, rejecting network-tool permissions."""
-    child = subprocess.Popen(command, env=environ, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-    for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
-        signal.signal(signum, lambda number, _frame: child.send_signal(number))
-    stdin_lock = threading.Lock()
-
-    def write_to_agent(data: bytes) -> None:
-        with stdin_lock:
-            child.stdin.write(data)
-            child.stdin.flush()
-
-    def client_to_agent() -> None:
-        try:
-            for line in sys.stdin.buffer:
-                write_to_agent(line)
-        except (BrokenPipeError, OSError):
-            pass
-        finally:
-            try:
-                with stdin_lock:
-                    child.stdin.close()
-            except OSError:
-                pass
-
-    threading.Thread(target=client_to_agent, daemon=True).start()
-    out = sys.stdout.buffer
-    try:
-        for line in child.stdout:
-            reply = denied_permission_reply(line)
-            if reply is not None:
-                write_to_agent(reply)
-                continue
-            out.write(line)
-            out.flush()
-    except (BrokenPipeError, OSError):
-        child.terminate()
-    return child.wait()
-
-
 def main() -> int:
     try:
         command, environ, config = prepare(dict(os.environ))
@@ -168,7 +90,10 @@ def main() -> int:
                          ("XDG_STATE_HOME", ".local/state"), ("XDG_CACHE_HOME", ".cache")):
             (home / sub).mkdir(parents=True, exist_ok=True)
             environ[var] = str(home / sub)
-        return relay(command, environ)
+        # WebFetch/WebSearch run natively. Their non-model traffic goes to ABB's
+        # egress observer (declared tool routes are forwarded and recorded).
+        sys.stdout.flush()
+        os.execve(command[0], command, environ)
     except (OSError, ValueError) as exc:
         message = str(exc).replace(os.environ.get(KEY_ENV) or "\0", "[REDACTED]")
         print(message, file=sys.stderr)
