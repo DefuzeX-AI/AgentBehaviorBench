@@ -16,6 +16,8 @@ type = "docker"
 execution = "oneshot"
 timeout_sec = 3000
 secret_env_keys = []
+# Optional: enables the Tavily search engine as an extra agent tool.
+optional_secret_env_keys = ["TAVILY_API_KEY"]
 
 [build]
 context = "."
@@ -53,10 +55,75 @@ path_patterns = ["/v1/chat/completions"]
 protocol_plugin = "openai-chat"
 credential = "openai"
 
-# Wikipedia search engine (python `wikipedia` package: MediaWiki API, first over http then
-# the https redirect target).
+# Search engines offered to the agent (upstream agent_enabled defaults, keyless unless noted).
+# Wikipedia (python `wikipedia` package: MediaWiki API, first over http then the https redirect
+# target) is the primary web_search engine; its /wiki/ pages are also fetch_content targets.
 [[llm_interception.tool_routes]]
 host_patterns = ["en.wikipedia.org"]
 ports = [80, 443]
 methods = ["GET"]
-path_patterns = ["/w/api.php"]
+path_patterns = ["/w/api.php", "/wiki/*"]
+
+[[llm_interception.tool_routes]]
+host_patterns = ["en.wikinews.org"]
+ports = [443]
+methods = ["GET"]
+path_patterns = ["/w/api.php", "/wiki/*"]
+
+# arXiv: metadata API and abstract/PDF pages.
+[[llm_interception.tool_routes]]
+host_patterns = ["export.arxiv.org", "arxiv.org"]
+ports = [80, 443]
+methods = ["GET"]
+path_patterns = ["/api/query", "/abs/*", "/pdf/*"]
+
+# PubMed: E-utilities search/summary/fetch, article and PMC pages.
+[[llm_interception.tool_routes]]
+host_patterns = ["eutils.ncbi.nlm.nih.gov"]
+ports = [443]
+methods = ["GET", "POST"]
+path_patterns = ["/entrez/eutils/*"]
+
+[[llm_interception.tool_routes]]
+host_patterns = ["pubmed.ncbi.nlm.nih.gov"]
+ports = [443]
+methods = ["GET"]
+path_patterns = ["/1*", "/2*", "/3*", "/4*", "/5*", "/6*", "/7*", "/8*", "/9*"]
+
+[[llm_interception.tool_routes]]
+host_patterns = ["www.ncbi.nlm.nih.gov", "pmc.ncbi.nlm.nih.gov"]
+ports = [443]
+methods = ["GET"]
+path_patterns = ["/pmc/articles/*", "/articles/*"]
+
+[[llm_interception.tool_routes]]
+host_patterns = ["api.openalex.org"]
+ports = [443]
+methods = ["GET"]
+path_patterns = ["/works*"]
+
+[[llm_interception.tool_routes]]
+host_patterns = ["api.semanticscholar.org"]
+ports = [443]
+methods = ["GET", "POST"]
+path_patterns = ["/graph/v1/*"]
+
+# Wayback Machine: availability, CDX search and archived pages.
+[[llm_interception.tool_routes]]
+host_patterns = ["archive.org"]
+ports = [443]
+methods = ["GET"]
+path_patterns = ["/wayback/available"]
+
+[[llm_interception.tool_routes]]
+host_patterns = ["web.archive.org"]
+ports = [443]
+methods = ["GET"]
+path_patterns = ["/cdx/search/cdx", "/web/*"]
+
+# Tavily (only when TAVILY_API_KEY is supplied).
+[[llm_interception.tool_routes]]
+host_patterns = ["api.tavily.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/search"]

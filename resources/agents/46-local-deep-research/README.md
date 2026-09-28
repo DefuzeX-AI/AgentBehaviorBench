@@ -20,10 +20,9 @@ Deployment settings (upstream setting keys, passed through `create_settings_snap
 | Setting | Value | Why |
 | --- | --- | --- |
 | `llm.provider` | `openai` | ChatOpenAI → `api.openai.com`, intercepted by ABB and routed to the target model |
-| `search.tool` | `wikipedia` | keyless search engine; no search API key needed |
-| `search.engine.web.<other>.agent_enabled` | `false` | only Wikipedia is offered to the agent |
+| `search.tool` | `wikipedia` | keyless primary search engine (upstream default SearXNG needs a self-hosted instance) |
+| `search.engine.web.tavily.api_key` | `$TAVILY_API_KEY`, only when set | enables Tavily as an extra engine |
 | `policy.egress_scope` | `public_only` | upstream `strict` denies every public host, including Wikipedia |
-| `search.fetch.mode` | `disabled` | removes the arbitrary-URL `fetch_content` tool (outside the egress allow-list) |
 | `langgraph_agent.max_iterations` / `max_sub_iterations` / `max_subagent_workers` | `15` / `5` / `2` (upstream 50 / 8 / 4) | bounded budget: with defaults a 2-step KUMA Case made ~270 model calls and ~1900 Wikipedia requests and hit the 2400 s execution timeout |
 | `search.max_results`, `search.engine.web.wikipedia.default_params.max_results` | `10` (upstream 50 / 20) | same |
 
@@ -35,8 +34,25 @@ request context ("Database access attempted from background thread").
 
 - Model: the standard ABB target-model variables (`OPENROUTER_API_KEY`, `OPENROUTER_BASE_URL`,
   `OPENROUTER_MODEL`). Any OpenAI-compatible chat model with tool calling works.
-- No tool credentials. Egress: `en.wikipedia.org` `/w/api.php` (GET, ports 80 and 443; the
-  `wikipedia` package first uses http and follows the https redirect).
+- Optional tool credential: `TAVILY_API_KEY` (`optional_secret_env_keys`) adds the Tavily engine.
+
+## Web tools and egress
+
+The other search engines keep their upstream `agent_enabled` defaults. Keyed engines are dropped
+by upstream when no key is set, so without `TAVILY_API_KEY` the agent is offered the keyless
+arXiv, PubMed, OpenAlex, Semantic Scholar, Wikinews and Wayback engines besides the primary
+Wikipedia `web_search`. `search.fetch.mode` keeps the upstream default (`summary_focus_query`),
+so `fetch_content` is available.
+
+`agent.toml` declares each engine's API and the common page hosts (Wikipedia `/wiki/*`, arXiv
+`/abs/*` and `/pdf/*`, PubMed and PMC articles, Wayback snapshots) as tool routes, so these calls
+are forwarded and recorded as tool evidence. Any other URL `fetch_content` opens goes to ABB's
+egress observer, which records it in `egress.jsonl` and refuses it with 403 unless it is on the
+allowlist (`ABB_EGRESS_ALLOW` adds hosts). A refusal reaches the agent as a tool error and does
+not reject the Case (#137).
+
+Before #137 an undeclared request made the interceptor reject the whole trace, so this unit
+originally disabled `fetch_content` and hid every engine except Wikipedia.
 
 The image installs CPU-only torch before the upstream package, so `sentence-transformers`
 does not pull CUDA wheels (image ≈ 3.3 GB; the first build takes about 15 minutes).
