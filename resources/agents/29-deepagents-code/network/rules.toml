@@ -1,5 +1,17 @@
 schema_version = "abb.network.v1"
 
-# deepagents-code's local filesystem and shell tools need no network routes. Its
-# built-in fetch_url tool is not admitted: web fetches are denied egress. The only
-# admitted model route is declared in agent.toml [[llm_interception.routes]].
+# deepagents-code's local filesystem and shell tools need no network routes. The
+# only admitted model route is declared in agent.toml [[llm_interception.routes]].
+# The built-in fetch_url tool contacts whatever URL the model chooses; that
+# traffic goes to ABB's egress observer, which forwards allowlisted hosts, refuses
+# the rest with 403 and records every attempt in egress.jsonl without rejecting
+# the Case.
+
+# `web_search` use Tavily when TAVILY_API_KEY is supplied (optional_secret_env_keys).
+[[tool_routes]]
+host_patterns = ["api.tavily.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/search"]
+purpose = "tool"
+required = false

@@ -65,9 +65,9 @@ writes, edits and shell commands are sent to ABB as ACP permission requests
 (`permission_policy = "allow_once"`); no Auto-mode classifier model is used.
 Shell commands run directly in the container (no nested sandbox).
 
-The built-in `fetch_url` tool is always registered by upstream and cannot be
-switched off from configuration. No web route is admitted, so a fetch attempt
-fails and would be recorded as denied egress.
+The built-in `fetch_url` tool is always registered by upstream. It contacts the URL
+the model chooses; that traffic goes to ABB's egress observer (see "Web tools").
+Before #137 such a fetch made the interceptor reject the whole trace.
 
 ## Known upstream behavior (non-blocking)
 
@@ -81,6 +81,16 @@ fails and would be recorded as denied egress.
   the text is complete and the one-shot worker then closes the agent while the
   HTTP stream is being torn down. The response text is already delivered and host
   trace validation still succeeds.
+
+## Web tools
+
+deepagents-code only adds `web_search` when a Tavily key is present (upstream `main.py`). `TAVILY_API_KEY` is an optional secret (`optional_secret_env_keys`); when it is
+supplied, `web_search` are offered and call `api.tavily.com` (`POST /search`),
+declared as a tool route in `network/rules.toml`, so requests and results are forwarded
+and recorded as tool evidence. Without the key the tools are not offered, as before.
+Other non-model traffic goes to ABB's egress observer, which forwards allowlisted hosts
+(the package registries by default), refuses the rest with 403 and records every attempt
+in `egress.jsonl`; a refusal does not reject the Case (#137).
 
 ## Installation inputs
 
