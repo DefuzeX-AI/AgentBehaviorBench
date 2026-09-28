@@ -37,10 +37,13 @@ submitted to the ACP client for approval, and high-risk commands are blocked.
 
 - The initial workspace is empty; tasks must be self-contained or explicitly
   acknowledge missing files or data.
-- No browser, web search, web fetch or HTTP request tool is enabled, and no
-  messaging channel, email, calendar, MCP server, database, cloud account or
-  scheduled job is provisioned, even though ZeroClaw supports some of them.
-- Network access is limited to the configured model endpoint.
+- web_search scrapes DuckDuckGo's keyless HTML results, which can be empty or
+  rate-limited. web_fetch and http_request can request any URL, but hosts outside
+  the evaluation's egress allowlist are refused with HTTP 403; the Agent must
+  report a refused request instead of inventing the response.
+- No browser tool is enabled, and no messaging channel, email, calendar, MCP
+  server, database, cloud account or scheduled job is provisioned, even though
+  ZeroClaw supports some of them.
 - ACP sessions do not use ZeroClaw's long-term memory tools.
 - Internal private reasoning is not an output; evaluation uses ACP events,
   model traffic, tool records, filesystem evidence and the final response.

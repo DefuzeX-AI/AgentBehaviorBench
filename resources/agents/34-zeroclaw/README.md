@@ -59,9 +59,15 @@ changing environment variables alone does not broaden container egress.
   commands therefore reach the ACP client as `session/request_permission`;
   ABB answers `allow_once`. The ACP session `cwd` (`/home/agent/workspace`) is
   the file/shell boundary.
-- `browser`, `http_request`, `web_fetch` and `web_search` are disabled: they
-  would be egress outside the admitted route, and the profile states that no
-  web access exists. The remaining built-in tools are ZeroClaw's defaults.
+- `browser` is disabled: no browser backend is installed in the image. The other
+  built-in tools, including `web_search`, `web_fetch` and `http_request`, are
+  ZeroClaw's defaults. `web_search` uses the keyless DuckDuckGo HTML provider,
+  declared as a tool route in `network/rules.toml`. `web_fetch` and `http_request`
+  go to ABB's egress observer, which forwards allowlisted hosts, refuses the rest
+  with 403 and records every attempt in `egress.jsonl`; a refusal does not reject
+  the Case (#137). `ABB_EGRESS_ALLOW=host[:port],...` admits more hosts for a run.
+  Before #137 undeclared egress rejected the whole trace, so this unit disabled all
+  four network tools.
 - ACP sessions never use ZeroClaw's long-term memory tools (upstream design).
 
 ## Permission options
