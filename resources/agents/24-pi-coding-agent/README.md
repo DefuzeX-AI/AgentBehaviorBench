@@ -59,15 +59,15 @@ The launcher also sets:
   None of that is on the admitted route and the interceptor would reject the trace
   as undeclared egress. `ripgrep` and `fd-find` are installed in the image so Pi's
   search tools work without downloads.
-- `npm_config_offline=true` and `npm_config_update_notifier=false`: pi-acp
-  0.0.33 runs `npm view @earendil-works/pi-coding-agent version` on every ACP
-  `session/new` to build an "update available" notice, with no switch to turn it
-  off, and npm checks `registry.npmjs.org` for its own updates. Without these the
-  first evaluation run was rejected with `egress_denied` for
-  `GET registry.npmjs.org/@earendil-works%2fpi-coding-agent` and `GET .../npm`.
-  With npm offline the lookup fails fast from the empty cache and the notice is
-  omitted. The variables are inherited by Pi's shell tool, so `npm` there is also
-  offline (the container has no other egress anyway).
+- `npm_config_update_notifier=false`: npm does not check for its own updates.
+  npm itself is online. pi-acp 0.0.33 runs `npm view
+  @earendil-works/pi-coding-agent version` on every ACP `session/new` to build an
+  "update available" notice, and Pi's bash tool inherits the environment, so the
+  Agent can `npm install` packages. `registry.npmjs.org` is on ABB's egress-observer
+  allowlist, so both are forwarded and recorded in `egress.jsonl` (#137). Before
+  #137 the first `npm view` made the interceptor reject the whole trace as
+  `egress_denied`, so this unit set `npm_config_offline=true`, which also left the
+  Agent's own shell without npm.
 - `PI_TELEMETRY=0`: disables install telemetry and provider attribution headers.
 - `PI_ACP_PI_COMMAND`: points pi-acp at the locked `pi` binary instead of
   whatever `pi` is first on `PATH`.

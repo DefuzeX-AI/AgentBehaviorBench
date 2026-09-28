@@ -62,12 +62,9 @@ def prepare(environ: dict[str, str]) -> tuple[list[str], dict[str, str], dict[st
         "PI_SKIP_VERSION_CHECK": "1",
         # Also turns off provider attribution headers.
         "PI_TELEMETRY": "0",
-        # pi-acp runs `npm view @earendil-works/pi-coding-agent version` on
-        # every session/new to build an update notice (no switch to turn it
-        # off), and npm itself checks registry.npmjs.org for its own updates.
-        # Offline npm fails fast from the empty cache instead of leaving the
-        # container; the notice is simply omitted.
-        "npm_config_offline": "true",
+        # npm's own update check is noise. npm itself stays online: the npm
+        # registry is on ABB's egress-observer allowlist, so pi-acp's
+        # `npm view` update notice and `npm install` in Pi's bash tool work.
         "npm_config_update_notifier": "false",
         # pi-acp spawns `pi --mode rpc`; pin it to the locked install.
         "PI_ACP_PI_COMMAND": str(BIN_DIR / "pi"),
