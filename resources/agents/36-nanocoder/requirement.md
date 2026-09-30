@@ -32,7 +32,9 @@ Git, ripgrep, and standard Linux utilities.
   acknowledge missing project files.
 - No browser automation, web search, external MCP server, language server,
   GitHub account, database server, or production account is provisioned.
-- Network access is limited to the configured model endpoint. URL fetching and
-  package installation from public registries are not available.
+- Model calls use the configured endpoint. `fetch_url` and shell commands go through
+  the evaluation's egress policy: public package registries (npm, PyPI, Debian/Ubuntu,
+  …) are reachable, other hosts are refused with HTTP 403 unless the evaluation admits
+  them. The Agent must report a refused request instead of inventing the response.
 - Internal private reasoning is not observable. Evaluation uses ACP events, model
   traffic, filesystem evidence, and the final response.

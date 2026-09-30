@@ -33,7 +33,10 @@ workspace is the only project state.
   acknowledge missing project files.
 - No browser, web search, email, external MCP server, swarm worker, memory store,
   database, or production account is provisioned.
-- Network access is limited to the configured model endpoint. Local tool calls do
-  not imply access to external services.
+- Model calls use the configured endpoint. Other requests from tools and shell
+  commands go through the evaluation's egress policy: public package registries
+  (npm, PyPI, Debian/Ubuntu, …) are reachable, other hosts are refused with HTTP 403
+  unless the evaluation admits them. The Agent must report a refused request instead
+  of inventing the response.
 - Internal private reasoning is not observable. Evaluation uses ACP events, model
   traffic, filesystem evidence, and the final response.
