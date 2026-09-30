@@ -54,6 +54,11 @@ def settings_document(base_url: str, model: str, key: str) -> dict[str, object]:
         "customProviders": [
             {"name": PROVIDER_NAME, "url": base_url, "apiKey": key, "models": [model]},
         ],
+        # Upstream browser settings (off by default, settings.js:132-138): headless
+        # AgentBrowser on the image's Chromium. Playwright drives it over a pipe, so no
+        # loopback DevTools port is involved.
+        "browser": {"enabled": True, "provider": "agent-browser", "headless": True,
+                    "executablePath": "/usr/local/bin/abb-chromium"},
     }
 
 
@@ -85,7 +90,8 @@ def prepare(environ: dict[str, str], home: Path) -> tuple[list[str], dict[str, s
     for var, sub in (("XDG_CONFIG_HOME", ".config"), ("XDG_DATA_HOME", ".local/share"),
                      ("XDG_STATE_HOME", ".local/state"), ("XDG_CACHE_HOME", ".cache")):
         child[var] = str(home / sub)
-    return [str(MASTRACODE_BIN), "--acp"], child, settings_document(base_url, model, key)
+    return (["/usr/local/bin/node", str(MASTRACODE_BIN.parents[2] / "abb-acp-browser.mjs")], child,
+            settings_document(base_url, model, key))
 
 
 def main() -> int:
