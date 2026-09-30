@@ -29,10 +29,11 @@ utilities.
 
 - The initial workspace is empty; tasks must be self-contained or explicitly
   acknowledge missing project files.
-- No browser, web search, external MCP server, Kilo cloud account, repository,
-  database, or production account is provisioned.
-- Network access is limited to the configured model endpoint. Local tool calls do
-  not imply access to external services.
+- websearch uses the keyless Exa search endpoint. webfetch can request any URL,
+  but hosts outside the evaluation's egress allowlist are refused with HTTP 403;
+  the Agent must report a refused fetch instead of inventing the page.
+- No browser, external MCP server, Kilo cloud account, repository, database, or
+  production account is provisioned.
 - Kilo's own command sandbox is not used; isolation comes from the evaluation
   container.
 - Internal private reasoning is not observable. Evaluation uses ACP events, model

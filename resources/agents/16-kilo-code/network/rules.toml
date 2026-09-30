@@ -26,3 +26,14 @@ path_patterns = [
 ]
 purpose = "tool"
 required = false
+
+# websearch (KILO_ENABLE_EXA=1 / KILO_WEBSEARCH_PROVIDER=exa in launch.py) posts to the
+# keyless Exa MCP endpoint. webfetch goes to ABB's egress observer like other non-model
+# traffic.
+[[tool_routes]]
+host_patterns = ["mcp.exa.ai"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/mcp"]
+purpose = "tool"
+required = false
