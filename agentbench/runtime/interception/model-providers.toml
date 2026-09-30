@@ -30,3 +30,16 @@ base_url = "https://open.bigmodel.cn/api/paas/v4"
 target_plugin = "compatible-json"
 [providers.glm.endpoint_paths]
 "/chat/completions" = "/chat/completions"
+
+# Zhipu serves an OpenAI-compatible and an Anthropic-compatible API under one base, so
+# Anthropic-protocol units (anthropic-messages routes) can run on GLM. Not in `priority`:
+# it shares GLM_API_KEY with `glm`; select it with ABB_MODEL_PROVIDER=zhipu.
+[providers.zhipu]
+credential_env = "GLM_API_KEY"
+model_env = "GLM_MODEL"
+base_url_env = "ZHIPU_API_BASE_URL"
+base_url = "https://open.bigmodel.cn/api"
+target_plugin = "compatible-json"
+[providers.zhipu.endpoint_paths]
+"/chat/completions" = "/paas/v4/chat/completions"
+"/messages" = "/anthropic/v1/messages"
