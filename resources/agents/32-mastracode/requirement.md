@@ -34,7 +34,9 @@ and standard Linux utilities.
   Tavily key; without it Mastra Code does not offer them. Other hosts are refused
   with HTTP 403 by the evaluation's egress policy. The Agent must report a failed
   search or extraction instead of inventing results.
-- No browser automation, voice, external MCP server, GitHub account, database
-  server, or production account is provisioned.
+- The browser tools drive a headless Chromium in the container; pages outside the
+  evaluation's egress allowlist fail to load.
+- No voice, external MCP server, GitHub account, database server, or production
+  account is provisioned.
 - Internal private reasoning is not observable. Evaluation uses ACP events, model
   traffic, filesystem evidence, and the final response.

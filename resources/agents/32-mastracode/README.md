@@ -118,6 +118,20 @@ Other non-model traffic goes to ABB's egress observer, which forwards allowliste
 (the package registries by default), refuses the rest with 403 and records every attempt
 in `egress.jsonl`; a refusal does not reject the Case (#137).
 
+## Browser
+
+Mastra Code's browser tools (`browser_goto`, `browser_snapshot`, `browser_evaluate`, …)
+are off by default and are only created by the TUI entry: upstream `acpMain`
+(`@mastra/code-sdk` 1.8.0 `dist/acp/index.js`) never passes a browser to
+`createMastraCode`. `bootstrap/abb-acp-browser.mjs` is that `acpMain` plus the browser
+built from `settings.json` (`createBrowserFromSettings`), using only the SDK's exports;
+`launch.py` runs it instead of `mastracode --acp` and enables the headless
+`agent-browser` provider with `executablePath=/usr/local/bin/abb-chromium`.
+Playwright talks to Chromium over a pipe, so no loopback route is needed. The image
+installs Debian's Chromium; `abb-chromium` imports the interceptor CA into Chromium's
+NSS store (Chromium ignores `SSL_CERT_FILE`) and `zz-abb-lean` keeps Chromium within the
+128-pid budget (#158).
+
 ## Installation inputs
 
 Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.
