@@ -15,6 +15,11 @@ from agentbench.runtime.interception import InterceptionConfig
 from .session import AgentSession
 
 
+# Variables that must name the public roots plus the interceptor CA, not the CA alone.
+TRUST_BUNDLE_KEYS = ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "GRPC_DEFAULT_SSL_ROOTS_FILE_PATH",
+                     "GIT_SSL_CAINFO", "CURL_CA_BUNDLE")
+
+
 def configure_trust():
     """Keep public CA roots for non-model HTTPS (e.g. real search)."""
     ca = os.environ.get("SSL_CERT_FILE")
@@ -33,7 +38,7 @@ def configure_trust():
             raise RuntimeError('Worker needs system CA certificates or certifi for model interception')
         bundle = Path("/tmp/abb-ca-bundle.pem")
         bundle.write_bytes(Path(roots).read_bytes() + b"\n" + Path(ca).read_bytes())
-        for key in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "GRPC_DEFAULT_SSL_ROOTS_FILE_PATH"):
+        for key in TRUST_BUNDLE_KEYS:
             os.environ[key] = str(bundle)
 
 

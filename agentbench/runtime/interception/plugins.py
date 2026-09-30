@@ -28,6 +28,9 @@ class PemEnvironmentTrust:
             "REQUESTS_CA_BUNDLE": certificate_path,
             "NODE_EXTRA_CA_CERTS": certificate_path,
             "GRPC_DEFAULT_SSL_ROOTS_FILE_PATH": certificate_path,
+            # git (libcurl-gnutls on Debian) and the curl CLI ignore SSL_CERT_FILE.
+            "GIT_SSL_CAINFO": certificate_path,
+            "CURL_CA_BUNDLE": certificate_path,
         }
 
 
