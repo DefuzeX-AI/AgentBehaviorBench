@@ -6,12 +6,17 @@ from agentbench.adapter.factory import DEFAULT_ADAPTER_FACTORY
 from agentbench.runtime.factory import RuntimeFactory
 from agentbench.runtime.docker import DockerRuntime
 from agentbench.runtime.agentcontainer.config import runtime_type, execution_strategy
+from agentbench.runtime.source import prepare_agent_source
 from .store import TraceStore, atomic_json, summarize
 
 
 def observe(agent, value, *, output: Path, environ, timeout=None):
     if runtime_type(agent.path) != "docker" or execution_strategy(agent.path) != "oneshot":
         raise ValueError("Observe currently requires runtime.type=docker and execution=oneshot; native services need an explicit observe caller")
+    # Materialize install/git sources the same way SuiteRunner does before evaluate/run;
+    # otherwise the Docker build of a package or pinned-git unit finds no agent/ directory.
+    if (agent.path / "agent.toml").is_file():
+        prepare_agent_source(agent.path, output_fn=lambda message: print(message, flush=True))
     run_id = uuid4().hex
     directory = output.resolve() / run_id
     directory.mkdir(parents=True, mode=0o700)
