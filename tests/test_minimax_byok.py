@@ -79,8 +79,13 @@ def test_global_unit_observes_only_declared_native_model_endpoints():
         assert any(r.matches(host='api.minimax.io', port=443, method='POST', path=path) for r in config.routes)
     assert not any('api.minimax.cn' in r.host_patterns for r in config.routes)
     assert {h for r in config.tool_routes for h in r.host_patterns} == {
-        'models.dev', 'agent.minimax.io', 'agent.minimaxi.com',
+        'models.dev', 'agent.minimax.io', 'agent.minimaxi.com', '127.0.0.1',
     }
+    # The browser tool's DevTools connection: loopback only, a fixed port range, GET only.
+    loopback = [r for r in config.tool_routes if r.host_patterns == ('127.0.0.1',)]
+    assert len(loopback) == 1 and loopback[0].ports == tuple(range(9222, 9232))
+    assert loopback[0].methods == ('GET',) and loopback[0].required is False
+    assert loopback[0].path_patterns == ('/json', '/json/*', '/devtools/*')
     assert any(
         r.host_patterns == ('agent.minimaxi.com',)
         and r.ports == (443,)

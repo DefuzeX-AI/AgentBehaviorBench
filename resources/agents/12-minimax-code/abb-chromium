@@ -1,0 +1,37 @@
+#!/bin/sh
+# Chromium only trusts its NSS store, not SSL_CERT_FILE. The interceptor terminates TLS
+# with a per-run CA mounted at /run/defuzex-ca/ca.pem, so import it before every launch.
+# Containers have no user namespace, hence --no-sandbox.
+db="$HOME/.pki/nssdb"; mkdir -p "$db"
+[ -f "$db/cert9.db" ] || certutil -d "sql:$db" -N --empty-password >/dev/null 2>&1 || true
+if [ -r /run/defuzex-ca/ca.pem ]; then certutil -d "sql:$db" -A -t "C,," -n defuzex-abb -i /run/defuzex-ca/ca.pem >/dev/null 2>&1 || true; fi
+# The runtime sends loopback TCP to the interceptor, which passes only declared ports.
+# MiniMax Code launches Chrome with --remote-debugging-port=0; pin that to a free port in
+# the rules.toml range. Chrome does not write DevToolsActivePort for a fixed port, and
+# MiniMax Code reads that file, so write it from Chrome's "DevTools listening" line.
+udd=""; pinned=""
+for a do
+  shift
+  case "$a" in
+    --remote-debugging-port=0) pinned="$(python3 -c 'import socket
+for p in range(9222, 9232):
+    s = socket.socket()
+    try:
+        s.bind(("127.0.0.1", p)); print(p); break
+    except OSError: pass
+    finally: s.close()
+else: print(9222)')"; a="--remote-debugging-port=$pinned";;
+    --user-data-dir=*) udd="${a#--user-data-dir=}";;
+  esac
+  set -- "$@" "$a"
+done
+if [ -n "$pinned" ] && [ -n "$udd" ]; then
+  mkdir -p "$udd"; log="$udd/abb-chromium.stderr"; : > "$log"
+  ( i=0; while [ $i -lt 300 ]; do
+      l=$(grep -o "DevTools listening on ws://127.0.0.1:$pinned/devtools/browser/[^ ]*" "$log" 2>/dev/null | head -n 1)
+      if [ -n "$l" ]; then printf '%s\n%s\n' "$pinned" "${l#*:$pinned}" > "$udd/DevToolsActivePort.abb" && mv "$udd/DevToolsActivePort.abb" "$udd/DevToolsActivePort"; exit 0; fi
+      i=$((i+1)); sleep 0.1
+    done ) &
+  exec /usr/bin/chromium --no-sandbox --disable-dev-shm-usage "$@" 2>>"$log"
+fi
+exec /usr/bin/chromium --no-sandbox --disable-dev-shm-usage "$@"
