@@ -89,7 +89,8 @@ ABB 目前支持原生接入 LangGraph Agent，也支持通过 Agent Client Prot
 ## 评测 SDK 与 Judge
 
 ABB 的正式评测当前使用 [KUMA DefuzeX SDK](https://github.com/DefuzeX-AI/KUMA-DefuzeX)，
-固定版本为 `kuma-defuzex[otel]==0.3.1`。KUMA 生成行为测试 Cases，接收 ABB 采集的执行
+通过 `kuma-defuzex[otel]` 安装。构建时实际执行 SDK 安装步骤会选用 PyPI 最新稳定版；
+已有镜像和 Docker 构建层继续复用，不会因 SDK 发布新版本而自动更新。KUMA 生成行为测试 Cases，接收 ABB 采集的执行
 证据，并将其提交给 DefuzeX Judge。Judge verdict 和评审信息会与 Suite artifacts 一起保存。
 
 ABB 还包含一个 `local` SDK 插件，用于确定性的离线开发、演示和测试。它不是正式 Benchmark

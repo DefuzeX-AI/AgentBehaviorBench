@@ -50,6 +50,30 @@ and tool traffic, and captures traces and filesystem evidence. Execution status
 and Judge verdict are reported separately: a container may run successfully
 while the Judge still finds a behavioral issue.
 
+Terminal summaries and result JSON expose `execution_status` separately from
+`quality_gate`. An accepted evaluation with Judge verdict `issue` or
+`insufficient_evidence` is `completed`, but its quality gate is `failed` and the
+CLI still exits with code 1. `judge_status` is the verdict;
+`judge_delivery_status` distinguishes `received`, `missing`, `service_failure`,
+and `unknown`. A received report can still be rejected by the host.
+
+Case records also expose `evidence_status`, `host_acceptance`, and
+`host_trace_validation`. These come from SDK/host evidence; older results and
+SDKs without this metadata report `unknown`. A Judge verdict of
+`insufficient_evidence` does not by itself mean that evidence capture failed.
+Agent and Suite records include `execution_counts` and `judge_counts`; Suite
+counts are per Agent, with separate `case_execution_counts` for their planned
+Cases, and an explicit `exit_code`. Cases of Agents never attempted are not
+included in `case_execution_counts` because their planned counts are unavailable
+in the terminal result model; those Agents are counted as skipped.
+
+The legacy `status`, `passed`, `failed`, and `suite_passed` fields retain their
+previous semantics for compatibility. New consumers should use the explicit
+execution and quality-gate fields. Saved completed evaluations are reused by
+`resume` even when their Judge verdict did not pass. Unknown acceptance metadata
+on old or third-party SDK results does not introduce a new gate; explicit host
+rejection, missing reports, and incomplete work cannot pass it.
+
 ## Imported Agents
 
 The following Agent sources are currently registered.
@@ -95,8 +119,10 @@ Case counts, and step limits.
 ## Evaluation SDK and Judge
 
 Official evaluations currently use the
-[KUMA DefuzeX SDK](https://github.com/DefuzeX-AI/KUMA-DefuzeX), pinned as
-`kuma-defuzex[otel]==0.3.1`. KUMA generates behavioral Cases, accepts the evidence
+[KUMA DefuzeX SDK](https://github.com/DefuzeX-AI/KUMA-DefuzeX), installed as
+`kuma-defuzex[otel]`. SDK installation selects the latest stable version available
+from PyPI. Existing images and Docker build layers are reused; cached images do
+not automatically update when a new SDK version is released. KUMA generates behavioral Cases, accepts the evidence
 captured by ABB, and submits it to the DefuzeX Judge. The resulting verdict and
 supporting assessment are stored with the Suite artifacts.
 

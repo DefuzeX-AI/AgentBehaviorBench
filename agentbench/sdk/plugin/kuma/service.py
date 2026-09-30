@@ -232,6 +232,7 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
             runtime_options = dict(
                 environ=environ, policy=EvaluationPolicy(state, repository=repository, target=target, writable=bool(policy.path)), trace_sink=Sink(),
                 trace_max_bytes=trace_max_bytes, control=control, identity=identity,
+                timeout_sec=timeout,
                 run_id=directory.name, artifact_root=directory,
             )
             if runtime_services is not None:

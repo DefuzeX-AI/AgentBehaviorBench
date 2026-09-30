@@ -264,28 +264,18 @@ def _summary_to_json(result: BenchmarkSuiteResult) -> dict[str, object]:
         "failed": result.failed_count,
         "skipped": result.skipped_count,
         "suite_passed": result.passed,
+        "execution_status": result.execution_status,
+        "execution_counts": result.execution_counts,
+        "case_execution_counts": result.case_execution_counts,
+        "judge_counts": result.judge_counts,
+        "quality_gate": result.quality_gate,
+        "exit_code": result.exit_code,
     }
 
 
 def _suite_agent_to_json(item: SuiteAgentResult) -> dict[str, object]:
-    return {
-        "agent_id": item.agent_id,
-        "status": item.status,
-        "case_results": [_case_to_json(case) for case in item.case_results],
-        "benchmarks": [
-            _benchmark_to_json(benchmark) for benchmark in item.benchmarks
-        ],
-        "requested_case_count": item.requested_case_count,
-        "completed_case_count": item.completed_case_count,
-        "attempted_case_count": item.attempted_case_count,
-        "skipped_case_count": item.skipped_case_count,
-        "preparation_error": _json_value(item.preparation_error),
-        "error": (
-            None
-            if item.error_type is None
-            else {"type": item.error_type, "message": item.error_message}
-        ),
-    }
+    from agentbench.harness.session.codec import agent_to_json
+    return agent_to_json(item)
 
 
 def _case_to_json(case: CaseResult) -> dict[str, object]:

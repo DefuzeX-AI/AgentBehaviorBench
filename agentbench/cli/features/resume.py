@@ -37,7 +37,7 @@ def execute(args: Namespace):
         print_suite_summary(result, print)
         print(f'Result artifact: {directory / "events.json"}')
         print(f'View: agentbench view {directory / "events.json"}')
-        return 0 if result.passed else 1
+        return result.exit_code
     except KeyboardInterrupt:
         print('Recovery interrupted; saved Cases and results retained.')
         return 130

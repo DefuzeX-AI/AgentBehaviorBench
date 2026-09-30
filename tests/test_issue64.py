@@ -1,7 +1,5 @@
 """Issue #64: a retained Judge verdict is counted, and labelled as host rejected, not "no report"."""
-from types import SimpleNamespace
-
-from agentbench.harness.result import CaseResult
+from agentbench.harness.result import BenchmarkSuiteResult, CaseResult, SuiteAgentResult
 from agentbench.cli.terminal_ui.presentation import case_event_status, print_suite_summary
 
 RETAINED = {'received_report': {'status': 'issue', 'report_id': 'judgment_x', 'run_id': 'run_x',
@@ -10,9 +8,8 @@ RETAINED = {'received_report': {'status': 'issue', 'report_id': 'judgment_x', 'r
 
 
 def _suite(*cases):
-    item = SimpleNamespace(case_results=cases, requested_case_count=len(cases))
-    return SimpleNamespace(items=[item], passed_count=0, failed_count=len(cases), skipped_count=0,
-                           selected_count=len(cases))
+    item = SuiteAgentResult(cases[0].agent_id, cases, len(cases))
+    return BenchmarkSuiteResult('suite', (item.agent_id,), (item,))
 
 
 def test_retained_verdict_is_the_case_judge_status_but_not_accepted():

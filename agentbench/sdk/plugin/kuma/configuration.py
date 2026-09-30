@@ -1,9 +1,9 @@
-"""Explicit plugin options aligned with the pinned public Kuma SDK contract."""
+"""Explicit plugin options aligned with the public Kuma SDK contract."""
 from collections.abc import Mapping
 import math
 from urllib.parse import urlsplit
 
-# The pinned SDK's public Backend. The host does not import the SDK to learn it.
+# The SDK's public Backend. The host does not import the SDK to learn it.
 DEFAULT_BASE_URL = 'https://defuzex.ai/api/agentdefuze'
 # Hosts the SDK itself allows over plain HTTP (local integration).
 _PLAIN_HTTP_HOSTS = frozenset({'localhost', '127.0.0.1', '::1', 'host.docker.internal'})
@@ -55,7 +55,7 @@ def request_options(value=None):
     Returns:
         A new JSON-safe mapping for create_run or resume_request.
     Raises:
-        ValueError: On unknown keys or values outside the pinned 0.3.1 contract.
+        ValueError: On unknown keys or values outside the supported SDK contract.
     """
     if value is None:
         return {}

@@ -379,4 +379,5 @@ def test_terminal_agent_aggregate_preserves_nonfailure_case_status(status):
     lines = []
     print_agent_complete(item, lines.append)
     assert status.upper() in lines[0]
-    assert "FAILED" not in lines[0]
+    assert "Execution: FAILED" not in lines[0]
+    assert "Quality gate: FAILED" in lines[0]

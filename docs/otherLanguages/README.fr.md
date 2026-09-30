@@ -96,8 +96,10 @@ l’état de préparation, le nombre de Cases et les limites de steps.
 ## SDK d’évaluation et Judge
 
 Les évaluations officielles utilisent actuellement le
-[SDK KUMA DefuzeX](https://github.com/DefuzeX-AI/KUMA-DefuzeX), fixé à la version
-`kuma-defuzex[otel]==0.3.1`. KUMA génère les Cases comportementaux, reçoit les
+[SDK KUMA DefuzeX](https://github.com/DefuzeX-AI/KUMA-DefuzeX), installé via
+`kuma-defuzex[otel]`. L’installation du SDK sélectionne la dernière version stable
+sur PyPI. Les images et couches Docker existantes sont réutilisées et ne sont pas
+actualisées automatiquement à chaque nouvelle version du SDK. KUMA génère les Cases comportementaux, reçoit les
 preuves collectées par ABB et les transmet au Judge DefuzeX. Le verdict et son
 évaluation sont enregistrés avec les artifacts de la Suite.
 

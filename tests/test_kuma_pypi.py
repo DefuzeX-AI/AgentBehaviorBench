@@ -68,11 +68,11 @@ def test_overlay_installs_pypi_requirements_without_sdk_source(echo_agent):
     with evaluation_agent(echo_agent) as staged:
         dockerfile = (staged.path / 'Dockerfile').read_text()
         assert '--index-url https://pypi.org/simple' in dockerfile
-        assert 'python -m pip --isolated install' in dockerfile
+        assert 'python -m pip --isolated install --upgrade' in dockerfile
         assert '-r /opt/abb-sdk/requirements.txt' in dockerfile
         assert dockerfile.rstrip().endswith('USER agent')
         requirements = staged.path / '.abb-sdk/requirements.txt'
-        assert 'kuma-defuzex[otel]==' in requirements.read_text()
+        assert 'kuma-defuzex[otel]' in requirements.read_text().splitlines()
         assert {item.name for item in requirements.parent.iterdir()} == {'requirements.txt'}
         assert 'agentbench.sdk.plugin.kuma.worker' in (staged.path / 'agent.toml').read_text()
         assert not (staged.path / '.abb-sdk/src').exists()
@@ -429,9 +429,9 @@ def test_real_pypi_overlay_and_offline_case_judge(echo_agent):
     (output / 'container.log').write_text(result.stdout + result.stderr, encoding='utf-8')
     assert result.returncode == 0, f'See {output / "container.log"}'
     package = json.loads((output / 'package.json').read_text())
-    expected_version = next(line.split('==', 1)[1] for line in requirements.splitlines()
-                            if line.startswith('kuma-defuzex'))
-    assert package['version'] == expected_version
+    assert 'kuma-defuzex[otel]' in requirements.splitlines()
+    expected_version = package['version']
+    assert expected_version
     assert package['adapter'] == 'agentbench.sdk.plugin.kuma.plugin:plugin'
     assert package['runtime'].startswith('/opt/abb-current-runtime/')
     run = json.loads((output / 'run.json').read_text())

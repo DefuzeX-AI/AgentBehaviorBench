@@ -1,4 +1,4 @@
-"""The registered requirement is the exact document used for KUMA generation."""
+"""KUMA generation preserves the registered Profile and adds runtime facts."""
 
 import asyncio
 import json
@@ -51,11 +51,15 @@ def test_worker_passes_requirement_contents_to_real_sdk(unit, tmp_path, monkeypa
 
     def cases(context):
         observed.append(context)
+        from kuma.providers.official_case import _safe_case_payload
+        payload, _ = _safe_case_payload(context, allow_sensitive=False,
+                                        evidence_capabilities=(), max_steps=1)
+        assert 'Execution environment supplied by ABB' in payload['behavior_spec']['production_scenario']
         return {'case_id': 'requirement-case', 'input_type': 'text', 'inputs': [
             {'input_id': 'one', 'payload_type': 'text', 'payload': 'echo this'}]}
 
     def offline_create(**options):
-        assert options['agent_profile_path'] == unit / 'requirement.md'
+        assert options['agent_profile_path'] != unit / 'requirement.md'
         assert options['allow_local'] is False
         if step_options.get('max_steps') is None:
             assert 'max_steps' not in options
@@ -79,6 +83,10 @@ def test_worker_passes_requirement_contents_to_real_sdk(unit, tmp_path, monkeypa
     assert len(observed) == 1
     assert observed[0].agent_description == 'Requirement document controls this Agent\'s evaluation.'
     assert observed[0].agent_profile_sections['behaviors_to_test'] == 'Return the supplied text unchanged.'
+    assert (unit / 'requirement.md').read_text() == REQUIREMENT
+    sent = json.loads((output / 'case-generation-profile.json').read_text())
+    assert sent['behavior_spec']['production_scenario'] == observed[0].agent_profile_sections['production_scenario']
+    assert (output / 'execution-environment.json').is_file()
     collection = json.loads((output / 'case-collection.json').read_text())
     assert collection['cases'][0]['case_id'] == 'requirement-case'
 
