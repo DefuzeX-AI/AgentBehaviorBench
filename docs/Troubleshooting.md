@@ -62,6 +62,20 @@ Use the Case/attempt's artifact ID, not just the Agent name. Failure before a st
 starts may leave its files absent. `observe --show RUN_DIRECTORY` reviews native
 observation artifacts offline; `view` opens a result JSON using the built web UI.
 
+## Runs without model calls
+
+An Agent may return a cached answer, reject an input, use only tools, or perform
+deterministic work without calling a model. Zero intercepted model calls does not
+reject the run; the Judge evaluates the actual output and available evidence.
+Host trace validation still checks observed calls for terminal outcomes, capture
+errors, truncation and persistence failures. Zero calls alone does not prove that
+all possible model traffic was observed.
+
+The former `[llm_interception].required` flag is no longer used. Remove it from
+Agent manifests; older manifests containing either value are still accepted, but
+the flag neither requires a model call nor disables trace validation. A tool
+route's separate `required` field still controls required network operations.
+
 ## Share a report
 
 **Export current report** downloads JSON containing all current Cases and attempt

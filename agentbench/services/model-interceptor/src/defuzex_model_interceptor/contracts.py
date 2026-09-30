@@ -79,6 +79,14 @@ class WireStrategy(Protocol):
     response_type: str
     source_model: object
 
+    def requirements(self, request: object) -> tuple[str, str]:
+        """Return (operation, primary input modality), validating source semantics.
+
+        A mixed text/image conversation has modality image. Legacy third-party
+        wires without this method are treated as text generation only.
+        """
+        ...
+
     def decode(self, request: object) -> tuple[dict, dict]:
         ...
 

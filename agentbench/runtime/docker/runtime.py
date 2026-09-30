@@ -34,7 +34,6 @@ from agentbench.runtime.interception import (
     TraceEvent,
     TraceSink,
     get_trust_plugin,
-    resolve_model_provider,
 )
 
 from .image_builder import DockerImageBuilder
@@ -153,8 +152,10 @@ class DockerRuntime:
         interception = InterceptionConfig.from_agent_dir(agent.path)
         if interception is not None and interception.mode == 'replace':
             # Validate the model service and credentials before enabling interception.
-            target = (self._model_provider or resolve_model_provider(environ=self._environ)).resolve(self._environ)
-            self._secret_resolver.require(target.credential_env)
+            from agentbench.runtime.interception.target_routing import resolve_target_routing
+            plan = resolve_target_routing(self._environ, self._model_provider)
+            for target in plan.targets.values():
+                self._secret_resolver.require(target.credential_env)
         if invocation is not None:
             # Jobs with input/output directories use the staged worker build context.
             with worker_build_context(config, control=self.control, deadline=preparation) as (context, dockerfile):
@@ -362,12 +363,12 @@ class DockerRuntime:
                 runtime_error_checker=trace_state.check_persistence if trace_state is not None else None,
                 trace_checkpoint=(
                     trace_state.checkpoint
-                    if interception is not None and interception.required
+                    if interception is not None
                     else None
                 ),
                 trace_validator=(
-                    self._required_trace_callback(trace_state)
-                    if interception is not None and interception.required
+                    self._trace_validation_callback(trace_state)
+                    if interception is not None
                     else None
                 ),
             )
@@ -636,22 +637,20 @@ class DockerRuntime:
         reader.start()
         return process, reader
 
-    def _required_trace_callback(
+    def _trace_validation_callback(
         self,
         trace_state: InterceptionTraceState,
     ) -> Callable[[object], None]:
-        def require_trace(value: object) -> None:
-            checkpoint = int(value)
-            if not trace_state.wait_for_completion_after(checkpoint, timeout=2, control=self.control):
-                raise DockerRuntimeError(
-                    "Agent invocation trace was not accepted: " + trace_state.diagnostic()
-                )
+        def validate_trace(value: object) -> None:
+            # The session API supplies a checkpoint, but zero new model calls
+            # is valid (cached answers, input rejection or deterministic work).
+            # Always drain and validate the calls that were actually observed.
             if not trace_state.wait_for_idle(control=self.control):
                 if trace_state.operation_failure:
                     raise DockerRuntimeError('Required Agent network operation failed: ' + trace_state.diagnostic())
                 raise DockerRuntimeError("Model trace is incomplete: " + trace_state.diagnostic())
 
-        return require_trace
+        return validate_trace
 
     def _wait_for_interceptor(
         self, container_name: str, ca_certificate: Path, *, deadline: Deadline | None = None,

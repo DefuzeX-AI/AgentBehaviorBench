@@ -1,4 +1,4 @@
-"""Explicit text-only Gemini ↔ OpenAI Chat semantic conversion.
+"""Explicit text/image Gemini → OpenAI Chat and text response conversion.
 
 Unsupported semantics fail closed instead of silently degrading a research run.
 Google GAPIC REST streaming expects a JSON array; alt=sse clients expect SSE.
@@ -17,6 +17,34 @@ def _text(parts):
     return "".join(p["text"] for p in parts)
 
 
+def _content(parts):
+    import base64
+    if not isinstance(parts, list) or not parts:
+        raise ValueError('Gemini content parts must be a non-empty list')
+    result = []
+    for part in parts:
+        if not isinstance(part, dict):
+            raise ValueError('Invalid Gemini content part')
+        if set(part) == {'text'} and isinstance(part['text'], str):
+            result.append({'type': 'text', 'text': part['text']})
+        elif set(part) == {'inlineData'}:
+            value = part['inlineData']
+            if not isinstance(value, dict) or set(value) != {'mimeType', 'data'}:
+                raise ValueError('Invalid Gemini inline image')
+            mime, data = value['mimeType'], value['data']
+            if mime not in ('image/png', 'image/jpeg', 'image/webp', 'image/gif') or not isinstance(data, str):
+                raise ValueError('Only inline image data is supported')
+            try:
+                if not base64.b64decode(data, validate=True):
+                    raise ValueError('Empty inline image')
+            except (ValueError, TypeError) as exc:
+                raise ValueError('Invalid base64 inline image') from exc
+            result.append({'type': 'image_url', 'image_url': {'url': f'data:{mime};base64,{data}'}})
+        else:
+            raise ValueError('Unsupported Gemini part; use text or inlineData images (private file references cannot cross providers)')
+    return ''.join(part['text'] for part in result) if all(part['type'] == 'text' for part in result) else result
+
+
 def request_to_chat(payload, *, streaming):
     allowed = {"contents", "systemInstruction", "generationConfig", "model", "tools", "safetySettings"}
     if set(payload) - allowed or payload.get("tools") or payload.get("safetySettings"):
@@ -31,7 +59,7 @@ def request_to_chat(payload, *, streaming):
         if set(content) - {"parts", "role"} or content.get("role", "user") not in {"user", "model"}:
             raise ValueError("Unsupported Gemini content role or fields")
         messages.append({"role": "assistant" if content.get("role") == "model" else "user",
-                         "content": _text(content["parts"])})
+                         "content": _content(content["parts"])})
     if not messages:
         raise ValueError("Gemini contents are required")
     result = {"messages": messages, "stream": streaming}
@@ -134,6 +162,11 @@ class GeminiWire:
             self.sse = "alt=sse" in request.path
             self.source_model = request.path.split("/models/", 1)[-1].split(":", 1)[0]
         return source, request_to_chat(source, streaming=self.streaming)
+
+    def requirements(self, request):
+        from model.inputs import conversation_input
+        _, payload = self.decode(request)
+        return 'generation', conversation_input(payload)
 
     def response(self, payload, status):
         return response_from_chat(payload, status=status)

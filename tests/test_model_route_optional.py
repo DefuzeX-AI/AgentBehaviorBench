@@ -6,7 +6,6 @@ from agentbench.runtime.interception.config import InterceptionConfig, Intercept
 
 MANIFEST = '''schema_version = "defuzex-bench.agent.v2"
 [llm_interception]
-required = true
 trust_plugin = "pem-env"
 {routes}
 [[llm_interception.credentials]]

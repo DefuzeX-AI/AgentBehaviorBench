@@ -14,7 +14,10 @@ class CommonInterceptor:
     def __init__(self, config):
         self.config = config
         self.policy = EgressPolicy(config)
-        self.secrets = tuple(v for c in config.credentials for v in (c.token, c.secret))
+        self.secrets = tuple(v for c in config.credentials for v in (c.token, c.secret) if v)
+        self.secrets += tuple(t.secret for t in config.targets.values() if t.secret)
+        if config.target is not None and config.target.secret:
+            self.secrets += (config.target.secret,)
 
     def running(self):
         events.emit("interceptor_ready", agent_id=self.config.agent_id, mode=self.config.mode)
@@ -25,7 +28,12 @@ class CommonInterceptor:
                     source_host=flow.metadata.get("defuzex_source_host"),
                     source_path=flow.metadata.get("defuzex_source_path"), host=flow.request.pretty_host,
                     path=flow.request.path, provider=flow.metadata.get("defuzex_provider"),
-                    framework_span_id=flow.metadata.get("framework_span_id"))
+                    framework_span_id=flow.metadata.get("framework_span_id"),
+                    **self._routing_fields(flow))
+
+    def _routing_fields(self, flow):
+        return {key: flow.metadata[key] for key in
+                ('target_id', 'target_rule', 'model_operation', 'input_modality') if key in flow.metadata}
 
     def _tool_fields(self, flow):
         fields = self._fields(flow)
@@ -81,7 +89,7 @@ class CommonInterceptor:
         fields = self._tool_fields(flow) if tool else {}
         fields.update(failure_fields(failure, self.secrets))
         fields.update(agent_id=self.config.agent_id,
-                      framework_span_id=metadata.get("framework_span_id"))
+                      framework_span_id=metadata.get("framework_span_id"), **self._routing_fields(flow))
         name = ('model_auxiliary_error' if getattr(metadata.get('wire'), 'auxiliary', False)
                 else 'tool_error' if tool else 'llm_error')
         events.emit(name, **redact(fields, self.secrets))

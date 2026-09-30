@@ -11,6 +11,7 @@ from ..registry import load_authentication, load_protocols, load_targets, load_w
 from ..observation.capture import ResponseCapture
 from ..transport.json import json_bytes
 from ..routing.automatic import AutomaticModelRouter
+from ..routing.targets import ModelTargetRouter
 
 
 from ..proxy.common import CommonInterceptor
@@ -22,9 +23,13 @@ class ReplaceInterceptor(CommonInterceptor):
         self.protocols, self.authentication, self.targets = load_protocols(), load_authentication(), load_targets()
         self.credentials = {c.credential_id: c for c in config.credentials}
         self._validate_plugins()
-        self.automatic = AutomaticModelRouter(load_wires(), config.credentials, self.authentication)
+        wires = load_wires()
+        self.automatic = AutomaticModelRouter(wires, config.credentials, self.authentication)
+        self.target_router = ModelTargetRouter(config, wires)
         from ..token_counting.service import TokenCountingService
-        self.token_counter = TokenCountingService(config.token_counting, config.target.model)
+        destinations = config.targets or {'default': config.target}
+        self.token_counters = {name: TokenCountingService(config.token_counting, target.model)
+                               for name, target in destinations.items()}
 
     def request(self, flow):
         span = flow.request.headers.pop("x-abb-framework-span", None)
@@ -63,16 +68,18 @@ class ReplaceInterceptor(CommonInterceptor):
             # never send the real target credential to the original provider.
             outbound = flow.request.copy()
             authentication = self.authentication[credential.auth_plugin]
-            if hasattr(authentication, "authorize_request"):
-                authentication.authorize_request(outbound, temporary_token=credential.token, upstream_secret=credential.secret)
-            else:
-                authentication.authorize(outbound.headers, temporary_token=credential.token, upstream_secret=credential.secret)
-            reply = self.token_counter.handle(route.protocol_plugin, source_body)
+            # Validate source credentials before inspecting or selecting a destination.
+            _authorize(authentication, outbound, credential.token, '')
+            target, target_id, rule_id, operation, modality = self.target_router.select(route, flow.request)
+            flow.metadata.update(target_id=target_id, target_rule=rule_id,
+                                 model_operation=operation, input_modality=modality)
+            reply = self.token_counters[target_id].handle(route.protocol_plugin, source_body)
             if reply is not None:
                 self._local_count(flow, reply)
                 return
-            prepared = self.targets[self.config.target.target_plugin].prepare_request(
-                outbound, route=route, target=self.config.target)
+            outbound = flow.request.copy()
+            _authorize(authentication, outbound, credential.token, target.secret or credential.secret)
+            prepared = self.targets[target.target_plugin].prepare_request(outbound, route=route, target=target)
         except InterceptorAuthenticationError as exc:
             self._error(flow, str(exc), 401, code=ErrorCode.AUTHENTICATION_FAILED)
             return
@@ -210,12 +217,20 @@ class ReplaceInterceptor(CommonInterceptor):
         return explicit if explicit is not None else self.automatic.resolve(flow.request)
 
     def _validate_plugins(self):
+        destinations = tuple(self.config.targets.values()) or (self.config.target,)
         missing = ({r.protocol_plugin for r in self.config.routes} - self.protocols.keys()
                    | {c.auth_plugin for c in self.config.credentials} - self.authentication.keys()
-                   | {self.config.target.target_plugin} - self.targets.keys())
+                   | {t.target_plugin for t in destinations if t is not None} - self.targets.keys())
         if missing:
             raise RuntimeError("Unknown model interceptor plugins: " + ", ".join(sorted(missing)))
 
 
 def _model(payload):
     return payload.get('model') if isinstance(payload, dict) else None
+
+
+def _authorize(plugin, request, token, secret):
+    if hasattr(plugin, 'authorize_request'):
+        plugin.authorize_request(request, temporary_token=token, upstream_secret=secret)
+    else:
+        plugin.authorize(request.headers, temporary_token=token, upstream_secret=secret)

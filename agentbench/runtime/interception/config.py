@@ -62,7 +62,6 @@ class ToolRouteConfig:
 
 @dataclass(frozen=True, slots=True)
 class InterceptionConfig:
-    required: bool
     trust_plugin: str
     environment: Mapping[str, str]
     credentials: tuple[CredentialConfig, ...]
@@ -117,7 +116,6 @@ class InterceptionConfig:
             mode=mode,
             observation_headers=_observation_headers(section.get("observation_headers", {})),
             observation_tool_purposes=_observation_tool_purposes(section.get("observation_tool_purposes", {})),
-            required=_boolean(section, "required", default=True),
             trust_plugin=_required_string(section, "trust_plugin"),
             environment=MappingProxyType(environment),
             credentials=credentials,
