@@ -53,6 +53,7 @@ failures do not silently retry against another provider.
 | OpenRouter | `OPENROUTER_API_KEY` | `OPENROUTER_MODEL` | `OPENROUTER_BASE_URL` |
 | DeepSeek | `DEEPSEEK_API_KEY` | `DEEPSEEK_MODEL` | `DEEPSEEK_BASE_URL` |
 | GLM | `GLM_API_KEY` | `GLM_MODEL` | `GLM_API_BASE_URL` |
+| Zhipu (explicit only) | `GLM_API_KEY` | `GLM_MODEL` | `ZHIPU_API_BASE_URL` |
 
 Models have no new built-in defaults. `--model` overrides `ABB_MODEL`, which
 otherwise overrides the selected provider's model variable. An available key with
@@ -71,6 +72,10 @@ DeepSeek defaults to `https://api.deepseek.com`, with Chat Completions, Response
 and Anthropic Messages endpoint mappings. GLM defaults to the standard
 `https://open.bigmodel.cn/api/paas/v4` Chat Completions endpoint. The existing
 `GLM_API_BASE_URL` setting takes precedence (including a Coding Plan deployment).
+`zhipu` uses the same key and model as GLM but the `https://open.bigmodel.cn/api`
+base, mapping Chat Completions to `/paas/v4/chat/completions` and Anthropic Messages to
+Zhipu's Anthropic-compatible `/anthropic/v1/messages`. It is not in `priority`; select it
+with `ABB_MODEL_PROVIDER=zhipu` for Agents whose routes use `anthropic-messages`.
 Gemini/Ollama text bridges use the target's Chat Completions endpoint. Protocols
 absent from a target's `endpoint_paths` table fail before forwarding; this does not
 add cross-protocol conversion for GLM Responses or Anthropic Messages. Change the
@@ -79,7 +84,8 @@ catalog only to match the capabilities of the actual deployment.
 Endpoint references: [DeepSeek Chat](https://api-docs.deepseek.com/api/create-chat-completion/),
 [DeepSeek Responses](https://api-docs.deepseek.com/guides/responses_api/),
 [DeepSeek Anthropic](https://api-docs.deepseek.com/guides/anthropic_api/),
-[GLM API example](https://docs.bigmodel.cn/cn/best-practice/case/ai-search-engine).
+[GLM API example](https://docs.bigmodel.cn/cn/best-practice/case/ai-search-engine),
+[Zhipu Anthropic-compatible API](https://docs.bigmodel.cn/cn/guide/develop/claude/introduction).
 
 This selection applies to replacement-mode Agent model calls. ACP observe mode
 retains native provider credentials. The onboarding builder (`agent add -b`)

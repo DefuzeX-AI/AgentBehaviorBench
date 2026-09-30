@@ -158,3 +158,18 @@ def test_host_catalog_reaches_service_target(tmp_path, monkeypatch, provider, pr
     assert request.path == expected_path
     assert json.loads(request.content)['model'] == 'selected'
     assert result.provider_id == provider
+
+
+def test_zhipu_serves_openai_and_anthropic_routes_and_is_never_auto_selected():
+    env = {'GLM_API_KEY': 'present', 'GLM_MODEL': 'glm-test'}
+    assert resolve_model_provider(environ=env).resolve(env).provider_id == 'glm'
+    env['ABB_MODEL_PROVIDER'] = 'zhipu'
+    target = resolve_model_provider(environ=env).resolve(env)
+    assert (target.provider_id, target.base_url, target.credential_env) == (
+        'zhipu', 'https://open.bigmodel.cn/api', 'GLM_API_KEY')
+    assert dict(target.endpoint_paths) == {'/chat/completions': '/paas/v4/chat/completions',
+                                           '/messages': '/anthropic/v1/messages'}
+    glm = resolve_model_provider('glm', environ=env).resolve(env)
+    assert '/messages' not in glm.endpoint_paths
+    override = {**env, 'ZHIPU_API_BASE_URL': 'https://api.z.ai/api'}
+    assert resolve_model_provider(environ=override).resolve(override).base_url == 'https://api.z.ai/api'
