@@ -87,7 +87,16 @@ the rest with 403 and records every attempt in `egress.jsonl`. A refusal is Agen
 behavior and does not reject the Case (#137); `ABB_EGRESS_ALLOW=host[:port],...`
 admits more hosts for a run. Before #137 any undeclared request rejected the whole
 trace, so the launcher also set `npm_config_offline=true` and no search backend was
-passed. The browser tool still has no Chrome in the image.
+passed.
+
+The `browser` helper in the eval prelude uses Puppeteer with Debian's Chromium
+(`PUPPETEER_EXECUTABLE_PATH=/usr/local/bin/abb-chromium`, set in the launcher; no Chrome
+download). `abb-chromium` imports the interceptor CA into Chromium's NSS store (Chromium
+ignores `SSL_CERT_FILE`) and pins Puppeteer's `--remote-debugging-port=0` into
+`127.0.0.1:9222-9231`, the loopback tool route in `network/rules.toml` (the runtime
+redirects loopback TCP too). `zz-abb-lean` keeps Chromium within the 128-pid budget
+(#158). A browser opened with an explicit profile/app path chooses its own random port
+and cannot be reached (#156).
 
 omp does not run a sandbox of its own, so no sandbox switch is needed under the
 container's `--cap-drop=ALL` limits.

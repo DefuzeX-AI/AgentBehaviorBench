@@ -36,7 +36,9 @@ file writes and shell commands through the client and asks it for permission fir
   the evaluation's egress allowlist are refused with HTTP 403. Shell commands can
   install packages from the public package registries (npm, PyPI, Debian). The
   Agent must report a failed search, fetch or download instead of inventing it.
-- No browser, external MCP server, omp plugin or extension, GitHub account,
-  repository, database, or production account is provisioned.
+- The browser helper drives a headless Chromium in the container; pages outside the
+  evaluation's egress allowlist fail to load. Named browser profiles are not supported.
+- No external MCP server, omp plugin or extension, GitHub account, repository,
+  database, or production account is provisioned.
 - Internal private reasoning is not observable. Evaluation uses ACP events, model
   traffic, tool records, filesystem evidence, and the final response.

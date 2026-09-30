@@ -89,6 +89,9 @@ def prepare(environ: dict[str, str], builtin: list[str]) -> tuple[list[str], dic
         # npm's own update check is noise. npm itself stays online for the bash
         # tool: the registry is on ABB's egress-observer allowlist.
         "npm_config_update_notifier": "false",
+        # The eval browser prelude launches the image's Chromium through the wrapper that
+        # trusts the interceptor CA, instead of downloading Chrome (launch.ts:224-273).
+        "PUPPETEER_EXECUTABLE_PATH": "/usr/local/bin/abb-chromium",
     }
     command = [str(BIN_DIR / "bun"), str(OMP_CLI), "acp"]
     return command, child, {"models.yml": models, "config.yml": config}

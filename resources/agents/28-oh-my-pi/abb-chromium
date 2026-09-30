@@ -1,0 +1,27 @@
+#!/bin/sh
+# Chromium only trusts its NSS store, not SSL_CERT_FILE. The interceptor terminates TLS
+# with a per-run CA mounted at /run/defuzex-ca/ca.pem, so import it before every launch.
+# Containers have no user namespace, hence --no-sandbox.
+db="$HOME/.pki/nssdb"; mkdir -p "$db"
+[ -f "$db/cert9.db" ] || certutil -d "sql:$db" -N --empty-password >/dev/null 2>&1 || true
+if [ -r /run/defuzex-ca/ca.pem ]; then certutil -d "sql:$db" -A -t "C,," -n defuzex-abb -i /run/defuzex-ca/ca.pem >/dev/null 2>&1 || true; fi
+# The runtime sends loopback TCP to the interceptor, which passes only declared ports.
+# Puppeteer launches Chrome with --remote-debugging-port=0; pin that to a free port in
+# the rules.toml range (omp reads the port from Chrome's stderr, so nothing else changes).
+udd=""; pinned=""
+for a do
+  shift
+  case "$a" in
+    --remote-debugging-port=0) pinned="$(python3 -c 'import socket
+for p in range(9222, 9232):
+    s = socket.socket()
+    try:
+        s.bind(("127.0.0.1", p)); print(p); break
+    except OSError: pass
+    finally: s.close()
+else: print(9222)')"; a="--remote-debugging-port=$pinned";;
+    --user-data-dir=*) udd="${a#--user-data-dir=}";;
+  esac
+  set -- "$@" "$a"
+done
+exec /usr/bin/chromium --no-sandbox --disable-dev-shm-usage "$@"
