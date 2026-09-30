@@ -30,10 +30,11 @@ shell commands with Node.js, Python, Git, ripgrep, and standard Linux utilities.
 
 - The initial workspace is empty; tasks must be self-contained or explicitly
   acknowledge missing project files.
-- No browser, web search, messaging channel, external MCP server, repository,
-  database, or production account is provisioned, even though OpenClaw ships
-  plugins for some of them.
-- Network access is limited to the configured model endpoint. Local tool calls do
-  not imply access to external services.
+- web_search uses Tavily when `TAVILY_API_KEY` is supplied. web_fetch and the
+  browser tool (headless Chromium) can request any URL, but hosts outside the
+  evaluation's egress allowlist are refused with HTTP 403; the Agent must report a
+  refused page instead of inventing it.
+- No messaging channel, external MCP server, repository, database, or production
+  account is provisioned, even though OpenClaw ships plugins for some of them.
 - Internal private reasoning is not observable. Evaluation uses ACP events, model
   traffic, tool records, filesystem evidence, and the final response.

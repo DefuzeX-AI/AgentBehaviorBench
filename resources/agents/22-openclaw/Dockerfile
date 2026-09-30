@@ -10,7 +10,10 @@ COPY agent/ ./agent/
 # pre/postinstall only prune and finalize its package dir; the launcher replays them
 # on first run, so run it once here while node_modules is still writable (the
 # runtime uid cannot write /opt/agent). The marker check fails the build otherwise.
-RUN cd agent && npm ci --omit=dev --ignore-scripts --no-audit --no-fund && npm cache clean --force \
+RUN cd agent && npm ci --omit=dev --ignore-scripts --no-audit --no-fund \
+    && npm install --no-save --omit=dev --ignore-scripts --no-audit --no-fund @openclaw/tavily-plugin@2026.9.5 \
+    && test -f node_modules/@openclaw/tavily-plugin/openclaw.plugin.json \
+    && npm cache clean --force \
     && node node_modules/openclaw/openclaw.mjs --version \
     && test ! -e node_modules/openclaw/.openclaw-lifecycle-pending \
     && test ! -e node_modules/openclaw/dist/openclaw-install-guard \
@@ -22,4 +25,14 @@ COPY .abb-runtime/ /opt/abb-runtime/
 COPY agent.toml ./
 COPY network/ ./network/
 COPY bootstrap/ ./bootstrap/
+USER agent
+
+# Headless Chromium for the browser tool. abb-chromium imports the interceptor CA into
+# Chromium's NSS store before launch; zz-abb-lean keeps Chromium within the container's
+# pid budget (#158).
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends chromium libnss3-tools fonts-liberation && rm -rf /var/lib/apt/lists/*
+COPY abb-chromium /usr/local/bin/abb-chromium
+RUN chmod 755 /usr/local/bin/abb-chromium
+COPY zz-abb-lean /etc/chromium.d/zz-abb-lean
 USER agent

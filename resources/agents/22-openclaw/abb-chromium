@@ -1,0 +1,8 @@
+#!/bin/sh
+# Chromium only trusts its NSS store, not SSL_CERT_FILE. The interceptor terminates TLS
+# with a per-run CA mounted at /run/defuzex-ca/ca.pem, so import it before every launch.
+# Containers have no user namespace, hence --no-sandbox.
+db="$HOME/.pki/nssdb"; mkdir -p "$db"
+[ -f "$db/cert9.db" ] || certutil -d "sql:$db" -N --empty-password >/dev/null 2>&1 || true
+if [ -r /run/defuzex-ca/ca.pem ]; then certutil -d "sql:$db" -A -t "C,," -n defuzex-abb -i /run/defuzex-ca/ca.pem >/dev/null 2>&1 || true; fi
+exec /usr/bin/chromium --no-sandbox --disable-dev-shm-usage "$@"
