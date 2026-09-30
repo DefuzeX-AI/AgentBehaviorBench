@@ -6,6 +6,7 @@ import tempfile
 
 from agentbench.runtime.contracts.execution import Deadline, RunControl
 from .adapter_build import stage_adapter_dependencies
+from .runtime_build import stage_runtime_dependencies
 from .source_links import materialize_file_links
 
 
@@ -47,4 +48,5 @@ def worker_build_context(config, *, control: RunControl | None = None,
                 raise ValueError(f"Worker build context must not contain symlinks: {path.relative_to(context)}")
         dockerfile = context / config.dockerfile.relative_to(config.build_context)
         stage_adapter_dependencies(config, context, dockerfile)
+        stage_runtime_dependencies(context, dockerfile)
         yield context, dockerfile

@@ -31,6 +31,8 @@ unit/                       <- build.context = "."
 - `COPY .abb-runtime/ /opt/abb-runtime/` plus
   `PYTHONPATH=/opt/abb-runtime` exposes BBA's Python modules; this COPY does NOT
   install either BBA's or the Agent's third-party dependencies.
+  Worker build staging installs BBA's bootstrap requirements (including `tomli`
+  on Python 3.10) into the final stage's Python environment automatically.
 - Read launch.argv/workdir in the saved manifest. The usual launch is
   `python -m agentbench.runtime.agentcontainer.worker` from `/opt/agent`.
   Do not launch a UI/web server instead or add an ENTRYPOINT that consumes or
