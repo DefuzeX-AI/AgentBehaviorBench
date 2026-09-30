@@ -30,3 +30,14 @@ methods = ["POST"]
 path_patterns = ["/search", "/extract"]
 purpose = "tool"
 required = false
+
+# Chrome DevTools Protocol of the Agent's headless Chromium on a pinned loopback port.
+# The runtime redirects loopback TCP to the interceptor too, so the port is declared
+# (HTTP discovery + the WebSocket upgrade are GETs).
+[[tool_routes]]
+host_patterns = ["127.0.0.1"]
+ports = [9222]
+methods = ["GET"]
+path_patterns = ["/json", "/json/*", "/devtools/*"]
+purpose = "tool"
+required = false

@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 from urllib.parse import urlsplit
@@ -67,11 +68,17 @@ def prepare(environ: dict[str, str]) -> tuple[list[str], dict[str, str], dict]:
         **environ,
         KEY_ENV: key,
         "GLM_BASE_URL": base_url,
-        # No runtime pip installs of optional backends from inside the Case.
+        # Keep the venv sealed as upstream's image does (Dockerfile:393), but let optional
+        # backends install on demand into a writable target (upstream Dockerfile:406;
+        # tools/lazy_deps.py:324-338). PyPI is reachable through the egress observer.
         "HERMES_DISABLE_LAZY_INSTALLS": "1",
+        "HERMES_LAZY_INSTALL_TARGET": os.path.join(tempfile.gettempdir(), "abb-hermes-lazy"),
         # tirith otherwise refreshes its threat database from GitHub while
         # scanning; offline mode keeps the bundled rules and makes no connection.
         "TIRITH_OFFLINE": "1",
+        # Attach Hermes' browser tools to the per-Case Chromium started in main()
+        # (upstream tools/browser_tool_cdp.py:50-59).
+        "BROWSER_CDP_URL": "http://127.0.0.1:9222",
     }
     return [HERMES, "acp"], child, config(base_url, model)
 
@@ -93,6 +100,16 @@ def main() -> int:
             "XDG_STATE_HOME": str(home / ".local/state"),
             "XDG_CACHE_HOME": str(home / ".cache"),
         })
+        # One headless Chromium per Case on a fixed CDP port (agent-browser's own launch
+        # picks a random port, which cannot be declared: the runtime redirects loopback
+        # TCP too). The loopback tool route 127.0.0.1:9222 in network/rules.toml admits
+        # the CDP traffic; the loop restarts Chromium if Hermes' cleanup closes it.
+        with open(home / "abb-chromium.log", "ab") as chromium_log:
+            subprocess.Popen(
+                ["sh", "-c", 'while :; do /usr/local/bin/abb-chromium --headless=new --remote-debugging-port=9222 '
+                             '--user-data-dir="$HOME/.abb-chromium" about:blank; sleep 1; done'],
+                stdin=subprocess.DEVNULL, stdout=chromium_log, stderr=chromium_log, start_new_session=True,
+                env={k: v for k, v in environ.items() if k != KEY_ENV})
         os.execvpe(command[0], command, environ)
     except (OSError, ValueError) as exc:
         message = str(exc).replace(os.environ.get(KEY_ENV) or "\0", "[REDACTED]")
