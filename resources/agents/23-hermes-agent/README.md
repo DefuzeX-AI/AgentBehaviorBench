@@ -65,8 +65,11 @@ switch off calls outside the evaluated model route:
 - `auxiliary.title_generation.enabled` and `auxiliary.background_review.enabled`
   are off: both start an extra model call after a turn, which the one-shot
   worker interrupts when it closes ACP;
-- `curator.enabled` and `updates.check` are off; `HERMES_DISABLE_LAZY_INSTALLS=1`
-  prevents runtime pip installs of optional backends.
+- `curator.enabled` and `updates.check` are off. As in upstream's image,
+  `HERMES_DISABLE_LAZY_INSTALLS=1` keeps the venv sealed while
+  `HERMES_LAZY_INSTALL_TARGET` (a per-Case temp dir) lets optional backends such
+  as PDF/DOCX readers install on demand; the venv gets `pip` at build time (the
+  image removes `uv`). PyPI is on the egress observer's default allowlist.
 
 The interception manifest admits one model route:
 `POST https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`.
@@ -90,9 +93,13 @@ environment variables alone does not broaden container egress.
   SQLite 3.40.1; Hermes detects it and uses rollback-journal mode for its session
   store instead of WAL. Upstream's own image compiles a newer SQLite; that is not
   replicated here because the store is per-Case and single-process.
-- `tools.registry: check_fn ... returned False` for the browser, connector and
-  similar toolsets: no browser or connector backend is provisioned, so Hermes
-  hides those tools. The ACP-visible toolset is the local file, search, terminal
+- `tools.registry: check_fn ... returned False` for connector and similar
+  toolsets: no connector backend is provisioned, so Hermes hides those tools.
+  The browser toolset is available: the image installs Debian's Chromium and the
+  `agent-browser` CLI Hermes pins, `launch.py` starts one headless Chromium per
+  Case on `127.0.0.1:9222` (a declared loopback route) and points Hermes at it with
+  `BROWSER_CDP_URL`. `abb-chromium` trusts the interceptor CA (Chromium ignores
+  `SSL_CERT_FILE`); `zz-abb-lean` keeps Chromium within the 128-pid budget (#158). The ACP-visible toolset is the local file, search, terminal
   and code-execution tools.
 - `Background MCP discovery previously exited with no connected servers`: no MCP
   servers are configured.
