@@ -34,7 +34,6 @@ from agentbench.runtime.interception import (
     TraceEvent,
     TraceSink,
     get_trust_plugin,
-    resolve_model_provider,
 )
 
 from .image_builder import DockerImageBuilder
@@ -153,8 +152,10 @@ class DockerRuntime:
         interception = InterceptionConfig.from_agent_dir(agent.path)
         if interception is not None and interception.mode == 'replace':
             # Validate the model service and credentials before enabling interception.
-            target = (self._model_provider or resolve_model_provider(environ=self._environ)).resolve(self._environ)
-            self._secret_resolver.require(target.credential_env)
+            from agentbench.runtime.interception.target_routing import resolve_target_routing
+            plan = resolve_target_routing(self._environ, self._model_provider)
+            for target in plan.targets.values():
+                self._secret_resolver.require(target.credential_env)
         if invocation is not None:
             # Jobs with input/output directories use the staged worker build context.
             with worker_build_context(config, control=self.control, deadline=preparation) as (context, dockerfile):

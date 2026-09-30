@@ -55,6 +55,16 @@ class Target:
     model: str
     headers: Mapping[str, str]
     endpoint_paths: Mapping[str, str] | None = None
+    input_modalities: tuple[str, ...] = ('text',)
+    secret: str = field(default='', repr=False)
+
+
+@dataclass(frozen=True, slots=True)
+class TargetRule:
+    rule_id: str
+    target_id: str
+    protocols: tuple[str, ...]
+    input: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +82,8 @@ class ServiceConfig:
     # Upstream proxy for traffic that is neither a model nor a tool route (the egress
     # observer service). Without it such traffic is denied here, as before.
     egress_proxy: tuple[str, int] | None = None
+    targets: Mapping[str, Target] = field(default_factory=dict)
+    target_rules: tuple[TargetRule, ...] = ()
 
     @classmethod
     def load(cls, path: str | Path) -> "ServiceConfig":
@@ -93,18 +105,32 @@ class ServiceConfig:
         max_bytes = raw.get("max_trace_bytes")
         if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes < 1024:
             raise ServiceConfigurationError("max_trace_bytes must be at least 1024")
+        targets, rules = {}, ()
+        if mode == 'replace' and 'targets' in raw:
+            if 'target' in raw:
+                raise ServiceConfigurationError('Use target or targets, not both')
+            targets = {name: _target(value) for name, value in _object(raw['targets'], 'targets').items()}
+            if not targets or any(not target.secret for target in targets.values()):
+                raise ServiceConfigurationError('Named targets require their own secret files')
+            rules = _target_rules(raw.get('target_rules'), targets)
+        elif mode == 'replace' and 'target_rules' in raw:
+            raise ServiceConfigurationError('target_rules requires named targets')
+        target = _target(raw.get('target')) if mode == 'replace' and not targets else None
+        if target is not None and not target.secret and any(not c.secret for c in credentials):
+            raise ServiceConfigurationError('Legacy target credentials require a secret file')
         return cls(
             mode=mode,
             observation_headers=_observation_headers(raw.get("observation_headers", {})),
             observation_tool_purposes=_observation_tool_purposes(raw.get("observation_tool_purposes", {})),
             agent_id=_string(raw, "agent_id"),
             max_trace_bytes=max_bytes,
-            target=_target(raw.get("target")) if mode == 'replace' else None,
+            target=target,
             credentials=credentials,
             routes=routes,
             tool_routes=_tool_routes(raw.get("tool_routes", [])),
             token_counting=_object(raw.get('token_counting', {}), 'token_counting') if mode == 'replace' else {},
             egress_proxy=_egress_proxy(raw.get('egress_proxy')),
+            targets=MappingProxyType(targets), target_rules=rules,
         )
 
 
@@ -114,7 +140,7 @@ def _credential(value: object) -> Credential:
         credential_id=_string(data, "id"),
         auth_plugin=_string(data, "auth_plugin"),
         token=_read_secret(_string(data, "token_file")),
-        secret=_read_secret(_string(data, "secret_file")),
+        secret=_read_secret(_string(data, "secret_file")) if 'secret_file' in data else '',
     )
 
 
@@ -151,6 +177,8 @@ def _target(value: object) -> Target:
     )):
         raise ServiceConfigurationError("target endpoint_paths must map endpoints to relative API paths")
     return Target(
+        input_modalities=_strings(data, 'input_modalities') if 'input_modalities' in data else ('text',),
+        secret=_read_secret(_string(data, 'secret_file')) if 'secret_file' in data else '',
         endpoint_paths=MappingProxyType(endpoints) if endpoints is not None else None,
         provider_id=_string(data, "provider_id"),
         target_plugin=_string(data, "target_plugin"),
@@ -160,6 +188,30 @@ def _target(value: object) -> Target:
             {str(key).strip(): str(item).strip() for key, item in headers.items()}
         ),
     )
+
+
+def _target_rules(value, targets):
+    if not isinstance(value, list) or not value:
+        raise ServiceConfigurationError('target_rules must be a non-empty list')
+    result, ids, signatures = [], set(), set()
+    for raw in value:
+        data = _object(raw, 'target rule')
+        if set(data) != {'id', 'target', 'protocols', 'input'}:
+            raise ServiceConfigurationError('Invalid model target rule fields')
+        rule = TargetRule(_string(data, 'id'), _string(data, 'target'),
+                          _strings(data, 'protocols'), _string(data, 'input'))
+        if rule.rule_id in ids or rule.target_id not in targets:
+            raise ServiceConfigurationError('Duplicate target rule id or unknown target')
+        if not {'text', rule.input}.issubset(targets[rule.target_id].input_modalities):
+            raise ServiceConfigurationError('Target does not support rule input modalities')
+        for protocol in rule.protocols:
+            signature = (protocol, rule.input)
+            if signature in signatures:
+                raise ServiceConfigurationError('Ambiguous model target rules')
+            signatures.add(signature)
+        ids.add(rule.rule_id)
+        result.append(rule)
+    return tuple(result)
 
 
 def _tool_routes(value: object) -> tuple[ToolRoute, ...]:

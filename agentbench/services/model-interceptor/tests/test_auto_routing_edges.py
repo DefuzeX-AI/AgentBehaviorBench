@@ -41,7 +41,11 @@ class RoutingEdgesTest(unittest.TestCase):
                 request = flow("https://model.example" + path, json.dumps({"model": "source", **body}).encode(),
                                {"content-type": "application/json; charset=utf-8", **headers})
                 addon.request(request)
-                self.assertIsNone(request.response)
+                if protocol == 'openai-embeddings':
+                    self.assertEqual(request.response.status_code, 422)
+                    self.assertIn('explicit target rule', request.response.text)
+                else:
+                    self.assertIsNone(request.response)
                 self.assertEqual(request.metadata["defuzex_resolved_route"].protocol_plugin, protocol)
 
     def test_rest_google_query_key_is_consumed_not_forwarded(self):

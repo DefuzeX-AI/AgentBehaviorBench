@@ -1,0 +1,46 @@
+# Copy this file and set ABB_MODEL_ROUTING_CONFIG to its absolute path.
+# Replace model IDs with models supported by your account and provider.
+# Credentials stay in the host environment; never put their values here.
+
+[targets.conversation]
+# Reuse --model / ABB_MODEL and the selected run provider for ordinary text.
+use_run_target = true
+
+[targets.vision]
+provider = "openrouter"
+model = "your-vision-model"
+input_modalities = ["text", "image"]
+
+[targets.vectors]
+provider = "openrouter"
+model = "your-embedding-model"
+# Optional per-target overrides; otherwise inherit the provider catalog.
+# credential_env = "MY_VECTOR_API_KEY"
+# base_url = "https://your-provider.example/v1"
+[targets.vectors.endpoint_paths]
+"/embeddings" = "/embeddings"
+
+[[rules]]
+id = "conversation"
+protocols = ["openai-chat", "gemini-content", "gemini-grpc", "ollama-chat", "ollama-generate"]
+input = "text"
+target = "conversation"
+
+[[rules]]
+id = "vision"
+protocols = ["openai-chat", "gemini-content", "gemini-grpc"]
+# Includes image-only and mixed text/image messages, including tool results.
+input = "image"
+target = "vision"
+
+[[rules]]
+id = "vectors"
+protocols = ["openai-embeddings"]
+input = "text"
+target = "vectors"
+
+# Remove protocols your destination does not support. An endpoint mapping is
+# an assertion about the real service, not an implementation of a missing API.
+# Add openai-responses / anthropic-messages only for compatible native endpoints.
+# For upstream token-count endpoints, add explicit rules using
+# openai-input-tokens / anthropic-count-tokens and a compatible target.

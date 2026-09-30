@@ -76,7 +76,7 @@ and Anthropic Messages endpoint mappings. GLM defaults to the standard
 base, mapping Chat Completions to `/paas/v4/chat/completions` and Anthropic Messages to
 Zhipu's Anthropic-compatible `/anthropic/v1/messages`. It is not in `priority`; select it
 with `ABB_MODEL_PROVIDER=zhipu` for Agents whose routes use `anthropic-messages`.
-Gemini/Ollama text bridges use the target's Chat Completions endpoint. Protocols
+Gemini text/image and Ollama text bridges use the target's Chat Completions endpoint. Protocols
 absent from a target's `endpoint_paths` table fail before forwarding; this does not
 add cross-protocol conversion for GLM Responses or Anthropic Messages. Change the
 catalog only to match the capabilities of the actual deployment.
@@ -90,6 +90,74 @@ Endpoint references: [DeepSeek Chat](https://api-docs.deepseek.com/api/create-ch
 This selection applies to replacement-mode Agent model calls. ACP observe mode
 retains native provider credentials. The onboarding builder (`agent add -b`)
 continues to use its separate OpenRouter configuration.
+
+## Per-request model targets
+
+Replacement mode supports separate destinations for text generation, image
+understanding and embeddings. Set `ABB_MODEL_ROUTING_CONFIG` to an absolute path
+to a TOML file based on the
+[routing example](../../runtime/interception/model-routing.example.toml).
+This is host run configuration, shared across Agents; it does not modify their
+source code or grant additional tool egress.
+
+Each `[targets.name]` resolves a `provider` from the existing provider catalog
+and an explicit `model`. It can override `base_url`, `credential_env` and
+`endpoint_paths`. `input_modalities` defaults to `["text"]`; include `"image"`
+for a vision-capable deployment. A target may instead set `use_run_target = true`
+to inherit the run's existing provider/model selection, including `--model`.
+Explicit target models do not inherit a global `ABB_MODEL` override. Names use
+lowercase letters, digits, underscores and hyphens, starting with a letter.
+
+Each `[[rules]]` has `id`, `protocols`, `input` and `target`. Matching uses the
+recognized source protocol and primary input modality: `text` for text-only
+requests, `image` for image-only or mixed text/image conversations. Images inside
+supported tool-result content also select `image`; mentioning images in a tool
+schema does not. Rules must be unambiguous; file order is not a priority system.
+Text and image rules may refer to the same vision-capable target.
+
+The host validates references, input declarations and all target credentials
+before building the Agent. The service validates installed wire plugins and
+endpoint compatibility before it becomes ready. Capability declarations describe
+the operator's deployment; ABB does not discover or guarantee remote model
+capabilities. A provider's endpoint and model must actually support the request.
+
+Source per-run tokens authenticate the Agent independently of destination keys.
+Each selected target supplies its own mounted secret; real keys never enter the
+Agent environment. Protocol conversion and authentication remain plugin-owned.
+Failed selection does not retry against another model or forward to the original
+provider. Known model calls without a matching target fail with a diagnostic.
+`network.jsonl` records `target_id`, `target_rule`, `model_operation` and
+`input_modality` alongside the original and rewritten model information.
+
+Without a routing file, existing single-target text generation and text token
+counting remain compatible. **Embeddings and image inputs now require an explicit
+rule** instead of silently using the text target. Once a routing file is selected,
+all model calls need matching rules, including token-count endpoints if used.
+ACP observe mode ignores replacement target configuration and keeps native calls.
+
+### Image support and verification
+
+- Native OpenAI Chat, Responses and Anthropic Messages preserve image content,
+  including URLs, inline base64, multiple images and mixed text/image order.
+  The selected target must support that native endpoint and image representation.
+- Gemini REST and gRPC inline PNG/JPEG/WebP/GIF images convert to Chat Completions
+  data URLs; textual responses and streams convert back to Gemini format.
+- Gemini provider-private file references, audio/video, image generation and
+  Ollama image conversion are not implemented. Unsupported conversion semantics
+  fail explicitly; images are never silently removed to obtain a text response.
+- Text embeddings use their configured model. Multimodal embedding objects need
+  an additional wire implementation that declares their input requirements.
+
+`tests/test_issue83.py` covers host configuration. The service's
+`tests/test_issue83.py` covers mixed targets, authentication, native image fields
+and Gemini REST/gRPC conversion. Run the service suite inside its dependency image.
+The opt-in host test `tests/test_model_target_acceptance.py` builds a real Agent
+and interceptor, calls text/image/embedding APIs and verifies a deterministic
+two-color image through both native Chat and Gemini. It writes sanitized trace,
+configuration, image and Agent output under `results/verification/model-targets-*`.
+Its required environment variables are documented in the test module; live calls
+consume provider credits. This verifies runtime model traffic, not KUMA generation
+of multimodal Cases or a Judge verdict.
 
 ## Source layout
 
@@ -108,6 +176,7 @@ src/
 │   ├── observe/handler.py      # Native forwarding and evidence capture
 │   ├── replace/handler.py      # Provider/auth/protocol replacement
 │   ├── routing/automatic.py    # Adapter-owned model request recognition
+│   ├── routing/targets.py      # Per-request target and input capability selection
 │   ├── routing/policy.py       # Explicit route and tool egress matching
 │   ├── targets/compatible_json.py # Shared configured JSON target preparation
 │   ├── targets/openrouter.py  # Compatibility target name
@@ -129,7 +198,7 @@ src/
     ├── anthropic/auth.py      # Anthropic API key handling
     └── google/
         ├── auth.py            # Google header/query credentials
-        ├── gemini.py          # Gemini text and stream conversion
+        ├── gemini.py          # Gemini text/image input and text stream conversion
         └── grpc.py            # Google protobuf messages and gRPC envelopes
 ```
 
@@ -220,8 +289,9 @@ The package layout replaces the old root-level `auth`, `addon`, `events`,
 paths above; protocol IDs, configuration keys, event names and CLI entry points
 remain unchanged. Reinstall the service after updating plugin metadata.
 
-Gemini and Ollama bridges currently support text, not tools, images, audio,
-cached content or provider-specific controls. Unsupported fields fail closed.
+Gemini supports text and inline image input; Ollama remains text-only. These
+bridges do not support tools, audio, cached content or provider-specific controls.
+Unsupported fields fail closed.
 The replacement target and model are selected from deployment configuration.
 32 original-client cases and separate fault checks are available in
 `tests/acceptance/interception`; see `docs/interception/acceptance.md`.

@@ -46,6 +46,10 @@ class OllamaWire:
             payload["stream_options"] = {"include_usage": True}
         return source, payload
 
+    def requirements(self, request):
+        self.decode(request)  # Reject unsupported multimodal semantics before routing.
+        return 'generation', 'text'
+
     def translate(self, payload, done=False):
         if payload.get("error"):
             raise ValueError("Upstream returned an error")

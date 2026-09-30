@@ -20,6 +20,19 @@ class NativeJsonWire:
         self.streaming = source.get("stream", False)
         return source, dict(source)
 
+    def requirements(self, request):
+        from .inputs import conversation_input
+        source = json_request(request)
+        if self.endpoint == '/embeddings':
+            value = source.get('input')
+            if isinstance(value, dict) or (isinstance(value, list) and any(isinstance(item, dict) for item in value)):
+                raise ValueError('Multimodal embeddings require a wire that declares their input modality')
+            return 'embedding', 'text'
+        if self.endpoint == '/completions':
+            return 'generation', 'text'
+        return ('token_count' if getattr(self, 'auxiliary', False) else 'generation',
+                conversation_input(source))
+
     def response(self, payload, status):
         return payload
 
