@@ -33,6 +33,10 @@ QUIET_ENV = {
     "KILO_DISABLE_CODEBASE_INDEXING": "1",  # needs an embedding service
     "KILO_DISABLE_CLAUDE_CODE": "1",  # do not import ~/.claude settings/skills
     "KILO_DISABLE_EXTERNAL_SKILLS": "1",
+    # Offer websearch through the keyless Exa MCP endpoint (as 15-opencode does); without
+    # this flag Kilo registers websearch only for its own kilo provider.
+    "KILO_ENABLE_EXA": "1",
+    "KILO_WEBSEARCH_PROVIDER": "exa",
 }
 
 
