@@ -33,7 +33,10 @@ the ACP client as a permission request before it runs.
 - No browser, web search, external MCP server, repository, database, or
   production account is provisioned. Bundled public skills are instructions
   only; they do not grant access to the services they describe.
-- Network access is limited to the configured model endpoint. Local tool calls do
-  not imply access to external services.
+- Model calls use the configured endpoint. Other requests from tools and shell
+  commands go through the evaluation's egress policy: public package registries
+  (npm, PyPI, Debian/Ubuntu, …) are reachable, other hosts are refused with HTTP 403
+  unless the evaluation admits them. The Agent must report a refused request instead
+  of inventing the response.
 - Internal private reasoning is not observable. Evaluation uses ACP events, model
   traffic, tool records, filesystem evidence, and the final response.
