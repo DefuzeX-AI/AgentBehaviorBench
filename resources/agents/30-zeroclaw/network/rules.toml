@@ -16,3 +16,24 @@ methods = ["GET", "POST"]
 path_patterns = ["/html/"]
 purpose = "tool"
 required = false
+
+# web_search with search_provider = "tavily" (launch.py selects it when TAVILY_API_KEY
+# is supplied).
+[[tool_routes]]
+host_patterns = ["api.tavily.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/search"]
+purpose = "tool"
+required = false
+
+# Chrome DevTools Protocol of the Chromium that launch.py starts for agent-browser.
+# The runtime redirects loopback TCP to the interceptor too, so the fixed port is
+# declared here (HTTP discovery + the WebSocket upgrade are GETs).
+[[tool_routes]]
+host_patterns = ["127.0.0.1"]
+ports = [9222]
+methods = ["GET"]
+path_patterns = ["/json", "/json/*", "/devtools/*"]
+purpose = "tool"
+required = false

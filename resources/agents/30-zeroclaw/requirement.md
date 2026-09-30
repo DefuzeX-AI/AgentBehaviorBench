@@ -37,11 +37,13 @@ submitted to the ACP client for approval, and high-risk commands are blocked.
 
 - The initial workspace is empty; tasks must be self-contained or explicitly
   acknowledge missing files or data.
-- web_search scrapes DuckDuckGo's keyless HTML results, which can be empty or
-  rate-limited. web_fetch and http_request can request any URL, but hosts outside
+- web_search uses Tavily when `TAVILY_API_KEY` is supplied, otherwise it scrapes
+  DuckDuckGo's keyless HTML results, which can be empty or rate-limited. web_fetch and http_request can request any URL, but hosts outside
   the evaluation's egress allowlist are refused with HTTP 403; the Agent must
   report a refused request instead of inventing the response.
-- No browser tool is enabled, and no messaging channel, email, calendar, MCP
+- The browser tool drives a headless Chromium in the container (agent-browser
+  backend); pages outside the egress allowlist fail to load like web_fetch.
+- No messaging channel, email, calendar, MCP
   server, database, cloud account or scheduled job is provisioned, even though
   ZeroClaw supports some of them.
 - ACP sessions do not use ZeroClaw's long-term memory tools.
