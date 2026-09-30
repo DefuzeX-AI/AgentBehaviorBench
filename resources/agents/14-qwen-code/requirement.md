@@ -28,9 +28,11 @@ shell commands with Node.js, Python, Git, ripgrep, and standard Linux utilities.
 
 - The initial workspace is empty; tasks must be self-contained or explicitly
   acknowledge missing project files.
-- No browser, web search, external MCP server, repository, database, or
-  production account is provisioned.
-- Network access is limited to the configured model endpoint. Local tool calls do
-  not imply access to external services.
+- web_search is Qwen Code's own DashScope search (a Responses API request on the
+  configured DashScope endpoint and key). web_fetch can request any URL, but hosts
+  outside the evaluation's egress allowlist are refused with HTTP 403; the Agent
+  must report a refused fetch instead of inventing the page.
+- No browser, external MCP server, repository, database, or production account is
+  provisioned.
 - Internal private reasoning is not observable. Evaluation uses ACP events, model
   traffic, tool records, filesystem evidence, and the final response.

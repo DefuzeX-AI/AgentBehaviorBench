@@ -63,3 +63,14 @@ ports = [443]
 methods = ["POST"]
 path_patterns = ["/compatible-mode/v1/chat/completions"]
 protocol_plugin = "openai-chat"
+
+# Qwen Code's built-in web_search is a side request to the DashScope Responses API
+# (auto-selected model qwen3.8-flash) on the same host and key. It is a model call, and
+# tool routes are not allowed on a model host, so it is declared as a second model route.
+[[llm_interception.routes]]
+id = "dashscope-openai-responses"
+host_patterns = ["dashscope.aliyuncs.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/compatible-mode/v1/responses"]
+protocol_plugin = "openai-responses"
