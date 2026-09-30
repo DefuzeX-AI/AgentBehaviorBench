@@ -52,3 +52,12 @@ remain unverified until a real key is supplied and an actual Case completes.
 3. Run observation/replacement regressions and a real native smoke. Investigate
    unknown requests before adding narrowly scoped routes; do not allow entire hosts.
 4. Run full SDK certification before marking the Agent ready.
+
+## Browser DevTools (loopback)
+
+`rules.toml` declares `127.0.0.1:9222-9231` (`GET /json`, `/json/*`, `/devtools/*`) for the
+`browser` tool's Chrome DevTools connection. The runtime redirects loopback TCP to the
+interceptor as well, and Chrome's default `--remote-debugging-port=0` would pick a port that
+cannot be declared, so `abb-chromium` pins it into this range. The image installs Debian's
+Chromium; `abb-chromium` imports the interceptor CA into Chromium's NSS store (Chromium
+ignores `SSL_CERT_FILE`), and `zz-abb-lean` keeps it within the 128-pid budget (#158).
