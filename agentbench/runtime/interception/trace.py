@@ -54,7 +54,8 @@ class InterceptionTraceState:
     response. Authentication, conversion and capture failures still reject
     evidence. A transport error alone does not identify who cancelled. A refused
     non-model destination is the Agent's behavior, not lost evidence (#137): it
-    is counted and reported, and acceptance still requires completed model calls.
+    is counted and reported. Zero model calls is valid; observed calls must have
+    terminal outcomes and their evidence must be persisted without capture loss.
     """
 
     def __init__(self) -> None:

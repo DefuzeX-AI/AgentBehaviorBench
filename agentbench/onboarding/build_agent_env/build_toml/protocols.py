@@ -41,5 +41,5 @@ def interception_for(models, tool_routes):
         if suffix:
             route["id"] += f"-{suffix + 1}"
         routes.append(route)
-    return {"required": True, "trust_plugin": "pem-env", "credentials": list(credentials.values()),
+    return {"trust_plugin": "pem-env", "credentials": list(credentials.values()),
             "routes": routes, "tool_routes": deepcopy(tool_routes)}

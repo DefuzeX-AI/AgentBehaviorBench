@@ -126,7 +126,7 @@ def test_runtime_distinguishes_required_operation_failure_from_incomplete_trace(
     send(state, 'tool_request', 'native', required=True)
     send(state, 'tool_response', 'native', status=401)
     runtime = SimpleNamespace(control=RunControl())
-    check = DockerRuntime._required_trace_callback(runtime, state)
+    check = DockerRuntime._trace_validation_callback(runtime, state)
     with pytest.raises(DockerRuntimeError, match='Required Agent network operation failed'):
         check(0)
 

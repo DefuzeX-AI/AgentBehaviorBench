@@ -363,12 +363,12 @@ class DockerRuntime:
                 runtime_error_checker=trace_state.check_persistence if trace_state is not None else None,
                 trace_checkpoint=(
                     trace_state.checkpoint
-                    if interception is not None and interception.required
+                    if interception is not None
                     else None
                 ),
                 trace_validator=(
-                    self._required_trace_callback(trace_state)
-                    if interception is not None and interception.required
+                    self._trace_validation_callback(trace_state)
+                    if interception is not None
                     else None
                 ),
             )
@@ -637,22 +637,20 @@ class DockerRuntime:
         reader.start()
         return process, reader
 
-    def _required_trace_callback(
+    def _trace_validation_callback(
         self,
         trace_state: InterceptionTraceState,
     ) -> Callable[[object], None]:
-        def require_trace(value: object) -> None:
-            checkpoint = int(value)
-            if not trace_state.wait_for_completion_after(checkpoint, timeout=2, control=self.control):
-                raise DockerRuntimeError(
-                    "Agent invocation trace was not accepted: " + trace_state.diagnostic()
-                )
+        def validate_trace(value: object) -> None:
+            # The session API supplies a checkpoint, but zero new model calls
+            # is valid (cached answers, input rejection or deterministic work).
+            # Always drain and validate the calls that were actually observed.
             if not trace_state.wait_for_idle(control=self.control):
                 if trace_state.operation_failure:
                     raise DockerRuntimeError('Required Agent network operation failed: ' + trace_state.diagnostic())
                 raise DockerRuntimeError("Model trace is incomplete: " + trace_state.diagnostic())
 
-        return require_trace
+        return validate_trace
 
     def _wait_for_interceptor(
         self, container_name: str, ca_certificate: Path, *, deadline: Deadline | None = None,

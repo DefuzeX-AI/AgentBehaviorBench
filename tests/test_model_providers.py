@@ -33,7 +33,7 @@ def test_direct_provider_config_and_service_credentials(tmp_path, name, key, mod
     target = provider.resolve(env)
     assert (target.provider_id, target.model, target.base_url) == (name, 'configured-model', url)
     assert target.target_plugin == 'compatible-json'
-    config = InterceptionConfig(True, 'pem-env', MappingProxyType({}),
+    config = InterceptionConfig('pem-env', MappingProxyType({}),
         (CredentialConfig('native', 'OPENAI_API_KEY', 'bearer-token'),), ())
     data, agent_env = prepare_service_config(config, agent_id='fixture', max_trace_bytes=4096,
         secret_dir=tmp_path, secret_resolver=EnvironmentSecretResolver(env), environ=env)
@@ -148,7 +148,7 @@ def test_host_catalog_reaches_service_target(tmp_path, monkeypatch, provider, pr
     from defuzex_model_interceptor.config import _target, Route
     from defuzex_model_interceptor.registry import load_targets
     env = {f'{provider.upper()}_API_KEY': 'test-secret', f'{provider.upper()}_MODEL': 'selected'}
-    config = InterceptionConfig(True, 'pem-env', {}, (), ())
+    config = InterceptionConfig('pem-env', {}, (), ())
     data, _ = prepare_service_config(config, agent_id='fixture', max_trace_bytes=4096,
         secret_dir=tmp_path, secret_resolver=EnvironmentSecretResolver(env), environ=env)
     target = _target(data['target'])

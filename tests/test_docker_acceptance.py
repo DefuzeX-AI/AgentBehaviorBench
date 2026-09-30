@@ -142,7 +142,7 @@ def test_one_agent_runs_two_cases_in_parallel_and_cleans_resources(cancel, inter
     if intercept:
         with (root / "agent.toml").open("a") as manifest:
             manifest.write(
-                '[llm_interception]\nrequired = true\ntrust_plugin = "pem-env"\n'
+                '[llm_interception]\ntrust_plugin = "pem-env"\n'
                 '[[llm_interception.credentials]]\nid = "openai"\nagent_env = "OPENAI_API_KEY"\nauth_plugin = "bearer-token"\n'
                 '[[llm_interception.routes]]\nid = "openai-chat"\nhost_patterns = ["api.openai.com"]\n'
                 'ports = [443]\nmethods = ["POST"]\npath_patterns = ["/v1/chat/completions"]\n'

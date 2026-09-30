@@ -338,8 +338,9 @@ invalid requests return 400; oversized inputs return 413. Native fallback remain
 visible, not disguised as a zero count. Without opt-in, auxiliary requests retain
 the real upstream response/status, including unsupported endpoint responses.
 
-`model_auxiliary_request/response/error` do not satisfy a generation checkpoint.
-The host drains them before acceptance. Responses record origin, algorithm version,
+`model_auxiliary_request/response/error` record auxiliary calls separately from
+generation. The host drains them before acceptance; no minimum number of model
+calls is required. Responses record origin, algorithm version,
 target/source models, encoding and request digest. Ordinary model evidence and
 unknown-request/authentication failures keep their existing strict policy.
 

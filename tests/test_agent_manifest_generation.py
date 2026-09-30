@@ -29,6 +29,7 @@ def facts():
 
 def render(source, facts, **kwargs):
     content = render_manifest(facts, source=source, agent_id="my-agent", **kwargs)
+    assert 'required' not in tomllib.loads(content)['llm_interception']
     validate_manifest(content, SimpleNamespace(source=source, agent_id="my-agent", plan={"bindings": ["bindings/bridge.py"]}))
     return tomllib.loads(content)
 

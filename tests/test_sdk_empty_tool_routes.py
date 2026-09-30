@@ -8,9 +8,9 @@ from agentbench.sdk.common.whitelist import append_whitelist, tomllib
 def test_sdk_can_append_routes_to_empty_array_without_changing_other_tables(tmp_path, declaration):
     whitelist = tmp_path / 'whitelist.json'
     whitelist.write_text(json.dumps([{'url': 'https://sdk.example/api', 'methods': ['POST']}]))
-    original = '[unrelated]\ntool_routes=[]\n[llm_interception]\nrequired=true\n' + declaration + '\n'
+    original = '[unrelated]\ntool_routes=[]\n[llm_interception]\ntrust_plugin="pem-env"\n' + declaration + '\n'
     result = tomllib.loads(append_whitelist(original, whitelist))
     assert result['unrelated']['tool_routes'] == []
-    assert result['llm_interception']['required'] is True
+    assert result['llm_interception']['trust_plugin'] == 'pem-env'
     assert result['llm_interception']['tool_routes'][0]['purpose'] == 'evaluation'
     assert result['llm_interception']['tool_routes'][0]['host_patterns'] == ['sdk.example']
