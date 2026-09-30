@@ -27,17 +27,20 @@ class EgressSettings:
     """What happens to Agent traffic that is neither a model nor a tool route.
 
     ``observe`` hands it to the egress observer, which admits the allowlist and
-    records every attempt as behavior (issue #137). ``deny`` keeps the previous
-    in-interceptor refusal. Entries are ``host`` or ``*.suffix``, optionally
-    ``:port``; without a port 80 and 443 are admitted.
+    records every attempt as behavior (issue #137). ``open`` also goes through the
+    observer and is recorded the same way, but forwards every destination: for
+    evaluating Agents whose real tools (web fetch, git, browsers) reach hosts that
+    cannot be listed in advance. ``deny`` keeps the previous in-interceptor refusal.
+    Entries are ``host`` or ``*.suffix``, optionally ``:port``; without a port 80 and
+    443 are admitted.
     """
 
     mode: str = "observe"
     allow: tuple[str, ...] = DEFAULT_EGRESS_ALLOW
 
     def __post_init__(self) -> None:
-        if self.mode not in ("observe", "deny"):
-            raise ValueError(f"{EGRESS_ENV} must be 'observe' or 'deny'")
+        if self.mode not in ("observe", "open", "deny"):
+            raise ValueError(f"{EGRESS_ENV} must be 'observe', 'open' or 'deny'")
         self.rules()
 
     @classmethod
@@ -62,6 +65,10 @@ class EgressSettings:
                 if value not in ports:
                     ports.append(value)
         return [{"host": host, "ports": ports} for host, ports in merged.items()]
+
+    @property
+    def uses_observer(self) -> bool:
+        return self.mode in ("observe", "open")
 
 
 @dataclass(frozen=True, slots=True)

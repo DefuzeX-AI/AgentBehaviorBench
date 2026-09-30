@@ -43,6 +43,12 @@ class ObserverConfigTest(unittest.TestCase):
         config = ObserverConfig.from_json(json.dumps({"agent_id": "a"}))
         self.assertIsNone(config.allow.match("pypi.org", 443))
 
+    def test_allow_all_is_off_unless_set(self):
+        self.assertFalse(ObserverConfig.from_json(json.dumps({"agent_id": "a"})).allow_all)
+        self.assertTrue(ObserverConfig.from_json(json.dumps({"agent_id": "a", "allow_all": True})).allow_all)
+        with self.assertRaises(ObserverConfigurationError):
+            ObserverConfig.from_json(json.dumps({"agent_id": "a", "allow_all": "yes"}))
+
     def test_invalid_configuration_is_rejected(self):
         for data in ({}, {"agent_id": "a", "listen_port": 80}, {"agent_id": "a", "allow": {}},
                      {"agent_id": "a", "allow": [{"host": "*", "ports": [443]}]},

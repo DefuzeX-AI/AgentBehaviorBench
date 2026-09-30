@@ -74,8 +74,10 @@ class EgressObserverPolicy:
 
 
 def observer_configuration(agent_id: str, settings: EgressSettings) -> str:
-    return json.dumps({"agent_id": agent_id, "listen_port": OBSERVER_PORT, "allow": settings.rules()},
-                      ensure_ascii=False)
+    data = {"agent_id": agent_id, "listen_port": OBSERVER_PORT, "allow": settings.rules()}
+    if settings.mode == "open":
+        data["allow_all"] = True
+    return json.dumps(data, ensure_ascii=False)
 
 
 @dataclass(slots=True)

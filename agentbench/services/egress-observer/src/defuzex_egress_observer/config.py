@@ -22,6 +22,8 @@ class ObserverConfig:
     allow: AllowList
     listen_port: int = DEFAULT_PORT
     connect_timeout: float = 15.0
+    # ABB_EGRESS=open: forward destinations the allowlist does not name (still recorded).
+    allow_all: bool = False
 
     @classmethod
     def from_environment(cls, environ=None) -> "ObserverConfig":
@@ -47,8 +49,11 @@ class ObserverConfig:
         allow = data.get("allow", [])
         if not isinstance(allow, list):
             raise ObserverConfigurationError("allow must be a list")
+        allow_all = data.get("allow_all", False)
+        if not isinstance(allow_all, bool):
+            raise ObserverConfigurationError("allow_all must be a boolean")
         return cls(agent_id=agent_id.strip(), listen_port=port,
-                   allow=AllowList(tuple(_rule(item) for item in allow)))
+                   allow=AllowList(tuple(_rule(item) for item in allow)), allow_all=allow_all)
 
 
 def _rule(value: object) -> AllowRule:
