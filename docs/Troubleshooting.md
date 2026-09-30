@@ -12,6 +12,7 @@
 | `Trace UI not built or incomplete` | Use compatible Node (20.19+ on 20.x or 22.12+), then `cd web`, `npm ci`, `npm run build`. Open the actual saved result path. |
 | Wrong Suite / URL | Use the complete printed `View:` URL including Suite ID and port. Python selects a free port if 8765 is occupied. |
 | Docker unavailable / permission denied | Run `docker info` as the same user. Start Desktop/Engine and inspect Docker context/permissions. Do not run ABB as root to hide ownership problems. |
+| Python 3.10 Case generation reports missing `tomllib` / `tomli` | Update ABB and rebuild the evaluation image. Worker staging installs `tomli` for Python below 3.11 into the image's selected Python environment; installing it only on the host does not repair an existing image. See [#85](https://github.com/DefuzeX-AI/AgentBehaviorBench/issues/85). |
 | Missing/invalid KUMA key | Nonempty `KUMA_API_KEY` takes precedence over `DEFUZEX_API_KEY`. Check exported variables overriding `.env` and service account access without displaying keys. |
 | Missing model / quota / provider error | `OPENROUTER_MODEL` has no runtime default. Check the slug, account access, funds/limits and tool/protocol support. A key is not a model name. |
 | `agent add -b` rejects model response | Requires strict structured outputs. Inspect `cache/onboarding/…` to distinguish schema incompatibility, output exhaustion and timeout. |
