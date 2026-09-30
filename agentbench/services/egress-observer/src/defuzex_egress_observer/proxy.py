@@ -101,11 +101,11 @@ class EgressProxy:
                 return
             fields.update(method=method, host=host, port=port, path=path)
             rule = self.config.allow.match(host, port)
-            if rule is None:
+            if rule is None and not self.config.allow_all:
                 events.emit("egress_denied", **fields, error_code="egress_denied", status=403)
                 _reply(writer, 403, "Forbidden")
                 return
-            fields["rule"] = rule.host
+            fields["rule"] = rule.host if rule is not None else "*"
             try:
                 upstream_reader, upstream_writer = await asyncio.wait_for(
                     asyncio.open_connection(host, port), self.config.connect_timeout)

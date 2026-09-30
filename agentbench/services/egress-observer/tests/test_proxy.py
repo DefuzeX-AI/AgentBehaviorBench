@@ -88,6 +88,24 @@ class ProxyTest(unittest.IsolatedAsyncioTestCase):
         denied = self.events[0][1]
         self.assertEqual((denied["host"], denied["port"], denied["error_code"]), ("example.com", 443, "egress_denied"))
 
+    async def test_allow_all_forwards_an_unlisted_destination_and_records_it(self):
+        config = ObserverConfig(agent_id="agent", listen_port=0, allow=AllowList(()), allow_all=True)
+        server = await asyncio.start_server(EgressProxy(config).handle, "127.0.0.1", 0)
+        self.addAsyncCleanup(server.wait_closed)
+        self.addCleanup(server.close)
+        reader, writer = await asyncio.open_connection("127.0.0.1", server.sockets[0].getsockname()[1])
+        writer.write(f"CONNECT 127.0.0.1:{self.upstream_port} HTTP/1.1\r\n\r\n".encode())
+        await writer.drain()
+        self.assertEqual(await reader.readuntil(b"\r\n\r\n"), b"HTTP/1.1 200 Connection Established\r\n\r\n")
+        writer.write(b"hi")
+        await writer.drain()
+        self.assertEqual(await asyncio.wait_for(reader.read(), 5), b"echo:hi")
+        writer.close()
+        await writer.wait_closed()
+        await asyncio.sleep(0.05)
+        self.assertEqual([name for name, _ in self.events], ["egress_request", "egress_response"])
+        self.assertEqual(self.events[0][1]["rule"], "*")
+
     async def test_plain_http_request_is_forwarded_with_its_status(self):
         data = await self.exchange(
             f"GET http://127.0.0.1:{self.upstream_port}/pkg?token=x HTTP/1.1\r\nhost: 127.0.0.1\r\n\r\n".encode())

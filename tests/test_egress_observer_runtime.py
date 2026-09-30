@@ -33,7 +33,16 @@ def test_unsafe_allow_entries_are_rejected(entry):
     with pytest.raises(ValueError):
         EgressSettings(allow=(entry,))
     with pytest.raises(ValueError):
-        EgressSettings(mode="open")
+        EgressSettings(mode="everything")
+
+
+def test_open_mode_uses_the_observer_and_forwards_everything():
+    settings = EgressSettings.from_environment({"ABB_EGRESS": "open"})
+    assert settings.mode == "open" and settings.uses_observer
+    assert not EgressSettings.from_environment({"ABB_EGRESS": "deny"}).uses_observer
+    config = json.loads(observer_configuration("agent", settings))
+    assert config["allow_all"] is True and config["allow"] == settings.rules()
+    assert "allow_all" not in json.loads(observer_configuration("agent", EgressSettings()))
 
 
 def test_observer_configuration_and_interceptor_handoff_address(tmp_path):

@@ -51,11 +51,12 @@ participate in model trace acceptance.
 ```
 
 A rule host is either exact or `*.suffix` (strict subdomains). An empty allowlist
-denies everything while still recording each attempt.
+denies everything while still recording each attempt. `"allow_all": true` forwards
+destinations the allowlist does not name; they are recorded with `"rule": "*"`.
 
 On the host side the allowlist comes from `agentbench/runtime/docker/policy.py`
-(`EgressSettings`). `ABB_EGRESS=deny` restores the previous in-interceptor denial;
-`ABB_EGRESS_ALLOW=host[:port],...` adds destinations.
+(`EgressSettings`). `ABB_EGRESS=open` sets `allow_all`; `ABB_EGRESS=deny` restores the
+previous in-interceptor denial; `ABB_EGRESS_ALLOW=host[:port],...` adds destinations.
 
 ## Tests
 

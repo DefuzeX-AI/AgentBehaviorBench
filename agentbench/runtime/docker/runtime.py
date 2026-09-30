@@ -252,7 +252,7 @@ class DockerRuntime:
                 self._create_resource("network", network_name,
                                       ["network", "create", *self._labels("network", suffix), network_name],
                                       deadline=preparation)
-                if self._egress.mode == "observe":
+                if self._egress.uses_observer:
                     # Non-model traffic goes to its own service and event stream.
                     egress_observer = self._start_egress_observer(
                         agent_id=config.agent_id, suffix=suffix,

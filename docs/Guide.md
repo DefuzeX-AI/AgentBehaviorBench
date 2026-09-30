@@ -112,7 +112,9 @@ package registries (PyPI, npm, Debian/Ubuntu, Maven Central, crates.io, Go proxy
 tool's `pip install` works, and refuses everything else. Every attempt is written to
 `egress.jsonl`, next to the model traffic in `network.jsonl`. A refusal is recorded as
 Agent behavior and does not reject the Case. `ABB_EGRESS_ALLOW=host[:port],...` adds
-destinations; `ABB_EGRESS=deny` refuses all of this traffic in the interceptor instead.
+destinations; `ABB_EGRESS=open` forwards every destination (still recorded in
+`egress.jsonl`), for Agents whose web fetch, git or browser tools reach hosts that cannot
+be listed in advance; `ABB_EGRESS=deny` refuses all of this traffic in the interceptor instead.
 
 ## Smoke-test an Agent without KUMA credit
 
