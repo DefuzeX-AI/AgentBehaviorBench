@@ -32,7 +32,7 @@ def toml_str(value: str) -> str:
     return json.dumps(value)
 
 
-def config_toml(base_url: str, model: str) -> str:
+def config_toml(base_url: str, model: str, search_provider: str = "duckduckgo") -> str:
     """ZeroClaw config.toml (schema v3) for one Case; contains no credential."""
     return "\n".join([
         "schema_version = 3",
@@ -66,11 +66,17 @@ def config_toml(base_url: str, model: str) -> str:
         "[runtime_profiles.abb]",
         "agentic = true",
         "",
-        # No browser backend (agent-browser/Chrome) is installed in the image.
         # http_request, web_fetch and web_search keep their upstream defaults;
         # their traffic goes to declared tool routes or ABB's egress observer.
+        # The browser uses the agent-browser backend, attached to the Chromium main()
+        # starts on 127.0.0.1:9222 (AGENT_BROWSER_CDP); allowed_domains keeps its default ["*"].
         "[browser]",
-        "enabled = false",
+        "enabled = true",
+        'backend = "agent_browser"',
+        "",
+        # Tavily when TAVILY_API_KEY is supplied, else upstream default DuckDuckGo.
+        "[web_search]",
+        f"search_provider = {toml_str(search_provider)}",
         "",
     ])
 
@@ -159,8 +165,10 @@ def main() -> int:
         home = Path(tempfile.mkdtemp(prefix="abb-zeroclaw-home-"))
         config_dir = home / ".zeroclaw"
         config_dir.mkdir(mode=0o700)
-        (config_dir / "config.toml").write_text(config_toml(base_url, model))
-        environ = {k: v for k, v in os.environ.items() if k != KEY_ENV}
+        tavily_key = os.environ.get("TAVILY_API_KEY", "").strip()
+        (config_dir / "config.toml").write_text(
+            config_toml(base_url, model, "tavily" if tavily_key else "duckduckgo"))
+        environ = {k: v for k, v in os.environ.items() if k not in (KEY_ENV, "TAVILY_API_KEY")}
         environ.update({
             "HOME": str(home),
             "XDG_CONFIG_HOME": str(home / ".config"),
@@ -170,7 +178,30 @@ def main() -> int:
             KEY_OVERRIDE_ENV: key,
             "NO_COLOR": "1",
         })
-        return relay([ZEROCLAW, "--config-dir", str(config_dir), "acp"], environ)
+        if tavily_key:
+            environ["ZEROCLAW_web_search__tavily_api_key"] = tavily_key
+        # agent-browser would pick a random CDP port (--remote-debugging-port=0);
+        # the runtime redirects loopback TCP too, so run Chromium on the port rules.toml declares.
+        environ["AGENT_BROWSER_CDP"] = "9222"
+        environ["AGENT_BROWSER_EXECUTABLE_PATH"] = "/usr/local/bin/abb-chromium"
+        chrome_env = {k: v for k, v in environ.items() if not k.startswith("ZEROCLAW_")}
+        with open(home / "chromium.log", "wb") as chrome_log:
+            chrome = subprocess.Popen(
+                ["/usr/local/bin/abb-chromium", "--headless=new", "--remote-debugging-port=9222",
+                 f"--user-data-dir={home / '.abb-chromium'}", "--no-first-run",
+                 "--no-default-browser-check", "--disable-background-networking",
+                 "--disable-component-update", "--disable-sync", "--password-store=basic",
+                 "--use-mock-keychain", "--window-size=1280,720", "about:blank"],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=chrome_log,
+                env=chrome_env, cwd=str(home), start_new_session=True)
+        try:
+            return relay([ZEROCLAW, "--config-dir", str(config_dir), "acp"], environ)
+        finally:
+            chrome.terminate()
+            try:
+                chrome.wait(5)
+            except subprocess.TimeoutExpired:
+                chrome.kill()
     except (OSError, ValueError) as exc:
         message = str(exc).replace(os.environ.get(KEY_ENV) or "\0", "[REDACTED]")
         print(message, file=sys.stderr)

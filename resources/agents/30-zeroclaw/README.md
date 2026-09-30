@@ -59,10 +59,20 @@ changing environment variables alone does not broaden container egress.
   commands therefore reach the ACP client as `session/request_permission`;
   ABB answers `allow_once`. The ACP session `cwd` (`/home/agent/workspace`) is
   the file/shell boundary.
-- `browser` is disabled: no browser backend is installed in the image. The other
-  built-in tools, including `web_search`, `web_fetch` and `http_request`, are
-  ZeroClaw's defaults. `web_search` uses the keyless DuckDuckGo HTML provider,
-  declared as a tool route in `network/rules.toml`. `web_fetch` and `http_request`
+- `browser` uses the `agent_browser` backend. The pinned release is built without
+  the native browser backend, so the image installs the `agent-browser` 0.38.1 CLI
+  (checksum-pinned) and Debian's Chromium. agent-browser normally starts Chrome on a
+  random debugging port, which cannot be declared as a route (the runtime redirects
+  loopback TCP too), so `launch.py` starts one headless Chromium per Case on
+  `127.0.0.1:9222` (declared in `network/rules.toml`) and points agent-browser at it
+  with `AGENT_BROWSER_CDP`. `abb-chromium` trusts the interceptor CA; `zz-abb-lean`
+  keeps Chromium within the 128-pid budget (#158).
+- The other built-in tools, including `web_search`, `web_fetch` and `http_request`,
+  are ZeroClaw's defaults. `web_search` uses Tavily when `TAVILY_API_KEY` is
+  supplied (`api.tavily.com /search`, a tool route; the key reaches ZeroClaw only
+  through its `ZEROCLAW_web_search__tavily_api_key` override and is never written
+  to disk), otherwise the keyless DuckDuckGo HTML provider, declared as a tool
+  route in `network/rules.toml`. `web_fetch` and `http_request`
   go to ABB's egress observer, which forwards allowlisted hosts, refuses the rest
   with 403 and records every attempt in `egress.jsonl`; a refusal does not reject
   the Case (#137). `ABB_EGRESS_ALLOW=host[:port],...` admits more hosts for a run.
