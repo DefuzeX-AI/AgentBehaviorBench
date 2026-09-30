@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
@@ -44,6 +45,9 @@ class BenchmarkResult:
     steps: tuple[BenchmarkStepResult, ...]
     history_count: int
     provider_mode: str | None = None
+    evidence_status: str = "unknown"
+    host_acceptance: str = "unknown"
+    host_trace_validation: str = "unknown"
 
     @property
     def passed(self) -> bool:
@@ -51,6 +55,16 @@ class BenchmarkResult:
 
 
 CaseStatus = Literal["succeeded", "failed", "cancelled", "skipped"]
+QualityGate = Literal["passed", "failed"]
+
+
+def _aggregate_execution(statuses) -> str:
+    """Aggregate terminal operational states, independently of Judge verdicts."""
+    states = set(statuses)
+    for state in ('failed', 'blocked', 'cancelled', 'skipped'):
+        if state in states:
+            return state
+    return 'completed' if states == {'completed'} else 'skipped'
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,9 +93,60 @@ class CaseResult:
     @property
     def execution_status(self) -> str:
         """Separate a delivered verdict from infrastructure failure."""
+        if self.status in {'cancelled', 'skipped'}:
+            return self.status
+        if ((self.artifacts or {}).get('completion') or {}).get('execution') == 'failed':
+            return 'failed'
+        if self.host_acceptance == 'rejected' or self.host_trace_validation == 'failed':
+            return 'blocked'
         if self.benchmark is not None and self.benchmark.report is not None and self.error_type is None:
             return "completed"
         return {"failed": "blocked", "succeeded": "completed"}.get(self.status, self.status)
+
+    @property
+    def evidence_status(self) -> str:
+        if self.benchmark is not None:
+            return self.benchmark.evidence_status
+        artifacts = self.artifacts or {}
+        return artifacts.get('evidence_status') or (artifacts.get('completion') or {}).get('evidence') or 'unknown'
+
+    @property
+    def host_trace_validation(self) -> str:
+        if self.benchmark is not None:
+            return self.benchmark.host_trace_validation
+        return (self.artifacts or {}).get('host_trace_validation') or 'unknown'
+
+    @property
+    def host_acceptance(self) -> str:
+        """Explicit host evidence; a report alone cannot establish acceptance."""
+        if self.benchmark is not None:
+            return self.benchmark.host_acceptance
+        artifacts = self.artifacts or {}
+        if artifacts.get('host_acceptance'):
+            return artifacts['host_acceptance']
+        retained = artifacts.get('received_report')
+        retained = retained if isinstance(retained, Mapping) else {}
+        if retained.get('host_accepted') is True:
+            return 'accepted'
+        if retained.get('host_accepted') is False or self.host_trace_validation == 'failed':
+            return 'rejected'
+        return 'unknown'
+
+    @property
+    def judge_delivery_status(self) -> str:
+        if self.judge_status is not None:
+            return 'received'
+        return (self.artifacts or {}).get('judge_delivery_status') or (
+            'missing' if self.benchmark is not None else 'unknown')
+
+    @property
+    def quality_gate(self) -> QualityGate:
+        """Keep the non-pass gate while excluding rejected or unfinished work."""
+        return 'passed' if (self.execution_status == 'completed' and self.error_type is None
+                            and self.benchmark is not None and self.benchmark.passed
+                            and self.host_acceptance != 'rejected'
+                            and self.host_trace_validation != 'failed'
+                            and self.evidence_status not in {'missing', 'failed'}) else 'failed'
 
     @property
     def judge_status(self) -> str | None:
@@ -101,8 +166,10 @@ class CaseResult:
 
     @property
     def judge_accepted(self) -> bool:
-        """Whether the verdict belongs to a run the host accepted."""
-        return self.benchmark is not None and self.benchmark.report is not None
+        """Legacy accepted-benchmark flag; explicit host evidence is host_acceptance."""
+        return (self.benchmark is not None and self.benchmark.report is not None
+                and self.error_type is None and self.host_acceptance != 'rejected'
+                and self.host_trace_validation != 'failed')
 
     def __post_init__(self) -> None:
         if type(self.case_index) is not int or self.case_index < 0:
@@ -169,8 +236,33 @@ class SuiteAgentResult:
 
     @property
     def passed(self) -> bool:
+        """Legacy aggregate; new consumers should use quality_gate."""
         return (self.preparation_error is None and len(self.case_results) == self.requested_case_count
                 and all(case.status == "succeeded" for case in self.case_results))
+
+    @property
+    def execution_counts(self) -> dict[str, int]:
+        counts = Counter(case.execution_status for case in self.case_results)
+        missing = self.requested_case_count - len(self.case_results)
+        if missing:
+            counts['skipped'] += missing
+        return dict(counts)
+
+    @property
+    def execution_status(self) -> str:
+        if self.preparation_error is not None:
+            return 'cancelled' if self.preparation_error.error_type == 'RunCancelled' else 'failed'
+        return _aggregate_execution(self.execution_counts)
+
+    @property
+    def judge_counts(self) -> dict[str, int]:
+        return dict(Counter(case.judge_status for case in self.case_results if case.judge_status is not None))
+
+    @property
+    def quality_gate(self) -> QualityGate:
+        return 'passed' if (self.preparation_error is None
+                            and len(self.case_results) == self.requested_case_count
+                            and all(case.quality_gate == 'passed' for case in self.case_results)) else 'failed'
 
     @property
     def status(self) -> CaseStatus:
@@ -225,3 +317,37 @@ class BenchmarkSuiteResult:
     @property
     def passed(self) -> bool:
         return self.skipped_count == 0 and self.failed_count == 0
+
+    @property
+    def execution_counts(self) -> dict[str, int]:
+        counts = Counter(item.execution_status for item in self.items)
+        if self.skipped_count:
+            counts['skipped'] += self.skipped_count
+        return dict(counts)
+
+    @property
+    def execution_status(self) -> str:
+        return _aggregate_execution(self.execution_counts)
+
+    @property
+    def case_execution_counts(self) -> dict[str, int]:
+        counts = Counter()
+        for item in self.items:
+            counts.update(item.execution_counts)
+        return dict(counts)
+
+    @property
+    def judge_counts(self) -> dict[str, int]:
+        counts = Counter()
+        for item in self.items:
+            counts.update(item.judge_counts)
+        return dict(counts)
+
+    @property
+    def quality_gate(self) -> QualityGate:
+        return 'passed' if (self.skipped_count == 0
+                            and all(item.quality_gate == 'passed' for item in self.items)) else 'failed'
+
+    @property
+    def exit_code(self) -> int:
+        return 0 if self.quality_gate == 'passed' else 1

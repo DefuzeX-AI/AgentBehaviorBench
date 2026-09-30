@@ -104,6 +104,12 @@ def collect_artifacts(directory, host, *, environ=None):
               'safe_case_replay': host.get('safe_case_replay') is True,
               'host_phase': host.get('phase'), 'host_error_type': host.get('error_type'),
               'completion': {key: summary.get(key) for key in ('execution', 'otel', 'submission', 'evidence')}}
+    result['evidence_status'] = summary.get('evidence') or 'unknown'
+    result['host_acceptance'] = ('accepted' if host.get('status') == 'succeeded'
+                                 else 'rejected' if host.get('status') == 'failed' else 'unknown')
+    # Only identity-checked reports below can establish received delivery.
+    result['judge_delivery_status'] = {'missing': 'missing', 'failed': 'service_failure'}.get(
+        summary.get('judge'), 'unknown')
     unreadable = [reason for relative in REQUIRED_ARTIFACTS
                   if (reason := unreadable_reason(directory, relative)) is not None]
     if unreadable:
@@ -145,6 +151,7 @@ def collect_artifacts(directory, host, *, environ=None):
             'run_id': _text(run_id), 'case_id': _text(case_id),
             'path': 'evaluation/judge/report.json', 'host_accepted': host.get('status') == 'succeeded',
         }
+        result['judge_delivery_status'] = 'received'
     related = []
     try:
         path = artifact_path(directory, 'network.jsonl')

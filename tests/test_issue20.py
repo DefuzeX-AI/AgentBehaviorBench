@@ -13,6 +13,7 @@ from agentbench.sdk.plugin.kuma import service
 def test_host_rejection_retains_only_matching_report(monkeypatch, tmp_path, foreign):
     root = tmp_path/'source'
     (root/'agent').mkdir(parents=True)
+    (root/'agent.toml').write_text('')
     agent = NS(path=root, agent_id='agent')
 
     @contextmanager

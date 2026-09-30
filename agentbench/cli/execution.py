@@ -225,7 +225,7 @@ def run_benchmark_once(
             print_viewer_footer(
                 result_log.path, None if viewer is None else viewer.url, output_fn
             )
-        return BenchmarkExecution(0 if result.passed else 1, result, result_log, viewer)
+        return BenchmarkExecution(result.exit_code, result, result_log, viewer)
     except (ProviderSelectionError, SuiteConfigurationError) as exc:
         close_live_cases()
         primary_error, keep_viewer_on_error = exc, True

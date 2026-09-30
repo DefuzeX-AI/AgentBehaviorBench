@@ -173,6 +173,9 @@ class BenchmarkRunner:
             steps=result.steps,
             history_count=result.history_count,
             provider_mode=provider_mode,
+            evidence_status=result.evidence_status,
+            host_acceptance=result.host_acceptance,
+            host_trace_validation=result.host_trace_validation,
         )
 
     async def arun(

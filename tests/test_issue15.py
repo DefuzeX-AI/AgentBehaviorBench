@@ -5,23 +5,26 @@ import pytest
 
 from agentbench.cli.features import evaluate
 from agentbench.cli.main import build_parser
+from agentbench.harness.result import BenchmarkResult, BenchmarkSuiteResult, CaseResult, SuiteAgentResult
 
 
 @pytest.mark.parametrize('statuses,expected', [(['pass'], 0), (['issue'], 1),
     (['insufficient_evidence'], 1), (['issue', 'pass'], 1)])
 def test_evaluate_exit_follows_every_judge(monkeypatch, tmp_path, statuses, expected):
     agent = NS(agent_id='agent', case_count=len(statuses))
-    reports = [NS(report=NS(status=s)) for s in statuses]
-    item = NS(error_type=None, completed_case_count=len(statuses),
-              requested_case_count=len(statuses), benchmarks=reports)
-    result = NS(items=[item], passed=expected == 0)
+    cases = tuple(CaseResult('agent', i, f'job-{i}', 'succeeded' if s == 'pass' else 'failed',
+                  benchmark=BenchmarkResult('agent', 'fixture', f'run-{i}', 'done', NS(status=s), (), 0))
+                  for i, s in enumerate(statuses))
+    result = BenchmarkSuiteResult('suite', ('agent',), (SuiteAgentResult('agent', cases, len(cases)),))
+    monkeypatch.setattr('agentbench.cli.terminal_ui.presentation.print_agents', lambda *a, **kw: None)
+    monkeypatch.setattr('agentbench.sdk.strategy_checks.check_agents', lambda *a, **kw: {})
     monkeypatch.setattr(evaluate, 'load_project_environment', lambda _: None)
     monkeypatch.setattr(evaluate, 'execution_environment_snapshot', lambda: NS(environ={}, concurrency=None))
     monkeypatch.setattr(evaluate, 'enabled_agents', lambda _: [{'agent_id': 'agent'}])
     monkeypatch.setattr(evaluate, 'resolve_agent', lambda *a: agent)
     monkeypatch.setattr(evaluate, 'build_trace_suite_runner', lambda **kw: object())
     monkeypatch.setattr(evaluate, 'run_benchmark_session',
-                        lambda *a, **kw: NS(result=result, exit_code=expected))
+                        lambda *a, **kw: NS(result=result, exit_code=0))
     args = build_parser().parse_args(['evaluate', 'agent', '--no-view', '--result-output', str(tmp_path/'run.json')])
     args.yes = True
     assert evaluate.execute(args) == expected

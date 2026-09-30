@@ -30,7 +30,7 @@ def execute(args: Namespace):
             on_created=lambda directory: print(f'New Suite: {directory.name}\nResult artifact: {directory / "events.json"}'))
         print_suite_summary(execution.result, print)
         print(f'View: agentbench view {execution.directory / "events.json"}')
-        return 0 if execution.result.passed else 1
+        return execution.result.exit_code
     except KeyboardInterrupt:
         print('New Suite interrupted; its saved Cases and results are retained.')
         return 130

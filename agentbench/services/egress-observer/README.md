@@ -6,8 +6,9 @@ separately.
 
 ## Where it sits
 
-The Agent shares the model interceptor's network namespace, so every non-root TCP
-connection still reaches mitmproxy first. The interceptor keeps full ownership of
+The Agent shares the model interceptor's network namespace. Loopback traffic
+is native and unobserved; non-loopback non-root IPv4 TCP connections still reach
+mitmproxy first. External IPv6 and non-DNS UDP remain blocked. The interceptor keeps full ownership of
 declared model routes and tool routes. A request that matches neither is no longer
 answered with a local `403 egress_denied`; the interceptor sends it upstream through
 this proxy instead (`server_conn.via`). The observer then decides:

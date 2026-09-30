@@ -22,7 +22,7 @@ SDK_INSTALL = (
     '|| python -m ensurepip --default-pip >/dev/null '
     '|| { echo "ABB evaluation overlay: $interpreter has no pip module and no ensurepip;'
     ' install pip into that interpreter in the Agent Dockerfile" >&2; exit 1; }; '
-    'python -m pip --isolated install --no-cache-dir '
+    'python -m pip --isolated install --upgrade --no-cache-dir '
     '--index-url https://pypi.org/simple '
     '-r /opt/abb-sdk/requirements.txt\n'
 )
@@ -35,7 +35,7 @@ SDK_ENVIRONMENT = ('KUMA_API_KEY', 'DEFUZEX_API_KEY', 'KUMA_BASE_URL')
 def evaluation_agent(agent, *, control=None, deadline=None, backend=DEFAULT_BASE_URL,
                      worker_package=__package__, sdk_environment=SDK_ENVIRONMENT,
                      require_profile=True):
-    """Stage an Agent and install the adapter's pinned PyPI SDK in its image.
+    """Stage an Agent and install the adapter's latest stable PyPI SDK in its image.
 
     The host does not need an SDK checkout or installation. Dependencies belong
     to this adapter and are installed only while building the evaluation image.

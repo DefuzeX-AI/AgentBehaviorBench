@@ -166,18 +166,11 @@ def print_agent_complete(
         if report and not report.get('host_accepted'):
             output_fn(f"Judge retained | Case {case.case_index + 1}: {report['status']} | "
                       f"Host rejected | {artifacts.get('directory', '')}/{report['path']}")
-    color = ANSI_GREEN if item.passed else ANSI_YELLOW if item.status in {"cancelled", "skipped"} else ANSI_RED
-    status = f"{color}{'PASS' if item.passed else item.status.upper()}{ANSI_RESET}"
-    if item.error_type is not None and item.completed_case_count == 0:
-        output_fn(
-            f"Result: {status} | "
-            f"{item.error_type}: {item.error_message}"
-        )
-        return
-
+    execution = item.execution_status
+    color = ANSI_GREEN if execution == 'completed' else ANSI_YELLOW if execution in {'cancelled', 'skipped'} else ANSI_RED
     detail = (
-        f"Result: {status} | "
-        f"cases={item.completed_case_count}/{item.requested_case_count}"
+        f"Result: {color}Execution: {execution.upper()}{ANSI_RESET} | "
+        f"cases={item.execution_counts.get('completed', 0)}/{item.requested_case_count}"
     )
     from collections import Counter
     verdicts = Counter(case.judge_status for case in item.case_results if case.judge_status is not None)
@@ -187,6 +180,7 @@ def print_agent_complete(
             for name, count in sorted(verdicts.items()))
     if item.error_type is not None:
         detail += f" | error={item.error_type}: {item.error_message}"
+    detail += f" | Quality gate: {item.quality_gate.upper()}"
     output_fn(detail)
 
 
@@ -204,13 +198,9 @@ def print_suite_summary(
     if rejected:
         judge += f' ({rejected} host rejected)'
     output_fn(f"\nCase execution: {completed}/{planned} completed | Judge: {judge}")
-    output_fn(
-        "\nSuite complete: "
-        f"{result.passed_count} passed, "
-        f"{result.failed_count} failed, "
-        f"{result.skipped_count} skipped, "
-        f"{result.selected_count} selected."
-    )
+    counts = ', '.join(f'{status}={count}' for status, count in sorted(result.execution_counts.items()))
+    output_fn(f"\nSuite execution: {result.execution_status.upper()} | Agents: {counts} | selected={result.selected_count}")
+    output_fn(f"Quality gate: {result.quality_gate.upper()} | exit_code={result.exit_code}")
 
 
 def case_event_status(event):

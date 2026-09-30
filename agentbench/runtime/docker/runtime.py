@@ -324,6 +324,14 @@ class DockerRuntime:
                 command.extend(("--mount", _bind_mount(inputs, "/run/abb-input")))
                 # Persist artifacts separately from the container's writable layer.
                 command.extend(("--mount", f"type=bind,source={outputs},target=/run/abb-output"))
+                from .environment import describe_environment
+                from agentbench.runtime.contracts.environment import ENVIRONMENT_FILE
+                from agentbench.observe.store import atomic_json
+                environment = describe_environment(
+                    command, workdir=config.workdir, egress=self._egress, interception=interception,
+                    timeout=self._timeout_override or config.timeout_sec)
+                atomic_json(inputs / ENVIRONMENT_FILE, environment.as_dict())
+                (inputs / ENVIRONMENT_FILE).chmod(0o644)
             # Disable Python bytecode caches and flush logs promptly.
             agent_environment.update(
                 PYTHONDONTWRITEBYTECODE="1",

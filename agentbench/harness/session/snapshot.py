@@ -55,12 +55,16 @@ def suite_snapshot(plan, events):
                                             'timestamp': event.get('timestamp')})
             job['status'] = item.get('status') or event.get('status', 'failed')
             job['preparation_error'] = item.get('preparation_error')
+            for key in ('execution_status', 'execution_counts', 'judge_counts', 'quality_gate'):
+                job[key] = deepcopy(item.get(key))
     cases = [case for job in jobs.values() for case in job['cases']]
     for job in jobs.values():
         job['counts'] = dict(Counter(case['execution_status'] for case in job['cases']))
         if any(case['execution_status'] in {'dispatched', 'running', 'retrying', 'waiting_judge', 'reconciling', 'retry_wait'}
                for case in job['cases']):
             job['status'] = 'running'
+            job['execution_status'] = 'running'
+            job['quality_gate'] = None
         for case in job['cases']:
             case['agent_job_id'] = job['job_id']
             case.update(manual_recovery(case))

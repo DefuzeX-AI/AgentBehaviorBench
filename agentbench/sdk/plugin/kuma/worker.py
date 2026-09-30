@@ -6,6 +6,7 @@ import os
 import platform
 import sys
 import traceback
+from contextlib import nullcontext
 from pathlib import Path
 from uuid import uuid4
 from importlib.metadata import version
@@ -57,6 +58,11 @@ async def execute(root, output, settings=None, sdk_repo=None, *, providers=None)
         # Pass each current input directly to the adapter. The Agent owns history
         # and memory, so no per-Agent input contract is required.
         configure_trust()
+        from agentbench.runtime.agentcontainer.environment import observe_environment
+        environment = observe_environment(settings.get('execution_environment'), workspace=(
+            {'path': workspace.path, 'initial_state': workspace.initial_state, 'fixture': workspace.fixture}
+            if workspace.path else None))
+        files.save('execution-environment.json', environment.as_dict())
         # Save process, SDK, and initial state metadata for progress inspection.
         credential, credential_source = (None, None) if providers is not None else api_key(os.environ)
         files.save('process.json', {'pid': os.getpid(), 'container': platform.node(),
@@ -84,20 +90,21 @@ async def execute(root, output, settings=None, sdk_repo=None, *, providers=None)
             # Generation mode creates and saves Cases from the Agent Profile
             # without invoking the Agent.
             from .generation import generate_collection
-            if providers is None:
-                # The registered requirement.md is the SDK Agent Profile. Reusing a
-                # saved Case rejects a profile, so supply it only during generation.
-                generation = dict(options=dict(options, agent_profile_path=root / 'requirement.md'))
-            else:
-                # A custom Case provider needs an explicit step ceiling and reads
-                # no Agent Profile; its content varies per slot.
-                generation = dict(options={'max_steps': providers.max_steps, **options},
-                                  case_options=providers.case_options)
-            collection = generate_collection(
-                create_run, count=settings['count'], files=files, repo=repository,
-                workspace=settings.get('workspace'),
-                case_indices=settings.get('case_indices'), allow_partial=settings.get('allow_partial', False),
-                **generation)
+            from .environment import generation_profile
+            profile_context = (generation_profile(root / 'requirement.md', environment, files)
+                               if providers is None else nullcontext())
+            with profile_context as profile_path:
+                if providers is None:
+                    generation = dict(options=dict(options, agent_profile_path=profile_path))
+                else:
+                    # Custom Providers retain their own document contract.
+                    generation = dict(options={'max_steps': providers.max_steps, **options},
+                                      case_options=providers.case_options)
+                collection = generate_collection(
+                    create_run, count=settings['count'], files=files, repo=repository,
+                    workspace=settings.get('workspace'),
+                    case_indices=settings.get('case_indices'), allow_partial=settings.get('allow_partial', False),
+                    **generation)
             complete = not collection['failures'] and not collection['unattempted_indices']
             files.save('manifest.json', {'phase': 'batch_generated' if complete else 'batch_partial',
                                         'count': len(collection['cases']),
@@ -239,6 +246,10 @@ def main(providers=None):
     # Read generation or execution settings from the host-mounted evaluation.json.
     try:
         settings = read_settings(args.settings)
+        from agentbench.runtime.contracts.environment import ENVIRONMENT_FILE
+        environment_path = args.settings.parent / ENVIRONMENT_FILE
+        if environment_path.exists():
+            settings['execution_environment'] = read_settings(environment_path)
     except EvaluationSettingsError as exc:
         # The host reads error.json; stderr alone only reaches diagnostics.json.
         Artifacts(args.output).save('error.json', {

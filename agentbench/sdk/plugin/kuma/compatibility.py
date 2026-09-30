@@ -1,4 +1,4 @@
-"""The two internal Case access points of pinned kuma-defuzex 0.3.1.
+"""The two internal Case access points of the installed kuma-defuzex SDK.
 
 The SDK has public save/reuse operations but no public normalized Case accessor.
 Keep these version-sensitive reads inside this plugin and exercise the real wheel.

@@ -104,7 +104,7 @@ def execute(args):
             return 1
         for index, report in enumerate(reports, 1):
             print(f'Judge Case {index}: {report.status}')
-        return execution.exit_code if execution.exit_code else (0 if all(r.status == 'pass' for r in reports) else 1)
+        return execution.exit_code or execution.result.exit_code
     except ConcurrencyConfigurationError as exc:
         print(f"Configuration error: {exc}")
         return 2

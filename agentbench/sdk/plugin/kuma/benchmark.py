@@ -255,4 +255,6 @@ def read_result(directory, agent_id, *, recovered_report=None, provider_mode='of
                         tuple(report.get('evidence_gaps', [])), report['report_id'], report['run_id'],
                         {**report.get('extensions', {}), 'abb_artifact_directory': str(directory)})
     return BenchmarkResult(agent_id, 'container-' + 'sdk', summary['run_id'], 'report_ready',
-                           normalized, tuple(steps), len(steps), provider_mode)
+                           normalized, tuple(steps), len(steps), provider_mode,
+                           evidence_status=summary['evidence'], host_acceptance='accepted',
+                           host_trace_validation=host.get('host_trace_validation', 'unknown'))

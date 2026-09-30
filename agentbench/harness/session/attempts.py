@@ -11,7 +11,9 @@ def new_case(suite_id, agent_id, index):
             'active_attempt_id': None, 'attempts': [], 'retry_count': 0,
             'retry_at': None, 'can_retry': False, 'recovery_action': None,
             'result': None, 'error': None, 'host_acceptance': None, 'resumable': False,
-            'report_received': False, 'received_report': None}
+            'report_received': False, 'received_report': None,
+            'evidence_status': 'unknown', 'host_trace_validation': 'unknown',
+            'judge_delivery_status': 'unknown', 'quality_gate': None}
 
 
 def execution_status(result):
@@ -35,7 +37,9 @@ def find_attempt(case, event, *, create=False):
                  'job_id': event.get('job_id'), 'artifact_run_id': None,
                  'status': 'running', 'execution_status': 'running', 'phase': 'execute',
                  'error': None, 'judge_status': None, 'result': None,
-                 'host_acceptance': None, 'started_at': event.get('timestamp')}
+                 'host_acceptance': None, 'started_at': event.get('timestamp'),
+                 'evidence_status': 'unknown', 'host_trace_validation': 'unknown',
+                 'judge_delivery_status': 'unknown', 'quality_gate': None}
         case['attempts'].append(match)
         case['attempts'].sort(key=lambda value: value['attempt_number'])
         case['active_attempt_id'] = case['attempts'][-1]['attempt_id']
@@ -89,37 +93,52 @@ def apply_case_event(case, event):
     elif kind in {'case_started', 'case_attempt_started'}:
         retrying = target['attempt_number'] > 1 or event.get('status') == 'retrying'
         target.update(status='running', execution_status='retrying' if retrying else 'running',
-                      retry_at=None, error=None)
+                      retry_at=None, error=None, quality_gate=None)
     elif kind == 'case_queued':
         target.update(status='queued', execution_status='queued')
     elif kind in {'retry_scheduled', 'case_retry_scheduled'}:
         target.update(status='retry_wait', execution_status='retry_wait', can_retry=False,
                       retry_at=event.get('retry_at'), error=event.get('error') or target.get('error'))
     elif kind in {'case_reconciling', 'case_recovery_started'}:
-        target.update(status='running', execution_status='reconciling', phase='recover')
+        target.update(status='running', execution_status='reconciling', phase='recover', quality_gate=None)
     elif kind in {'case_completed', 'case_attempt_failed'}:
         target['status'] = data.get('status', 'failed')
         target['result'] = deepcopy(result)
         target['error'] = data.get('error')
         target['execution_status'] = execution_status(data)
-        report = ((result or {}).get('benchmark') or {}).get('report') or {}
+        benchmark = (result or {}).get('benchmark') or {}
+        report = benchmark.get('report') or {}
         received = artifacts.get('received_report') or {}
         target['received_report'] = deepcopy(received) or None
         target['report_received'] = bool(report or received)
         target['judge_status'] = data.get('judge_status') or report.get('status') or received.get('status')
-        acceptance = ('accepted' if report and not target['error'] else
-                      'accepted' if received.get('host_accepted') is True else 'rejected' if received else None)
-        target['host_acceptance'] = data.get('host_acceptance', acceptance)
+        acceptance = ('accepted' if received.get('host_accepted') is True else
+                      'rejected' if received.get('host_accepted') is False else 'unknown')
+        target['host_acceptance'] = (data.get('host_acceptance') or benchmark.get('host_acceptance')
+                                     or artifacts.get('host_acceptance') or acceptance)
+        for key in ('evidence_status', 'host_trace_validation', 'judge_delivery_status'):
+            target[key] = data.get(key) or benchmark.get(key) or artifacts.get(key) or 'unknown'
+        if target['report_received']:
+            target['judge_delivery_status'] = 'received'
+        elif benchmark and target['judge_delivery_status'] == 'unknown':
+            target['judge_delivery_status'] = 'missing'
+        target['quality_gate'] = data.get('quality_gate') or (
+            'passed' if report.get('status') == 'pass' and not target['error']
+            and target['execution_status'] == 'completed'
+            and target['host_acceptance'] != 'rejected'
+            and target['host_trace_validation'] != 'failed'
+            and target['evidence_status'] not in {'missing', 'failed'} else 'failed')
         target['finished_at'] = event.get('timestamp')
         target['retry_at'] = None
     elif kind in {'progress', 'step_started', 'step_completed', 'step_failed'}:
-        if target.get('execution_status') not in {'completed', 'needs_attention', 'blocked', 'cancelled', 'skipped', 'retry_wait'}:
+        if target.get('execution_status') not in {'completed', 'failed', 'needs_attention', 'blocked', 'cancelled', 'skipped', 'retry_wait'}:
             target['execution_status'] = 'waiting_judge' if event.get('stage') in {'judge', 'judging', 'judge_wait'} else target.get('execution_status', 'running')
     # Delayed events for an old Attempt update its history, never the current row.
     if attempt is not None and attempt['attempt_id'] == case['active_attempt_id']:
         for key in ('status', 'execution_status', 'judge_status', 'phase', 'stage', 'job_id',
                     'artifact_run_id', 'artifact_directory', 'result', 'error', 'retry_at',
-                    'host_acceptance', 'can_retry', 'recovery_action', 'report_received', 'received_report'):
+                    'host_acceptance', 'can_retry', 'recovery_action', 'report_received', 'received_report',
+                    'evidence_status', 'host_trace_validation', 'judge_delivery_status', 'quality_gate'):
             case[key] = deepcopy(attempt.get(key))
         case['retry_count'] = max(0, attempt['attempt_number'] - 1, attempt.get('retry_count') or 0)
         if attempt.get('case_id'):

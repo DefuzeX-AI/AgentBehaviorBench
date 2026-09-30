@@ -253,8 +253,20 @@ factories can publish a `signature` using the same contract; factories without
 one continue to work through explicit routes. No Agent-specific exceptions are
 used. Automatic routes live on the individual flow, never in shared config.
 
-Unknown HTTP egress is denied; non-root TCP is redirected on every port. IPv6
-and non-DNS UDP are blocked. Google supports header or query API keys and
+Loopback traffic (`lo` with destination `127.0.0.0/8` or `::1`) bypasses the
+HTTP proxy. Local TCP/UDP services, random browser debugging ports and local
+HTTP servers work without tool routes; closed ports retain native connection
+refusal. Local traffic is not captured and produces no model/tool/egress events.
+Existing loopback tool routes are unnecessary. A model served on loopback is
+also outside model interception and replacement. Private LAN addresses, other
+containers and the Agent's non-loopback interface address are not exempt.
+
+External non-root IPv4 TCP is still redirected on every port. External IPv6
+and non-DNS UDP remain blocked; this is not general TCP/UDP egress support.
+Unmatched HTTP requests follow the configured egress observer policy (or are
+denied when no observer is configured). A local relay's subsequent external
+connections still follow these rules when run as the non-root Agent user.
+Google supports header or query API keys and
 rejects ambiguous credentials. `network-isolated` remains restricted to keyless
 local protocols inside a private Agent namespace.
 
@@ -264,6 +276,19 @@ the query string); matching requests retain their destination and produce
 `tool_request` / `tool_response` events. Declared model hosts cannot bypass
 model interception through a tool rule. When adapting an Agent, declare only
 the external endpoints it needs instead of allowing an entire service.
+
+An offline container regression for loopback and the external boundary is
+available as `tests/test_issue156.py`. Set `ABB_LOOPBACK_TEST_IMAGE` to an
+already-built interceptor image and run the following from this service directory
+on a Docker-enabled host:
+
+```sh
+python -m unittest discover -s tests -p test_issue156.py
+```
+
+It mounts the current source and tests random TCP/UDP ports, both loopback
+address families, server-first replies, refused connections, local HTTP,
+Docker DNS and retained external rejection. No API credentials are needed.
 
 The KUMA evaluation build overlay reads `agentbench/sdk/plugin/kuma/whitelist.json`
 to add its backend routes and one release

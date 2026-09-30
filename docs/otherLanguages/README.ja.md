@@ -91,7 +91,9 @@ Folder Mover Agent はローカルディレクトリからインポートされ�
 ## 評価 SDK と Judge
 
 正式な評価では現在 [KUMA DefuzeX SDK](https://github.com/DefuzeX-AI/KUMA-DefuzeX)
-を使用し、`kuma-defuzex[otel]==0.3.1` に固定しています。KUMA は振る舞いテストの Cases を
+を `kuma-defuzex[otel]` としてインストールします。SDK のインストール処理が実行されると、
+PyPI の最新安定版が選択されます。既存のイメージと Docker のビルドレイヤーは再利用され、
+SDK の新バージョン公開だけでは自動更新されません。KUMA は振る舞いテストの Cases を
 生成し、ABB が収集した証拠を受け取り、DefuzeX Judge に送信します。判定結果と評価内容は
 Suite artifacts とともに保存されます。
 

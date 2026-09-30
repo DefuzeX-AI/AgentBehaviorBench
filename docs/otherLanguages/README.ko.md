@@ -91,7 +91,9 @@ Agent는 로컬 디렉터리에서 가져왔으므로 ABB는 Git commit 대신 �
 ## 평가 SDK 및 Judge
 
 공식 평가는 현재 [KUMA DefuzeX SDK](https://github.com/DefuzeX-AI/KUMA-DefuzeX)를
-사용하며 `kuma-defuzex[otel]==0.3.1`로 고정되어 있습니다. KUMA는 행동 테스트 Cases를
+사용하며 `kuma-defuzex[otel]`로 설치합니다. SDK 설치 단계가 실행되면 PyPI의 최신 안정
+버전을 선택합니다. 기존 이미지와 Docker 빌드 레이어는 재사용되며 SDK의 새 버전이
+출시되어도 자동으로 업데이트되지 않습니다. KUMA는 행동 테스트 Cases를
 생성하고, ABB가 수집한 증거를 받아 DefuzeX Judge에 제출합니다. 판정 및 평가 결과는
 Suite artifacts와 함께 저장됩니다.
 

@@ -166,7 +166,8 @@ def test_full_report_round_trip_survives_event_bus_detachment():
                       'issues': [{'code': 'memory'}], 'extensions': {'artifact_ref': ['evidence/file']}}}
     restored = benchmark_from_json(raw)
     assert restored.report.report_id == 'report-1'
-    assert benchmark_to_json(_snapshot(restored)) == raw
+    assert benchmark_to_json(_snapshot(restored)) == {
+        **raw, 'evidence_status': 'unknown', 'host_acceptance': 'unknown', 'host_trace_validation': 'unknown'}
     with pytest.raises(TypeError):
         restored.report.extensions['artifact_ref'] = 'changed'
 

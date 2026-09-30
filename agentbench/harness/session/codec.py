@@ -72,6 +72,9 @@ def benchmark_to_json(benchmark):
     return {'agent_id': benchmark.agent_id, 'adapter_name': benchmark.adapter_name,
             'run_id': benchmark.run_id, 'run_state': benchmark.run_state,
             'provider_mode': benchmark.provider_mode, 'passed': benchmark.passed,
+            'evidence_status': benchmark.evidence_status,
+            'host_acceptance': benchmark.host_acceptance,
+            'host_trace_validation': benchmark.host_trace_validation,
             'history_count': benchmark.history_count, 'report': report_to_json(benchmark.report),
             'steps': [{'input_id': step.input_id, 'payload': json_value(step.payload),
                        'output': json_value(step.invocation.output),
@@ -85,10 +88,28 @@ def case_to_json(case):
              'benchmark': None if case.benchmark is None else benchmark_to_json(case.benchmark),
              'error': None if case.error_type is None else
                  {'type': case.error_type, 'message': case.error_message}}
-    for name in ('attempt_id', 'attempt_number', 'execution_status', 'judge_status'):
+    for name in ('attempt_id', 'attempt_number', 'execution_status', 'judge_status',
+                 'evidence_status', 'host_acceptance', 'host_trace_validation',
+                 'judge_delivery_status', 'quality_gate'):
         if hasattr(case, name):
             value[name] = json_value(getattr(case, name))
     return value
+
+
+def agent_to_json(item):
+    """One public Agent shape for exports and persisted recovery events."""
+    return {'agent_id': item.agent_id, 'status': item.status,
+            'execution_status': item.execution_status, 'execution_counts': item.execution_counts,
+            'judge_counts': item.judge_counts, 'quality_gate': item.quality_gate,
+            'case_results': [case_to_json(case) for case in item.case_results],
+            'benchmarks': [benchmark_to_json(benchmark) for benchmark in item.benchmarks],
+            'requested_case_count': item.requested_case_count,
+            'completed_case_count': item.completed_case_count,
+            'attempted_case_count': item.attempted_case_count,
+            'skipped_case_count': item.skipped_case_count,
+            'preparation_error': json_value(item.preparation_error),
+            'error': None if item.error_type is None else
+                {'type': item.error_type, 'message': item.error_message}}
 
 
 def benchmark_from_json(value):
@@ -102,7 +123,10 @@ def benchmark_from_json(value):
                   for step in value.get('steps', ()))
     return BenchmarkResult(value['agent_id'], value['adapter_name'], value['run_id'],
                            value['run_state'], report, steps, value['history_count'],
-                           value.get('provider_mode'))
+                           value.get('provider_mode'),
+                           evidence_status=value.get('evidence_status', 'unknown'),
+                           host_acceptance=value.get('host_acceptance', 'unknown'),
+                           host_trace_validation=value.get('host_trace_validation', 'unknown'))
 
 
 def case_from_json(value):
@@ -129,6 +153,5 @@ def event_to_json(event):
         value['case_result'] = case_to_json(value['case_result'])
     item = value.get('item')
     if item is not None and hasattr(item, 'case_results'):
-        value['item'] = {**json_value(item), 'status': item.status,
-                         'case_results': [case_to_json(case) for case in item.case_results]}
+        value['item'] = agent_to_json(item)
     return json_value(value)
