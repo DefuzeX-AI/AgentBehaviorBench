@@ -1,5 +1,8 @@
 import { Descriptions, Tag, Typography } from 'antd';
 import { changeStyle } from './fileChangesModel.js';
+import { lazy, Suspense } from 'react';
+
+const FileDiffViewer = lazy(() => import('./FileDiffViewer.jsx'));
 
 export default function FileChangeDetails({ change, snapshot }) {
   const record = change.original;
@@ -15,7 +18,7 @@ export default function FileChangeDetails({ change, snapshot }) {
       { key: 'source', label: 'Evidence', children: `${snapshot.source} · ${snapshot.complete && record.complete !== false ? 'Complete' : 'Partial'}` },
     ]} />
     <h4>File diff</h4>
-    {typeof record.diff === 'string' && record.diff ? <pre className="file-change-diff">{record.diff}</pre>
+    {typeof record.diff === 'string' && record.diff ? <Suspense fallback={<p>Loading file viewer…</p>}><FileDiffViewer key={change.id} record={record} path={change.path} /></Suspense>
       : <p>{change.fileType === 'directory' ? 'Directory change; no text diff.' : record.reason || 'No text diff was captured.'}</p>}
     <details><summary>Original file evidence</summary><pre className="file-change-diff">{JSON.stringify(record, null, 2)}</pre></details>
   </div>;

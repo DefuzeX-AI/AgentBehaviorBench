@@ -9,6 +9,14 @@
 .sequence-row { display:grid; grid-template-columns:96px minmax(0,1fr); }
 .sequence-time { position:sticky; left:0; z-index:2; background:#fff; padding:40px 12px; color:#62766a; font-size:11px; font-variant-numeric:tabular-nums; }
 .sequence-body { position:relative; min-width:0; }
+.sequence-canvas { position:relative; }
+.sequence-canvas > .sequence-lifelines { left:96px; }
+.sequence-section { position:relative; }
+.sequence-inline-stage { display:flex; justify-content:space-between; gap:16px; align-items:center; margin:0 16px 12px 8px; padding:8px 12px; background:#f8faf9; border:1px solid #e5ebe7; border-radius:5px; color:#62766a; text-align:left; cursor:pointer; font-size:11px; }
+.sequence-inline-stage small { color:#73877a; font-size:10px; }
+.sequence-inline-stage > span:last-child { white-space:nowrap; font-variant-numeric:tabular-nums; }
+.sequence-bookkeeping .sequence-time { padding:9px 12px; }
+.sequence-inline-stage[aria-pressed=true],.sequence-inline-stage:focus-visible { outline:2px solid #285c4d; outline-offset:-2px; }
 .sequence-action { position:relative; display:grid; grid-template-columns:repeat(var(--lane-count),minmax(0,1fr)); padding:24px 0; margin-bottom:28px; }
 .sequence-action-linked { padding:30px 0; min-height:112px; }
 .sequence-lifelines { display:grid; grid-template-columns:repeat(var(--lane-count),minmax(0,1fr)); position:absolute; inset:0; pointer-events:none; }
@@ -28,13 +36,14 @@
 .sequence-duration { font-size:13px; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .sequence-duration-track { display:block; height:4px; border-radius:3px; background:#dce6df; margin:7px 0 0; overflow:hidden; }.sequence-duration-track i { display:block; height:100%; background:#547c65; }
 .sequence-card small { display:block; font-size:10px; color:#8a6141; margin-top:5px; }
+.sequence-card .sequence-input-reference { color:#62766a; }
 .sequence-lane-1 { background:#f7f3fb; border-left-color:#9773b1; }.sequence-lane-3 { background:#eff5fc; border-left-color:#638ab7; }.sequence-lane-4 { background:#fffaef; border-left-color:#b39554; }
 .sequence-status-failed { border-left-color:#bd665d; }.sequence-status-unconfirmed { border-style:dashed; }
 .sequence-card[aria-pressed=true],.sequence-stage[aria-pressed=true],.sequence-card:focus-visible,.sequence-stage:focus-visible { outline:2px solid #285c4d; outline-offset:-2px; }
 .sequence-stage { display:flex; justify-content:space-between; align-items:center; gap:20px; width:calc(100% - 32px); margin:10px 16px; padding:14px 16px; border:1px solid #dce5df; border-left:3px solid #819e8d; border-radius:7px; text-align:left; background:#f8faf9; cursor:pointer; color:#294536; }
 .sequence-stage-name strong { display:block; font-size:13px; font-weight:500; }.sequence-stage-name small { display:block; margin-top:6px; color:#73877a; font-size:11px; }
 .sequence-stage-duration { min-width:110px; width:20%; text-align:right; font-variant-numeric:tabular-nums; }.sequence-stage-duration strong { font-size:16px; font-weight:500; }.sequence-stage-duration small { display:block; font-size:10px; color:#73877a; margin-top:4px; }
-.sequence-execution-heading,.sequence-input-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; width:100%; padding:14px 18px; text-align:left; background:#fff; color:#294536; border:0; border-top:1px solid #e5ebe7; cursor:pointer; }
+.sequence-execution-heading,.sequence-input-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; width:100%; padding:14px 18px; text-align:left; background:#f2f7f4; color:#294536; border:0; border-block:1px solid #e5ebe7; cursor:pointer; }
 .sequence-execution-heading { margin-top:12px; background:#f2f7f4; }.sequence-execution-heading strong { font-size:14px; font-weight:500; }.sequence-execution-heading span,.sequence-input-heading span { font-size:11px; color:#6d8375; }.sequence-input-heading strong { font-size:12px; font-weight:500; }
 .sequence-footer { padding:16px; font-size:11px; color:#6d7f74; border-top:1px solid #e5ebe7; }.sequence-empty { padding:25px; color:#6d7f74; }
 @media(max-width:600px) { .sequence-stage { gap:10px; padding:12px; }.sequence-stage-duration { min-width:75px; }.sequence-input-heading,.sequence-execution-heading { flex-wrap:wrap; } }

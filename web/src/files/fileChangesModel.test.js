@@ -41,3 +41,12 @@ test('recorded move source and unknown actions are preserved', () => {
   assert.equal(changeStyle(snapshot.changes[1].type).tone, 'unknown');
   assert.equal(changeStyle('deleted').label, 'Deleted');
 });
+
+test('separate SDK submission does not steal the Agent Input snapshot', () => {
+  const agent = group('agent', 'step-1');
+  agent.members[0] = { kind: 'agent', attributes: { input_id: 'step-1' } };
+  const sdk = group('submit', 'step-1');
+  const placed = placeFileSnapshots(fileSnapshots([input('step-1', [])]), [agent, sdk]);
+  assert.equal(placed.byGroup.get('agent').length, 1);
+  assert.equal(placed.byGroup.has('submit'), false);
+});

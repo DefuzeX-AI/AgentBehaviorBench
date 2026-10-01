@@ -28,8 +28,10 @@ export function fileSnapshots(inputs = []) {
 export function placeFileSnapshots(snapshots, groups) {
   const byGroup = new Map(), unplaced = [];
   for (const snapshot of snapshots) {
-    const matches = snapshot.inputId ? groups.filter(group => group.type === 'calls' && group.members.some(row =>
+    const candidates = snapshot.inputId ? groups.filter(group => group.type === 'calls' && group.members.some(row =>
       (row.attributes?.input_id || row.attributes?.['abb.input_id']) === snapshot.inputId)) : [];
+    const owners = candidates.filter(group => group.members.some(row => row.kind === 'agent' && row.attributes?.input_id === snapshot.inputId));
+    const matches = owners.length ? owners : candidates;
     if (matches.length !== 1) { unplaced.push(snapshot); continue; }
     const key = matches[0].id;
     byGroup.set(key, [...(byGroup.get(key) || []), snapshot]);
