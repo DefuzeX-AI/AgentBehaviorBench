@@ -5,6 +5,7 @@ import { timingSequence } from '../sequence/model.js';
 import { groupTimings } from '../sequence/grouping.js';
 import { buildTopology } from '../topology/model.js';
 import TimingDetails from './TimingDetails.jsx';
+import SharedPreparation from './SharedPreparation.jsx';
 import useLiveJson from '../useLiveJson.js';
 import { formatTime, makeTimeline } from './timelineModel.js';
 import './timeline.css';
@@ -60,7 +61,7 @@ export default function CaseTimeline({ run, revision, attempt, preparationRuns =
   ];
   return <section className="case-timeline" aria-label="Case timings">
     {!!preparationRuns.length && <label>Timing scope <Select value={scope} onChange={value => { setScope(value); setSelection(null); setFileSelection(null); }}
-      options={[{ value: 'case', label: 'Selected Case attempt' }, ...preparationRuns.map((id, i) => ({ value: id, label: `Shared Case preparation ${i + 1}` }))]} /></label>}
+      options={[{ value: 'case', label: 'Full flow: preparation + Case attempt' }, ...preparationRuns.map((id, i) => ({ value: id, label: `Shared Case preparation ${i + 1}` }))]} /></label>}
     {scope !== 'case' && <Alert type="info" showIcon message="Shared preparation is measured once for the batch. It is not added to every Case's execution total." />}
     {error && <Alert type="warning" showIcon message="Unable to refresh timings" description={error} />}
     <div className="timing-summary">
@@ -76,6 +77,8 @@ export default function CaseTimeline({ run, revision, attempt, preparationRuns =
     {data && !model.hasTimings && <Alert type="info" showIcon message="This older run has no lifecycle timings." description="Available traces are shown below. Missing preparation and SDK timings are not reconstructed." />}
     {model.rows.some(s => s.status === 'unconfirmed') && <Alert type="warning" showIcon message="Some stages have no confirmed end. Their last recorded measurement is retained; time is not extrapolated." />}
     {model.warnings.map(w => <Alert key={w} type="warning" message={w} />)}
+    {scope === 'case' && [...new Set(preparationRuns)].map((id, index) => <SharedPreparation key={id} run={id} revision={revision} index={index} />)}
+    {scope === 'case' && <h3 className="case-execution-title">Case execution</h3>}
     {!!model.rows.length && <>
       <Segmented aria-label="Timing view" value={view} options={[{ label: 'Sequence', value: 'sequence' }, { label: 'Waterfall', value: 'waterfall' }, { label: 'Topology', value: 'topology' }]}
         onChange={value => { setView(value); const url = new URL(location.href); url.searchParams.set('timingView', value); history.replaceState(null, '', url); }} />
@@ -95,7 +98,7 @@ export default function CaseTimeline({ run, revision, attempt, preparationRuns =
       {evidenceReady && !snapshots.length && <Text type="secondary">No file snapshot evidence was captured for this attempt.</Text>}
     </>}
     <Drawer title={selectedFile ? `File change · ${selectedFile.path}` : selectedParticipant?.title || selectedGroup?.title || selected?.name || 'Stage details'} open={Boolean(selectedFile || selected || selectedGroup || selectedParticipant)}
-      onClose={() => { setSelection(null); setFileSelection(null); }} size="large" destroyOnHidden>
+      onClose={() => { setSelection(null); setFileSelection(null); }} size="min(736px, 100vw)" destroyOnHidden>
       {selectedFile ? <FileChangeDetails change={selectedFile} snapshot={fileSnapshot} />
         : !!detailRecords.length && <TimingDetails key={`${selectedRun}:${selection}`} records={detailRecords} focusId={selected?.id} run={selectedRun} spans={data?.spans} />}
     </Drawer>

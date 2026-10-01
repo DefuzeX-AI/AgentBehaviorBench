@@ -84,7 +84,9 @@ async def drive_run(run, invoke, directory, *, provider, repo_path=None, file_ev
                         run.submit(output=result['output'], status='completed')
                     else:
                         terminal = {'timeout': 'timeout', 'cancelled': 'aborted', 'aborted': 'aborted'}.get(result['status'], 'failed')
-                        run.submit(status=terminal, error=f'Agent execution {terminal}; see local diagnostics')
+                        # Preserve native failure text after credential redaction.
+                        # Missing/empty errors stay missing/empty; do not invent a diagnosis.
+                        run.submit(status=terminal, error=result.get('error'))
             except Exception:
                 if len(run.history) > before:
                     summary['phase'] = 'judge'

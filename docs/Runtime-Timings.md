@@ -1,10 +1,24 @@
 # Runtime timings
 
-Open a Case and select **Timing**. The default **Sequence** view groups environment
-and Docker preparation into one stage, with separate SDK bookkeeping and final
-validation/cleanup stages. Agent execution is grouped by recorded Input identity
-and parent-child relationships. Framework wrappers stay in the detail tree;
-Agent turns, typed model/tool calls and SDK waits remain visible in the main view.
+Open a Case and select **Timing**. The default flow shows saved shared Case
+preparation before the selected execution attempt. Generation operations are
+visible immediately; expand preparation to see its Docker setup and all other
+operations. Shared preparation has its own measured total and is not charged to
+each attempt. Individual preparation runs remain selectable through Timing scope.
+
+Sequence uses one continuous canvas. Each participating lane keeps the same
+position throughout the Case, including SDK submissions and later Inputs. The
+initial non-call steps are folded into **Before first action**; trailing steps
+are folded into **Finishing steps**. Open either block for its original operation
+tree, including Docker setup, image resolution and service startup. Small
+bookkeeping steps between calls remain compact rows at their recorded start
+positions. Unknown operations remain inspectable with their recorded names.
+
+Agent calls and SDK submissions share an Input heading only when an explicit
+Input ID identifies a unique Agent operation in the same execution phase.
+Missing or ambiguous IDs keep operations separate. These are presentation groups,
+not new parent-child relationships. Total/container/Case envelopes provide
+context without duplicating every nested operation in the main view.
 
 Click a stage or Input heading to open its complete step tree in the right drawer.
 Selecting a step shows elapsed time, time outside measured children, status and
@@ -12,17 +26,21 @@ its complete saved timing record. OTel steps also expose input, output and other
 trace payloads on demand. The drawer preserves parent-child nesting, rather than
 presenting overlapping parent and child durations as an additive breakdown.
 
-Only participating lanes are displayed in each Input. Rows are compact and
-continuous, without sequence pagination. The optional filter shows the three
-longest groups. Bars compare group summaries at the top level and calls within
-each Input; they do not all use the full run's time range. Vertical spacing is not
-proportional to elapsed time. Nested and parallel calls overlap.
+Only lanes participating anywhere in the flow are displayed. A single header and
+continuous lifelines connect all Inputs; filtering keeps these positions fixed.
+Rows remain continuous without sequence pagination. The optional filter shows
+the three longest groups. Overlapping Input groups also label their individual
+call cards with the Input ID. Bars compare calls within each Input rather than using
+the full run's time range. File snapshots appear after the Input's last recorded
+call, including its SDK submission. Vertical spacing is not proportional to
+elapsed time. Nested and parallel calls overlap.
 
 Group totals use the union of measured root intervals, excluding gaps and counting
-nested children once. The environment group also includes recorded queue/dispatch
-time, so it can differ from the Preparation summary. SDK bookkeeping may span
-several parts of the run; its group is explicitly labeled **Across this execution**.
-Unknown or ambiguous Input identities remain in separate groups.
+nested children once. Individual calls and intervening bookkeeping remain in
+recorded start order even when different Inputs overlap. Visual order does not
+infer data dependencies; use Waterfall for a proportional time axis. Shared
+preparation is a linked prerequisite displayed separately, not an invented parent
+call from the execution attempt.
 
 Solid arrows require recorded parent-call or
 framework-span links. Dashed return arrows require a confirmed end. Cross-process
@@ -57,8 +75,7 @@ viewer server must be running to serve the page.
   stages stay on their original Attempt, and their recorded time is included.
   A completed Attempt's elapsed time also includes gaps before recovery; the
   recorded evaluation total includes only measured host execution intervals.
-  Queue and retry-backoff records remain inspectable in the environment group's
-  drawer and are not included in that attempt total.
+  Queue and retry-backoff records remain separately inspectable and are not included in that attempt total.
 - Nested calls and parallel operations overlap. Do not add all row durations.
   “Outside measured children” is uncovered elapsed time, not CPU time. Its value
   is omitted when child intervals come from incomparable process clocks.
@@ -73,6 +90,18 @@ viewer server must be running to serve the page.
 
 ## Implementation
 
+### Submission errors and local diagnostics
+
+ABB submits successful native output and failed/timeout/aborted native error text
+to KUMA after credential redaction. Failure text is not replaced with a generic
+diagnosis; line breaks and empty or missing errors retain their original values.
+This does not upload all local diagnostics: KUMA still applies its own Trace
+allowlist and capture limits. An underlying tool error swallowed by the Agent
+and retained only in local stderr is not automatically part of its final error.
+Inspect the saved `inputs/*/submission.json` for the SDK's committed evidence.
+Historical submissions and Judge reports are unchanged; new execution attempts
+use the corrected error forwarding.
+
 ### File changes in the sequence
 
 Each Input can show file and directory cards from its saved `file_evidence`.
@@ -80,6 +109,16 @@ Green means created, red deleted, blue modified, and purple a recorded move or
 rename. Labels and symbols accompany colors; deletion does not mean failure.
 Hover or focus shows the full path and evidence basis. Clicking opens the same
 details drawer with the captured diff and original record.
+
+The file viewer uses lazy-loaded `@pierre/diffs` components for line numbers,
+colored additions/deletions, and word-level changes. The drawer uses a unified
+diff; Expand offers a side-by-side view. Raw patch and copy remain available.
+New Markdown files open as rendered text when the evidence contains the complete
+file; other complete files receive syntax highlighting. Deleted files can show
+their previous content. Full previews require complete evidence, contiguous
+hunks from line one, a matching `/dev/null` header, and a matching captured byte
+size. Partial or modified-file patches remain diffs; malformed and oversized
+patches fall back to the original text without truncation.
 
 These are before/after snapshot differences, not filesystem events. They appear
 after the matching Input, never at an invented timestamp or on an inferred tool
