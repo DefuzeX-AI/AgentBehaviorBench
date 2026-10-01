@@ -100,6 +100,9 @@ function FileContent({ run, entry, label }) {
 export default function CaseReplay({ run }) {
   const [reload, setReload] = useState(0);
   const data = useReplay(run, reload);
+  const evaluation = useLiveJson(run ? `/api/observe/runs/${run}/evaluation` : null, reload, false);
+  const sdk = evaluation.data?.process?.sdk;
+  const userLabel = typeof sdk === 'string' && sdk.trim() ? `User (${sdk.trim()})` : 'User';
   const model = useMemo(() => replayModel(data.rows, data.archive), [data.rows, data.archive]);
   const [position, setPosition] = useState(null), [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1), [skipWait, setSkipWait] = useState(true);
@@ -167,9 +170,9 @@ export default function CaseReplay({ run }) {
           return <article key={event.id} aria-label={user ? 'User message' : message ? 'Agent message' : event.title}
             className={`replay-event ${message ? `replay-message replay-${user ? 'user' : 'agent'}` : 'replay-activity'} ${selected?.id === event.id ? 'selected' : ''}`}>
             <button type="button" className="replay-event-heading" title={`View evidence: ${event.title}`}
-              aria-label={`View evidence: ${user ? 'User' : message ? 'Agent' : event.title} at ${stamp(event.time - model.start)}`}
+              aria-label={`View evidence: ${user ? userLabel : message ? 'Agent' : event.title} at ${stamp(event.time - model.start)}`}
               onClick={inspect}>
-              <Icon /><strong>{user ? 'User' : message ? 'Agent' : event.title}</strong>
+              <Icon /><strong>{user ? userLabel : message ? 'Agent' : event.title}</strong>
               {event.kind === 'chat' && <span className="replay-event-context">Model</span>}
               <time>{stamp(event.time - model.start)}</time><span className="replay-evidence-link">↗</span>
             </button>
