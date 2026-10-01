@@ -83,6 +83,41 @@ def test_overlay_installs_pypi_requirements_without_sdk_source(echo_agent):
     assert not (echo_agent.path / 'agent/.gitignore').exists()
 
 
+def test_overlay_preserves_utf8_files_with_gbk_host_default(echo_agent, monkeypatch):
+    comment = '# JSON \u2014 \u4e2d\u6587 \U0001f4c1\n'
+    originals = {}
+    for name in ('agent/.gitignore', 'agent.toml', 'Dockerfile'):
+        path = echo_agent.path / name
+        content = path.read_bytes() if path.exists() else b''
+        originals[name] = comment.encode('utf-8') + content
+        path.write_bytes(originals[name])
+
+    original_read = Path.read_text
+    original_write = Path.write_text
+
+    def gbk_read(self, encoding=None, errors=None):
+        return original_read(self, encoding=encoding or 'gbk', errors=errors)
+
+    def gbk_write(self, data, encoding=None, errors=None, **kwargs):
+        return original_write(self, data, encoding=encoding or 'gbk', errors=errors, **kwargs)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, 'read_text', gbk_read)
+        patch.setattr(Path, 'write_text', gbk_write)
+        with evaluation_agent(echo_agent) as staged:
+            for name in originals:
+                content = (staged.path / name).read_bytes().decode('utf-8')
+                assert content.splitlines()[0] == comment.rstrip('\n')
+            assert '/.kuma/' in (staged.path / 'agent/.gitignore').read_bytes().decode('utf-8')
+            assert 'agentbench.sdk.plugin.kuma.worker' in (
+                staged.path / 'agent.toml').read_bytes().decode('utf-8')
+            assert 'COPY .abb-sdk/ /opt/abb-sdk/' in (
+                staged.path / 'Dockerfile').read_bytes().decode('utf-8')
+
+    for name, content in originals.items():
+        assert (echo_agent.path / name).read_bytes() == content
+
+
 def test_preflight_does_not_require_host_sdk_checkout_or_import(echo_agent, monkeypatch):
     import builtins
     original_import = builtins.__import__

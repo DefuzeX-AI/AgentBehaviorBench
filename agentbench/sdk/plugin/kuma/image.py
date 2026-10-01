@@ -80,15 +80,15 @@ def evaluation_agent(agent, *, control=None, deadline=None, backend=DEFAULT_BASE
             ignore_file = root / 'agent/.gitignore'
             if ignore_file.is_symlink():
                 raise ValueError('Agent ignore file cannot be a symlink')
-            existing = ignore_file.read_text() if ignore_file.exists() else ''
+            existing = ignore_file.read_text(encoding='utf-8') if ignore_file.exists() else ''
             if not {'.kuma/', '/.kuma/'}.intersection(line.strip() for line in existing.splitlines()):
-                ignore_file.write_text(existing + '\n/.kuma/\n')
+                ignore_file.write_text(existing + '\n/.kuma/\n', encoding='utf-8')
             staged_sdk = root / '.abb-sdk'
             staged_sdk.mkdir()
             shutil.copy2(requirements, staged_sdk / 'requirements.txt')
             if any(p.is_symlink() for p in root.rglob('*')):
                 raise ValueError('Evaluation build must not contain symlinks')
-            source = (root / 'agent.toml').read_text()
+            source = (root / 'agent.toml').read_text(encoding='utf-8')
             source, count = re.subn(r'(?m)^argv = .*$',
                                    f'argv = ["python", "-m", "{worker_package}.worker"]', source)
             if count != 1:
@@ -99,9 +99,9 @@ def evaluation_agent(agent, *, control=None, deadline=None, backend=DEFAULT_BASE
                 {'url': backend, 'methods': ['GET', 'POST']},
                 {'url': backend + '/sdk/*', 'methods': ['GET', 'POST']})
             source = append_whitelist(source, Path(__file__).with_name('whitelist.json'), backend_routes)
-            (root / 'agent.toml').write_text(source)
+            (root / 'agent.toml').write_text(source, encoding='utf-8')
             dockerfile = root / 'Dockerfile'
-            original = dockerfile.read_text()
+            original = dockerfile.read_text(encoding='utf-8')
             users = re.findall(r'(?im)^USER\s+(.+)$', original)
             if not users or users[-1].strip() in ('root', '0'):
                 raise ValueError('Evaluation requires an explicit non-root image USER')
@@ -113,6 +113,6 @@ def evaluation_agent(agent, *, control=None, deadline=None, backend=DEFAULT_BASE
                             if require_profile or (root / 'requirement.md').is_file() else '')
             dockerfile.write_text(original + '\nUSER root\nCOPY .abb-sdk/ /opt/abb-sdk/\n'
                                  + SDK_INSTALL + profile_copy
-                                 + evaluation_copy + 'USER ' + users[-1] + '\n')
+                                 + evaluation_copy + 'USER ' + users[-1] + '\n', encoding='utf-8')
             check()
         yield SimpleNamespace(path=root, agent_id=agent.agent_id, framework=agent.framework)
