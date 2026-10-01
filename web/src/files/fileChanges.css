@@ -1,0 +1,18 @@
+.file-changes { margin: 8px 16px 18px; padding: 16px; background: #fafcfb; border: 1px solid #e0e8e2; border-radius: 9px; }
+.file-changes-heading { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; }
+.file-changes-heading > span, .file-changes > p { color: #63766b; font-size: 12px; }
+.file-changes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-block: 12px; }
+.file-change-card { --change-color: #67756e; display: flex; align-items: center; gap: 12px; min-width: 0; padding: 14px; border: 1px solid #dbe5de; border-radius: 8px; background: white; text-align: left; cursor: pointer; transition: border-color 150ms, box-shadow 150ms; }
+.file-change-card:hover, .file-change-card:focus-visible { border-color: var(--change-color); box-shadow: 0 2px 8px #18342615; }
+.file-change-card:focus-visible { outline: 2px solid var(--change-color); outline-offset: 2px; }
+.file-change-created { --change-color: #23864d; }.file-change-deleted { --change-color: #bb3944; }.file-change-modified { --change-color: #2675b0; }.file-change-moved { --change-color: #8558b3; }
+.file-change-icon { position: relative; color: var(--change-color); font-size: 30px; flex-shrink: 0; }
+.file-change-icon b { position: absolute; right: -5px; bottom: -2px; display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; background: var(--change-color); color: white; font: bold 13px/1 sans-serif; border: 2px solid white; }
+.file-change-caption { min-width: 0; }.file-change-caption strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #263c30; font-size: 13px; }
+.file-change-caption small { display: block; color: var(--change-color); margin-top: 4px; }
+.file-change-tooltip { max-width: 340px; overflow-wrap: anywhere; }.file-change-tooltip > div { margin-top: 5px; }
+.file-change-details { overflow-wrap: anywhere; }.file-change-diff { padding: 14px; background: #f3f6f4; border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 60vh; overflow: auto; font: 12px/1.7 ui-monospace, monospace; }
+.file-change-arrived { animation: file-change-arrive 850ms ease-out both; }
+@keyframes file-change-arrive { from { opacity: .3; transform: translateY(6px); box-shadow: 0 0 0 3px var(--change-color); } to { opacity: 1; transform: translateY(0); box-shadow: none; } }
+@media (prefers-reduced-motion: reduce) { .file-change-arrived { animation: none; }.file-change-card { transition: none; } }
+@media (max-width: 600px) { .file-changes { margin-inline: 8px; padding: 12px; }.file-changes-grid { grid-template-columns: 1fr; } }

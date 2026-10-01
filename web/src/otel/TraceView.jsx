@@ -3,6 +3,7 @@ import { traceTree, duration } from './tree.js';
 import './trace.css';
 import useLiveJson from '../useLiveJson.js';
 import ExecutionGraph from './ExecutionGraph.jsx';
+import ReadableContent from '../cases/ReadableContent.jsx';
 
 function Node({ span, onSelect, selected }) {
   return <li><div className="span-row">
@@ -15,8 +16,8 @@ function Node({ span, onSelect, selected }) {
     </details>}</li>;
 }
 
-function SpanDetails({ run, span }) {
-  const [payload, setPayload] = useState(null), [label, setLabel] = useState(''), [error, setError] = useState('');
+export function SpanDetails({ run, span }) {
+  const [payload, setPayload] = useState(null), [label, setLabel] = useState(() => ['input', 'output', 'error', 'metadata', 'events'].find(k => span.attributes?.[`abb.${k}_ref`]) || ''), [error, setError] = useState('');
   useEffect(() => {
     setPayload(null); setError('');
     if (!label) return;
@@ -28,12 +29,12 @@ function SpanDetails({ run, span }) {
     return () => controller.abort();
   }, [run, span.span_id, label, span.live, span.attributes?.[`abb.${label}_ref`]]);
   return <aside className="span-details"><h3>{span.name}</h3>
-    <p>{span.status?.status_code} · {duration(span)?.toFixed(1)} ms</p>
-    <p className="span-id">Trace {span.trace_id}<br />Span {span.span_id}<br />Parent {span.parent_span_id || 'None'}</p>
+    <p>{span.status?.status_code && span.status.status_code !== 'UNSET' ? `${span.status.status_code} · ` : ''}{duration(span)?.toFixed(1)} ms</p>
     <div className="payload-buttons">{['input', 'output', 'error', 'metadata', 'events'].filter(k => span.attributes?.[`abb.${k}_ref`]).map(k =>
       <button key={k} aria-pressed={k === label} onClick={() => setLabel(k)}>{{ input: 'Input', output: 'Output', error: 'Error', metadata: 'Metadata', events: 'Events' }[k]}</button>)}</div>
     {error && <p role="alert">{error}</p>}
-    {label && !error && <pre>{payload ? JSON.stringify(payload.payload, null, 2) : 'Loading complete payload…'}</pre>}
+    {label && !error && (payload ? <ReadableContent key={`${span.span_id}:${label}`} value={payload.payload} /> : <p role="status">Loading complete payload…</p>)}
+    <details><summary>Trace identifiers</summary><p className="span-id">Trace {span.trace_id}<br />Span {span.span_id}<br />Parent {span.parent_span_id || 'None'}</p></details>
     <details><summary>Raw OTel span</summary><pre>{JSON.stringify({ ...span, children: undefined }, null, 2)}</pre></details>
   </aside>;
 }

@@ -7,6 +7,7 @@ therefore creates one Run per requested Case, saves that Case as a
 executing the Agent. Execution later reuses those files.
 """
 import json
+from agentbench.observe.timing import span
 from pathlib import Path, PurePosixPath
 
 from agentbench.sdk.common.case_identity import case_content_sha256
@@ -52,7 +53,8 @@ def generate_collection(create_run, *, count, options, files, repo,
         files.save('case-collection.json', collection)
         try:
             slot_options = options if case_options is None else {**options, **case_options(index)}
-            entry = _generate_case(create_run, slot_options, files, index)
+            with span('Generate Case', kind='generation', case_index=index):
+                entry = _generate_case(create_run, slot_options, files, index)
             if workspace is not None:
                 entry['workspace'] = workspace
             validate_entries([*collection['cases'], entry], count=count)

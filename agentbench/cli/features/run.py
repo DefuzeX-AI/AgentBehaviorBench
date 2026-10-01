@@ -11,6 +11,7 @@ from agentbench.cli.terminal_ui.constants import LOGO_PAUSE_SECONDS
 from agentbench.cli.environment import load_project_environment, execution_environment_snapshot
 from agentbench.cli.execution import run_benchmark_session
 from agentbench.cli.terminal_ui.logo import print_logo
+from agentbench.cli.terminal_ui.loading import loading_line
 from agentbench.cli.terminal_ui.presentation import (
     confirm_agents,
     print_agents,
@@ -108,15 +109,15 @@ def run(configuration: RunConfiguration | None = None) -> int:
         )
 
     print_logo(config.output_fn)
-    # wait 2 sec
-    time.sleep(LOGO_PAUSE_SECONDS)
+    with loading_line("Loading agents", config.output_fn):
+        time.sleep(LOGO_PAUSE_SECONDS)
+        registry = load_registry(DEFAULT_REGISTRY_PATH)
+        agents = registry.ready()
+        from agentbench.sdk.strategy_checks import check_agents
 
+        checks = None if not agents or config.suite_runner is not None else check_agents(
+            agents, selection=config.sdk_selection, sdk=config.sdk, environ=config.environ)
 
-    # regist agents
-    registry = load_registry(DEFAULT_REGISTRY_PATH)
-
-    # we only pick ready agent, for adpating agent, run verify command first
-    agents = registry.ready()
     if not agents:
         print_agents(agents, config.output_fn)
         config.output_fn("No enabled ready benchmark agents detected.")
@@ -131,9 +132,6 @@ def run(configuration: RunConfiguration | None = None) -> int:
             "Use 'agentbench certify <agent_id>' when an adapter is ready."
         )
 
-    from agentbench.sdk.strategy_checks import check_agents
-    checks = None if config.suite_runner is not None else check_agents(
-        agents, selection=config.sdk_selection, sdk=config.sdk, environ=config.environ)
     if config.assume_yes:
         print_agents(agents, config.output_fn, strategy_checks=checks)
     if not config.assume_yes and not confirm_agents(
@@ -144,24 +142,20 @@ def run(configuration: RunConfiguration | None = None) -> int:
     ):
         return 0
 
-    # Starting bench
-
-    # output LLM data
-    llm_activity = LLMActivity(config.output_fn)
-
-    # build benchmark_runner
-    suite_runner = config.suite_runner or build_trace_suite_runner(
-        max_bytes=config.llm_trace_max_bytes,
-        model=config.model,
-        activity_sink=llm_activity,
-        sdk=config.sdk,
-        sdk_selection=config.sdk_selection,
-        sdk_options=config.sdk_options,
-        concurrency=config.concurrency,
-        environ=config.environ,
-    )
-    if config.retry_policy is not None:
-        suite_runner.retry_policy = config.retry_policy
+    with loading_line("Preparing benchmark", config.output_fn):
+        llm_activity = LLMActivity(config.output_fn)
+        suite_runner = config.suite_runner or build_trace_suite_runner(
+            max_bytes=config.llm_trace_max_bytes,
+            model=config.model,
+            activity_sink=llm_activity,
+            sdk=config.sdk,
+            sdk_selection=config.sdk_selection,
+            sdk_options=config.sdk_options,
+            concurrency=config.concurrency,
+            environ=config.environ,
+        )
+        if config.retry_policy is not None:
+            suite_runner.retry_policy = config.retry_policy
 
     execution = run_benchmark_session(
         agents,

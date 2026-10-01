@@ -36,6 +36,9 @@ def suite_snapshot(plan, events):
             job['status'] = 'queued' if kind == 'agent_queued' else 'running'
         if event.get('phase') == 'generate' and event.get('event') == 'progress':
             job['generation_status'] = {'started': 'running'}.get(event.get('status'), event.get('status'))
+            artifact = event.get('artifact_run_id')
+            if artifact and artifact not in job.setdefault('preparation_runs', []):
+                job['preparation_runs'].append(artifact)
         index = event.get('case_index')
         if type(index) is int and 0 <= index < len(job['cases']):
             apply_case_event(job['cases'][index], event)
@@ -67,6 +70,7 @@ def suite_snapshot(plan, events):
             job['quality_gate'] = None
         for case in job['cases']:
             case['agent_job_id'] = job['job_id']
+            case['preparation_runs'] = list(job.get('preparation_runs', []))
             case.update(manual_recovery(case))
     counts = dict(Counter(case['execution_status'] for case in cases))
     counts.update(planned=len(cases), completed=sum(case['execution_status'] == 'completed' for case in cases),

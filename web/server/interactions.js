@@ -6,14 +6,14 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const project = fileURLToPath(new URL('../../', import.meta.url));
-export async function interactionPage(root, run, query, signal) {
+export async function interactionPage(root, run, query, signal, module = 'agentbench.observe.interactions') {
   if (!/^[a-zA-Z0-9_-]+$/.test(run)) throw new Error('Invalid run');
   const base = await realpath(root), directory = await realpath(path.join(base, run));
   if (!directory.startsWith(base + path.sep)) throw new Error('Path outside runs');
   const venv = path.join(project, '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
   const python = process.env.ABB_PYTHON || (existsSync(venv) ? venv : 'python3');
   return new Promise((resolve, reject) => {
-    const child = spawn(python, ['-m', 'agentbench.observe.interactions', directory, JSON.stringify(query)],
+    const child = spawn(python, ['-m', module, directory, JSON.stringify(query)],
       { cwd: project, shell: false, signal });
     const output = [];
     child.stdout.on('data', chunk => output.push(chunk));

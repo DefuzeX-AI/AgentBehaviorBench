@@ -2,11 +2,13 @@
 
 These history/state/extension semantics belong to KUMA, not the SDK contract.
 """
+from agentbench.observe.timing import span, timed
 from agentbench.sdk.common.artifacts import Artifacts, plain
 from agentbench.observe.store import TraceStore
 from agentbench.observe.result import sanitize_result
 
 
+@timed('Case dialogue', kind='case')
 async def drive_run(run, invoke, directory, *, provider, repo_path=None, file_evidence_required=False):
     """Deliver current Inputs sequentially; leave context entirely to the Agent.
 
@@ -33,7 +35,8 @@ async def drive_run(run, invoke, directory, *, provider, repo_path=None, file_ev
     try:
         while True:
             summary['phase'] = 'input'
-            item = run.get_input(full=True)
+            with span('Get next input', kind='sdk'):
+                item = run.get_input(full=True)
             if item is None:
                 break
             number = len(summary['steps']) + 1
@@ -49,7 +52,10 @@ async def drive_run(run, invoke, directory, *, provider, repo_path=None, file_ev
             trace.record('input_mapped', input_id=item.input_id, case_id=run.case_id,
                          artifact=f'{relative}/mapped-input.json')
             summary['phase'] = 'execution'
-            result = await invoke(payload, directory / relative, provider)
+            with span('Agent turn', kind='agent', input_id=item.input_id, case_id=run.case_id) as operation:
+                result = await invoke(payload, directory / relative, provider)
+                if operation is not None:
+                    operation.status = result['status']
             # Artifacts.save sanitizes only its serialized copy. The same safe
             # value must cross the SDK submission boundary, including custom callers.
             result, _ = sanitize_result(result, files.secrets)
@@ -60,67 +66,70 @@ async def drive_run(run, invoke, directory, *, provider, repo_path=None, file_ev
             summary['execution'] = ('failed' if not succeeded or summary['execution'] == 'failed'
                                     else 'succeeded')
             summary['phase'] = 'otel'
-            import json
-            trace_status = json.loads((directory / relative / 'otel-status.json').read_text())
-            summary['otel'] = ('incomplete' if trace_status['status'] != 'complete'
-                               or summary['otel'] == 'incomplete' else 'complete')
-            if not provider.force_flush():
-                summary['otel'] = 'incomplete'
+            with span('Flush trace evidence', kind='evidence'):
+                import json
+                trace_status = json.loads((directory / relative / 'otel-status.json').read_text())
+                summary['otel'] = ('incomplete' if trace_status['status'] != 'complete'
+                                   or summary['otel'] == 'incomplete' else 'complete')
+                if not provider.force_flush():
+                    summary['otel'] = 'incomplete'
             before = len(run.history)
             step = {'input_id': item.input_id, 'directory': relative, 'committed': False}
             summary['steps'].append(step)
             summary['phase'] = 'submission'
             try:
                 trace.record('submission_started', input_id=item.input_id, case_id=run.case_id)
-                if succeeded:
-                    run.submit(output=result['output'], status='completed')
-                else:
-                    terminal = {'timeout': 'timeout', 'cancelled': 'aborted', 'aborted': 'aborted'}.get(result['status'], 'failed')
-                    run.submit(status=terminal, error=f'Agent execution {terminal}; see local diagnostics')
+                with span('Submit output / wait for SDK', kind='sdk_wait', input_id=item.input_id):
+                    if succeeded:
+                        run.submit(output=result['output'], status='completed')
+                    else:
+                        terminal = {'timeout': 'timeout', 'cancelled': 'aborted', 'aborted': 'aborted'}.get(result['status'], 'failed')
+                        run.submit(status=terminal, error=f'Agent execution {terminal}; see local diagnostics')
             except Exception:
                 if len(run.history) > before:
                     summary['phase'] = 'judge'
                 raise
             finally:
-                committed = run.history[before:]
-                if committed:
-                    step['committed'] = True
-                    summary['submission'] = 'committed'
-                    files.save(f'{relative}/submission.json', committed[0].submission)
-                    submission = plain(committed[0].submission)
-                    files.save(f'{relative}/file-evidence.json', {
-                        'file_evidence': submission.get('file_evidence'),
-                        'capture_status': {key: value for key, value in submission.get('capture_status', {}).items()
-                                           if key in ('file_snapshot', 'file_diff', 'sensitive_scan')},
-                        'runtime_evidence': submission.get('extensions', {}).get('runtime_evidence')})
-                    if file_evidence_required:
-                        captures = submission.get('capture_status', {})
-                        states = [captures.get(key, {}).get('status') for key in ('file_snapshot', 'file_diff')]
-                        current = ('missing' if not submission.get('file_evidence') or any(s not in ('complete', 'partial') for s in states)
-                                   else 'partial' if 'partial' in states else 'complete')
-                        summary['files'] = ('missing' if 'missing' in (summary['files'], current)
-                                            else 'partial' if 'partial' in (summary['files'], current) else current)
-                    step['submission_status'] = submission['status']
-                    step['capture_status'] = submission.get('capture_status', {})
-                    trace.record('submission_committed', input_id=item.input_id, case_id=run.case_id,
-                                 artifact=f'{relative}/submission.json')
-                    # KUMA Submission recursively freezes JSON as MappingProxyType.
-                    # Inspect the detached JSON snapshot already used for persistence,
-                    # so a valid immutable trace is not mistaken for missing evidence.
-                    evidence = submission['extensions'].get('trace_evidence')
-                    files.save(f'{relative}/evidence.json', evidence)
-                    capture_status = submission.get('capture_status', {})
-                    traces = capture_status.get('traces', {})
-                    summary['evidence'] = ('captured' if isinstance(evidence, dict)
-                        and traces.get('status') in ('complete', 'partial') and summary['evidence'] != 'missing' else 'missing')
-                    tool_status = [{'span_id': span.get('span_id'), 'tool_content_status': span['tool_content_status']}
-                                   for span in (evidence or {}).get('spans', ()) if 'tool_content_status' in span]
-                    files.save(f'{relative}/capture-status.json', {
-                        'input_id': item.input_id, 'capture_status': capture_status,
-                        'tool_content_status': tool_status,
-                        'trace_summary': {key: evidence.get(key) for key in ('reasons', 'missing', 'dropped_count')}
-                                         if isinstance(evidence, dict) else None})
-                files.save('manifest.json', summary)
+                with span('Save submission evidence', kind='evidence', input_id=item.input_id):
+                    committed = run.history[before:]
+                    if committed:
+                        step['committed'] = True
+                        summary['submission'] = 'committed'
+                        files.save(f'{relative}/submission.json', committed[0].submission)
+                        submission = plain(committed[0].submission)
+                        files.save(f'{relative}/file-evidence.json', {
+                            'file_evidence': submission.get('file_evidence'),
+                            'capture_status': {key: value for key, value in submission.get('capture_status', {}).items()
+                                               if key in ('file_snapshot', 'file_diff', 'sensitive_scan')},
+                            'runtime_evidence': submission.get('extensions', {}).get('runtime_evidence')})
+                        if file_evidence_required:
+                            captures = submission.get('capture_status', {})
+                            states = [captures.get(key, {}).get('status') for key in ('file_snapshot', 'file_diff')]
+                            current = ('missing' if not submission.get('file_evidence') or any(s not in ('complete', 'partial') for s in states)
+                                       else 'partial' if 'partial' in states else 'complete')
+                            summary['files'] = ('missing' if 'missing' in (summary['files'], current)
+                                                else 'partial' if 'partial' in (summary['files'], current) else current)
+                        step['submission_status'] = submission['status']
+                        step['capture_status'] = submission.get('capture_status', {})
+                        trace.record('submission_committed', input_id=item.input_id, case_id=run.case_id,
+                                     artifact=f'{relative}/submission.json')
+                        # KUMA Submission recursively freezes JSON as MappingProxyType.
+                        # Inspect the detached JSON snapshot already used for persistence,
+                        # so a valid immutable trace is not mistaken for missing evidence.
+                        evidence = submission['extensions'].get('trace_evidence')
+                        files.save(f'{relative}/evidence.json', evidence)
+                        capture_status = submission.get('capture_status', {})
+                        traces = capture_status.get('traces', {})
+                        summary['evidence'] = ('captured' if isinstance(evidence, dict)
+                            and traces.get('status') in ('complete', 'partial') and summary['evidence'] != 'missing' else 'missing')
+                        tool_status = [{'span_id': span.get('span_id'), 'tool_content_status': span['tool_content_status']}
+                                       for span in (evidence or {}).get('spans', ()) if 'tool_content_status' in span]
+                        files.save(f'{relative}/capture-status.json', {
+                            'input_id': item.input_id, 'capture_status': capture_status,
+                            'tool_content_status': tool_status,
+                            'trace_summary': {key: evidence.get(key) for key in ('reasons', 'missing', 'dropped_count')}
+                                             if isinstance(evidence, dict) else None})
+                    files.save('manifest.json', summary)
         summary['phase'] = 'judge'
         if run.report is not None:
             files.save('judge/report.json', run.report)

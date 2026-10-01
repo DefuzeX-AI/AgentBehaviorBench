@@ -84,6 +84,12 @@ export function runsPlugin(root) {
           res.on('close', () => { if (!res.writableEnded) controller.abort(); });
           return reply(200, await interactionPage(root, interactions[1], Object.fromEntries(url.searchParams), controller.signal));
         }
+        const timeline = /^\/api\/observe\/runs\/([a-zA-Z0-9_-]+)\/timeline$/.exec(url.pathname);
+        if (timeline) {
+          const controller = new AbortController();
+          res.on('close', () => { if (!res.writableEnded) controller.abort(); });
+          return reply(200, await interactionPage(root, timeline[1], {}, controller.signal, 'agentbench.observe.timeline'));
+        }
         const eventMatch = /^\/api\/observe\/runs\/([a-zA-Z0-9_-]+)\/events$/.exec(url.pathname);
         if (eventMatch) return reply(200, await eventPage(root, eventMatch[1], Number(url.searchParams.get('offset') || 0)));
         const evaluated = /^\/api\/observe\/runs\/([a-zA-Z0-9_-]+)\/evaluation$/.exec(url.pathname);

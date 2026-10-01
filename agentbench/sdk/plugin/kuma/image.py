@@ -1,4 +1,5 @@
 """Isolated evaluation build overlay; original Agent/network files stay untouched."""
+from agentbench.observe.timing import span
 from contextlib import contextmanager
 from pathlib import Path
 import re
@@ -67,50 +68,51 @@ def evaluation_agent(agent, *, control=None, deadline=None, backend=DEFAULT_BASE
     if not requirements.is_file() or requirements.is_symlink():
         raise ValueError('KUMA adapter requirements.txt is missing or linked')
     with tempfile.TemporaryDirectory(prefix='abb-evaluation-') as temporary:
-        root = Path(temporary) / 'agent-unit'
-        shutil.copytree(agent.path, root, ignore=_ignore, symlinks=True,
-                        copy_function=checked_copy)
-        materialize_file_links(root, check)
-        if any(p.is_symlink() for p in root.rglob('*')):
-            raise ValueError('Agent source must not contain symlinks')
-        # SDK atomically updates .gitignore unless this rule already exists.
-        # Prepare it in the build copy so the runtime source remains read-only.
-        ignore_file = root / 'agent/.gitignore'
-        if ignore_file.is_symlink():
-            raise ValueError('Agent ignore file cannot be a symlink')
-        existing = ignore_file.read_text() if ignore_file.exists() else ''
-        if not {'.kuma/', '/.kuma/'}.intersection(line.strip() for line in existing.splitlines()):
-            ignore_file.write_text(existing + '\n/.kuma/\n')
-        staged_sdk = root / '.abb-sdk'
-        staged_sdk.mkdir()
-        shutil.copy2(requirements, staged_sdk / 'requirements.txt')
-        if any(p.is_symlink() for p in root.rglob('*')):
-            raise ValueError('Evaluation build must not contain symlinks')
-        source = (root / 'agent.toml').read_text()
-        source, count = re.subn(r'(?m)^argv = .*$',
-                               f'argv = ["python", "-m", "{worker_package}.worker"]', source)
-        if count != 1:
-            raise ValueError('Expected one explicit launch.argv')
-        if sdk_environment:
-            source = extend_runtime_environment(source, tuple(sdk_environment), field='worker_env_keys')
-        backend_routes = () if backend is None else (
-            {'url': backend, 'methods': ['GET', 'POST']},
-            {'url': backend + '/sdk/*', 'methods': ['GET', 'POST']})
-        source = append_whitelist(source, Path(__file__).with_name('whitelist.json'), backend_routes)
-        (root / 'agent.toml').write_text(source)
-        dockerfile = root / 'Dockerfile'
-        original = dockerfile.read_text()
-        users = re.findall(r'(?im)^USER\s+(.+)$', original)
-        if not users or users[-1].strip() in ('root', '0'):
-            raise ValueError('Evaluation requires an explicit non-root image USER')
-        # Optional profile schemas or fixtures may live here; text-input Agents
-        # do not need to create an otherwise empty directory for Docker COPY.
-        evaluation_copy = ('COPY evaluation/ /opt/agent/evaluation/\n'
-                           if (root / 'evaluation').is_dir() else '')
-        profile_copy = ('COPY requirement.md /opt/agent/requirement.md\n'
-                        if require_profile or (root / 'requirement.md').is_file() else '')
-        dockerfile.write_text(original + '\nUSER root\nCOPY .abb-sdk/ /opt/abb-sdk/\n'
-                             + SDK_INSTALL + profile_copy
-                             + evaluation_copy + 'USER ' + users[-1] + '\n')
-        check()
+        with span('Prepare evaluation overlay', kind='preparation'):
+            root = Path(temporary) / 'agent-unit'
+            shutil.copytree(agent.path, root, ignore=_ignore, symlinks=True,
+                            copy_function=checked_copy)
+            materialize_file_links(root, check)
+            if any(p.is_symlink() for p in root.rglob('*')):
+                raise ValueError('Agent source must not contain symlinks')
+            # SDK atomically updates .gitignore unless this rule already exists.
+            # Prepare it in the build copy so the runtime source remains read-only.
+            ignore_file = root / 'agent/.gitignore'
+            if ignore_file.is_symlink():
+                raise ValueError('Agent ignore file cannot be a symlink')
+            existing = ignore_file.read_text() if ignore_file.exists() else ''
+            if not {'.kuma/', '/.kuma/'}.intersection(line.strip() for line in existing.splitlines()):
+                ignore_file.write_text(existing + '\n/.kuma/\n')
+            staged_sdk = root / '.abb-sdk'
+            staged_sdk.mkdir()
+            shutil.copy2(requirements, staged_sdk / 'requirements.txt')
+            if any(p.is_symlink() for p in root.rglob('*')):
+                raise ValueError('Evaluation build must not contain symlinks')
+            source = (root / 'agent.toml').read_text()
+            source, count = re.subn(r'(?m)^argv = .*$',
+                                   f'argv = ["python", "-m", "{worker_package}.worker"]', source)
+            if count != 1:
+                raise ValueError('Expected one explicit launch.argv')
+            if sdk_environment:
+                source = extend_runtime_environment(source, tuple(sdk_environment), field='worker_env_keys')
+            backend_routes = () if backend is None else (
+                {'url': backend, 'methods': ['GET', 'POST']},
+                {'url': backend + '/sdk/*', 'methods': ['GET', 'POST']})
+            source = append_whitelist(source, Path(__file__).with_name('whitelist.json'), backend_routes)
+            (root / 'agent.toml').write_text(source)
+            dockerfile = root / 'Dockerfile'
+            original = dockerfile.read_text()
+            users = re.findall(r'(?im)^USER\s+(.+)$', original)
+            if not users or users[-1].strip() in ('root', '0'):
+                raise ValueError('Evaluation requires an explicit non-root image USER')
+            # Optional profile schemas or fixtures may live here; text-input Agents
+            # do not need to create an otherwise empty directory for Docker COPY.
+            evaluation_copy = ('COPY evaluation/ /opt/agent/evaluation/\n'
+                               if (root / 'evaluation').is_dir() else '')
+            profile_copy = ('COPY requirement.md /opt/agent/requirement.md\n'
+                            if require_profile or (root / 'requirement.md').is_file() else '')
+            dockerfile.write_text(original + '\nUSER root\nCOPY .abb-sdk/ /opt/abb-sdk/\n'
+                                 + SDK_INSTALL + profile_copy
+                                 + evaluation_copy + 'USER ' + users[-1] + '\n')
+            check()
         yield SimpleNamespace(path=root, agent_id=agent.agent_id, framework=agent.framework)

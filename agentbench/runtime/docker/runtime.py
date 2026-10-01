@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from agentbench.observe.timing import span, timed
 import math
 import os
 import shutil
@@ -136,6 +137,7 @@ class DockerRuntime:
         return self._timeout_override or AgentContainerConfig.from_agent_dir(
             agent.path, secret_resolver=self._secret_resolver, environ=self._environ).timeout_sec
 
+    @timed('Prepare Docker session', kind='preparation')
     def start(self, agent: AgentDescriptor, *, invocation=None,
               preparation_deadline: Deadline | None = None) -> RuntimeSession:
         # Check cancellation, the preparation deadline, and Docker availability first.
@@ -345,7 +347,8 @@ class DockerRuntime:
             # Register and create the Agent container so failures can clean it up reliably.
             self._plan_resource("container", agent_name, "agent", suffix)
             planned_agent = True
-            self._create_resource("container", agent_name, command, deadline=preparation)
+            with span("Create Agent container", kind="preparation"):
+                self._create_resource("container", agent_name, command, deadline=preparation)
             preparation.check()
             
             # Start the Agent container and capture stdout and stderr.
@@ -396,6 +399,7 @@ class DockerRuntime:
                     DockerCommandRunner.terminate(process)
             raise
 
+    @timed('Start model interceptor', kind='preparation')
     def _start_interceptor(
         self,
         *,
@@ -499,6 +503,7 @@ class DockerRuntime:
             token_environment,
         )
 
+    @timed('Start egress observer', kind='preparation')
     def _start_egress_observer(
         self, *, agent_id: str, suffix: str, network_name: str, deadline: Deadline | None = None,
     ) -> RunningEgressObserver:
@@ -722,6 +727,7 @@ class DockerRuntime:
                 "Transparent interception requires an Agent image with a non-root USER"
             )
 
+    @timed('Check Docker availability', kind='preparation')
     def _check_available(self, *, deadline: Deadline | None = None) -> None:
         try:
             result = self._run_quiet("info", "--format", "{{.ServerVersion}}", capture=True, deadline=deadline)

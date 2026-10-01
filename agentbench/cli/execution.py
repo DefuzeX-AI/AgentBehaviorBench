@@ -27,6 +27,7 @@ from .terminal_ui.presentation import (
 )
 from .terminal_ui.progress import ProgressPrinter, configuration_error
 from .terminal_ui.live_cases import LiveCases
+from .terminal_ui.loading import loading_line
 from .result_export import ResultLogWriter, start_result_log
 from .terminal_ui import LLMActivity
 from .viewer import RunningViewer
@@ -121,40 +122,44 @@ def run_benchmark_once(
             activity.set_live_cases(None)
 
     try:
-        if output_path is not None:
-            # Factories retain the CLI environment snapshot. Without a factory,
-            # capture the environment when the result log starts.
-            environ = getattr(getattr(runner, "_runner_factory", None), "environ", None)
-            from .sessions.configuration import runner_configuration
-            from .sessions.fresh import begin_result_log
-            saved_configuration = runner_configuration(runner)
-            if saved_configuration is not None and all(isinstance(agent, AgentRegistration) for agent in agents):
-                result_log = begin_result_log(output_path, suite_id, agents,
-                    configuration=saved_configuration, environ=environ)
-            else:
-                result_log = start_result_log(
-                output_path,
-                suite_id=suite_id,
-                selected_agent_ids=tuple(agent.agent_id for agent in agents),
-                configured_workers=parallelism,
-                effective_workers=effective_workers,
-                total_case_count=total_case_count,
-                selected_case_counts={agent.agent_id: agent.case_count for agent in agents},
-                batch_progress=concurrent,
-                environ=environ if isinstance(environ, Mapping) else None,
-                )
-            if viewer_starter is not None:
-                try:
-                    if hasattr(result_log, 'store'):
-                        from .sessions.control import register_control
-                        import os
-                        controller = register_control(result_log.path, os.environ if environ is None else environ)
-                    viewer = viewer_starter(result_log.path)
-                except OSError as exc:
-                    if controller is not None:
-                        controller.close()
-                        controller = None
-                    output_fn(f'Live viewer unavailable: {exc}. Results will still be saved.')
+        viewer_warning = None
+        with loading_line("Starting benchmark", output_fn):
+            if output_path is not None:
+                # Factories retain the CLI environment snapshot. Without a factory,
+                # capture the environment when the result log starts.
+                environ = getattr(getattr(runner, "_runner_factory", None), "environ", None)
+                from .sessions.configuration import runner_configuration
+                from .sessions.fresh import begin_result_log
+                saved_configuration = runner_configuration(runner)
+                if saved_configuration is not None and all(isinstance(agent, AgentRegistration) for agent in agents):
+                    result_log = begin_result_log(output_path, suite_id, agents,
+                        configuration=saved_configuration, environ=environ)
+                else:
+                    result_log = start_result_log(
+                    output_path,
+                    suite_id=suite_id,
+                    selected_agent_ids=tuple(agent.agent_id for agent in agents),
+                    configured_workers=parallelism,
+                    effective_workers=effective_workers,
+                    total_case_count=total_case_count,
+                    selected_case_counts={agent.agent_id: agent.case_count for agent in agents},
+                    batch_progress=concurrent,
+                    environ=environ if isinstance(environ, Mapping) else None,
+                    )
+                if viewer_starter is not None:
+                    try:
+                        if hasattr(result_log, 'store'):
+                            from .sessions.control import register_control
+                            import os
+                            controller = register_control(result_log.path, os.environ if environ is None else environ)
+                        viewer = viewer_starter(result_log.path)
+                    except OSError as exc:
+                        if controller is not None:
+                            controller.close()
+                            controller = None
+                        viewer_warning = f'Live viewer unavailable: {exc}. Results will still be saved.'
+        if viewer_warning is not None:
+            output_fn(viewer_warning)
         print_run_queued(len(agents), suite_id, viewer.url if viewer else None,
                          effective_workers, parallelism, output_fn)
         activity.set_concurrent(concurrent)

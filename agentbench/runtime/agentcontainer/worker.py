@@ -1,6 +1,8 @@
 """One invocation inside an isolated process; never selects another runtime."""
 from __future__ import annotations
 
+from agentbench.observe.timing import span
+
 import argparse
 import asyncio
 import json
@@ -90,12 +92,14 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None, ses
         config["configurable"] = configurable
         config.setdefault("metadata", {}).update(abb_run_id=run_id)
         store.record("execution_start", input=envelope["input"])
-        adapter = session.load(root, envelope)
+        with span('Load Agent adapter', kind='preparation'):
+            adapter = session.load(root, envelope)
         interception = InterceptionConfig.from_agent_dir(root)
         hosts = [host for route in (*interception.routes, *interception.tool_routes)
                  for host in route.host_patterns] if interception else []
         with model_correlation(hosts):
-            invocation = await adapter.ainvoke(envelope["input"], run_config=config)
+            with span('Invoke Agent', kind='execution', invocation_id=run_id, **{k: v for k, v in context.items() if k != 'invocation_id'}):
+                invocation = await adapter.ainvoke(envelope["input"], run_config=config)
         result.update(status="succeeded", output=invocation.output, raw_output=invocation.raw_output)
         store.record("execution_end", output=invocation.output)
     except BaseException as exc:

@@ -2,6 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readSuiteRoute, suiteRouteHref } from './suiteRoute.js';
 
+test('timing deep link restores the historical attempt after reopening', () => {
+  const item = { agent_id: 'alpha', case_index: 0, attempts: [{ attempt_id: 'old' }, { attempt_id: 'new' }] };
+  const href = suiteRouteHref(item, 'timing', { pathname: '/suite/test/', search: '' }, 'old');
+  const route = readSuiteRoute([item], href.slice(href.indexOf('#')));
+  assert.equal(route.tab, 'timing');
+  assert.equal(route.attemptId, 'old');
+});
+
 const cases = [{ agent_id: 'alpha', case_index: 0 }, { agent_id: 'alpha', case_index: 1 }];
 
 test('Agent introduction has a distinct shareable route including before Cases exist', () => {

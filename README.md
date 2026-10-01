@@ -165,6 +165,7 @@ Run `agentbench COMMAND --help` for command-specific options.
 - [How to add an Agent to ABB for testing](docs/How%20To%20Add%20Agent.md)
 - [Detailed setup, operation, recovery, and development reference](docs/README-previous.md)
 - [Results and troubleshooting](docs/Troubleshooting.md)
+- [Per-Case execution timelines and persisted timings](docs/Runtime-Timings.md)
 
 ## License
 

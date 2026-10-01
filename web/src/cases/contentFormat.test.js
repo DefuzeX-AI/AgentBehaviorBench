@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { inspectContent } from './contentFormat.js';
+import { inspectContent, readableMessages } from './contentFormat.js';
 
 test('detects serialized JSON and preserves the original evidence', () => {
   const raw = '  {"response":"Hello\\n\\n**world**", "messages": []}  ';
@@ -26,4 +26,30 @@ test('supports objects, arrays, fenced JSON and falsy outputs', () => {
     assert.equal(inspectContent(value).parsed, value);
   }
   assert.equal(inspectContent('').raw, '');
+});
+
+test('reads nested framework messages without exposing empty metadata as prose', () => {
+  const value = [[{ type: 'system', content: 'System\nmessage', additional_kwargs: {} },
+    { type: 'human', content: 'Question', id: 'message-id' }]];
+  const original = JSON.stringify(value);
+  const messages = readableMessages(value);
+  assert.deepEqual(messages.map(m => [m.role, m.content]), [['System', 'System\nmessage'], ['User', 'Question']]);
+  assert.equal(JSON.stringify(value), original);
+});
+
+test('reads generation output and retains tool calls and mixed content blocks', () => {
+  const tools = [{ name: 'search', args: { query: 'docs' } }];
+  const blocks = [{ type: 'text', text: 'Searching' }, { type: 'image', source: { data: 'fixture' } }];
+  const [message] = readableMessages({ generations: [[{ message: { type: 'ai', content: blocks, tool_calls: tools } }]], llm_output: {} });
+  assert.equal(message.role, 'Assistant');
+  assert.deepEqual(message.content, blocks);
+  assert.deepEqual(message.tools, tools);
+  assert.equal(readableMessages({ role: 'assistant', content: '', additional_kwargs: { tool_calls: tools } })[0].tools, tools);
+});
+
+test('unknown and mixed arrays keep the full JSON fallback', () => {
+  for (const value of [null, [], [1, 2], [{ role: 'user', content: 'ok' }, { other: 'keep me' }], { messages: 'text' }]) {
+    assert.deepEqual(readableMessages(value), []);
+  }
+  assert.equal(inspectContent({ answer: 'Readable answer', messages: [] }).responseKey, 'answer');
 });

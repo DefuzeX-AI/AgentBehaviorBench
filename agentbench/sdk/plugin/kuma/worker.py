@@ -1,5 +1,6 @@
 """Official KUMA and the existing Agent worker, in one container process."""
 import argparse
+from agentbench.observe.timing import span, timing_session
 import asyncio
 import json
 import os
@@ -18,42 +19,52 @@ from agentbench.runtime.agentcontainer.session import AgentSession
 
 
 async def execute(root, output, settings=None, sdk_repo=None, *, providers=None):
+    output = Path(output)
+    output.mkdir(parents=True, exist_ok=True)
+    with timing_session(output / 'timing.jsonl', source='worker', name='SDK worker') as operation:
+        code = await _execute(root, output, settings, sdk_repo, providers=providers)
+        operation.status = 'succeeded' if code == 0 else 'failed'
+        return code
+
+
+async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None):
     # sdk_repo is the SDK repository/ledger root, mounted apart from the Agent tree
     # so the image's own /opt/agent/agent stays visible; in place when omitted.
     # providers, when given, replaces the official Case and Judge with local SDK
     # providers: it supplies name, max_steps, case_options(index) and
     # judge_provider(output). The Backend is then never called, so no credential.
-    repository = Path(sdk_repo) if sdk_repo is not None else root / 'agent'
-    # Enter the in-container evaluation flow. root is the Agent directory,
-    # output stores artifacts, and settings contains the job configuration.
-    # Import the official KUMA SDK, evidence capture, and Agent invocation here.
-    from kuma import create_run, DEFAULT_BASE_URL
-    from kuma.otel import configure_trace_evidence
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.resources import Resource
-    from agentbench.runtime.agentcontainer.worker import execute as invoke_agent, configure_trust
-    from agentbench.runtime.agentcontainer.config import tomllib
+    with span('Initialize SDK worker', kind='sdk'):
+        repository = Path(sdk_repo) if sdk_repo is not None else root / 'agent'
+        # Enter the in-container evaluation flow. root is the Agent directory,
+        # output stores artifacts, and settings contains the job configuration.
+        # Import the official KUMA SDK, evidence capture, and Agent invocation here.
+        from kuma import create_run, DEFAULT_BASE_URL
+        from kuma.otel import configure_trace_evidence
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.resources import Resource
+        from agentbench.runtime.agentcontainer.worker import execute as invoke_agent, configure_trust
+        from agentbench.runtime.agentcontainer.config import tomllib
 
 
 
     
-    # Prepare artifact storage and connect OpenTelemetry evidence to the KUMA SDK.
-    files = Artifacts(output)
-    provider = TracerProvider(resource=Resource.create({'service.name': 'abb-evaluation'}))
-    capture = configure_trace_evidence(provider)
+        # Prepare artifact storage and connect OpenTelemetry evidence to the KUMA SDK.
+        files = Artifacts(output)
+        provider = TracerProvider(resource=Resource.create({'service.name': 'abb-evaluation'}))
+        capture = configure_trace_evidence(provider)
     
-    # Read the in-container Agent manifest for its ID and framework.
-    with (root / 'agent.toml').open('rb') as stream:
-        manifest = tomllib.load(stream)
-    from agentbench.sdk.common.workspace import workspace_policy
-    workspace = workspace_policy(manifest)
-    if workspace.path:
-        repository = Path(workspace.path)
-    # Create the reusable Agent session before the SDK Run exists.
-    run = None
-    exporter = None
-    agent_session = AgentSession()
-    settings = dict(settings or {})
+        # Read the in-container Agent manifest for its ID and framework.
+        with (root / 'agent.toml').open('rb') as stream:
+            manifest = tomllib.load(stream)
+        from agentbench.sdk.common.workspace import workspace_policy
+        workspace = workspace_policy(manifest)
+        if workspace.path:
+            repository = Path(workspace.path)
+        # Create the reusable Agent session before the SDK Run exists.
+        run = None
+        exporter = None
+        agent_session = AgentSession()
+        settings = dict(settings or {})
     try:
         # Pass each current input directly to the adapter. The Agent owns history
         # and memory, so no per-Agent input contract is required.
@@ -121,7 +132,8 @@ async def execute(root, output, settings=None, sdk_repo=None, *, providers=None)
         # Create the SDK Run from the saved Case without generating another one.
         # A saved Case accepts a Judge provider; only a Case provider conflicts with it.
         judge = {} if providers is None else {'judge_provider': providers.judge_provider(output)}
-        run = create_run(case_path=settings['case_artifact'], **options, **judge)
+        with span('Load prepared Case', kind='sdk'):
+            run = create_run(case_path=settings['case_artifact'], **options, **judge)
 
 
         if workspace.export_changed_files:
@@ -183,21 +195,22 @@ async def execute(root, output, settings=None, sdk_repo=None, *, providers=None)
         return 1
     finally:
         # Always close the Agent session and save its final state.
-        try:
-            await agent_session.aclose()
-        finally:
-            files.save('session.json', agent_session.snapshot())
-            if exporter is not None:
-                try:
-                    exporter.finish()
-                except Exception as exc:
-                    files.save('workspace-artifacts.json', {'status': 'failed', 'error_type': type(exc).__name__})
-            # Cancel an unfinished SDK Run that is still waiting for input or submission.
-            if run is not None and run.state in ('ready', 'input_delivered'):
-                run.cancel()
-            # Flush traces and close the provider last.
-            provider.force_flush()
-            provider.shutdown()
+        with span('Close SDK and Agent session', kind='cleanup'):
+            try:
+                await agent_session.aclose()
+            finally:
+                files.save('session.json', agent_session.snapshot())
+                if exporter is not None:
+                    try:
+                        exporter.finish()
+                    except Exception as exc:
+                        files.save('workspace-artifacts.json', {'status': 'failed', 'error_type': type(exc).__name__})
+                # Cancel an unfinished SDK Run that is still waiting for input or submission.
+                if run is not None and run.state in ('ready', 'input_delivered'):
+                    run.cancel()
+                # Flush traces and close the provider last.
+                provider.force_flush()
+                provider.shutdown()
 
 
 class EvaluationSettingsError(RuntimeError):
