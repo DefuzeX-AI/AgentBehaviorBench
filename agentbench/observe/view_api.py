@@ -268,6 +268,9 @@ class RunViewAPI:
             return interactions(self.directory, query)
         if route == 'evaluation':
             return self.evaluation()
+        if route == 'replay':
+            from .replay import replay
+            return replay(self.directory, query)
         if route == 'events':
             return self.events(int(query.get('offset', ['0'])[0]))
         if route == 'otel':

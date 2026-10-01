@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readSuiteRoute, suiteRouteHref } from './suiteRoute.js';
+import { CASE_TABS, readSuiteRoute, suiteRouteHref } from './suiteRoute.js';
 
 test('timing deep link restores the historical attempt after reopening', () => {
   const item = { agent_id: 'alpha', case_index: 0, attempts: [{ attempt_id: 'old' }, { attempt_id: 'new' }] };
@@ -29,4 +29,10 @@ test('Suite route creates a shareable Case URL without changing the base path', 
   const location = { pathname: '/suite/suite-one/', search: '?mode=local' };
   assert.equal(suiteRouteHref(null, 'overview', location), '/suite/suite-one/?mode=local');
   assert.equal(suiteRouteHref(cases[0], 'trace', location), '/suite/suite-one/?mode=local#agent=alpha&case=0&tab=trace');
+});
+
+test('Replay follows Timing and has a shareable Case route', () => {
+  assert.equal(CASE_TABS[CASE_TABS.indexOf('timing') + 1], 'replay');
+  const href = suiteRouteHref(cases[0], 'replay', { pathname: '/suite/one/', search: '' });
+  assert.equal(readSuiteRoute(cases, href.slice(href.indexOf('#'))).tab, 'replay');
 });

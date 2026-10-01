@@ -56,9 +56,9 @@ def _files(root):
         for folder in root.glob(pattern):
             for name in ('framework.jsonl', 'input.json', 'mapped-input.json', 'request.json',
                          'result.json', 'submission.json', 'file-evidence.json'):
-                names.add(str((folder / name).relative_to(root)))
+                names.add((folder / name).relative_to(root).as_posix())
     for path in (root / 'evaluation/workspace-files').glob('*.json'):
-        names.add(str(path.relative_to(root)))
+        names.add(path.relative_to(root).as_posix())
     files = []
     for name in sorted(names):
         candidate = root / name
@@ -299,7 +299,8 @@ class InteractionIndex:
         self.revision = _id(json.dumps(files))
 
     def public(self, row):
-        return {k: v for k, v in row.items() if not k.startswith('_')}
+        return {**{k: v for k, v in row.items() if not k.startswith('_')},
+                **({'artifact_file': row['_artifact']} if row.get('_artifact') else {})}
 
     def detail(self, identifier):
         row = self.by_id[identifier]

@@ -16,6 +16,7 @@ import './cases.css';
 
 const { Text, Title } = Typography;
 const CaseTimeline = lazy(() => import('./CaseTimeline.jsx'));
+const CaseReplay = lazy(() => import('./CaseReplay.jsx'));
 
 export default function CaseDetailsPage({ item, revision, onBack, onAgentSelect }) {
   const dispatch = useDispatch();
@@ -35,6 +36,7 @@ export default function CaseDetailsPage({ item, revision, onBack, onAgentSelect 
     { key: 'timing', label: 'Timing', children: <Suspense fallback={loading}><CaseTimeline key={attempt?.attempt_id || item.key}
       run={artifact} revision={revision} attempt={attempt} preparationRuns={item.preparation_runs || []}
       inputs={evaluation.data?.inputs} evidenceReady={Boolean(evaluation.data)} evidenceError={evaluation.error} /></Suspense> },
+    { key: 'replay', label: 'Replay', children: <Suspense fallback={loading}><CaseReplay key={artifact || item.key} run={artifact} /></Suspense> },
     { key: 'conversation', label: 'Conversation', children: artifactLoading ? loading : <CaseConversation inputs={evaluation.data?.inputs} /> },
     { key: 'tools', label: 'Tools & Files', children: artifact ? <CaseToolsFiles run={artifact} revision={revision} inputs={evaluation.data?.inputs} /> : null },
     { key: 'judge', label: 'Judge', children: artifactLoading && !report ? loading : <CaseJudge report={report} item={attempt || item} /> },
@@ -61,7 +63,7 @@ export default function CaseDetailsPage({ item, revision, onBack, onAgentSelect 
     </> : errorText(attempt.error)} />}
     {!artifact && <Alert type="info" showIcon message="Execution artifacts are not available yet" description={attempt ? 'This attempt has no viewable artifact directory. Saved Suite state remains available below.' : 'Case execution has not started.'} />}
 
-    <Tabs className="case-tabs" activeKey={detailTab === 'judge' && !report ? 'overview' : detailTab} onChange={value => dispatch(actions.detailTabChanged(value))}
-      items={tabs.map(tab => ({ ...tab, disabled: tab.key === 'judge' ? !report : ['conversation', 'tools', 'trace'].includes(tab.key) && !artifact }))} />
+    <Tabs className="case-tabs" activeKey={((detailTab === 'replay' && !artifact) || (detailTab === 'judge' && !report)) ? 'overview' : detailTab} onChange={value => dispatch(actions.detailTabChanged(value))}
+      items={tabs.map(tab => ({ ...tab, disabled: tab.key === 'judge' ? !report : ['replay', 'conversation', 'tools', 'trace'].includes(tab.key) && !artifact }))} />
   </section>;
 }
