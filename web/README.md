@@ -67,6 +67,15 @@ calls remain concurrent. Responses appear only after their recorded end. Select
 an event for its request/result, or a workspace path for its captured content and
 previous version. Refresh records explicitly when inspecting a running attempt.
 
+The compact player places User messages on the right and Agent replies on the
+left. Its collapsible file explorer uses Ant Design DirectoryTree with virtual
+scrolling, A/M/D badges for the latest captured change, descendant change counts,
+and a Changes only filter. Deleted paths remain inspectable; seeking backward
+restores earlier file states and badges. File contents and raw event evidence
+open in a drawer. Model/network calls are available through Display options;
+detailed timeline lanes can be expanded from the playback bar. The Judge result
+appears as a verdict card only when playback reaches its recorded timestamp.
+
 New execution runs store local workspace history in `replay/` beside
 `evaluation/` in the run directory. A separate `/run/abb-replay` host mount keeps
 it outside the observed workspace and KUMA repository. Replay files are not added
