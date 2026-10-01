@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from agentbench.observe.timing import timed
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -34,6 +35,7 @@ class DockerImageBuilder:
     build_timeout: float = 1800
     environ: Mapping[str, str] | None = None
 
+    @timed('Resolve image', kind='image')
     def build(
         self,
         *,
@@ -57,6 +59,7 @@ class DockerImageBuilder:
         tag = f"defuzex-agentbench/{_safe_name(repository)}:{digest}"
         commands = self.command_runner or DockerCommandRunner(self.executable, environ=self.environ)
 
+        @timed('Inspect cached image', kind='image')
         def inspect_cached() -> str | None:
             inspected = commands.run(
                 ["image", "inspect", "--format", '{{index .Config.Labels "abb.build_fingerprint"}}', tag],
@@ -68,6 +71,7 @@ class DockerImageBuilder:
                 raise DockerBuildError(f"Docker image fingerprint does not match: {tag}")
             return tag
 
+        @timed('Build Docker image', kind='build')
         def build_once() -> str:
             try:
                 built = commands.run(
@@ -91,6 +95,7 @@ class DockerImageBuilder:
         )
 
 
+@timed('Fingerprint build files', kind='preparation')
 def _content_digest(
     root: Path, *, fingerprint_paths: Sequence[Path] | None = None,
     control: RunControl | None = None, deadline: Deadline | None = None,

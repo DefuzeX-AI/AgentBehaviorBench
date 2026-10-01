@@ -7,7 +7,10 @@ Start the prototype by running `npm run dev -- --port 5174` in `web/`, then open
 The page uses the current Run's read-only APIs and refreshes snapshots manually. The existing timeline remains available.
 
 - A: a spatial map of Case/Input, root Agent calls, and results/evaluation; expanding a child call collapses single-branch framework wrappers that contain no interactions.
-- B: a downward time sequence with SDK, Agent, LLM, and Tools lanes; complete calls are grouped together.
+- B: the shared SequenceDiagram showing only participating lanes, with saved
+  durations and bars relative to the longest call in the displayed group. The
+  Case Timing tab adds lifecycle stage grouping and per-Input sections, with the
+  full parent-child timing tree in its detail drawer. Sequence rows are continuous.
 - C: three columns for call navigation, current content, and direct child calls; follow a path one level at a time to inspect input and output.
 
 Solid edges come from parent-child relationships within the same trace. Dashed edges represent Input or framework-span links; select an edge to inspect its evidence.

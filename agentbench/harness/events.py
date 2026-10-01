@@ -61,6 +61,7 @@ class EventBus:
 
     def publish(self, event, callback=None, args=()):
         # Freeze data before the runner advances its Case/SDK state.
+        event = {'timestamp': datetime.now(timezone.utc).isoformat(), **event}
         value = (_snapshot(event), callback, _snapshot(args))
         if threading.get_ident() == self._owner:
             self._deliver(value)

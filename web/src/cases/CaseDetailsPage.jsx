@@ -1,4 +1,5 @@
 import { Alert, Select, Skeleton, Space, Tabs, Tag, Typography } from 'antd';
+import { lazy, Suspense } from 'react';
 import SuiteBreadcrumb from '../navigation/SuiteBreadcrumb.jsx';
 import { useDispatch, useSelector } from 'react-redux';
 import useLiveJson from '../useLiveJson.js';
@@ -14,6 +15,7 @@ import CaseRawJson from './CaseRawJson.jsx';
 import './cases.css';
 
 const { Text, Title } = Typography;
+const CaseTimeline = lazy(() => import('./CaseTimeline.jsx'));
 
 export default function CaseDetailsPage({ item, revision, onBack, onAgentSelect }) {
   const dispatch = useDispatch();
@@ -30,6 +32,9 @@ export default function CaseDetailsPage({ item, revision, onBack, onAgentSelect 
   const loading = <Skeleton active paragraph={{ rows: 6 }} />;
   const tabs = [
     { key: 'overview', label: 'Overview', children: <CaseOverview item={item} attempt={attempt} data={evaluation.data} error={evaluation.error} /> },
+    { key: 'timing', label: 'Timing', children: <Suspense fallback={loading}><CaseTimeline key={attempt?.attempt_id || item.key}
+      run={artifact} revision={revision} attempt={attempt} preparationRuns={item.preparation_runs || []}
+      inputs={evaluation.data?.inputs} evidenceReady={Boolean(evaluation.data)} evidenceError={evaluation.error} /></Suspense> },
     { key: 'conversation', label: 'Conversation', children: artifactLoading ? loading : <CaseConversation inputs={evaluation.data?.inputs} /> },
     { key: 'tools', label: 'Tools & Files', children: artifact ? <CaseToolsFiles run={artifact} revision={revision} inputs={evaluation.data?.inputs} /> : null },
     { key: 'judge', label: 'Judge', children: artifactLoading && !report ? loading : <CaseJudge report={report} item={attempt || item} /> },

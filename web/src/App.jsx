@@ -22,7 +22,7 @@ const MAX_BYTES = 20 * 1024 * 1024;
 
 function BoundSuiteApp({ endpoint }) {
   const dispatch = useDispatch();
-  const { selectedCaseKey, selectedAgentId, detailTab } = useSelector(state => state.suite);
+  const { selectedCaseKey, selectedAgentId, selectedAttempts, detailTab } = useSelector(state => state.suite);
   const [revision, setRevision] = useState(0);
   const suite = useSuiteLive(endpoint, revision);
   const cases = useMemo(() => normalizeCases(suite.data), [suite.data]);
@@ -36,6 +36,7 @@ function BoundSuiteApp({ endpoint }) {
       if (route.item) {
         dispatch(actions.caseSelected(route.item));
         dispatch(actions.detailTabChanged(route.tab));
+        if (route.attemptId) dispatch(actions.attemptSelected({ key: route.item.key, attempt_id: route.attemptId }));
       } else if (route.agent) dispatch(actions.agentSelected(route.agent));
       else dispatch(actions.suiteSelected());
       window.scrollTo({ top: 0, behavior: 'instant' });
@@ -46,8 +47,8 @@ function BoundSuiteApp({ endpoint }) {
   }, [cases, dispatch, suite.data]);
 
   useEffect(() => {
-    if (hydrated.current && selectedCase) writeSuiteRoute(selectedCase, detailTab, 'replace');
-  }, [selectedCase, detailTab]);
+    if (hydrated.current && selectedCase) writeSuiteRoute(selectedCase, detailTab, 'replace', selectedAttempts[selectedCase.key]);
+  }, [selectedCase, detailTab, selectedAttempts]);
 
   const selectCase = item => { writeSuiteRoute(item, 'overview', 'push'); dispatch(actions.caseSelected(item)); window.scrollTo({ top: 0, behavior: 'instant' }); };
   const selectAgent = id => { writeSuiteRoute({ agent_id: id }, 'overview', 'push'); dispatch(actions.agentSelected(id)); window.scrollTo({ top: 0, behavior: 'instant' }); };

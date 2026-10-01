@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+from agentbench.observe.timing import span
 from collections.abc import Callable
 from concurrent.futures import Future
 
@@ -32,21 +33,23 @@ class BuildCoordinator:
                 self._records[key] = future
         assert future is not None
         if not owner:
-            while not future.done():
+            with span('Wait for shared image', kind='wait'):
+                while not future.done():
+                    self._check(control, deadline)
+                    if control is not None:
+                        control.wait(0.05)
+                    else:
+                        threading.Event().wait(0.05)
                 self._check(control, deadline)
-                if control is not None:
-                    control.wait(0.05)
-                else:
-                    threading.Event().wait(0.05)
-            self._check(control, deadline)
-            return future.result()
+                return future.result()
         try:
             cached = inspect_cached()
             if cached is not None:
                 future.set_result(cached)
                 return cached
-            while not self._slot.acquire(timeout=0.05):
-                self._check(control, deadline)
+            with span('Wait for build slot', kind='wait'):
+                while not self._slot.acquire(timeout=0.05):
+                    self._check(control, deadline)
             try:
                 self._check(control, deadline)
                 with self._lock:

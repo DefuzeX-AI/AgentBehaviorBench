@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ReactFlow, Background, Controls, Handle, Position, MarkerType } from '@xyflow/react';
 import { Alert, Button, ConfigProvider, Drawer, Pagination, Select, Tag } from 'antd';
 import enUS from 'antd/locale/en_US';
+import SequenceDiagram from '../sequence/SequenceDiagram.jsx';
+import { interactionSequence } from '../sequence/model.js';
 import InteractionDetails from '../interactions/InteractionDetails.jsx';
 import JsonValue from '../interactions/JsonValue.jsx';
 import { branches, descendants, elapsed, inputKey, kinds, makeModel, metrics, spanKind, statusText, time } from './model.js';
@@ -113,28 +115,8 @@ function rowData(row) {
 }
 
 function SequenceVariant({ rows, model, inspect }) {
-  const [page, setPage] = useState(1), [filter, setFilter] = useState('calls');
-  const records = rows.filter(r => filter === 'all' || ['chat', 'tool', 'case', 'input', 'output', 'submission', 'judge'].includes(r.kind));
-  const lanes = ['SDK / data', 'Agent / framework', 'LLM', 'Tools / HTTP'];
-  return <div className="fp-sequence">
-    <div className="fp-map-toolbar"><span>Read downward through time · row spacing does not represent duration · unlinked events have no call arrows</span>
-      <Select value={filter} onChange={v => { setFilter(v); setPage(1); }} options={[{ value: 'calls', label: 'Primary interactions' }, { value: 'all', label: 'Include HTTP' }]} /></div>
-    <div className="fp-lane-head"><span>Local time</span>{lanes.map(l => <strong key={l}>{l}</strong>)}</div>
-    <div className="fp-sequence-scroll">{records.slice((page - 1) * 15, page * 15).map(r => {
-      const destination = r.kind === 'chat' ? 2 : ['tool', 'http'].includes(r.kind) ? 3 : ['input', 'output'].includes(r.kind) ? 1 : 0;
-      const linked = model.attached.has(r.id) && (r.kind === 'tool' || (['chat', 'http'].includes(r.kind) && r.link_evidence === 'framework_span_id'));
-      return <div className="fp-sequence-row" key={r.id}><time>{time(r.timestamp)}<small>{r.time_basis === 'file_mtime' ? 'File time' : elapsed(r.duration_ms)}</small></time>
-        <div className="fp-lane-body"><div className="fp-lane-lines">{lanes.map(l => <i key={l} />)}</div>
-          {linked && <svg className="fp-wire" viewBox="0 0 800 100" preserveAspectRatio="none" aria-label="Request and response">
-            <path d={`M 300 34 H ${destination === 2 ? 395 : 595} l -7 -4 m 7 4 l -7 4`} fill="none" stroke="#507caa" />
-            {r.status === 'complete' && <path d={`M ${destination === 2 ? 395 : 595} 68 H 300 l 7 -4 m -7 4 l 7 4`} fill="none" stroke="#82a49a" strokeDasharray="4 3" />}
-          </svg>}
-          <button className={`fp-sequence-card fp-${r.kind}`} style={{ left: `${destination * 25 + 1}%` }} onClick={() => inspect({ row: r })}>
-            <span className="fp-kind">{kinds[r.kind]}</span><strong>{r.title}</strong><small>{r.tags.includes('tool_call') ? 'Contains Tool call · ' : ''}{statusText(r.status)}{!r.link_evidence ? ' · unlinked' : ''}</small>
-          </button>
-        </div></div>;
-    })}</div><div className="fp-sequence-pages"><Pagination current={page} pageSize={15} total={records.length} showSizeChanger={false} showQuickJumper onChange={setPage} /></div>
-  </div>;
+  const records = useMemo(() => interactionSequence(rows, model), [rows, model]);
+  return <SequenceDiagram records={records} onInspect={inspect} />;
 }
 
 function FocusVariant({ model, rows, roots, inspect, run, revision }) {

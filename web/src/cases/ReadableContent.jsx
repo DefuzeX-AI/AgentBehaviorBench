@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button, Segmented, Space, Tag, Typography } from 'antd';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { inspectContent } from './contentFormat.js';
+import { inspectContent, readableMessages } from './contentFormat.js';
 
 function Markdown({ children }) {
   return <div className="content-markdown"><ReactMarkdown skipHtml remarkPlugins={[remarkGfm]} components={{ img: () => null }}>{children}</ReactMarkdown></div>;
@@ -24,6 +24,7 @@ function JsonNode({ name, value, root = false }) {
 
 export default function ReadableContent({ value }) {
   const { raw, json, parsed, responseKey } = inspectContent(value);
+  const messages = json ? readableMessages(parsed) : [];
   const [mode, setMode] = useState('readable');
   const options = [{ label: 'Readable', value: 'readable' }, ...(json ? [{ label: 'JSON', value: 'json' }] : []), { label: 'Raw', value: 'raw' }];
   return <div className="readable-content">
@@ -31,8 +32,22 @@ export default function ReadableContent({ value }) {
     {mode === 'raw' ? <pre className="content-raw">{raw}</pre>
       : mode === 'json' ? <pre className="content-raw">{JSON.stringify(parsed, null, 2)}</pre>
       : json ? <>
-        {responseKey && <section className="content-response"><Typography.Text type="secondary">{responseKey}</Typography.Text><Markdown>{parsed[responseKey]}</Markdown></section>}
-        <div className="content-tree" aria-label="Complete JSON structure"><JsonNode name="root" value={parsed} root={!responseKey} /></div>
+        {messages.length > 0 ? <div className="content-messages">{messages.map((message, index) => <section className="content-message" key={index}>
+          <div className="content-message-heading"><Tag>{message.role}</Tag>{message.name && <Typography.Text type="secondary">{message.name}</Typography.Text>}</div>
+          <MessageBody value={message.content} />
+          {message.tools?.length > 0 && <div className="content-tree"><JsonNode name="Tool calls" value={message.tools} root /></div>}
+        </section>)}</div> : responseKey && <section className="content-response"><Typography.Text type="secondary">{responseKey}</Typography.Text><Markdown>{parsed[responseKey]}</Markdown></section>}
+        {messages.length > 0 || responseKey ? <details className="content-complete"><summary>Complete JSON structure</summary><div className="content-tree"><JsonNode name="root" value={parsed} root /></div></details>
+          : <div className="content-tree" aria-label="Complete JSON structure"><JsonNode name="root" value={parsed} root /></div>}
       </> : <Markdown>{raw}</Markdown>}
   </div>;
+}
+
+function MessageBody({ value }) {
+  if (typeof value === 'string') return value ? <Markdown>{value}</Markdown> : <Typography.Text type="secondary">No text content</Typography.Text>;
+  if (Array.isArray(value)) return value.map((block, index) =>
+    typeof block === 'string' ? <Markdown key={index}>{block}</Markdown>
+      : ['text', 'input_text', 'output_text'].includes(block?.type) && typeof block.text === 'string' ? <Markdown key={index}>{block.text}</Markdown>
+        : <div className="content-tree" key={index}><JsonNode name={block?.type || `Block ${index + 1}`} value={block} root /></div>);
+  return <div className="content-tree"><JsonNode name="Content" value={value} root /></div>;
 }

@@ -1,5 +1,6 @@
 """Host orchestration using the existing Docker runtime and network isolation."""
 import json
+from agentbench.observe.timing import span, timing_session
 import shutil
 import tempfile
 from collections.abc import Mapping
@@ -143,166 +144,174 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
     directory = output.resolve() / uuid4().hex
     directory.mkdir(parents=True, mode=0o700)
     files = Artifacts(directory, environ=environ)
-    inputs = directory / 'request'; inputs.mkdir()
-    # The Case artifact is addressed inside the Run repository; the host copies the
-    # prepared file into the repository ledger below, before the container starts.
-    reused = f'.kuma/{Path(case_artifact).name}' if case_artifact is not None else None
-    files.save('request/evaluation.json', {
-        'sdk_request_options': sdk_request_options or {},
-        'max_steps': max_steps,
-        'mode': 'generate' if generation_count is not None else 'execute',
-        'count': generation_count, 'case_artifact': reused,
-        'case_indices': generation_indices, 'allow_partial': partial_generation,
-        'expected_case': {'case_id': expected_case_id, 'content_sha256': expected_content_sha256}})
-    destination = directory / 'evaluation'; destination.mkdir(mode=0o777); destination.chmod(0o777)
-    identity = {**dict(job_context or {}), **dict(identity or {}),
-                'agent_id': agent.agent_id, 'artifact_run_id': directory.name,
-                'phase': 'generate' if generation_count is not None else 'execute'}
-    identity.setdefault('case_index', None)
-    identity.setdefault('case_id', None)
-    identity.setdefault('sdk_run_id', None)
-    if generation_count is not None:
-        identity.update(case_index=None, case_id=None)
-    status = {**identity, 'schema': 'abb.evaluate.run.v1', 'run_id': directory.name,
-              'status': 'running', 'cleanup_status': 'pending', 'host_trace_validation': 'not_performed',
-              'safe_case_replay': safe_case_replay is True}
-    files.save('run.json', status)
-    session = None
-    workspace_temp = None
-    primary_error = None
-    try:
-        if on_artifacts_ready is not None:
-            on_artifacts_ready(directory)
-        control.check()
-
-        # The container worker calls create_run/save_case for Case preparation.
-        overlay_options = dict(backend=backend_url(environ)) if overlay is None else dict(overlay)
-        with evaluation_agent(agent, control=control, deadline=preparation,
-                              **overlay_options) as descriptor:
-            # SDK requires repo and its ledger on the same filesystem. Mount the
-            # actual staged Agent source read-only, with only its .kuma writable.
-            repository = directory / 'sdk-repo'
-            def checked_copy(source, target):
-                control.check()
-                preparation.check()
-                with open(source, 'rb') as incoming, open(target, 'wb') as outgoing:
-                    while chunk := incoming.read(1024 * 1024):
-                        control.check()
-                        preparation.check()
-                        outgoing.write(chunk)
-                shutil.copystat(source, target)
-                return target
-            policy = workspace_policy(tomllib.loads((descriptor.path / 'agent.toml').read_text()))
-            target = policy.path or SDK_REPOSITORY
-            ledger_root = repository
-            if policy.path:
-                ledger_root.mkdir()
-                workspace_temp = tempfile.TemporaryDirectory(prefix='.abb-workspace-', dir=directory.parent)
-                repository = Path(workspace_temp.name)
-                contract = prepare_workspace(descriptor.path, repository, policy)
-                repository.chmod(0o777)
-                for item in repository.rglob('*'):
-                    item.chmod(0o777 if item.is_dir() else (item.stat().st_mode & 0o111) | 0o666)
-                files.save('evaluation/workspace.json', contract)
-                settings_path = directory / 'request/evaluation.json'
-                settings = json.loads(settings_path.read_text())
-                settings['workspace'] = contract
-                files.save('request/evaluation.json', settings)
-                if case_artifact is not None:
-                    if expected_environment_sha256 is None:
-                        raise ValueError('Saved Case has no workspace contract; generate new Cases for this workspace')
-                    if expected_environment_sha256 != workspace_digest(contract):
-                        raise ValueError('Saved Case workspace differs; no Agent steps were executed')
-            else:
-                shutil.copytree(descriptor.path / 'agent', repository, ignore=_ignore,
-                                copy_function=checked_copy)
-            state = ledger_root / '.kuma'; state.mkdir(mode=0o777); state.chmod(0o777)
-            if case_artifact is not None:
-                shutil.copyfile(case_artifact, state / Path(case_artifact).name)
-            store = TraceStore(directory / 'network.jsonl', directory.name,
-                               source='interceptor', context=identity, environ=environ)
-            class Sink:
-                def emit(self, event):
-                    # Preserve full evidence before handing a bounded summary to UI.
-                    store.emit(event)
-                    if trace_sink is not None:
-                        data = _trace_preview(redact(json_value(event.data), files.secrets))
-                        data.update(redact({**identity, 'artifact_directory': str(directory)}, files.secrets))
-                        trace_sink.emit(TraceEvent(event.event, data))
-            runtime_options = dict(
-                environ=environ, policy=EvaluationPolicy(state, repository=repository, target=target, writable=bool(policy.path)), trace_sink=Sink(),
-                trace_max_bytes=trace_max_bytes, control=control, identity=identity,
-                timeout_sec=timeout,
-                run_id=directory.name, artifact_root=directory,
-            )
-            if runtime_services is not None:
-                runtime = runtime_services.create_docker_runtime(**runtime_options)
-            else:
-                runtime = DockerRuntime(build_coordinator=build_coordinator, **runtime_options)
+    with timing_session(directory / 'timing.jsonl', source='host', name='Evaluation',
+                        identity={**dict(job_context or {}), **dict(identity or {}), 'agent_id': agent.agent_id}) as timing_root:
+        inputs = directory / 'request'; inputs.mkdir()
+        # The Case artifact is addressed inside the Run repository; the host copies the
+        # prepared file into the repository ledger below, before the container starts.
+        reused = f'.kuma/{Path(case_artifact).name}' if case_artifact is not None else None
+        files.save('request/evaluation.json', {
+            'sdk_request_options': sdk_request_options or {},
+            'max_steps': max_steps,
+            'mode': 'generate' if generation_count is not None else 'execute',
+            'count': generation_count, 'case_artifact': reused,
+            'case_indices': generation_indices, 'allow_partial': partial_generation,
+            'expected_case': {'case_id': expected_case_id, 'content_sha256': expected_content_sha256}})
+        destination = directory / 'evaluation'; destination.mkdir(mode=0o777); destination.chmod(0o777)
+        identity = {**dict(job_context or {}), **dict(identity or {}),
+                    'agent_id': agent.agent_id, 'artifact_run_id': directory.name,
+                    'phase': 'generate' if generation_count is not None else 'execute'}
+        identity.setdefault('case_index', None)
+        identity.setdefault('case_id', None)
+        identity.setdefault('sdk_run_id', None)
+        if generation_count is not None:
+            identity.update(case_index=None, case_id=None)
+        status = {**identity, 'schema': 'abb.evaluate.run.v1', 'run_id': directory.name,
+                  'status': 'running', 'cleanup_status': 'pending', 'host_trace_validation': 'not_performed',
+                  'safe_case_replay': safe_case_replay is True}
+        files.save('run.json', status)
+        session = None
+        workspace_temp = None
+        primary_error = None
+        try:
+            if on_artifacts_ready is not None:
+                on_artifacts_ready(directory)
             control.check()
 
-            # Start the container process, then wait for its generation/execution mode.
-            session = runtime.start(descriptor, 
-                                    invocation=(inputs, destination),
-                                    preparation_deadline=preparation)
-            checkpoint = session.trace_checkpoint()
-            code = session.wait(timeout=timeout)
-            status['exit_code'] = code
-            # Preparation calls the SDK only; no Agent/LLM invocation exists.
-            if generation_count is None:
-                from .diagnostics import read_diagnostic
-                summary = read_diagnostic(directory, 'evaluation/manifest.json')
-                judge_only_failure = (
-                    summary.get('phase') == 'judge' and summary.get('execution') == 'succeeded'
-                    and summary.get('otel') == 'complete' and summary.get('submission') == 'committed'
-                    and summary.get('evidence') == 'captured')
-                if code == 0 or judge_only_failure:
-                    status['host_trace_validation'] = 'failed'
-                    session.validate_trace(checkpoint)
-                    status['host_trace_validation'] = 'succeeded'
-            status['status'] = 'succeeded' if code == 0 else 'failed'
-    except BaseException as exc:
-        primary_error = exc
-        status.update(status='cancelled' if isinstance(exc, RunCancelled) else 'failed',
-                      error_type=type(exc).__name__, error=str(exc))
-        if isinstance(exc, DockerCleanupError):
-            status.update(cleanup_status='failed', cleanup_error_type=type(exc).__name__,
-                          cleanup_error=str(exc))
-        raise
-    finally:
-        try:
-            if session is not None:
-                try:
-                    session.close()
-                    status['cleanup_status'] = 'succeeded'
-                except BaseException as exc:
-                    status.update(status='failed', cleanup_status='failed',
-                                  cleanup_error_type=type(exc).__name__, cleanup_error=str(exc))
-                    raise
-                finally:
-                    files.save('diagnostics.json', {
-                        'stdout': session.stdout, 'stderr': session.stderr,
-                        'cleanup_status': status['cleanup_status'],
-                        'cleanup_error': status.get('cleanup_error'), **identity,
-                    })
-            else:
-                if status['cleanup_status'] != 'failed':
-                    status['cleanup_status'] = 'not_started'
+            # The container worker calls create_run/save_case for Case preparation.
+            overlay_options = dict(backend=backend_url(environ)) if overlay is None else dict(overlay)
+            with evaluation_agent(agent, control=control, deadline=preparation,
+                                  **overlay_options) as descriptor:
+                # SDK requires repo and its ledger on the same filesystem. Mount the
+                # actual staged Agent source read-only, with only its .kuma writable.
+                repository = directory / 'sdk-repo'
+                def checked_copy(source, target):
+                    control.check()
+                    preparation.check()
+                    with open(source, 'rb') as incoming, open(target, 'wb') as outgoing:
+                        while chunk := incoming.read(1024 * 1024):
+                            control.check()
+                            preparation.check()
+                            outgoing.write(chunk)
+                    shutil.copystat(source, target)
+                    return target
+                with span('Prepare Case workspace', kind='preparation'):
+                    policy = workspace_policy(tomllib.loads((descriptor.path / 'agent.toml').read_text()))
+                    target = policy.path or SDK_REPOSITORY
+                    ledger_root = repository
+                    if policy.path:
+                        ledger_root.mkdir()
+                        workspace_temp = tempfile.TemporaryDirectory(prefix='.abb-workspace-', dir=directory.parent)
+                        repository = Path(workspace_temp.name)
+                        contract = prepare_workspace(descriptor.path, repository, policy)
+                        repository.chmod(0o777)
+                        for item in repository.rglob('*'):
+                            item.chmod(0o777 if item.is_dir() else (item.stat().st_mode & 0o111) | 0o666)
+                        files.save('evaluation/workspace.json', contract)
+                        settings_path = directory / 'request/evaluation.json'
+                        settings = json.loads(settings_path.read_text())
+                        settings['workspace'] = contract
+                        files.save('request/evaluation.json', settings)
+                        if case_artifact is not None:
+                            if expected_environment_sha256 is None:
+                                raise ValueError('Saved Case has no workspace contract; generate new Cases for this workspace')
+                            if expected_environment_sha256 != workspace_digest(contract):
+                                raise ValueError('Saved Case workspace differs; no Agent steps were executed')
+                    else:
+                        shutil.copytree(descriptor.path / 'agent', repository, ignore=_ignore,
+                                        copy_function=checked_copy)
+                    state = ledger_root / '.kuma'; state.mkdir(mode=0o777); state.chmod(0o777)
+                    if case_artifact is not None:
+                        shutil.copyfile(case_artifact, state / Path(case_artifact).name)
+                store = TraceStore(directory / 'network.jsonl', directory.name,
+                                   source='interceptor', context=identity, environ=environ)
+                class Sink:
+                    def emit(self, event):
+                        # Preserve full evidence before handing a bounded summary to UI.
+                        store.emit(event)
+                        if trace_sink is not None:
+                            data = _trace_preview(redact(json_value(event.data), files.secrets))
+                            data.update(redact({**identity, 'artifact_directory': str(directory)}, files.secrets))
+                            trace_sink.emit(TraceEvent(event.event, data))
+                runtime_options = dict(
+                    environ=environ, policy=EvaluationPolicy(state, repository=repository, target=target, writable=bool(policy.path)), trace_sink=Sink(),
+                    trace_max_bytes=trace_max_bytes, control=control, identity=identity,
+                    timeout_sec=timeout,
+                    run_id=directory.name, artifact_root=directory,
+                )
+                if runtime_services is not None:
+                    runtime = runtime_services.create_docker_runtime(**runtime_options)
+                else:
+                    runtime = DockerRuntime(build_coordinator=build_coordinator, **runtime_options)
+                control.check()
+
+                # Start the container process, then wait for its generation/execution mode.
+                session = runtime.start(descriptor,
+                                        invocation=(inputs, destination),
+                                        preparation_deadline=preparation)
+                checkpoint = session.trace_checkpoint()
+                with span('Container execution', kind='container') as container_timing:
+                    code = session.wait(timeout=timeout)
+                    container_timing.status = 'succeeded' if code == 0 else 'failed'
+                status['exit_code'] = code
+                # Preparation calls the SDK only; no Agent/LLM invocation exists.
+                if generation_count is None:
+                    from .diagnostics import read_diagnostic
+                    summary = read_diagnostic(directory, 'evaluation/manifest.json')
+                    judge_only_failure = (
+                        summary.get('phase') == 'judge' and summary.get('execution') == 'succeeded'
+                        and summary.get('otel') == 'complete' and summary.get('submission') == 'committed'
+                        and summary.get('evidence') == 'captured')
+                    if code == 0 or judge_only_failure:
+                        status['host_trace_validation'] = 'failed'
+                        with span('Validate network evidence', kind='evidence'):
+                            session.validate_trace(checkpoint)
+                        status['host_trace_validation'] = 'succeeded'
+                status['status'] = 'succeeded' if code == 0 else 'failed'
+        except BaseException as exc:
+            primary_error = exc
+            status.update(status='cancelled' if isinstance(exc, RunCancelled) else 'failed',
+                          error_type=type(exc).__name__, error=str(exc))
+            if isinstance(exc, DockerCleanupError):
+                status.update(cleanup_status='failed', cleanup_error_type=type(exc).__name__,
+                              cleanup_error=str(exc))
+            raise
         finally:
-            from .diagnostics import collect_artifacts
-            status['artifacts'] = collect_artifacts(directory, status, environ=environ)
-            if primary_error is not None:
-                primary_error.artifacts = status['artifacts']
-            manifest = destination / 'manifest.json'
-            if manifest.is_file() and not manifest.is_symlink():
-                try:
-                    status['sdk_run_id'] = json.loads(manifest.read_text()).get('run_id')
-                except (OSError, ValueError, AttributeError):
-                    pass  # Preserve the original container/validation outcome.
-            files.save('run.json', status)
-            if workspace_temp is not None:
-                workspace_temp.cleanup()
-    return directory
+            try:
+                if session is not None:
+                    try:
+                        with span('Cleanup containers and network', kind='cleanup'):
+                            session.close()
+                        status['cleanup_status'] = 'succeeded'
+                    except BaseException as exc:
+                        status.update(status='failed', cleanup_status='failed',
+                                      cleanup_error_type=type(exc).__name__, cleanup_error=str(exc))
+                        raise
+                    finally:
+                        files.save('diagnostics.json', {
+                            'stdout': session.stdout, 'stderr': session.stderr,
+                            'cleanup_status': status['cleanup_status'],
+                            'cleanup_error': status.get('cleanup_error'), **identity,
+                        })
+                else:
+                    if status['cleanup_status'] != 'failed':
+                        status['cleanup_status'] = 'not_started'
+            finally:
+                from .diagnostics import collect_artifacts
+                status['artifacts'] = collect_artifacts(directory, status, environ=environ)
+                if primary_error is not None:
+                    primary_error.artifacts = status['artifacts']
+                manifest = destination / 'manifest.json'
+                if manifest.is_file() and not manifest.is_symlink():
+                    try:
+                        status['sdk_run_id'] = json.loads(manifest.read_text()).get('run_id')
+                    except (OSError, ValueError, AttributeError):
+                        pass  # Preserve the original container/validation outcome.
+                files.save('run.json', status)
+                if workspace_temp is not None:
+                    workspace_temp.cleanup()
+        timing_root.status = status['status']
+        return directory
 
 
 def _trace_preview(value, *, depth=0, budget=None):

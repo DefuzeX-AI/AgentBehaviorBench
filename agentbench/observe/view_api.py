@@ -272,6 +272,9 @@ class RunViewAPI:
             return self.events(int(query.get('offset', ['0'])[0]))
         if route == 'otel':
             return self.spans()
+        if route == 'timeline':
+            from .timeline import timeline
+            return timeline(self)
         match = re.fullmatch(r'otel/([0-9a-f]{16})/payload/(input|output|error|metadata|events)', route)
         if match:
             span = next(s for s in self.spans()['spans'] if s['span_id'] == match[1])

@@ -248,6 +248,7 @@ class CaseScheduler:
         while self.delayed and self.delayed[0][0] <= time.monotonic() and self.admission and not self.control.cancelled:
             _, _, state, index = heapq.heappop(self.delayed)
             state.pending.append(state.prepared[index])
+            self._publish({**state.identities[index], 'event': 'retry_released'})
             if state not in self.ready:
                 self.ready.append(state)
 

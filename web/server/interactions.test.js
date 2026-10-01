@@ -22,3 +22,22 @@ test('Vite serves the Python interaction contract with pagination and rejects es
     await assert.rejects(interactionPage(root, 'escape', {}));
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test('Vite timing bridge reads saved measurements again after reopening', async t => {
+  const root = await mkdtemp(path.join(tmpdir(), 'abb-timeline-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(path.join(root, 'run'));
+  const pathToJournal = path.join(root, 'run/timing.jsonl');
+  const record = duration => JSON.stringify({ event: 'operation', timestamp: '2026-01-01T00:00:00Z', data: {
+    id: 'stage', name: 'Evaluation', kind: 'total', source: 'host', status: 'succeeded',
+    start_ms: 1000, end_ms: 1000 + duration, duration_ms: duration,
+  } });
+  await writeFile(pathToJournal, `${record(200)}\n`);
+  const read = () => interactionPage(root, 'run', {}, undefined, 'agentbench.observe.timeline');
+  assert.equal((await read()).operations[0].duration_ms, 200);
+  await writeFile(pathToJournal, `${record(200)}\n${record(500)}\n`);
+  const reopened = await read();
+  assert.equal(reopened.schema, 'abb.timeline.v1');
+  assert.equal(reopened.operations.length, 1);
+  assert.equal(reopened.operations[0].duration_ms, 500);
+});

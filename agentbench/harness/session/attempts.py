@@ -38,6 +38,9 @@ def find_attempt(case, event, *, create=False):
                  'status': 'running', 'execution_status': 'running', 'phase': 'execute',
                  'error': None, 'judge_status': None, 'result': None,
                  'host_acceptance': None, 'started_at': event.get('timestamp'),
+                 'queued_at': case.get('ready_at'),
+                 'retry_wait_started_at': case.get('retry_wait_started_at'),
+                 'retry_released_at': case.get('retry_released_at'),
                  'evidence_status': 'unknown', 'host_trace_validation': 'unknown',
                  'judge_delivery_status': 'unknown', 'quality_gate': None}
         case['attempts'].append(match)
@@ -58,6 +61,7 @@ def apply_case_event(case, event):
         case['origin'] = deepcopy(event.get('origin'))
         return
     if kind == 'case_prepared':
+        case['ready_at'] = event.get('timestamp')
         prepared = event.get('prepared_case') or event.get('case')
         if isinstance(prepared, dict):
             case['prepared_case'] = deepcopy(prepared)
@@ -97,8 +101,12 @@ def apply_case_event(case, event):
     elif kind == 'case_queued':
         target.update(status='queued', execution_status='queued')
     elif kind in {'retry_scheduled', 'case_retry_scheduled'}:
+        case['retry_wait_started_at'] = event.get('timestamp')
         target.update(status='retry_wait', execution_status='retry_wait', can_retry=False,
                       retry_at=event.get('retry_at'), error=event.get('error') or target.get('error'))
+    elif kind == 'retry_released':
+        case['ready_at'] = event.get('timestamp')
+        case['retry_released_at'] = event.get('timestamp')
     elif kind in {'case_reconciling', 'case_recovery_started'}:
         target.update(status='running', execution_status='reconciling', phase='recover', quality_gate=None)
     elif kind in {'case_completed', 'case_attempt_failed'}:
