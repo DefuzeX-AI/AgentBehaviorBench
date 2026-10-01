@@ -33,3 +33,4 @@ class RunConfiguration:
     concurrency: ConcurrencySettings | None = None
     environ: Mapping[str, str] | None = None
     retry_policy: RetryPolicy | None = None
+    results_dir: str | Path | None = None

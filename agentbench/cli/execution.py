@@ -31,6 +31,7 @@ from .terminal_ui.loading import loading_line
 from .result_export import ResultLogWriter, start_result_log
 from .terminal_ui import LLMActivity
 from .viewer import RunningViewer
+from .result_paths import validate_results_dir
 
 
 def run_benchmark_session(
@@ -39,6 +40,7 @@ def run_benchmark_session(
     viewer_starter: Callable[[Path], RunningViewer] | None,
     llm_activity: LLMActivity | None = None,
     input_fn: Callable[[str], str] = input,
+    results_dir: str | Path | None = None,
 ) -> BenchmarkExecution:
     """
 
@@ -51,7 +53,8 @@ def run_benchmark_session(
 
         # Run a single benchmark session and return the result if no rerun is requested.
         execution = run_benchmark_once(agents, runner=runner, output_path=output_path,
-            output_fn=output_fn, viewer_starter=viewer_starter, llm_activity=llm_activity)
+            output_fn=output_fn, viewer_starter=viewer_starter, llm_activity=llm_activity,
+            **({'results_dir': results_dir} if results_dir is not None else {}))
 
 
         
@@ -95,8 +98,10 @@ def run_benchmark_once(
     output_fn: Callable[[str], None],
     viewer_starter: ViewerStarter | None,
     llm_activity: LLMActivity | None = None,
+    results_dir: str | Path | None = None,
 ) -> BenchmarkExecution:
 
+    directory = validate_results_dir(output_path, results_dir)
     # step 1: prepare suite
     suite_id = runner.new_suite_id()
     parallelism = runner.concurrency.max_parallel_cases  # Configured concurrent Case limit.
@@ -124,7 +129,7 @@ def run_benchmark_once(
     try:
         viewer_warning = None
         with loading_line("Starting benchmark", output_fn):
-            if output_path is not None:
+            if output_path is not None or directory is not None:
                 # Factories retain the CLI environment snapshot. Without a factory,
                 # capture the environment when the result log starts.
                 environ = getattr(getattr(runner, "_runner_factory", None), "environ", None)
@@ -133,10 +138,10 @@ def run_benchmark_once(
                 saved_configuration = runner_configuration(runner)
                 if saved_configuration is not None and all(isinstance(agent, AgentRegistration) for agent in agents):
                     result_log = begin_result_log(output_path, suite_id, agents,
-                        configuration=saved_configuration, environ=environ)
+                        configuration=saved_configuration, environ=environ, results_dir=directory)
                 else:
                     result_log = start_result_log(
-                    output_path,
+                    directory / 'result.json' if directory is not None else output_path,
                     suite_id=suite_id,
                     selected_agent_ids=tuple(agent.agent_id for agent in agents),
                     configured_workers=parallelism,

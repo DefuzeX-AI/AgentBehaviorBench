@@ -25,6 +25,7 @@ from agentbench.harness.registry import load_registry
 from agentbench.project import project_root
 from agentbench.runtime.interception import DEFAULT_TRACE_MAX_BYTES
 from .base import CommandFeature
+from agentbench.cli.result_paths import configure_result_paths, legacy_result_notice, validate_results_dir
 
 # A checkout keeps its bundled registry; an installed CLI uses the project it runs in.
 DEFAULT_REGISTRY_PATH = project_root() / "resources" / "registry.toml"
@@ -39,15 +40,7 @@ def configure_parser(parser: ArgumentParser) -> None:
         metavar="PATH",
         help="Load host secrets and defaults from PATH instead of .env.",
     )
-    parser.add_argument(
-        "--output",
-        metavar="PATH",
-        default="results/result.json",
-        help=(
-            "Write a unique JSON result snapshot, including "
-            "trace-like step data (default: results/result.json)."
-        ),
-    )
+    configure_result_paths(parser, legacy_option='--output')
     parser.add_argument('--no-view', action='store_true',
                         help='Save results without starting the local live viewer.')
     parser.add_argument(
@@ -66,10 +59,17 @@ def configure_parser(parser: ArgumentParser) -> None:
 
 def execute(args: Namespace) -> int:
     try:
+        directory = validate_results_dir(args.output, getattr(args, 'results_dir', None))
+        if args.output is None and directory is None:
+            directory = Path('results').resolve()
+        if args.output is not None:
+            legacy_result_notice('--output', args.output, print)
         load_project_environment(args.env_file)
         loaded = execution_environment_snapshot()
         kwargs: dict[str, object] = {"output_path": args.output, "assume_yes": args.yes, "concurrency": loaded.concurrency,
                                      "environ": loaded.environ, **sdk_arguments(args)}
+        if directory is not None:
+            kwargs['results_dir'] = directory
         policy = retry_policy_argument(args)
         if policy is not None:
             kwargs['retry_policy'] = policy
@@ -93,6 +93,7 @@ def run(configuration: RunConfiguration | None = None) -> int:
     """Confirm ready Agents, run the suite, and return a shell exit code."""
 
     config = configuration or RunConfiguration()
+    validate_results_dir(config.output_path, config.results_dir)
     if config.sdk is not None and config.sdk_selection is not None:
         raise ValueError("Pass sdk or sdk_selection, not both")
 
@@ -167,6 +168,7 @@ def run(configuration: RunConfiguration | None = None) -> int:
 
         viewer_starter=config.viewer_starter,
         llm_activity=llm_activity,
+        **({'results_dir': config.results_dir} if config.results_dir is not None else {}),
 
     )
     return execution.exit_code
