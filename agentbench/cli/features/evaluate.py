@@ -18,6 +18,7 @@ from ..sdk import configure_sdk_parser, sdk_arguments
 from agentbench.observe.catalog import enabled_agents, select_agent, resolve_agent
 from agentbench.runtime.interception import DEFAULT_TRACE_MAX_BYTES
 from agentbench.sdk import evaluation_plan
+from agentbench.cli.result_paths import configure_result_paths, legacy_result_notice, validate_results_dir
 
 
 def configure_parser(parser):
@@ -30,7 +31,7 @@ def configure_parser(parser):
     configure_retry_parser(parser)
     parser.add_argument('--no-view', action='store_true', help='Save results without starting the live viewer.')
     parser.add_argument('--llm-trace-max-bytes', type=int, default=DEFAULT_TRACE_MAX_BYTES)
-    parser.add_argument('--result-output', type=Path, help='ABB result JSON naming base (independent of SDK output)')
+    configure_result_paths(parser, legacy_option='--result-output')
     parser.add_argument('--output', type=Path, help='Override the SDK output option')
     parser.add_argument('--timeout', type=float, help='Override the SDK timeout option (seconds)')
     parser.add_argument('--cases', type=int, help='Number of independent Cases (default: Registry case count)')
@@ -39,6 +40,7 @@ def configure_parser(parser):
 
 def execute(args):
     try:
+        results_dir = validate_results_dir(args.result_output, getattr(args, 'results_dir', None))
         policy = retry_policy_argument(args)
         if args.timeout is not None and (not math.isfinite(args.timeout) or args.timeout <= 0):
             raise ValueError('Timeout must be finite and positive')
@@ -80,9 +82,13 @@ def execute(args):
             print_agents((agent,), print, strategy_checks=checks)
         if not args.yes and not confirm_agents((agent,), input_fn=input, output_fn=print, strategy_checks=checks):
             return 0
-        output = args.result_output or _default_output_path(args.registry, agent.agent_id, command="evaluate")
+        output = args.result_output
+        if output is None and results_dir is None:
+            results_dir = _default_output_path(args.registry, agent.agent_id, command="evaluate").parent
+        if args.result_output is not None:
+            legacy_result_notice('--result-output', args.result_output, print)
         if args.output is not None:
-            print('--output configures the SDK only; --result-output selects the ABB result JSON.')
+            print('--output configures the SDK only; --results-dir selects the ABB result directory.')
         activity = LLMActivity(print)
         runner = build_trace_suite_runner(max_bytes=args.llm_trace_max_bytes,
             model=args.model, activity_sink=activity,
@@ -92,7 +98,8 @@ def execute(args):
             runner.retry_policy = policy
         execution = run_benchmark_session((agent,), runner=runner, output_path=output,
             output_fn=print, viewer_starter=None if args.no_view else start_viewer_server,
-            llm_activity=activity, input_fn=input)
+            llm_activity=activity, input_fn=input,
+            **({'results_dir': results_dir} if results_dir is not None else {}))
         if execution.result is None:
             return execution.exit_code
         items = execution.result.items

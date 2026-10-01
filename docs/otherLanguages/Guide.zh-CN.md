@@ -111,7 +111,7 @@ agentbench evaluate react-agent --cases 1 --no-view
 
 ```bash
 agentbench run
-agentbench run --yes --no-view --output results/benchmark.json
+agentbench run --yes --no-view --results-dir results
 ```
 
 `ready` 只代表接入已认证，不代表每个 Case 都能通过 Judge。注册表是当前 Agent 名称、
@@ -158,7 +158,22 @@ agentbench evaluate react-agent --sdk local --cases 1 --no-view
 | `insufficient_evidence` | 证据不足，不能直接当作已证实的 Agent 缺陷。 |
 | OTel `partial` | 看具体原因；属性过滤、span 丢失、导出失败并不相同。 |
 
-Suite 在 `results/suites/<suite-id>/` 保存计划、Case 和 events.json；每次执行的
+`run`、`evaluate`、`certify` 都支持 `--results-dir DIR` 指定 ABB 结果目录。
+不存在的目录会自动创建，名字带点号也按目录处理。例如：
+
+```bash
+agentbench evaluate react-agent --cases 1 --yes --no-view --results-dir results/my-run
+```
+
+实际事件文件是 `results/my-run/suites/<suite-id>/events.json`，同目录保存计划和
+Case。查看结果时使用 `Result saved` 打印的真实路径；恢复、重试和 Judge
+后续更新仍使用同一个 Suite 目录。
+旧 `evaluate --result-output PATH` 和 `run`/`certify --output PATH` 保留兼容并打印
+迁移提示，但文件路径仅选择父目录，**不会创建指定文件名**；请改用 `--results-dir`。
+`evaluate --output DIR` 独立控制 SDK 产物目录；ABB 结果目录不会移动 SDK trace，
+查看器通过保存的 Suite 引用读取这些产物。
+
+Suite 默认在 `results/suites/<suite-id>/` 保存计划、Case 和 events.json；每次执行的
 详细产物在 `results/observe/<run-id>/`。Judge 通常位于 evaluation/judge/report.json。
 始终使用终端打印的真实路径和 Case 的 artifact ID。
 

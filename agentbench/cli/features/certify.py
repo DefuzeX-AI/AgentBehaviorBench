@@ -30,6 +30,7 @@ from agentbench.sdk.plugins import SDKSelection
 
 from .base import CommandFeature
 from .run import DEFAULT_REGISTRY_PATH
+from agentbench.cli.result_paths import configure_result_paths, legacy_result_notice, validate_results_dir
 
 
 def configure_parser(parser: ArgumentParser) -> None:
@@ -44,11 +45,7 @@ def configure_parser(parser: ArgumentParser) -> None:
         metavar="PATH",
         help="Load host secrets and defaults from PATH instead of .env.",
     )
-    parser.add_argument(
-        "--output",
-        metavar="PATH",
-        help="Optional base path for the JSON certification snapshot.",
-    )
+    configure_result_paths(parser, legacy_option='--output')
     parser.add_argument(
         "--model",
         metavar="MODEL",
@@ -65,10 +62,17 @@ def configure_parser(parser: ArgumentParser) -> None:
 
 def execute(args: Namespace) -> int:
     try:
+        directory = validate_results_dir(args.output, getattr(args, 'results_dir', None))
+        if args.output is None and directory is None:
+            directory = _default_output_path(args.registry, args.agent_id).parent
+        if args.output is not None:
+            legacy_result_notice('--output', args.output, print)
         load_project_environment(args.env_file)
         loaded = execution_environment_snapshot()
         kwargs: dict[str, object] = {"output_path": args.output, "assume_yes": args.yes, "concurrency": loaded.concurrency,
                                      "environ": loaded.environ, **sdk_arguments(args)}
+        if directory is not None:
+            kwargs['results_dir'] = directory
         policy = retry_policy_argument(args)
         if policy is not None:
             kwargs['retry_policy'] = policy
@@ -105,8 +109,10 @@ def certify(
     concurrency: ConcurrencySettings | None = None,
     environ: Mapping[str, str] | None = None,
     retry_policy: RetryPolicy | None = None,
+    results_dir: str | Path | None = None,
 ) -> int:
     """Run one adapting Agent and promote it after adapter execution succeeds."""
+    validate_results_dir(output_path, results_dir)
     if sdk is not None and sdk_selection is not None:
         raise ValueError("Pass sdk or sdk_selection, not both")
     if suite_runner is not None and (
@@ -134,7 +140,7 @@ def certify(
         )
         return 2
 
-    artifact_base = output_path or _default_output_path(registry_path, agent_id)
+    artifact_base = output_path if results_dir is not None else output_path or _default_output_path(registry_path, agent_id)
     output_fn(f"Certifying adapting Agent: {agent_id}")
     output_fn(
         "The registry will change to ready if the Agent completes its Cases "
@@ -169,6 +175,7 @@ def certify(
         viewer_starter=viewer_starter,
         input_fn=post_run_input_fn,
         llm_activity=llm_activity,
+        **({'results_dir': results_dir} if results_dir is not None else {}),
     )
     if execution.result is None or not _agent_completed_certification(
         execution.result, agent_id

@@ -96,7 +96,7 @@ agentbench observe --list
 agentbench evaluate react-agent --cases 1 --no-view
 agentbench run
 # Non-interactive and headless:
-agentbench run --yes --no-view --output results/benchmark.json
+agentbench run --yes --no-view --results-dir results
 ```
 
 A Case can contain multiple ordered inputs. `run` selects enabled ready Agents and
@@ -162,6 +162,24 @@ container failure. For partial OTel, inspect the reason: attribute filtering,
 missing spans and export failure are different conditions.
 
 Managed Suites retain plans, Cases and `events.json` under `results/suites/<suite-id>/`.
+`run`, `evaluate` and `certify` accept `--results-dir DIR` to select the ABB result
+directory explicitly. Missing directories are created; dotted names are directories
+too. For example:
+
+```bash
+agentbench evaluate react-agent --cases 1 --yes --no-view --results-dir results/my-run
+```
+
+The canonical event log is `results/my-run/suites/<suite-id>/events.json`, alongside
+the Suite plan and saved Cases. Use the exact `Result saved` path with `agentbench view`;
+the directory remains the source for resume/retry and later Judge updates.
+Legacy `evaluate --result-output PATH` and `run`/`certify --output PATH` remain
+compatible, but a file path only selects its parent for managed Suites: the requested
+filename is not created. They print a migration notice; use `--results-dir` instead.
+`evaluate --output DIR` independently selects the SDK artifact directory. Selecting
+an ABB result directory does not relocate SDK traces. The live viewer uses the saved
+Suite references to reach those artifacts.
+
 Detailed attempts live under `results/observe/<run-id>/`; Judge reports are normally
 at `evaluation/judge/report.json`. Use the printed paths and exact attempt IDs.
 
