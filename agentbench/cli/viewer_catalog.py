@@ -11,6 +11,7 @@ from agentbench.harness.session.store import read_suite
 from agentbench.harness.session.snapshot import suite_snapshot
 from agentbench.harness.session.references import INDEX_SCHEMA
 from agentbench.observe.view_api import SuiteRunCatalogAPI
+from agentbench.observe.evaluation_source import evaluation_source
 
 
 class ViewerSuiteCatalog:
@@ -69,15 +70,19 @@ class ViewerSuiteCatalog:
                     if path.is_symlink() or path.parent.is_symlink() or plan_path.is_symlink():
                         raise ValueError('Linked state')
                     stat = path.stat()
-                    fingerprint = (stat.st_mtime_ns, stat.st_size)
+                    plan_stat = plan_path.stat() if plan_path.is_file() else None
+                    fingerprint = (stat.st_mtime_ns, stat.st_size,
+                                   None if plan_stat is None else (plan_stat.st_mtime_ns, plan_stat.st_size))
                     cached = self._cache.get(path)
                     if cached is None or cached[0] != fingerprint:
                         if plan_path.is_file():
                             plan, events = read_suite(path.parent)
                             snapshot = suite_snapshot(plan, events)
                             snapshot['events'] = events
+                            snapshot['evaluation_source'] = evaluation_source(snapshot, plan)
                         else:
                             from .viewer import parse_result_log
+                            plan = None
                             snapshot = parse_result_log(path)
                         identifier = snapshot['suite_id']
                         if not isinstance(identifier, str) or not identifier:
@@ -87,13 +92,14 @@ class ViewerSuiteCatalog:
                         cases = [case for job in snapshot['jobs'] for case in job['cases']]
                         row = {'suite_id': identifier, 'url': f'/suite/{quote(identifier, safe="")}/',
                                'state': snapshot['state'], 'origin_suite_id': snapshot.get('origin_suite_id'),
+                               'evaluation_source': snapshot['evaluation_source'],
                                'updated': stat.st_mtime, 'agent_ids': [job['agent_id'] for job in snapshot['jobs']],
                                'counts': snapshot.get('counts') or {
                                    'planned': len(cases), 'completed': sum(c.get('status') in {'succeeded', 'failed'} for c in cases),
                                    'judge_received': sum(bool((c.get('result') or {}).get('benchmark')) for c in cases)}}
-                        cached = (fingerprint, row, snapshot)
+                        cached = (fingerprint, row, snapshot, plan)
                         self._cache[path] = cached
-                    _, row, snapshot = cached
+                    _, row, snapshot, _ = cached
                     identifier = row['suite_id']
                     if identifier in paths and paths[identifier] != path:
                         ambiguous.add(identifier)
@@ -122,6 +128,25 @@ class ViewerSuiteCatalog:
         self.refresh()
         with self._guard:
             return {'suites': list(self._rows), 'warnings': list(self._warnings)}
+
+    def overview(self):
+        from .viewer_overview import benchmark_evaluators, benchmark_overview
+        from agentbench.harness.ground_truth import benchmark_ground_truth
+        self.refresh()
+        with self._guard:
+            # Use only currently valid, unambiguous paths, never stale cache entries.
+            records = []
+            for row in self._rows:
+                path = self._paths[row['suite_id']]
+                _, _, snapshot, plan = self._cache[path]
+                records.append({'snapshot': snapshot, 'plan': plan, 'directory': path.parent})
+            snapshots = [record['snapshot'] for record in records]
+            agent_ids = {job['agent_id'] for snapshot in snapshots for job in snapshot['jobs']}
+            # Ground truth and assessments can change independently of Suite events.
+            ground_truth = benchmark_ground_truth(self.root, records, agent_ids)
+            overview = benchmark_overview(snapshots, self._warnings, ground_truth=ground_truth)
+            overview['evaluators'] = benchmark_evaluators(self.root, records)
+            return overview
 
     def resolve(self, suite_id):
         self.refresh()

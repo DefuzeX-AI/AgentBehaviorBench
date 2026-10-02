@@ -108,5 +108,5 @@ export function makeTimeline(data, attempt = null) {
       ...(operations.some(s => s.phase === 'judge') ? [
         { label: 'Judge queue', duration_ms: unionDuration(operations.filter(wallQueue).map(s => [s.start_ms, s.end_ms])) },
         { label: 'Host Judge', duration_ms: kindDuration('judge', 'host') }] : [])],
-    hasTimings: Boolean(host), warnings: data?.warnings || [] };
+    hasTimings: Boolean(host), recoveryOnly, warnings: data?.warnings || [] };
 }

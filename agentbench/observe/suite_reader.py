@@ -15,6 +15,8 @@ def persisted_snapshot(result_log):
     projected = reconcile_reports(plan, events, snapshot)
     if projected is not events:
         snapshot = suite_snapshot(plan, projected)
+    from .evaluation_source import evaluation_source
+    snapshot['evaluation_source'] = evaluation_source(snapshot, plan)
     snapshot.update(events=events, event_count=len(events), path=str(path),
                     total_case_count=sum(agent['case_count'] for agent in plan['agents']),
                     suite_error=snapshot.get('error'), parse_errors=[])

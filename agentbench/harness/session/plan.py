@@ -61,8 +61,10 @@ def source_digest(root):
     root = Path(root).resolve(strict=True)
     digest = hashlib.sha256()
     for directory, folders, files in os.walk(root, followlinks=False):
+        # Human evaluation records do not change the Agent's execution provenance.
         folders[:] = sorted(name for name in folders
-                            if name not in IGNORED_DIRECTORIES and not name.endswith('.egg-info'))
+                            if name not in IGNORED_DIRECTORIES and not name.endswith('.egg-info')
+                            and not (Path(directory) == root and name == 'ground_truth'))
         for name in sorted(files):
             if name == '.DS_Store' or name.startswith('.env') or name.endswith(('.pyc', '.pyo')):
                 continue

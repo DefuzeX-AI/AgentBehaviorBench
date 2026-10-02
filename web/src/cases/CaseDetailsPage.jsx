@@ -4,13 +4,13 @@ import SuiteBreadcrumb from '../navigation/SuiteBreadcrumb.jsx';
 import { useDispatch, useSelector } from 'react-redux';
 import useLiveJson from '../useLiveJson.js';
 import { actions } from '../suite/store.js';
-import { currentAttempt, errorText, executionStatus, reportOf } from '../suite/model.js';
+import { currentAttempt, errorText, executionStatus } from '../suite/model.js';
+import { attemptReport } from './caseAttemptModel.js';
 import { ExecutionBadge, JudgeBadge } from '../suite/CaseStatus.jsx';
 import CaseOverview from './CaseOverview.jsx';
 import CaseConversation from './CaseConversation.jsx';
 import CaseToolsFiles from './CaseToolsFiles.jsx';
 import CaseJudge from './CaseJudge.jsx';
-import CaseTrace from './CaseTrace.jsx';
 import CaseGeneration from './CaseGeneration.jsx';
 import CaseResultFiles from './CaseResultFiles.jsx';
 import ReuseCaseControl from '../suite/ReuseCaseControl.jsx';
@@ -22,20 +22,26 @@ const CaseTimeline = lazy(() => import('./CaseTimeline.jsx'));
 const CaseReplay = lazy(() => import('./CaseReplay.jsx'));
 
 export default function CaseDetailsPage({ item, revision, onBack, onAgentSelect }) {
-  const dispatch = useDispatch();
   const selectedId = useSelector(state => state.suite.selectedAttempts[item.key]);
-  const detailTab = useSelector(state => state.suite.detailTab);
   const attempt = selectedId ? item.attempts.find(value => value.attempt_id === selectedId) : currentAttempt(item);
+  return <CaseAttemptDetails key={`${item.key}:${attempt?.attempt_id || 'pending'}:${attempt?.artifact_run_id || ''}`}
+    item={item} attempt={attempt} revision={revision} onBack={onBack} onAgentSelect={onAgentSelect} />;
+}
+
+function CaseAttemptDetails({ item, attempt, revision, onBack, onAgentSelect }) {
+  const dispatch = useDispatch();
+  const detailTab = useSelector(state => state.suite.detailTab);
   const artifact = attempt?.artifact_run_id;
   const evaluation = useLiveJson(artifact ? `/api/observe/runs/${artifact}/evaluation` : null, revision);
   const rejected = attempt?.host_accepted === false || attempt?.host_acceptance === false || attempt?.host_acceptance === 'rejected';
-  const report = evaluation.data?.judge || reportOf(attempt) || reportOf(item);
+  const report = attemptReport(item, attempt, evaluation.data);
+  const judgeItem = attempt || (item.attempts.length ? {} : item);
   const artifactLoading = Boolean(artifact && !evaluation.data && !evaluation.error);
   const failures = (evaluation.data?.inputs || []).filter(input => input.result?.status === 'failed').flatMap(input => input.failures || []);
   const failure = failures.find(value => value.category !== 'tool_error') || failures[0];
   const loading = <Skeleton active paragraph={{ rows: 6 }} />;
   const tabs = [
-    { key: 'overview', label: 'Overview', children: <CaseOverview item={item} attempt={attempt} data={evaluation.data} error={evaluation.error} /> },
+    { key: 'overview', label: 'Overview', children: <CaseOverview item={item} attempt={attempt} report={report} onJudgeSelect={() => dispatch(actions.detailTabChanged('judge'))} data={evaluation.data} error={evaluation.error} /> },
     { key: 'timing', label: 'Timing', children: <Suspense fallback={loading}><CaseTimeline key={attempt?.attempt_id || item.key}
       run={artifact} revision={revision} attempt={attempt} preparationRuns={item.preparation_runs || []}
       inputs={evaluation.data?.inputs} evidenceReady={Boolean(evaluation.data)} evidenceError={evaluation.error} /></Suspense> },
@@ -43,8 +49,10 @@ export default function CaseDetailsPage({ item, revision, onBack, onAgentSelect 
     { key: 'replay', label: 'Replay', children: <Suspense fallback={loading}><CaseReplay key={artifact || item.key} run={artifact} /></Suspense> },
     { key: 'generation', label: 'Case Generation', children: <CaseGeneration item={item} revision={revision} /> },
     { key: 'tools', label: 'Tools & Files', children: artifact ? <CaseToolsFiles run={artifact} revision={revision} inputs={evaluation.data?.inputs} /> : null },
-    { key: 'judge', label: 'Judge', children: artifactLoading && !report ? loading : <CaseJudge report={report} item={attempt || item} /> },
-    { key: 'trace', label: 'Trace', children: artifact ? <CaseTrace run={artifact} revision={revision} /> : null },
+    { key: 'judge', label: 'Judge', children: <>
+      {evaluation.error && <Alert type="warning" showIcon message="Judge artifacts unavailable" description={report ? 'Showing the report retained in this Attempt.' : evaluation.error} />}
+      {artifactLoading && !report ? loading : <CaseJudge report={report} item={judgeItem} />}
+    </> },
     { key: 'json', label: 'Result Files', children: <CaseResultFiles key={attempt?.attempt_id || item.key} run={artifact} preparationRuns={item.preparation_runs || []} revision={revision} /> },
   ];
 
@@ -52,9 +60,9 @@ export default function CaseDetailsPage({ item, revision, onBack, onAgentSelect 
     <SuiteBreadcrumb agentId={item.agent_id} caseIndex={item.case_index} onSuiteSelect={onBack} onAgentSelect={onAgentSelect} />
     <div className="case-header"><div><Text className="case-eyebrow">{item.agent_id}</Text><Title level={1}>Case {item.case_index + 1}</Title>
       <Text copyable type="secondary">{item.case_id || 'Case ID pending'}</Text></div>
-      <Space wrap><ExecutionBadge status={attempt ? executionStatus(attempt) : item.execution_status} /><JudgeBadge status={attempt?.judge_status || report?.status || item.judge_status} />{rejected && <Tag color="error">Host rejected</Tag>}</Space></div>
+      <div className="case-header-actions"><Space wrap><ExecutionBadge status={attempt ? executionStatus(attempt) : item.execution_status} /><JudgeBadge status={report?.status || judgeItem.judge_status} />{rejected && <Tag color="error">Host rejected</Tag>}</Space>
+        <ReuseCaseControl item={item} /></div></div>
 
-    <ReuseCaseControl item={item} />
     <div className="case-attempt-bar"><label><Text type="secondary">Execution attempt</Text><Select value={attempt?.attempt_id || ''} disabled={!item.attempts.length} onChange={value => dispatch(actions.attemptSelected({ key: item.key, attempt_id: value }))}
       options={item.attempts.map(value => ({ value: value.attempt_id, label: `Attempt ${value.attempt_number}${value.attempt_id === item.active_attempt_id ? ' (current)' : ''}` }))} placeholder="Execution has not started" /></label>
       {artifact && <Text type="secondary">Artifact run <Text copyable code>{artifact}</Text></Text>}</div>
@@ -69,6 +77,6 @@ export default function CaseDetailsPage({ item, revision, onBack, onAgentSelect 
     {!artifact && <Alert type="info" showIcon message="Execution artifacts are not available yet" description={attempt ? 'This attempt has no viewable artifact directory. Saved Suite state remains available below.' : 'Case execution has not started.'} />}
 
     <Tabs className="case-tabs" activeKey={detailTab === 'replay' && !artifact ? 'overview' : detailTab} onChange={value => dispatch(actions.detailTabChanged(value))}
-      items={CASE_TABS.map(key => tabs.find(tab => tab.key === key)).map(tab => ({ ...tab, disabled: ['replay', 'conversation', 'tools', 'trace'].includes(tab.key) && !artifact }))} />
+      items={CASE_TABS.map(key => tabs.find(tab => tab.key === key)).map(tab => ({ ...tab, disabled: ['replay', 'conversation', 'tools'].includes(tab.key) && !artifact }))} />
   </section>;
 }

@@ -28,7 +28,7 @@ test('Suite route distinguishes the overview from an exact Case', () => {
 test('Suite route creates a shareable Case URL without changing the base path', () => {
   const location = { pathname: '/suite/suite-one/', search: '?mode=local' };
   assert.equal(suiteRouteHref(null, 'overview', location), '/suite/suite-one/?mode=local');
-  assert.equal(suiteRouteHref(cases[0], 'trace', location), '/suite/suite-one/?mode=local#agent=alpha&case=0&tab=trace');
+  assert.equal(suiteRouteHref(cases[0], 'trace', location), '/suite/suite-one/?mode=local#agent=alpha&case=0&tab=timing');
 });
 
 test('Replay follows Timing and has a shareable Case route', () => {
@@ -37,12 +37,19 @@ test('Replay follows Timing and has a shareable Case route', () => {
   assert.equal(readSuiteRoute(cases, href.slice(href.indexOf('#'))).tab, 'replay');
 });
 
-test('generation precedes Judge and tools and trace follow it; existing JSON links still work', () => {
-  assert.deepEqual(CASE_TABS, ['overview', 'timing', 'replay', 'conversation', 'generation', 'judge', 'tools', 'trace', 'json']);
+test('Judge leads Case navigation, Timing includes Trace, and existing JSON links still work', () => {
+  assert.deepEqual(CASE_TABS, ['judge', 'overview', 'timing', 'replay', 'conversation', 'generation', 'tools', 'json']);
   const item = { agent_id: 'alpha', case_index: 0 };
   for (const tab of ['replay', 'generation', 'json']) {
     const href = suiteRouteHref(item, tab, { pathname: '/suite/one/', search: '?resultRun=run1&resultFile=evaluation%2Fcase.json' });
     assert.equal(readSuiteRoute([item], href.slice(href.indexOf('#'))).tab, tab);
     assert.ok(href.includes('resultFile=evaluation%2Fcase.json'));
   }
+});
+
+test('new Case links open Judge while explicit Overview and legacy Trace bookmarks still work', () => {
+  const item = { ...cases[0], attempts: [{ attempt_id: 'old' }] };
+  assert.equal(readSuiteRoute([item], '#agent=alpha&case=0').tab, 'judge');
+  assert.equal(readSuiteRoute([item], '#agent=alpha&case=0&tab=overview').tab, 'overview');
+  assert.deepEqual(readSuiteRoute([item], '#agent=alpha&case=0&tab=trace&attempt=old'), { item, tab: 'timing', attemptId: 'old' });
 });

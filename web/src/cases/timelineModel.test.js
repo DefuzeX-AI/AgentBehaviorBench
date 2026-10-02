@@ -32,6 +32,7 @@ test('old traces remain visible without fabricated lifecycle totals', () => {
   assert.equal(model.rows[0].duration_ms, 1000);
   assert.equal(model.total_ms, null);
   assert.equal(model.hasTimings, false);
+  assert.equal(model.recoveryOnly, false);
 });
 
 test('framework children link to measured invocation without duplicated root envelope', () => {
@@ -64,9 +65,40 @@ test('historical attempts isolate recovery journals sharing the same artifact', 
   assert.equal(resumed.total_ms, 50);
   assert.equal(resumed.sdk_ms, 30);
   assert.equal(resumed.agent_ms, null);
+  assert.equal(resumed.recoveryOnly, true);
   const sameAttempt = makeTimeline({ operations: [original, { ...recovery, attempt_id: 'a' }, wait] }, { attempt_id: 'a' });
   assert.deepEqual(sameAttempt.rows.map(s => s.id), ['original', 'recovery', 'wait']);
   assert.equal(sameAttempt.total_ms, 150);
+  assert.equal(sameAttempt.recoveryOnly, false);
+});
+
+test('recovery timing never presents the original artifact trace as a new Agent execution', () => {
+  const data = {
+    operations: [
+      { ...op('original', 1000, 2000, 'total'), attempt_id: 'a', clock_id: 'original' },
+      { ...op('recovery', 3000, 4000, 'total'), attempt_id: 'b', clock_id: 'recovery', phase: 'recover' },
+      { ...op('worker', 1100, 1900, 'agent'), source: 'worker' },
+    ],
+    spans: [{ trace_id: 'trace', span_id: 'call', name: 'Agent call', start_time_unix_nano: '1200000000', end_time_unix_nano: '1800000000' }],
+  };
+  const original = makeTimeline(data, { attempt_id: 'a' });
+  assert.ok(original.rows.some(row => row.id === 'trace:call'));
+  assert.equal(original.recoveryOnly, false);
+  const recovery = makeTimeline(data, { attempt_id: 'b' });
+  assert.deepEqual(recovery.rows.map(row => row.id), ['recovery']);
+  assert.equal(recovery.recoveryOnly, true);
+});
+
+test('scheduler timing remains available before an execution artifact is saved', () => {
+  const model = makeTimeline(null, {
+    attempt_id: 'pending-artifact', status: 'running',
+    queued_at: '2026-01-01T00:00:00Z', started_at: '2026-01-01T00:00:03Z',
+  });
+  assert.equal(model.rows.length, 1);
+  assert.equal(model.rows[0].id, 'schedule-queue');
+  assert.equal(model.rows[0].duration_ms, 3000);
+  assert.equal(model.total_ms, null);
+  assert.equal(model.hasTimings, false);
 });
 
 test('missing worker timings are unknown rather than zero', () => {

@@ -1,4 +1,5 @@
-import { Alert, Descriptions, Progress, Statistic, Tag, Typography } from 'antd';
+import { Alert, Button, Descriptions, Progress, Statistic, Tag, Typography } from 'antd';
+import { ArrowRightOutlined } from '@ant-design/icons';
 import { executionLabels } from '../suite/model.js';
 import JudgeProgress from './JudgeProgress.jsx';
 import { judgeProgress } from './judgeProgress.js';
@@ -7,14 +8,21 @@ const { Paragraph, Text, Title } = Typography;
 const stateColor = value => ['succeeded', 'complete', 'completed', 'committed', 'received', 'captured'].includes(value) ? 'success'
   : ['failed', 'rejected', 'missing'].includes(value) ? 'error' : value ? 'processing' : 'default';
 
-export default function CaseOverview({ item, attempt, data, error }) {
+export default function CaseOverview({ item, attempt, report, onJudgeSelect, data, error }) {
+  const selected = attempt || item;
   const manifest = data?.manifest || {};
+  const judgeSummary = [report?.summary, report?.extensions?.reason, report?.issues?.[0]?.message]
+    .find(value => typeof value === 'string' && value.trim()) || 'View the saved Judge report.';
   const publicCase = data?.case?.extensions?.official_case?.public_case || {};
-  const stages = [['Execution', manifest.execution || item.execution_status], ['OTel', manifest.otel],
-    ['Submission', manifest.submission], ['Judge', manifest.judge || item.judge_status], ['Evidence', manifest.evidence]];
+  const stages = [['Execution', manifest.execution || selected.execution_status], ['OTel', manifest.otel],
+    ['Submission', manifest.submission], ['Judge', manifest.judge || selected.judge_status], ['Evidence', manifest.evidence]];
   const finished = stages.filter(([, value]) => ['succeeded', 'complete', 'completed', 'committed', 'received', 'captured'].includes(value)).length;
   return <div className="case-overview">
     {error && <Alert type="warning" showIcon message="Case artifacts are temporarily unavailable" description={error} />}
+    {report && <section className="case-judge-preview" aria-label="Judge summary"><div><Text className="case-eyebrow">JUDGE RESULT</Text>
+      <strong>{report.status || 'Unknown'}</strong>
+      <p>{judgeSummary}</p></div>
+      <Button onClick={onJudgeSelect} icon={<ArrowRightOutlined />} iconPlacement="end">Read Judge</Button></section>}
     <div className="case-stage-strip">{stages.map(([label, value]) => <div key={label}><Text type="secondary">{label}</Text><Tag color={stateColor(value)}>{value || 'Not provided'}</Tag></div>)}</div>
     <div className="case-overview-grid">
       <section className="case-summary-card"><Text className="case-eyebrow">CASE SUMMARY</Text><Title level={3}>{publicCase.title || `Case ${item.case_index + 1}`}</Title>
@@ -24,7 +32,7 @@ export default function CaseOverview({ item, attempt, data, error }) {
           { key: 'case', label: 'Case ID', children: <Text copyable code>{item.case_id || 'Pending'}</Text> },
           { key: 'run', label: 'Artifact run', children: <Text copyable code>{attempt?.artifact_run_id || 'Not created'}</Text> },
           { key: 'strategy', label: 'Strategy', children: publicCase.strategy_id || data?.case?.extensions?.official_case?.executed_strategy_group?.strategy_group_id || 'Not recorded' },
-          { key: 'execution', label: 'Execution', children: executionLabels[item.execution_status] || item.execution_status },
+          { key: 'execution', label: 'Execution', children: executionLabels[selected.execution_status] || selected.execution_status },
         ]} />
       </section>
       <section className="case-readiness-card"><Statistic title="Recorded steps" value={data?.inputs?.length || manifest.steps?.length || 0} />
@@ -32,7 +40,7 @@ export default function CaseOverview({ item, attempt, data, error }) {
         <Text type="secondary">Artifact pipeline completeness</Text>
       </section>
     </div>
-    {!data?.judge && (judgeProgress(attempt || item) ? <JudgeProgress item={attempt || item} />
+    {!report && (judgeProgress(selected) ? <JudgeProgress item={selected} />
       : data && <Alert type="info" showIcon message="No Judge report has been produced" description="Execution data is retained. Judge remains separate from execution status." />)}
   </div>;
 }

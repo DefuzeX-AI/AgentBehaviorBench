@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { Descriptions, Tag, Tree, Typography } from 'antd';
 import { detailTree } from '../sequence/grouping.js';
-import { SpanDetails } from '../otel/TraceView.jsx';
 import { formatTime } from './timelineModel.js';
+
+const SpanDetails = lazy(() => import('../otel/TraceView.jsx').then(module => ({ default: module.SpanDetails })));
 
 export default function TimingDetails({ records, focusId, run, spans }) {
   const tree = useMemo(() => detailTree(records), [records]);
@@ -34,7 +35,7 @@ export default function TimingDetails({ records, focusId, run, spans }) {
       { key: 'start', label: 'Started', children: new Date(selected.start_ms).toISOString() },
       { key: 'input', label: 'Input', children: selected.attributes?.input_id || selected.attributes?.['abb.input_id'] || '—' },
     ]} />
-    {span && <SpanDetails key={`${run}:${selected.id}`} run={run} span={span} />}
+    {span && <Suspense fallback={<p>Loading span details…</p>}><SpanDetails key={`${run}:${selected.id}`} run={run} span={span} /></Suspense>}
     <details><summary>Complete timing record</summary><pre className="timing-record">{JSON.stringify(selected, null, 2)}</pre></details>
   </div>;
 }
