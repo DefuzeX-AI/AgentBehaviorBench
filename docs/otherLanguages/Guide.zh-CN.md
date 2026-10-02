@@ -71,11 +71,20 @@ CLI 运行会复用当前项目已启动的查看器，输出同一地址下对�
 展开其中的 **Trace details** 可查看 OTel 和执行流程。旧 `tab=trace` 链接进入 Timing，
 明确指定 Overview 的旧链接仍打开 Overview。
 
+Benchmark Overview 顶部按 SDK 提供选项卡，例如 **KUMA** 和 **Local**。
+每个选项卡只显示该 SDK 的 Agent、Suite、Case 和已核验发现；`?sdk=...` 保留选择，
+**Export JSON** 导出当前选项卡。缺失、部分缺失和混合来源单独分组，
+不会把这些结果计给某个已知 SDK。侧栏仍显示所有保存的 Suite。
+
 Benchmark Overview 的主指标是发现了多少经过人工确认的 ground truth 缺陷。
 每个 Agent 可在 `agent.toml` 旁的 `ground_truth/` 中保存已确认缺陷和观察数据。
 独立的评估记录分别标明 Case 是否复现缺陷、Judge 是否正确识别；同一缺陷多次命中只计一次。
 未配置 ground truth 显示 **Not configured**，尚无评估显示 **Not assessed**，不会当作 0% 发现率。
 存储格式及评估接口见 [Ground truth 契约](Ground%20Truth.zh-CN.md)。
+当前百分比是该 SDK 历史结果的 **Observed GT coverage（已观测 GT 覆盖率）**。
+独立的 **Benchmark score** 暂显示 **Protocol not configured**；正式评分需要统一的
+Agent/GT 集合、固定预算和独立重复轮次。[评分协议草案](Benchmark%20Scoring.zh-CN.md)
+定义 GT Discovery@B 及 Case、Judge、稳定性分项指标，历史覆盖率不用于排名。
 
 每个 Agent 仍保留 Suite 数和总 Case 数。展开 Agent 可查看 ground truth 结果、
 各 Suite 的贡献数量和结果链接。
@@ -87,6 +96,7 @@ Benchmark Overview 的主指标是发现了多少经过人工确认的 ground tr
 Judge 返回 `issue` 也不会自动算作发现某个已知缺陷。
 缺失、损坏或 ID 有歧义的 Suite 不计入，并显示提示。收集统计只读取保存的结果，
 不会执行 Agent 或评测。可导出 JSON，或访问本地 `GET /api/benchmark/overview` 获取汇总和明细。
+API 保留所有 SDK 的总汇总，并在 `evaluators` 中提供各 SDK 独立分组。
 
 ## 配置真实评测
 

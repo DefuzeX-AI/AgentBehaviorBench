@@ -130,7 +130,7 @@ class ViewerSuiteCatalog:
             return {'suites': list(self._rows), 'warnings': list(self._warnings)}
 
     def overview(self):
-        from .viewer_overview import benchmark_overview
+        from .viewer_overview import benchmark_evaluators, benchmark_overview
         from agentbench.harness.ground_truth import benchmark_ground_truth
         self.refresh()
         with self._guard:
@@ -144,7 +144,9 @@ class ViewerSuiteCatalog:
             agent_ids = {job['agent_id'] for snapshot in snapshots for job in snapshot['jobs']}
             # Ground truth and assessments can change independently of Suite events.
             ground_truth = benchmark_ground_truth(self.root, records, agent_ids)
-            return benchmark_overview(snapshots, self._warnings, ground_truth=ground_truth)
+            overview = benchmark_overview(snapshots, self._warnings, ground_truth=ground_truth)
+            overview['evaluators'] = benchmark_evaluators(self.root, records)
+            return overview
 
     def resolve(self, suite_id):
         self.refresh()

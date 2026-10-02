@@ -1,3 +1,20 @@
+import { evaluatorName } from '../suite/evaluationSource.js';
+
+export function evaluatorTabName(evaluator) {
+  const reserved = { '@mixed': 'Mixed sources', '@not_recorded': 'Not recorded', '@partial': 'Partial records' };
+  return reserved[evaluator.id] || evaluatorName(evaluator.id);
+}
+
+export function selectedEvaluator(evaluators, requested) {
+  return evaluators.find(value => value.id === requested) || evaluators[0] || null;
+}
+
+export function evaluatorHref(id, locationValue) {
+  const params = new URLSearchParams(locationValue.search);
+  params.set('sdk', id);
+  return `${locationValue.pathname}?${params}${locationValue.hash || ''}`;
+}
+
 export function caseVolume(agent) {
   const counts = agent.suites.map(suite => suite.case_count);
   if (!counts.length) return 'No Suites';

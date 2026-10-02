@@ -1,6 +1,33 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { caseVolume, caseProgress, groundTruthProgress } from './model.js';
+import { caseVolume, caseProgress, evaluatorHref, evaluatorTabName, groundTruthProgress, selectedEvaluator } from './model.js';
+
+test('SDK tab selection keeps each SDK’s Case totals and discoveries independent', () => {
+  const groups = [
+    { id: 'kuma', totals: { case_count: 17 }, ground_truth: { discovered_defect_count: 1 } },
+    { id: 'local', totals: { case_count: 1 }, ground_truth: { discovered_defect_count: 0 } },
+  ];
+  assert.equal(selectedEvaluator(groups, 'local').totals.case_count, 1);
+  assert.equal(selectedEvaluator(groups, 'local').ground_truth.discovered_defect_count, 0);
+  assert.equal(selectedEvaluator(groups, null).id, 'kuma');
+  assert.equal(selectedEvaluator(groups, 'removed-sdk').id, 'kuma');
+  assert.equal(selectedEvaluator([], 'kuma'), null);
+});
+
+test('SDK tab links preserve other URL state and encode custom SDK names', () => {
+  const href = evaluatorHref('custom:sdk', { pathname: '/', search: '?sdk=local&view=saved', hash: '#section' });
+  assert.equal(href, '/?sdk=custom%3Asdk&view=saved#section');
+  assert.equal(new URL(href, 'http://localhost').searchParams.get('sdk'), 'custom:sdk');
+});
+
+test('unattributed SDK tabs stay explicit instead of claiming KUMA results', () => {
+  assert.equal(evaluatorTabName({ id: 'kuma' }), 'KUMA');
+  assert.equal(evaluatorTabName({ id: 'local' }), 'Local');
+  assert.equal(evaluatorTabName({ id: 'my-sdk' }), 'my-sdk');
+  assert.equal(evaluatorTabName({ id: '@mixed', evaluation_source: { sdks: ['kuma', 'local'] } }), 'Mixed sources');
+  assert.equal(evaluatorTabName({ id: '@partial' }), 'Partial records');
+  assert.equal(evaluatorTabName({ id: '@not_recorded' }), 'Not recorded');
+});
 
 test('equal Suite sizes show the multiplication behind the Case total', () => {
   assert.equal(caseVolume({ suites: [{ case_count: 10 }, { case_count: 10 }] }), '2 Suites × 10 Cases');

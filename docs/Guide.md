@@ -70,6 +70,12 @@ the main sequence, waterfall and topology views; expand **Trace details** there 
 OTel and execution flow. Existing `tab=trace` links open Timing, while explicit
 Overview links retain their destination.
 
+Benchmark Overview starts with SDK tabs (for example **KUMA** and **Local**). Each tab
+shows only that SDK's Agents, Suites, Cases and reviewed discoveries. The selected
+tab is retained in `?sdk=...`; **Export JSON** exports that tab's data. Missing,
+partial and mixed evaluator records appear in separate tabs without crediting
+their results to a named SDK. The sidebar continues to list all saved Suites.
+
 Benchmark Overview measures discovery of known Agent defects against human-confirmed
 ground truth. Each Agent can keep its reference defects and observations in
 `ground_truth/` beside `agent.toml`. An explicit assessment records whether a Case
@@ -78,6 +84,11 @@ defects, so reproducing the same defect repeatedly does not inflate the total.
 Agents without ground truth show **Not configured**; those without assessments show
 **Not assessed**. Neither is shown as a zero discovery rate. See the
 [ground truth contract](Ground%20Truth.md) for storage formats and assessment inputs.
+The visible percentage is **observed GT coverage** over that SDK's saved history.
+The separate **Benchmark score** remains **Protocol not configured** until a
+shared Agent/GT set, fixed budgets and independent trials can be enforced. The
+[proposed scoring protocol](Benchmark%20Scoring.md) defines GT Discovery@B and
+separate Case, Judge and reliability metrics; historical coverage is not a ranking.
 
 Suite and Case totals remain available per Agent. For example, two Suites with ten
 Cases each show `2 Suites × 10 Cases` and a total of twenty. Expand an Agent for
@@ -91,6 +102,7 @@ or a passing Judge verdict. A Judge's `issue` alone is not a ground truth match.
 Missing, corrupt or ambiguous Suites are excluded with a warning. No Agent code
 or evaluation is run to collect these statistics. Export the current totals and
 per-Agent Suite breakdown as JSON, or read `GET /api/benchmark/overview` locally.
+That API retains all-SDK aggregates and adds independent groups in `evaluators`.
 
 ## Configure services
 

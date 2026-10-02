@@ -49,18 +49,21 @@ def _defect_summary(defect, records):
             'assessment_count': len(records), 'assessed_attempt_count': assessed}
 
 
-def benchmark_ground_truth(project_root, suite_records, agent_ids):
+def benchmark_ground_truth(project_root, suite_records, agent_ids, *, include_unrun_agents=True):
     """Aggregate validated discoveries for accepted catalog Suites and current manifests.
 
     Each Suite record contains ``plan``, ``snapshot`` and canonical ``directory``.
     Pass only catalog-accepted Suites; legacy records may use ``plan=None``.
     Unconfigured Agents have a null discovery rate, not a zero success rate.
     Registered Agents with manifests are included even before their first Suite.
+    Set ``include_unrun_agents=False`` for an evaluator scope: only participating
+    Agents then contribute to the defect denominator and per-Agent results.
     """
     units, invalid_ids, warnings = registered_units(project_root)
     selected = set(agent_ids)
     manifests, statuses = {}, {}
-    for identifier in sorted(selected | set(units) | (invalid_ids or set())):
+    identifiers = selected | set(units) | (invalid_ids or set()) if include_unrun_agents else selected
+    for identifier in sorted(identifiers):
         if invalid_ids is None or identifier in invalid_ids:
             statuses[identifier] = 'invalid'
             continue
