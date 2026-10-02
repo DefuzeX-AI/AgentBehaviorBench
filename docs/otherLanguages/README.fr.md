@@ -135,6 +135,8 @@ options :
 
 Exécutez `agentbench COMMAND --help` pour afficher les options d’une commande.
 
+Pour compiler la visionneuse, utilisez Node.js 20.19+ (20.x) ou 22.12+ et exécutez `cd web && npm ci && npm run build` à la racine du dépôt. Recompilez après toute modification du frontend.
+
 ## Documentation complémentaire
 
 - [Installer, configurer et exécuter ABB — anglais](../README-previous.md)

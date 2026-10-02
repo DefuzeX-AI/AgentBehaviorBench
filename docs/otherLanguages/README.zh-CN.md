@@ -125,6 +125,8 @@ usage: agentbench [-h]
 
 运行 `agentbench COMMAND --help` 可以查看某个子命令的完整参数。
 
+查看器构建需要 Node.js 20.19+（20.x）或 22.12+：在仓库根目录执行 `cd web && npm ci && npm run build`。前端修改后需重新构建。
+
 ## 更多文档
 
 - [如何安装、配置和启动 ABB](Guide.zh-CN.md)

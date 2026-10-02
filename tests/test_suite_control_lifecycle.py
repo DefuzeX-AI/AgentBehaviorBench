@@ -16,6 +16,7 @@ from tests.test_suite_resume import make_agent, make_case, runner_for
 
 @pytest.fixture(autouse=True)
 def isolated_reference_index(tmp_path, monkeypatch):
+    monkeypatch.setattr(viewer, 'project_root', lambda: tmp_path)
     monkeypatch.setattr(fresh, 'PROJECT_ROOT', tmp_path)
     monkeypatch.setattr(recovery, 'PROJECT_ROOT', tmp_path)
 

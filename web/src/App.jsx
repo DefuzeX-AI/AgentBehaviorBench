@@ -14,6 +14,7 @@ import SuiteOverview from './suite/SuiteOverview.jsx';
 import AgentDetailsPage from './agents/AgentDetailsPage.jsx';
 import { actions } from './suite/store.js';
 import { normalizeCases } from './suite/model.js';
+import { suiteEndpoint } from './navigation/suiteCatalog.js';
 
 const RawRunView = lazy(() => import('./RawRunView.jsx'));
 const FlowPrototype = lazy(() => import('./flow-prototype/FlowPrototype.jsx'));
@@ -21,11 +22,12 @@ const CaseReplay = lazy(() => import('./cases/CaseReplay.jsx'));
 const PAGE_SIZE = 100;
 const MAX_BYTES = 20 * 1024 * 1024;
 
-function BoundSuiteApp({ endpoint }) {
+function BoundSuiteApp({ endpoint, catalogEndpoint }) {
   const dispatch = useDispatch();
   const { selectedCaseKey, selectedAgentId, selectedAttempts, detailTab } = useSelector(state => state.suite);
   const [revision, setRevision] = useState(0);
   const suite = useSuiteLive(endpoint, revision);
+  const catalog = useLiveJson(catalogEndpoint, revision);
   const cases = useMemo(() => normalizeCases(suite.data), [suite.data]);
   const selectedCase = cases.find(item => item.key === selectedCaseKey) || null;
   const hydrated = useRef(false);
@@ -55,7 +57,7 @@ function BoundSuiteApp({ endpoint }) {
   const selectAgent = id => { writeSuiteRoute({ agent_id: id }, 'overview', 'push'); dispatch(actions.agentSelected(id)); window.scrollTo({ top: 0, behavior: 'instant' }); };
   const selectSuite = () => { writeSuiteRoute(null, 'overview', 'push'); dispatch(actions.suiteSelected()); window.scrollTo({ top: 0, behavior: 'instant' }); };
   return <div className="workspace suite-workspace">
-    <SuiteSidebar snapshot={suite.data} selectedCaseKey={selectedCaseKey} busy={!suite.data && !suite.error} error={suite.error}
+    <SuiteSidebar snapshot={suite.data} catalog={catalog.data} catalogError={catalog.error} selectedCaseKey={selectedCaseKey} revision={revision} busy={!suite.data && !suite.error} error={suite.error}
       onSuiteSelect={selectSuite} onCaseSelect={selectCase} onRefresh={() => setRevision(value => value + 1)} />
     <main className="suite-main">
       <header className="suite-shell-header"><div><div className="brand">AGENT BEHAVIOR BENCH</div><span>{suite.data?.suite_id || 'Loading Suite'}</span></div>
@@ -153,8 +155,10 @@ function TraceExplorer() {
 }
 
 export default function App() {
-  const endpoint = document.querySelector('meta[name="abb-result-api"]')?.content || null;
+  const injected = document.querySelector('meta[name="abb-result-api"]')?.content || null;
+  const catalogEndpoint = document.querySelector('meta[name="abb-suites-api"]')?.content || null;
+  const endpoint = injected ? suiteEndpoint(window.location.pathname, injected) : null;
   return <ConfigProvider theme={{ token: { colorPrimary: '#244d3d', borderRadius: 6, fontSize: 13, colorText: '#202623', colorBgLayout: '#fafbf9' }, components: { Table: { headerBg: '#f0f3ef', headerColor: '#58655c' } } }}>
-    {endpoint ? <BoundSuiteApp endpoint={endpoint} /> : <TraceExplorer />}
+    {endpoint ? <BoundSuiteApp endpoint={endpoint} catalogEndpoint={catalogEndpoint} /> : <TraceExplorer />}
   </ConfigProvider>;
 }

@@ -129,6 +129,8 @@ usage: agentbench [-h]
 
 各コマンドのオプションは `agentbench COMMAND --help` で確認できます。
 
+ビューアーのビルドには Node.js 20.19+（20.x）または 22.12+ が必要です。リポジトリのルートで `cd web && npm ci && npm run build` を実行してください。フロントエンド変更後は再ビルドが必要です。
+
 ## 関連ドキュメント
 
 - [ABB のインストール、設定、実行 — 英語](../README-previous.md)

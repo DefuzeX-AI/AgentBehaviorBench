@@ -1,6 +1,8 @@
 import { actions } from './store.js';
 
 export const commandInFlight = command => ['sending', 'accepted', 'queued', 'running', 'uncertain'].includes(command?.status);
+export const commandBlocksNew = (action, command) => commandInFlight(command)
+  && !(action === 'reuse' && ['queued', 'running'].includes(command.status));
 
 export function controlCapability(snapshot, origin) {
   const capability = snapshot?.capabilities || {};
@@ -17,7 +19,7 @@ export function sendSuiteCommand(action, item, dependencies = {}) {
     const state = getState().suite;
     const origin = dependencies.origin || window.location.origin;
     const capability = controlCapability(state.snapshot, origin);
-    if (!capability || commandInFlight(state.command)) return;
+    if (!capability || commandBlocksNew(action, state.command)) return;
     const command = {
       command_id: (dependencies.uuid || (() => crypto.randomUUID()))(), action,
       ...(item ? { agent_id: item.agent_id, case_index: item.case_index } : {}),

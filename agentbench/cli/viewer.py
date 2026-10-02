@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import socket
 from collections.abc import Callable
 from html import escape
 import threading
+from uuid import uuid4
 from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -21,7 +23,7 @@ DEFAULT_PORT = 8765
 
 
 class ViewerHTTPServer(ThreadingHTTPServer):
-    """Keep each viewer's port bound to exactly one Suite on Windows too."""
+    """Local project viewer with exclusive port ownership on Windows too."""
 
     allow_reuse_address = os.name != 'nt'
 
@@ -31,6 +33,16 @@ class ViewerHTTPServer(ThreadingHTTPServer):
             # viewer's port instead of triggering our free-port fallback.
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
         super().server_bind()
+
+    def server_close(self):
+        catalog = getattr(self.RequestHandlerClass, 'suite_catalog', None)
+        try:
+            if catalog is not None:
+                catalog.close()
+                from .viewer_service import unpublish
+                unpublish(catalog.root, self.RequestHandlerClass.instance_id)
+        finally:
+            super().server_close()
 
 
 # Built viewer assets: ABB_WEB_ROOT, else web/dist of the project (a checkout, or
@@ -71,8 +83,8 @@ def require_viewer_assets():
 class RunningViewer:
     """Background local viewer server."""
 
-    server: ThreadingHTTPServer
-    thread: threading.Thread
+    server: ThreadingHTTPServer | None
+    thread: threading.Thread | None
     base_url: str
     url: str
     on_stop: Callable[[], None] | None = None
@@ -83,10 +95,13 @@ class RunningViewer:
                 self.on_stop()
         finally:
             try:
-                self.server.shutdown()
+                if self.server is not None:
+                    self.server.shutdown()
             finally:
-                self.server.server_close()
-                self.thread.join(timeout=2)
+                if self.server is not None:
+                    self.server.server_close()
+                if self.thread is not None:
+                    self.thread.join(timeout=2)
 
 
 def serve_result_log(
@@ -132,11 +147,17 @@ def start_viewer_server(
     path = Path(result_log).resolve()
     suite_id = _result_log_suite_id(path)
     require_viewer_assets()
+    from .sessions.control import close_control
+    if port == DEFAULT_PORT and host == DEFAULT_HOST and (path.parent / 'plan.json').is_file():
+        from .viewer_service import find_viewer
+        shared = find_viewer(project_root())
+        if shared:
+            return RunningViewer(None, None, shared, _locked_viewer_url(shared, suite_id),
+                                 on_stop=lambda: close_control(path))
     server = create_viewer_server(path, host=host, port=port)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     base_url = f"http://{host}:{server.server_port}"
-    from .sessions.control import close_control
     return RunningViewer(
         server=server,
         thread=thread,
@@ -158,17 +179,24 @@ def create_viewer_server(
         result_log, expected_suite_id=_result_log_suite_id(result_log)
     )
     try:
-        return ViewerHTTPServer((host, port), handler)
+        server = ViewerHTTPServer((host, port), handler)
     except OSError:
         if port == 0:
             raise
-        return ViewerHTTPServer((host, 0), handler)
+        server = ViewerHTTPServer((host, 0), handler)
+    if handler.suite_catalog is not None and host in {'127.0.0.1', 'localhost'}:
+        from .viewer_service import publish
+        try:
+            publish(handler.suite_catalog.root, f'http://{host}:{server.server_port}', handler.instance_id)
+        except OSError:
+            pass  # The viewer still works when its project cache is read-only.
+    return server
 
 
 def build_viewer_handler(
     result_log: Path, *, expected_suite_id: str | None
 ) -> type[SimpleHTTPRequestHandler]:
-    """Build a request handler bound to one JSON result artifact."""
+    """Serve project Suites, initially selecting the requested result artifact."""
     run_api = None
     if result_log.name == 'run.json':
         try:
@@ -181,9 +209,16 @@ def build_viewer_handler(
     suite_view = run_api is None
     if suite_view:
         from agentbench.observe.view_api import SuiteRunCatalogAPI
+        from .viewer_catalog import ViewerSuiteCatalog
         run_api = SuiteRunCatalogAPI(result_log)
+        catalog = ViewerSuiteCatalog(project_root(), result_log)
+    else:
+        catalog = None
 
     class ViewerHandler(SimpleHTTPRequestHandler):
+        suite_catalog = catalog
+        instance_id = uuid4().hex
+
         def __init__(self, *args, **kwargs):  # type: ignore[no-untyped-def]
             super().__init__(*args, directory=str(WEB_ROOT), **kwargs)
 
@@ -196,20 +231,38 @@ def build_viewer_handler(
             if parsed.path.startswith('/api/') and not local_origin(self.headers):
                 self._send_json({'error': 'Same-origin reads only'}, status=HTTPStatus.FORBIDDEN)
                 return
+            if catalog is not None and parsed.path == '/api/suites':
+                self._send_json(catalog.listing())
+                return
+            selected_log, selected_id = result_log, expected_suite_id
+            selection = re.fullmatch(r'/api/suites/([^/]+)/.*|/suite/([^/]+)/?', parsed.path)
+            if catalog is not None and selection:
+                selected_id = unquote(selection[1] or selection[2])
+                try:
+                    selected_log = catalog.resolve(selected_id)
+                except ValueError:
+                    self._send_json({'error': 'Unknown or unavailable Suite'}, status=HTTPStatus.NOT_FOUND)
+                    return
+            elif catalog is not None and parsed.path == '/':
+                selected_id = catalog.default_id()
+                if selected_id is not None:
+                    selected_log = catalog.resolve(selected_id)
             if run_api is not None and parsed.path.startswith('/api/observe/'):
                 try:
-                    payload = run_api.route(parsed.path, parse_qs(parsed.query))
+                    artifact = re.fullmatch(r'/api/observe/runs/([a-zA-Z0-9_-]+)/(.+)', parsed.path)
+                    api = catalog.artifact(artifact[1]) if catalog is not None and artifact else run_api
+                    payload = api.route(parsed.path, parse_qs(parsed.query))
                 except (OSError, ValueError, KeyError, StopIteration):
                     self._send_json({'error': 'Artifact unavailable'}, status=HTTPStatus.NOT_FOUND)
                 else:
                     self._send_json(payload)
                 return
-            result_api_path = _suite_result_api_path(expected_suite_id)
+            result_api_path = _suite_result_api_path(selected_id)
             if suite_view and parsed.path.startswith(result_api_path + '/agents/'):
                 from agentbench.observe.agent_profile import agent_profile
                 agent_id = unquote(parsed.path[len(result_api_path + '/agents/'):])
                 try:
-                    snapshot = parse_result_log(result_log)
+                    snapshot = parse_result_log(selected_log)
                     if agent_id not in {job['agent_id'] for job in snapshot.get('jobs', [])}:
                         raise ValueError('Agent outside Suite')
                     payload = agent_profile(project_root(), agent_id)
@@ -220,7 +273,9 @@ def build_viewer_handler(
                 return
             if parsed.path == result_api_path:
                 try:
-                    payload = controlled_snapshot(parse_result_log(result_log), result_log)
+                    if catalog is not None:
+                        catalog.controller(selected_log)
+                    payload = controlled_snapshot(parse_result_log(selected_log), selected_log)
                 except (OSError, ValueError, KeyError):
                     self._send_json({'error': 'Suite snapshot unavailable'}, status=HTTPStatus.SERVICE_UNAVAILABLE)
                 else:
@@ -232,11 +287,13 @@ def build_viewer_handler(
                 self._send_suite_mismatch()
                 return
             if parsed.path == "/api/health":
-                self._send_json({"ok": True})
+                from .viewer_service import SCHEMA, project_identity
+                self._send_json({'ok': True, **({'schema': SCHEMA, 'project': project_identity(catalog.root),
+                                                'instance_id': self.instance_id} if catalog else {})})
                 return
 
-            suite_path = _suite_view_path(expected_suite_id)
-            if parsed.path.rstrip("/") == suite_path.rstrip("/"):
+            suite_path = _suite_view_path(selected_id)
+            if parsed.path.rstrip("/") == suite_path.rstrip("/") or catalog is not None and parsed.path == '/':
                 try:
                     require_viewer_assets()
                 except ViewerUnavailable as exc:
@@ -247,6 +304,7 @@ def build_viewer_handler(
                 html = index.read_text(encoding="utf-8")
                 if suite_view:
                     html = html.replace("<head>", f'<head><meta name="abb-result-api" content="{escape(result_api_path, quote=True)}">', 1)
+                    html = html.replace("<head>", '<head><meta name="abb-suites-api" content="/api/suites">', 1)
                 body = html.encode("utf-8")
                 self.send_response(HTTPStatus.OK)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -267,7 +325,18 @@ def build_viewer_handler(
             if not local_origin(self.headers, require_origin=True):
                 self._send_json({'error': 'Same-origin commands only'}, status=HTTPStatus.FORBIDDEN)
                 return
-            controller = bound_controller(result_log)
+            selected_log = result_log
+            if catalog is not None:
+                match = re.fullmatch(r'/api/suites/([^/]+)/commands', urlparse(self.path).path)
+                try:
+                    if match is None:
+                        raise ValueError('Unknown Suite command route')
+                    selected_log = catalog.resolve(unquote(match[1]))
+                except ValueError:
+                    self._send_json({'error': 'Unknown or unavailable Suite'}, status=HTTPStatus.NOT_FOUND)
+                    return
+                catalog.controller(selected_log)
+            controller = bound_controller(selected_log)
             if controller is None:
                 self._send_json({'error': 'This viewer is read-only'}, status=HTTPStatus.FORBIDDEN)
                 return

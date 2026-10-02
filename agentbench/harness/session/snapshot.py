@@ -20,6 +20,18 @@ def suite_snapshot(plan, events):
     for event in events:
         revision = event.get('sequence', revision + 1)
         kind = event.get('event')
+        if kind == 'suite_cases_added':
+            state, summary, error = 'running', None, None
+            for entry in event['cases']:
+                # Also support callers projecting the original on-disk plan directly.
+                identifier, index = entry['agent_id'], entry['prepared_case']['case_index']
+                job = jobs.setdefault(identifier, {'agent_id': identifier, 'registration_index': len(jobs),
+                    'job_id': None, 'status': 'queued', 'generation_status': 'queued', 'cases': []})
+                while len(job['cases']) <= index:
+                    job['cases'].append(new_case(suite_id, identifier, len(job['cases'])))
+                case = job['cases'][index]
+                apply_case_event(case, {**entry, 'event': 'case_prepared', 'timestamp': event.get('timestamp')})
+                apply_case_event(case, {**entry, 'event': 'case_reused'})
         if kind in {'suite_resumed', 'suite_started', 'run_started', 'suite_resume_started'}:
             state, summary, error = 'running', None, None
         elif kind == 'suite_completed':
@@ -63,7 +75,7 @@ def suite_snapshot(plan, events):
     cases = [case for job in jobs.values() for case in job['cases']]
     for job in jobs.values():
         job['counts'] = dict(Counter(case['execution_status'] for case in job['cases']))
-        if any(case['execution_status'] in {'dispatched', 'running', 'retrying', 'waiting_judge', 'reconciling', 'retry_wait'}
+        if any(case['execution_status'] in {'ready', 'queued', 'dispatched', 'running', 'retrying', 'waiting_judge', 'reconciling', 'retry_wait'}
                for case in job['cases']):
             job['status'] = 'running'
             job['execution_status'] = 'running'

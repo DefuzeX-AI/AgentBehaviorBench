@@ -13,6 +13,7 @@ import CaseJudge from './CaseJudge.jsx';
 import CaseTrace from './CaseTrace.jsx';
 import CaseGeneration from './CaseGeneration.jsx';
 import CaseResultFiles from './CaseResultFiles.jsx';
+import ReuseCaseControl from '../suite/ReuseCaseControl.jsx';
 import { CASE_TABS } from '../navigation/suiteRoute.js';
 import './cases.css';
 
@@ -53,6 +54,7 @@ export default function CaseDetailsPage({ item, revision, onBack, onAgentSelect 
       <Text copyable type="secondary">{item.case_id || 'Case ID pending'}</Text></div>
       <Space wrap><ExecutionBadge status={attempt ? executionStatus(attempt) : item.execution_status} /><JudgeBadge status={attempt?.judge_status || report?.status || item.judge_status} />{rejected && <Tag color="error">Host rejected</Tag>}</Space></div>
 
+    <ReuseCaseControl item={item} />
     <div className="case-attempt-bar"><label><Text type="secondary">Execution attempt</Text><Select value={attempt?.attempt_id || ''} disabled={!item.attempts.length} onChange={value => dispatch(actions.attemptSelected({ key: item.key, attempt_id: value }))}
       options={item.attempts.map(value => ({ value: value.attempt_id, label: `Attempt ${value.attempt_number}${value.attempt_id === item.active_attempt_id ? ' (current)' : ''}` }))} placeholder="Execution has not started" /></label>
       {artifact && <Text type="secondary">Artifact run <Text copyable code>{artifact}</Text></Text>}</div>

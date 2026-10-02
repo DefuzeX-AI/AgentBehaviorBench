@@ -140,6 +140,9 @@ def _absolute_path(value):
 
 def _event_paths(event):
     """Read host-owned reference fields; never scan Agent prompt/output content."""
+    if event.get('event') == 'suite_cases_added':
+        for entry in event['cases']:
+            yield from _event_paths(entry)
     for key in ('artifact_directory',):
         if event.get(key) is not None:
             yield _absolute_path(event[key])
