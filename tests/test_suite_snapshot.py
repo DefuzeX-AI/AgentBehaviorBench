@@ -7,6 +7,51 @@ PLAN = {'suite_id': 'suite_state', 'agents': [{'agent_id': 'react', 'case_count'
                                            {'agent_id': 'research', 'case_count': 3}]}
 
 
+def test_persisted_host_judge_queue_and_accepted_progress_survive_reopening():
+    rows = [event('case_started'), event('judge_queued', artifact_directory='saved-attempt')]
+    snapshot = suite_snapshot(PLAN, rows)
+    case = snapshot['jobs'][0]['cases'][0]
+    assert case['execution_status'] == 'waiting_judge'
+    assert case['judge_delivery_status'] == 'queued' and case['judge_status'] is None
+    assert case['artifact_directory'] == 'saved-attempt'
+    rows.append(event('progress', stage='judge_wait', status='started'))
+    reopened = suite_snapshot(PLAN, rows)['jobs'][0]['cases'][0]
+    assert reopened['judge_delivery_status'] == 'judging'
+    assert len(reopened['attempts']) == 1 and reopened['active_attempt_id'] == case['active_attempt_id']
+
+
+def test_received_report_clears_stale_wait_stage_and_resume_hint():
+    result = {'status': 'failed', 'execution_status': 'failed',
+              'error': {'type': 'ValueError', 'message': 'Invalid Agent input'},
+              'artifacts': {'host_acceptance': 'accepted', 'host_trace_validation': 'succeeded',
+                  'received_report': {'status': 'issue', 'host_accepted': True},
+                  'recovery': {'action': 'blocked', 'allow_replay': False,
+                               'reason': 'Resume the durable host Judge task without Agent replay'}}}
+    rows = [event('case_started'), event('progress', stage='judge_wait', status='started'),
+            event('case_completed', case_result=result)]
+    case = suite_snapshot(PLAN, rows)['jobs'][0]['cases'][0]
+    assert case['stage'] == 'judge_completed'
+    assert case['judge_delivery_status'] == 'received'
+    assert case['execution_status'] == 'failed' and case['quality_gate'] == 'failed'
+    assert not case['can_retry'] and 'No Judge resubmission' in case['recovery_reason']
+
+
+def test_old_submission_wrapper_does_not_hide_sdk_and_native_causes():
+    from agentbench.observe.result_reconciliation import reconcile_reports
+    result = {'status': 'failed', 'execution_status': 'failed',
+        'error': {'type': 'ValueError', 'message': 'Judge requires original cleanup and host trace acceptance'},
+        'artifacts': {'phase': 'submission', 'completion': {'submission': 'failed'},
+            'sdk_error': {'type': 'SensitiveDataError', 'code': 'sensitive_data_blocked', 'message': 'Sensitive data blocked'},
+            'native_failure': {'error_type': 'ValueError', 'error': 'Provider API key is not set'}}}
+    rows = [event('case_started'), event('case_completed', case_result=result)]
+    projected = reconcile_reports(PLAN, rows, suite_snapshot(PLAN, rows))
+    case = suite_snapshot(PLAN, projected)['jobs'][0]['cases'][0]
+    assert case['error']['type'] == 'SensitiveDataError'
+    assert case['error']['code'] == 'sensitive_data_blocked'
+    assert 'Provider API key is not set' in case['error']['message']
+    assert rows[-1]['case_result']['error']['type'] == 'ValueError'
+
+
 def event(kind, *, number=1, agent='react', index=0, **data):
     return {'event': kind, 'agent_id': agent, 'case_index': index,
             'attempt_id': f'attempt-{number}', 'attempt_number': number,

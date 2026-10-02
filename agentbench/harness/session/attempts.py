@@ -100,6 +100,9 @@ def apply_case_event(case, event):
                       retry_at=None, error=None, quality_gate=None)
     elif kind == 'case_queued':
         target.update(status='queued', execution_status='queued')
+    elif kind == 'judge_queued':
+        target.update(status='running', execution_status='waiting_judge', phase='judge',
+                      stage='judge_queue', judge_delivery_status='queued', quality_gate=None)
     elif kind in {'retry_scheduled', 'case_retry_scheduled'}:
         case['retry_wait_started_at'] = event.get('timestamp')
         target.update(status='retry_wait', execution_status='retry_wait', can_retry=False,
@@ -128,8 +131,11 @@ def apply_case_event(case, event):
             target[key] = data.get(key) or benchmark.get(key) or artifacts.get(key) or 'unknown'
         if target['report_received']:
             target['judge_delivery_status'] = 'received'
+            target.update(phase='completed', stage='judge_completed')
         elif benchmark and target['judge_delivery_status'] == 'unknown':
             target['judge_delivery_status'] = 'missing'
+        elif target.get('stage') in {'judge_queue', 'judge', 'judge_wait'}:
+            target['stage'] = 'judge_failed'
         target['quality_gate'] = data.get('quality_gate') or (
             'passed' if report.get('status') == 'pass' and not target['error']
             and target['execution_status'] == 'completed'
@@ -140,7 +146,12 @@ def apply_case_event(case, event):
         target['retry_at'] = None
     elif kind in {'progress', 'step_started', 'step_completed', 'step_failed'}:
         if target.get('execution_status') not in {'completed', 'failed', 'needs_attention', 'blocked', 'cancelled', 'skipped', 'retry_wait'}:
-            target['execution_status'] = 'waiting_judge' if event.get('stage') in {'judge', 'judging', 'judge_wait'} else target.get('execution_status', 'running')
+            judging = event.get('stage') in {'judge_queue', 'judge', 'judging', 'judge_wait'}
+            target['execution_status'] = 'waiting_judge' if judging else target.get('execution_status', 'running')
+            if judging:
+                target['judge_delivery_status'] = ('queued' if event['stage'] == 'judge_queue' else
+                    'received' if event.get('status') == 'succeeded' else
+                    'judging' if event['stage'] == 'judge_wait' else 'submitting')
     # Delayed events for an old Attempt update its history, never the current row.
     if attempt is not None and attempt['attempt_id'] == case['active_attempt_id']:
         for key in ('status', 'execution_status', 'judge_status', 'phase', 'stage', 'job_id',

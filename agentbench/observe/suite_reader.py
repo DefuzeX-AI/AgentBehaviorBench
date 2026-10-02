@@ -11,6 +11,10 @@ def persisted_snapshot(result_log):
     from agentbench.harness.session import read_suite, suite_snapshot
     plan, events = read_suite(path.parent)
     snapshot = suite_snapshot(plan, events)
+    from .result_reconciliation import reconcile_reports
+    projected = reconcile_reports(plan, events, snapshot)
+    if projected is not events:
+        snapshot = suite_snapshot(plan, projected)
     snapshot.update(events=events, event_count=len(events), path=str(path),
                     total_case_count=sum(agent['case_count'] for agent in plan['agents']),
                     suite_error=snapshot.get('error'), parse_errors=[])

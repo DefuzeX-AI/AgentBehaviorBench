@@ -83,6 +83,11 @@ ABB_MAX_PARALLEL_CASES=1
 - `TAVILY_API_KEY`：从 [Tavily](https://app.tavily.com/) 获取，仅使用该工具的 Agent 需要。
 - `ABB_MAX_PARALLEL_CASES`：正整数，默认 1；4 表示整个 Suite 最多并行 4 个 Case，
   包括同一 Agent 的不同 Case。它不限制 Agent 内部搜索工具的并发。
+- `ABB_MAX_PARALLEL_JUDGES`：正整数，默认 2；官方 KUMA Judge 在容器清理后由
+  宿主机独立提交，不占 Agent 执行名额。
+- `ABB_JUDGE_QUEUE_CAPACITY`：正整数，默认 8；限制等待任务和预留执行名额，
+  满额时暂停接收新的执行。任务持久化，恢复时不会重新执行 Agent。
+  详见 [Host Judge queue（英文）](../Host%20Judge%20Queue.md)。
 
 Shell 已导出的变量优先于 `.env`，已导出的空值也会影响读取。`--env-file PATH`
 选择其他文件，`--model MODEL` 覆盖单次 Agent 模型。`.env` 不会整份挂入容器，
@@ -166,7 +171,7 @@ agentbench evaluate react-agent --cases 1 --yes --no-view --results-dir results/
 ```
 
 实际事件文件是 `results/my-run/suites/<suite-id>/events.json`，同目录保存计划和
-Case。查看结果时使用 `Result saved` 打印的真实路径；恢复、重试和 Judge
+Case。查看结果时使用 `Result saved` 打印的真实路径；恢复、重试和宿主机 Judge
 后续更新仍使用同一个 Suite 目录。
 旧 `evaluate --result-output PATH` 和 `run`/`certify --output PATH` 保留兼容并打印
 迁移提示，但文件路径仅选择父目录，**不会创建指定文件名**；请改用 `--results-dir`。

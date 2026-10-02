@@ -7,7 +7,7 @@ from pathlib import Path
 from agentbench.adapter import AdapterInvocation
 from agentbench.harness.errors import ProviderSelectionError
 from agentbench.harness.progress import emit_progress
-from agentbench.harness.result import BenchmarkResult, BenchmarkStepResult
+from agentbench.harness.result import BenchmarkResult, BenchmarkStepResult, BenchmarkStepFailure
 from agentbench.runtime.contracts.execution import RunControl
 from agentbench.runtime.interception import resolve_model_provider
 from agentbench.adapter.factory import DEFAULT_ADAPTER_FACTORY
@@ -16,8 +16,8 @@ from agentbench.sdk.contracts import PreparedCase, PreparedCaseBatch, RunnerReco
 from agentbench.sdk.common.case_identity import case_content_sha256
 
 from .service import evaluate
-from .diagnostics import evaluation_failure, collect_artifacts
-from .configuration import backend_url, request_options, api_key
+from .diagnostics import evaluation_failure, collect_artifacts, host_acceptance, artifact_path
+from .configuration import backend_url, request_options, api_key, validate_host_judge_dependency
 from .case_files import artifact_digest
 from .preparation import prepare_batch
 
@@ -38,6 +38,7 @@ class KumaContainerRunner:
 
     # Reported as the run's provider mode; a plugin reusing this runner renames it.
     provider_mode = 'official-container'
+    supports_deferred_judgment = True
 
     def __init__(self, *, environ=None, options=None, trace_sink=None, trace_max_bytes=262144,
                  control=None, build_coordinator=None, job_context=None,
@@ -86,6 +87,7 @@ class KumaContainerRunner:
         try:
             api_key(self.environ)
             backend_url(self.environ)
+            validate_host_judge_dependency()
             # Only replacement depends on a BBA-selected Agent model provider.
             if DEFAULT_ADAPTER_FACTORY.network_mode(getattr(registration, 'framework', 'langgraph')) == 'replace':
                 resolve_model_provider(environ=self.environ)
@@ -126,6 +128,23 @@ class KumaContainerRunner:
         """Resume the original Judge request and validate its unchanged evidence."""
         from .recovery_execution import recover_case
         try:
+            directory = (previous_result.artifacts or {}).get('directory')
+            if directory and ((Path(directory) / 'judge-task.json').is_file()
+                              or (Path(directory) / 'evaluation/judge/context.json').is_file()):
+                from agentbench.sdk.judgment import DeferredJudgment
+                from .judge_tasks import prepare_task
+                from .diagnostics import read_diagnostic
+                host = read_diagnostic(Path(directory), 'run.json')
+                if (previous_result.agent_id != registration.agent_id
+                        or previous_result.case_index != case.case_index
+                        or previous_result.case_id != case.case_id
+                        or host.get('attempt_id') != previous_result.attempt_id):
+                    raise ValueError('Judge recovery belongs to another Case or Attempt')
+                ticket = (DeferredJudgment(Path(directory)) if (Path(directory) / 'judge-task.json').is_file()
+                          else prepare_task(Path(directory), case, environ=self.environ))
+                return self.judge_case(registration, case, ticket,
+                    on_progress=on_progress, on_step_start=on_step_start,
+                    on_step_complete=on_step_complete, on_step_failure=on_step_failure)
             return recover_case(self, registration, case, previous_result=previous_result,
                                 validator=read_result, on_progress=on_progress)
         except Exception as exc:
@@ -134,8 +153,32 @@ class KumaContainerRunner:
                     'action': 'blocked', 'automatic': False, 'reason': str(exc)}}
             raise
 
+    def execute_case(self, registration, case, **callbacks):
+        return self.run_case(registration, case, _defer_judge=True, **callbacks)
+
+    def judge_case(self, registration, case, ticket, *, on_progress=None,
+                   on_step_start=None, on_step_complete=None, on_step_failure=None):
+        from .judge_tasks import judge_task
+        try:
+            result = judge_task(self, registration, case, ticket, on_progress=on_progress)
+            emit_progress(on_progress, stage='judge', status='succeeded',
+                detail='Validated Input artifacts', artifact_directory=str(ticket.directory),
+                sdk_run_id=result.run_id, event_timing='artifact_replay',
+                **self._identity(registration, phase='judge', case_index=case.case_index, case_id=case.case_id))
+            replay_input_events(ticket.directory, result, on_step_start, on_step_complete, on_step_failure)
+            return result
+        except BaseException as exc:
+            if not getattr(exc, 'artifacts', None):
+                host = json.loads((ticket.directory / 'run.json').read_text(encoding='utf-8'))
+                exc.artifacts = collect_artifacts(ticket.directory, {**host, 'validation': 'failed'},
+                                                  environ=self.environ)
+                exc.artifacts['recovery'] = {'action': 'blocked', 'automatic': False,
+                    'allow_replay': False, 'reason': str(exc)}
+            raise
+
     def run_case(self, registration, case: PreparedCase, *, on_progress=None,
-                 on_step_start=None, on_step_complete=None, on_step_failure=None) -> BenchmarkResult:
+                 on_step_start=None, on_step_complete=None, on_step_failure=None,
+                 _defer_judge=False) -> BenchmarkResult:
         """Execute only the requested prepared Case, without a mutable cursor."""
         self.control.check()
         self.validate_sdk(registration)
@@ -160,10 +203,23 @@ class KumaContainerRunner:
             expected_environment_sha256=case.environment_sha256,
             trace_sink=self.trace_sink, trace_max_bytes=self.trace_max_bytes,
             **self._runtime_options(identity),
+            **({'defer_judge': True} if _defer_judge else {}),
             on_artifacts_ready=lambda path: self._artifacts_ready(
                 registration, on_progress, path, identity, 'Live artifacts available'))
         try:
             self.control.check()
+            if _defer_judge:
+                from .judge_tasks import prepare_task
+                host = json.loads((directory / 'run.json').read_text(encoding='utf-8'))
+                if host.get('status') != 'succeeded':
+                    raise evaluation_failure(directory, 'Container execution or SDK submission failed',
+                                             environ=self.environ)
+                ticket = prepare_task(directory, case, environ=self.environ)
+                emit_progress(on_progress, stage='judge_queue', status='started',
+                    detail='Agent execution and Docker cleanup complete; Judge queued',
+                    artifact_directory=str(directory), artifact_run_id=directory.name,
+                    case_count=registration.case_count, **{**identity, 'phase': 'judge'})
+                return ticket
             result = read_result(directory, registration.agent_id, provider_mode=self.provider_mode)
             executed = json.loads((directory / 'evaluation/case.json').read_text())
             if executed['case_id'] != case.case_id:
@@ -176,14 +232,10 @@ class KumaContainerRunner:
                 artifact_run_id=directory.name, sdk_run_id=result.run_id,
                 event_timing='artifact_replay', case_count=registration.case_count, **identity,
             )
-            for step in result.steps:
-                if on_step_start:
-                    on_step_start(registration.agent_id, step.input_id, step.payload)
-                if on_step_complete:
-                    on_step_complete(registration.agent_id, step)
+            replay_input_events(directory, result, on_step_start, on_step_complete, on_step_failure)
             return result
         except Exception as exc:
-            status = json.loads((directory / 'run.json').read_text())
+            status = json.loads((directory / 'run.json').read_text(encoding='utf-8'))
             status['status'] = 'failed'
             exc.artifacts = collect_artifacts(directory, status, environ=self.environ)
             Artifacts(directory, environ=self.environ).save('run.json', {
@@ -194,30 +246,52 @@ class KumaContainerRunner:
             raise
 
 
+def replay_input_events(directory, result, on_start, on_complete, on_failure):
+    """Emit recorded success/failure callbacks in the original Case Input order."""
+    case = json.loads(artifact_path(directory, 'evaluation/case.json').read_text(encoding='utf-8'))
+    outcomes = {step.input_id: (step, on_complete) for step in result.steps}
+    outcomes.update({failure.input_id: (failure, on_failure) for failure in result.failures})
+    for item in case['inputs']:
+        outcome, callback = outcomes[item['input_id']]
+        if on_start:
+            on_start(result.agent_id, outcome.input_id, outcome.payload)
+        if callback:
+            callback(result.agent_id, outcome)
+
+
 def read_result(directory, agent_id, *, recovered_report=None, provider_mode='official-container'):
     """Validate persisted artifacts or a recovered report before publishing it.
 
     A recovered candidate still requires original host trace acceptance, cleanup,
-    complete Input/output/submission/evidence identity and report identity. This
-    read-only path never promotes a failed host status merely because of a report.
+    complete Input/output/submission/evidence identity and report identity.
+    Committed native failures retain their errors independently of Judge delivery.
+    A report alone cannot establish acceptance or successful Agent execution.
     """
     def read(relative):
-        candidate = directory / relative
-        path = candidate.resolve(strict=True)
-        if not path.is_relative_to(directory.resolve()) or candidate.is_symlink():
-            raise ValueError('Result path outside run')
+        path = artifact_path(directory, relative)
         return json.loads(path.read_text(encoding='utf-8'))
     host = read('run.json')
+    summary = read('evaluation/manifest.json')
     if recovered_report is not None:
         if host.get('host_trace_validation') != 'succeeded' or host.get('cleanup_status') != 'succeeded':
             raise ValueError('Recovery requires original cleanup and host trace acceptance')
         host = {**host, 'status': 'succeeded'}
-    if host.get('agent_id') != agent_id or host.get('run_id') != directory.name or host.get('status') != 'succeeded':
+    # Older host Judge tasks wrote status=failed for a committed native failure.
+    # Reconcile those only with original host gates, never from the verdict alone.
+    accepted_failure = (host.get('status') == 'failed' and summary.get('execution') == 'failed'
+                        and host.get('exit_code') in (None, 0)
+                        and host.get('cleanup_status') == 'succeeded'
+                        and host.get('host_trace_validation') == 'succeeded'
+                        and host_acceptance(host) == 'accepted')
+    if (host.get('agent_id') != agent_id or host.get('run_id') != directory.name
+            or host_acceptance(host) == 'rejected'
+            or (host.get('status') != 'succeeded' and not accepted_failure)):
         raise evaluation_failure(directory, 'Container evaluation did not complete')
-    summary = read('evaluation/manifest.json')
     if recovered_report is not None:
         summary = {**summary, 'judge': 'received', 'phase': 'finished'}
-    for key, expected in {'execution':'succeeded', 'otel':'complete', 'submission':'committed',
+    if summary.get('execution') not in ('succeeded', 'failed'):
+        raise RuntimeError(f'Incomplete execution; artifacts: {directory}')
+    for key, expected in {'otel':'complete', 'submission':'committed',
                            'evidence':'captured', 'judge':'received', 'phase':'finished'}.items():
         if summary.get(key) != expected:
             raise RuntimeError(f'Incomplete {key}; artifacts: {directory}')
@@ -231,16 +305,22 @@ def read_result(directory, agent_id, *, recovered_report=None, provider_mode='of
     expected_ids = [item['input_id'] for item in case['inputs']]
     if not expected_ids or [s['input_id'] for s in summary['steps']] != expected_ids or len(set(expected_ids)) != len(expected_ids):
         raise RuntimeError('Incomplete or duplicate submitted Inputs')
-    steps = []
-    for step in summary['steps']:
+    steps, failures = [], []
+    for step, expected_input in zip(summary['steps'], case['inputs']):
         prefix = 'evaluation/' + step['directory']
         item, result, submission = (read(f'{prefix}/{name}.json') for name in ('input', 'result', 'submission'))
         request = read(f'{prefix}/request.json')
-        if (result.get('schema') != 'abb.result.v1' or result.get('status') != 'succeeded'
-            or submission.get('status') != 'completed' or request.get('agent_id') != agent_id
+        succeeded = result.get('status') == 'succeeded'
+        submitted_status = {'succeeded': 'completed', 'failed': 'failed', 'timeout': 'timeout',
+                            'cancelled': 'aborted', 'aborted': 'aborted'}.get(result.get('status'))
+        if (result.get('schema') != 'abb.result.v1' or submitted_status is None
+            or submission.get('status') != submitted_status or request.get('agent_id') != agent_id
             or request.get('session_id') != summary['run_id']
             or result['agent_id'] != agent_id or result['run_id'] != request['run_id']
-            or item['input_id'] != step['input_id'] or submission['output'] != result['output']
+            or item['input_id'] != step['input_id'] or submission.get('output') != result.get('output')
+            or (succeeded and 'output' not in result)
+            or item.get('payload') != expected_input.get('payload')
+            or (not succeeded and submission.get('error') != result.get('error'))
             or not step['committed']):
             raise RuntimeError('Input / output / submission identity mismatch')
         if read(f'{prefix}/otel-status.json').get('status') != 'complete':
@@ -248,13 +328,20 @@ def read_result(directory, agent_id, *, recovered_report=None, provider_mode='of
         capture = submission.get('capture_status', {}).get('traces', {})
         if capture.get('status') not in ('complete', 'partial') or not isinstance(read(f'{prefix}/evidence.json'), dict):
             raise RuntimeError('SDK trace capture was not recorded; inspect capture-status.json')
-        value = BenchmarkStepResult(item['input_id'], item['payload'],
-                                   AdapterInvocation(result['output'], result.get('raw_output')))
-        steps.append(value)
+        if succeeded:
+            steps.append(BenchmarkStepResult(item['input_id'], item['payload'],
+                         AdapterInvocation(result['output'], result.get('raw_output'))))
+        else:
+            failures.append(BenchmarkStepFailure(item['input_id'], item['payload'],
+                result.get('error_type') or 'AgentExecutionError', result.get('error') or '',
+                result.get('output'), result.get('raw_output')))
+    if (summary['execution'] == 'failed') != bool(failures):
+        raise RuntimeError('Execution summary does not match the submitted Inputs')
     normalized = Report(report['status'], report.get('confidence'), tuple(report.get('issues', [])),
                         tuple(report.get('evidence_gaps', [])), report['report_id'], report['run_id'],
                         {**report.get('extensions', {}), 'abb_artifact_directory': str(directory)})
     return BenchmarkResult(agent_id, 'container-' + 'sdk', summary['run_id'], 'report_ready',
-                           normalized, tuple(steps), len(steps), provider_mode,
+                           normalized, tuple(steps), len(summary['steps']), provider_mode,
                            evidence_status=summary['evidence'], host_acceptance='accepted',
-                           host_trace_validation=host.get('host_trace_validation', 'unknown'))
+                           host_trace_validation=host.get('host_trace_validation', 'unknown'),
+                           failures=tuple(failures))

@@ -95,6 +95,21 @@ def test_timeline_endpoint_and_worker_file_survive_reader_restart(tmp_path):
     assert len(first['operations']) == 3
 
 
+def test_timeline_loads_host_judge_and_persisted_queue_journals(tmp_path):
+    from agentbench.observe.store import TraceStore
+    identity = {'phase': 'judge', 'attempt_id': 'attempt-1'}
+    TraceStore(tmp_path / 'timing-judge-queue.jsonl', 'run-1', source='timing', context=identity).record(
+        'operation', id='queue', parent_id=None, kind='wait', name='Wait in Judge queue',
+        source='host', clock_id='host-wall', start_ms=1000, end_ms=2000, duration_ms=1000, status='succeeded')
+    with timing_session(tmp_path / 'timing-judge-1.jsonl', source='host', name='Host Judge', identity=identity):
+        with span('Submit Judge evidence', kind='judge'):
+            pass
+    first = timeline(RunViewAPI(tmp_path))['operations']
+    assert len(first) == 3
+    assert all(row['phase'] == 'judge' and row['attempt_id'] == 'attempt-1' for row in first)
+    assert timeline(RunViewAPI(tmp_path))['operations'] == first
+
+
 def test_timing_reader_never_follows_outside_symlink(tmp_path):
     outside = tmp_path / 'outside'
     outside.mkdir()

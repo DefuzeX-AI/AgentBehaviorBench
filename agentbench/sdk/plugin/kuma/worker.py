@@ -132,6 +132,9 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
         # Create the SDK Run from the saved Case without generating another one.
         # A saved Case accepts a Judge provider; only a Case provider conflicts with it.
         judge = {} if providers is None else {'judge_provider': providers.judge_provider(output)}
+        deferred = settings.get('defer_judge') is True
+        if deferred:
+            judge = {'judge': False}
         with span('Load prepared Case', kind='sdk'):
             run = create_run(case_path=settings['case_artifact'], **options, **judge)
 
@@ -179,7 +182,13 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
         # Drive the Case by receiving inputs, invoking the Agent, submitting
         # outputs, and collecting the Judge report.
         summary = await drive_run(run, invoke, output, provider=provider, repo_path=repository,
-                                  file_evidence_required=workspace.track_files)
+                                  file_evidence_required=workspace.track_files, defer_judge=deferred)
+        if deferred and summary['judge'] == 'queued':
+            from .judge_bundle import export_context
+            with span('Export Judge evidence', kind='evidence'):
+                files.save('judge/context.json', export_context(run, case, upload_diff=workspace.upload_diff))
+            return 0 if (summary['otel'] == 'complete' and summary['evidence'] == 'captured'
+                         and summary['files'] in ('disabled', 'complete', 'partial')) else 1
         # The worker exit code checks execution and evidence completeness,
         # independently of whether the Judge verdict is pass.
         return 0 if (summary['judge'] == 'received' and summary['otel'] == 'complete'

@@ -13,6 +13,9 @@ ProgressStage = Literal[
     "agent_start",
     "case_generation",
     "benchmark_execution",
+    "judge_queue",
+    "judge",
+    "judge_wait",
 ]
 ProgressStatus = Literal["started", "succeeded", "failed"]
 

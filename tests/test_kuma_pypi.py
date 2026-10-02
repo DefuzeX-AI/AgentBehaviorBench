@@ -72,7 +72,7 @@ def test_overlay_installs_pypi_requirements_without_sdk_source(echo_agent):
         assert '-r /opt/abb-sdk/requirements.txt' in dockerfile
         assert dockerfile.rstrip().endswith('USER agent')
         requirements = staged.path / '.abb-sdk/requirements.txt'
-        assert 'kuma-defuzex[otel]' in requirements.read_text().splitlines()
+        assert 'kuma-defuzex[otel]>=0.3.3' in requirements.read_text().splitlines()
         assert {item.name for item in requirements.parent.iterdir()} == {'requirements.txt'}
         assert 'agentbench.sdk.plugin.kuma.worker' in (staged.path / 'agent.toml').read_text()
         assert not (staged.path / '.abb-sdk/src').exists()

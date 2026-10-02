@@ -9,6 +9,7 @@ def timeline(api):
     operations, warnings = {}, []
     names = ['timing.jsonl', 'evaluation/timing.jsonl']
     names.extend(sorted(path.name for path in api.directory.glob('timing-recovery-*.jsonl')))
+    names.extend(sorted(path.name for path in api.directory.glob('timing-judge-*.jsonl')))
     for name in names:
         try:
             path = api.file(name)

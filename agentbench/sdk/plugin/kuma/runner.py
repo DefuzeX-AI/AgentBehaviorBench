@@ -9,7 +9,8 @@ from agentbench.observe.result import sanitize_result
 
 
 @timed('Case dialogue', kind='case')
-async def drive_run(run, invoke, directory, *, provider, repo_path=None, file_evidence_required=False):
+async def drive_run(run, invoke, directory, *, provider, repo_path=None, file_evidence_required=False,
+                    defer_judge=False):
     """Deliver current Inputs sequentially; leave context entirely to the Agent.
 
     Args:
@@ -133,7 +134,10 @@ async def drive_run(run, invoke, directory, *, provider, repo_path=None, file_ev
                                              if isinstance(evidence, dict) else None})
                     files.save('manifest.json', summary)
         summary['phase'] = 'judge'
-        if run.report is not None:
+        if defer_judge:
+            summary['judge'] = 'queued'
+            summary['phase'] = 'judge_queued'
+        elif run.report is not None:
             files.save('judge/report.json', run.report)
             trace.record('judge_received', case_id=run.case_id, artifact='judge/report.json')
             summary['judge'] = 'received'

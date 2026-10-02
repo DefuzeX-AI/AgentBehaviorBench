@@ -61,7 +61,7 @@ export default function CaseDetailsPage({ item, revision, onBack, onAgentSelect 
     </> : errorText(attempt.error)} />}
     {!artifact && <Alert type="info" showIcon message="Execution artifacts are not available yet" description={attempt ? 'This attempt has no viewable artifact directory. Saved Suite state remains available below.' : 'Case execution has not started.'} />}
 
-    <Tabs className="case-tabs" activeKey={detailTab === 'judge' && !report ? 'overview' : detailTab} onChange={value => dispatch(actions.detailTabChanged(value))}
-      items={tabs.map(tab => ({ ...tab, disabled: tab.key === 'judge' ? !report : ['conversation', 'tools', 'trace'].includes(tab.key) && !artifact }))} />
+    <Tabs className="case-tabs" activeKey={detailTab} onChange={value => dispatch(actions.detailTabChanged(value))}
+      items={tabs.map(tab => ({ ...tab, disabled: ['conversation', 'tools', 'trace'].includes(tab.key) && !artifact }))} />
   </section>;
 }

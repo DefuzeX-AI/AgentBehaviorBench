@@ -8,13 +8,24 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from contextlib import chdir
+from contextlib import contextmanager
+import os
 from importlib.metadata import version
 import json
 from pathlib import Path
 import sqlite3
 from unittest.mock import patch
 from uuid import uuid4
+
+
+@contextmanager
+def chdir(path):
+    previous = Path.cwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(previous)
 
 
 AGENT_SOURCE = '''"""A deterministic Agent with its own SQLite memory and lifecycle."""
@@ -111,7 +122,7 @@ def write_agent(root: Path) -> None:
 
 
 async def execute_case(root: Path, work: Path, output: Path, inputs: list[str], expected: list[str | None],
-                       *, allow_local: bool = True):
+                       *, allow_local: bool = True, defer_judge: bool = False):
     """Run a saved real SDK Case through the production KUMA container worker.
 
     Args:
@@ -169,7 +180,7 @@ async def execute_case(root: Path, work: Path, output: Path, inputs: list[str], 
         "os.environ", {"KUMA_API_KEY": "offline-provider-not-a-credential"}
     ), chdir(work):
         code = await execute(root, output, {"case_artifact": str(case_path),
-            "expected_case": expected_identity, "max_steps": len(inputs)})
+            "expected_case": expected_identity, "max_steps": len(inputs), 'defer_judge': defer_judge})
 
     steps = sorted((output / "inputs").glob("*"))
     assert steps, (output / "error.json").read_text() if (output / "error.json").exists() else "No Agent inputs"

@@ -18,6 +18,10 @@ def manual_recovery(case):
         return blocked('An active or interrupted Attempt must be reconciled by Suite recovery')
     result = case.get('result') or {}
     artifacts = result.get('artifacts') or {}
+    if case.get('report_received') and case.get('host_acceptance') == 'accepted':
+        return blocked('Judge completed; inspect the Agent execution error. No Judge resubmission is needed')
+    if case.get('report_received'):
+        return blocked('Judge report received; inspect result validation before any new submission')
     recovery = artifacts.get('recovery') or {}
     prepared = case.get('prepared_case')
     reusable = bool(prepared and prepared.get('artifact_path') and prepared.get('artifact_sha256'))

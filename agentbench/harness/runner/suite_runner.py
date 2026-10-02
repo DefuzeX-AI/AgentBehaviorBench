@@ -265,6 +265,8 @@ class SuiteRunner:
                 preparations, 
                 create_case_job=create_case_job, 
                 workers=workers,
+                judge_workers=self.concurrency.max_parallel_judges,
+                judge_queue_capacity=self.concurrency.judge_queue_capacity,
                 control=control, bus=bus, callbacks=callbacks, continue_on_error=continue_on_error,
                 retry_policy=retry_policy or self.retry_policy, seeds=resume_state, retain_case=retain_case,
             ).run()
