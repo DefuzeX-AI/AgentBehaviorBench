@@ -22,6 +22,7 @@ test('Suite Agent Case navigation preserves filters and supports returning to ea
   assert.equal(store.getState().suite.selectedAgentId, 'alpha');
   store.dispatch(actions.caseSelected(normalizeCases(snapshot(1))[0]));
   assert.ok(store.getState().suite.selectedCaseKey);
+  assert.equal(store.getState().suite.detailTab, 'judge');
   store.dispatch(actions.agentSelected('alpha'));
   assert.equal(store.getState().suite.selectedCaseKey, null);
   store.dispatch(actions.suiteSelected());
@@ -128,4 +129,12 @@ test('viewer capabilities refresh without advancing the Case revision', () => {
   receive(store, { ...snapshot(1), capabilities: { can_control: true, control_token: 'new-token' } });
   assert.equal(store.getState().suite.snapshot.capabilities.control_token, 'new-token');
   assert.equal(store.getState().suite.snapshot.revision, 1);
+});
+
+test('evaluator metadata refreshes after a viewer upgrade without new Case events', () => {
+  const store = createSuiteStore();
+  receive(store, snapshot(1));
+  const source = { status: 'recorded', sdk: 'local', sdks: ['local'] };
+  receive(store, { ...snapshot(1), evaluation_source: source });
+  assert.deepEqual(store.getState().suite.snapshot.evaluation_source, source);
 });

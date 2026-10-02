@@ -17,17 +17,32 @@ import useFileChangeAnimation from '../files/useFileChangeAnimation.js';
 const { Text } = Typography;
 const Waterfall = lazy(() => import('./CaseWaterfall.jsx'));
 const Topology = lazy(() => import('../topology/TopologyDiagram.jsx'));
+const CaseTrace = lazy(() => import('./CaseTrace.jsx'));
 
 const emptyInputs = [];
 
 export default function CaseTimeline({ run, revision, attempt, preparationRuns = [], inputs = emptyInputs, evidenceReady = false, evidenceError }) {
-  const [scope, setScope] = useState('case'), [selection, setSelection] = useState(null);
-  const [fileSelection, setFileSelection] = useState(null);
+  const [scope, setScope] = useState('case');
   const [view, setView] = useState(() => {
     const saved = new URLSearchParams(location.search).get('timingView');
     return ['waterfall', 'topology'].includes(saved) ? saved : 'sequence';
   });
   const selectedRun = scope === 'case' ? run : scope;
+  return <section className="case-timeline" aria-label="Case timings">
+    {!!preparationRuns.length && <label>Timing scope <Select value={scope} onChange={setScope}
+      options={[{ value: 'case', label: 'Full flow: preparation + Case attempt' }, ...preparationRuns.map((id, i) => ({ value: id, label: `Shared Case preparation ${i + 1}` }))]} /></label>}
+    <TimingScope key={`${scope}:${selectedRun || 'pending'}:${attempt?.attempt_id || ''}`}
+      selectedRun={selectedRun} scope={scope} revision={revision} attempt={attempt} preparationRuns={preparationRuns}
+      inputs={scope === 'case' ? inputs : emptyInputs} evidenceReady={evidenceReady} evidenceError={evidenceError}
+      view={view} onViewChange={value => {
+        setView(value); const url = new URL(location.href); url.searchParams.set('timingView', value); history.replaceState(null, '', url);
+      }} />
+  </section>;
+}
+
+function TimingScope({ selectedRun, scope, revision, attempt, preparationRuns, inputs, evidenceReady, evidenceError, view, onViewChange }) {
+  const [selection, setSelection] = useState(null), [fileSelection, setFileSelection] = useState(null);
+  const [traceOpen, setTraceOpen] = useState(false);
   const { data, error } = useLiveJson(selectedRun ? `/api/observe/runs/${selectedRun}/timeline` : null, revision);
   const model = useMemo(() => makeTimeline(data, scope === 'case' ? attempt : null), [data, attempt, scope]);
   const sequence = useMemo(() => timingSequence(model), [model]);
@@ -59,9 +74,7 @@ export default function CaseTimeline({ run, revision, attempt, preparationRuns =
     { title: 'Duration', dataIndex: 'duration_ms', render: formatTime, sorter: (a, b) => (a.duration_ms ?? -1) - (b.duration_ms ?? -1) },
     { title: 'Status', dataIndex: 'status' },
   ];
-  return <section className="case-timeline" aria-label="Case timings">
-    {!!preparationRuns.length && <label>Timing scope <Select value={scope} onChange={value => { setScope(value); setSelection(null); setFileSelection(null); }}
-      options={[{ value: 'case', label: 'Full flow: preparation + Case attempt' }, ...preparationRuns.map((id, i) => ({ value: id, label: `Shared Case preparation ${i + 1}` }))]} /></label>}
+  return <div className="timing-scope">
     {scope !== 'case' && <Alert type="info" showIcon message="Shared preparation is measured once for the batch. It is not added to every Case's execution total." />}
     {error && <Alert type="warning" showIcon message="Unable to refresh timings" description={error} />}
     <div className="timing-summary">
@@ -81,14 +94,14 @@ export default function CaseTimeline({ run, revision, attempt, preparationRuns =
     {scope === 'case' && <h3 className="case-execution-title">Case execution</h3>}
     {!!model.rows.length && <>
       <Segmented aria-label="Timing view" value={view} options={[{ label: 'Sequence', value: 'sequence' }, { label: 'Waterfall', value: 'waterfall' }, { label: 'Topology', value: 'topology' }]}
-        onChange={value => { setView(value); const url = new URL(location.href); url.searchParams.set('timingView', value); history.replaceState(null, '', url); }} />
+        onChange={onViewChange} />
       {view === 'sequence' ? <SequenceDiagram key={selectedRun || 'pending'} records={sequence} grouped={grouped} start={model.start} end={model.end}
         selectedId={selection} onInspect={({ timing, group }) => inspectTiming(group || timing.id)}
         renderGroupFooter={scope === 'case' ? group => renderFiles(files.byGroup.get(group.id) || []) : undefined} />
         : view === 'topology' ? <Suspense fallback={<p>Loading topology…</p>}><Topology key={selectedRun || 'pending'} graph={topology} onSelect={inspectTiming} selectedId={selection} /></Suspense>
           : <Suspense fallback={<p>Loading waterfall…</p>}><Waterfall key={selectedRun || 'pending'} model={model} onSelect={inspectTiming} /></Suspense>}
-      <Text type="secondary">Nested and parallel durations overlap; they are not added together. Host and container positions use wall-clock anchors. Recorded lifecycle durations use each process's monotonic clock.</Text>
-      <details><summary>All recorded stages · {model.rows.length}</summary>
+      <details className="timing-records"><summary>All recorded stages · {model.rows.length}</summary>
+        <Text type="secondary">Nested and parallel durations overlap; they are not added together. Host and container positions use wall-clock anchors. Recorded lifecycle durations use each process's monotonic clock.</Text>
         <Table size="small" rowKey="id" columns={columns} dataSource={model.rows} pagination={{ pageSize: 20 }} scroll={{ x: 580 }} />
       </details>
     </>}
@@ -97,10 +110,16 @@ export default function CaseTimeline({ run, revision, attempt, preparationRuns =
       {renderFiles(view === 'sequence' && model.rows.length ? files.unplaced : snapshots)}
       {evidenceReady && !snapshots.length && <Text type="secondary">No file snapshot evidence was captured for this attempt.</Text>}
     </>}
+    {selectedRun && <details className="timing-trace-details" open={traceOpen} onToggle={event => setTraceOpen(event.currentTarget.open)}>
+      <summary>Trace details <span>OTel & execution flow</span></summary>
+      {traceOpen && (!data ? <p>{error ? 'Trace scope could not be verified. Timings will retry automatically.' : 'Loading trace scope…'}</p>
+        : model.recoveryOnly ? <p>This recovery attempt reuses an earlier execution. Select the original attempt to inspect its Agent trace.</p>
+          : <Suspense fallback={<p>Loading trace details…</p>}><CaseTrace key={selectedRun} run={selectedRun} revision={revision} /></Suspense>)}
+    </details>}
     <Drawer title={selectedFile ? `File change · ${selectedFile.path}` : selectedParticipant?.title || selectedGroup?.title || selected?.name || 'Stage details'} open={Boolean(selectedFile || selected || selectedGroup || selectedParticipant)}
       onClose={() => { setSelection(null); setFileSelection(null); }} size="min(736px, 100vw)" destroyOnHidden>
       {selectedFile ? <FileChangeDetails change={selectedFile} snapshot={fileSnapshot} />
         : !!detailRecords.length && <TimingDetails key={`${selectedRun}:${selection}`} records={detailRecords} focusId={selected?.id} run={selectedRun} spans={data?.spans} />}
     </Drawer>
-  </section>;
+  </div>;
 }

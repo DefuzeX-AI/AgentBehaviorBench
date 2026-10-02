@@ -16,9 +16,25 @@ def _ignore(directory, names):
             or name.startswith(".env") or name.endswith((".pyc", ".pem", ".key"))]
 
 
+def agent_build_ignore(agent_root):
+    """Keep host evaluation answers outside builds, preserving nested Agent source."""
+    root = Path(agent_root).resolve()
+
+    def ignore(directory, names):
+        excluded = _ignore(directory, names)
+        if Path(directory).resolve() == root and 'ground_truth' in names:
+            excluded.append('ground_truth')
+        return excluded
+
+    return ignore
+
+
 @contextmanager
 def worker_build_context(config, *, control: RunControl | None = None,
                          deadline: Deadline | None = None):
+    if Path(config.build_context).resolve().is_relative_to(Path(config.agent_root).resolve() / 'ground_truth'):
+        raise ValueError('Ground truth cannot be an Agent build context')
+
     def check():
         if control is not None:
             control.check()
@@ -40,7 +56,8 @@ def worker_build_context(config, *, control: RunControl | None = None,
             context = Path(temporary).resolve() / "context"
             # Preserve links during copying so no outside file is dereferenced. Ignored
             # trees (e.g. a local venv) may contain links but are never included.
-            shutil.copytree(config.build_context, context, ignore=_ignore, symlinks=True, copy_function=copy)
+            shutil.copytree(config.build_context, context, ignore=agent_build_ignore(config.agent_root),
+                            symlinks=True, copy_function=copy)
             package = Path(__file__).resolve().parents[2]
             shutil.copytree(package, context / ".abb-runtime" / "agentbench", ignore=_ignore, symlinks=True, copy_function=copy)
             materialize_file_links(context, check)

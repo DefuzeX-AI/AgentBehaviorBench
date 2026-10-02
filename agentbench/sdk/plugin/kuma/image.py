@@ -6,7 +6,7 @@ import re
 import shutil
 import tempfile
 from types import SimpleNamespace
-from agentbench.runtime.docker.worker_build import _ignore
+from agentbench.runtime.docker.worker_build import agent_build_ignore
 from agentbench.runtime.docker.source_links import materialize_file_links
 from agentbench.sdk.common.whitelist import append_whitelist
 from .configuration import DEFAULT_BASE_URL
@@ -70,7 +70,7 @@ def evaluation_agent(agent, *, control=None, deadline=None, backend=DEFAULT_BASE
     with tempfile.TemporaryDirectory(prefix='abb-evaluation-') as temporary:
         with span('Prepare evaluation overlay', kind='preparation'):
             root = Path(temporary) / 'agent-unit'
-            shutil.copytree(agent.path, root, ignore=_ignore, symlinks=True,
+            shutil.copytree(agent.path, root, ignore=agent_build_ignore(agent.path), symlinks=True,
                             copy_function=checked_copy)
             materialize_file_links(root, check)
             if any(p.is_symlink() for p in root.rglob('*')):

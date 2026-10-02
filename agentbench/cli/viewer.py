@@ -234,6 +234,9 @@ def build_viewer_handler(
             if catalog is not None and parsed.path == '/api/suites':
                 self._send_json(catalog.listing())
                 return
+            if catalog is not None and parsed.path == '/api/benchmark/overview':
+                self._send_json(catalog.overview())
+                return
             selected_log, selected_id = result_log, expected_suite_id
             selection = re.fullmatch(r'/api/suites/([^/]+)/.*|/suite/([^/]+)/?', parsed.path)
             if catalog is not None and selection:
@@ -493,6 +496,9 @@ def parse_result_log(path: str | Path) -> dict[str, object]:
         payload['agents'] = [dict(job, case_results=[case['result'] for case in job['cases']
                                                     if case['result'] is not None])
                              for job in canonical['jobs']]
+    else:
+        from agentbench.observe.evaluation_source import evaluation_source
+        payload['evaluation_source'] = evaluation_source(payload)
     return payload
 
 

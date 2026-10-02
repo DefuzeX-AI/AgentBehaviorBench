@@ -11,7 +11,7 @@ import { suiteCatalogRows } from './suiteCatalog.js';
 import SuiteNavEntry from './SuiteNavEntry.jsx';
 import './navigation.css';
 
-export default function SuiteSidebar({ snapshot, catalog, catalogError, selectedCaseKey, revision, busy, error, onSuiteSelect, onCaseSelect, onRefresh }) {
+export default function SuiteSidebar({ snapshot, catalog, catalogError, overviewSelected = false, selectedCaseKey, revision, busy, error, onSuiteSelect, onCaseSelect, onRefresh }) {
   const [collapsed, setCollapsed] = useState(false);
   const [query, setQuery] = useState('');
   const suiteId = snapshot?.suite_id || 'Loading Suite';
@@ -21,9 +21,9 @@ export default function SuiteSidebar({ snapshot, catalog, catalogError, selected
   if (collapsed) return <aside className="sidebar suite-sidebar suite-sidebar-collapsed" aria-label="Suite navigation">
     <div className="suite-collapsed-nav">
       <Tooltip title="Expand sidebar" placement="right"><Button type="text" icon={<InsertRowLeftOutlined />} onClick={() => setCollapsed(false)} aria-label="Expand sidebar" /></Tooltip>
-      <Tooltip title="All Suites overview" placement="right"><Button type="text" icon={<SwitcherOutlined />} onClick={onSuiteSelect} aria-label="All Suites overview" /></Tooltip>
+      <Tooltip title="Benchmark overview" placement="right"><Button type="text" icon={<SwitcherOutlined />} href="/" aria-label="Benchmark overview" aria-current={overviewSelected ? 'page' : undefined} /></Tooltip>
       <i className="suite-collapsed-divider" />
-      <Tooltip title={suiteId} placement="right"><button type="button" className="suite-collapsed-suite selected" onClick={onSuiteSelect} aria-label={`Open ${suiteId}`}>S</button></Tooltip>
+      {!overviewSelected && <Tooltip title={suiteId} placement="right"><button type="button" className="suite-collapsed-suite selected" onClick={onSuiteSelect} aria-label={`Open ${suiteId}`}>S</button></Tooltip>}
     </div>
     <span className="suite-collapsed-spacer" />
     <Tooltip title="Refresh" placement="right"><Button type="text" icon={<ReloadOutlined spin={busy} />} onClick={onRefresh} aria-label="Refresh Suite" /></Tooltip>
@@ -38,6 +38,7 @@ export default function SuiteSidebar({ snapshot, catalog, catalogError, selected
       </span>
     </header>
 
+    <a href="/" className={`suite-overview-link${overviewSelected ? ' selected' : ''}`} aria-current={overviewSelected ? 'page' : undefined}><SwitcherOutlined />Benchmark overview</a>
     <div className="suite-sidebar-search"><Input allowClear size="small" prefix={<SearchOutlined />} value={query}
       onChange={event => setQuery(event.target.value)} placeholder="Filter Suites, Agents or Cases" aria-label="Filter Suites, Agents or Cases" /></div>
 

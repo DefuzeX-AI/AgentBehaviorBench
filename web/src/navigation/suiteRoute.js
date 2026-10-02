@@ -1,4 +1,10 @@
-export const CASE_TABS = ['overview', 'timing', 'replay', 'conversation', 'generation', 'judge', 'tools', 'trace', 'json'];
+export const DEFAULT_CASE_TAB = 'judge';
+export const CASE_TABS = ['judge', 'overview', 'timing', 'replay', 'conversation', 'generation', 'tools', 'json'];
+
+export function normalizeCaseTab(tab) {
+  if (tab === 'trace') return 'timing';
+  return CASE_TABS.includes(tab) ? tab : DEFAULT_CASE_TAB;
+}
 
 export function readSuiteRoute(cases, hash = window.location.hash, agentIds = cases.map(item => item.agent_id)) {
   const params = new URLSearchParams(hash.replace(/^#/, ''));
@@ -10,17 +16,17 @@ export function readSuiteRoute(cases, hash = window.location.hash, agentIds = ca
   if (!item) return { item: null, tab: 'overview' };
   const requestedTab = params.get('tab');
   const attempt = item.attempts?.find(a => a.attempt_id === params.get('attempt'));
-  return { item, tab: CASE_TABS.includes(requestedTab) ? requestedTab : 'overview',
+  return { item, tab: normalizeCaseTab(requestedTab),
     ...(attempt ? { attemptId: attempt.attempt_id } : {}) };
 }
 
-export function suiteRouteHref(item, tab = 'overview', locationValue = window.location, attemptId = null) {
+export function suiteRouteHref(item, tab = DEFAULT_CASE_TAB, locationValue = window.location, attemptId = null) {
   const params = new URLSearchParams();
   if (item) {
     params.set('agent', item.agent_id);
     if (item.case_index != null) {
       params.set('case', String(item.case_index));
-      params.set('tab', CASE_TABS.includes(tab) ? tab : 'overview');
+      params.set('tab', normalizeCaseTab(tab));
       if (attemptId) params.set('attempt', attemptId);
     }
   }

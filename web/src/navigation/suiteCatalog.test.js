@@ -21,3 +21,12 @@ test('deep links select their Suite endpoint and root retains the default', () =
   assert.equal(suiteEndpoint('/suite/suite_second/', '/api/suites/first/result'), '/api/suites/suite_second/result');
   assert.equal(suiteEndpoint('/', '/api/suites/first/result'), '/api/suites/first/result');
 });
+
+test('SDK identity stays searchable and is refreshed from Suite snapshots', () => {
+  const source = { status: 'recorded', sdks: ['local'] };
+  const catalog = { suites: [{ suite_id: 'one', evaluation_source: source }] };
+  assert.equal(suiteCatalogMatches(catalog.suites[0], 'LOCAL'), true);
+  assert.deepEqual(suiteCatalogRows(catalog, { suite_id: 'one' })[0].evaluation_source, source);
+  const changed = { status: 'mixed', sdks: ['kuma', 'local'] };
+  assert.deepEqual(suiteCatalogRows(catalog, { suite_id: 'one', evaluation_source: changed })[0].evaluation_source, changed);
+});

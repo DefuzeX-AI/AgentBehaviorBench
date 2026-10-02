@@ -48,16 +48,49 @@ agentbench view results/offline-demo-YYYYMMDD-HHMMSS.json
 ```
 
 Open the complete printed `View:` URL, including its Suite path. Keep the viewer
-running; Ctrl+C stops it. The address root lists saved Suites in the sidebar;
+running; Ctrl+C stops it. The address root opens Benchmark Overview and lists saved Suites in the sidebar;
 `/suite/SUITE_ID/` selects one. The list refreshes automatically, including new runs
 and reruns, and discovers canonical Suites under project `results/` plus registered
 external Suite directories. Unavailable history is reported without hiding valid results.
 Suite cards start collapsed and show execution completion and Judge counts. Use
 each card's arrow to expand its Agents and Cases, or click the card to open that Suite.
+Each Suite also shows its recorded evaluator (KUMA, Local, or another SDK) in the
+sidebar and page header. The label comes from saved execution configuration;
+unknown or mixed historical sources are shown explicitly. It does not identify
+the Agent under test or the person who started the run.
 CLI runs reuse a running project viewer and print a link to their own Suite on that
 same address. When starting a viewer, port 8765 is the default; ABB selects an
 available port when it is occupied. Rebuild after frontend changes. Normal use
 does not require `npm run dev`.
+
+Opening a Case selects **Judge** first, with its verdict, findings and recorded
+reasoning. Report metadata and the complete JSON remain available below the results.
+Selecting an older Attempt shows only that Attempt's report. **Timing** contains
+the main sequence, waterfall and topology views; expand **Trace details** there for
+OTel and execution flow. Existing `tab=trace` links open Timing, while explicit
+Overview links retain their destination.
+
+Benchmark Overview measures discovery of known Agent defects against human-confirmed
+ground truth. Each Agent can keep its reference defects and observations in
+`ground_truth/` beside `agent.toml`. An explicit assessment records whether a Case
+reproduced a defect and whether its Judge identified it. Discovery counts unique
+defects, so reproducing the same defect repeatedly does not inflate the total.
+Agents without ground truth show **Not configured**; those without assessments show
+**Not assessed**. Neither is shown as a zero discovery rate. See the
+[ground truth contract](Ground%20Truth.md) for storage formats and assessment inputs.
+
+Suite and Case totals remain available per Agent. For example, two Suites with ten
+Cases each show `2 Suites × 10 Cases` and a total of twenty. Expand an Agent for
+ground truth outcomes and its Suite breakdown. Different Suite sizes are summed
+individually. New runs and reuse admissions update these totals live.
+
+Total Cases includes planned and queued slots. Reuse adds new Case slots, even
+when the saved Case ID is identical; retries of one slot do not increase the total.
+Execution completion in the Suite breakdown does not mean ground truth discovery
+or a passing Judge verdict. A Judge's `issue` alone is not a ground truth match.
+Missing, corrupt or ambiguous Suites are excluded with a warning. No Agent code
+or evaluation is run to collect these statistics. Export the current totals and
+per-Agent Suite breakdown as JSON, or read `GET /api/benchmark/overview` locally.
 
 ## Configure services
 

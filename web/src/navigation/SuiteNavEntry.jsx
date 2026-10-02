@@ -4,9 +4,10 @@ import { useMemo, useState } from 'react';
 import useLiveJson from '../useLiveJson.js';
 import { isActive, needsAttention, normalizeCases } from '../suite/model.js';
 import { ExecutionBadge } from '../suite/CaseStatus.jsx';
+import EvaluationSourceBadge from '../suite/EvaluationSourceBadge.jsx';
 import { caseNavigationTitle, compactIdentity, suiteNavigationSummary } from './sidebarModel.js';
 import { suiteCatalogMatches } from './suiteCatalog.js';
-import { suiteRouteHref } from './suiteRoute.js';
+import { DEFAULT_CASE_TAB, suiteRouteHref } from './suiteRoute.js';
 
 const judgeColor = status => status === 'pass' ? 'success'
   : status === 'issue' || status === 'insufficient_evidence' ? 'warning' : 'default';
@@ -66,6 +67,7 @@ export default function SuiteNavEntry({ row, snapshot, selected, selectedCaseKey
             <b aria-label={`Execution complete: ${summary.percentage}%`} className={summary.percentage === 100 ? 'completion-full' : summary.percentage > 0 ? 'completion-active' : 'completion-pending'}>{summary.percentage}%</b>
           </Tooltip></span>
         <small title={row.suite_id}>{compactIdentity(row.suite_id, 12, 9)}</small>
+        <span><EvaluationSourceBadge source={row.evaluation_source} compact /></span>
         <span className="suite-nav-root-stats">{summary.complete}/{summary.total} complete <i /> {summary.judged}/{summary.total} judged</span>
       </RootContent>
     </div>
@@ -81,7 +83,7 @@ export default function SuiteNavEntry({ row, snapshot, selected, selectedCaseKey
           </button>
           {agentExpanded && <div className="suite-nav-cases">
             {job.visibleCases.map(item => <CaseItem key={item.key} item={item} selected={selected && selectedCaseKey === item.key}
-              onSelect={onCaseSelect} href={selected ? undefined : suiteRouteHref(item, 'overview', { pathname: row.url, search: '' })} />)}
+              onSelect={onCaseSelect} href={selected ? undefined : suiteRouteHref(item, DEFAULT_CASE_TAB, { pathname: row.url, search: '' })} />)}
             {!job.visibleCases.length && <Typography.Text type="secondary" className="suite-nav-empty">No matching Cases</Typography.Text>}
           </div>}
         </section>;

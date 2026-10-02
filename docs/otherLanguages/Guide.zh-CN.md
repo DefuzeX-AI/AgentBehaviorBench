@@ -55,14 +55,38 @@ agentbench view results/offline-demo-YYYYMMDD-HHMMSS.json
 ```
 
 首次 clone 没有 `web/dist`，必须先构建。打开 `View:` 后的完整地址（包括 Suite 路径），
-保持命令运行；Ctrl+C 关闭查看器。根地址的侧栏列出保存的 Suite，
+保持命令运行；Ctrl+C 关闭查看器。根地址打开 Benchmark Overview，侧栏列出保存的 Suite，
 `/suite/SUITE_ID/` 选中指定 Suite。列表自动刷新，包含新运行和复跑结果；扫描项目
 `results/` 中的标准 Suite 目录和已登记的外部 Suite 目录。无法读取的历史记录会单独提示。
 Suite 卡片默认收起，显示执行完成比例和 Judge 数量；点击箭头可独立展开 Agent 和 Case，
 点击卡片可打开对应 Suite。
+侧栏和页面标题区也会显示保存的评测来源（KUMA、Local 或其他 SDK）。标识来自已保存的执行配置；
+历史来源缺失或混合时会明确显示。它表示评测器，不是被测 Agent 或启动运行的人员。
 CLI 运行会复用当前项目已启动的查看器，输出同一地址下对应 Suite 的链接。
 新启动查看器默认使用 8765，端口被占用时会换空闲端口。
 普通评测不用启动 `npm run dev`；前端修改后需重新构建。
+
+打开 Case 默认进入 **Judge**，优先展示判定、问题和保存的判断依据，报告元数据及完整 JSON 位于下方。
+切换到历史 Attempt 时只展示该轮报告。**Timing** 保留主要的时序、瀑布图和拓扑视图，
+展开其中的 **Trace details** 可查看 OTel 和执行流程。旧 `tab=trace` 链接进入 Timing，
+明确指定 Overview 的旧链接仍打开 Overview。
+
+Benchmark Overview 的主指标是发现了多少经过人工确认的 ground truth 缺陷。
+每个 Agent 可在 `agent.toml` 旁的 `ground_truth/` 中保存已确认缺陷和观察数据。
+独立的评估记录分别标明 Case 是否复现缺陷、Judge 是否正确识别；同一缺陷多次命中只计一次。
+未配置 ground truth 显示 **Not configured**，尚无评估显示 **Not assessed**，不会当作 0% 发现率。
+存储格式及评估接口见 [Ground truth 契约](Ground%20Truth.zh-CN.md)。
+
+每个 Agent 仍保留 Suite 数和总 Case 数。展开 Agent 可查看 ground truth 结果、
+各 Suite 的贡献数量和结果链接。
+例如两个 Suite 各有十个 Case，会显示 `2 Suites × 10 Cases`，合计二十个；
+各 Suite 的 Case 数不同时逐一相加。新增运行、reuse 和执行进度会自动更新统计。
+
+总 Case 数包含已计划和排队的 Case。reuse 增加新的 Case 记录，即使 Case ID 相同也计数；
+同一 Case 的 retry 不增加总数。Suite 明细的执行完成数不等于 ground truth 命中数或 Judge 通过数；
+Judge 返回 `issue` 也不会自动算作发现某个已知缺陷。
+缺失、损坏或 ID 有歧义的 Suite 不计入，并显示提示。收集统计只读取保存的结果，
+不会执行 Agent 或评测。可导出 JSON，或访问本地 `GET /api/benchmark/overview` 获取汇总和明细。
 
 ## 配置真实评测
 

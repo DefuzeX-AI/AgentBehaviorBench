@@ -1,5 +1,6 @@
 import { configureStore, createSlice } from '@reduxjs/toolkit';
 import { normalizeCases, currentAttempt } from './model.js';
+import { DEFAULT_CASE_TAB, normalizeCaseTab } from '../navigation/suiteRoute.js';
 
 const initialState = {
   endpoint: null, snapshot: null, error: '', updated: null,
@@ -31,6 +32,7 @@ const suiteSlice = createSlice({
         if (JSON.stringify(old.capabilities) !== JSON.stringify(snapshot.capabilities)) state.snapshot.capabilities = snapshot.capabilities;
         if (old.can_resume !== snapshot.can_resume) state.snapshot.can_resume = snapshot.can_resume;
         if (JSON.stringify(old.commands) !== JSON.stringify(snapshot.commands)) state.snapshot.commands = snapshot.commands;
+        if (JSON.stringify(old.evaluation_source) !== JSON.stringify(snapshot.evaluation_source)) state.snapshot.evaluation_source = snapshot.evaluation_source;
       }
       // Keep an explicitly selected historical attempt across live updates.
       for (const item of normalizeCases(snapshot)) {
@@ -52,10 +54,10 @@ const suiteSlice = createSlice({
     caseSelected(state, { payload: item }) {
       state.selectedAgentId = item.agent_id;
       state.selectedCaseKey = item.key;
-      state.detailTab = 'overview';
+      state.detailTab = DEFAULT_CASE_TAB;
       if (!state.selectedAttempts[item.key]) state.selectedAttempts[item.key] = currentAttempt(item)?.attempt_id || null;
     },
-    detailTabChanged(state, { payload }) { state.detailTab = payload; },
+    detailTabChanged(state, { payload }) { state.detailTab = normalizeCaseTab(payload); },
     attemptSelected(state, { payload }) { state.selectedAttempts[payload.key] = payload.attempt_id; },
     filterChanged(state, { payload }) {
       state.filters = { ...state.filters, ...payload };

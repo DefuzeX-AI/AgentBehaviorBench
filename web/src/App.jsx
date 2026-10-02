@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { eventIdentity, parseTrace, sortEvents } from './trace.js';
 import RunSidebar from './RunSidebar.jsx';
 import SuiteSidebar from './navigation/SuiteSidebar.jsx';
-import { readSuiteRoute, writeSuiteRoute } from './navigation/suiteRoute.js';
+import { DEFAULT_CASE_TAB, readSuiteRoute, writeSuiteRoute } from './navigation/suiteRoute.js';
 import TraceView from './otel/TraceView.jsx';
 import EvaluationView from './evaluation/EvaluationView.jsx';
 import CaseDetailsPage from './cases/CaseDetailsPage.jsx';
@@ -15,6 +15,8 @@ import AgentDetailsPage from './agents/AgentDetailsPage.jsx';
 import { actions } from './suite/store.js';
 import { normalizeCases } from './suite/model.js';
 import { suiteEndpoint } from './navigation/suiteCatalog.js';
+import BenchmarkOverview from './benchmark/BenchmarkOverview.jsx';
+import EvaluationSourceBadge from './suite/EvaluationSourceBadge.jsx';
 
 const RawRunView = lazy(() => import('./RawRunView.jsx'));
 const FlowPrototype = lazy(() => import('./flow-prototype/FlowPrototype.jsx'));
@@ -53,7 +55,7 @@ function BoundSuiteApp({ endpoint, catalogEndpoint }) {
     if (hydrated.current && selectedCase) writeSuiteRoute(selectedCase, detailTab, 'replace', selectedAttempts[selectedCase.key]);
   }, [selectedCase, detailTab, selectedAttempts]);
 
-  const selectCase = item => { writeSuiteRoute(item, 'overview', 'push'); dispatch(actions.caseSelected(item)); window.scrollTo({ top: 0, behavior: 'instant' }); };
+  const selectCase = item => { writeSuiteRoute(item, DEFAULT_CASE_TAB, 'push'); dispatch(actions.caseSelected(item)); window.scrollTo({ top: 0, behavior: 'instant' }); };
   const selectAgent = id => { writeSuiteRoute({ agent_id: id }, 'overview', 'push'); dispatch(actions.agentSelected(id)); window.scrollTo({ top: 0, behavior: 'instant' }); };
   const selectSuite = () => { writeSuiteRoute(null, 'overview', 'push'); dispatch(actions.suiteSelected()); window.scrollTo({ top: 0, behavior: 'instant' }); };
   return <div className="workspace suite-workspace">
@@ -61,7 +63,7 @@ function BoundSuiteApp({ endpoint, catalogEndpoint }) {
       onSuiteSelect={selectSuite} onCaseSelect={selectCase} onRefresh={() => setRevision(value => value + 1)} />
     <main className="suite-main">
       <header className="suite-shell-header"><div><div className="brand">AGENT BEHAVIOR BENCH</div><span>{suite.data?.suite_id || 'Loading Suite'}</span></div>
-        <span className="suite-live-dot"><i />Live result</span></header>
+        <div className="suite-shell-source"><EvaluationSourceBadge source={suite.data?.evaluation_source} /><span className="suite-live-dot"><i />Live result</span></div></header>
       {selectedCase ? <CaseDetailsPage item={selectedCase} revision={revision} onBack={selectSuite} onAgentSelect={selectAgent} />
         : selectedAgentId ? <AgentDetailsPage key={selectedAgentId} agentId={selectedAgentId} endpoint={endpoint} snapshot={suite.data} cases={cases} onBack={selectSuite} onCaseSelect={selectCase} />
           : <SuiteOverview onCaseSelect={selectCase} onAgentSelect={selectAgent} />}
@@ -159,6 +161,7 @@ export default function App() {
   const catalogEndpoint = document.querySelector('meta[name="abb-suites-api"]')?.content || null;
   const endpoint = injected ? suiteEndpoint(window.location.pathname, injected) : null;
   return <ConfigProvider theme={{ token: { colorPrimary: '#244d3d', borderRadius: 6, fontSize: 13, colorText: '#202623', colorBgLayout: '#fafbf9' }, components: { Table: { headerBg: '#f0f3ef', headerColor: '#58655c' } } }}>
-    {endpoint ? <BoundSuiteApp endpoint={endpoint} catalogEndpoint={catalogEndpoint} /> : <TraceExplorer />}
+    {catalogEndpoint && window.location.pathname === '/' ? <BenchmarkOverview catalogEndpoint={catalogEndpoint} />
+      : endpoint ? <BoundSuiteApp endpoint={endpoint} catalogEndpoint={catalogEndpoint} /> : <TraceExplorer />}
   </ConfigProvider>;
 }
