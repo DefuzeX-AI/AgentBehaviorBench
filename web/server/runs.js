@@ -85,6 +85,13 @@ export function runsPlugin(root) {
           return reply(200, await interactionPage(root, interactions[1], Object.fromEntries(url.searchParams), controller.signal));
         }
         const timeline = /^\/api\/observe\/runs\/([a-zA-Z0-9_-]+)\/timeline$/.exec(url.pathname);
+        const replay = /^\/api\/observe\/runs\/([a-zA-Z0-9_-]+)\/replay$/.exec(url.pathname);
+        if (replay) {
+          const controller = new AbortController();
+          res.on('close', () => { if (!res.writableEnded) controller.abort(); });
+          return reply(200, await interactionPage(root, replay[1], Object.fromEntries(url.searchParams),
+            controller.signal, 'agentbench.observe.replay'));
+        }
         if (timeline) {
           const controller = new AbortController();
           res.on('close', () => { if (!res.writableEnded) controller.abort(); });

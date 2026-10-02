@@ -22,15 +22,18 @@ from agentbench.runtime.docker.worker_build import _ignore
 
 
 class EvaluationPolicy:
-    def __init__(self, state, *, repository=None, target=SDK_REPOSITORY, writable=False):
+    def __init__(self, state, *, repository=None, target=SDK_REPOSITORY, writable=False, replay=None):
         self.state = state.resolve()
         self.repository = (repository or state.parent).resolve()
         self.target, self.writable = target, writable
+        self.replay = replay
 
     def run_arguments(self):
+        from agentbench.runtime.workspace_replay import REPLAY_MOUNT
+        recording = ('--mount', f'type=bind,source={self.replay},target={REPLAY_MOUNT}') if self.replay else ()
         return (*DockerPolicy().run_arguments(), '--mount',
                 f'type=bind,source={self.repository},target={self.target}' + ('' if self.writable else ',readonly'), '--mount',
-                f'type=bind,source={self.state},target={self.target}/.kuma')
+                f'type=bind,source={self.state},target={self.target}/.kuma', *recording)
 
 
 def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max_bytes=262144,
@@ -234,8 +237,13 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
                             data = _trace_preview(redact(json_value(event.data), files.secrets))
                             data.update(redact({**identity, 'artifact_directory': str(directory)}, files.secrets))
                             trace_sink.emit(TraceEvent(event.event, data))
+                replay_directory = None
+                if generation_count is None:
+                    replay_directory = directory / 'replay'
+                    replay_directory.mkdir(mode=0o777)
+                    replay_directory.chmod(0o777)
                 runtime_options = dict(
-                    environ=environ, policy=EvaluationPolicy(state, repository=repository, target=target, writable=bool(policy.path)), trace_sink=Sink(),
+                    environ=environ, policy=EvaluationPolicy(state, repository=repository, target=target, writable=bool(policy.path), replay=replay_directory), trace_sink=Sink(),
                     trace_max_bytes=trace_max_bytes, control=control, identity=identity,
                     timeout_sec=timeout,
                     run_id=directory.name, artifact_root=directory,

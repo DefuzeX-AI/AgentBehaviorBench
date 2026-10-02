@@ -20,7 +20,7 @@ def test_policy_mounts_actual_workspace_and_preserves_ledger(tmp_path):
     args = EvaluationPolicy(tmp_path / 'sdk-repo/.kuma', repository=root,
                             target=policy.path, writable=True).run_arguments()
     assert f'type=bind,source={root},target=/home/agent/workspace' in args
-    assert f'type=bind,source={tmp_path}/sdk-repo/.kuma,target=/home/agent/workspace/.kuma' in args
+    assert f'type=bind,source={tmp_path / "sdk-repo" / ".kuma"},target=/home/agent/workspace/.kuma' in args
     assert contract == prepare_workspace(tmp_path, tmp_path / 'another', policy)
     assert workspace_policy({}).track_files is False
 
@@ -50,7 +50,7 @@ def test_final_files_export_sdk_snapshot_limits_and_secrets(tmp_path):
     files=Artifacts(tmp_path/'out', environ={'MINIMAX_API_KEY':'fake-regression-credential-12345'})
     exporter=ChangedFileExporter(root,files)
     (root/'remove.txt').unlink()
-    (root/'unicode.txt').write_text('你好\n')
+    (root/'unicode.txt').write_text('你好\n', encoding='utf-8')
     (root/'secret.txt').write_text('fake-regression-credential-12345')
     (root/'binary').write_bytes(b'\x00\xff')
     (root/'huge').write_text('x' * (1024*1024+1))
@@ -79,8 +79,8 @@ def test_sdk_three_round_diffs_use_per_input_baseline(tmp_path):
         judge_provider=lambda ctx:{'status':'pass','summary':'Local evidence contract','issues':[]})
     target=root/'file.txt'
     try:
-        run.get_input();target.write_text('one\n');run.submit(output='created')
-        run.get_input();target.write_text('two\n');run.submit(output='modified')
+        run.get_input();target.write_text('one\n', encoding='utf-8', newline='\n');run.submit(output='created')
+        run.get_input();target.write_text('two\n', encoding='utf-8', newline='\n');run.submit(output='modified')
         run.get_input();target.unlink();run.submit(output='deleted')
         changes=[h.submission.file_evidence.changes for h in run.history]
         assert [[c.change_type for c in step] for step in changes]==[['created'],['modified'],['deleted']]

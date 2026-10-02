@@ -63,6 +63,7 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
         # Create the reusable Agent session before the SDK Run exists.
         run = None
         exporter = None
+        replay = None
         agent_session = AgentSession()
         settings = dict(settings or {})
     try:
@@ -164,6 +165,14 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
             'case_generated', case_id=run.case_id, artifact='case.json')
 
         
+        # An independent host mount keeps versions outside the workspace, SDK
+        # ledger, Submission, and trace provider. Only ABB's viewer reads it.
+        from agentbench.runtime.workspace_replay import REPLAY_MOUNT
+        from agentbench.runtime.replay_lifecycle import ReplayCapture
+        if Path(REPLAY_MOUNT).is_dir():
+            replay = ReplayCapture(workspace.path or manifest.get('adapter', {}).get('cwd') or Path.cwd(),
+                                   REPLAY_MOUNT, secrets=files.secrets)
+
         async def invoke(payload, folder, shared_provider):
             # Reuse one Agent session for every turn and pass only the current input.
             # shared_provider is the common trace provider for the Case.
@@ -176,7 +185,13 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
                 'observation_context': {key: observed_input[key] for key in ('case_id', 'input_id') if isinstance(observed_input.get(key), str)},
                 'agent_id': manifest['agent_id'], 'framework': manifest['framework'], 'input': payload})
             # Invoke the Agent and wait for this turn to complete.
-            await invoke_agent(root, request, folder, provider=shared_provider, session=agent_session)
+            if replay is not None:
+                replay.checkpoint('input_start', observed_input.get('input_id'))
+            try:
+                await invoke_agent(root, request, folder, provider=shared_provider, session=agent_session)
+            finally:
+                if replay is not None:
+                    replay.checkpoint('input_end', observed_input.get('input_id'))
             # Return the Agent result to the SDK dialogue driver.
             return json.loads((folder / 'result.json').read_text())
         # Drive the Case by receiving inputs, invoking the Agent, submitting
@@ -209,6 +224,8 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
                 await agent_session.aclose()
             finally:
                 files.save('session.json', agent_session.snapshot())
+                if replay is not None:
+                    replay.finish()
                 if exporter is not None:
                     try:
                         exporter.finish()
