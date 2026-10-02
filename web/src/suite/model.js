@@ -12,8 +12,21 @@ export const executionLabels = {
 export const phaseLabels = {
   generate: 'Generate Case', case_generation: 'Generate Case', prepare: 'Prepare Case',
   execute: 'Execute Case', benchmark_execution: 'Execute Case / Judge', agent: 'Agent execution',
-  judge: 'Judge', recovery: 'Recover request', recover: 'Recover request', completed: 'Complete',
+  judge_queue: 'Judge queued · Agent execution finished', judge: 'Submitting evidence / waiting for Judge',
+  judge_wait: 'Judge accepted · waiting for report',
+  judge_completed: 'Judge completed · report received', judge_failed: 'Judge did not complete',
+  recovery: 'Recover request', recover: 'Recover request', completed: 'Complete',
 };
+
+export function casePhaseLabel(item) {
+  if (item.report_received || item.judge_delivery_status === 'received' || reportOf(item)) {
+    return phaseLabels.judge_completed;
+  }
+  if (!isActive(item.execution_status) && ['judge_queue', 'judge', 'judge_wait'].includes(item.stage)) {
+    return phaseLabels.judge_failed;
+  }
+  return phaseLabels[item.stage] || phaseLabels[item.phase] || item.stage || item.phase || '';
+}
 export const needsAttention = status => ['blocked', 'needs_attention', 'failed', 'exhausted', 'interrupted', 'cancelled', 'skipped'].includes(status);
 export const isActive = status => ['running', 'retrying', 'judging', 'waiting_judge', 'recovering', 'reconciling', 'generating'].includes(status);
 export const isComplete = status => ['completed', 'succeeded'].includes(status);

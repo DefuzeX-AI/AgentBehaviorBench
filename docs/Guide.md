@@ -106,6 +106,11 @@ Judge pass. Check [the registry](../resources/registry.toml) for current selecti
 `ABB_MAX_PARALLEL_CASES=4` permits up to four Cases across the Suite, including
 Cases of the same Agent. It does not limit tool concurrency inside an Agent.
 
+Official KUMA Judge submission runs on the host after Docker cleanup, with a
+separate FIFO queue. `ABB_MAX_PARALLEL_JUDGES` defaults to `2` and
+`ABB_JUDGE_QUEUE_CAPACITY` to `8`. Saved tasks resume without executing the Agent
+again. See [Host Judge queue](Host%20Judge%20Queue.md) for limits and recovery.
+
 Agent traffic that is neither a declared model route nor a tool route goes to the
 [egress observer](../agentbench/services/egress-observer/README.md). It admits the common
 package registries (PyPI, npm, Debian/Ubuntu, Maven Central, crates.io, Go proxy), so a
@@ -172,7 +177,7 @@ agentbench evaluate react-agent --cases 1 --yes --no-view --results-dir results/
 
 The canonical event log is `results/my-run/suites/<suite-id>/events.json`, alongside
 the Suite plan and saved Cases. Use the exact `Result saved` path with `agentbench view`;
-the directory remains the source for resume/retry and later Judge updates.
+the directory remains the source for resume/retry and later host Judge updates.
 Legacy `evaluate --result-output PATH` and `run`/`certify --output PATH` remain
 compatible, but a file path only selects its parent for managed Suites: the requested
 filename is not created. They print a migration notice; use `--results-dir` instead.

@@ -12,6 +12,18 @@ class KumaEvaluationSDK:
 
     execution = "container"
 
+    def read_case_result(self, directory, case, *, agent_id):
+        from .judge_tasks import validate_execution, TASK
+        from .diagnostics import read_diagnostic
+        from .benchmark import read_result
+        task = read_diagnostic(directory, TASK)
+        if task.get('schema') != 'abb.judge-task.v1':
+            raise ValueError('Missing original Judge task')
+        host, _, _, _ = validate_execution(directory, case, task=task)
+        if host.get('agent_id') != agent_id or task.get('attempt_id') != host.get('attempt_id'):
+            raise ValueError('Saved report belongs to another Agent or Attempt')
+        return read_result(directory, agent_id)
+
     def version_info(self):
         # Complete the public check before catalog transport can schedule an
         # asynchronous stderr reminder. The SDK cache deduplicates later checks.

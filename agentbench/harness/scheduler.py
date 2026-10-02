@@ -1,4 +1,4 @@
-"""One bounded pool for preparation and Case execution, owned by a coordinator."""
+"""Independent bounded execution and Judge pools, owned by one coordinator."""
 
 from __future__ import annotations
 
@@ -18,11 +18,12 @@ from agentbench.sdk.contracts import PreparedCase
 
 from .errors import SuiteConfigurationError
 from .events import EventBus
-from .jobs import (CaseJob, CaseOutcome, PreparationJob, PreparationOutcome,
+from .jobs import (CaseJob, JudgmentJob, CaseOutcome, PreparationJob, PreparationOutcome,
                    SuiteCallbacks, run_case_job, run_preparation_job)
 from .result import CaseResult, EvaluationFailure, SuiteAgentResult
 from .scheduling import AgentState, AgentSeed, RetryPolicy
 from .scheduling.preparation import accept_preparation
+from .scheduling.judgment import JudgmentQueue
 
 CaseJobFactory = Callable[[PreparationJob, PreparedCase, Mapping[str, object]], CaseJob]
 
@@ -33,12 +34,13 @@ class CaseScheduler:
     def __init__(self, preparations: Sequence[PreparationJob], *, create_case_job: CaseJobFactory,
                  workers: int, control: RunControl, bus: EventBus,
                  callbacks: SuiteCallbacks, continue_on_error: bool,
-                 retry_policy=None, seeds=None, retain_case=None):
+                 retry_policy=None, seeds=None, retain_case=None, judge_workers=2, judge_queue_capacity=8):
         self.states = [AgentState(job) for job in preparations]
         self.unprepared, self.ready = deque(), deque()
         self.inflight: dict[Future, tuple[AgentState, PreparationJob | CaseJob]] = {}
         self.create_case_job = create_case_job
         self.workers = workers
+        self.judgments = JudgmentQueue(judge_workers, judge_queue_capacity)
         self.control, self.bus, self.callbacks = control, bus, callbacks
         self.continue_on_error = continue_on_error
         self.admission = True
@@ -69,6 +71,7 @@ class CaseScheduler:
     def run(self) -> tuple[SuiteAgentResult, ...]:
         # Start the worker pool.
         pool = ThreadPoolExecutor(max_workers=self.workers, thread_name_prefix="abb-case")
+        judge_pool = ThreadPoolExecutor(max_workers=self.judgments.workers, thread_name_prefix='abb-judge')
         previous_sigint = None
         if threading.current_thread() is threading.main_thread():
             previous_sigint = signal.getsignal(signal.SIGINT)
@@ -77,12 +80,17 @@ class CaseScheduler:
         try:
             for state in self.states:
                 self._finish_agent(state)
-            while self.inflight or (self.admission and not self.control.cancelled
+            while self.inflight or (self.judgments.pending and not self.control.cancelled) or (self.admission and not self.control.cancelled
                                     and (self.ready or self.unprepared or self.delayed)):
                 try:
                     self._release_retries()
+                    if self.judgments.pending:
+                        self.bus.drain(discard=self.consumer_failed)
+                    self._fill_judges(judge_pool)
                     self._fill_slots(pool)
                     if not self.inflight:
+                        if self.judgments.pending and not self.control.cancelled:
+                            continue
                         if not self.delayed:
                             break
                         self.bus.drain(discard=self.consumer_failed)
@@ -122,6 +130,7 @@ class CaseScheduler:
         finally:
             try:
                 pool.shutdown(wait=True, cancel_futures=True)
+                judge_pool.shutdown(wait=True, cancel_futures=True)
             finally:
                 if previous_sigint is not None:
                     signal.signal(signal.SIGINT, previous_sigint)
@@ -153,7 +162,9 @@ class CaseScheduler:
 
     # Queue work for the worker pool.
     def _fill_slots(self, pool: ThreadPoolExecutor):
-        while self.admission and not self.control.cancelled and len(self.inflight) < self.workers:
+        while self.admission and not self.control.cancelled and self._execution_count() < self.workers:
+            if not self.judgments.can_execute(self._execution_count()):
+                break
             if self.ready:
                 state = self.ready.popleft()
                 case = state.pending.popleft()
@@ -183,6 +194,10 @@ class CaseScheduler:
                         self._publish({**identity, 'event': 'case_retry_cancelled', 'status': 'cancelled'})
                     continue
                 function = run_case_job
+                if job.previous_result is not None and getattr(job.runner, 'supports_deferred_judgment', False):
+                    self.judgments.append(state, JudgmentJob(**job.__dict__))
+                    state.started = True
+                    continue
 
             # Prepare Cases for an Agent that does not have them yet.
             elif self.unprepared:
@@ -209,6 +224,21 @@ class CaseScheduler:
             state.started = True
             self.inflight[future] = (state, job)
 
+    def _execution_count(self):
+        return sum(not isinstance(job, JudgmentJob) for _, job in self.inflight.values())
+
+    def _fill_judges(self, pool):
+        active = len(self.inflight) - self._execution_count()
+        while self.judgments.pending and active < self.judgments.workers and not self.control.cancelled:
+            state, job = self.judgments.pending.popleft()
+            try:
+                future = pool.submit(run_case_job, job, control=self.control, bus=self.bus, callbacks=self.callbacks)
+            except BaseException as exc:
+                self._accept(state, job, self._unexpected_outcome(job, exc))
+                continue
+            self.inflight[future] = (state, job)
+            active += 1
+
     def _accept(self, state: AgentState, job: PreparationJob | CaseJob,
                 outcome: PreparationOutcome | CaseOutcome):
         if outcome.fatal is not None:
@@ -216,7 +246,23 @@ class CaseScheduler:
         if isinstance(outcome, PreparationOutcome):
             accept_preparation(self, state, job, outcome)
         else:
+            if outcome.judgment is not None:
+                ticket = outcome.judgment
+                deferred = JudgmentJob(**job.__dict__, ticket=ticket)
+                self.judgments.append(state, deferred)
+                state.waiting_results[job.case.case_index] = CaseResult(
+                    job.registration.agent_id, job.case.case_index, str(job.identity['job_id']), 'failed',
+                    case_id=job.case.case_id, attempt_id=job.identity.get('attempt_id'),
+                    attempt_number=job.identity.get('attempt_number', 1), error_type='JudgePending',
+                    error_message='Agent execution finished; durable Judge task awaits submission',
+                    artifacts={'directory': str(ticket.directory), 'phase': 'judge', 'recovery': {
+                        'action': 'resume_request', 'automatic': True, 'allow_replay': False,
+                        'reason': 'Resume the original host Judge task'}})
+                self._publish({**job.identity, 'event': 'judge_queued', 'phase': 'judge',
+                    'artifact_directory': str(ticket.directory), 'artifact_run_id': ticket.directory.name})
+                return
             result = outcome.result
+            state.waiting_results.pop(result.case_index, None)
             retries = state.retries.get(result.case_index, 0)
             if (outcome.fatal is None and self.admission and self.continue_on_error
                     and self.retry_policy.permits(result, retries)):

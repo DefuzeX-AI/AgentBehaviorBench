@@ -16,6 +16,7 @@ class LocalContainerRunner(KumaContainerRunner):
     """Prepare fixed Cases and execute them with the local Judge, as KUMA does."""
 
     provider_mode = 'local-container'
+    supports_deferred_judgment = False
 
     def validate_sdk(self, registration):
         try:

@@ -30,6 +30,8 @@ def runner_configuration(runner):
             'model_provider': target.provider_id if target else None,
             'trace_max_bytes': factory.trace_max_bytes,
             'workers': runner.concurrency.max_parallel_cases,
+            'judge_workers': runner.concurrency.max_parallel_judges,
+            'judge_queue_capacity': runner.concurrency.judge_queue_capacity,
             'retry_policy': asdict(runner.retry_policy),
             'sdk_distributions': installed_sdk_distributions(reference),
             'provider_base_url': target.base_url if target else None,
@@ -70,7 +72,8 @@ def build_saved_runner(configuration, environ, *, activity_sink=None):
     runner = build_trace_suite_runner(
         max_bytes=configuration['trace_max_bytes'], model=configuration.get('model'),
         sdk_selection=resolve_sdk(configuration['sdk']), sdk_options=configuration.get('sdk_options'),
-        concurrency=ConcurrencySettings(configuration['workers']), environ=environ,
+        concurrency=ConcurrencySettings(configuration['workers'], configuration.get('judge_workers', 2),
+                                        configuration.get('judge_queue_capacity', 8)), environ=environ,
         activity_sink=activity_sink)
     runner.retry_policy = RetryPolicy(**configuration.get('retry_policy', {}))
     return runner

@@ -70,7 +70,9 @@ class ProgressPrinter:
         if (self._llm_activity is not None and self._llm_activity.compact
                 and event.stage not in {'sdk_check', 'agent_start'}):
             if event.status == 'started':
-                label = 'Generating' if event.stage == 'case_generation' else 'Running Agent'
+                label = {'case_generation': 'Generating', 'judge_queue': 'Judge queued',
+                         'judge': 'Submitting Judge evidence', 'judge_wait': 'Waiting for Judge report'}
+                label = label.get(event.stage, 'Running Agent')
                 self._llm_activity.show_case_status(event.agent_id, event.case_index, label)
             elif event.status == 'failed':
                 self._llm_activity.write_static(f'[{event.agent_id}] {ANSI_RED}FAILED{ANSI_RESET} | {event.detail or event.stage}')
@@ -171,6 +173,10 @@ def configuration_error(message: object) -> str:
 
 
 def _stage_label(event: BenchmarkProgress) -> str:
+    if event.stage in {'judge_queue', 'judge', 'judge_wait'}:
+        return {'judge_queue': 'Waiting for host Judge slot...',
+                'judge': 'Host submitting Judge evidence...',
+                'judge_wait': 'Host waiting for Judge report...'}[event.stage]
     if event.stage == "sdk_check":
         return "Checking evaluation SDK configuration..."
     if event.stage == "agent_start":

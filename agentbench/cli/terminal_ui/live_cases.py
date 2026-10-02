@@ -63,6 +63,15 @@ class LiveCases:
                         row.stage, row.detail = "ERROR", _fit(event.detail or "Execution failed", 48)
                     elif event.status == "succeeded":
                         row.stage, row.detail = "FINISHING", "Validating results"
+            elif event.stage in {'judge_queue', 'judge', 'judge_wait'} and type(event.case_index) is int:
+                row = self._rows.setdefault((agent, event.case_index), _CaseRow('JUDGE', ''))
+                row.stage = 'JUDGE QUEUE' if event.stage == 'judge_queue' else 'JUDGE'
+                row.detail = {'judge_queue': 'Agent container released; waiting for Judge slot',
+                              'judge': 'Host submitting evidence',
+                              'judge_wait': 'Host waiting for verdict'}[event.stage]
+                if event.stage == 'judge' and event.status == 'succeeded':
+                    row.detail = 'Judge report received; validating result'
+                self._active = True
             self._dirty = True
             self._render_locked(force=True)
 
@@ -197,6 +206,11 @@ class LiveCases:
         completed = len(self._completed)
         pending = max(0, total - running - completed)
         title = f"LIVE CASES  {running} running / {total} total · {self._workers} workers"
+        queued = sum(row.stage == 'JUDGE QUEUE' for row in self._rows.values())
+        judging = sum(row.stage == 'JUDGE' for row in self._rows.values())
+        if queued or judging:
+            title = (f"LIVE CASES  {running - queued - judging} executing · {judging} judging · {queued} Judge queued"
+                     f" · {self._workers} execution workers")
         lines = [_rule(title, width)]
         for agent, progress in sorted(self._generation.items()):
             if progress.active_index is not None:

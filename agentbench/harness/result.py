@@ -48,10 +48,15 @@ class BenchmarkResult:
     evidence_status: str = "unknown"
     host_acceptance: str = "unknown"
     host_trace_validation: str = "unknown"
+    failures: tuple[BenchmarkStepFailure, ...] = ()
+
+    @property
+    def execution_status(self) -> str:
+        return 'failed' if self.failures else 'completed'
 
     @property
     def passed(self) -> bool:
-        return self.report is not None and self.report.status == "pass"
+        return not self.failures and self.report is not None and self.report.status == "pass"
 
 
 CaseStatus = Literal["succeeded", "failed", "cancelled", "skipped"]
@@ -96,6 +101,8 @@ class CaseResult:
         if self.status in {'cancelled', 'skipped'}:
             return self.status
         if ((self.artifacts or {}).get('completion') or {}).get('execution') == 'failed':
+            return 'failed'
+        if self.benchmark is not None and self.benchmark.execution_status == 'failed':
             return 'failed'
         if self.host_acceptance == 'rejected' or self.host_trace_validation == 'failed':
             return 'blocked'
@@ -214,7 +221,7 @@ class SuiteAgentResult:
 
     @property
     def completed_case_count(self) -> int:
-        return len(self.benchmarks)
+        return sum(case.execution_status == 'completed' for case in self.case_results)
 
     @property
     def attempted_case_count(self) -> int:

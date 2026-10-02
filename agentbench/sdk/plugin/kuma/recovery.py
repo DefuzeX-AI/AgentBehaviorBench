@@ -27,6 +27,9 @@ def classify_failure(artifacts):
     request = artifacts.get('sdk_request') or {}
     blocked = {'action': 'blocked', 'automatic': False, 'phase': phase,
                'reason': 'No safe recovery is established for this failure'}
+    if artifacts.get('judge_delivery_status') == 'received':
+        return {**blocked, 'allow_replay': False,
+                'reason': 'Judge report received; no automatic replay or Judge resubmission is needed'}
     if error.get('code') in AUTOMATIC_RETRY_BLOCKED:
         return {**blocked, 'reason': 'SDK error prohibits automatic retry; preserve the original request'}
     native = artifacts.get('native_failure') or {}

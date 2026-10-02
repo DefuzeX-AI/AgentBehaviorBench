@@ -1,4 +1,6 @@
 import { Alert, Descriptions, Empty, List, Tag, Typography } from 'antd';
+import JudgeProgress from './JudgeProgress.jsx';
+import { judgeProgress } from './judgeProgress.js';
 
 const { Paragraph, Text, Title } = Typography;
 
@@ -8,7 +10,8 @@ function FindingList({ title, items, empty }) {
 }
 
 export default function CaseJudge({ report, item }) {
-  if (!report) return <Alert type="info" showIcon message="Judge report not received" description="The Case execution may still be valid. Judge generation and host acceptance are tracked independently." />;
+  if (!report) return judgeProgress(item) ? <JudgeProgress item={item} />
+    : <Alert type="info" showIcon message="Judge report not received" description="The Case execution may still be valid. Judge generation and host acceptance are tracked independently." />;
   const rejected = item.host_accepted === false || item.host_acceptance === false || item.host_acceptance === 'rejected';
   const passed = report.status?.toLowerCase() === 'pass';
   return <div className="judge-report">

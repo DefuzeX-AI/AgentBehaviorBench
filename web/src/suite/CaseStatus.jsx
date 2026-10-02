@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { SyncOutlined } from '@ant-design/icons';
 import { Tag } from 'antd';
-import { errorText, executionLabels, isActive, isComplete, needsAttention, phaseLabels } from './model.js';
+import { casePhaseLabel, errorText, executionLabels, isActive, isComplete, needsAttention } from './model.js';
 
 export function ExecutionBadge({ status }) {
   const color = isComplete(status) ? 'success' : status === 'retry_wait' ? 'warning' : needsAttention(status) ? 'error' : isActive(status) ? 'processing' : 'default';
@@ -30,7 +30,7 @@ export default function CaseStatus({ item }) {
   return <div className="suite-case-state">
     <ExecutionBadge status={item.execution_status} />
     {item.execution_status === 'retry_wait' && <RetryTime at={item.retry_at} />}
-    {(item.phase || item.stage) && <small>{phaseLabels[item.stage] || phaseLabels[item.phase] || item.stage || item.phase}</small>}
+    {casePhaseLabel(item) && <small>{casePhaseLabel(item)}</small>}
     {item.current_step != null && <small>Turn {item.current_step}{item.total_steps != null ? ` of ${item.total_steps}` : ''}</small>}
     {(item.error || item.result?.error) && <small className="suite-error-text">{errorText(item.error || item.result?.error)}</small>}
     {item.recovery_reason && <small>{item.recovery_reason}</small>}

@@ -456,6 +456,8 @@ def test_discovered_adapter_runs_real_agent_and_exports_case_output_judge(
 
     add_adapter(adapter_directory, source=CASE_FILE_PLUGIN)
     agent_root = tmp_path / "echo"
+    agent_root.mkdir()
+    (agent_root / 'requirement.md').write_text('Echo the supplied text unchanged.\n', encoding='utf-8')
     source = agent_root / "agent"
     source.mkdir(parents=True)
     module_name = f"sdk_directory_echo_{uuid4().hex}"

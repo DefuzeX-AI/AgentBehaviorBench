@@ -43,7 +43,7 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
              runtime_services=None, expected_case_id=None, expected_content_sha256=None,
              sdk_request_options=None, generation_indices=None, partial_generation=False,
              expected_environment_sha256=None,
-             safe_case_replay=False, require_credentials=True, overlay=None):
+             safe_case_replay=False, require_credentials=True, overlay=None, defer_judge=False):
     """
     
     Run the Kuma worker in Docker and return its host artifact directory.
@@ -154,6 +154,7 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
         # prepared file into the repository ledger below, before the container starts.
         reused = f'.kuma/{Path(case_artifact).name}' if case_artifact is not None else None
         files.save('request/evaluation.json', {
+            'defer_judge': defer_judge,
             'sdk_request_options': sdk_request_options or {},
             'max_steps': max_steps,
             'mode': 'generate' if generation_count is not None else 'execute',
