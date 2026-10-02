@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, symlink, rm } from 'node:fs/promises';
@@ -79,4 +80,25 @@ test('API denies cross-origin reads and writes, lists same-origin runs', async t
   assert.equal((await call('GET', { host: 'localhost:5173', origin: 'https://evil.example' })).statusCode, 403);
   assert.equal((await call('POST', { host: 'localhost:5173' })).statusCode, 405);
   assert.equal((await call('GET', { host: 'localhost:5173' })).body.runs.length, 1);
+});
+
+test('Vite reads local Replay archives through the Python API', async t => {
+  const root = await fixture(t);
+  let middleware;
+  runsPlugin(root).configureServer({ middlewares: { use(fn) { middleware = fn; } } });
+  async function read(suffix) {
+    const response = new EventEmitter();
+    response.setHeader = () => {};
+    response.end = body => { response.body = JSON.parse(body); response.writableEnded = true; };
+    await middleware({ url: `/api/observe/runs/run1/${suffix}`, method: 'GET', headers: { host: 'localhost:5173' } }, response, () => assert.fail());
+    return response;
+  }
+  assert.equal((await read('replay')).body.available, false);
+  await mkdir(path.join(root, 'run1/replay/blobs'), { recursive: true });
+  await writeFile(path.join(root, 'run1/replay/manifest.json'), JSON.stringify({ status: 'complete', warnings: [] }));
+  await writeFile(path.join(root, 'run1/replay/baseline.json'), JSON.stringify({ time_ms: 10, entries: {} }));
+  await writeFile(path.join(root, 'run1/replay/blobs', 'a'.repeat(64)), 'recorded content');
+  assert.equal((await read('replay')).body.baseline.time_ms, 10);
+  assert.equal((await read(`replay?blob=${'a'.repeat(64)}`)).body.text, 'recorded content');
+  assert.equal((await read('replay?blob=..%2Fsecret')).statusCode, 404);
 });

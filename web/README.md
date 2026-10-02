@@ -58,6 +58,46 @@ Python view serves the built UI and bound run events. If assets are missing or
 incomplete, CLI preflight exits with build instructions. A bound Suite displays
 all Agents and Cases and supports expanding several Cases simultaneously.
 
+## Execution replay
+
+The Replay tab is available in a Case attempt and the standalone run viewer.
+Play, pause, step in either direction, seek, adjust speed, and skip long waits.
+Conversation, tool/MCP and network calls share the recorded timeline; overlapping
+calls remain concurrent. Responses appear only after their recorded end. Select
+an event for its request/result, or a workspace path for its captured content and
+previous version. Refresh records explicitly when inspecting a running attempt.
+
+The compact player places User messages on the right and Agent replies on the
+left. Its collapsible file explorer uses Ant Design DirectoryTree with virtual
+scrolling, A/M/D badges for the latest captured change, descendant change counts,
+and a Changes only filter. Deleted paths remain inspectable; seeking backward
+restores earlier file states and badges. File contents and raw event evidence
+open in a drawer. Model/network calls are available through Display options;
+detailed timeline lanes can be expanded from the playback bar. The Judge result
+appears as a verdict card only when playback reaches its recorded timestamp.
+
+New execution runs store local workspace history in `replay/` beside
+`evaluation/` in the run directory. A separate `/run/abb-replay` host mount keeps
+it outside the observed workspace and KUMA repository. Replay files are not added
+to SDK submissions, Judge context, or trace evidence. Existing evaluation
+evidence and its configured upload policy are unchanged.
+
+The recorder observes the declared evaluation workspace, otherwise the ACP
+working directory or the worker's current directory. It saves a baseline, watches
+Linux file notifications with periodic reconciliation, and captures each Input
+boundary and final Agent cleanup. Other hosts use sampling. Times describe when
+versions were observed, not exact write times or inferred tool causation. Rapid
+writes can merge; files created and removed between captures may not appear.
+
+`.git` and `.kuma` directories are excluded. Links and special files are not
+followed; sensitive paths, binary files and files over 2 MiB retain metadata only.
+Known environment credentials are redacted in text. Content is deduplicated by
+hash, with 256 MiB of content, 10,000 paths, 100,000 events and 32 MiB of event
+metadata per run. Limits and capture failures are shown as partial coverage;
+recording failures do not change the Agent's execution or Judge verdict.
+Old runs retain conversation/call replay and explicitly show that historical
+file versions are unavailable. Replay is read-only and never re-executes tools.
+
 ## Suites and recovery
 
 The Suite page reads a unified Python snapshot. Redux manages snapshot revision,
