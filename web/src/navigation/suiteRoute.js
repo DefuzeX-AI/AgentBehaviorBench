@@ -1,4 +1,4 @@
-export const CASE_TABS = ['overview', 'timing', 'replay', 'conversation', 'tools', 'judge', 'trace', 'json'];
+export const CASE_TABS = ['overview', 'timing', 'replay', 'conversation', 'generation', 'judge', 'tools', 'trace', 'json'];
 
 export function readSuiteRoute(cases, hash = window.location.hash, agentIds = cases.map(item => item.agent_id)) {
   const params = new URLSearchParams(hash.replace(/^#/, ''));

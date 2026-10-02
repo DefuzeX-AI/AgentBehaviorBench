@@ -1,10 +1,10 @@
-import { EventEmitter } from 'node:events';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, symlink, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { listRuns, readRun, runsPlugin } from './runs.js';
+import { EventEmitter } from 'node:events';
 
 async function fixture(t) {
   const root = await mkdtemp(path.join(tmpdir(), 'abb-runs-test-'));
@@ -82,8 +82,13 @@ test('API denies cross-origin reads and writes, lists same-origin runs', async t
   assert.equal((await call('GET', { host: 'localhost:5173' })).body.runs.length, 1);
 });
 
-test('Vite reads local Replay archives through the Python API', async t => {
+test('Vite exposes the same saved generation and directory browsing as Python', async t => {
   const root = await fixture(t);
+  await mkdir(path.join(root, 'run1/evaluation/cases'), { recursive: true });
+  await writeFile(path.join(root, 'run1/evaluation/case-collection.json'), JSON.stringify({
+    cases: [{ case_index: 0, case_id: 'case-a', artifact: '.kuma/abb-case-0001.json' }],
+  }));
+  await writeFile(path.join(root, 'run1/evaluation/cases/abb-case-0001.json'), JSON.stringify({ case: { case_id: 'case-a' } }));
   let middleware;
   runsPlugin(root).configureServer({ middlewares: { use(fn) { middleware = fn; } } });
   async function read(suffix) {
@@ -93,6 +98,11 @@ test('Vite reads local Replay archives through the Python API', async t => {
     await middleware({ url: `/api/observe/runs/run1/${suffix}`, method: 'GET', headers: { host: 'localhost:5173' } }, response, () => assert.fail());
     return response;
   }
+  assert.equal((await read('generation')).body.cases[0].artifact.case.case_id, 'case-a');
+  assert.ok((await read('files')).body.entries.some(entry => entry.path === 'evaluation' && entry.type === 'directory'));
+  const file = await read('file?path=evaluation%2Fcases%2Fabb-case-0001.json');
+  assert.equal(JSON.parse(file.body.text).case.case_id, 'case-a');
+  assert.equal((await read('file?path=..%2Frun1%2Frun.json')).statusCode, 404);
   assert.equal((await read('replay')).body.available, false);
   await mkdir(path.join(root, 'run1/replay/blobs'), { recursive: true });
   await writeFile(path.join(root, 'run1/replay/manifest.json'), JSON.stringify({ status: 'complete', warnings: [] }));

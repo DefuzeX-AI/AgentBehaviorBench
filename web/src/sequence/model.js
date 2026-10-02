@@ -3,7 +3,7 @@ export const timingLanes = ['Runtime', 'SDK / Judge', 'Agent / framework', 'LLM'
 export function timingLane(row) {
   if (row.kind === 'llm' || row.kind === 'chat') return 3;
   if (row.kind === 'tool' || row.kind === 'http') return 4;
-  if (['sdk_wait', 'sdk', 'generation'].includes(row.kind)) return 1;
+  if (['sdk_wait', 'sdk', 'generation', 'judge'].includes(row.kind) || row.phase === 'judge') return 1;
   if (row.source === 'otel' || ['agent', 'execution', 'case', 'input'].includes(row.kind)) return 2;
   return row.source === 'worker' ? 2 : 0;
 }

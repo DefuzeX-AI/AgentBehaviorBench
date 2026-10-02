@@ -36,3 +36,13 @@ test('Replay follows Timing and has a shareable Case route', () => {
   const href = suiteRouteHref(cases[0], 'replay', { pathname: '/suite/one/', search: '' });
   assert.equal(readSuiteRoute(cases, href.slice(href.indexOf('#'))).tab, 'replay');
 });
+
+test('generation precedes Judge and tools and trace follow it; existing JSON links still work', () => {
+  assert.deepEqual(CASE_TABS, ['overview', 'timing', 'replay', 'conversation', 'generation', 'judge', 'tools', 'trace', 'json']);
+  const item = { agent_id: 'alpha', case_index: 0 };
+  for (const tab of ['replay', 'generation', 'json']) {
+    const href = suiteRouteHref(item, tab, { pathname: '/suite/one/', search: '?resultRun=run1&resultFile=evaluation%2Fcase.json' });
+    assert.equal(readSuiteRoute([item], href.slice(href.indexOf('#'))).tab, tab);
+    assert.ok(href.includes('resultFile=evaluation%2Fcase.json'));
+  }
+});

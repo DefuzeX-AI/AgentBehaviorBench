@@ -85,7 +85,9 @@ export default function SuiteSidebar({ snapshot, selectedCaseKey, busy, error, o
         <button type="button" className="suite-nav-chevron" onClick={() => setSuiteExpanded(value => !value)} aria-label={`${suiteExpanded ? 'Collapse' : 'Expand'} Suite`}><Chevron expanded={suiteExpanded} /></button>
         <button type="button" className="suite-nav-root-content" onClick={onSuiteSelect}>
           <span className="suite-nav-root-heading"><strong>Suite</strong><code>{compactIdentity(suiteId, 7, 4)}</code>
-            <b className={summary.percentage === 100 ? 'pass-high' : summary.percentage >= 70 ? 'pass-mid' : 'pass-low'}>{summary.percentage}%</b></span>
+            <Tooltip title={`Execution complete: ${summary.complete}/${summary.total} Cases`}>
+              <b aria-label={`Execution complete: ${summary.percentage}%`} className={summary.percentage === 100 ? 'completion-full' : summary.percentage > 0 ? 'completion-active' : 'completion-pending'}>{summary.percentage}%</b>
+            </Tooltip></span>
           <small title={suiteId}>{compactIdentity(suiteId, 12, 9)}</small>
           <span className="suite-nav-root-stats">{summary.complete}/{summary.total} complete <i /> {summary.judged}/{summary.total} judged</span>
         </button>

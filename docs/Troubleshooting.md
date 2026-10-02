@@ -11,6 +11,7 @@
 | IDE cannot resolve `kuma…` | Install the plugin's `requirements.txt` in the host venv and select that interpreter. Docker's packages are separate. |
 | `Trace UI not built or incomplete` | Use compatible Node (20.19+ on 20.x or 22.12+), then `cd web`, `npm ci`, `npm run build`. Open the actual saved result path. |
 | Wrong Suite / URL | Use the complete printed `View:` URL including Suite ID and port. Python selects a free port if 8765 is occupied. |
+| Newly printed Suite URL returns 404 on Windows | Update ABB and open the saved `events.json` with `agentbench view`. Older viewers could share an occupied port and send requests to a previous Suite. Restarting the viewer loads the fix; the benchmark can continue running. |
 | Docker unavailable / permission denied | Run `docker info` as the same user. Start Desktop/Engine and inspect Docker context/permissions. Do not run ABB as root to hide ownership problems. |
 | Python 3.10 Case generation reports missing `tomllib` / `tomli` | Update ABB and rebuild the evaluation image. Worker staging installs `tomli` for Python below 3.11 into the image's selected Python environment; installing it only on the host does not repair an existing image. See [#85](https://github.com/DefuzeX-AI/AgentBehaviorBench/issues/85). |
 | Missing/invalid KUMA key | Nonempty `KUMA_API_KEY` takes precedence over `DEFUZEX_API_KEY`. Check exported variables overriding `.env` and service account access without displaying keys. |

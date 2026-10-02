@@ -70,6 +70,27 @@ def test_attempt_catalog_rejects_foreign_suite_artifact(store, tmp_path):
     assert SuiteRunCatalogAPI(store.path).route('/api/observe/runs', {})['runs'] == []
 
 
+def test_result_files_are_bound_to_registered_attempt_and_imported_preparation(store, tmp_path):
+    selected = artifact(tmp_path, 'selected')
+    foreign = artifact(tmp_path, 'unregistered')
+    start_attempt(store, selected, 1)
+    imported = artifact(tmp_path, 'imported', attempt_id=None)
+    (imported / 'run.json').write_text(json.dumps({
+        'schema': 'abb.case_collection.import.v1', 'run_id': 'imported',
+        'agent_id': 'alpha', 'suite_id': 'suite_view', 'status': 'succeeded'}))
+    store.append({'event': 'progress', 'agent_id': 'alpha', 'phase': 'generate',
+                  'status': 'succeeded', 'artifact_run_id': 'imported',
+                  'artifact_directory': str(imported)})
+    api = SuiteRunCatalogAPI(store.path)
+    assert api.route('/api/observe/runs/selected/files', {})['entries'][0]['name'] == 'run.json'
+    assert api.route('/api/observe/runs/imported/generation', {})['metadata']['schema'] == 'abb.case_collection.import.v1'
+    for route in ('files', 'file', 'generation'):
+        with pytest.raises(ValueError):
+            api.route(f'/api/observe/runs/{foreign.name}/{route}', {'path': ['run.json']})
+    with pytest.raises(ValueError):
+        api.route('/api/observe/runs/selected/file', {'path': ['../unregistered/run.json']})
+
+
 def test_agent_profile_endpoint_is_bound_to_suite(store, monkeypatch):
     from agentbench.observe import agent_profile
     monkeypatch.setattr(agent_profile, 'agent_profile', lambda root, agent_id: {'agent_id': agent_id})
@@ -106,6 +127,35 @@ def request(url, *, body=None, origin=None, token=None):
             return response.status, json.load(response)
     except HTTPError as response:
         return response.code, json.load(response)
+
+
+def test_two_viewers_use_distinct_ports_and_serve_their_own_suites(store, tmp_path, monkeypatch):
+    """An occupied port must not route a fresh run's URL to the previous Suite."""
+    web_root = tmp_path / 'web'
+    web_root.mkdir()
+    (web_root / 'index.html').write_text('<html><head></head><body>Viewer</body></html>', encoding='utf-8')
+    monkeypatch.setattr(viewer, 'WEB_ROOT', web_root)
+    other_path = tmp_path / 'other.json'
+    other_path.write_text(json.dumps([{
+        'event': 'run_started', 'suite_id': 'suite_other', 'selected_agent_ids': [],
+    }]), encoding='utf-8')
+
+    first = viewer.start_viewer_server(store.path, port=0)
+    try:
+        second = viewer.start_viewer_server(other_path, port=first.server.server_port)
+        try:
+            assert second.server.server_port != first.server.server_port
+            for running, suite_id in ((first, 'suite_view'), (second, 'suite_other')):
+                with urlopen(running.url, timeout=3) as response:
+                    assert response.status == 200
+                    assert f'/api/suites/{suite_id}/result' in response.read().decode('utf-8')
+                status, snapshot = request(running.base_url + f'/api/suites/{suite_id}/result')
+                assert status == 200 and snapshot['suite_id'] == suite_id
+            assert request(second.base_url + '/api/suites/suite_view/result')[0] == 409
+        finally:
+            second.stop()
+    finally:
+        first.stop()
 
 
 def test_bound_control_checks_origin_token_and_route_before_dispatch(store, monkeypatch):

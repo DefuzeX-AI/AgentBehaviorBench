@@ -20,7 +20,10 @@ export function makeTimeline(data, attempt = null) {
   const recoveryClocks = new Set(roots.filter(s => s.phase === 'recover').map(s => s.clock_id));
   const recoveryOnly = roots.length > 0 && roots.every(s => s.phase === 'recover');
   const closed = attempt?.status ? terminal.has(attempt.status) : Boolean(attempt?.finished_at) || terminal.has(data?.metadata?.status);
-  const operations = (data?.operations || []).filter(s => s.source === 'host' ? hostClocks.has(s.clock_id) : !recoveryOnly).map(row => {
+  const wallQueue = s => s.source === 'host' && s.clock_id === 'host-wall' && s.phase === 'judge'
+    && s.kind === 'wait' && (!attempt?.attempt_id || s.attempt_id === attempt.attempt_id);
+  const operations = (data?.operations || []).filter(s => s.source === 'host'
+    ? hostClocks.has(s.clock_id) || wallQueue(s) : !recoveryOnly).map(row => {
     const fresh = Number.isFinite(now) && now - row.observed_at_ms < 15000 && now >= row.observed_at_ms;
     const status = row.status === 'running' && ((!recoveryClocks.has(row.clock_id) && closed) || !fresh) ? 'unconfirmed' : row.status;
     // Only persisted measurements advance the chart. A lost process never grows forever.
@@ -94,12 +97,16 @@ export function makeTimeline(data, attempt = null) {
     return measured.length ? unionDuration(measured.map(s => [s.start_ms, s.end_ms])) : null;
   };
   const attemptTotal = Number.isFinite(dispatched) && attemptEnd >= dispatched ? attemptEnd - dispatched : null;
-  const activeTotal = roots.length ? unionDuration(roots.map(s => [s.start_ms, s.end_ms])) : null;
+  const activeTotal = roots.length ? unionDuration([...roots, ...operations.filter(wallQueue)]
+    .map(s => [s.start_ms, s.end_ms])) : null;
   return { rows, start, end, total_ms: attemptTotal ?? activeTotal,
     total_label: attemptTotal != null ? 'Attempt elapsed' : 'Recorded evaluation time', agent_ms: host ? kindDuration('agent') : null,
     sdk_ms: host ? kindDuration('sdk_wait') : null, running: rows.some(s => s.status === 'running'),
     phases: [{ label: 'Preparation', duration_ms: kindDuration('preparation', 'host') },
       { label: 'Container execution', duration_ms: kindDuration('container', 'host') },
-      { label: 'Cleanup', duration_ms: kindDuration('cleanup', 'host') }],
+      { label: 'Cleanup', duration_ms: kindDuration('cleanup', 'host') },
+      ...(operations.some(s => s.phase === 'judge') ? [
+        { label: 'Judge queue', duration_ms: unionDuration(operations.filter(wallQueue).map(s => [s.start_ms, s.end_ms])) },
+        { label: 'Host Judge', duration_ms: kindDuration('judge', 'host') }] : [])],
     hasTimings: Boolean(host), warnings: data?.warnings || [] };
 }

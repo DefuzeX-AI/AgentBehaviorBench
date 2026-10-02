@@ -268,9 +268,17 @@ class RunViewAPI:
             return interactions(self.directory, query)
         if route == 'evaluation':
             return self.evaluation()
+        if route == 'generation':
+            from .case_generation import generation
+            return generation(self.directory)
         if route == 'replay':
             from .replay import replay
             return replay(self.directory, query)
+        if route in ('files', 'file'):
+            from .result_files import list_files, preview_file
+            relative = query.get('path', [''])[0]
+            return (preview_file(self.directory, relative) if route == 'file'
+                    else list_files(self.directory, relative, int(query.get('offset', ['0'])[0])))
         if route == 'events':
             return self.events(int(query.get('offset', ['0'])[0]))
         if route == 'otel':
@@ -353,7 +361,7 @@ class SuiteRunCatalogAPI:
                 metadata = api.read('run.json')
                 if (not isinstance(metadata, dict) or metadata.get('agent_id') != agent_id
                     or metadata.get('run_id') != directory.name
-                    or metadata.get('schema') not in ('abb.observe.run.v1', 'abb.evaluate.run.v1')
+                    or metadata.get('schema') not in ('abb.observe.run.v1', 'abb.evaluate.run.v1', 'abb.case_collection.import.v1')
                     or not re.fullmatch(r'[a-zA-Z0-9_-]+', directory.name)):
                     continue
                 if (identity.get('artifact_run_id') not in (None, directory.name)

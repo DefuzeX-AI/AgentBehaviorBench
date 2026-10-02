@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 from collections.abc import Callable
 from html import escape
 import threading
@@ -17,6 +18,21 @@ from agentbench.project import project_root
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
+
+
+class ViewerHTTPServer(ThreadingHTTPServer):
+    """Keep each viewer's port bound to exactly one Suite on Windows too."""
+
+    allow_reuse_address = os.name != 'nt'
+
+    def server_bind(self) -> None:
+        if os.name == 'nt':
+            # SO_REUSEADDR on Windows allows a second listener to take an active
+            # viewer's port instead of triggering our free-port fallback.
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
+
+
 # Built viewer assets: ABB_WEB_ROOT, else web/dist of the project (a checkout, or
 # the working directory of an installed CLI; see agentbench.project).
 WEB_ROOT = (Path(os.environ["ABB_WEB_ROOT"]).expanduser().resolve() if os.environ.get("ABB_WEB_ROOT", "").strip()
@@ -142,11 +158,11 @@ def create_viewer_server(
         result_log, expected_suite_id=_result_log_suite_id(result_log)
     )
     try:
-        return ThreadingHTTPServer((host, port), handler)
+        return ViewerHTTPServer((host, port), handler)
     except OSError:
         if port == 0:
             raise
-        return ThreadingHTTPServer((host, 0), handler)
+        return ViewerHTTPServer((host, 0), handler)
 
 
 def build_viewer_handler(

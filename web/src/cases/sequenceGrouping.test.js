@@ -9,6 +9,17 @@ const row = (id, kind, start, duration, parent_id, source = 'host', attributes =
   parent_id, source, attributes, status: 'succeeded', clock_id: source, depth: 0,
 });
 
+test('host Judge submission is visible in its SDK lane after the queue wait', () => {
+  const records = timingSequence({ rows: [row('Agent', 'agent', 0, 100),
+    { ...row('Wait in Judge queue', 'wait', 100, 200), phase: 'judge' },
+    { ...row('Submit Judge evidence', 'judge', 300, 150), phase: 'judge' }] });
+  const { groups } = groupTimings(records);
+  const judge = groups.find(group => group.root?.id === 'Submit Judge evidence');
+  assert.equal(judge.type, 'calls');
+  assert.equal(judge.records[0].lane, 1);
+  assert.ok(groups.some(group => group.title === 'Wait in Judge queue'));
+});
+
 test('a real Docker subtree folds together without inventing environment stages', () => {
   const rows = [row('total', 'total', 0, 10000), row('queue', 'wait', 0, 10, null, 'scheduler'),
     row('overlay', 'preparation', 10, 90, 'total'), row('docker', 'preparation', 100, 6900, 'total'),
