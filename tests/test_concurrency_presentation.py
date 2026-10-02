@@ -241,6 +241,18 @@ def test_live_cases_can_show_ten_concurrent_cases():
     display.close()
 
 
+def test_live_cases_keeps_judge_waiting_visible_after_container_exit():
+    display = LiveCases({'agent': 2}, 1, stream=StringIO(), refresh_seconds=0)
+    display.on_event({'event': 'case_started', 'agent_id': 'agent', 'case_index': 0})
+    for stage, detail in [('judge_queue', 'Agent container released'),
+                          ('judge', 'Host submitting evidence'), ('judge_wait', 'Host waiting for verdict')]:
+        display.on_progress(BenchmarkProgress(stage=stage, status='started', agent_id='agent', case_index=0))
+        assert any(detail in line for line in display.snapshot_lines())
+    display.on_event({'event': 'case_started', 'agent_id': 'agent', 'case_index': 1})
+    assert any('Host waiting for verdict' in line for line in display.snapshot_lines())
+    display.close()
+
+
 def test_live_cases_shows_actual_generation_slot(tmp_path):
     stream = StringIO()
     display = LiveCases({'react-agent': 10}, 3, stream=stream, refresh_seconds=0)

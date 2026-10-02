@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass, replace
 
 from agentbench.runtime.contracts.execution import RunCancelled, RunControl, RuntimeInfrastructureError
 from agentbench.sdk.contracts import EvaluationRunner, PreparedCase, PreparedCaseBatch, PreparationFailure
+from agentbench.sdk.judgment import DeferredJudgment
 
 from .errors import ProviderSelectionError, SuiteConfigurationError
 from .events import EventBus, EventDeliveryError
@@ -44,6 +45,11 @@ class CaseJob:
 
 
 @dataclass(frozen=True)
+class JudgmentJob(CaseJob):
+    ticket: DeferredJudgment | None = None
+
+
+@dataclass(frozen=True)
 class PreparationOutcome:
     cases: tuple[PreparedCase, ...] = ()
     error: EvaluationFailure | None = None
@@ -54,8 +60,9 @@ class PreparationOutcome:
 
 @dataclass(frozen=True)
 class CaseOutcome:
-    result: CaseResult
+    result: CaseResult | None
     fatal: BaseException | None = None
+    judgment: DeferredJudgment | None = None
 
 
 def fatal_error(exc: BaseException, control: RunControl) -> BaseException | None:
@@ -153,19 +160,29 @@ def run_case_job(job: CaseJob, *, control: RunControl,
     try:
         control.check()
         status = 'retrying' if job.identity.get('attempt_number', 1) > 1 or job.previous_result else 'running'
+        if isinstance(job, JudgmentJob):
+            if job.ticket is not None:
+                benchmark = job.runner.judge_case(job.registration, job.case, job.ticket,
+                    on_progress=events.progress, on_step_start=events.step_started,
+                    on_step_complete=events.step_completed, on_step_failure=events.step_failed)
+            else:
+                benchmark = job.runner.recover_case(job.registration, job.case,
+                    previous_result=job.previous_result, on_progress=events.progress,
+                    on_step_start=events.step_started, on_step_complete=events.step_completed,
+                    on_step_failure=events.step_failed)
+            return CaseOutcome(_case_result(job, benchmark))
         bus.publish({**job.identity, "event": "case_started", "status": status})
-        execute = job.runner.run_case if job.previous_result is None else getattr(job.runner, 'recover_case')
+        execute = (job.runner.execute_case if getattr(job.runner, 'supports_deferred_judgment', False)
+                   else job.runner.run_case) if job.previous_result is None else getattr(job.runner, 'recover_case')
         recovery = {} if job.previous_result is None else {'previous_result': job.previous_result}
         benchmark = execute(
             job.registration, job.case, **recovery, on_progress=events.progress,
             on_step_start=events.step_started, on_step_complete=events.step_completed,
             on_step_failure=events.step_failed,
         )
-        result = CaseResult(job.registration.agent_id, job.case.case_index, str(job.identity["job_id"]),
-                            "succeeded" if benchmark.passed else "failed",
-                            case_id=job.case.case_id, benchmark=benchmark)
-        return CaseOutcome(replace(result, attempt_id=job.identity.get('attempt_id'),
-                                   attempt_number=job.identity.get('attempt_number', 1)))
+        if isinstance(benchmark, DeferredJudgment):
+            return CaseOutcome(None, judgment=benchmark)
+        return CaseOutcome(_case_result(job, benchmark))
     except BaseException as exc:
         result = CaseResult(job.registration.agent_id, job.case.case_index, str(job.identity["job_id"]),
                             "cancelled" if isinstance(exc, RunCancelled) else "failed",
@@ -178,3 +195,14 @@ def run_case_job(job: CaseJob, *, control: RunControl,
         return CaseOutcome(replace(result, artifacts=artifacts or None,
                                    attempt_id=job.identity.get('attempt_id'),
                                    attempt_number=job.identity.get('attempt_number', 1)), fatal_error(exc, control))
+
+
+def _case_result(job, benchmark):
+    failure = next(iter(benchmark.failures), None)
+    return CaseResult(job.registration.agent_id, job.case.case_index, str(job.identity['job_id']),
+                      'succeeded' if benchmark.passed else 'failed', case_id=job.case.case_id,
+                      benchmark=benchmark,
+                      error_type=failure.error_type if failure else None,
+                      error_message=failure.error_message if failure else None,
+                      attempt_id=job.identity.get('attempt_id'),
+                      attempt_number=job.identity.get('attempt_number', 1))

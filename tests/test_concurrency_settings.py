@@ -6,11 +6,13 @@ from agentbench.harness.concurrency import ConcurrencyConfigurationError, Concur
 from agentbench.cli.environment import execution_environment_snapshot, load_execution_environment
 
 
-def test_default_and_only_user_setting():
+def test_default_execution_and_independent_judge_settings():
     assert ConcurrencySettings.from_environ({}).max_parallel_cases == 1
     assert ConcurrencySettings.from_environ({'ABB_MAX_PARALLEL_CASES': ' 4 '}).effective_workers(100) == 4
     assert ConcurrencySettings(4).effective_workers(1) == 1
-    assert tuple(ConcurrencySettings.__dataclass_fields__) == ('max_parallel_cases',)
+    defaults = ConcurrencySettings.from_environ({})
+    assert defaults.max_parallel_judges == 2
+    assert defaults.judge_queue_capacity == 8
 
 
 @pytest.mark.parametrize('value', ['', ' ', '0', '-1', '1.5', 'true', '+2', 'four', '１２'])

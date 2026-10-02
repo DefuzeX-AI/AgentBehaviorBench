@@ -43,7 +43,7 @@ def suite_snapshot(plan, events):
         if type(index) is int and 0 <= index < len(job['cases']):
             apply_case_event(job['cases'][index], event)
             if kind in {'attempt_dispatched', 'case_started', 'case_attempt_started', 'retry_scheduled', 'case_retry_scheduled',
-                        'case_recovery_started', 'case_reconciling'}:
+                        'case_recovery_started', 'case_reconciling', 'judge_queued'}:
                 state, summary, error = 'running', None, None
         if kind == 'agent_completed':
             item = event.get('item') or {}

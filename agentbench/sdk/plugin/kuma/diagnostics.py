@@ -79,6 +79,18 @@ def _text(value, limit=500):
     return ''.join(c if unicodedata.category(c) != 'Cc' else ' ' for c in str(value))[:limit]
 
 
+def host_acceptance(host):
+    """Host evidence acceptance is independent of the Agent or Judge outcome."""
+    if (host.get('validation') == 'failed' or host.get('host_trace_validation') == 'failed'
+            or host.get('cleanup_status') == 'failed'):
+        return 'rejected'
+    if (host.get('cleanup_status') == 'succeeded'
+            and host.get('host_trace_validation') == 'succeeded'):
+        return 'accepted'
+    return ('accepted' if host.get('status') == 'succeeded'
+            else 'rejected' if host.get('status') == 'failed' else 'unknown')
+
+
 def collect_artifacts(directory, host, *, environ=None):
     """Collect safe SDK errors and a received report independently of acceptance.
 
@@ -105,8 +117,7 @@ def collect_artifacts(directory, host, *, environ=None):
               'host_phase': host.get('phase'), 'host_error_type': host.get('error_type'),
               'completion': {key: summary.get(key) for key in ('execution', 'otel', 'submission', 'evidence')}}
     result['evidence_status'] = summary.get('evidence') or 'unknown'
-    result['host_acceptance'] = ('accepted' if host.get('status') == 'succeeded'
-                                 else 'rejected' if host.get('status') == 'failed' else 'unknown')
+    result['host_acceptance'] = host_acceptance(host)
     # Only identity-checked reports below can establish received delivery.
     result['judge_delivery_status'] = {'missing': 'missing', 'failed': 'service_failure'}.get(
         summary.get('judge'), 'unknown')
@@ -149,7 +160,7 @@ def collect_artifacts(directory, host, *, environ=None):
         result['received_report'] = {
             'status': report['status'], 'report_id': _text(report['report_id']),
             'run_id': _text(run_id), 'case_id': _text(case_id),
-            'path': 'evaluation/judge/report.json', 'host_accepted': host.get('status') == 'succeeded',
+            'path': 'evaluation/judge/report.json', 'host_accepted': result['host_acceptance'] == 'accepted',
         }
         result['judge_delivery_status'] = 'received'
     related = []
@@ -201,6 +212,8 @@ def failure_message(artifacts):
             # A client-side resolution or connect failure never reaches the interceptor,
             # so no related network event names the Backend; the SDK's own record does.
             parts.append(f"KUMA backend: {artifacts['sdk_base_url']}")
+    if native := artifacts.get('native_failure'):
+        parts.append(f"Agent {native.get('error_type') or native.get('status')}: {native.get('error') or 'No error details recorded'}")
     for item in artifacts.get('related_network_errors', ()):
         parts.append(f"related network: {item.get('error_code') or 'unclassified'} "
                      f"{item.get('method') or ''} {item.get('host') or ''}{item.get('path') or ''}: {item.get('error') or ''}")

@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
+    from agentbench.sdk.judgment import DeferredJudgment
     from agentbench.harness.registry import AgentRegistration
     from agentbench.harness.result import BenchmarkResult
     from agentbench.runtime.contracts.execution import RunControl
@@ -116,6 +117,17 @@ class StrategyCheck:
 class SDKVersionInfo(Protocol):
     """Optional silent version/update metadata for host-owned presentation."""
     def version_info(self) -> Mapping[str, str | None]: ...
+
+
+@runtime_checkable
+class SDKResultReader(Protocol):
+    """Optional offline validator for a saved, terminal Case and Judge report.
+
+    Implementations must not execute the Agent, contact a service, or mutate
+    artifacts. The caller binds the directory to a trusted Suite/Attempt first.
+    """
+
+    def read_case_result(self, directory: Path, case: PreparedCase, *, agent_id: str) -> BenchmarkResult: ...
 
 
 class StrategyChecker(Protocol):
@@ -228,6 +240,28 @@ class EvaluationRunner(Protocol):
 
     def run_case(
         self, registration: AgentRegistration, case: PreparedCase, *,
+        on_progress=None, on_step_start=None, on_step_complete=None, on_step_failure=None,
+    ) -> BenchmarkResult: ...
+
+
+@runtime_checkable
+class DeferredJudgmentRunner(Protocol):
+    """Optional two-stage execution; tickets become durable before returning.
+
+    Cleanup and evidence acceptance precede the ticket. The host Judge stage
+    must reuse that execution without replaying its Agent or changing its Case.
+    Schedulers dispatch these methods in separate bounded worker pools.
+    """
+
+    supports_deferred_judgment: bool
+
+    def execute_case(
+        self, registration: AgentRegistration, case: PreparedCase, *,
+        on_progress=None, on_step_start=None, on_step_complete=None, on_step_failure=None,
+    ) -> DeferredJudgment: ...
+
+    def judge_case(
+        self, registration: AgentRegistration, case: PreparedCase, ticket: DeferredJudgment, *,
         on_progress=None, on_step_start=None, on_step_complete=None, on_step_failure=None,
     ) -> BenchmarkResult: ...
 
