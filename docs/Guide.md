@@ -48,9 +48,16 @@ agentbench view results/offline-demo-YYYYMMDD-HHMMSS.json
 ```
 
 Open the complete printed `View:` URL, including its Suite path. Keep the viewer
-running; Ctrl+C stops it. Port 8765 is the default; ABB selects an available port
-when it is occupied. Rebuild after frontend changes. Normal use does not require
-`npm run dev`.
+running; Ctrl+C stops it. The address root lists saved Suites in the sidebar;
+`/suite/SUITE_ID/` selects one. The list refreshes automatically, including new runs
+and reruns, and discovers canonical Suites under project `results/` plus registered
+external Suite directories. Unavailable history is reported without hiding valid results.
+Suite cards start collapsed and show execution completion and Judge counts. Use
+each card's arrow to expand its Agents and Cases, or click the card to open that Suite.
+CLI runs reuse a running project viewer and print a link to their own Suite on that
+same address. When starting a viewer, port 8765 is the default; ABB selects an
+available port when it is occupied. Rebuild after frontend changes. Normal use
+does not require `npm run dev`.
 
 ## Configure services
 
@@ -189,9 +196,57 @@ Detailed attempts live under `results/observe/<run-id>/`; Judge reports are norm
 at `evaluation/judge/report.json`. Use the printed paths and exact attempt IDs.
 
 `resume SUITE` continues eligible unfinished work. `retry SUITE --agent ID --case N`
-targets one unfinished Case (N starts at 1). `reuse SUITE` creates a new linked Suite
-with saved Cases. An uncertain accepted request or unsafe replay can remain blocked.
+targets one unfinished Case (N starts at 1). `reuse SUITE` submits saved Cases to a
+linked reuse Suite. An uncertain accepted request or unsafe replay can remain blocked.
 Changing a Profile does not change saved Cases; generate new ones to test the new Profile.
+
+To rerun one saved Case through fresh Agent execution and judging, use its Case ID
+or artifact run ID from the viewer/results directory:
+
+```bash
+agentbench reuse CASE_ID
+agentbench reuse ARTIFACT_RUN_ID
+agentbench reuse results/suites/SUITE_ID --agent AGENT_ID --case 2
+```
+
+`--case` starts at 1. A saved `case.json` path or an attempt directory/file path is
+also accepted. IDs search project results and indexed external Suites;
+`--suite-root DIR` limits lookup to another results directory. If an ID occurs in
+multiple Suites (including earlier reruns), the command prints explicit source
+commands to choose from. A Suite ID without `--agent`/`--case` still reuses all Cases.
+Standalone traces without a canonical Suite plan cannot be reused.
+
+CLI and Viewer requests join a running reuse Suite in the same project when their
+SDK/model settings, credentials and Agent provenance match. An explicit `--output-root`
+also restricts which destination can be joined. Otherwise, a new Suite is created.
+Every intentional request adds fresh Case slots, including repeated requests for the
+same Case ID. Each slot copies the exact saved artifact, records its source Suite/Agent/
+Case position, and creates fresh execution evidence and a new Judge result. It does
+not run Case generation. Current Agent code is used with the saved runner settings;
+`--model` and `--max-steps` can override those settings. Original results are retained.
+This schedules one new evaluation, subject to the configured recovery policy; it
+does not resubmit the previous evidence to Judge.
+
+Newly admitted Cases appear as queued work while the current scheduler pass finishes;
+the next pass executes them under the saved concurrency limits. Once the batch has
+drained and completed, the next reuse starts a new Suite. Requests from different
+processes share the same admission lock, and repeated delivery of one request ID
+does not add another execution. The original plan remains unchanged; additional
+slots and their provenance are recorded in the ordered event log.
+
+In a local `agentbench view` session, open a Case and click **Rerun this Case**.
+**Open reuse Suite** switches to the batch's progress/results on the same viewer and port.
+The original and reuse Suites both appear in the sidebar. Once the Case
+artifact is saved, reuse reads an atomic
+snapshot and can execute independently while the original Suite continues. Ordinary
+progress updates do not invalidate a reuse request. The copied Case records the
+source event revision and verifies the original artifact digest.
+Keep the process that owns the batch running; stopping it cancels that batch.
+Interrupting a CLI command that joined another process's batch only stops its wait.
+Accepted requests and copied inputs remain available, including requests queued
+before an interruption. The printed/saved `events.json` remains available for
+`agentbench view` and `agentbench resume`. Rechecking an uncertain request keeps the
+same command identity and destination, so transport retries do not create extra runs.
 
 The viewer exports a JSON snapshot, not all traces or a standalone HTML report.
 Preserve Suite and referenced attempt directories for full evidence; moving to a

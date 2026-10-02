@@ -159,6 +159,8 @@ options:
 
 Run `agentbench COMMAND --help` for command-specific options.
 
+Build the viewer with Node.js 20.19+ (20.x) or 22.12+: run `cd web && npm ci && npm run build` from the repository root. Rebuild after frontend changes.
+
 ## More documentation
 
 - [How to install, configure, and run ABB](docs/Guide.md)

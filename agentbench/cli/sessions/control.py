@@ -4,12 +4,15 @@ from collections.abc import Mapping
 from pathlib import Path
 import secrets
 import threading
+import time
 from queue import Queue
+from urllib.parse import quote
 
 from agentbench.harness.session import SuiteLockedError, read_snapshot
 from agentbench.observe.store import redact
 from agentbench.runtime.contracts.execution import RunControl
 from .recovery import execute_recovery
+from .reuse_command import execute_reuse_command
 
 _CONTROLS = {}
 _LOCK = threading.Lock()
@@ -50,7 +53,7 @@ class SuiteControl:
         self._selections = {}
         self._signals = {}
         self._stop = threading.Event()
-        self._runner = None
+        self._runners, self._reuse_threads = {}, set()
         self._thread = threading.Thread(target=self._work, name=f'abb-control-{self.suite_id}', daemon=True)
         self._thread.start()
 
@@ -75,7 +78,7 @@ class SuiteControl:
         if not isinstance(identifier, str) or not 1 <= len(identifier) <= 100:
             raise ValueError('A bounded command_id is required')
         action = payload.get('action')
-        if action not in {'resume', 'retry'}:
+        if action not in {'resume', 'retry', 'reuse'}:
             raise ValueError('Unsupported Suite action')
         with self._guard:
             if identifier in self._commands:
@@ -88,29 +91,41 @@ class SuiteControl:
                 if previous.get('command_id') == identifier:
                     return previous
             expected = payload.get('expected_revision')
-            if expected is not None and (type(expected) is not int or expected != snapshot['revision']):
+            # Reuse only reads immutable prepared inputs and writes a new Suite;
+            # unrelated live progress must not invalidate this selection.
+            if expected is not None and (type(expected) is not int or
+                                         action != 'reuse' and expected != snapshot['revision']):
                 raise RuntimeError('Suite changed; refresh its state before scheduling recovery')
             selection = None
-            if action == 'retry':
+            if action in {'retry', 'reuse'}:
                 agent, index = payload.get('agent_id'), payload.get('case_index')
                 if type(index) is not int:
-                    raise ValueError('Retry requires an integer Case index')
+                    raise ValueError('Case commands require an integer Case index')
                 case = next((case for job in snapshot['jobs'] if job['agent_id'] == agent
                              for case in job['cases'] if case['case_index'] == index), None)
-                if case is None or case['execution_status'] in {'completed', 'running', 'retrying', 'retry_wait'}:
+                if action == 'reuse' and (case is None or not (case.get('prepared_case') or {}).get('artifact_path')):
+                    raise ValueError('Reuse requires a persisted Case artifact')
+                if action == 'retry' and (case is None or case['execution_status'] in {'completed', 'running', 'retrying', 'retry_wait'}):
                     raise ValueError('Only an unfinished inactive Case may be retried')
                 selection = {(agent, index)}
             for previous_id, previous in self._commands.items():
-                if previous['status'] in {'queued', 'running'}:
+                if action != 'reuse' and previous['action'] != 'reuse' and previous['status'] in {'queued', 'running'}:
                     other = self._selections[previous_id]
                     if selection is None or other is None or selection.intersection(other):
                         raise RuntimeError('Recovery for this selection is already queued or running')
-            command = {'command_id': identifier, 'action': action, 'status': 'queued'}
+            command = {'command_id': identifier, 'action': action, 'status': 'queued',
+                       **({'agent_id': agent, 'case_index': index} if selection else {})}
             self._commands[identifier] = command
             self._selections[identifier] = selection
             # Cancellation exists before runner construction and survives that race.
             self._signals[identifier] = RunControl()
-            self._queue.put((identifier, selection, action == 'retry'))
+            item = (identifier, selection, action == 'retry')
+            if action == 'reuse':
+                thread = threading.Thread(target=self._reuse_work, args=(item,), daemon=True)
+                self._reuse_threads.add(thread)
+                thread.start()
+            else:
+                self._queue.put(item)
             return dict(command)
 
     def _work(self):
@@ -118,28 +133,51 @@ class SuiteControl:
             item = self._queue.get()
             if item is None:
                 return
-            identifier, selection, replay = item
-            while not self._stop.is_set():
-                try:
+            self._execute(item)
+
+    def _reuse_work(self, item):
+        try:
+            self._execute(item)
+        finally:
+            with self._guard:
+                self._reuse_threads.discard(threading.current_thread())
+
+    def _execute(self, item):
+        identifier, selection, replay = item
+        while not self._stop.is_set():
+            try:
+                if self._commands[identifier]['action'] == 'reuse':
+                    execute_reuse_command(self.path.parent, environ=self.environ, selection=selection,
+                        command_id=identifier, run_control=self._signals[identifier],
+                        on_created=lambda directory: self._show_reuse(identifier, directory),
+                        on_runner=lambda runner: self._set_active(identifier, runner))
+                else:
                     execute_recovery(self.path.parent, environ=self.environ, selection=selection,
                                      replay=replay, command_id=identifier,
                                      run_control=self._signals[identifier],
                                      on_runner=lambda runner: self._set_active(identifier, runner))
-                except SuiteLockedError:
-                    self._stop.wait(0.2)
-                    continue
-                except Exception as exc:
-                    from agentbench.harness.session.plan import environment_secrets
-                    self._set_status(identifier, 'rejected', redact(str(exc), environment_secrets(self.environ)))
-                else:
-                    self._set_status(identifier, 'completed')
-                break
+            except SuiteLockedError:
+                self._set_status(identifier, 'queued')
+                self._stop.wait(0.2)
+                continue
+            except Exception as exc:
+                from agentbench.harness.session.plan import environment_secrets
+                self._set_status(identifier, 'rejected', redact(str(exc), environment_secrets(self.environ)))
+            else:
+                self._set_status(identifier, 'completed')
+            break
 
-    def _set_runner(self, runner):
-        self._runner = runner
+    def _show_reuse(self, identifier, directory):
+        with self._guard:
+            self._commands[identifier].update(result_path=str(directory / 'events.json'), suite_id=directory.name,
+                result_url=f'/suite/{quote(directory.name, safe="")}/')
 
     def _set_active(self, identifier, runner):
-        self._set_runner(runner)
+        with self._guard:
+            if runner is None:
+                self._runners.pop(identifier, None)
+            else:
+                self._runners[identifier] = runner
         if runner is not None:
             self._set_status(identifier, 'running')
             if self._stop.is_set():
@@ -147,6 +185,8 @@ class SuiteControl:
 
     def _set_status(self, identifier, status, error=None):
         with self._guard:
+            if self._stop.is_set() and status in {'queued', 'running'}:
+                status, error = 'rejected', 'Viewer recovery controller was closed'
             self._commands[identifier].update(status=status, error=error)
 
     def close(self):
@@ -157,11 +197,18 @@ class SuiteControl:
             for command in self._commands.values():
                 if command['status'] == 'queued':
                     command.update(status='rejected', error='Viewer recovery controller was closed')
-        if self._runner is not None:
-            self._runner.cancel()
+            runners = list(self._runners.values())
+        for runner in runners:
+            runner.cancel()
         self._queue.put(None)
         with _LOCK:
             if _CONTROLS.get(str(self.path)) is self:
                 del _CONTROLS[str(self.path)]
         if self._thread is not threading.current_thread():
             self._thread.join(timeout=60)
+        deadline = time.monotonic() + 60
+        with self._guard:
+            threads = list(self._reuse_threads)
+        for thread in threads:
+            if thread is not threading.current_thread():
+                thread.join(timeout=max(0, deadline - time.monotonic()))

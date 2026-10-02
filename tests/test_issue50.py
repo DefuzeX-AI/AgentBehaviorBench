@@ -29,6 +29,7 @@ def _result_log(tmp_path):
 
 @pytest.mark.parametrize('sources', [True, False], ids=['checkout', 'no-sources'])
 def test_server_page_and_cli_explain_a_missing_build_identically(tmp_path, monkeypatch, sources):
+    monkeypatch.setattr(viewer, 'project_root', lambda: tmp_path)
     web = tmp_path / 'web'
     (web / 'dist').mkdir(parents=True)
     if sources:

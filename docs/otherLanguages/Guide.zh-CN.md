@@ -55,7 +55,13 @@ agentbench view results/offline-demo-YYYYMMDD-HHMMSS.json
 ```
 
 首次 clone 没有 `web/dist`，必须先构建。打开 `View:` 后的完整地址（包括 Suite 路径），
-保持命令运行；Ctrl+C 关闭查看器。默认端口 8765 被占用时会换空闲端口。
+保持命令运行；Ctrl+C 关闭查看器。根地址的侧栏列出保存的 Suite，
+`/suite/SUITE_ID/` 选中指定 Suite。列表自动刷新，包含新运行和复跑结果；扫描项目
+`results/` 中的标准 Suite 目录和已登记的外部 Suite 目录。无法读取的历史记录会单独提示。
+Suite 卡片默认收起，显示执行完成比例和 Judge 数量；点击箭头可独立展开 Agent 和 Case，
+点击卡片可打开对应 Suite。
+CLI 运行会复用当前项目已启动的查看器，输出同一地址下对应 Suite 的链接。
+新启动查看器默认使用 8765，端口被占用时会换空闲端口。
 普通评测不用启动 `npm run dev`；前端修改后需重新构建。
 
 ## 配置真实评测
@@ -183,9 +189,44 @@ Suite 默认在 `results/suites/<suite-id>/` 保存计划、Case 和 events.json
 始终使用终端打印的真实路径和 Case 的 artifact ID。
 
 `resume SUITE` 继续符合恢复条件的未完成任务；`retry SUITE --agent ID --case N`
-恢复一个未完成 Case；`reuse SUITE` 用保存的 Case 创建新 Suite。已接受但响应不明、
+恢复一个未完成 Case；`reuse SUITE` 把保存的 Case 提交到复跑 Suite。已接受但响应不明、
 非安全重放或清理未确认的请求仍可能阻塞，不承诺任何失败都可自动重试。
 改 Profile 不会改变旧 Case；验证新 Profile 要重新生成。
+
+单独复跑某个 Case，可以使用结果里的 Case ID、artifact run ID，或明确指定来源：
+
+```bash
+agentbench reuse CASE_ID
+agentbench reuse ARTIFACT_RUN_ID
+agentbench reuse results/suites/SUITE_ID --agent AGENT_ID --case 2
+```
+
+`--case` 从 1 开始；也接受保存的 `case.json` 路径、执行产物目录或其内部文件路径。
+默认搜索项目 results 和已登记的外部 Suite；`--suite-root DIR` 指定其他搜索目录。
+如果 ID 在多份结果中出现（包括之前的复跑），命令会列出明确的来源命令供选择。
+只传 Suite ID 且不带 `--agent`/`--case` 时，仍然复跑全部 Case。
+没有 Suite plan 的独立 trace 暂不支持复跑。
+
+CLI 和网页优先加入当前项目正在运行、SDK／模型配置、凭据和 Agent 来源一致的复跑 Suite。
+指定 `--output-root` 时，只加入该目录中的批次；没有兼容批次时创建新 Suite。
+每次主动请求都新增 Case 位置，即使 Case ID 相同，也会复制原始 Case 文件并记录来源，重新执行 Agent、收集证据并请求
+Judge，不重新生成 Case，也不覆盖旧结果。使用当前 Agent 代码及保存的运行配置；
+可用 `--model`、`--max-steps` 覆盖配置。一次命令安排一次新评测，执行中仍遵循既有恢复
+策略；这不是把旧证据重新发给 Judge。
+
+新加入的 Case 会立即显示为排队任务，当前一轮调度结束后，按保存的并发限制执行下一批。
+全部任务执行完并关闭批次后，下一次 reuse 再创建新 Suite。多个 CLI／网页进程共用入队锁；
+同一个请求 ID 重发不会增加执行次数。原始 plan 保持不变，新增 Case 及其来源写入有序事件记录。
+
+通过本地 `agentbench view` 打开的 Case 详情页，可以点击 **Rerun this Case**，再点击
+**Open reuse Suite** 在同一网页和端口切换到该批次的进度和结果，原 Suite 和复跑 Suite 都在侧栏中。
+Case 保存后，即使原 Suite 或该 Case 仍在运行，
+也可以独立复跑，无需等待原 Suite 结束。系统读取原子快照、校验 Case 文件摘要并记录
+来源事件版本；普通进度更新不会使复跑请求失效。复跑期间保持批次所属的进程运行；退出它会取消
+该批次。加入其他进程批次的 CLI 被中断时，只停止等待，任务继续由所属进程执行。
+已接受的请求和 Case 文件会保留，包括中断前还在排队的任务。新结果的 `events.json` 可用 `agentbench view` 查看、
+`agentbench resume` 恢复。网络请求结果不明时，**Check request again** 沿用相同请求 ID，
+不会因重发请求而额外启动一轮。
 
 网页的 Export current report 导出 **JSON 快照**，不打包全部 trace，也不是独立 HTML。
 完整结果需保留 Suite 和引用的执行目录；跨机器路径可能需要调整。

@@ -15,6 +15,11 @@ from agentbench.harness.session import SuiteStore
 from agentbench.observe.view_api import SuiteRunCatalogAPI
 
 
+@pytest.fixture(autouse=True)
+def isolated_project(tmp_path, monkeypatch):
+    monkeypatch.setattr(viewer, 'project_root', lambda: tmp_path)
+
+
 @pytest.fixture
 def store(tmp_path):
     source = tmp_path / 'agent'
@@ -151,7 +156,7 @@ def test_two_viewers_use_distinct_ports_and_serve_their_own_suites(store, tmp_pa
                     assert f'/api/suites/{suite_id}/result' in response.read().decode('utf-8')
                 status, snapshot = request(running.base_url + f'/api/suites/{suite_id}/result')
                 assert status == 200 and snapshot['suite_id'] == suite_id
-            assert request(second.base_url + '/api/suites/suite_view/result')[0] == 409
+            assert request(second.base_url + '/api/suites/suite_view/result')[0] == 404
         finally:
             second.stop()
     finally:
@@ -178,7 +183,7 @@ def test_bound_control_checks_origin_token_and_route_before_dispatch(store, monk
         url = base + controller.capabilities['control_url']
         assert request(url, body=body, origin='https://evil.example', token='test-only')[0] == 403
         assert request(url, body=body, origin=base, token='wrong')[0] == 403
-        assert request(base + '/api/suites/foreign/commands', body=body, origin=base, token='test-only')[0] == 409
+        assert request(base + '/api/suites/foreign/commands', body=body, origin=base, token='test-only')[0] == 404
         assert controller.calls == []
         assert request(url, body=body, origin=base, token='test-only')[0] == 202
         assert controller.calls == [body]

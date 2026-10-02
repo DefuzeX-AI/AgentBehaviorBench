@@ -65,3 +65,50 @@ test('server errors retain the command identity because execution might have sta
   assert.equal(store.getState().suite.command.status, 'uncertain');
   assert.equal(store.getState().suite.command.command_id, 'server-error');
 });
+
+test('Case reuse keeps its source and new result link while the source revision stays unchanged', async () => {
+  const store = controlledStore();
+  let body;
+  await store.dispatch(sendSuiteCommand('reuse', { agent_id: 'alpha', case_index: 2 }, {
+    origin, uuid: () => 'reuse-one', fetch: async (_, options) => {
+      body = JSON.parse(options.body);
+      return { ok: true, json: async () => ({ status: 'queued' }) };
+    },
+  }));
+  assert.deepEqual(body, { command_id: 'reuse-one', action: 'reuse', agent_id: 'alpha', case_index: 2, expected_revision: 7 });
+  const snapshot = store.getState().suite.snapshot;
+  store.dispatch(actions.snapshotReceived({ snapshot: { ...snapshot, commands: [{
+    command_id: 'reuse-one', status: 'completed', result_url: 'http://127.0.0.1:8766/?suite=new',
+    result_path: '/results/suites/new/events.json',
+  }] } }));
+  const command = store.getState().suite.command;
+  assert.equal(command.status, 'completed');
+  assert.equal(command.agent_id, 'alpha');
+  assert.equal(command.case_index, 2);
+  assert.equal(command.result_path, '/results/suites/new/events.json');
+  assert.equal(command.result_url, 'http://127.0.0.1:8766/?suite=new');
+  assert.equal(store.getState().suite.snapshot.suite_id, 's');
+});
+
+test('a new reuse can be submitted after acknowledgment while the previous execution runs', async () => {
+  const store = controlledStore();
+  const sent = [];
+  let index = 0;
+  const dependencies = { origin, uuid: () => `reuse-${++index}`, fetch: async (_, options) => {
+    sent.push(JSON.parse(options.body));
+    return { ok: true, json: async () => ({ status: 'running', result_url: '/suite/shared/' }) };
+  } };
+  await store.dispatch(sendSuiteCommand('reuse', { agent_id: 'alpha', case_index: 0 }, dependencies));
+  await store.dispatch(sendSuiteCommand('reuse', { agent_id: 'alpha', case_index: 0 }, dependencies));
+  assert.deepEqual(sent.map(command => command.command_id), ['reuse-1', 'reuse-2']);
+  assert.equal(store.getState().suite.command.result_url, '/suite/shared/');
+});
+
+test('an uncertain reuse cannot be replaced with a new request', async () => {
+  const store = controlledStore();
+  let sends = 0;
+  const dependencies = { origin, fetch: async () => { sends++; throw new Error('lost acknowledgment'); } };
+  await store.dispatch(sendSuiteCommand('reuse', { agent_id: 'alpha', case_index: 0 }, dependencies));
+  await store.dispatch(sendSuiteCommand('reuse', { agent_id: 'alpha', case_index: 0 }, dependencies));
+  assert.equal(sends, 1);
+});

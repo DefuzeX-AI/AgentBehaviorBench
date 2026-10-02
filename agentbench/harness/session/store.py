@@ -10,6 +10,7 @@ from uuid import uuid4
 from agentbench.observe.store import redact
 
 from .atomic import atomic_json
+from .admission import extend_plan
 from .cases import retain_prepared, verify_prepared
 from .codec import case_from_json, event_to_json, prepared_from_json
 from .locking import SuiteLock
@@ -36,6 +37,7 @@ def read_suite(directory):
         if (not isinstance(event, dict) or event.get('schema') != EVENT_SCHEMA
                 or event.get('sequence') != index or event.get('suite_id') != plan['suite_id']):
             raise ValueError('Suite events have inconsistent schema, sequence or identity')
+        plan = extend_plan(plan, event)
     return plan, events
 
 
@@ -143,9 +145,10 @@ class SuiteStore:
         value = redact({'event_id': uuid4().hex, 'timestamp': datetime.now(timezone.utc).isoformat(),
                         'source': 'abb', **value, 'schema': EVENT_SCHEMA,
                         'suite_id': self.suite_id, 'sequence': len(self._events) + 1}, self._secrets)
+        updated_plan = extend_plan(self._plan, value)
         pending = [*self._events, value]
         atomic_json(self.path, pending)
-        self._events = pending
+        self._events, self._plan = pending, updated_plan
         return deepcopy(value)
 
     append_event = append
@@ -158,20 +161,22 @@ class SuiteStore:
                             self._plan['configuration'] if configuration is None else configuration,
                             secrets=self._secrets)
 
-    def retain_case(self, agent_id, case):
+    def retain_case(self, agent_id, case, *, allow_repeated=False):
         """Publish immutable bytes before recording a prepared slot; return its stable ref."""
         self._check_writer()
         job = next((job for job in self.snapshot()['jobs'] if job['agent_id'] == agent_id), None)
         if job is None or not 0 <= case.case_index < len(job['cases']):
             raise ValueError('Prepared Case is outside the planned selection')
+        existing = job['cases'][case.case_index]['prepared_case']
+        if existing is not None:
+            return retain_prepared(self.directory, agent_id, case, existing)
         for other in job['cases']:
             saved = other['prepared_case']
             if other['case_index'] == case.case_index or saved is None:
                 continue
-            if ((case.case_id is not None and saved.get('case_id') == case.case_id)
+            if not allow_repeated and ((case.case_id is not None and saved.get('case_id') == case.case_id)
                     or (case.content_sha256 is not None and saved.get('content_sha256') == case.content_sha256)):
                 raise ValueError('Prepared Case duplicates an already saved slot for this Agent')
-        existing = job['cases'][case.case_index]['prepared_case']
         retained = retain_prepared(self.directory, agent_id, case, existing)
         if existing is None:
             self.append({'event': 'case_prepared', 'agent_id': agent_id,

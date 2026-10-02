@@ -27,7 +27,10 @@ export function suiteProxySettings(environment = process.env) {
   }
   return {
     plugins: [{ name: 'abb-python-suite', configureServer: install, configurePreviewServer: install,
-      transformIndexHtml: () => [{ tag: 'meta', attrs: { name: 'abb-result-api', content: resultUrl }, injectTo: 'head' }] }],
+      transformIndexHtml: () => [
+        { tag: 'meta', attrs: { name: 'abb-result-api', content: resultUrl }, injectTo: 'head' },
+        { tag: 'meta', attrs: { name: 'abb-suites-api', content: '/api/suites' }, injectTo: 'head' },
+      ] }],
     proxy: { '/api': { target: target.origin, changeOrigin: true,
       configure(proxy) {
         proxy.on('proxyReq', (proxyRequest, request) => {
