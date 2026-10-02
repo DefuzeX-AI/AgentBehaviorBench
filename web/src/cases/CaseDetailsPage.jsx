@@ -11,7 +11,9 @@ import CaseConversation from './CaseConversation.jsx';
 import CaseToolsFiles from './CaseToolsFiles.jsx';
 import CaseJudge from './CaseJudge.jsx';
 import CaseTrace from './CaseTrace.jsx';
-import CaseRawJson from './CaseRawJson.jsx';
+import CaseGeneration from './CaseGeneration.jsx';
+import CaseResultFiles from './CaseResultFiles.jsx';
+import { CASE_TABS } from '../navigation/suiteRoute.js';
 import './cases.css';
 
 const { Text, Title } = Typography;
@@ -36,12 +38,13 @@ export default function CaseDetailsPage({ item, revision, onBack, onAgentSelect 
     { key: 'timing', label: 'Timing', children: <Suspense fallback={loading}><CaseTimeline key={attempt?.attempt_id || item.key}
       run={artifact} revision={revision} attempt={attempt} preparationRuns={item.preparation_runs || []}
       inputs={evaluation.data?.inputs} evidenceReady={Boolean(evaluation.data)} evidenceError={evaluation.error} /></Suspense> },
-    { key: 'replay', label: 'Replay', children: <Suspense fallback={loading}><CaseReplay key={artifact || item.key} run={artifact} /></Suspense> },
     { key: 'conversation', label: 'Conversation', children: artifactLoading ? loading : <CaseConversation inputs={evaluation.data?.inputs} /> },
+    { key: 'replay', label: 'Replay', children: <Suspense fallback={loading}><CaseReplay key={artifact || item.key} run={artifact} /></Suspense> },
+    { key: 'generation', label: 'Case Generation', children: <CaseGeneration item={item} revision={revision} /> },
     { key: 'tools', label: 'Tools & Files', children: artifact ? <CaseToolsFiles run={artifact} revision={revision} inputs={evaluation.data?.inputs} /> : null },
     { key: 'judge', label: 'Judge', children: artifactLoading && !report ? loading : <CaseJudge report={report} item={attempt || item} /> },
     { key: 'trace', label: 'Trace', children: artifact ? <CaseTrace run={artifact} revision={revision} /> : null },
-    { key: 'json', label: 'Raw JSON', children: artifactLoading ? loading : <CaseRawJson data={evaluation.data || attempt || item} /> },
+    { key: 'json', label: 'Result Files', children: <CaseResultFiles key={attempt?.attempt_id || item.key} run={artifact} preparationRuns={item.preparation_runs || []} revision={revision} /> },
   ];
 
   return <section className="case-details" aria-label={`${item.agent_id} Case ${item.case_index + 1}`}>
@@ -64,6 +67,6 @@ export default function CaseDetailsPage({ item, revision, onBack, onAgentSelect 
     {!artifact && <Alert type="info" showIcon message="Execution artifacts are not available yet" description={attempt ? 'This attempt has no viewable artifact directory. Saved Suite state remains available below.' : 'Case execution has not started.'} />}
 
     <Tabs className="case-tabs" activeKey={detailTab === 'replay' && !artifact ? 'overview' : detailTab} onChange={value => dispatch(actions.detailTabChanged(value))}
-      items={tabs.map(tab => ({ ...tab, disabled: ['replay', 'conversation', 'tools', 'trace'].includes(tab.key) && !artifact }))} />
+      items={CASE_TABS.map(key => tabs.find(tab => tab.key === key)).map(tab => ({ ...tab, disabled: ['replay', 'conversation', 'tools', 'trace'].includes(tab.key) && !artifact }))} />
   </section>;
 }

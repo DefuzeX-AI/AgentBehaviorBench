@@ -1,5 +1,7 @@
 import { Alert, Descriptions, Progress, Statistic, Tag, Typography } from 'antd';
 import { executionLabels } from '../suite/model.js';
+import JudgeProgress from './JudgeProgress.jsx';
+import { judgeProgress } from './judgeProgress.js';
 
 const { Paragraph, Text, Title } = Typography;
 const stateColor = value => ['succeeded', 'complete', 'completed', 'committed', 'received', 'captured'].includes(value) ? 'success'
@@ -30,6 +32,7 @@ export default function CaseOverview({ item, attempt, data, error }) {
         <Text type="secondary">Artifact pipeline completeness</Text>
       </section>
     </div>
-    {data && !data.judge && <Alert type="info" showIcon message="No Judge report has been produced" description="Execution data is retained. Judge remains separate from execution status." />}
+    {!data?.judge && (judgeProgress(attempt || item) ? <JudgeProgress item={attempt || item} />
+      : data && <Alert type="info" showIcon message="No Judge report has been produced" description="Execution data is retained. Judge remains separate from execution status." />)}
   </div>;
 }

@@ -1,6 +1,6 @@
 import { unionDuration } from '../cases/timelineModel.js';
 
-const callKinds = new Set(['agent', 'llm', 'chat', 'tool', 'http', 'sdk_wait', 'generation']);
+const callKinds = new Set(['agent', 'llm', 'chat', 'tool', 'http', 'sdk_wait', 'generation', 'judge']);
 
 export function groupSummary(records) {
   const ids = new Set(records.map(r => r.id));

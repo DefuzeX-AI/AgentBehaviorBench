@@ -83,3 +83,19 @@ test('runtime summary measures nested preparation once and excludes worker clean
     { ...op('worker-cleanup', 85, 90, 'cleanup'), source: 'worker' }] });
   assert.deepEqual(model.phases.map(p => p.duration_ms), [30, 60, 10]);
 });
+
+test('host Judge queue survives reload, counts elapsed time and isolates attempts', () => {
+  const run = { ...op('execution', 0, 100, 'total'), attempt_id: 'a', clock_id: 'execution' };
+  const queue = { ...op('queue', 100, 300, 'wait'), phase: 'judge', attempt_id: 'a', clock_id: 'host-wall' };
+  const judge = { ...op('host-judge', 300, 400, 'total'), phase: 'judge', attempt_id: 'a', clock_id: 'judge' };
+  const submit = { ...op('submit', 310, 390, 'judge', 'host-judge'), phase: 'judge', clock_id: 'judge' };
+  const other = { ...queue, id: 'other-attempt-queue', attempt_id: 'b' };
+  const data = { operations: [run, queue, judge, submit, other] };
+  const model = makeTimeline(data, { attempt_id: 'a' });
+  assert.equal(model.total_ms, 400);
+  assert.equal(model.phases.find(p => p.label === 'Judge queue').duration_ms, 200);
+  assert.equal(model.phases.find(p => p.label === 'Host Judge').duration_ms, 80);
+  assert.ok(model.rows.some(s => s.id === 'queue'));
+  assert.ok(!model.rows.some(s => s.id === 'other-attempt-queue'));
+  assert.deepEqual(makeTimeline(JSON.parse(JSON.stringify(data)), { attempt_id: 'a' }), model);
+});

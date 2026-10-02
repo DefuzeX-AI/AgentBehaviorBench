@@ -25,11 +25,10 @@ export function suiteNavigationSummary(cases) {
   const total = cases.length;
   const complete = cases.filter(item => isComplete(item.execution_status)).length;
   const judged = cases.filter(item => item.report_received).length;
-  const passed = cases.filter(item => item.judge_status === 'pass').length;
   return {
     total,
     complete,
     judged,
-    percentage: total ? Math.round((passed / total) * 100) : 0,
+    percentage: total ? Math.round((complete / total) * 100) : 0,
   };
 }
