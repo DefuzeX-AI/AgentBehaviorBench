@@ -25,68 +25,42 @@
 
 ## ABB란 무엇인가요?
 
-AgentBehaviorBench는 AI Agent를 위한 행동 테스트 시스템입니다. 구체적인 작업에서 Agent가
-받은 지시, 호출한 모델과 도구, 발생시킨 변경 사항, 수집된 증거가 최종 답변을 뒷받침하는지를
-평가합니다.
-
-ABB는 최종 텍스트만 비교하지 않습니다. Case를 통해 안전 경계, 지시 처리, 도구 사용,
-상태 변경, Agent가 자신의 행동을 정확하게 보고했는지 등을 검사할 수 있습니다. 각 평가는
-Case, Agent 출력, 실행 증거, Judge 결과를 보존합니다.
+AgentBehaviorBench(ABB)는 AI Agent가 다른 Agent의 행동을 테스트하는 능력을 평가하는
+벤치마크입니다. 바로 실행할 수 있는 대상 Agents와 사람이 직접 수행한 실제 테스트를 통해 확인한 행동 결함이라는
+두 가지 데이터셋을 포함합니다. 확인된 결함은 Ground Truth(정답 데이터)로 사용합니다.
+평가에 참여하는 테스트 Agent는 테스트 케이스를 생성하고 대상 Agent가 이를 실행하도록 한 뒤,
+그 과정에서 생성된 실행 궤적을 분석하여 대상 Agent의 문제를 찾습니다.
 
 ## 개요
 
-ABB는 서로 다른 프레임워크로 구현된 여러 Agent를 등록하여 하나의 평가 파이프라인에서
-실행할 수 있습니다. 평가 SDK는 각 Agent가 선언한 기능을 바탕으로 Cases를 생성합니다.
-ABB는 각 Case를 격리된 환경에서 실행하고 모델 호출, 도구 호출, 파일 변경 및 Agent 출력을
-수집한 뒤, SDK가 이 증거를 사용하여 관찰된 행동을 판정합니다.
+ABB는 Adapters를 통해 서로 다른 프레임워크로 구현된 대상 Agents를 연결하고 하나의
+파이프라인에서 테스트 케이스를 실행하며 행동 증거를 수집합니다. ABB에 연결하는 테스트
+Agent는 테스트 케이스 생성, 실행 증거 분석 및 결함 판정(Judge) 능력을 갖추어야 하며,
+평가 SDK를 통해 연결됩니다. 실행 증거에는 테스트 입력, Agent 출력과 실행 상태,
+OpenTelemetry 트레이스, 파일 증거 수집을 활성화한 경우의 파일 변경 기록과 Diff가 포함됩니다.
+테스트 Agent는 이러한 증거를 바탕으로 행동 결함을 보고해야 합니다. 벤치마크에서
+Ground Truth에 지정된 결함을 찾아내면 해당 점수를 받습니다.
 
-![AgentBehaviorBench 아키텍처](../figures/abb-architecture-v2.png)
+AgentBehaviorBench 평가에 참여하는 각 테스트 Agent는 다음 능력을 갖추어야 합니다.
+
+1. **테스트 케이스 생성(Case Generation)**: 대상 Agent의 기능과 행동 제약을 바탕으로 그 행동을 검증하는 테스트 케이스를 생성합니다.
+2. **실행 궤적 분석(Trajectory Analysis)**: 테스트 입력, Agent 출력, OpenTelemetry 트레이스 및 파일 변경 증거를 분석하여 잠재적인 행동 이상을 식별합니다.
+3. **결함 판정(Judging)**: 실행 증거를 바탕으로 대상 Agent에 행동 결함이 있는지 판단하고, 구체적인 문제와 이를 뒷받침하는 증거를 보고합니다.
+
+![AgentBehaviorBench 아키텍처](../figures/abb-suite-sdk-roles.png)
 
 Agent Registry는 테스트 대상 소스 리비전과 ABB가 Agent를 시작하는 방법을 기록합니다.
 Harness는 Cases를 예약하고, 컨테이너를 시작하고, Agent Run을 실행하고, 선언된 트래픽을
 라우팅하며 trace와 파일 시스템 증거를 수집합니다. 실행 상태와 Judge 판정은 별개입니다.
 Agent가 정상적으로 실행되더라도 Judge가 행동 문제를 발견할 수 있습니다.
 
-## 현재 가져온 Agents
+## 리소스
 
-다음 Agent 소스가 현재 ABB에 등록되어 있습니다.
-
-ABB는 현재 LangGraph Agent의 네이티브 통합과 Agent Client Protocol(ACP)을 통해 제공되는
-Agent를 지원합니다.
-
-각 GitHub revision 링크는 `agent.toml`에 고정된 정확한 commit을 가리킵니다. Folder Mover
-Agent는 로컬 디렉터리에서 가져왔으므로 ABB는 Git commit 대신 소스 내용 digest를 기록합니다.
-
-| Agent | GitHub 소스 | 선택한 리비전 |
-| --- | --- | --- |
-| `folder-mover-agent` | 로컬 소스 | `sha256:2826f61…` |
-| `company-research-agent` | [guy-hartstein/company-research-agent](https://github.com/guy-hartstein/company-research-agent) | [`c714203`](https://github.com/guy-hartstein/company-research-agent/commit/c7142035a1cd413e34ad0595dbe9b5ca8b0308e8) |
-| `react-agent` | [langchain-ai/react-agent](https://github.com/langchain-ai/react-agent) | [`9bbd82d`](https://github.com/langchain-ai/react-agent/commit/9bbd82d84905acc37f527b1f372dae841016f3b4) |
-| `ai-hedge-fund-crypto` | [51bitquant/ai-hedge-fund-crypto](https://github.com/51bitquant/ai-hedge-fund-crypto) | [`c6750e0`](https://github.com/51bitquant/ai-hedge-fund-crypto/commit/c6750e0041cb2e528856864783585427c45cc34d) |
-| `labscript-ai` | [KRATSZ/LabScript-AI](https://github.com/KRATSZ/LabScript-AI) | [`abff772`](https://github.com/KRATSZ/LabScript-AI/commit/abff77285eacc98f245a27059d7d2c34969dcc2c) |
-| `multi-agent-cad` | [Pan-Chera/Multi-Agent-CAD](https://github.com/Pan-Chera/Multi-Agent-CAD) | [`f31a2f6`](https://github.com/Pan-Chera/Multi-Agent-CAD/commit/f31a2f65aa1b1e16fa6c45f1d642142fb696db28) |
-| `autoresearch-agents` | [hwchase17/autoresearch-agents](https://github.com/hwchase17/autoresearch-agents) | [`552fd6a`](https://github.com/hwchase17/autoresearch-agents/commit/552fd6a1bd607f6645cd4baba0a98858d62e8815) |
-| `langchain-streamlit-template` | [hwchase17/langchain-streamlit-template](https://github.com/hwchase17/langchain-streamlit-template) | [`3c676a6`](https://github.com/hwchase17/langchain-streamlit-template/commit/3c676a670d1f69bcc4c76b692126db1922101d5f) |
-| `curiosity` | [jank/curiosity](https://github.com/jank/curiosity) | [`41c9195`](https://github.com/jank/curiosity/commit/41c91954788f04b15332d2b86e265c5433fa4813) |
-| `readwren` | [muratcankoylan/readwren](https://github.com/muratcankoylan/readwren) | [`3d0bfe4`](https://github.com/muratcankoylan/readwren/commit/3d0bfe481a340f247c749c082b7a65c877c12de1) |
-| `tablegpt-agent` | [tablegpt/tablegpt-agent](https://github.com/tablegpt/tablegpt-agent) | [`26bc576`](https://github.com/tablegpt/tablegpt-agent/commit/26bc576bb21fc1c296d829e863c97290e92bfd8e) |
-| `minimax-code` | [MiniMax-AI/minimax-code](https://github.com/MiniMax-AI/minimax-code) | [`a5639bc`](https://github.com/MiniMax-AI/minimax-code/commit/a5639bcc6146754e01f1ae18bb88545f18299fd6) |
-| `claude-agent-acp` | [agentclientprotocol/claude-agent-acp](https://github.com/agentclientprotocol/claude-agent-acp) | [`d421f56`](https://github.com/agentclientprotocol/claude-agent-acp/commit/d421f56a6c43cde16d9a7531d08a750a5ef2f04a) |
-| `qwen-code` | [QwenLM/qwen-code](https://github.com/QwenLM/qwen-code) | [`1026c4a`](https://github.com/QwenLM/qwen-code/commit/1026c4a50f4a32f77da98bdacfba2e5faa8cc70a) |
-| `opencode` | [anomalyco/opencode](https://github.com/anomalyco/opencode) | [`014614d`](https://github.com/anomalyco/opencode/commit/014614d35b397775e5d397a490fc72368c894ec2) |
-| `kilo-code` | [Kilo-Org/kilocode](https://github.com/Kilo-Org/kilocode) | [`01ef456`](https://github.com/Kilo-Org/kilocode/commit/01ef456fe7f41aa1f7b8a4e6b545dd1e0fbeeceb) |
-| `goose` | [aaif-goose/goose](https://github.com/aaif-goose/goose) | [`1a4249a`](https://github.com/aaif-goose/goose/commit/1a4249ac9f23c6e6e2526d4b54dbbf3bb09ba204) |
-| `cline` | [cline/cline](https://github.com/cline/cline) | [`d718dd1`](https://github.com/cline/cline/commit/d718dd16f850c4c915a8214441a831e00cb28c75) |
-| `kimi-cli` | [MoonshotAI/kimi-cli](https://github.com/MoonshotAI/kimi-cli) | [`86f1364`](https://github.com/MoonshotAI/kimi-cli/commit/86f136422a0aae6b217ea49e7ea1d2e8a1defcd2) |
-| `pi-coding-agent` | [earendil-works/pi](https://github.com/earendil-works/pi) | [`13cbf77`](https://github.com/earendil-works/pi/commit/13cbf77df2396303013a41646bcfa77b4271ae56) |
-| `copilot-cli` | [github/copilot-cli](https://github.com/github/copilot-cli) | [`ab6139c`](https://github.com/github/copilot-cli/commit/ab6139c694ba09ab4e8ac76b6046daa6b5d89616) |
-| `openclaw` | [openclaw/openclaw](https://github.com/openclaw/openclaw) | [`ec9c1a1`](https://github.com/openclaw/openclaw/commit/ec9c1a13db8938e5a3eaa51fca2e981cde2395a9) |
-| `hermes-agent` | [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) | [`345cd2b`](https://github.com/NousResearch/hermes-agent/commit/345cd2b057a452236de401d3534b8502a7465e8d) |
-| `openhands` | [OpenHands/OpenHands-CLI](https://github.com/OpenHands/OpenHands-CLI) | [`2963442`](https://github.com/OpenHands/OpenHands-CLI/commit/2963442dacc7cea44e39b7c4e73724295c853465) |
-| `deepagents-code` | [langchain-ai/deepagents](https://github.com/langchain-ai/deepagents) | [`a764619`](https://github.com/langchain-ai/deepagents/commit/a764619aa8c850bc75e2e916cf53a587637d8c81) |
-
-`resources/registry.toml`은 Agent 활성화 상태, 준비 상태, Case 수 및 step 제한에 대한
-공식 정보원입니다.
+- [등록된 Agents](Agents.ko.md) — 대상 Agent 목록, 소스 저장소 및 고정 리비전.
+- [Agent 등록부 읽는 방법](Registry.ko.md) — `registry.toml` 필드, Agent 선택 및 Case 예산.
+- [Agent 추가 방법](How%20To%20Add%20Agent.ko.md)
+- [CLI 문서](cli.ko.md)
+- [ABB 시작 방법 — 영어](../Guide.md)
 
 ## 평가 SDK 및 Judge
 
@@ -97,44 +71,14 @@ Agent는 로컬 디렉터리에서 가져왔으므로 ABB는 Git commit 대신 �
 생성하고, ABB가 수집한 증거를 받아 DefuzeX Judge에 제출합니다. 판정 및 평가 결과는
 Suite artifacts와 함께 저장됩니다.
 
-ABB에는 결정론적 오프라인 개발과 테스트를 위한 `local` SDK plugin도 포함되어 있습니다.
+ABB에는 고정 스모크 테스트 Cases와 로컬 Judge를 사용하는 `local` SDK plugin도 포함되어 있습니다.
+KUMA 백엔드 크레딧은 필요하지 않지만 Agent와 Judge 모델 호출에는 비용이 발생할 수 있습니다.
 이 plugin은 공식 benchmark 결과에 사용되는 Judge가 아닙니다.
 
-## ABB CLI 도움말
-
-```text
-usage: agentbench [-h]
-                  {run,agent,view,certify,observe,evaluate,clean,sdk,resume,retry,reuse}
-                  ...
-
-등록된 Benchmark Agents를 실행, 인증 및 검사합니다.
-
-위치 인수:
-  {run,agent,view,certify,observe,evaluate,clean,sdk,resume,retry,reuse}
-    run                 활성화되고 ready인 모든 Agents를 실행합니다.
-    agent               Agent 소스를 가져오고 검사합니다.
-    view                저장된 결과를 로컬 뷰어에서 엽니다.
-    certify             adapting Agent를 실행하고 성공 후 ready로 승격합니다.
-    observe             활성화된 Agent를 실행하고 trace를 저장합니다.
-    evaluate            독립적인 SDK Cases로 Agent를 평가합니다.
-    clean               참조되지 않는 로컬 결과 기록을 보관합니다.
-    sdk                 평가 SDK plugins를 나열하고 검사합니다.
-    resume              저장된 Suite의 완료되지 않은 작업을 계속합니다.
-    retry               원래 입력으로 완료되지 않은 Case를 다시 실행합니다.
-    reuse               저장된 Cases를 연결된 새 Suite에서 실행합니다.
-
-옵션:
-  -h, --help            도움말을 표시하고 종료합니다
-```
-
-명령별 옵션은 `agentbench COMMAND --help`로 확인할 수 있습니다.
-
-뷰어를 빌드하려면 Node.js 20.19+ (20.x) 또는 22.12+가 필요합니다. 저장소 루트에서 `cd web && npm ci && npm run build`를 실행하세요. 프런트엔드 변경 후에는 다시 빌드하세요.
 
 ## 추가 문서
 
 - [ABB 설치, 설정 및 실행 — 영어](../README-previous.md)
-- [테스트할 Agent를 ABB에 추가하는 방법](How%20To%20Add%20Agent.ko.md)
 - [결과 및 문제 해결 — 영어](../Troubleshooting.md)
 
 ## 라이선스

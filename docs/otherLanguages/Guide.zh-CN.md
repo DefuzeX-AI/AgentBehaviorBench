@@ -1,10 +1,6 @@
-# ABB 安装、运行与 Agent 接入
+# 如何启动 ABB
 
 [English](../Guide.md) | 中文
-
-ABB 负责选择 Agent、容器执行、Case 并发、证据和本地结果；KUMA SDK 定义评测
-协议，调用 DefuzeX 服务生成 Case 和判分。OpenRouter 是被测 Agent 的模型服务，
-Tavily 是部分 Agent 的搜索服务。三类服务的凭据和额度相互独立。
 
 ## 安装前准备
 
@@ -18,8 +14,7 @@ Tavily 是部分 Agent 的搜索服务。三类服务的凭据和额度相互独
 | Node.js 20.x 至少 20.19，或 22.12+，以及 npm | 构建网页；`node --version`、`npm --version`。无界面运行可不安装。 |
 | 浏览器 | 打开终端输出的完整本地 URL。 |
 
-Node 版本来自仓库锁定的 Vite 依赖。它用于构建/开发网页，普通查看器由 Python
-提供 `web/dist`；安装 Python 包不会自动构建网页。
+网页可以查看 ABB 启动的进程及其运行状态，以及 Agent 输出的内容。
 
 macOS 使用 [Docker Desktop](https://docs.docker.com/desktop/setup/install/mac-install/)；
 Linux 使用 [Docker Engine](https://docs.docker.com/engine/install/) 并配置当前用户权限；
@@ -41,9 +36,31 @@ agentbench sdk list
 python -m examples.offline_demo --output results/offline-demo.json
 ```
 
-SDK 列表应出现 `kuma` 和 `local`。离线示例无需 Docker、API key 或模型调用，预期显示
-`Case execution: 1/1 completed | Judge: pass=1`。这验证本地流程，不代表正式服务通过。
+如果你尚未接入自己的测试 Agent，默认 SDK 列表应出现 KUMA（CLI 中显示为 `kuma`）和 `local`。
+KUMA 是我们为 Benchmark 提供的基线测试 Agent，通过 `kuma` SDK 插件接入；`local` 则是
+用于最低限度离线验证的测试 Agent，通过 `local` SDK 插件提供。
+
+离线示例使用本地 echo Agent 和确定性 Judge，无需 Docker、API key 或模型调用。成功时预期显示
+`Case execution: 1/1 completed | Judge: pass=1`，表示本地测试流程已跑通。
 记录 `OFFLINE_RESULT=` 后的真实路径：程序会给输出文件加时间戳。
+
+如果 demo 提示 `Agent requirement.md is missing`，说明 echo 示例缺少接入文件。
+这是示例问题，不是 API key 错误；请使用包含该示例修复的版本。
+CLI 帮助与 SDK 列表仍可用于不需要凭据的安装检查。
+
+## 网页构建
+
+ABB 支持使用 `--no-view` 运行 Benchmark 而不启动网页，例如 `agentbench run --no-view`。
+仅使用命令行时，无需安装用于构建网页的 Node.js 和 npm。不过，我们强烈建议安装并构建
+网页查看器，方便查看 ABB 启动的进程、运行状态及 Agent 输出的内容。
+
+下图为本地网页的 Benchmark 概览，可查看已保存的 Suites、Agents 和 Cases。
+
+![ABB 网页 Benchmark 概览](../figures/abb-web-overview.jpg)
+
+进入具体 Case 的 **Conversation** 页面，可以查看测试输入及 Agent 输出。
+
+![ABB 网页中的 Agent 输入与输出](../figures/abb-web-agent-output.jpg)
 
 ```bash
 cd web
@@ -54,97 +71,91 @@ cd ..
 agentbench view results/offline-demo-YYYYMMDD-HHMMSS.json
 ```
 
-首次 clone 没有 `web/dist`，必须先构建。打开 `View:` 后的完整地址（包括 Suite 路径），
-保持命令运行；Ctrl+C 关闭查看器。根地址打开 Benchmark Overview，侧栏列出保存的 Suite，
-`/suite/SUITE_ID/` 选中指定 Suite。列表自动刷新，包含新运行和复跑结果；扫描项目
-`results/` 中的标准 Suite 目录和已登记的外部 Suite 目录。无法读取的历史记录会单独提示。
-Suite 卡片默认收起，显示执行完成比例和 Judge 数量；点击箭头可独立展开 Agent 和 Case，
-点击卡片可打开对应 Suite。
-侧栏和页面标题区也会显示保存的评测来源（KUMA、Local 或其他 SDK）。标识来自已保存的执行配置；
-历史来源缺失或混合时会明确显示。它表示评测器，不是被测 Agent 或启动运行的人员。
-CLI 运行会复用当前项目已启动的查看器，输出同一地址下对应 Suite 的链接。
-新启动查看器默认使用 8765，端口被占用时会换空闲端口。
-普通评测不用启动 `npm run dev`；前端修改后需重新构建。
+首次 clone 后需先完成上述网页构建。打开终端输出的 `View:` 完整地址，
+保持命令运行；按 Ctrl+C 关闭查看器。
 
-打开 Case 默认进入 **Judge**，优先展示判定、问题和保存的判断依据，报告元数据及完整 JSON 位于下方。
-切换到历史 Attempt 时只展示该轮报告。**Timing** 保留主要的时序、瀑布图和拓扑视图，
-展开其中的 **Trace details** 可查看 OTel 和执行流程。旧 `tab=trace` 链接进入 Timing，
-明确指定 Overview 的旧链接仍打开 Overview。
+1. 在侧栏展开 Suite，选择要查看的 Agent 和 Case。运行进度与结果会自动刷新。
+2. 在 **Conversation** 查看测试输入和 Agent 输出，在 **Judge** 查看缺陷判定及依据。
+3. 在 **Timing** 查看执行时序；展开 **Trace details** 查看 OpenTelemetry 调用轨迹。
+4. 返回 **Benchmark Overview**，选择 **KUMA**、**Local** 等 SDK 选项卡查看汇总，
+   点击 **Export JSON** 导出当前结果。
 
-Benchmark Overview 顶部按 SDK 提供选项卡，例如 **KUMA** 和 **Local**。
-每个选项卡只显示该 SDK 的 Agent、Suite、Case 和已核验发现；`?sdk=...` 保留选择，
-**Export JSON** 导出当前选项卡。缺失、部分缺失和混合来源单独分组，
-不会把这些结果计给某个已知 SDK。侧栏仍显示所有保存的 Suite。
-
-Benchmark Overview 的主指标是发现了多少经过人工确认的 ground truth 缺陷。
-每个 Agent 可在 `agent.toml` 旁的 `ground_truth/` 中保存已确认缺陷和观察数据。
-独立的评估记录分别标明 Case 是否复现缺陷、Judge 是否正确识别；同一缺陷多次命中只计一次。
-未配置 ground truth 显示 **Not configured**，尚无评估显示 **Not assessed**，不会当作 0% 发现率。
-存储格式及评估接口见 [Ground truth 契约](Ground%20Truth.zh-CN.md)。
-当前百分比是该 SDK 历史结果的 **Observed GT coverage（已观测 GT 覆盖率）**。
-独立的 **Benchmark score** 暂显示 **Protocol not configured**；正式评分需要统一的
-Agent/GT 集合、固定预算和独立重复轮次。[评分协议草案](Benchmark%20Scoring.zh-CN.md)
-定义 GT Discovery@B 及 Case、Judge、稳定性分项指标，历史覆盖率不用于排名。
-
-每个 Agent 仍保留 Suite 数和总 Case 数。展开 Agent 可查看 ground truth 结果、
-各 Suite 的贡献数量和结果链接。
-例如两个 Suite 各有十个 Case，会显示 `2 Suites × 10 Cases`，合计二十个；
-各 Suite 的 Case 数不同时逐一相加。新增运行、reuse 和执行进度会自动更新统计。
-
-总 Case 数包含已计划和排队的 Case。reuse 增加新的 Case 记录，即使 Case ID 相同也计数；
-同一 Case 的 retry 不增加总数。Suite 明细的执行完成数不等于 ground truth 命中数或 Judge 通过数；
-Judge 返回 `issue` 也不会自动算作发现某个已知缺陷。
-缺失、损坏或 ID 有歧义的 Suite 不计入，并显示提示。收集统计只读取保存的结果，
-不会执行 Agent 或评测。可导出 JSON，或访问本地 `GET /api/benchmark/overview` 获取汇总和明细。
-API 保留所有 SDK 的总汇总，并在 `evaluators` 中提供各 SDK 独立分组。
+前端修改后重新运行 `npm run build`。
 
 ## 配置真实评测
 
-仅在还没有 `.env` 时复制模板，升级时保留已有配置：
+### 1. 选择目标 Agent
+
+先从[已加入的 Agents](Agents.zh-CN.md) 中选择你想测试的 Agent，记下它的 `agent_id`。
+参考[注册表说明](Registry.zh-CN.md)，在 `resources/registry.toml` 中确认其框架和启用状态。
+
+如果还没有 `.env`，先复制模板；已有配置请保留：
 
 ```bash
-cp .env.example .env
+test -f .env || cp .env.example .env
 ```
+
+### 2. 配置目标 Agent 的模型
+
+目标 Agent 执行任务需要调用模型，请根据其接入方式填写 `.env`。
+
+**LangGraph Agent**：选择 OpenRouter、DeepSeek 或 GLM，填写所选服务的 API key 和模型名称。
+例如使用 OpenRouter：
+
+```dotenv
+OPENROUTER_API_KEY=
+OPENROUTER_MODEL=openai/gpt-4.1-mini
+```
+
+也可以使用以下服务，模型名称请填写账号可用且支持目标 Agent 所需功能的模型：
+
+| 模型服务 | API key | 模型名称 |
+| --- | --- | --- |
+| DeepSeek | `DEEPSEEK_API_KEY` | `DEEPSEEK_MODEL` |
+| GLM | `GLM_API_KEY` | `GLM_MODEL` |
+
+默认按 OpenRouter → DeepSeek → GLM 选择第一个已填写 key 的服务。如果填写了多个服务，
+可用 `ABB_MODEL_PROVIDER=deepseek` 或 `ABB_MODEL_PROVIDER=glm` 指定选择。
+若使用 GLM，请确认 `GLM_API_BASE_URL` 与你的账号及所用 API 服务对应。
+需要网页搜索的 Agent 还需填写 `TAVILY_API_KEY`，具体以该 Agent 的配置为准。
+
+**ACP Agent**：这些 Agent 通常有各自推荐或已配置的模型服务。请在 `.env` 中找到对应
+Agent 的注释段，填写所需 API key；如有模型名称和 API 地址，也按该 Agent 的要求填写。
+例如 MiniMax Code 使用 `MINIMAX_API_KEY`，Qwen Code 使用 `DASHSCOPE_API_KEY`，
+使用 GLM 的 Agent 则填写 `GLM_API_KEY`、`GLM_MODEL` 和 `GLM_API_BASE_URL`。
+具体要求可查看对应 `resources/agents/<目录>/README.md`，模板见
+[`.env.example`](../../.env.example)。
+
+### 3. 使用 KUMA 进行评测
+
+如果使用 KUMA 生成测试用例并提交 Judge，除目标 Agent 的模型配置外，还需填写：
 
 ```dotenv
 KUMA_API_KEY=
-OPENROUTER_API_KEY=
-OPENROUTER_MODEL=openai/gpt-4.1-mini
-TAVILY_API_KEY=
-ABB_MAX_PARALLEL_CASES=1
 ```
 
-- `KUMA_API_KEY`：Case/Judge 服务凭据，参考 [DefuzeX 文档](https://defuzex.ai/documentation?view=sdk)
-  和 [KUMA 官方仓库](https://github.com/DefuzeX-AI/KUMA-DefuzeX)。`DEFUZEX_API_KEY`
-  是 ABB 支持的别名；非空 `KUMA_API_KEY` 优先，只需配置一个。
-- `OPENROUTER_API_KEY`：从 [OpenRouter](https://openrouter.ai/settings/keys) 创建。
-- `OPENROUTER_MODEL`：必须设置的模型名称，不是密钥。模板里的值只是示例，代码没有
-  自动默认值；需确认账号可用、支持 Agent 所需的工具调用和协议。
-- `TAVILY_API_KEY`：从 [Tavily](https://app.tavily.com/) 获取，仅使用该工具的 Agent 需要。
-- `ABB_MAX_PARALLEL_CASES`：正整数，默认 1；4 表示整个 Suite 最多并行 4 个 Case，
-  包括同一 Agent 的不同 Case。它不限制 Agent 内部搜索工具的并发。
-- `ABB_MAX_PARALLEL_JUDGES`：正整数，默认 2；官方 KUMA Judge 在容器清理后由
-  宿主机独立提交，不占 Agent 执行名额。
-- `ABB_JUDGE_QUEUE_CAPACITY`：正整数，默认 8；限制等待任务和预留执行名额，
-  满额时暂停接收新的执行。任务持久化，恢复时不会重新执行 Agent。
-  详见 [Host Judge queue（英文）](../Host%20Judge%20Queue.md)。
-
-Shell 已导出的变量优先于 `.env`，已导出的空值也会影响读取。`--env-file PATH`
-选择其他文件，`--model MODEL` 覆盖单次 Agent 模型。`.env` 不会整份挂入容器，
-Agent 只获得声明的配置与运行时提供的凭据。当前 ReAct 的模型经拦截器转发，
-宿主机无需再提供真实 `ANTHROPIC_API_KEY`。
-
-需要在宿主机做 KUMA 检查或 `agent add -b` 时，在当前 venv 安装：
+ABB 不会自动安装 KUMA SDK。使用 KUMA 时，在运行 ABB 的虚拟环境中直接安装其发行包：
 
 ```bash
-python -m pip install -r agentbench/sdk/plugin/kuma/requirements.txt
-python -c "from importlib.metadata import version; import kuma; print(version('kuma-defuzex')); print(kuma.__file__)"
+python -m pip install "kuma-defuzex[otel]>=0.3.3"
 ```
 
-发行包叫 `kuma-defuzex`，导入名叫 `kuma`。容器也会独立安装该 requirements；
-容器安装成功不等于 IDE/宿主机已安装。不要使用旧的 `.[defuzex]` extra。
+运行评测时使用 `--sdk kuma`。
+
+使用 `--sdk local` 做冒烟测试时不需要 `KUMA_API_KEY`，仍需配置目标 Agent 使用的模型。
 
 ## 先跑一个 Case
+
+运行 Case 前，请确认以下准备工作已完成：
+
+- [ ] 已安装 ABB 并激活对应虚拟环境，`agentbench --help` 能正常运行。
+- [ ] Docker 已启动，当前用户执行 `docker info` 成功。
+- [ ] 已选定目标 Agent 的 `agent_id`，并在[注册表](Registry.zh-CN.md)中将其设为 `enabled = true`。
+- [ ] 已在 `.env` 中填写该 Agent 所需的模型 API key、模型名称及其他配置，如搜索服务的 key。
+- [ ] 已选定评测 SDK：使用 KUMA 时已安装 KUMA SDK 并填写 `KUMA_API_KEY`；使用 `--sdk local` 时无需 KUMA key。
+- [ ] 如需网页实时查看，已完成 `npm ci` 和 `npm run build`；使用 `--no-view` 可跳过网页构建。
+
+以下以 `react-agent` 为例，测试其他 Agent 时替换为对应的 `agent_id`：
 
 ```bash
 agentbench observe --list
@@ -152,7 +163,16 @@ agentbench evaluate react-agent --cases 1 --no-view
 ```
 
 一个 Case 可包含多轮输入。`--no-view` 不启动网页，但结果仍保存；可稍后构建网页
-再打开。`run` 执行注册表中全部启用且 ready 的 Agent，Case 数取各自的 `case`：
+再打开。
+
+如需通过网页实时查看运行情况，请先完成网页构建，然后运行：
+
+```bash
+agentbench evaluate react-agent --cases 1
+```
+
+`run` 执行注册表中全部启用且 ready 的 Agent，Case 数取各自的 `case`。
+字段含义及每个 Case 的 `step` 上限见[如何阅读 `registry.toml`](Registry.zh-CN.md)：
 
 ```bash
 agentbench run
@@ -183,92 +203,3 @@ agentbench evaluate react-agent --sdk local --cases 1 --no-view
   Agent 的模型目标是 Anthropic messages 协议时必须设置。
 - 不写 `--sdk` 的命令仍然使用 `kuma`；`local` 只能按名字选择。
 - 运行目录里除常规产物外还有 `local-judge.json`，记录 Judge 模型、判决和原始回复。
-
-## 添加 Agent
-
-请按 [Agent 接入指南](How%20To%20Add%20Agent.zh-CN.md) 操作：先配置环境，
-再运行添加命令，最后了解每个文件的用途。该指南提供与 README 相同的六种语言。
-
-## 结果与故障处理
-
-| 现象 | 判断与处理 |
-| --- | --- |
-| `Trace UI not built` | 先检查 Node 版本，再在 web/ 执行 npm ci 和 npm run build。 |
-| Docker 不可用 | 当前用户执行 docker info，检查服务、context 和权限。 |
-| SDK 导入错误 | 安装插件 requirements；IDE 选择同一个 venv。 |
-| key/model 错误 | 分清 KUMA、模型、搜索服务；检查环境优先级、模型 slug 和额度。 |
-| `-b` schema 错误 | 检查生成模型是否支持严格结构化输出，以及失败阶段记录。 |
-| `FAILED` 但有 Judge | 查看执行状态和 Judge 状态，不能直接判断容器崩溃。 |
-| `issue` | 已发现行为问题，核对具体步骤和实际 trace。 |
-| `insufficient_evidence` | 证据不足，不能直接当作已证实的 Agent 缺陷。 |
-| OTel `partial` | 看具体原因；属性过滤、span 丢失、导出失败并不相同。 |
-
-`run`、`evaluate`、`certify` 都支持 `--results-dir DIR` 指定 ABB 结果目录。
-不存在的目录会自动创建，名字带点号也按目录处理。例如：
-
-```bash
-agentbench evaluate react-agent --cases 1 --yes --no-view --results-dir results/my-run
-```
-
-实际事件文件是 `results/my-run/suites/<suite-id>/events.json`，同目录保存计划和
-Case。查看结果时使用 `Result saved` 打印的真实路径；恢复、重试和宿主机 Judge
-后续更新仍使用同一个 Suite 目录。
-旧 `evaluate --result-output PATH` 和 `run`/`certify --output PATH` 保留兼容并打印
-迁移提示，但文件路径仅选择父目录，**不会创建指定文件名**；请改用 `--results-dir`。
-`evaluate --output DIR` 独立控制 SDK 产物目录；ABB 结果目录不会移动 SDK trace，
-查看器通过保存的 Suite 引用读取这些产物。
-
-Suite 默认在 `results/suites/<suite-id>/` 保存计划、Case 和 events.json；每次执行的
-详细产物在 `results/observe/<run-id>/`。Judge 通常位于 evaluation/judge/report.json。
-始终使用终端打印的真实路径和 Case 的 artifact ID。
-
-`resume SUITE` 继续符合恢复条件的未完成任务；`retry SUITE --agent ID --case N`
-恢复一个未完成 Case；`reuse SUITE` 把保存的 Case 提交到复跑 Suite。已接受但响应不明、
-非安全重放或清理未确认的请求仍可能阻塞，不承诺任何失败都可自动重试。
-改 Profile 不会改变旧 Case；验证新 Profile 要重新生成。
-
-单独复跑某个 Case，可以使用结果里的 Case ID、artifact run ID，或明确指定来源：
-
-```bash
-agentbench reuse CASE_ID
-agentbench reuse ARTIFACT_RUN_ID
-agentbench reuse results/suites/SUITE_ID --agent AGENT_ID --case 2
-```
-
-`--case` 从 1 开始；也接受保存的 `case.json` 路径、执行产物目录或其内部文件路径。
-默认搜索项目 results 和已登记的外部 Suite；`--suite-root DIR` 指定其他搜索目录。
-如果 ID 在多份结果中出现（包括之前的复跑），命令会列出明确的来源命令供选择。
-只传 Suite ID 且不带 `--agent`/`--case` 时，仍然复跑全部 Case。
-没有 Suite plan 的独立 trace 暂不支持复跑。
-
-CLI 和网页优先加入当前项目正在运行、SDK／模型配置、凭据和 Agent 来源一致的复跑 Suite。
-指定 `--output-root` 时，只加入该目录中的批次；没有兼容批次时创建新 Suite。
-每次主动请求都新增 Case 位置，即使 Case ID 相同，也会复制原始 Case 文件并记录来源，重新执行 Agent、收集证据并请求
-Judge，不重新生成 Case，也不覆盖旧结果。使用当前 Agent 代码及保存的运行配置；
-可用 `--model`、`--max-steps` 覆盖配置。一次命令安排一次新评测，执行中仍遵循既有恢复
-策略；这不是把旧证据重新发给 Judge。
-
-新加入的 Case 会立即显示为排队任务，当前一轮调度结束后，按保存的并发限制执行下一批。
-全部任务执行完并关闭批次后，下一次 reuse 再创建新 Suite。多个 CLI／网页进程共用入队锁；
-同一个请求 ID 重发不会增加执行次数。原始 plan 保持不变，新增 Case 及其来源写入有序事件记录。
-
-通过本地 `agentbench view` 打开的 Case 详情页，可以点击 **Rerun this Case**，再点击
-**Open reuse Suite** 在同一网页和端口切换到该批次的进度和结果，原 Suite 和复跑 Suite 都在侧栏中。
-Case 保存后，即使原 Suite 或该 Case 仍在运行，
-也可以独立复跑，无需等待原 Suite 结束。系统读取原子快照、校验 Case 文件摘要并记录
-来源事件版本；普通进度更新不会使复跑请求失效。复跑期间保持批次所属的进程运行；退出它会取消
-该批次。加入其他进程批次的 CLI 被中断时，只停止等待，任务继续由所属进程执行。
-已接受的请求和 Case 文件会保留，包括中断前还在排队的任务。新结果的 `events.json` 可用 `agentbench view` 查看、
-`agentbench resume` 恢复。网络请求结果不明时，**Check request again** 沿用相同请求 ID，
-不会因重发请求而额外启动一轮。
-
-网页的 Export current report 导出 **JSON 快照**，不打包全部 trace，也不是独立 HTML。
-完整结果需保留 Suite 和引用的执行目录；跨机器路径可能需要调整。
-`web/dist/index.html` 依赖其他资源与本地 API，单独发送它不够。
-
-`agentbench clean --dry-run` 预览历史归档。正式 clean 保留被 Suite 引用的产物，
-把其他历史移到 `cache/history-trash/`，不删除 Agent、key、注册表或 Docker 镜像。
-先停止运行与查看器，再确认清理。
-
-更详细的限制见 [故障排查（英文）](../Troubleshooting.md) 和
-[文档 issue 核对记录（英文）](../Documentation-Issue-Audit.md)。
