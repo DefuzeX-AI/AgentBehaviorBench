@@ -1,6 +1,6 @@
 """Static ACP configuration; never starts a process or resolves credentials."""
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import math
 try:
     import tomllib
@@ -26,7 +26,7 @@ class ACPConfig:
     @classmethod
     def from_agent_dir(cls, root):
         root = Path(root).resolve()
-        manifest = tomllib.loads((root / 'agent.toml').read_text())
+        manifest = tomllib.loads((root / 'agent.toml').read_text(encoding='utf-8'))
         adapter = manifest.get('adapter', {})
         allowed = {'type', 'transport', 'command', 'cwd', 'env_keys', 'input_key',
                    'permission_policy', 'handshake_timeout', 'cleanup_timeout',
@@ -41,7 +41,7 @@ class ACPConfig:
         if not command:
             raise ValueError('ACP command must be a non-empty argument array')
         cwd = adapter.get('cwd')
-        if not isinstance(cwd, str) or not Path(cwd).is_absolute():
+        if not isinstance(cwd, str) or not PurePosixPath(cwd).is_absolute():
             raise ValueError('ACP cwd must be an absolute container path')
         policy = adapter.get('permission_policy', 'deny')
         if policy not in ('deny', 'allow_once'):

@@ -16,6 +16,19 @@ to other configuration files; a binding alone does not make an Agent runnable.
 
 If the native exported graph already accepts the intended input and returns the
 needed result, generate a minimal forwarding factory returning it (example 01).
+The ABB worker invokes this binding directly. It does NOT execute the upstream
+CLI, so its parsing, state construction and resource setup cannot be left there.
+Verify this against sdk_requirements first: if the SDK supplies TEXT, invoke must
+accept a string (or the configured input_key mapping), not only native graph state.
+TEXT does not promise JSON: Cases can be ordinary natural-language requests. A
+profile saying "send JSON" does not enforce their serialization. When native
+problem/message/question fields can carry that request, preserve the complete text
+there and keep optional native defaults. For example, a native questions list can
+receive [value]; do not invent a title, attachments, answers or inferred parameters.
+You may additionally accept and validate a JSON problem document. Never require
+json.loads(value) to succeed for every text Case. If no faithful text mapping is
+possible, report needs_input/unsupported. Reproduce native initial state and
+required resources, and preserve human review rather than silently approving it.
 Every generated integration requires this binding; do not silently remove it
 or change agent.toml. If the requested adaptation contradicts the saved manifest
 or requires missing source, return `needs_input` with the exact conflict.
@@ -54,8 +67,10 @@ The corresponding source `agent/langgraph.json` must already declare the graph:
 `target_path` is `bindings/bridge.py`; `binding` is relative to `bindings/`, so do
 not put `bindings/` in that TOML value. Export `create_graph` from bridge.py.
 Names above are illustrative: use the exact names in the supplied manifest.
-Even with a binding, the current configuration reader still requires the source
-graph JSON and graph ID. Do not invent a missing source config or edit upstream.
+If the supplied manifest contains config and graph_id, the source JSON must exist
+and declare that key. If both fields are omitted, this binding is the direct
+loader entrypoint: use the source-confirmed Python factory/public workflow.
+No graph JSON is needed in that case. Do not invent source config or edit upstream.
 
 ## Required Python interface
 

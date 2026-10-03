@@ -1,5 +1,5 @@
 """Small strategy contract; shared builders own persistence and SDK policy."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
@@ -17,10 +17,11 @@ class OnboardingStrategy:
     validate_unit: Callable
     binding_steps: Callable
     version: str = "1"
+    reference_documents: Callable[[], dict[str, str]] = field(default=dict)
 
     @property
     def manifest_schema(self):
         return self.assets / "manifest/analysis.schema.json"
 
     def requirements(self):
-        return (self.assets / "manifest" / f"adapter-{self.name}.md").read_text()
+        return (self.assets / "manifest" / f"adapter-{self.name}.md").read_text(encoding="utf-8")

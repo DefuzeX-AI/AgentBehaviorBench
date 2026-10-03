@@ -51,7 +51,6 @@ Agent Registry 记录当前测试的是哪个 Agent 源码版本，以及 ABB �
 - [如何添加 Agent](How%20To%20Add%20Agent.zh-CN.md)
 - [CLI 文档](cli.zh-CN.md)
 - [如何启动 ABB](Guide.zh-CN.md)
-- [完整安装、运行、恢复和开发参考（英文）](../README-previous.md)
 - [结果说明和故障排查（英文）](../Troubleshooting.md)
 
 ## 许可证

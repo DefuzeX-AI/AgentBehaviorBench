@@ -78,7 +78,6 @@ KUMA 後端のクレジットは不要ですが、Agent と Judge のモデル�
 
 ## 関連ドキュメント
 
-- [ABB のインストール、設定、実行 — 英語](../README-previous.md)
 - [結果とトラブルシューティング — 英語](../Troubleshooting.md)
 
 ## ライセンス

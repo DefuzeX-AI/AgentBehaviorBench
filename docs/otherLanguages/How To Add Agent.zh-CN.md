@@ -92,6 +92,8 @@ resources/agents/NN-name/
 
 LangGraph 的 binding 导出同步、无参数工厂，返回真实可调用的 Agent，并处理原生输入输出和生命周期清理。ACP 接入通过 `agent.toml` 中配置的原生命令和协议运行，不要求 Python binding 工厂。两种接入都应保留 Agent 本身的行为。
 
+具体文件布局、调用示例、config 转发、原生生命周期和验证方法，见 [LangGraph binding 编写手册](LangGraph%20Bindings.zh-CN.md)。
+
 ### `Dockerfile` — 容器内安装什么
 
 安装 Agent 的 Python/系统依赖，复制源码、binding 和配置。检查 CPU 架构、解释器、

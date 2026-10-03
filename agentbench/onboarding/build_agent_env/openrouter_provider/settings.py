@@ -20,11 +20,14 @@ class BuildSettings:
     timeout_seconds: int
     retries: int
     repair_attempts: int
+    source_request_rounds: int
+    max_requested_file_bytes: int
+    max_requested_context_bytes: int
 
 
 def load_settings(path: Path | None = None) -> BuildSettings:
     """Read packaged settings, then merge an optional TOML [build] override."""
-    values = tomllib.loads((ASSETS / "settings.toml").read_text())["build"]
+    values = tomllib.loads((ASSETS / "settings.toml").read_text(encoding="utf-8"))["build"]
     if path is not None:
         overrides = tomllib.loads(path.read_text(encoding="utf-8")).get("build")
         if not isinstance(overrides, dict):
@@ -36,6 +39,6 @@ def load_settings(path: Path | None = None) -> BuildSettings:
         if key == "model":
             if not isinstance(value, str):
                 raise BuildError("build.model must be a string")
-        elif type(value) is not int or value < (0 if key in {"retries", "repair_attempts"} else 1):
+        elif type(value) is not int or value < (0 if key in {"retries", "repair_attempts", "source_request_rounds"} else 1):
             raise BuildError(f"Invalid build setting: {key}")
     return BuildSettings(**values)

@@ -26,13 +26,13 @@ def register_agent(unit: Path, registry_path: Path, repository: str) -> str:
         relative = unit.resolve().relative_to(root).as_posix()
     except ValueError:
         raise BuildError("Agent directory must be inside the --registry repository root") from None
-    manifest = tomllib.loads((unit / "agent.toml").read_text())
+    manifest = tomllib.loads((unit / "agent.toml").read_text(encoding="utf-8"))
     agent_id = manifest["agent_id"]
     path.parent.mkdir(parents=True, exist_ok=True)
     lock = SuiteLock(confined(path.parent, ".agent-add-lock"))
     lock.acquire()
     try:
-        original = path.read_text() if path.exists() else None
+        original = path.read_text(encoding="utf-8") if path.exists() else None
         text = original if original is not None else f'schema_version = "{EXPECTED_SCHEMA_VERSION}"\n'
         data = tomllib.loads(text)
         for entry in data.get("agents", []):
@@ -53,7 +53,7 @@ def register_agent(unit: Path, registry_path: Path, repository: str) -> str:
             stream.write(text + block)
         try:
             load_registry(temporary)
-            current = path.read_text() if path.exists() else None
+            current = path.read_text(encoding="utf-8") if path.exists() else None
             if current != original:
                 raise BuildError("Registry changed during onboarding; retry without rebuilding")
             temporary.replace(path)

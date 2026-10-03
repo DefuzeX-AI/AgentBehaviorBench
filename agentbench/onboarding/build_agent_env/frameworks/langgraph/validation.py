@@ -13,11 +13,15 @@ def validate_manifest(manifest, session):
     if not isinstance(binding, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*\.py:[A-Za-z_][A-Za-z0-9_]*", binding):
         raise BuildError("Onboarding requires adapter.binding='filename.py:factory' relative to outer bindings/; "
                          "the selected synchronous factory must be callable without arguments")
-    config_name = adapter.get("config", "")
+    config_name = adapter.get("config")
+    if config_name is None:
+        if adapter.get("graph_id") is not None:
+            raise BuildError("adapter.graph_id requires an existing adapter.config JSON descriptor; use null for both when loading the outer binding directly")
+        return None, None
     source = session.source.directory / "agent"
     config_path = safe_file(source, config_name) if isinstance(config_name, str) else None
     if config_path is None:
-        raise BuildError("adapter.config must reference an existing file inside agent/")
+        raise BuildError("adapter.config must reference an existing file inside agent/; for a source-backed Python factory without a JSON descriptor, set config and graph_id to null and use the planned outer binding")
     # The temporary unit holds only manifest and graph descriptor.
     return config_name, config_path
 
@@ -41,6 +45,6 @@ def validate_unit(root, manifest, session):
     entry_root = root / "bindings" if adapter.binding else root / "agent"
     if not attribute or safe_file(entry_root, filename) is None:
         raise BuildError("Adapter entrypoint does not reference an existing local file")
-    session.completed = {"agent.toml": (root / "agent.toml").read_text()}
+    session.completed = {"agent.toml": (root / "agent.toml").read_text(encoding="utf-8")}
     session.current_path = "bindings/" + filename
-    validate_binding((entry_root / filename).read_text(), session)
+    validate_binding((entry_root / filename).read_text(encoding="utf-8"), session)

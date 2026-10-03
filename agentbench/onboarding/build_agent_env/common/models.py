@@ -41,6 +41,7 @@ class BuildSession:
     current_path: str | None = None
     manifest_options: object = None
     sdk_context: dict = field(default_factory=dict)
+    generation_model: str | None = None
 
     def generate(self, payload: dict, *, prompt: str, schema: dict) -> dict:
         if self.client is None:
@@ -48,11 +49,14 @@ class BuildSession:
         return self.client.generate(payload, prompt=prompt, schema=schema)
 
     def payload(self) -> dict:
+        from agentbench.sdk.contracts import SDKOnboardingInputs
         from dataclasses import asdict
         from ..build_toml.frameworks import framework_requirements
+        from ..frameworks.registry import strategy
         from ..build_toml.options import ManifestOptions
         from ..build_toml.tool_routes import network_evidence
         from ..openrouter_provider.privacy import contains_secret
+        from ..openrouter_provider.context import environment_presence
         from .errors import BuildError
         from .layout import build_context
         import json
@@ -65,8 +69,14 @@ class BuildSession:
                 "build_context": build_context(self.source.directory),
                 "tool_network_evidence": network_evidence(self.context),
                 "framework_requirements": framework_requirements(),
+                "framework_documents": strategy(self.plan["framework"]).reference_documents()
+                    if self.plan.get("framework") else {},
                 "deployment_options": options,
+                "native_environment_presence": environment_presence(self.context, self.environ),
+                "native_default_policy": "Preserve upstream optional defaults unless explicitly overridden. Do not force human approval or --no-interrupt just to finish a benchmark. Unset optional model endpoint variables use the native default endpoint; do not ask whether to override them.",
                 "sdk_requirements": self.sdk.onboarding_requirements(),
+                "sdk_input_types": list(self.sdk.onboarding_input_types())
+                    if isinstance(self.sdk, SDKOnboardingInputs) else [],
                 "sdk_context": self.sdk_context,
                 "answers": self.answers, "plan": self.plan,
                 "completed_files": dict(self.completed)}

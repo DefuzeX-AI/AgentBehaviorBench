@@ -40,7 +40,7 @@ def options_from_cli(args):
         path = Path(path)
         if not path.is_file() or path.stat().st_size > 65536:
             raise BuildError("Adapter context must be a JSON file no larger than 64 KiB")
-        context = json.loads(path.read_text())
+        context = json.loads(path.read_text(encoding="utf-8"))
     timeout = getattr(args, "agent_timeout", None)
     return ManifestOptions(timeout_sec=300 if timeout is None else timeout,
                            observe=getattr(args, "with_observe", False), adapter_context=context)

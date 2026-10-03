@@ -12,7 +12,7 @@ CATALOG = Path(__file__).parent / "assets/tool-providers.json"
 
 
 def network_evidence(context):
-    catalog = json.loads(CATALOG.read_text())
+    catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
     results = []
     for file in context.get("files", []):
         if not file["path"].endswith(".py") or file.get("truncated"):

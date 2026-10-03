@@ -9,6 +9,6 @@ ASSETS = Path(__file__).parent / "assets"
 def steps(plan):
     result = []
     if plan["needs_input_schema"]:
-        result.append(FileStep("evaluation/input-schema.json", (ASSETS / "schema.md").read_text(), validate_schema))
-    result.append(FileStep("requirement.md", (ASSETS / "requirement.md").read_text(), validate_requirement))
+        result.append(FileStep("evaluation/input-schema.json", (ASSETS / "schema.md").read_text(encoding="utf-8"), validate_schema))
+    result.append(FileStep("requirement.md", (ASSETS / "requirement.md").read_text(encoding="utf-8"), validate_requirement))
     return result

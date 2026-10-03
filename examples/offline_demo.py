@@ -16,15 +16,22 @@ def run_demo(output):
         root = Path(temporary)
         source = root/'agent'
         source.mkdir()
+        (root/'requirement.md').write_text(
+            '# Offline echo Agent\n\n'
+            'Receives a text prompt and returns the same text unchanged.\n'
+            'No external tools, models or network access are used.\n', encoding='utf-8')
         name = 'offline_echo_' + uuid4().hex
         (source/f'{name}.py').write_text(
             'from typing_extensions import TypedDict\nfrom langgraph.graph import StateGraph, START, END\n'
             'class State(TypedDict):\n    prompt: str\n    response: str\n'
             'builder = StateGraph(State)\nbuilder.add_node("echo", lambda state: {"response": state["prompt"]})\n'
-            'builder.add_edge(START, "echo")\nbuilder.add_edge("echo", END)\ngraph = builder.compile()\n')
-        (source/'langgraph.json').write_text(json.dumps({'graphs': {'agent': f'./{name}.py:graph'}}))
+            'builder.add_edge(START, "echo")\nbuilder.add_edge("echo", END)\ngraph = builder.compile()\n',
+            encoding='utf-8')
+        (source/'langgraph.json').write_text(json.dumps({'graphs': {'agent': f'./{name}.py:graph'}}),
+                                            encoding='utf-8')
         (root/'agent.toml').write_text('[runtime]\ntype="in_process"\n[adapter]\ntype="langgraph"\n'
-            'mode="in_process"\nconfig="langgraph.json"\ngraph_id="agent"\ninput_key="prompt"\noutput_key="response"\n')
+            'mode="in_process"\nconfig="langgraph.json"\ngraph_id="agent"\ninput_key="prompt"\noutput_key="response"\n',
+            encoding='utf-8')
         agent = AgentRegistration('offline-echo', root, True, 'ready', 'langgraph', 'local demonstration')
         print('Offline demonstration: deterministic local Judge, no Kuma service or model calls.')
         return run_benchmark_session((agent,), runner=SuiteRunner(sdk=local_sdk), output_path=output,

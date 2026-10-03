@@ -12,8 +12,16 @@ Their credentials and quotas are separate.
 Use a source checkout with an editable installation; the standalone wheel does
 not include all Agent resources and built viewer assets. Install Git, Python 3.10+
 with pip/venv, and Docker accessible to your user for Docker Agent execution.
-The offline demo needs no Docker. Platform instructions are in
-[detailed reference](README-previous.md#before-you-start).
+The offline demo needs no Docker.
+
+- **macOS:** install and start [Docker Desktop](https://docs.docker.com/desktop/setup/install/mac-install/).
+- **Linux:** install [Docker Engine](https://docs.docker.com/engine/install/) and
+  follow its [post-installation guidance](https://docs.docker.com/engine/install/linux-postinstall/)
+  so the user running ABB can run `docker info` successfully.
+- **Windows:** use [Docker Desktop with WSL 2](https://docs.docker.com/desktop/features/wsl/)
+  and run the Bash commands below in a WSL Linux terminal.
+
+Agent images and binary dependencies must support your CPU architecture.
 
 The viewer build requires npm and Node.js 20.19+ on 20.x, or 22.12+.
 The web interface lets you inspect the processes started by ABB, their execution

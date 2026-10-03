@@ -56,7 +56,7 @@ class OpenRouterClient:
             schema["properties"]["evidence"]["items"]["enum"] = paths
         body = {"model": self.target.model, "max_tokens": self.settings.max_output_tokens,
                 "messages": [
-                    {"role": "system", "content": (ASSETS / "system.md").read_text() + "\n\n" + prompt},
+                    {"role": "system", "content": (ASSETS / "system.md").read_text(encoding="utf-8") + "\n\n" + prompt},
                     {"role": "user", "content": json.dumps(payload, ensure_ascii=False)}],
                 "provider": {"require_parameters": True},
                 "response_format": {"type": "json_schema", "json_schema": {

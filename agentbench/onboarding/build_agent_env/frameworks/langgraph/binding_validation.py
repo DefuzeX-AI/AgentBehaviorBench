@@ -2,6 +2,9 @@
 import ast
 from agentbench.runtime.agentcontainer.config import tomllib
 from ...common.errors import BuildError
+from .input_boundary import validate_forwarding_input
+from .native_initialization import validate_native_initialization
+from .plain_text import validate_plain_text
 
 
 def validate_binding(content, session):
@@ -28,6 +31,9 @@ def validate_binding(content, session):
         raise BuildError("Binding factory must be undecorated so its zero-argument interface can be checked")
     if _yields(factory):
         raise BuildError("Binding factory must return an invoke-capable object, not a generator")
+    validate_forwarding_input(factory, tree, manifest, session)
+    validate_plain_text(factory, tree, manifest, session)
+    validate_native_initialization(tree, session)
 
 
 def _yields(node):

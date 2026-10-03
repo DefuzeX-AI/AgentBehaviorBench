@@ -8,7 +8,7 @@ from ..common.errors import BuildError
 
 
 def protocol_catalog():
-    return json.loads((Path(__file__).parent / "assets/protocols.json").read_text())
+    return json.loads((Path(__file__).parent / "assets/protocols.json").read_text(encoding="utf-8"))
 
 
 def interception_for(models, tool_routes):

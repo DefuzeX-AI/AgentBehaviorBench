@@ -20,6 +20,20 @@ input_key = "prompt"
 output_key = "response"
 ```
 
+For a source-backed Python factory without a JSON descriptor, select an outer
+binding directly and omit both `config` and `graph_id`:
+
+```toml
+[adapter]
+type = "langgraph"
+binding = "bridge.py:create_graph"
+```
+
+The loader resolves this factory under the unit's `bindings/` directory. The
+worker calls the returned object's `invoke` directly; it does not run the upstream
+CLI. Any required parsing, initialization and resource management belong in that
+binding. An explicitly supplied descriptor is still validated, even with a binding.
+
 Execution flow:
 
 ```text
@@ -38,7 +52,7 @@ The loader supports packages at the source root or inside its `src/` directory.
 This adapter runs in-process, where package names and dependencies can collide.
 For `runtime.type = "docker"`, RuntimeFactory instead selects the container
 adapter and executes `launch.argv`; it does not import the upstream graph on
-the host. See [Agent unit layout](../../../docs/Agents/Layout.md).
+the host. See [Agent unit layout](../../../docs/LangGraph%20Bindings.md#file-layout-and-manifest-selection).
 
 Official references:
 

@@ -94,9 +94,13 @@ class Client:
     def __init__(self, plan, *, files=None, callback=None):
         self.plan = plan
         self.files = dict(FILES if files is None else files)
-        self.requests, self.callback = [], callback
+        self.requests, self.reviews, self.callback = [], [], callback
 
     def generate(self, payload, *, prompt, schema):
+        if payload.get("response_kind") == "configuration_review":
+            self.reviews.append(copy.deepcopy(payload))
+            return {"status": "complete", "summary": "Source compatibility checked",
+                    "evidence": ["src/pkg/graph.py"], "missing_information": [], "issues": []}
         self.requests.append(copy.deepcopy(payload))
         if self.callback:
             returned = self.callback(payload)

@@ -78,7 +78,6 @@ KUMA 백엔드 크레딧은 필요하지 않지만 Agent와 Judge 모델 호출�
 
 ## 추가 문서
 
-- [ABB 설치, 설정 및 실행 — 영어](../README-previous.md)
 - [결과 및 문제 해결 — 영어](../Troubleshooting.md)
 
 ## 라이선스

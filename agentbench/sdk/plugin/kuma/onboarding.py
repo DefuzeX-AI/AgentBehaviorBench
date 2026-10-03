@@ -18,6 +18,11 @@ Replace this with the real limitations.
 The official Case service used by BBA certification currently accepts TEXT only.
 Its request builder rejects structured Inputs even though local profile parsing
 supports them. For this workflow set input_type: text and omit input_schema.
+TEXT Cases can be ordinary natural-language requests. A profile asking for JSON
+does not enforce JSON formatting. A binding must support plain text when the
+native problem/message fields permit a faithful mapping (for example [text] for
+a questions list); JSON can be an additional validated format. Never invent
+missing business facts or treat a JSON-only parser as general text support.
 Do not confuse native graph state with the SDK boundary: a graph taking a mapping
 can accept SDK text through adapter.input_key or a verified native text wrapper.
 For a single required string field (for example company), set input_key to that
