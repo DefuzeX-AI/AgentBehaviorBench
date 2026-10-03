@@ -106,12 +106,13 @@ def test_suite_configuration_records_selected_provider():
     from types import SimpleNamespace
     from agentbench.cli.sessions.configuration import runner_configuration
     from agentbench.harness.scheduling import RetryPolicy
+    from agentbench.harness.concurrency import ConcurrencySettings
     factory = SimpleNamespace(model=None, trace_max_bytes=4096,
         environ={'DEEPSEEK_API_KEY': 'test-secret', 'DEEPSEEK_MODEL': 'ds-model'},
         plan=SimpleNamespace(options={}, selection=SimpleNamespace(
             reference=SimpleNamespace(source='directory', name='local'))))
     runner = SimpleNamespace(_runner_factory=factory, retry_policy=RetryPolicy(),
-                             concurrency=SimpleNamespace(max_parallel_cases=1))
+                             concurrency=ConcurrencySettings(max_parallel_cases=1))
     result = runner_configuration(runner)
     assert result['model_provider'] == 'deepseek'
     assert result['model'] == 'ds-model'

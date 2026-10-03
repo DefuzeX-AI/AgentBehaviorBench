@@ -93,8 +93,15 @@ continues to use its separate OpenRouter configuration.
 
 ## Per-request model targets
 
-Replacement mode supports separate destinations for text generation, image
-understanding and embeddings. Set `ABB_MODEL_ROUTING_CONFIG` to an absolute path
+Without a routing file, replacement mode sends text and image-bearing generation
+requests to the selected run provider/model, preserving image content. No model
+capability lookup or automatic model switch is performed; choose a model that
+supports the inputs used by the Agent. If it rejects images, ABB retains that
+provider error rather than dropping the pictures or substituting another model.
+
+Replacement mode also supports separate destinations for text generation, image
+understanding and embeddings. For different destinations or embedding requests,
+set `ABB_MODEL_ROUTING_CONFIG` to an absolute path
 to a TOML file based on the
 [routing example](../../runtime/interception/model-routing.example.toml).
 This is host run configuration, shared across Agents; it does not modify their

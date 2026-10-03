@@ -14,6 +14,23 @@ from agentbench.runtime.interception.target_routing import resolve_target_routin
 from agentbench.runtime.interception.config import InterceptionConfigurationError
 
 
+def test_default_target_handles_text_and_images_without_a_routing_file(tmp_path):
+    env = dict(OPENROUTER_MODEL='selected-model', OPENROUTER_API_KEY='test-secret')
+    plan = resolve_target_routing(env)
+    assert not plan.explicit
+    assert plan.targets['default'].model == 'selected-model'
+    assert plan.inputs['default'] == ('text', 'image')
+    config = SimpleNamespace(mode='replace', observation_headers={}, observation_tool_purposes={},
+                             routes=(), tool_routes=(), token_counting={},
+                             credentials=(CredentialConfig('openai', 'OPENAI_API_KEY', 'bearer-token'),))
+    data, tokens = prepare_service_config(config, agent_id='fixture', max_trace_bytes=4096,
+        secret_dir=tmp_path, secret_resolver=EnvironmentSecretResolver(env), environ=env)
+    assert data['target']['input_modalities'] == ['text', 'image']
+    assert data['target']['model'] == 'selected-model'
+    assert 'targets' not in data and 'target_rules' not in data
+    assert tokens['OPENAI_API_KEY'] != env['OPENROUTER_API_KEY']
+
+
 def test_prepare_multiple_model_targets(tmp_path):
     routing = tmp_path / 'models.toml'
     routing.write_text('''
