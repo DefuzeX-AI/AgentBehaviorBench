@@ -22,8 +22,8 @@ def source_metadata(source):
             continue
         if path.stat().st_size > 262144:
             raise BuildError("Source metadata record is too large")
-        recorded = (json.loads(path.read_text()) if name.endswith(".json")
-                    else tomllib.loads(path.read_text()).get("source", {}))
+        recorded = (json.loads(path.read_text(encoding="utf-8")) if name.endswith(".json")
+                    else tomllib.loads(path.read_text(encoding="utf-8")).get("source", {}))
         if not isinstance(recorded, dict):
             raise BuildError("Source metadata must be an object")
         for field in ("repository", "revision"):

@@ -14,6 +14,19 @@ def acp_plan(plan):
     return {**plan, 'framework': 'acp', 'bindings': []}
 
 
+@pytest.mark.parametrize('cwd,valid', [('/home/agent/workspace', True),
+                                     ('relative/workspace', False), ('C:/workspace', False)])
+def test_container_cwd_uses_posix_paths_on_every_host(tmp_path, cwd, valid):
+    from agentbench.adapter.acp.config import ACPConfig
+    manifest = f'display_name="中文 Agent"\n[adapter]\ntype="acp"\ncommand=["native-cli"]\ncwd="{cwd}"\n'
+    (tmp_path / 'agent.toml').write_text(manifest, encoding='utf-8')
+    if valid:
+        assert ACPConfig.from_agent_dir(tmp_path).cwd == cwd
+    else:
+        with pytest.raises(ValueError, match='absolute container path'):
+            ACPConfig.from_agent_dir(tmp_path)
+
+
 class ACPClient(Client):
     def generate(self, payload, *, prompt, schema):
         if payload.get('response_kind') == 'configuration_facts':

@@ -22,9 +22,9 @@ def validate(content, session):
 
 
 def steps():
-    prompt = "\n\n".join(path.read_text() for path in
+    prompt = "\n\n".join(path.read_text(encoding="utf-8") for path in
                          [ASSETS / "prompt.md", *sorted(ASSETS.glob("example-*.md"))])
     return [FileStep("Dockerfile", prompt, validate,
                      render=lambda response, session: normalize_copy_sources(response["content"], session.source.directory)),
             FileStep(".dockerignore", "", lambda content, session: None,
-                     template=(ASSETS / "dockerignore").read_text())]
+                     template=(ASSETS / "dockerignore").read_text(encoding="utf-8"))]

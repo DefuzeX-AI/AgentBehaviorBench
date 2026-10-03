@@ -4,7 +4,7 @@ from agentbench.adapter.factory import DEFAULT_ADAPTER_FACTORY
 from agentbench.adapter.langgraph.config import LangGraphAdapterConfig
 from ..common.errors import BuildError
 from .base import OnboardingStrategy
-from .langgraph import bindings, planning, manifest, validation
+from .langgraph import bindings, planning, manifest, validation, handbook
 from .acp import planning as acp_planning, manifest as acp_manifest
 from agentbench.adapter.acp.config import ACPConfig
 
@@ -15,6 +15,7 @@ STRATEGIES = {"langgraph": OnboardingStrategy(
     validate_manifest=validation.validate_manifest, stage_validation=manifest.stage_validation,
     validate_selection=validation.validate_selection, validate_unit=validation.validate_unit,
     binding_steps=bindings.steps,
+    reference_documents=handbook.reference_documents,
 ), "acp": OnboardingStrategy(
     name="acp", assets=Path(__file__).parent / "acp/assets",
     read_config=ACPConfig.from_agent_dir, render_adapter=acp_manifest.render_adapter,

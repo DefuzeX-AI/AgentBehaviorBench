@@ -86,7 +86,6 @@ l’Agent et du Judge peuvent être payants. Ce plugin n’est pas le Judge offi
 
 ## Documentation complémentaire
 
-- [Installer, configurer et exécuter ABB — anglais](../README-previous.md)
 - [Résultats et dépannage — anglais](../Troubleshooting.md)
 
 ## Licence

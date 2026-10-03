@@ -16,6 +16,23 @@ other file-generation requests return **one file only**. The file is validated a
 before the next request begins. Earlier files remain installed when a later stage
 fails or the user presses Ctrl-C. Certification remains a separate `-c` action.
 
+After static validation, a separate structured model review checks each generated
+file against source evidence, SDK input requirements and previously saved files.
+It checks actual text parsing, the public caller's initialization and resources,
+Docker requirements and the profile's deployed capabilities. Concrete defects
+enter the same bounded per-file correction loop before installation; unresolved
+defects stop the build before registration. This adds model calls and is not a
+substitute for certification. Unchanged reviewed files reuse a source-matched
+checkpoint; modified existing files are reviewed and preserved on conflict.
+
+Once planning selects LangGraph, every file-generation, correction and review
+request includes the full [binding handbook](../../../docs/LangGraph%20Bindings.md)
+in `framework_documents`. ACP requests do not include it. Source and editable
+installs read `docs/LangGraph Bindings.md` from this checkout; wheels bundle a
+snapshot of that same file at build time. Handbook changes invalidate cached
+plans and reviews while preserving existing integration files. No separate
+model call is needed to load the guide; its text adds to request input tokens.
+
 | Directory | Responsibility |
 | --- | --- |
 | `planning/` | Source analysis and selection of required bindings/optional input schema; no file contents in the plan response. |
@@ -34,8 +51,8 @@ in the generic builder.
 `framework` is inferred from the source, not assigned a universal default.
 Requests include `framework_requirements` from the intersection of registered
 runtime adapters and explicit onboarding support in `frameworks/registry.py`.
-Currently that intersection contains only LangGraph. Its field instructions live
-in `frameworks/langgraph/assets/manifest/adapter-langgraph.md`, separate from the general TOML prompt.
+Currently that intersection contains LangGraph and ACP. Their field instructions
+live under each strategy's `assets/manifest/`, separate from the general TOML prompt.
 New frameworks require an actual runtime adapter, static configuration validation
 and matching generation instructions; adding a name alone does not implement
 support. Non-file-based adapters also need the entrypoint validation flow extended.
@@ -66,6 +83,17 @@ no model request. Model/request settings are in
 Static checks do not establish that dependencies install or that the Agent runs.
 Those are tested by the existing certification pipeline after configuration is
 complete. No `evaluation/` folder is required for text-input Agents.
+
+When a valid `needs_input` response asks for concrete files already in `agent/`,
+the builder reads those files safely and resubmits the request automatically.
+It never imports source, follows unsafe symlinks or sends actual `.env` contents.
+`source_request_rounds`, `max_requested_file_bytes` and
+`max_requested_context_bytes` bound these follow-ups separately from initial
+excerpts. Only explicitly requested source is expanded. File paths, truncation
+and follow-up responses are recorded; requested evidence is restored and hashed
+on resume. Missing deployment/business facts still require actual answers.
+Changing `--build-model` invalidates the old plan and model review cache while
+preserving existing files for revalidation.
 
 ## Structured output compatibility
 
@@ -112,6 +140,12 @@ Every complete LangGraph plan includes an outer `bindings/*.py` file. The genera
 selects its synchronous zero-argument factory; a compatible native graph needs only
 a forwarding factory returning it. Other Agents need source-backed input/output
 adaptation and their full public lifecycle. Upstream `agent/` files stay unchanged.
+An absent JSON descriptor is supported when an existing Python factory/public
+workflow is evidenced: omit adapter.config and adapter.graph_id and select the
+outer binding. Declared pyproject.toml CLI modules and their local imports are
+collected statically, including imports beyond a truncated text excerpt. A byte
+budget splitting the last UTF-8 character preserves the valid prefix. Installation,
+input/state and model configuration evidence precede large transitive implementations.
 Python checks validate syntax and the factory signature without importing source.
 Docker checks follow COPY into the final stage, including stage inheritance and
 COPY --from, to verify the selected binding's location beside agent.toml. They do

@@ -25,8 +25,8 @@ record, commands, runtime policy, an observe table, or a replay-safe declaration
 | --- | --- | --- |
 | display_name | Upstream human-facing name from README/package metadata. | Company Research Agent |
 | framework | Actual execution framework; must have supplied onboarding support. A dependency name alone is not proof. | langgraph only for a verified LangGraph execution interface |
-| adapter.config | Existing framework configuration relative to agent/. | langgraph.json |
-| adapter.graph_id | Actual declared graph key. Do not guess from repository name. | agent |
+| adapter.config | Existing JSON graph descriptor relative to agent/; null when the outer binding loads a verified native Python factory/workflow directly. Never use graph.py or invent langgraph.json. | langgraph.json or null |
+| adapter.graph_id | Actual declared JSON graph key; null when config is null. Do not guess from repository name. | agent or null |
 | adapter.input_key | Field used to wrap scalar input; null when native input passes through. Dictionaries pass through unchanged. | company |
 | adapter.output_key | Field extracted from the binding/native result; null for complete result. | report |
 | adapter.binding | Required outer binding from plan.bindings, relative to bindings/, selecting a synchronous zero-argument factory. Never null. | company.py:create_graph |

@@ -45,13 +45,13 @@ def validate_manifest(content, session):
         raise BuildError("Use build.context='.' and build.dockerfile='Dockerfile'")
     with tempfile.TemporaryDirectory(prefix="agent-manifest-check-") as directory:
         root = Path(directory)
-        (root / "agent.toml").write_text(content)
+        (root / "agent.toml").write_text(content, encoding="utf-8")
         network_reference = manifest.get('llm_interception', {}).get('network_config')
         if network_reference is not None:
             from agentbench.runtime.interception.network_rules import stage_network_rules
             stage_network_rules(session.source.directory, root, network_reference)
         selected.stage_validation(root, config_name, config_path)
-        (root / "Dockerfile").write_text("FROM scratch\n")
+        (root / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
         parsed = read_config(root)
         AgentContainerConfig.from_agent_dir(root, secret_resolver=_PlaceholderSecrets(), environ={})
         execution_strategy(root)

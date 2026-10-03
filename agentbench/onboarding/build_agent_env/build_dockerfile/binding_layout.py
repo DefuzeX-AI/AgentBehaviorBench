@@ -19,7 +19,7 @@ def validate_binding_layout(content, session):
     root = session.source.directory
     manifest_text = getattr(session, "completed", {}).get("agent.toml")
     if manifest_text is None:
-        manifest_text = (root / "agent.toml").read_text()
+        manifest_text = (root / "agent.toml").read_text(encoding="utf-8")
     manifest = tomllib.loads(manifest_text)
     reference = manifest.get("adapter", {}).get("binding")
     if not reference:

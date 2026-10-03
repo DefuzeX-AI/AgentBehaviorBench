@@ -86,7 +86,7 @@ def test_real_client_responses_require_local_validation_and_bounded_repairs(sour
         wire = body["response_format"]["json_schema"]["schema"]
         result = fixtures.generate(payload, prompt="", schema=wire)
         selected = (stage == "plan" and "target_path" not in payload or
-                    stage == "facts" and payload.get("target_path") == "agent.toml")
+                    stage == "facts" and payload.get("response_kind") == "configuration_facts")
         if selected:
             attempts += 1
             if attempts > 1:

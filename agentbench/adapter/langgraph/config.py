@@ -21,7 +21,7 @@ class LangGraphConfigurationError(ValueError):
 @dataclass(frozen=True)
 class LangGraphAdapterConfig:
     agent_root: Path
-    graph_id: str
+    graph_id: str | None
     entrypoint: str
     input_key: str | None
     output_key: str | None
@@ -58,20 +58,26 @@ class LangGraphAdapterConfig:
             raise LangGraphConfigurationError(
                 f"Agent source directory does not exist: {source_root}"
             )
-        config_name = _required_string(adapter, "config")
-        config_path = _resolve_inside(source_root, config_name)
-        langgraph_config = _read_json(config_path)
-        graphs = _required_mapping(langgraph_config, "graphs")
-        graph_id = _required_string(adapter, "graph_id")
-
-        try:
-            graph_definition = graphs[graph_id]
-        except KeyError as exc:
-            raise LangGraphConfigurationError(
-                f"Graph {graph_id!r} is not declared in {config_path}"
-            ) from exc
-
-        entrypoint = _graph_entrypoint(graph_definition, graph_id)
+        binding = _optional_string(adapter, "binding")
+        config_name = _optional_string(adapter, "config")
+        if config_name is None:
+            if binding is None:
+                raise LangGraphConfigurationError("Specify adapter.config or an outer adapter.binding factory")
+            if _optional_string(adapter, "graph_id") is not None:
+                raise LangGraphConfigurationError("adapter.graph_id requires an existing adapter.config JSON descriptor")
+            graph_id, entrypoint = None, binding
+        else:
+            config_path = _resolve_inside(source_root, config_name)
+            langgraph_config = _read_json(config_path)
+            graphs = _required_mapping(langgraph_config, "graphs")
+            graph_id = _required_string(adapter, "graph_id")
+            try:
+                graph_definition = graphs[graph_id]
+            except KeyError as exc:
+                raise LangGraphConfigurationError(
+                    f"Graph {graph_id!r} is not declared in {config_path}"
+                ) from exc
+            entrypoint = _graph_entrypoint(graph_definition, graph_id)
         return cls(
             agent_root=root,
             graph_id=graph_id,
@@ -79,7 +85,7 @@ class LangGraphAdapterConfig:
             input_key=_optional_string(adapter, "input_key"),
             output_key=_optional_string(adapter, "output_key"),
             mode=mode,
-            binding=_optional_string(adapter, "binding"),
+            binding=binding,
             context=_context(adapter),
         )
 

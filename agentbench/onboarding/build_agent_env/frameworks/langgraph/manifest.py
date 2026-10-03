@@ -5,6 +5,9 @@ def render_adapter(facts):
 
 
 def stage_validation(root, name, source):
+    if name is None:
+        (root / "agent").mkdir(parents=True, exist_ok=True)
+        return
     target = root / "agent" / name
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(source.read_text())
+    target.write_bytes(source.read_bytes())

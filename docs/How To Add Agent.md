@@ -96,6 +96,8 @@ a route or environment variable does not implement a tool or provision a service
 
 For LangGraph, the binding exports a synchronous zero-argument factory returning the real invokable Agent and adapts native input/output and lifecycle cleanup. ACP integrations use the native ACP command and protocol configured in `agent.toml`; a Python binding factory is not required. Neither form should replace the Agent’s behavior.
 
+See [Writing LangGraph bindings](LangGraph%20Bindings.md) for file layout, invocation examples, config forwarding, native lifecycle handling and validation.
+
 ### `Dockerfile` — what is installed inside the Agent container
 
 Installs the Agent's Python/system dependencies and copies its source, binding and

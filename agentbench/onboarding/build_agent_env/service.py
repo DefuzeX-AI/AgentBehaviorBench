@@ -80,6 +80,7 @@ def build_agent_environment(
             context=collect_context(source, settings, environ), answers=answers, attempt=attempt,
             agent_id=source.directory.name.split("-", 1)[1], output_fn=output_fn,
             client=client, client_factory=lambda: OpenRouterClient(settings, environ, model=model),
+            generation_model=model or settings.model or environ.get("OPENROUTER_BUILD_MODEL") or environ.get("OPENROUTER_MODEL"),
             manifest_options=manifest_options)
         return _build(session, registry_path)
     finally:

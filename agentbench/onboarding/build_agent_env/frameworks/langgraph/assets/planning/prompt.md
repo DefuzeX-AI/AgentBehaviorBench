@@ -9,6 +9,28 @@ onboarding integrations, not a default framework to assign to every repository.
 Determine the native entrypoint and framework-specific configuration, inputs,
 output, package installation, default model protocol, tool network needs and SDK
 input type. Explain these decisions in summary.
+Read the declared Python CLI module as well as graph/state modules. Its run method
+often defines the real business input, initial state and resource lifecycle.
+The summary must explain how the SDK input reaches this public workflow, including
+required parsing, initialization, writable paths and human review behavior.
+Do not select a forwarding factory merely because build_graph().invoke exists.
+
+If the SDK only supplies text, plan for ordinary natural-language requests, not
+just JSON serialized as a string. A native CLI's JSON file format does not constrain
+SDK Cases. Preserve the full request in a source-confirmed native problem/message
+field or questions list, retaining optional defaults. JSON document parsing may be
+an additional format. A profile requesting JSON does not enforce that format.
+If required business values cannot be derived truthfully, return needs_input or
+unsupported instead of inventing them or assuming a JSON-only Case service.
+Do not ask the user whether SDK text or a native mapping is expected when their
+contracts are already supplied. Derive module exports and invocation argument
+types from the supplied source; do not ask the user to confirm visible functions.
+
+A repository using a source-confirmed LangGraph Python factory such as
+build_graph() does not need to contain langgraph.json. Plan an outer binding
+around the real factory/public workflow. The later manifest can set config=null
+and graph_id=null and load that binding directly. Do not invent source JSON files,
+graph keys or public symbols. Missing JSON alone is not missing business input.
 
 bindings lists only NEW outer Python files that BBA should generate, not the
 Agent's existing source modules, class names or graph nodes. Every complete plan
