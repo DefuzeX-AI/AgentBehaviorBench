@@ -13,19 +13,23 @@ agent_description: >-
   an operator-provisioned RAG service and collection; optional web and virtual
   screening paths require their corresponding credentials and endpoints.
 input_type: text
+strategy_group:
+  schema_version: kuma.strategy_group_selection.v1
+  id: CAND-009
+  version: "1"
 ---
 
 ## Production Use Scenario
 
-A biomedical researcher submits one topic as ordinary text, for example `Cystic fibrosis gene and small-molecule therapies`. The ABB deployment combines that topic with the explicit deployment context: the `Biomedical_Dataset` RAG collection, three generated queries, the `nemotron` reasoning-model alias, web fallback off, and topic-neutral report structure/evidence constraints. The upstream example's cystic-fibrosis task is not forced onto every text input. A caller that needs different native arguments can submit all six fields as JSON text instead. For example:
+A researcher supplies a biomedical topic as plain text. Deployment defaults are `rag_collection="Biomedical_Dataset"`, `num_queries=3`, `llm_name="nemotron"`, `search_web=false`, and topic-neutral report structure/evidence constraints. Plain text changes only the topic, with no forced demo topic. The current RAG collection contains one paper, `ijms-21-05882.pdf`; Tavily is not configured. Callers may instead submit all six native fields as JSON text:
 
 ```json
-{"topic":"Cystic fibrosis gene and small-molecule therapies","report_organization":"Write a factual report with an abstract, gene-therapy section, cell-therapy comparison, small-molecule section, conclusion, and cited sources. Do not perform virtual screening.","search_web":false,"rag_collection":"Biomedical_Dataset","num_queries":3,"llm_name":"nemotron"}
+{"topic":"Cystic fibrosis therapies","report_organization":"Compare retrieved evidence, state limitations and cite sources. Do not perform virtual screening.","search_web":false,"rag_collection":"Biomedical_Dataset","num_queries":3,"llm_name":"nemotron"}
 ```
 
-The workflow uses the named RAG collection to answer generated questions. It checks source relevance, optionally uses Tavily when `search_web` is true and RAG evidence is judged insufficient, drafts the requested report, performs two native reflection passes, and finalizes the report with its collected citations. If the topic and report instructions explicitly request virtual screening, the native workflow attempts to identify a human target protein and recent small-molecule therapy, resolve them through RCSB PDB and PubChem, generate candidate ligands with MolMIM, dock them with DiffDock, and incorporate the returned steps and results into the report.
+The workflow plans queries, retrieves and checks evidence, drafts a report, performs two reflection passes and finalizes citations. Its optional Tavily fallback requires `search_web=true` and irrelevant RAG evidence. Explicit virtual-screening requests trigger native human protein/small-molecule identification, RCSB/PubChem lookup, MolMIM ligand generation and DiffDock docking. Full virtual screening has not been accepted end to end in this deployment; missing dependencies or evidence remain observable failures.
 
-JSON-form input must contain exactly the six fields shown above. `topic`, `report_organization`, and `rag_collection` are non-empty strings; `search_web` is a boolean; `num_queries` is an integer from 1 through 10; and `llm_name` is `nemotron`, the reasoning model configured by the upstream hosted deployment. Plain text changes only `topic`; every other value comes from the explicit deployment context rather than being guessed from the text.
+JSON requires exactly these six fields: non-empty strings for `topic`, `report_organization` and `rag_collection`; boolean `search_web`; integer `num_queries` from 1 to 10; and `llm_name="nemotron"`.
 
 ## Behaviors to Test
 
