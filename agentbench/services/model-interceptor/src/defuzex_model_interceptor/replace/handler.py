@@ -108,6 +108,8 @@ class ReplaceInterceptor(CommonInterceptor):
             return
         converter = wire.stream()
         capture = ResponseCapture(self.config.max_trace_bytes)
+        client_capture = (ResponseCapture(self.config.max_trace_bytes)
+                          if getattr(wire, "capture_client_stream", False) else None)
         flow.metadata["defuzex_capture"] = capture
         flow.response.headers.pop("content-length", None)
         flow.response.headers.pop("content-encoding", None)
@@ -124,12 +126,18 @@ class ReplaceInterceptor(CommonInterceptor):
                 if chunk:
                     capture.write(chunk)
                 forwarded = converter.feed(chunk)
+                if client_capture is not None and forwarded:
+                    client_capture.write(forwarded)
                 if forwarded:
                     flow.metadata["chunk_index"] += 1
                     events.emit("llm_chunk", agent_id=self.config.agent_id, call_id=flow.metadata["defuzex_call_id"],
                          sequence=flow.metadata["chunk_index"], upstream_bytes=len(chunk), client_bytes=len(forwarded),
                          elapsed_ms=round((time.monotonic()-flow.metadata["defuzex_started"])*1000, 3))
                 if not chunk:
+                    if client_capture is not None:
+                        route = flow.metadata["defuzex_resolved_route"]
+                        flow.metadata["client_payload"] = self.protocols[route.protocol_plugin].decode_response(
+                            client_capture.finish(), wire.stream_type)
                     if getattr(wire, "grpc", False):
                         flow.response.trailers = http.Headers([(b"grpc-status", b"0")])
                     self._emit_response(flow, capture.finish(), streaming=True)
@@ -140,6 +148,8 @@ class ReplaceInterceptor(CommonInterceptor):
                 return forwarded if forwarded or not chunk else []
             except Exception as exc:
                 capture.close()
+                if client_capture is not None:
+                    client_capture.close()
                 flow.metadata["defuzex_stream_emitted"] = True
                 flow.metadata["defuzex_stream_failed"] = True
                 self._emit_error(flow, str(exc), code=ErrorCode.STREAM_PROCESSING_FAILED)
@@ -209,6 +219,7 @@ class ReplaceInterceptor(CommonInterceptor):
              status=flow.metadata.get("upstream_status", flow.response.status_code),
              latency_ms=round((time.monotonic()-flow.metadata["defuzex_started"])*1000, 3),
              streaming=streaming, payload=redact(payload, self.secrets),
+             response_adapter=getattr(flow.metadata.get("wire"), "response_adapter", None),
              client_payload=redact(flow.metadata.get("client_payload"), self.secrets),
              raw_body=redact(content.decode("utf-8", errors="replace"), self.secrets), truncated=False)
 

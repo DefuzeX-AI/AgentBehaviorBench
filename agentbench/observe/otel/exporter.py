@@ -13,6 +13,17 @@ class FileExporter(SpanExporter):
         self.lock = threading.Lock()
         self.error = None
         self.closed = False
+        # Local correlation and payload paths belong to the ABB artifact, not
+        # public OTel semantics consumed by SDK evidence/privacy validation.
+        self.local_attributes = {}
+
+    def annotate(self, span, attributes):
+        with self.lock:
+            self.local_attributes.setdefault(span.context.span_id, {}).update(attributes)
+
+    def local(self, span, key):
+        with self.lock:
+            return self.local_attributes.get(span.context.span_id, {}).get(key)
 
     def export(self, spans, *, live=False):
         try:
@@ -21,9 +32,11 @@ class FileExporter(SpanExporter):
                     return SpanExportResult.SUCCESS
                 with (self.directory / ('otel-live.jsonl' if live else 'otel.jsonl')).open('a', encoding='utf-8') as stream:
                     for span in spans:
-                        if span.attributes.get('abb.invocation_id') != self.run_id:
+                        attributes = {**span.attributes, **self.local_attributes.get(span.context.span_id, {})}
+                        if attributes.get('abb.invocation_id') != self.run_id:
                             continue
                         data = json.loads(span.to_json())
+                        data['attributes'] = attributes
                         data['live'] = span.end_time is None
                         # Keep IDs explicit and stable for local UI and SDK comparisons.
                         data.update(trace_id=f'{span.context.trace_id:032x}',
@@ -36,6 +49,8 @@ class FileExporter(SpanExporter):
                         row = dict(schema='abb.observe.event.v1', source='otel', event='span',
                                    run_id=self.session_id, timestamp=data['end_time'], data=data)
                         stream.write(json.dumps(redact(row, self.secrets), ensure_ascii=False) + '\n')
+                        if span.end_time is not None:
+                            self.local_attributes.pop(span.context.span_id, None)
                     stream.flush()
             return SpanExportResult.SUCCESS
         except Exception as exc:
@@ -47,7 +62,7 @@ class FileExporter(SpanExporter):
         directory = self.directory / 'otel-payloads'
         directory.mkdir(exist_ok=True)
         atomic_json(directory / name, redact(json_value(value), self.secrets))
-        span.set_attribute(f'abb.{label}_ref', f'otel-payloads/{name}')
+        self.annotate(span, {f'abb.{label}_ref': f'otel-payloads/{name}'})
         # Publish a real in-progress span snapshot; the ended export replaces it by ID.
         self.export([span], live=True)
 
@@ -61,13 +76,14 @@ class FileExporter(SpanExporter):
                    'run_id': self.session_id, 'timestamp': datetime.now(timezone.utc).isoformat(),
                    'event': event, 'data': value}
             stream.write(json.dumps(redact(json_value(row), self.secrets), ensure_ascii=False) + '\n')
-        span.set_attribute('abb.events_ref', f'otel-payloads/{name}')
+        self.annotate(span, {'abb.events_ref': f'otel-payloads/{name}'})
         if span_event:
             span.add_event(event)
 
     def shutdown(self):
         with self.lock:
             self.closed = True
+            self.local_attributes.clear()
 
     def force_flush(self, timeout_millis=30000):
         return self.error is None

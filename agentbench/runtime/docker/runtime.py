@@ -97,7 +97,7 @@ class DockerRuntime:
         self._environ = dict(os.environ if environ is None else environ)
         self.control = control or RunControl()
         self.identity = dict(identity or {})
-        self._limits = limits or RuntimeLimits()
+        self._limits = limits or RuntimeLimits.from_environment(self._environ)
         self._resources = resource_registry or ResourceRegistry()
         self._uncertain_resources: set[tuple[str, str]] = set()
         client_environment = dict(os.environ if command_environ is None else command_environ)
@@ -450,6 +450,15 @@ class DockerRuntime:
                 "--mount",
                 _bind_mount(config_file, "/run/secrets/interceptor_config"),
             ]
+            # An Agent may explicitly route a private host-side tool service via
+            # Docker's host-gateway alias. The declaration is opt-in and still
+            # passes through the normal narrow tool-route policy.
+            if any(
+                host.lower() == "host.docker.internal"
+                for route in interception.tool_routes
+                for host in route.host_patterns
+            ):
+                command.extend(("--add-host", "host.docker.internal:host-gateway"))
             for path in sorted(secret_dir.glob("*.token")) + sorted(
                 secret_dir.glob("*.secret")
             ):

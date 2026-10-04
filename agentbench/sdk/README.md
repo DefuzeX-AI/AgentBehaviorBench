@@ -47,6 +47,20 @@ service.
 
 ## Strategy checks
 
+### Container output permissions
+
+The KUMA and Local SDK worker retain the Agent image's native non-root UID.
+Before exit, the worker adds read permission to regular files it owns in the
+explicit evaluation output mount, and read/traverse permission to its output
+directories. This also covers partial results and startup diagnostics. It does
+not change file contents, follow symlinks, grant additional write permission,
+or modify the SDK's private ledger. The host's containing run directory stays
+private (0700). This is necessary because atomic JSON writes create 0600 files,
+which are otherwise unreadable when host and container UIDs differ.
+
+Older failed runs are not repaired or resumed by this change. Start a fresh
+evaluation; do not rewrite their manifest to indicate success.
+
 Plugins can implement the optional `SDKStrategyChecks` protocol in `contracts.py`.
 The SDK owns profile parsing and catalog access; CLI and viewer code consume the
 shared `StrategyCheck` result without knowing SDK-specific group IDs.

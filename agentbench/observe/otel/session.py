@@ -6,7 +6,7 @@ from opentelemetry.context import Context
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.trace import Status, StatusCode
-from agentbench.observe.store import atomic_json, redact
+from agentbench.observe.store import atomic_json, json_value, redact
 from .exporter import FileExporter
 from .routing import attach
 
@@ -30,16 +30,32 @@ class OtelSession:
         try:
             payload = json.dumps(redact(value, self.exporter.secrets), ensure_ascii=True, allow_nan=False)
         except (ValueError, TypeError, RecursionError):
-            span.set_attribute(f'abb.tool_{label}_omission', 'not_json_serializable')
+            self.exporter.annotate(span, {f'abb.tool_{label}_omission': 'not_json_serializable'})
             return
         span.set_attribute(f'gen_ai.tool.call.{label}', payload)
+
+    def _model_content(self, span, direction, value):
+        """Use supported semantic keys for actually observed callback bodies.
+
+        Pydantic LangChain messages/results need JSON projection; credentials
+        are redacted first. SDK scanning/size limits still own retention and
+        completeness. Missing/unserializable bodies are never filled in.
+        """
+        try:
+            payload = json.dumps(redact(json_value(value), self.exporter.secrets),
+                                 ensure_ascii=True, allow_nan=False)
+        except (ValueError, TypeError, RecursionError):
+            self.exporter.annotate(span, {f'abb.model_{direction}_omission': 'not_json_serializable'})
+            return
+        span.set_attribute(f'gen_ai.{direction}.messages', payload)
 
     def record(self, event, **data):
         with self.lock:
             identity = {f'abb.{key}': data[key] for key in ('input_id', 'case_id', 'agent_id') if isinstance(data.get(key), str)}
             if event == 'execution_start':
                 self.root = self.tracer.start_span('abb.execute', context=Context(), attributes={
-                    'abb.invocation_id': self.invocation_id, 'gen_ai.operation.name': 'invoke_agent', **identity})
+                    'gen_ai.operation.name': 'invoke_agent'})
+                self.exporter.annotate(self.root, {'abb.invocation_id': self.invocation_id, **identity})
                 self.exporter.payload(self.root, 'input', data.get('input'))
             elif event == 'span_start':
                 parent_id = data.get('parent_span_id')
@@ -50,11 +66,14 @@ class OtelSession:
                 operation = {'llm': 'chat', 'tool': 'execute_tool'}.get(kind, 'invoke_agent')
                 span = self.tracer.start_span(data.get('name', kind),
                     context=trace.set_span_in_context(parent, Context()) if parent else Context(),
-                    attributes={'abb.invocation_id': self.invocation_id, 'abb.framework_span_id': data['span_id'],
-                                'abb.kind': kind, 'gen_ai.operation.name': operation, **identity})
+                    attributes={'gen_ai.operation.name': operation})
+                self.exporter.annotate(span, {'abb.invocation_id': self.invocation_id,
+                    'abb.framework_span_id': data['span_id'], 'abb.kind': kind, **identity})
                 if data['span_id'] in self.spans:
                     raise ValueError('Duplicate framework span start')
                 self.spans[data['span_id']] = span
+                if kind == 'llm' and 'input' in data:
+                    self._model_content(span, 'input', data['input'])
                 if kind == 'tool':
                     span.set_attribute('gen_ai.tool.name', data.get('name', 'tool'))
                     span.set_attribute('gen_ai.tool.type', 'function')
@@ -76,13 +95,15 @@ class OtelSession:
                     return
                 label = 'error' if event == 'span_error' else 'output'
                 self.exporter.payload(span, label, data.get(label))
-                if event == 'span_end' and span.attributes.get('abb.kind') == 'tool':
+                if event == 'span_end' and self.exporter.local(span, 'abb.kind') == 'llm' and 'output' in data:
+                    self._model_content(span, 'output', data['output'])
+                if event == 'span_end' and self.exporter.local(span, 'abb.kind') == 'tool':
                     if 'output' in data:
                         self._tool_content(span, 'result', data['output'])
                     else:
-                        span.set_attribute('abb.tool_result_omission', 'not_observed')
+                        self.exporter.annotate(span, {'abb.tool_result_omission': 'not_observed'})
                     if 'gen_ai.tool.call.arguments' not in span.attributes:
-                        span.set_attribute('abb.tool_arguments_omission', 'not_observed')
+                        self.exporter.annotate(span, {'abb.tool_arguments_omission': 'not_observed'})
                     if isinstance(data.get('tool_call_id'), str):
                         span.set_attribute('gen_ai.tool.call.id', data['tool_call_id'])
                     if data.get('tool_status') == 'error':
@@ -90,7 +111,7 @@ class OtelSession:
                 if event == 'span_error':
                     span.set_status(Status(StatusCode.ERROR, 'Agent step raised an exception'))
                 elif event == 'span_control':
-                    span.set_attribute('abb.control_flow', data['control'])
+                    self.exporter.annotate(span, {'abb.control_flow': data['control']})
                 span.end()
             elif event in ('execution_end', 'execution_error') and self.root:
                 label = 'output' if event == 'execution_end' else 'error'
@@ -107,7 +128,7 @@ class OtelSession:
         with self.lock:
             unfinished = len(self.spans)
             for span in self.spans.values():
-                span.set_attribute('abb.incomplete', True)
+                self.exporter.annotate(span, {'abb.incomplete': True})
                 span.set_status(Status(StatusCode.ERROR, 'Step did not finish before execution closed'))
                 span.end()
             self.spans.clear()

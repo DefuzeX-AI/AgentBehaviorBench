@@ -20,7 +20,7 @@ class RuntimeServices:
         client_environment = dict(os.environ)
         client_environment.update(self.environ)
         self.command_environ = MappingProxyType(client_environment)
-        self.limits = limits or RuntimeLimits()
+        self.limits = limits or RuntimeLimits.from_environment(self.command_environ)
         self.build_coordinator = BuildCoordinator()
         self.resource_registry = ResourceRegistry()
 

@@ -1,0 +1,53 @@
+# Operator-only catalog for the biomedical NVIDIA run. No credential values.
+# Existing provider priority is unchanged, so the Local Judge still resolves
+# the existing DeepSeek deployment independently of Agent target routing.
+priority = ["openrouter", "deepseek", "glm"]
+
+[providers.openrouter]
+credential_env = "OPENROUTER_API_KEY"
+model_env = "OPENROUTER_MODEL"
+base_url_env = "OPENROUTER_BASE_URL"
+base_url = "https://openrouter.ai/api/v1"
+target_plugin = "openrouter"
+[providers.openrouter.header_env]
+HTTP-Referer = "OPENROUTER_HTTP_REFERER"
+X-OpenRouter-Title = "OPENROUTER_APP_TITLE"
+
+[providers.deepseek]
+credential_env = "DEEPSEEK_API_KEY"
+model_env = "DEEPSEEK_MODEL"
+base_url_env = "DEEPSEEK_BASE_URL"
+base_url = "https://api.deepseek.com"
+target_plugin = "compatible-json"
+[providers.deepseek.endpoint_paths]
+"/chat/completions" = "/chat/completions"
+"/responses" = "/responses"
+"/messages" = "/anthropic/v1/messages"
+
+[providers.glm]
+credential_env = "GLM_API_KEY"
+model_env = "GLM_MODEL"
+base_url_env = "GLM_API_BASE_URL"
+base_url = "https://open.bigmodel.cn/api/paas/v4"
+target_plugin = "compatible-json"
+[providers.glm.endpoint_paths]
+"/chat/completions" = "/chat/completions"
+
+[providers.zhipu]
+credential_env = "GLM_API_KEY"
+model_env = "GLM_MODEL"
+base_url_env = "ZHIPU_API_BASE_URL"
+base_url = "https://open.bigmodel.cn/api"
+target_plugin = "compatible-json"
+[providers.zhipu.endpoint_paths]
+"/chat/completions" = "/paas/v4/chat/completions"
+"/messages" = "/anthropic/v1/messages"
+
+[providers.nvidia]
+credential_env = "NVIDIA_API_KEY"
+model_env = "NVIDIA_REASONING_MODEL"
+base_url_env = "NVIDIA_REASONING_BASE_URL"
+base_url = "https://integrate.api.nvidia.com/v1"
+target_plugin = "compatible-json"
+[providers.nvidia.endpoint_paths]
+"/chat/completions" = "/chat/completions"
