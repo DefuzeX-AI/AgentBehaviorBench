@@ -98,6 +98,7 @@ def test_cli_downloads_numbered_source_and_prints_json_array(repository, tmp_pat
     assert str(unit) in output.err
     assert (unit / "agent/notes.txt").read_text() == "fixture\n"
     assert not (unit / "agent/.git").exists()
+    assert (unit / "ground_truth/.gitkeep").read_bytes() == b""
     source = json.loads((unit / "source-manifest.json").read_text())
     assert source["repository"] == URL
     assert source["revision"] == repository[1]
@@ -134,6 +135,7 @@ def test_cli_copies_absolute_local_directory_into_numbered_unit(tmp_path, capsys
     unit = root / "01-local-agent"
     assert (unit / "agent/notes.txt").read_text() == "copied too\n"
     assert not (unit / "agent/.git").exists()
+    assert (unit / "ground_truth/.gitkeep").read_bytes() == b""
     metadata = json.loads((unit / "source-manifest.json").read_text())
     assert metadata["repository"] == str(local.resolve())
     assert metadata["source_type"] == "local-directory"
@@ -168,6 +170,23 @@ def test_local_source_reuse_does_not_require_the_original_after_import(tmp_path)
     reused = download_or_reuse(original_identifier, root)
 
     assert reused.directory == first.directory
+
+
+def test_reuse_restores_ground_truth_placeholder_and_preserves_references(tmp_path):
+    local = tmp_path / "local-agent"
+    write(local, "README.md")
+    imported = download_agent(str(local.resolve()), tmp_path / "agents")
+    reference = write(imported.directory, "ground_truth/manifest.json", '{"defects": []}\n')
+    placeholder = imported.directory / "ground_truth/.gitkeep"
+    placeholder.unlink()
+
+    download_or_reuse(str(local.resolve()), imported.directory.parent)
+
+    assert placeholder.read_bytes() == b""
+    assert reference.read_text() == '{"defects": []}\n'
+    placeholder.write_text("keep existing content\n")
+    download_or_reuse(str(local.resolve()), imported.directory.parent)
+    assert placeholder.read_text() == "keep existing content\n"
 
 
 def test_cli_local_source_enters_the_existing_build_workflow(tmp_path, monkeypatch, capsys):

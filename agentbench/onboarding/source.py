@@ -112,12 +112,25 @@ def download_agent(repository: str, agents_directory: Path, *, timeout: float = 
         try:
             source.rename(unit / "agent")
             manifest.rename(unit / manifest.name)
+            ensure_ground_truth_directory(unit)
         except BaseException:
             shutil.rmtree(unit)
             raise
     return DownloadedAgent(
         unit, selected.identifier, revision, files, tuple(warnings), selected.source_type
     )
+
+
+def ensure_ground_truth_directory(unit: Path) -> None:
+    """Keep a host-owned reference directory without replacing existing files."""
+    directory = unit / "ground_truth"
+    if directory.is_symlink():
+        raise AgentDownloadError("Ground truth directory must not be a symlink")
+    directory.mkdir(exist_ok=True)
+    try:
+        (directory / ".gitkeep").touch(exist_ok=False)
+    except FileExistsError:
+        pass
 
 
 def _agent_source(value: str, *, require_local: bool = True) -> _AgentSource:

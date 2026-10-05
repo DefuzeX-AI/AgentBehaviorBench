@@ -99,6 +99,8 @@ cd ..
 python -m agentbench agent add https://github.com/owner/repository
 ```
 
+`agent add` 还会在 `agent/` 同级创建 `ground_truth/.gitkeep`，复用已导入的 Agent 时也会补齐。占位文件用于让 Git 保留目录；已确认的缺陷和证据仍需按 [Ground Truth](Ground%20Truth.zh-CN.md) 手动准备。
+
 `SOURCE` 是 HTTPS 仓库地址本身，不能是文件或 `/tree/branch` 页面；也可以是本地绝对目录，
 例如 `/absolute/path/to/local-agent`，PowerShell 可用 `C:\work\local-agent`，不需要 `-d`。
 GitHub 导入默认分支 revision，目前没有 `--revision`。本地导入排除 `.git`，记录内容的

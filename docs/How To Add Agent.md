@@ -114,6 +114,8 @@ Start with source import only. This gives a review point before model calls:
 python -m agentbench agent add https://github.com/owner/repository
 ```
 
+`agent add` also creates `ground_truth/.gitkeep` beside `agent/`, including when reusing an imported unit. The placeholder keeps the directory in Git; confirmed defects and evidence are prepared manually as described in [Ground Truth](Ground%20Truth.md).
+
 `SOURCE` is the HTTPS repository URL itself, not a file or `/tree/branch` URL, or
 an absolute local directory such as `/absolute/path/to/local-agent` or
 `C:\work\local-agent` on PowerShell. No `-d` flag is needed. GitHub imports use the

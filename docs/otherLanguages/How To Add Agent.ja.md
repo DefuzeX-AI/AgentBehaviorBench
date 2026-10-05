@@ -106,6 +106,8 @@ cd ..
 python -m agentbench agent add https://github.com/owner/repository
 ```
 
+`agent add` は `agent/` と同じ階層に `ground_truth/.gitkeep` も作成し、既存のユニットを再利用する際にも補います。このファイルは Git にディレクトリを保持させるためのものです。確認済みの不具合と証拠は [Ground Truth](../Ground%20Truth.md) に従って手動で用意してください。
+
 `SOURCE` は HTTPS リポジトリ本体の URL で、ファイルや `/tree/branch` URL ではありません。
 `/absolute/path/to/local-agent` や PowerShell の `C:\work\local-agent` のようなローカル絶対
 ディレクトリも指定でき、`-d` は不要です。GitHub はデフォルトブランチの revision を使い、
