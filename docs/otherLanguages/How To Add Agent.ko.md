@@ -50,6 +50,8 @@ SOURCE는 파일·브랜치 페이지가 아닌 HTTPS GitHub 저장소 URL 또�
 agentbench agent add https://github.com/owner/repository
 ```
 
+`agent add`는 `agent/`와 같은 위치에 `ground_truth/.gitkeep`도 생성하며, 기존 unit을 재사용할 때도 누락된 파일을 보완합니다. 이 파일은 Git이 디렉터리를 유지하도록 합니다. 확인된 결함과 증거는 [Ground Truth](../Ground%20Truth.md)에 따라 수동으로 준비하세요.
+
 같은 소스로 통합 파일을 생성하세요. `-b` 또는 `-c` 없이 일반 가져오기를 반복하면 중복 오류가 발생합니다. 해당 옵션은 기존 단위를 재사용하지만 수정된 소스에서 갱신하지 않습니다. 로컬은 `/absolute/path/to/local-agent`, PowerShell은 `"C:\work\local-agent"`을 사용할 수 있습니다.
 
 ```bash

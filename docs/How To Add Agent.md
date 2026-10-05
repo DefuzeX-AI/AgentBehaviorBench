@@ -50,6 +50,8 @@ SOURCE must be an HTTPS GitHub repository URL, not a file or branch page, or an 
 agentbench agent add https://github.com/owner/repository
 ```
 
+`agent add` also creates `ground_truth/.gitkeep` beside `agent/`, including when reusing an imported unit. The placeholder keeps the directory in Git; confirmed defects and evidence are prepared manually as described in [Ground Truth](Ground%20Truth.md).
+
 Then generate integration files using the same source. Plain import repeated without `-b` or `-c` reports a duplicate; those options reuse the matching imported unit. Reuse does not refresh the snapshot from an edited source directory. For a local source, use `/absolute/path/to/local-agent`, or `"C:\work\local-agent"` in PowerShell.
 
 ```bash

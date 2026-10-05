@@ -6,6 +6,8 @@ Ground truth records a real Agent defect that a person has confirmed through rep
 
 ## Retain confirmed defects
 
+`agentbench agent add` creates `ground_truth/.gitkeep` in each imported unit and fills in missing placeholders when reusing a unit. This keeps the directory in Git; it does not configure ground truth until you provide a valid `manifest.json` and evidence.
+
 Keep the reference directory beside `agent.toml`, outside the upstream `agent/` source:
 
 ```text

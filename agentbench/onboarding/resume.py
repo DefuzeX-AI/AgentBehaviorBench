@@ -6,7 +6,10 @@ from pathlib import Path
 
 from .discovery import discover_files
 from .source_status import checkout_warnings
-from .source import AgentDownloadError, DownloadedAgent, NUMBERED_UNIT, _agent_source, download_agent
+from .source import (
+    AgentDownloadError, DownloadedAgent, NUMBERED_UNIT, _agent_source,
+    download_agent, ensure_ground_truth_directory,
+)
 
 
 def download_or_reuse(repository: str, agents_directory: Path) -> DownloadedAgent:
@@ -43,4 +46,7 @@ def download_or_reuse(repository: str, agents_directory: Path) -> DownloadedAgen
         ))
     if len(matches) > 1:
         raise AgentDownloadError("Multiple downloaded units match this repository")
-    return matches[0] if matches else download_agent(repository, agents_directory)
+    if matches:
+        ensure_ground_truth_directory(matches[0].directory)
+        return matches[0]
+    return download_agent(repository, agents_directory)

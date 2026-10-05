@@ -50,6 +50,8 @@ SOURCE est l’URL HTTPS d’un dépôt GitHub, pas une page de fichier ou branc
 agentbench agent add https://github.com/owner/repository
 ```
 
+`agent add` crée aussi `ground_truth/.gitkeep` à côté de `agent/`, y compris lors de la réutilisation d’une unité importée. Ce fichier permet à Git de conserver le répertoire ; les défauts confirmés et leurs preuves restent à préparer manuellement selon [Ground Truth](../Ground%20Truth.md).
+
 Générez ensuite avec la même source. Répéter l’import sans `-b` ou `-c` signale un doublon ; ces options réutilisent l’unité correspondante sans actualiser une source modifiée. Pour une source locale, utilisez `/absolute/path/to/local-agent` ou `"C:\work\local-agent"` sous PowerShell.
 
 ```bash

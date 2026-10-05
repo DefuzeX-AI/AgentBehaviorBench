@@ -6,6 +6,8 @@ Ground truth 保存真实 Agent 的已确认缺陷：人工检查原始观察，
 
 ## 保存已确认缺陷
 
+`agentbench agent add` 会为导入的 Agent 创建 `ground_truth/.gitkeep`，复用时也会补齐缺失的占位文件。它用于让 Git 保留目录；只有提供有效的 `manifest.json` 和证据后，ground truth 才算已配置。
+
 固定目录位于 `agent.toml` 旁，不放入上游 `agent/` 源码：
 
 ```text

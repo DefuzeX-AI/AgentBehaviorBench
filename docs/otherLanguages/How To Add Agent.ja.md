@@ -50,6 +50,8 @@ SOURCE は HTTPS の GitHub リポジトリ URL（ファイル・ブランチペ
 agentbench agent add https://github.com/owner/repository
 ```
 
+`agent add` は `agent/` と同じ階層に `ground_truth/.gitkeep` も作成し、既存のユニットを再利用する際にも補います。このファイルは Git にディレクトリを保持させるためのものです。確認済みの不具合と証拠は [Ground Truth](../Ground%20Truth.md) に従って手動で用意してください。
+
 次に同じソースで統合ファイルを生成します。`-b`・`-c` なしの再インポートは重複エラーになり、これらの指定で既存ユニットを再利用します。変更したソースからの更新は行いません。ローカルでは `/absolute/path/to/local-agent`、PowerShell では `"C:\work\local-agent"` を指定できます。
 
 ```bash

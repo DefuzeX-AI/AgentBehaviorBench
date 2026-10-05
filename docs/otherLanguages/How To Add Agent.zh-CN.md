@@ -50,6 +50,8 @@ SOURCE 必须是 HTTPS GitHub 仓库地址本身（不能是文件或分支页�
 agentbench agent add https://github.com/owner/repository
 ```
 
+`agent add` 还会在 `agent/` 同级创建 `ground_truth/.gitkeep`，复用已导入的 Agent 时也会补齐。占位文件用于让 Git 保留目录；已确认的缺陷和证据仍需按 [Ground Truth](Ground%20Truth.zh-CN.md) 手动准备。
+
 然后用同一来源生成接入文件。不带 `-b` 或 `-c` 重复普通导入会报重复；这两个选项可复用匹配的已导入单元，不会从已变化的源码目录刷新快照。本地来源可用 `/absolute/path/to/local-agent`，PowerShell 可用 `"C:\work\local-agent"`。
 
 ```bash
