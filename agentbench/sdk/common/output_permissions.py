@@ -4,6 +4,23 @@ import stat
 from pathlib import Path
 
 
+def prepare_output(directory):
+    """Create shared output and Judge directories under a private host Run.
+
+    The container exports Judge context here, then the host atomically writes
+    the report. Both UIDs need directory write access; the containing Run is
+    host-owned and 0700. Creating these directories on the host retains host
+    ownership through the worker's read-only permission publication.
+    """
+    root = Path(directory)
+    root.mkdir(mode=0o777)
+    root.chmod(0o777)
+    judge = root / 'judge'
+    judge.mkdir(mode=0o777)
+    judge.chmod(0o777)
+    return root
+
+
 def share_output(directory):
     """Allow host reads without changing identity, contents or write permissions.
 

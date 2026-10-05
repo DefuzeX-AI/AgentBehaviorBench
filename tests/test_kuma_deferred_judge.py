@@ -132,6 +132,32 @@ def test_interrupt_after_accepted_post_recovers_with_get_without_repost(tmp_path
     assert benchmark.passed and len(backend.posts) == 1
 
 
+def test_report_write_failure_recovers_original_judge_without_resubmission(tmp_path, monkeypatch):
+    runner, agent, case, ticket, _ = stage_task(tmp_path)
+    backend = OfflineBackend(case.case_id, 'issue')
+    monkeypatch.setattr('kuma.transport.backend.BackendClient', lambda **kwargs: backend)
+    save = Artifacts.save
+
+    def fail_report(self, relative, value):
+        if relative == 'evaluation/judge/report.json':
+            raise PermissionError('container-owned Judge directory')
+        return save(self, relative, value)
+
+    context = (ticket.directory / 'evaluation/judge/context.json').read_bytes()
+    with monkeypatch.context() as scoped:
+        scoped.setattr(Artifacts, 'save', fail_report)
+        with pytest.raises(PermissionError):
+            judge_task(runner, agent, case, ticket)
+    polls = backend.polls
+    assert json.loads((ticket.directory / 'judge-task.json').read_text())['state'] == 'interrupted'
+    result = judge_task(runner, agent, case, ticket)
+    assert result.report.status == 'issue'
+    # The pinned SDK polls the original completed operation again; no new POST.
+    assert len(backend.posts) == 1 and backend.polls == polls + 1
+    assert (ticket.directory / 'evaluation/judge/context.json').read_bytes() == context
+    assert json.loads((ticket.directory / 'evaluation/manifest.json').read_text())['judge'] == 'received'
+
+
 def test_modified_queued_evidence_is_rejected_before_any_sdk_upload(tmp_path, monkeypatch):
     runner, agent, case, ticket, _ = stage_task(tmp_path)
     backend = OfflineBackend(case.case_id)

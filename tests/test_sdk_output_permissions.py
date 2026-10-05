@@ -3,12 +3,35 @@ import stat
 
 import pytest
 
-from agentbench.sdk.common.output_permissions import share_output
+from agentbench.sdk.common.output_permissions import prepare_output, share_output
 from agentbench.sdk.plugin.kuma import worker
 
 
 def mode(path):
     return stat.S_IMODE(path.stat().st_mode)
+
+
+def test_host_prepares_judge_directory_for_atomic_report_handoff(tmp_path, monkeypatch):
+    import os
+    from agentbench.sdk.common.artifacts import Artifacts
+
+    private = tmp_path / 'run'
+    private.mkdir(mode=0o700)
+    output = prepare_output(private / 'evaluation')
+    judge = output / 'judge'
+    owner = judge.stat().st_uid
+    Artifacts(output).save('judge/context.json', {'history': 'original'})
+    context = (judge / 'context.json').read_bytes()
+    # Worker publication must not remove the host-owned directory permissions.
+    with monkeypatch.context() as scoped:
+        scoped.setattr(os, 'getuid', lambda: owner + 1)
+        share_output(output)
+    assert mode(private) == 0o700
+    assert mode(output) == mode(judge) == 0o777
+    assert judge.stat().st_uid == owner
+    Artifacts(output).save('judge/report.json', {'status': 'issue'})
+    Artifacts(output).save('judge/report.json', {'status': 'issue', 'received': True})
+    assert (judge / 'context.json').read_bytes() == context
 
 
 def test_output_is_readable_without_changing_content_or_private_parent(tmp_path):

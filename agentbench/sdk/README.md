@@ -58,8 +58,15 @@ or modify the SDK's private ledger. The host's containing run directory stays
 private (0700). This is necessary because atomic JSON writes create 0600 files,
 which are otherwise unreadable when host and container UIDs differ.
 
-Older failed runs are not repaired or resumed by this change. Start a fresh
-evaluation; do not rewrite their manifest to indicate success.
+The host pre-creates the evaluation mount and its `judge/` directory with shared
+directory write access inside that private Run. The container exports context
+there, and the host can then atomically save the deferred Judge report. Worker
+publication preserves these host-owned directories and adds no file write access.
+
+For an older interrupted Judge task, retain the original evidence and SDK ledger.
+After correcting only the directory ownership/permissions, `agentbench resume`
+can recover the original Judge operation or its cached report without Agent
+replay. Never rewrite a manifest to indicate success.
 
 Plugins can implement the optional `SDKStrategyChecks` protocol in `contracts.py`.
 The SDK owns profile parsing and catalog access; CLI and viewer code consume the
