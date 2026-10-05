@@ -25,7 +25,7 @@ def download_or_reuse(repository: str, agents_directory: Path) -> DownloadedAgen
         if unit.is_symlink() or manifest.is_symlink() or not manifest.is_file():
             continue
         try:
-            metadata = json.loads(manifest.read_text())
+            metadata = json.loads(manifest.read_text(encoding="utf-8"))
         except (ValueError, UnicodeError):
             continue
         if not isinstance(metadata, dict):

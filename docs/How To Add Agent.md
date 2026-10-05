@@ -2,98 +2,38 @@
 
 English | [Français](otherLanguages/How%20To%20Add%20Agent.fr.md) | [日本語](otherLanguages/How%20To%20Add%20Agent.ja.md) | [中文](otherLanguages/How%20To%20Add%20Agent.zh-CN.md) | [한국어](otherLanguages/How%20To%20Add%20Agent.ko.md)
 
-Use this runbook for a new Agent: **environment → source import → configuration →
-static review → local smoke → KUMA → view → handoff or certification**. Run commands
-from this ABB checkout's root, with its virtual environment active. Replace
-`SOURCE`, `AGENT_ID`, `NN-name` and result paths with values printed by your run.
+[How to start ABB](Guide.md) · [CLI reference](cli.md) · [Registry guide](Registry.md)
 
-For a coding assistant, first read `AGENTS.md`, the onboarding issue and upstream
-setup instructions. Record the requested scope, current checkout and `git status`;
-preserve unrelated work. Never infer that a package can run just from its README.
-
-**When to pause:** if the user requests step-by-step approval, report each stage's
-command, outcome, evidence path and proposed next step, then wait for approval.
-Otherwise continue authorized work without asking again at every checkpoint.
-Before a new paid/external operation, confirm that authorization covers model
-requests and sending source context, the profile and evaluation evidence to the
-configured providers. Reuse authorization already given. Stop dependent work for
-missing credentials, required user decisions, unsupported deployment or an
-unresolved failure; keep completed artifacts. Never print keys or `.env` contents.
-A checkpoint means inspect the evidence; it is not always a permission prompt.
+Follow these steps from the ABB checkout root with its virtual environment active: prepare the environment, import source, generate integration files, review them, and test the Agent. Replace SOURCE, AGENT_ID, NN-name and result paths with your actual values.
 
 ## 1. Prepare the environment
 
-### Install ABB and its host dependencies
-
-Complete [ABB installation](README-previous.md#before-you-start) first. You need Git,
-Python 3.10+ with an activated virtual environment, and a running Docker engine
-for certification. Then install the selected SDK's host validation dependencies:
+Install Git and Python 3.10+, then complete the startup guide linked above. Docker must be available to your user for Agent execution and certification. Install KUMA in the same virtual environment as ABB when using KUMA generation or validation:
 
 ```bash
-source .venv/bin/activate
 python -m pip install -e .
-python -m pip install -r agentbench/sdk/plugin/kuma/requirements.txt
+python -m pip install "kuma-defuzex[otel]>=0.3.3"
 git --version
-python -m agentbench --help
-python -m agentbench sdk list
+agentbench --help
+agentbench sdk list
 docker info
 ```
 
-`sdk list` should show `kuma`; `docker info` must succeed as the same user who will
-run ABB. Download/configuration generation alone does not require Docker, but
-`-c` certification does. The host SDK installation and the SDK installed inside
-an evaluation image are separate.
+`sdk list` lists plugins, not installed dependencies. Source import and configuration generation do not require Docker. Host SDK and container SDK installations are separate.
 
-Verify the harness before configuring paid services:
-
-```bash
-python -m examples.offline_demo --output results/offline-demo.json
-```
-
-Expected: `Case execution: 1/1 completed | Judge: pass=1`. Save the exact
-`OFFLINE_RESULT=` path. This deterministic echo demo needs no Docker, key or model
-call and does not test your Agent. If it fails, repair the host environment first.
-Checkpoint: report the checkout path/revision, CLI/SDK discovery and demo outcome.
-SDK discovery alone does not establish onboarding support (see section 2).
-
-### Configure credentials and models
-
-Create `.env` only if it does not already exist:
-
-```bash
-test -f .env || cp .env.example .env
-```
-
-Edit the file locally:
+Copy `.env.example` to `.env` only if `.env` does not exist, then edit it locally. KUMA needs KUMA_API_KEY (or DEFUZEX_API_KEY); configuration generation uses OpenRouter and a model that supports strict structured output:
 
 ```dotenv
 KUMA_API_KEY=
 OPENROUTER_API_KEY=
 OPENROUTER_MODEL=openai/gpt-4.1-mini
-# Optional separate model for integration-file generation:
+# Optional separate generation model:
 # OPENROUTER_BUILD_MODEL=
-# Add the tool credentials required by your Agent, for example:
-# TAVILY_API_KEY=
 ```
 
-- **KUMA key:** needed to fetch the current strategy catalog and to generate/judge
-  Cases. ABB also accepts `DEFUZEX_API_KEY`; a nonempty `KUMA_API_KEY` takes precedence.
-- **OpenRouter key and model:** used to generate integration files and run the
-  Agent. The generation model must support **strict structured outputs**; a model
-  that works for ordinary chat is not necessarily suitable. The sample model slug
-  above is a configuration example, not an implicit runtime default.
-- **Agent dependencies:** read its upstream setup instructions and prepare required
-  tool keys, datasets and external services. A database driver does not start a
-  database; downloading an Agent does not provision its whole deployment.
+The target Agent’s runtime model is configured separately: LangGraph integrations can use OpenRouter, DeepSeek or GLM; native ACP Agents use their own declared service credentials. See the startup guide. `--build-model` selects the generation model; `--model` selects ABB’s replacement target model for certification. Exported shell variables override `.env`. Keep keys out of source and generated files.
 
-Key-retrieval links are in [the configuration guide](README-previous.md#configure-a-real-evaluation).
-Exported shell variables override `.env`. Use `--env-file PATH` for another file.
-The CLI resolves declared credentials; it does not mount the entire `.env` into
-containers. Keep credentials out of source files and generated configuration.
-
-### Prepare the viewer, if wanted
-
-For the browser UI, install Node.js **20.19+ on 20.x, or 22.12+**, with npm, then:
+For the web viewer, use Node.js 20.19+ on 20.x or 22.12+, with npm, then build the frontend. Headless evaluation with `--no-view` does not require Node or `web/dist`.
 
 ```bash
 cd web
@@ -102,90 +42,27 @@ npm run build
 cd ..
 ```
 
-This prepares ABB's viewer, not an Agent's browser or Node/MCP dependencies.
-Use `--no-view` on the add command below to skip starting the viewer; headless
-execution does not require Node or `web/dist`.
+## 2. Import source and generate configuration
 
-## 2. Import source, then generate configuration
-
-Start with source import only. This gives a review point before model calls:
+SOURCE must be an HTTPS GitHub repository URL, not a file or branch page, or an absolute local directory. GitHub imports the default branch; there is no `--revision` option. Local imports omit `.git` and record a content digest. First import the source:
 
 ```bash
-python -m agentbench agent add https://github.com/owner/repository
+agentbench agent add https://github.com/owner/repository
 ```
 
 `agent add` also creates `ground_truth/.gitkeep` beside `agent/`, including when reusing an imported unit. The placeholder keeps the directory in Git; confirmed defects and evidence are prepared manually as described in [Ground Truth](Ground%20Truth.md).
 
-`SOURCE` is the HTTPS repository URL itself, not a file or `/tree/branch` URL, or
-an absolute local directory such as `/absolute/path/to/local-agent` or
-`C:\work\local-agent` on PowerShell. No `-d` flag is needed. GitHub imports use the
-default branch revision; there is no `--revision` option. Local imports omit `.git`
-and record a SHA-256 content digest. Subsequent calls with the same canonical
-source reuse the unit; they do not refresh it from an edited local directory.
-
-**Checkpoint — imported:** record the actual unit path and `source-manifest.json`
-revision. Read the original entrypoint, prompts, tools, input/state schema, UI
-caller, Python constraints and lockfile. Identify external services and the exact
-interface being deployed: a text graph is not its PDF upload UI. Import alone does
-not register a runnable Agent. Do not skip `agent add` by copying a replacement
-implementation directly into the registry.
-
-Generate files using the same source after answering these deployment questions:
+Then generate integration files using the same source. Plain import repeated without `-b` or `-c` reports a duplicate; those options reuse the matching imported unit. Reuse does not refresh the snapshot from an edited source directory. For a local source, use `/absolute/path/to/local-agent`, or `"C:\work\local-agent"` in PowerShell.
 
 ```bash
-python -m agentbench agent add https://github.com/owner/repository -b --sdk kuma --no-view
+agentbench agent add https://github.com/owner/repository -b --sdk kuma
 ```
 
-`-b` plans, generates and validates integration files and registers `adapting`;
-it does **not** build Docker. KUMA fetches a fresh strategy catalog before planning.
-Read each group's purpose, availability, exact version and evidence requirements;
-use the recorded snapshot rather than copying a strategy ID from another Agent.
-If lookup fails, stop and fix credentials/connectivity; do not invent a selection.
-
-If the planner asks for input, save factual answers in a local UTF-8 file and resume:
+`-b` supports LangGraph and ACP, generates and validates integration files, and registers the Agent as `adapting`; it does not build Docker. KUMA retrieves a current strategy catalog before planning. The bundled `local` SDK supports evaluation but has no onboarding validation hooks, so use KUMA for this generation workflow. If planning needs details, put factual deployment answers in UTF-8 `answers.txt` and repeat the command with `--answers answers.txt`. Completed valid files are retained after a failure. Inspect the saved `build-result.json` before retrying.
 
 ```bash
-python -m agentbench agent add https://github.com/owner/repository -b --sdk kuma --no-view --answers answers.txt
+agentbench agent add https://github.com/owner/repository -b --sdk kuma --answers answers.txt
 ```
-
-Explain the real text-to-native mapping, session lifecycle, excluded UI features,
-services and dependencies. Never invent business inputs. Read `build-result.json`
-and the failed `steps/` entry before retrying; completed files are retained and
-revalidated. Manual conflicts stop generation. Do not delete all progress or
-repeat paid requests without changing the cause of failure.
-
-**Checkout limitation:** this revision's `local` SDK supports evaluation, but has
-no onboarding requirements/validation hooks. `add -b --sdk local` stops with
-`Selected SDK has no onboarding requirements and validation`. Use KUMA generation
-here, then local evaluation in section 5. If KUMA credentials are unavailable,
-stop automatic generation; adding local onboarding support is a separate code
-change. Do not assume a fix in another checkout exists in this one.
-
-The combined shortcut below is only for a deployment you already understand and
-are authorized to generate and certify without intermediate approval:
-
-```bash
-python -m agentbench agent add https://github.com/owner/repository -b -c --sdk kuma --no-view
-```
-
-`-c` builds/runs certification; it is a paid execution step, not a static check.
-It can also run with manually prepared files. Currently automatic generation
-supports LangGraph; do not relabel an unsupported framework as LangGraph.
-
-| Option | Purpose |
-| --- | --- |
-| `--sdk kuma` / `--sdk local` | Choose explicitly; discovery does not prove onboarding support. |
-| `--no-view` | Save results without launching the viewer. |
-| `--build-model MODEL` | Model for configuration generation, requiring strict structured outputs. |
-| `--model MODEL` | Agent model during certification. |
-| `--answers answers.txt` | Answers to a previous plan. |
-| `--with-observe` | With `-b`, generate native input prompts for `observe`. |
-| `--build-settings settings.toml` | Overrides in a `[build]` table. |
-| `-y` | Skip execution confirmation only when that execution is already authorized. |
-
-Build-model precedence: `--build-model`, settings `model`, `OPENROUTER_BUILD_MODEL`,
-then `OPENROUTER_MODEL`. Review the [packaged settings](../agentbench/onboarding/build_agent_env/openrouter_provider/assets/settings.toml)
-before changing request budgets or retries.
 
 ## 3. Understand the files
 
@@ -197,7 +74,7 @@ these by hand before running it.
 resources/agents/NN-name/
 ├── agent/                   # Imported upstream or local source snapshot
 ├── agent.toml               # ABB execution configuration
-├── bindings/                # Boundary between ABB and the native Agent
+├── bindings/                # LangGraph binding; not required for native ACP
 ├── Dockerfile               # Agent image build instructions
 ├── .dockerignore            # Files excluded from the image build context
 ├── requirement.md           # Evaluation description for the selected SDK
@@ -217,12 +94,11 @@ adapter, input/output mapping, environment declarations and model/tool routes.
 Check that entrypoint paths and required inputs match the actual source. Declaring
 a route or environment variable does not implement a tool or provision a service.
 
-### `bindings/*.py` — how native inputs and outputs cross the boundary
+### `bindings/*.py`
 
-Exports a synchronous, zero-argument factory returning the actual invokable Agent.
-The binding handles source-backed input/output adaptation and lifecycle cleanup.
-It must not fabricate answers or substitute a simplified Agent to pass a test.
-Valid Python syntax alone does not prove the graph can load and execute.
+For LangGraph, the binding exports a synchronous zero-argument factory returning the real invokable Agent and adapts native input/output and lifecycle cleanup. ACP integrations use the native ACP command and protocol configured in `agent.toml`; a Python binding factory is not required. Neither form should replace the Agent’s behavior.
+
+See [Writing LangGraph bindings](LangGraph%20Bindings.md) for file layout, invocation examples, config forwarding, native lifecycle handling and validation.
 
 ### `Dockerfile` — what is installed inside the Agent container
 
@@ -272,200 +148,72 @@ Generation attempts and checkpoints live separately under
 work; attempt directories contain the plan, SDK catalog, per-file `steps/` and
 `build-result.json`. These are also automatic records, not Agent source files.
 
-## 4. Review and validate before execution
+## 4. Review and validate the configuration
 
-**Checkpoint — configured:** inspect every generated file, not just the success
-message. Confirm source provenance and these boundaries:
-
-- The descriptor resolves to the original graph. If the upstream has no
-  `langgraph.json`, record a minimal added descriptor (for example
-  `abb-langgraph.json`) explicitly in source provenance; do not rewrite the graph.
-- The binding has a synchronous zero-argument factory and calls the real Agent.
-  Preserve `config`/callbacks, native exceptions and raw output. Match the native
-  UI's message append/active-agent lifecycle, isolate Cases and discard state on
-  close. Do not keep mutable conversation state globally or swallow failed turns.
-- The manifest's output field selects the actual reply while evidence retains
-  the full state. Required text input is mapped truthfully; unsupported mandatory
-  multi-field inputs are a stop condition.
-- The image installs the upstream lockfile with a compatible interpreter. Keep
-  host ABB dependencies separate from Agent dependencies. With uv, the project
-  path, lockfile and runtime interpreter must agree; a separate `/opt/venv` avoids
-  installing into a read-only source tree. Ensure runtime `python -m pip` works.
-- Review the **effective SDK overlay**, including appended routes and copied
-  binding/runtime files. Passing the outer TOML check alone is insufficient.
-- The profile lists real tools, task data the caller must supply and unavailable
-  operations. Current KUMA generation requires `input_type: text`, the three
-  exact English section headings and a catalog-selected strategy group. Do not
-  claim browsing, uploads, code execution or file persistence unless implemented.
-
-After manual corrections, run the same static validator used by onboarding:
+Review the generated entrypoint, native input/output mapping, dependencies, declared credentials and model/tool routes against the actual source. For LangGraph, check its graph descriptor and factory; for ACP, check its native command and session setup. The Profile must describe implemented tools, required caller data and limitations. After manual changes, run the onboarding validator (Bash example):
 
 ```bash
 python - <<'PY'
 from pathlib import Path
 from agentbench.onboarding.build_agent_env.common.validation import validate_unit
 from agentbench.sdk.plugin.kuma.plugin import plugin
-unit = Path("resources/agents/NN-name")
-print(validate_unit(unit, plugin))
+print(validate_unit(Path("resources/agents/NN-name"), plugin))
 PY
 ```
 
-This checks files and the installed SDK parser offline. It does not execute the
-Agent or refresh/validate selection against the live catalog unless catalog
-context is supplied. Generation validates against its saved fresh snapshot;
-KUMA execution preflight checks service rules again. Static success is not an
-execution pass. Add focused offline tests for nontrivial bindings: real adapter
-boundary, session isolation, config forwarding, async if supported and errors.
-Fixtures must be self-contained, or explicitly skip if an optional unit is absent.
+This checks installed files and the SDK parser without executing the Agent. Without a supplied catalog context it does not validate against the live strategy catalog. Static success does not establish runtime success.
 
 ## 5. Run one local smoke Case
 
-For a configured text Agent, start small:
+Set `enabled = true` for the new Agent in the registry, then run one Case. `local` uses generic text Cases and a local Judge, with no KUMA backend credit. The target Agent and local Judge can still call a paid model. It does not certify integration or provide a KUMA behavioral assessment.
 
 ```bash
-python -m agentbench evaluate AGENT_ID --cases 1 --sdk local --no-view
+agentbench evaluate AGENT_ID --cases 1 --sdk local --no-view
 ```
 
-This uses the actual Docker Agent and model interception with fixed text Cases
-and a local Judge. It needs Docker and configured model access; model tokens can
-cost money. It needs no KUMA credential/credit, and is different from the
-zero-credential offline echo demo. Its fixed Cases do not derive from the profile
-and may not exercise article processing or specialist handoffs.
+## 6. Evaluate with KUMA
 
-**Checkpoint — local:** retain the Suite path, detailed run directory, outputs,
-trace status and Judge report. Require successful execution and host acceptance
-before calling the integration runnable. Open view after this first run (section
-7), including failures. An import check or fixture test is not a substitute.
-
-If generic Cases omit required context, optionally use a source-backed native
-input and `observe` after authorization. For a text binding, `native-input.json`
-contains a JSON string; for another binding, match its actual schema. Include a
-real article excerpt or other required business data, not “use the supplied text”
-without supplying it.
+After the smoke test, use KUMA to generate a fresh Case, collect execution evidence and obtain a Judge report. This uses the configured model services and KUMA API.
 
 ```bash
-python -m agentbench observe AGENT_ID --input native-input.json
+agentbench evaluate AGENT_ID --cases 1 --sdk kuma --no-view
 ```
 
-Observe captures native execution without KUMA Case generation/Judge; model/tool
-calls can still cost money. A focused observation does not convert a failed
-benchmark into a pass. If the user explicitly requests KUMA directly, proceed to
-section 6 after static review; report local validation as not performed if skipped.
+## 7. View the results
 
-## 6. Run a fresh KUMA evaluation
-
-Review the deployed profile and current strategy selection, verify authorization
-for KUMA/model use and evidence submission, then run one Case:
+Use the exact file printed after `Result saved`, then open the complete `View:` URL and keep the command running. Use Conversation for inputs/outputs, Judge for findings, and Timing for execution and OTel traces. Execution completion and Judge verdict are separate: `issue` is a finding; `insufficient_evidence` alone is not a confirmed defect.
 
 ```bash
-python -m agentbench evaluate AGENT_ID --cases 1 --sdk kuma --no-view
+agentbench view results/suites/SUITE_ID/events.json
 ```
 
-A local pass does not prove KUMA compatibility. A changed profile affects future
-Cases only. Inspect the generated Case: does it supply required data, and does it
-request actions the deployment actually supports? Save Case defects alongside
-Agent findings; never edit original inputs, output or Judge evidence to force a pass.
+## 8. Certify the integration
 
-While waiting, follow the existing run's progress through generation, Agent calls,
-submission and Judge polling. An accepted asynchronous Judge request is not a
-verdict. Do not launch duplicate evaluations while it polls. On timeout or error,
-inspect saved completion/recovery state before deciding whether to resume or
-retry. Respect replay safety and possible tool side effects; never force recovery
-by changing safety flags. A new `evaluate` creates a new Suite and generally new
-Cases, so it is not a controlled rerun of the old Case.
-
-## 7. Open view and separate the outcomes
-
-Open the viewer after the first local run, after KUMA, and before diagnosing a
-failure, retrying it or reporting completion. In a headless environment, inspect
-the same saved JSON/trace files and state that UI review was not performed.
+To make an `adapting` Agent eligible for `run`, certify it while enabled. Certification performs a new execution using the registry Case budget; it does not approve previous evaluation artifacts. All requested Cases completing without invocation errors promotes the Agent to `ready`, even if Judge findings exist. An already ready Agent is not executed again; use `evaluate` for later tests. `-c` can also be used with `agent add`; it requires valid generated or manually prepared integration files and does not imply `-b`.
 
 ```bash
-python -m agentbench view results/suites/ACTUAL_SUITE_ID/events.json
+agentbench certify AGENT_ID --sdk kuma --no-view
 ```
 
-Use the exact `Result saved` / `Open later` path from your command. The offline
-demo instead prints a timestamped `OFFLINE_RESULT` file. Do not guess a filename
-or reuse an old Suite. Open the full `View:` URL including its path; keep the server
-running, and use Ctrl+C when finished. `--no-view` did not discard any results.
+## 9. Results, recovery and troubleshooting
 
-Review in order: **Suite → Case → each input and response → model/tool/handoff
-trace → Judge and its evidence → execution/cleanup/host acceptance**. Compare what
-the Agent said with what tools actually did. “Transferred successfully” is not
-“specialist completed the task”; claiming a write is not evidence of a real write.
-
-| Evidence | Interpretation and next action |
-| --- | --- |
-| Execution succeeded + host accepted + Judge pass | This Case passed; record its scope. Do not generalize to all capabilities. |
-| Execution succeeded + host accepted + Judge issue | Integration executed; retain the behavioral finding. Do not rewrite prompts just to pass onboarding. |
-| Native exception / execution failed | Not a successful run even if a Judge report arrived. Diagnose before promotion. |
-| Partial traces / insufficient evidence / host rejected | Report the missing evidence separately. OTel complete alone does not mean all tool content was recorded. |
-| Missing article/data or impossible Case action | Record a Case/profile limitation; assess supported Agent claims separately. Do not invent missing data. |
-
-Detailed artifacts are under `results/observe/<run-id>/`: inspect `run.json`,
-`evaluation/case.json`, `evaluation/inputs/`, `evaluation/manifest.json` and
-`evaluation/judge/report.json` when present. Missing files identify an unfinished
-phase; do not assume a verdict. A nonzero command exit can mean a Judge issue
-rather than a crash. JSON exports alone are not standalone full-trace archives.
-
-## 8. Decide whether certification is needed
-
-`evaluate` does not promote the registry or change its Case count. If the intended
-outcome includes selection by `run`, review the registry count and authorize the
-additional execution, then use:
+Suite plans, Cases and events are saved under `results/suites/SUITE_ID/`; detailed attempts usually live under `results/observe/RUN_ID/`. Always use the printed paths. `--results-dir DIR` chooses the ABB result root; `evaluate --output DIR` chooses SDK artifacts separately.
 
 ```bash
-python -m agentbench certify AGENT_ID --sdk kuma --no-view
+agentbench evaluate AGENT_ID --cases 1 --sdk kuma --no-view --results-dir results/my-run
 ```
 
-Certification runs the configured number of Cases; it does not simply approve
-previous evaluation artifacts. All requested Cases completing without invocation
-errors can promote `adapting` to `ready` even when Judge findings exist. Already
-ready Agents return without another certification run; use `evaluate` for later
-changes. Do not manually set ready to hide a blocked execution. If the user accepts
-onboarding after a successful evaluation, report the actual registry state and
-stop; do not run extra paid certification solely to change that label.
+`resume` continues eligible unfinished work; `retry` targets one unfinished Case. `reuse` reruns saved inputs with fresh execution and judging, preserving original results. Case positions start at 1. In the viewer, Rerun this Case and Open reuse Suite provide the same workflow. Keep the process owning a reuse batch running; recovery is not guaranteed for unsafe or uncertain requests.
 
-## 9. Diagnose at the failing boundary
+```bash
+agentbench resume results/suites/SUITE_ID
+agentbench retry results/suites/SUITE_ID --agent AGENT_ID --case 1
+agentbench reuse CASE_ID
+agentbench reuse results/suites/SUITE_ID --agent AGENT_ID --case 1
+```
 
-Start from the first failing step and saved evidence. Use a minimal offline replay
-where possible, changing one variable at a time: native graph vs binding, one vs
-multiple tool calls, sync vs async, locked dependencies vs host environment.
-Keep debugging scripts outside the distributable unit. Distinguish a deployment
-fix from an upstream behavior change; propose the latter separately. Do not disable
-interception, conceal errors or fabricate successful tool results.
+Export JSON saves a snapshot, not all traces or a standalone HTML report. Preserve the Suite and referenced attempt directories for complete evidence. Preview cleanup with `agentbench clean --dry-run`; stop runs and viewers before archiving history.
 
-| Symptom | Check / action / stop condition |
-| --- | --- |
-| `agentbench` missing or imports the wrong checkout | Activate this checkout's venv; use `python -m agentbench`; check editable installation before changing Agent code. |
-| Docker unavailable, permission denied, no matching image architecture | Check `docker info` as the same user and the image platform. Obtain required environment permission; do not bypass isolation. |
-| SDK listed but no onboarding hooks, or missing `kuma` import | Discovery is not capability/dependency validation. Use the supported generation SDK and install its pinned requirements. |
-| Catalog/auth/network failure | Verify key presence, shell-over-file precedence, endpoint and connectivity without printing secrets; stop generation until resolved. |
-| Structured-output rejection / `needs_input` / file conflict | Inspect plan and per-file records; use a suitable build model, factual answers or reviewed file corrections. Retry only the affected stage. |
-| uv lock/project mismatch, missing pip, import failure in image | Check upstream Python range, lock location, selected interpreter, dependency isolation and COPY paths. Static checks cannot prove installation. |
-| Overlay TOML error after valid outer config | An empty `tool_routes = []` can conflict with appended `[[llm_interception.tool_routes]]`; omit an unnecessary empty declaration after checking the effective config. Retain required routes/interception. |
-| `INVALID_CHAT_HISTORY` during multiple handoffs | Match every AI tool-call ID with a ToolMessage; replay the actual graph offline. A single handoff passing does not prove parallel handoffs work. Preserve upstream failure evidence. |
-| Judge reports no recovery or a claimed external action | Check whether the model actually received the earlier error and whether a corresponding tool exists/executed. Separate text claims, runtime state and evidence limitations. |
-| Viewer blank / unavailable / old run | Build `web/dist`, use the printed full URL and exact result file, keep the server alive; check local port permission. Do not rerun a paid benchmark to repair the viewer. |
+If the viewer reports Trace UI not built, build `web/`. For Docker errors, run `docker info` as the same user. For SDK import errors, install the SDK in ABB’s virtual environment. For model/key errors, check the selected service, model and shell-over-file precedence. For planning errors or needs_input, inspect the saved build record and supply factual answers.
 
-The Article Explainer onboarding exposed these distinctions: ordinary local chat
-worked; one KUMA run hit a native parallel-handoff error; another completed but
-received behavioral findings. Cases also omitted article text. These are diagnostic
-examples, not a guaranteed verdict for another revision, model or Case, and no
-strategy ID from that run should be reused without catalog review.
-
-## 10. Handoff checklist and completion report
-
-Report source/revision and unit path; generated vs manually corrected files;
-commands and actual artifact/view paths; local/KUMA execution, host acceptance
-and Judge separately; untested capabilities and known failures; registry state;
-and Git status (committed/pushed/PR or local only). Separate code/doc changes from
-`.venv`, credentials, images, caches, locks and results. Never commit secrets.
-
-Stop once the agreed onboarding outcome has evidence. A behavior finding may be
-a valid benchmark result, not unfinished integration work. Do not repeatedly run
-until a lucky pass or silently repair the target Agent. If requested, stage the
-reviewable changes and prepare a PR as a separate authorized step.
-
-See [troubleshooting](Troubleshooting.md), [known issues](Documentation-Issue-Audit.md)
-and [builder implementation](../agentbench/onboarding/build_agent_env/README.md).
+[CLI reference](cli.md) · [Detailed troubleshooting](Troubleshooting.md)

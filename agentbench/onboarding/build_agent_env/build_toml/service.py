@@ -23,7 +23,7 @@ def render_response(response, session):
 def step(framework="langgraph"):
     assets = Path(__file__).parent / "assets"
     selected = strategy(framework)
-    prompt = (selected.assets / "manifest/prompt.md").read_text() + "\n\n" + (assets / "client-transports.md").read_text()
+    prompt = (selected.assets / "manifest/prompt.md").read_text(encoding="utf-8") + "\n\n" + (assets / "client-transports.md").read_text(encoding="utf-8")
     return FileStep("agent.toml", prompt,
                     validate_manifest, response_schema=selected.manifest_schema, render=render_response,
                     request_data={"response_kind": "configuration_facts",

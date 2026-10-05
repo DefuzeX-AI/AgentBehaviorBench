@@ -2,91 +2,38 @@
 
 [English](../How%20To%20Add%20Agent.md) | [Français](How%20To%20Add%20Agent.fr.md) | 日本語 | [中文](How%20To%20Add%20Agent.zh-CN.md) | [한국어](How%20To%20Add%20Agent.ko.md)
 
-**環境 → ソースのインポート → 設定 → 静的確認 → local スモークテスト → KUMA → view →
-引き渡しまたは認証** の順に進めます。コマンドはこの ABB checkout のルートで、その仮想環境を
-有効にして実行してください。`SOURCE`、`AGENT_ID`、`NN-name`、結果パスは実際の出力に置き換えます。
+[ABB の起動方法 — 英語](../Guide.md) · [CLI リファレンス](cli.ja.md) · [登録表](Registry.ja.md)
 
-Coding agent は最初に `AGENTS.md`、追加依頼の issue、上流のセットアップ手順を読みます。
-作業範囲、現在の checkout、`git status` を記録し、無関係な変更を保護してください。
-README の記載だけで実行可能と判断してはいけません。
-
-**停止する条件：**段階ごとの承認を求められた場合は、各段階のコマンド、結果、証拠パス、
-次の作業を報告して承認を待ちます。それ以外は、承認済みの範囲を毎回聞き直さず進めます。
-新たな有料・外部処理の前には、モデル呼び出しと、ソースの文脈・profile・評価証拠の送信が
-承認に含まれることを確認します。既存の承認は有効です。認証情報や必須判断が不足する場合、
-未対応のデプロイ、原因未解決の失敗では、それに依存する作業を止め、完了分を保存します。
-キーや `.env` の内容は表示しません。チェックポイントは証拠の確認であり、毎回の許可要求ではありません。
+ABB リポジトリのルートで仮想環境を有効にし、環境設定、ソースのインポート、統合ファイルの生成、確認、テストの順に進めます。SOURCE、AGENT_ID、NN-name、結果パスは実際の値に置き換えてください。
 
 ## 1. 環境を設定する
 
-### ABB とホスト側の依存関係
-
-先に [ABB のインストール](README.ja.md) を済ませます。Git、Python 3.10+、有効な
-仮想環境が必要です。認証には実行ユーザーがアクセスできる Docker も必要です。
-選択した SDK のホスト側検証パッケージをインストールします。
+Git と Python 3.10+ を用意し、上記の起動ガイドで ABB をインストールします。Agent の実行と認証には、そのユーザーで利用できる Docker が必要です。KUMA による生成・検証では ABB と同じ仮想環境に KUMA をインストールします。
 
 ```bash
-source .venv/bin/activate
 python -m pip install -e .
-python -m pip install -r agentbench/sdk/plugin/kuma/requirements.txt
+python -m pip install "kuma-defuzex[otel]>=0.3.3"
 git --version
-python -m agentbench --help
-python -m agentbench sdk list
+agentbench --help
+agentbench sdk list
 docker info
 ```
 
-sdk list に kuma が表示され、ABB と同じユーザーで docker info が成功することを確認します。
-ダウンロードと設定生成だけなら Docker は不要ですが、-c の認証には必要です。
-ホストと評価コンテナの SDK インストールは別です。
+`sdk list` はプラグインを一覧するだけで、依存関係の検証ではありません。インポートと設定生成には Docker は不要です。ホストとコンテナの SDK インストールは別です。
 
-有料サービス設定前に harness を確認します。
-
-```bash
-python -m examples.offline_demo --output results/offline-demo.json
-```
-
-期待値は `Case execution: 1/1 completed | Judge: pass=1` です。正確な
-`OFFLINE_RESULT=` パスを保存してください。この決定的 echo demo は Docker、キー、モデル不要で、
-対象 Agent の試験ではありません。失敗したら先にホスト環境を直します。チェックポイントでは
-checkout パス/revision、CLI/SDK 検出、demo 結果を報告します。SDK 検出は統合対応の
-証明ではありません（第 2 節）。
-
-### 認証情報とモデル
-
-.env が存在しない場合だけテンプレートをコピーします。
-
-```bash
-test -f .env || cp .env.example .env
-```
-
-ローカルで編集します。
+`.env` がない場合のみ `.env.example` をコピーし、ローカルで編集します。KUMA には KUMA_API_KEY（または DEFUZEX_API_KEY）が必要です。設定生成は OpenRouter と厳密な構造化出力に対応するモデルを使います。
 
 ```dotenv
 KUMA_API_KEY=
 OPENROUTER_API_KEY=
 OPENROUTER_MODEL=openai/gpt-4.1-mini
-# Optional separate model for integration-file generation:
+# Optional separate generation model:
 # OPENROUTER_BUILD_MODEL=
-# Add the tool credentials required by your Agent, for example:
-# TAVILY_API_KEY=
 ```
 
-- **KUMA key**：戦略カタログ取得、Case 生成と Judge に必要です。ABB は DEFUZEX_API_KEY
-  も受け付けますが、空でない KUMA_API_KEY が優先されます。
-- **OpenRouter key とモデル**：接続設定ファイルの生成と Agent の実行に使います。
-  生成用モデルには **厳密な構造化出力** の対応が必要です。通常のチャットが動くだけでは
-  十分ではありません。例のモデル名は設定例であり、暗黙の実行時デフォルトではありません。
-- **Agent 固有の依存関係**：上流の説明に従ってツール key、データ、外部サービスを用意します。
-  DB ドライバーのインストールは DB の起動ではなく、Agent のダウンロードも全サービスの配備ではありません。
+対象 Agent の実行モデルは別設定です。LangGraph は OpenRouter、DeepSeek、GLM を利用でき、ネイティブ ACP は各 Agent のサービス認証情報を使います。起動ガイドを参照してください。`--build-model` は生成モデル、`--model` は認証時の ABB 置換先モデルです。シェルの変数が `.env` より優先されます。キーをソースや生成ファイルに書かないでください。
 
-key の取得先は [設定ガイド（英語）](../README-previous.md#configure-a-real-evaluation) にあります。
-シェルで export した変数が .env より優先され、--env-file PATH で別のファイルを指定できます。
-CLI は宣言された認証情報を解決し、.env 全体をコンテナにマウントしません。
-実際の key をソースや生成設定に記入しないでください。
-
-### 必要ならビューアーを準備
-
-npm と Node.js **20.x の 20.19 以上、または 22.12 以上** が必要です。
+Web ビューアーには npm と Node.js 20.x の 20.19 以上、または 22.12 以上が必要です。フロントエンドをビルドしてください。`--no-view` の評価には Node や `web/dist` は不要です。
 
 ```bash
 cd web
@@ -95,83 +42,29 @@ npm run build
 cd ..
 ```
 
-これは ABB ビューアーのビルドです。Agent 自身のブラウザーや Node/MCP 依存関係は別です。
-画面が不要なら以下の追加コマンドに --no-view を付けます。ヘッドレス実行には Node や web/dist は不要です。
+## 2. ソースのインポートと設定生成
 
-## 2. ソースをインポートしてから設定を生成する
-
-モデル呼び出し前に確認できるよう、まずインポートだけ実行します。
+SOURCE は HTTPS の GitHub リポジトリ URL（ファイル・ブランチページは不可）、またはローカルの絶対ディレクトリです。GitHub は既定ブランチを使い、`--revision` はありません。ローカルでは `.git` を除外して内容のダイジェストを記録します。まずインポートします。
 
 ```bash
-python -m agentbench agent add https://github.com/owner/repository
+agentbench agent add https://github.com/owner/repository
 ```
 
 `agent add` は `agent/` と同じ階層に `ground_truth/.gitkeep` も作成し、既存のユニットを再利用する際にも補います。このファイルは Git にディレクトリを保持させるためのものです。確認済みの不具合と証拠は [Ground Truth](../Ground%20Truth.md) に従って手動で用意してください。
 
-`SOURCE` は HTTPS リポジトリ本体の URL で、ファイルや `/tree/branch` URL ではありません。
-`/absolute/path/to/local-agent` や PowerShell の `C:\work\local-agent` のようなローカル絶対
-ディレクトリも指定でき、`-d` は不要です。GitHub はデフォルトブランチの revision を使い、
-`--revision` はありません。ローカルは `.git` を除き SHA-256 を記録します。同じ正規化済み
-ソースへの再実行は既存 unit を再利用し、変更されたローカルソースを再コピーしません。
-
-**確認 — インポート完了：**実際の unit パスと `source-manifest.json` の revision を記録します。
-元の入口、prompt、ツール、入力/状態スキーマ、UI の呼び出し、Python 制約、lockfile を読み、
-外部サービスと公開するインターフェースを特定します。テキスト graph は PDF アップロード UI
-とは別です。インポートだけでは実行可能 Agent として登録されません。`agent add` を飛ばして
-代替実装をレジストリーへ直接追加しないでください。
-
-デプロイ内容を明確にしたら、同じソースで生成します。
+次に同じソースで統合ファイルを生成します。`-b`・`-c` なしの再インポートは重複エラーになり、これらの指定で既存ユニットを再利用します。変更したソースからの更新は行いません。ローカルでは `/absolute/path/to/local-agent`、PowerShell では `"C:\work\local-agent"` を指定できます。
 
 ```bash
-python -m agentbench agent add https://github.com/owner/repository -b --sdk kuma --no-view
+agentbench agent add https://github.com/owner/repository -b --sdk kuma
 ```
 
-`-b` は計画・生成・検証・`adapting` 登録を行い、**Docker ビルドは行いません**。
-KUMA は計画前に最新カタログを取得します。目的、可用性、正確なバージョン、証拠要件を確認し、
-そのスナップショットを保存します。他の Agent の戦略 ID をコピーしないでください。
-取得失敗時は認証情報や接続を修正するまで停止し、選択を捏造しません。
-
-計画が情報を要求したら、事実に基づく回答をローカル UTF-8 ファイルに保存して再開します。
+`-b` は LangGraph と ACP に対応し、ファイルを生成・検証して `adapting` として登録します。Docker はビルドしません。KUMA は計画前に現行戦略カタログを取得します。同梱の `local` には統合検証 API がないため、生成には KUMA を使います。質問があれば実際のデプロイ情報を UTF-8 の `answers.txt` に書き、`--answers answers.txt` を付けて再実行します。有効な完了ファイルは保持されるため、失敗時は先に `build-result.json` を確認してください。
 
 ```bash
-python -m agentbench agent add https://github.com/owner/repository -b --sdk kuma --no-view --answers answers.txt
+agentbench agent add https://github.com/owner/repository -b --sdk kuma --answers answers.txt
 ```
 
-テキストと原生入力の対応、セッション寿命、除外する UI、サービスと依存関係を説明し、業務入力を
-作り上げないでください。再試行前に `build-result.json` と失敗した `steps/` を確認します。
-完了ファイルは保持・再検証され、手動編集との競合は生成を停止します。全進捗を削除したり、
-原因を変えずに有料リクエストを繰り返したりしないでください。
-
-**この revision の制限：**`local` SDK は評価を提供しますが、統合要件/検証 hook がありません。
-`add -b --sdk local` は `Selected SDK has no onboarding requirements and validation` で停止します。
-ここでは KUMA で生成後、第 5 節の local 評価を使います。KUMA 認証情報がなければ自動生成を
-停止します。local の生成対応は別のコード変更であり、別 checkout の修正が存在するとは限りません。
-
-以下の一括コマンドは、デプロイを理解し、中間承認なしの生成・認証が承認済みの場合だけ使用します。
-
-```bash
-python -m agentbench agent add https://github.com/owner/repository -b -c --sdk kuma --no-view
-```
-
-`-c` はビルドと認証実行であり、有料呼び出しが発生し得ます。静的確認ではありません。
-手動設定にも使えます。現在の自動生成は LangGraph 対応で、未対応 framework を LangGraph と偽らないでください。
-
-| オプション | 用途 |
-| --- | --- |
-| `--sdk kuma` / `--sdk local` | 明示的に選択。検出できることと生成対応は別です。 |
-| `--no-view` | viewer を起動せず結果を保存。 |
-| `--build-model MODEL` | 厳密な構造化出力を備えた設定生成モデル。 |
-| `--model MODEL` | 認証時の Agent モデル。 |
-| `--answers answers.txt` | 前の計画への回答。 |
-| `--with-observe` | `-b` と併用し observe 入力案内を生成。 |
-| `--build-settings settings.toml` | `[build]` テーブルによる上書き。 |
-| `-y` | 実行が承認済みの場合だけ CLI 確認を省略。 |
-
-生成モデルの優先順位は `--build-model`、settings `model`、`OPENROUTER_BUILD_MODEL`、
-`OPENROUTER_MODEL` です。予算や再試行の変更前に
-[同梱設定（英語）](../../agentbench/onboarding/build_agent_env/openrouter_provider/assets/settings.toml)を確認してください。
-
-## 3. 各ファイルの役割を理解する
+## 3. 各ファイルの役割
 
 Agent 単位のディレクトリは `resources/agents/NN-name/` です。取得したソースの周囲に
 接続ファイルが生成されるので、実行前に全部を手書きする必要はありません。
@@ -180,7 +73,7 @@ Agent 単位のディレクトリは `resources/agents/NN-name/` です。取得
 resources/agents/NN-name/
 ├── agent/                   # インポートした上流またはローカルのソーススナップショット
 ├── agent.toml               # ABB execution configuration
-├── bindings/                # Boundary between ABB and the native Agent
+├── bindings/                # LangGraph binding; not required for native ACP
 ├── Dockerfile               # Agent image build instructions
 ├── .dockerignore            # Files excluded from the image build context
 ├── requirement.md           # Evaluation description for the selected SDK
@@ -198,11 +91,9 @@ ID、フレームワーク、ソース revision、Docker のビルド/起動、�
 環境宣言、モデル/ツールの経路を定義します。エントリーポイントと必須入力を実装と照合します。
 経路や変数の宣言だけではツール実装やサービス起動にはなりません。
 
-### `bindings/*.py` — ネイティブ入出力との境界
+### `bindings/*.py`
 
-同期・引数なしのファクトリーから実際の呼び出し可能 Agent を返します。ソースに基づく形式変換と
-ライフサイクルの終了処理を担います。架空の回答や簡略化した別 Agent を使って合格させてはいけません。
-Python 構文の妥当性だけではグラフが読み込めて実行できることは証明できません。
+LangGraph の binding は同期・引数なしファクトリーで実際の Agent を返し、入出力と終了処理を適合します。ACP は `agent.toml` のネイティブコマンドとプロトコルで動作し、Python binding のファクトリーは不要です。Agent 本来の動作を保持してください。
 
 ### `Dockerfile` — コンテナへのインストール
 
@@ -244,170 +135,72 @@ input-contract.json も必須ではありません。現在の公式 KUMA 生成
 build-state.json は再利用可能な作業を追跡し、各 attempt に計画、SDK カタログ、steps、
 build-result.json を保存します。これらも自動記録で、Agent 本体のソースではありません。
 
-## 4. 実行前のレビューと静的検証
+## 4. 設定の確認と検証
 
-**確認 — 設定完了：**成功メッセージだけでなく全生成ファイルを確認します。出典と次の境界を調べます。
-
-- descriptor が元の graph を指すこと。上流に `langgraph.json` がない場合は
-  `abb-langgraph.json` など最小 descriptor の追加を出典に明記し、graph 自体を改変しません。
-- binding は同期・引数なし factory から本物の Agent を呼び、`config`/callbacks、例外、
-  raw output を保持します。UI のメッセージ追加/active-agent の寿命を再現し、Case を隔離、
-  close で清掃します。グローバル可変会話状態や例外の隠蔽は不可です。
-- 出力フィールドは本当の返信を抽出し、証拠には完全な状態を残します。テキストから提供できない
-  複数の必須業務フィールドがある場合は停止します。
-- 上流 lockfile を互換 Python でインストールし、ホスト ABB 依存と分離します。uv の project、
-  lockfile、実行 Python を一致させ、独立 `/opt/venv` で読み取り専用ソースへのインストールを
-  避けます。実行 Python の pip も確認します。
-- 追加ルートや binding/runtime の COPY を含む **SDK overlay 適用後**の設定を確認します。
-  外側 TOML の検証だけでは不十分です。
-- profile は実在するツール、利用者が渡すデータ、できない操作を記します。現在の KUMA 生成は
-  `input_type: text`、正確な英語の三見出し、カタログからの戦略選択が必要です。
-  未実装のブラウズ、アップロード、コード実行、永続化を能力として宣言しません。
-
-手動修正後、統合で使う静的 validator を実行します。
+実際のソースと照合し、入口、入出力、依存関係、認証情報の宣言、モデル・ツールの経路を確認します。LangGraph はグラフ記述とファクトリー、ACP はネイティブコマンドとセッションを確認します。Profile には実装済みツール、必要な入力、制限を記載します。手動変更後は検証します（Bash の例）。
 
 ```bash
 python - <<'PY'
 from pathlib import Path
 from agentbench.onboarding.build_agent_env.common.validation import validate_unit
 from agentbench.sdk.plugin.kuma.plugin import plugin
-unit = Path("resources/agents/NN-name")
-print(validate_unit(unit, plugin))
+print(validate_unit(Path("resources/agents/NN-name"), plugin))
 PY
 ```
 
-ファイルとインストール済み SDK parser をオフライン確認します。Agent は実行せず、カタログ
-context を渡さなければ最新カタログ取得/選択検証もしません。生成は取得したスナップショットを
-使い、KUMA 実行前にもサービス規則を確認します。静的成功は実行成功ではありません。
-複雑な binding は実 adapter 境界、Case 隔離、config 伝達、対応する場合の async、例外を
-オフライン試験します。fixture は自己完結させ、任意 unit がない場合は明示的 skip にします。
+ファイルと SDK パーサーを確認し、Agent は実行しません。カタログ文脈がない場合、現行のリモートカタログ検証は行いません。静的検証だけでは実行成功を証明できません。
 
-## 5. local スモーク Case を一つ実行する
+## 5. local スモーク Case を実行する
 
-設定済みのテキスト Agent を小さく試します。
+登録表で新 Agent を `enabled = true` にして、一つの Case を実行します。`local` は一般的なテキスト Cases とローカル Judge を使い、KUMA 後端のクレジットは消費しません。Agent と Judge のモデル呼び出しには料金が発生する場合があります。統合認証や KUMA の行動評価にはなりません。
 
 ```bash
-python -m agentbench evaluate AGENT_ID --cases 1 --sdk local --no-view
+agentbench evaluate AGENT_ID --cases 1 --sdk local --no-view
 ```
 
-実 Docker Agent とモデル interception を使い、固定テキスト Case と local Judge で評価します。
-Docker とモデル設定が必要で、モデル料金は発生し得ます。KUMA のキー/クレジットは不要ですが、
-認証情報なしのオフライン echo demo とは違います。固定 Case は profile から生成されず、
-記事処理や専門家 handoff を網羅するとは限りません。
+## 6. KUMA で評価する
 
-**確認 — local：**Suite パス、詳細ディレクトリ、返信、trace 状態、Judge を保存します。
-実行成功と host acceptance を確認して初めて実行可能と報告します。最初の実行後は失敗時も
-view を確認します（第 7 節）。import や fixture 試験だけでは代替できません。
-
-汎用 Case に必要な文脈がない場合は、承認の範囲で source に基づく入力と `observe` を使えます。
-テキスト binding の `native-input.json` は JSON 文字列、他の場合は実際の schema に合わせます。
-「与えられた文章を読め」とだけ書かず、実際の本文や業務データを渡してください。
+スモークテスト後、KUMA で新しい Case を生成し、証拠収集と Judge レポート取得を行います。設定したモデルサービスと KUMA API を呼び出します。
 
 ```bash
-python -m agentbench observe AGENT_ID --input native-input.json
+agentbench evaluate AGENT_ID --cases 1 --sdk kuma --no-view
 ```
 
-observe は KUMA Case/Judge なしで原生実行を記録しますが、モデル/ツール料金は発生し得ます。
-個別観察で失敗 benchmark を成功扱いにはできません。直接 KUMA を依頼された場合は静的確認後に
-第 6 節へ進み、local を省略したなら未実施と報告します。
+## 7. 結果を確認する
 
-## 6. 新しい KUMA 評価を実行する
-
-配置済み profile と現在の戦略を確認し、KUMA/モデル利用と証拠送信の承認を確認して一件実行します。
+`Result saved` に表示された実際のファイルを使い、完全な `View:` URL を開いてコマンドを動かし続けます。Conversation は入出力、Judge は指摘、Timing は実行と OTel を表示します。実行完了と判定は別です。`issue` は指摘、`insufficient_evidence` だけでは確認済み欠陥を意味しません。
 
 ```bash
-python -m agentbench evaluate AGENT_ID --cases 1 --sdk kuma --no-view
+agentbench view results/suites/SUITE_ID/events.json
 ```
 
-local 成功は KUMA 互換性の証明ではありません。profile の変更は将来の Case のみに影響します。
-生成 Case が必要データを渡し、実装済み操作を求めているか確認してください。Case の欠陥と
-Agent の問題を併記し、合格のために元の入力、出力、Judge 証拠を編集しないでください。
+## 8. 統合を認証する
 
-同じ実行の生成、Agent 呼び出し、提出、Judge polling を追跡します。非同期受付は判定ではなく、
-待機中に重複評価を開始しません。timeout/エラーは保存された完了/復旧状態を確認してから
-再開や再試行を判断します。再実行安全性とツール副作用を尊重し、安全フラグを書き換えて強制
-復旧しません。新しい `evaluate` は新 Suite と通常は新 Case を作り、旧 Case の対照再試験ではありません。
-
-## 7. view を開き、結果を分けて判断する
-
-最初の local 後、KUMA 後、失敗診断・再試行・完了報告前に viewer を開きます。
-headless なら同じ JSON/trace を読み、UI レビュー未実施と明記します。
+`adapting` の Agent を `run` 対象にするには有効状態で認証します。登録表の Case 予算で新たに実行し、過去の結果を承認する操作ではありません。全 Cases が呼び出しエラーなく完了すれば、Judge の指摘があっても `ready` になります。既に ready の Agent は再実行しないため、後のテストには `evaluate` を使います。`agent add -c` は有効な統合ファイルが必要で、`-b` を暗黙には有効にしません。
 
 ```bash
-python -m agentbench view results/suites/ACTUAL_SUITE_ID/events.json
+agentbench certify AGENT_ID --sdk kuma --no-view
 ```
 
-実際の `Result saved` / `Open later` パスを使います。オフライン demo は時刻付き
-`OFFLINE_RESULT` を出力します。推測した名前や古い Suite を使わないでください。
-パスを含む完全な `View:` URL を開き、サーバーを動かしたままにします。終了は Ctrl+C です。
-`--no-view` でも結果は保存されています。
+## 9. 結果、再実行、トラブル対処
 
-**Suite → Case → 各入力/返信 → モデル/ツール/handoff trace → Judge と証拠 →
-実行/清掃/host acceptance** の順で確認します。handoff 成功は専門家の作業完了ではなく、
-書き込みの主張だけでは実際の書き込みを証明できません。
-
-| 証拠 | 解釈と次の行動 |
-| --- | --- |
-| 実行成功 + host accepted + Judge pass | この Case は成功。範囲を記録し、全能力に一般化しない。 |
-| 実行成功 + host accepted + Judge issue | 統合は実行できた。行動上の問題を保存し、合格目的で prompt を変えない。 |
-| 原生例外 / execution failed | Judge があっても成功実行ではない。昇格前に診断する。 |
-| 部分 trace / insufficient evidence / host rejected | 証拠不足を分けて報告。OTel complete は全ツール内容の記録を意味しない。 |
-| 記事/データ欠落、実行不能な Case 操作 | Case/profile 制限を記録し、根拠のある Agent 主張を別途判断。データを捏造しない。 |
-
-`results/observe/<run-id>/` の `run.json`、`evaluation/case.json`、`evaluation/inputs/`、
-`evaluation/manifest.json`、`evaluation/judge/report.json` を存在する範囲で確認します。
-欠落は段階未完了を示し得ます。判定を仮定しないでください。非ゼロ終了は Judge issue の場合も
-あり、必ずしも crash ではありません。JSON export 単体は完全 trace の独立アーカイブではありません。
-
-## 8. 認証が必要か判断する
-
-`evaluate` は registry 昇格や Case 数変更をしません。`run` の選択対象にする必要があるなら、
-registry の件数と追加実行の承認を確認して実行します。
+計画、Cases、イベントは `results/suites/SUITE_ID/`、実行詳細は通常 `results/observe/RUN_ID/` に保存します。表示されたパスを使ってください。`--results-dir DIR` は ABB の結果ルート、`evaluate --output DIR` は別の SDK 成果物保存先です。
 
 ```bash
-python -m agentbench certify AGENT_ID --sdk kuma --no-view
+agentbench evaluate AGENT_ID --cases 1 --sdk kuma --no-view --results-dir results/my-run
 ```
 
-certify は設定件数を再実行し、過去の証拠を承認するだけではありません。全 Case が呼び出し
-エラーなしで完了すれば、Judge の問題があっても `adapting` から `ready` へ昇格できます。
-ready 済みなら再実行せず戻るため、変更後は evaluate を使います。実行の阻害を隠す手動 ready
-変更は不可です。利用者が評価成功で追加完了と認めたら実際の registry 状態を報告して停止し、
-ラベルだけのために追加の有料認証をしないでください。
+`resume` は復旧可能な未完了作業、`retry` は一つの未完了 Case を対象にします。`reuse` は保存入力を新たに実行・判定し、元の結果を保持します。番号は 1 からです。ビューアーの Rerun this Case と Open reuse Suite も利用できます。バッチの所有プロセスを動かし続けてください。安全でない再実行や応答不明の要求は復旧できない場合があります。
 
-## 9. 失敗した境界を診断する
+```bash
+agentbench resume results/suites/SUITE_ID
+agentbench retry results/suites/SUITE_ID --agent AGENT_ID --case 1
+agentbench reuse CASE_ID
+agentbench reuse results/suites/SUITE_ID --agent AGENT_ID --case 1
+```
 
-最初の失敗と保存証拠から始め、可能なら最小オフライン再現を作ります。graph/binding、単一/複数
-tool call、sync/async、固定依存/ホスト環境など一度に一要因だけ比較します。診断 script は
-配布 unit 外へ置きます。デプロイ修正と上流行動変更は分け、後者は別提案にします。
-interception 無効化、エラー隠蔽、成功したツール結果の捏造は禁止です。
+Export JSON はスナップショットで、全トレースや独立 HTML ではありません。完全な証拠には Suite と参照先の実行ディレクトリを保持します。`agentbench clean --dry-run` で確認し、実際のアーカイブ前に実行とビューアーを停止します。
 
-| 症状 | 確認・対処・停止条件 |
-| --- | --- |
-| agentbench 不在、別 checkout の import | 現在の venv と `python -m agentbench` を使い、Agent 修正前に editable install を確認。 |
-| Docker 不可、権限、image architecture | 同一ユーザーの `docker info` と platform を確認。必要な権限を得て隔離は維持。 |
-| SDK 検出済みだが onboarding hook 不在、kuma import 失敗 | 検出は能力/依存検証ではない。生成対応 SDK と固定 requirements を使用。 |
-| catalog/auth/network | キーの有無、shell 優先順位、endpoint、接続を秘密を表示せず確認。解消まで生成停止。 |
-| 構造化出力拒否、needs_input、競合 | plan/step 記録を読み、適合モデル、事実の回答、確認済みファイル修正を行い、該当段階だけ再試行。 |
-| uv project/lock 不一致、pip 不在、container import | Python 範囲、lock 場所、interpreter、依存隔離、COPY を確認。静的成功はインストール証明ではない。 |
-| 外側 TOML は正常だが overlay 失敗 | 空の `tool_routes = []` と追加 `[[llm_interception.tool_routes]]` の競合を確認し、不要な空宣言だけ除く。必須ルートと interception は保持。 |
-| 複数 handoff で INVALID_CHAT_HISTORY | AI tool-call ID と ToolMessage を照合し原 graph をオフライン再現。単一成功は並行成功を保証しない。 |
-| Judge が復旧不在や外部操作の主張を指摘 | モデルが先の例外を受け取ったか、対応ツールが存在/実行されたかを確認。文章、状態、証拠の限界を分離。 |
-| viewer 空白、不達、古い結果 | web/dist を構築し、正確な URL/ファイル、サーバー継続、ポート権限を確認。viewer 修復のために有料評価を繰り返さない。 |
+Trace UI not built は `web/` をビルドします。Docker エラーは同じユーザーで `docker info`、SDK インポートエラーは ABB の仮想環境への SDK インストールを確認します。モデル・キーはサービス、モデル名、シェル変数優先順位を確認します。計画エラーや needs_input は保存記録と実際の情報を確認します。
 
-Article Explainer では local 対話は動き、一度の KUMA は原生の並行 handoff で失敗、別の
-実行は完了したものの行動上の問題が見つかりました。Case の記事本文も欠落していました。
-これは診断例であり、他 revision/モデル/Case の結果を保証しません。戦略 ID も再確認なく流用しません。
-
-## 10. 引き渡しチェックリストと完了報告
-
-ソース/revision、unit パス、生成/手動修正ファイル、コマンド、実結果/view パス、local/KUMA
-の実行・host acceptance・Judge を別々に報告します。未試験の能力、既知の失敗、registry と
-Git 状態（ローカルのみ、commit/push/PR）も記します。コード/docs と `.venv`、秘密、image、
-cache、lock、結果を区別し、秘密を commit しません。
-
-合意した追加目標に証拠が揃えば停止します。行動上の問題は有効な benchmark 結果であり、
-必ずしも追加作業の未完了ではありません。偶然の合格まで回したり、対象 Agent を黙って直したり
-しません。commit/PR が依頼されたら、別の承認済み段階としてレビュー可能な差分を用意します。
-
-参照：[障害対応（英語）](../Troubleshooting.md)、[既知の問題（英語）](../Documentation-Issue-Audit.md)、
-[生成実装（英語）](../../agentbench/onboarding/build_agent_env/README.md)。
+[CLI リファレンス](cli.ja.md) · [詳しいトラブル対処 — 英語](../Troubleshooting.md)

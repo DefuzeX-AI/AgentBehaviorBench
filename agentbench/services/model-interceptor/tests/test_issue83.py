@@ -91,7 +91,7 @@ class TargetRoutingTest(unittest.TestCase):
         self.assertEqual(call.request.host, 'original.example')
         self.assertNotIn('upstream-secret', str(call.request.headers))
 
-    def test_legacy_target_does_not_rewrite_embeddings_or_images(self):
+    def test_legacy_target_does_not_rewrite_embeddings_or_undeclared_images(self):
         self.data['target'] = self.data['targets']['chat']
         self.data['target'].pop('endpoint_paths')
         self.data['credentials'][0]['secret_file'] = self.data['targets']['chat']['secret_file']
@@ -105,7 +105,31 @@ class TargetRoutingTest(unittest.TestCase):
             {'type': 'image_url', 'image_url': {'url': 'https://assets.example/a.png'}}]}]})
         addon.request(image)
         self.assertEqual(image.response.status_code, 422)
-        self.assertIn('explicit target rule', image.response.text)
+        self.assertIn('does not support image input', image.response.text)
+
+    def test_default_run_target_preserves_images_without_explicit_rules(self):
+        self.data['target'] = dict(self.data['targets']['chat'], input_modalities=['text', 'image'])
+        self.data['target'].pop('endpoint_paths')
+        self.data['credentials'][0]['secret_file'] = self.data['target']['secret_file']
+        del self.data['targets'], self.data['target_rules']
+        parts = [{'type': 'text', 'text': 'Review the generated figure'},
+                 {'type': 'image_url', 'image_url': {'url': 'data:image/png;base64,aW1hZ2U=', 'detail': 'high'}}]
+        body = {'model': 'source-model', 'messages': [{'role': 'user', 'content': parts}]}
+        call = self.request('/chat/completions', body)
+        addon = self.addon()
+        addon.request(call)
+        self.assertIsNone(call.response)
+        self.assertEqual(call.request.host, 'chat.example')
+        self.assertEqual(call.request.headers['authorization'], 'Bearer chat-upstream-secret')
+        self.assertEqual(json.loads(call.request.content), dict(body, model='chat-model'))
+        # Unsupported remote model capabilities remain actual provider failures.
+        failure = b'{"error":{"message":"selected model does not support image input"}}'
+        call.response = http.Response.make(400, failure, {'content-type': 'application/json'})
+        addon.response(call)
+        self.assertEqual(call.response.status_code, 400)
+        self.assertIn('selected model does not support image input', call.response.text)
+        self.assertEqual(json.loads(call.response.content)['error']['code'], 'upstream_error')
+        self.assertNotIn('upstream-secret', json.dumps(self.events))
 
     def test_gemini_inline_images_survive_rest_and_grpc_conversion(self):
         from google.ai.generativelanguage_v1beta.types import GenerateContentRequest

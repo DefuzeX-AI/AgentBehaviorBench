@@ -6,7 +6,10 @@ from pathlib import Path
 from .errors import BuildError, BuildPaused
 from .responses import validate_response
 from .writer import confined, install_file, save_json
+from .review import review_file
+from .checkpoint import digest
 from ..openrouter_provider.privacy import contains_secret, redact
+from ..openrouter_provider.source_requests import generate_with_source
 
 SCHEMA = Path(__file__).parents[1] / "openrouter_provider/assets/file-response.schema.json"
 
@@ -22,10 +25,12 @@ def run_step(step, session, checkpoint, index, total):
         try:
             if not target.is_file() or target.stat().st_size > session.settings.max_response_bytes:
                 raise BuildError("Existing file is not a bounded regular file")
-            content = target.read_text()
+            content = target.read_text(encoding="utf-8")
             if contains_secret(content, session.environ):
                 raise BuildError("Existing file contains credentials and cannot be sent to the model")
             step.validate(content, session)
+            if step.template is None and checkpoint.data.get("reviews", {}).get(step.path) != digest(content):
+                review_file(step, content, session, stage, prefix, checkpoint=checkpoint)
         except (ValueError, OSError, SyntaxError) as exc:
             message = redact(str(exc), session.environ)
             save_json(stage / "result.json", {"status": "conflict", "path": step.path, "message": message})
@@ -35,7 +40,7 @@ def run_step(step, session, checkpoint, index, total):
     else:
         content = step.template
         if content is None:
-            content = generate_file(step, session, stage, prefix)
+            content = generate_file(step, session, stage, prefix, checkpoint=checkpoint)
         else:
             step.validate(content, session)
         install_file(session.source.directory, step.path, content)
@@ -43,18 +48,21 @@ def run_step(step, session, checkpoint, index, total):
         status = "saved"
     session.completed[step.path] = content
     checkpoint.record_file(step.path, content)
+    if step.template is None:
+        checkpoint.record_review(step.path, content)
     save_json(stage / "result.json", {"status": status, "path": step.path})
 
 
-def generate_file(step, session, stage, prefix):
+def generate_file(step, session, stage, prefix, *, checkpoint=None):
     """Retry only this response with validator feedback, keeping earlier files."""
-    schema = json.loads((step.response_schema or SCHEMA).read_text())
+    schema = json.loads((step.response_schema or SCHEMA).read_text(encoding="utf-8"))
     schema["properties"]["path"]["enum"] = [step.path]
     base_payload = {**session.payload(), **step.request_data, "target_path": step.path}
     payload = base_payload
     for index in range(session.settings.repair_attempts + 1):
         session.output_fn(prefix + (": generating" if index == 0 else ": correcting current file"))
-        response = session.generate(payload, prompt=step.prompt, schema=schema)
+        response = generate_with_source(session, payload, prompt=step.prompt, schema=schema,
+                                        stage=stage, checkpoint=checkpoint)
         if contains_secret(json.dumps(response), session.environ):
             raise BuildError("Model response contains a credential; it was not saved or sent back")
         save_json(stage / f"response-{index + 1}.json", response)
@@ -67,8 +75,9 @@ def generate_file(step, session, stage, prefix):
                 raise BuildError("Rendered file contains credentials")
             if not content.strip():
                 raise BuildError("Generated file content is empty")
-            (stage / "candidate").write_text(content)
+            (stage / "candidate").write_text(content, encoding="utf-8")
             step.validate(content, session)
+            review_file(step, content, session, stage, prefix, checkpoint=checkpoint)
             return content
         except BuildPaused:
             raise

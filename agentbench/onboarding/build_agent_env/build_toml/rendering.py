@@ -25,7 +25,7 @@ def render_manifest(facts, *, source, agent_id, options=None):
     Existing Agent files are never changed by this function.
     """
     selected = strategy(facts.get("framework"))
-    schema = json.loads(selected.manifest_schema.read_text())["properties"]["facts"]["anyOf"][0]
+    schema = json.loads(selected.manifest_schema.read_text(encoding="utf-8"))["properties"]["facts"]["anyOf"][0]
     error = next(Draft202012Validator(schema).iter_errors(facts), None)
     if error:
         raise BuildError(f"Invalid manifest facts at {error.json_path}: {error.message}")

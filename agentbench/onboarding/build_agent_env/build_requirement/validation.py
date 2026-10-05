@@ -31,7 +31,7 @@ def validate_requirement(content, session):
         for name, value in {**session.completed, "requirement.md": content}.items():
             path = root / file_path(name)
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(value)
+            path.write_text(value, encoding="utf-8")
         session.sdk.validate_onboarding(root)
         if isinstance(session.sdk, SDKOnboardingContext):
             session.sdk.validate_onboarding_context(root, context=session.sdk_context)

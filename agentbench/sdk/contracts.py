@@ -90,6 +90,13 @@ class SDKOnboarding(Protocol):
 
 
 @runtime_checkable
+class SDKOnboardingInputs(Protocol):
+    """Optional machine-readable Case input formats, owned by the selected SDK."""
+
+    def onboarding_input_types(self) -> tuple[str, ...]: ...
+
+
+@runtime_checkable
 class SDKOnboardingContext(Protocol):
     """Optional live SDK metadata for generation, fetched once per build attempt.
 

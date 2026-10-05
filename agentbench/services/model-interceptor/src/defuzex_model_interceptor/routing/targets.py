@@ -33,9 +33,10 @@ class ModelTargetRouter:
             rule = matches[0]
             target, target_id, rule_id = self.config.targets[rule.target_id], rule.target_id, rule.rule_id
         else:
-            if operation not in ('generation', 'token_count') or modality != 'text':
+            if operation not in ('generation', 'token_count') or modality not in ('text', 'image'):
                 raise TargetRoutingError(f'{operation}/{modality} requires an explicit target rule in ABB_MODEL_ROUTING_CONFIG')
-            target, target_id, rule_id = self.config.target, 'default', 'legacy-text'
+            target, target_id = self.config.target, 'default'
+            rule_id = 'legacy-text' if modality == 'text' else 'default-image'
         if target is None or not {'text', modality}.issubset(target.input_modalities):
             raise TargetRoutingError(f'Target {target_id} does not support {modality} input')
         return target, target_id, rule_id, operation, modality

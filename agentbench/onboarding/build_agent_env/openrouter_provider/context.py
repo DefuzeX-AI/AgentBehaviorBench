@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import codecs
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -47,6 +48,7 @@ def collect_context(source: DownloadedAgent, settings: BuildSettings,
     seen, files, omitted = set(), [], []
     used = 0
     while queue:
+        queue.sort(key=_priority)
         name = queue.pop(0)
         if name in seen:
             continue
@@ -66,7 +68,10 @@ def collect_context(source: DownloadedAgent, settings: BuildSettings,
                 with path.open("rb") as stream:
                     raw = stream.read(remaining + 1)
                 truncated = len(raw) > remaining
-                content = raw[:remaining].decode("utf-8-sig", errors="strict")
+                # A byte budget may split the last UTF-8 character. Keep the
+                # valid prefix while still rejecting invalid bytes within it.
+                decoder = codecs.getincrementaldecoder("utf-8-sig")(errors="strict")
+                content = decoder.decode(raw[:remaining], final=not truncated)
         except UnicodeError:
             omitted.append({"path": name, "reason": "non_utf8_or_truncated_character"})
             continue
@@ -90,10 +95,22 @@ def collect_context(source: DownloadedAgent, settings: BuildSettings,
         if path.suffix.lower() == ".lock" and truncated:
             entry["excerpt"] = "Bounded lockfile excerpt; omitted content may contain additional constraints."
         files.append(entry)
-        if path.suffix == ".py" and not truncated:
-            queue[0:0] = _imports(root, path, original_content)
+        if path.suffix == ".py":
+            # A CLI can exceed the prompt excerpt budget while still declaring
+            # the graph and state imports needed for truthful integration.
+            import_content = original_content
+            if truncated:
+                with path.open("rb") as stream:
+                    scan = stream.read(1024 * 1024 + 1)
+                try:
+                    import_content = scan.decode("utf-8-sig") if len(scan) <= 1024 * 1024 else ""
+                except UnicodeError:
+                    import_content = ""
+            # Breadth-first collection keeps direct entrypoint/state/config
+            # evidence ahead of deep transitive tool implementation trees.
+            queue.extend(_imports(root, path, import_content))
         elif not truncated:
-            queue[0:0] = references(root, path, original_content)
+            queue.extend(references(root, path, original_content))
     return {"repository": source.repository, "revision": source.revision,
             "source_root": "agent/", "file_paths_relative_to": "agent/",
             "files": files, "omitted": omitted, "content_bytes": used}
@@ -102,10 +119,17 @@ def collect_context(source: DownloadedAgent, settings: BuildSettings,
 def _priority(name: str) -> tuple:
     path = Path(name)
     name = path.name.lower()
-    rank = (0 if "langgraph" in name or "acp" in name else 1 if path.suffix in {".py", ".ts"} else
-            2 if path.suffix.lower() == ".lock" or name.startswith("requirements") or name in
-            {"pyproject.toml", "setup.cfg", ".python-version", "runtime.txt"} else
-            4 if name.startswith("readme.") and name not in {"readme.md", "readme.rst", "readme.txt"} else 3)
+    # Preserve installation and invocation contracts before CLI administration,
+    # frontends or large transitive implementations consume the source budget.
+    contract = name in {"graph.py", "state.py", "config.py", "settings.py", "llm.py",
+                        "model.py", "models.py", "transport.py", "cli.py", "cli.ts"}
+    metadata = name in {"pyproject.toml", "package.json", "setup.cfg", ".python-version", "runtime.txt"}
+    rank = (0 if "langgraph" in name or "acp" in name or contract or metadata or
+            name.startswith(("requirements", ".env")) else
+            4 if name.startswith("readme.") and name not in {"readme.md", "readme.rst", "readme.txt"} else
+            1 if len(path.parts) == 1 and name.startswith("readme") else
+            2 if path.suffix in {".py", ".ts"} or path.suffix.lower() == ".lock" else
+            3)
     return rank, len(path.parts), name
 
 
@@ -136,3 +160,24 @@ def _imports(root: Path, path: Path, content: str) -> list[str]:
                         if safe_file(root, name):
                             candidates.add(name)
     return sorted(candidates)
+
+
+def environment_presence(context: dict, environ: Mapping[str, str]) -> dict[str, bool]:
+    """Expose whether source-referenced variables are set, never their values."""
+    names = set()
+    for item in context['files']:
+        if not item['path'].endswith('.py'):
+            continue
+        try:
+            tree = ast.parse(item['content'])
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not node.args:
+                continue
+            method = node.func
+            getter = isinstance(method, ast.Attribute) and (method.attr == 'getenv' or
+                method.attr == 'get' and isinstance(method.value, ast.Attribute) and method.value.attr == 'environ')
+            if getter and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str):
+                names.add(node.args[0].value)
+    return {name: bool(environ.get(name, '').strip()) for name in sorted(names)}

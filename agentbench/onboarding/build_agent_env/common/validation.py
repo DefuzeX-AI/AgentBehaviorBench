@@ -15,13 +15,13 @@ def validate_unit(root, sdk, *, expected_id=None, sdk_context=None):
     for name in REQUIRED_FILES:
         if safe_file(root, name) is None:
             raise BuildError(f"Missing or unsafe integration file: {name}")
-    session = SimpleNamespace(source=SimpleNamespace(directory=root), agent_id=expected_id,
+    session = SimpleNamespace(source=SimpleNamespace(directory=root), agent_id=expected_id, sdk=sdk,
                               plan={"bindings": []})
-    validate_manifest((root / "agent.toml").read_text(), session)
-    manifest = tomllib.loads((root / "agent.toml").read_text())
+    validate_manifest((root / "agent.toml").read_text(encoding="utf-8"), session)
+    manifest = tomllib.loads((root / "agent.toml").read_text(encoding="utf-8"))
     strategy(manifest.get("framework")).validate_unit(root, manifest, session)
     container = AgentContainerConfig.from_agent_dir(root, secret_resolver=_PlaceholderSecrets(), environ={})
-    validate_dockerfile(container.dockerfile.read_text(), session)
+    validate_dockerfile(container.dockerfile.read_text(encoding="utf-8"), session)
     sdk.validate_onboarding(root)
     if sdk_context is not None and isinstance(sdk, SDKOnboardingContext):
         sdk.validate_onboarding_context(root, context=sdk_context)

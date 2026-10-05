@@ -23,7 +23,10 @@ def resolve_target_routing(environ, model_provider=None):
     path = environ.get(ROUTING_ENV, '').strip()
     if not path:
         target = (model_provider or resolve_model_provider(environ=environ)).resolve(environ)
-        return ModelRoutingPlan({'default': target}, {'default': ('text',)}, ())
+        # Preserve image-bearing generation requests for the selected run model.
+        # The destination validates its real capabilities; do not select a new
+        # model or require a routing file merely to pass images through.
+        return ModelRoutingPlan({'default': target}, {'default': ('text', 'image')}, ())
     try:
         with Path(path).open('rb') as stream:
             raw = tomllib.load(stream)

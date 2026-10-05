@@ -48,6 +48,10 @@ class KumaEvaluationSDK:
         from .onboarding import REQUIREMENTS
         return REQUIREMENTS
 
+    def onboarding_input_types(self) -> tuple[str, ...]:
+        """The official Case request boundary currently accepts text only."""
+        return ("text",)
+
     def validate_onboarding(self, directory) -> None:
         from .onboarding import validate
         validate(directory)

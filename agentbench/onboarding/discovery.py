@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from fnmatch import fnmatchcase
 from pathlib import Path
 
@@ -60,7 +61,48 @@ def discover_files(source_root: Path) -> tuple[str, ...]:
             found.add(relative.as_posix())
             if fnmatchcase(name.lower(), "*langgraph*.json"):
                 found.update(_entrypoint_files(path, root))
+            elif name.lower() == "pyproject.toml":
+                found.update(_python_entrypoint_files(path, root))
     return tuple(sorted(found))
+
+
+def _python_entrypoint_files(config: Path, root: Path) -> set[str]:
+    """Resolve declared installed CLI modules statically; never import packages."""
+    from agentbench.runtime.agentcontainer.config import tomllib
+
+    if config.stat().st_size > 1024 * 1024:
+        return set()
+    try:
+        value = tomllib.loads(config.read_text(encoding="utf-8-sig"))
+    except (ValueError, UnicodeError):
+        return set()
+    project = value.get("project", {})
+    if not isinstance(project, dict):
+        return set()
+    result = set()
+    for group in ("scripts", "gui-scripts"):
+        declarations = project.get(group, {})
+        if not isinstance(declarations, dict):
+            continue
+        for reference in declarations.values():
+            if not isinstance(reference, str):
+                continue
+            module, separator, attribute = reference.partition(":")
+            if not separator or not attribute or not re.fullmatch(r"[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*", module):
+                continue
+            for base in (config.parent, config.parent / "src"):
+                target = base.joinpath(*module.split("."))
+                for path in (target.with_suffix(".py"), target / "__init__.py"):
+                    if not path.is_relative_to(root) or not path.is_file():
+                        continue
+                    relative = path.relative_to(root)
+                    if any(part in SKIPPED_DIRECTORIES for part in relative.parts):
+                        continue
+                    if any(parent.is_symlink() for parent in (path, *path.parents)
+                           if parent.is_relative_to(root)):
+                        continue
+                    result.add(relative.as_posix())
+    return result
 
 
 def _entrypoint_files(config: Path, root: Path) -> set[str]:
