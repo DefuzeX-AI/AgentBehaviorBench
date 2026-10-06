@@ -21,6 +21,7 @@ def load_protocols() -> dict[str, ProtocolPlugin]:
         ANTHROPIC_MESSAGES_PROTOCOL,
         JSON_HTTP_PROTOCOL,
         OPENAI_CHAT_PROTOCOL,
+        THINKING_CHAT_PROTOCOL,
         OPENAI_RESPONSES_PROTOCOL,
         GEMINI_CONTENT_PROTOCOL,
     )
@@ -28,6 +29,7 @@ def load_protocols() -> dict[str, ProtocolPlugin]:
     plugins: dict[str, ProtocolPlugin] = {
         JSON_HTTP_PROTOCOL.name: JSON_HTTP_PROTOCOL,
         OPENAI_CHAT_PROTOCOL.name: OPENAI_CHAT_PROTOCOL,
+        THINKING_CHAT_PROTOCOL.name: THINKING_CHAT_PROTOCOL,
         OPENAI_RESPONSES_PROTOCOL.name: OPENAI_RESPONSES_PROTOCOL,
         ANTHROPIC_MESSAGES_PROTOCOL.name: ANTHROPIC_MESSAGES_PROTOCOL,
         GEMINI_CONTENT_PROTOCOL.name: GEMINI_CONTENT_PROTOCOL,
@@ -80,9 +82,11 @@ def load_wires():
     from model.ollama import OllamaWire
     from model.google.gemini import GeminiWire
     from model.native import NativeJsonWire
+    from model.thinking import ThinkingChatWire
     from model.auxiliary import TokenCountWire
     registry = {
         "openai-chat": lambda: NativeJsonWire("/chat/completions"),
+        "openai-chat-thinking": ThinkingChatWire,
         "openai-responses": lambda: NativeJsonWire("/responses", "response.completed"),
         "anthropic-messages": lambda: NativeJsonWire("/messages", "message_stop"),
         "openai-input-tokens": lambda: TokenCountWire("/responses/input_tokens", "bearer-token"),

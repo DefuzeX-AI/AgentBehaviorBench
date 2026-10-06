@@ -19,6 +19,10 @@ class OpenAIChatProtocol(JsonHttpProtocol):
     name = "openai-chat"
 
 
+class ThinkingChatProtocol(JsonHttpProtocol):
+    name = "openai-chat-thinking"
+
+
 class OpenAIResponsesProtocol(JsonHttpProtocol):
     name = "openai-responses"
 
@@ -48,6 +52,7 @@ def _decode(content: bytes, content_type: str) -> object:
 
 JSON_HTTP_PROTOCOL = JsonHttpProtocol()
 OPENAI_CHAT_PROTOCOL = OpenAIChatProtocol()
+THINKING_CHAT_PROTOCOL = ThinkingChatProtocol()
 OPENAI_RESPONSES_PROTOCOL = OpenAIResponsesProtocol()
 ANTHROPIC_MESSAGES_PROTOCOL = AnthropicMessagesProtocol()
 

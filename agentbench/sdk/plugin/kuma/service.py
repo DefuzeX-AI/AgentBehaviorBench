@@ -14,6 +14,7 @@ from agentbench.runtime.contracts.execution import (
 from agentbench.runtime.interception import TraceEvent
 from agentbench.observe.store import TraceStore, json_value, redact
 from agentbench.sdk.common.artifacts import Artifacts
+from agentbench.sdk.common.output_permissions import prepare_output
 from .configuration import SDK_REPOSITORY, backend_url
 from agentbench.sdk.common.workspace import workspace_policy, prepare_workspace, workspace_digest
 from agentbench.runtime.agentcontainer.config import tomllib
@@ -161,7 +162,7 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
             'count': generation_count, 'case_artifact': reused,
             'case_indices': generation_indices, 'allow_partial': partial_generation,
             'expected_case': {'case_id': expected_case_id, 'content_sha256': expected_content_sha256}})
-        destination = directory / 'evaluation'; destination.mkdir(mode=0o777); destination.chmod(0o777)
+        destination = prepare_output(directory / 'evaluation')
         identity = {**dict(job_context or {}), **dict(identity or {}),
                     'agent_id': agent.agent_id, 'artifact_run_id': directory.name,
                     'phase': 'generate' if generation_count is not None else 'execute'}

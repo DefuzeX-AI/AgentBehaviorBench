@@ -12,6 +12,7 @@ from pathlib import Path
 from uuid import uuid4
 from importlib.metadata import version
 from agentbench.sdk.common.artifacts import Artifacts
+from agentbench.sdk.common.output_permissions import share_output
 from .runner import drive_run
 from .configuration import SDK_REPOSITORY, request_options, api_key
 from .compatibility import run_case
@@ -21,10 +22,15 @@ from agentbench.runtime.agentcontainer.session import AgentSession
 async def execute(root, output, settings=None, sdk_repo=None, *, providers=None):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
-    with timing_session(output / 'timing.jsonl', source='worker', name='SDK worker') as operation:
-        code = await _execute(root, output, settings, sdk_repo, providers=providers)
-        operation.status = 'succeeded' if code == 0 else 'failed'
-        return code
+    try:
+        with timing_session(output / 'timing.jsonl', source='worker', name='SDK worker') as operation:
+            code = await _execute(root, output, settings, sdk_repo, providers=providers)
+            operation.status = 'succeeded' if code == 0 else 'failed'
+            return code
+    finally:
+        # Includes the final timing record and partial/error artifacts. Both
+        # local and official KUMA reuse this worker with the image's native UID.
+        share_output(output)
 
 
 async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None):
@@ -50,7 +56,14 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
     
         # Prepare artifact storage and connect OpenTelemetry evidence to the KUMA SDK.
         files = Artifacts(output)
-        provider = TracerProvider(resource=Resource.create({'service.name': 'abb-evaluation'}))
+        # Choose public metadata at emission, rather than discovering private
+        # host/process fields (e.g. service.instance.id) then having KUMA drop
+        # them. Process identity remains in process.json, never SDK span attrs.
+        provider = TracerProvider(resource=Resource({
+            'service.name': 'abb-evaluation', 'telemetry.sdk.language': 'python',
+            'telemetry.sdk.name': 'opentelemetry',
+            'telemetry.sdk.version': version('opentelemetry-sdk'),
+        }))
         capture = configure_trace_evidence(provider)
     
         # Read the in-container Agent manifest for its ID and framework.
@@ -293,6 +306,7 @@ def main(providers=None):
         # The host reads error.json; stderr alone only reaches diagnostics.json.
         Artifacts(args.output).save('error.json', {
             'phase': 'startup', 'type': type(exc).__name__, 'message': str(exc)})
+        share_output(args.output)
         print(exc, file=sys.stderr, flush=True)
         return 1
     # Run the asynchronous flow and propagate its exit code.
@@ -307,6 +321,7 @@ def main(providers=None):
         message = f'{exc} (interpreter {sys.executable})'
         Artifacts(args.output).save('error.json', {
             'phase': 'startup', 'type': type(exc).__name__, 'message': message})
+        share_output(args.output)
         print(message, file=sys.stderr, flush=True)
         return 1
 

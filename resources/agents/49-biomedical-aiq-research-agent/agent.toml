@@ -1,0 +1,110 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "biomedical-aiq-research-agent"
+display_name = "NVIDIA Biomedical AI-Q Research Agent"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+repository = "https://github.com/NVIDIA-AI-Blueprints/biomedical-aiq-research-agent"
+revision = "b5cd7b4c7ae544c1e21ac79ef9fa67641eeff5a4"
+downloaded_on = "2026-10-03"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 1800
+env_keys = ["AIRA_RAG_URL", "MOLMIM_ENDPOINT_URL", "DIFFDOCK_ENDPOINT_URL"]
+optional_secret_env_keys = ["RAG_API_KEY", "TAVILY_API_KEY", "NVIDIA_API_KEY"]
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+binding = "bridge.py:create_graph"
+output_key = "report"
+
+[adapter.context]
+report_organization = "Address the supplied topic and its requested scope, length, and format. For research reports, organize relevant findings, supporting evidence, limitations, and sources. Cite retrieved sources for scientific claims; distinguish evidence from interpretation and state missing evidence. Do not introduce an unrelated research topic or additional tasks."
+search_web = false
+rag_collection = "Biomedical_Dataset"
+num_queries = 3
+llm_name = "nemotron"
+
+[llm_interception]
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "nvidia-openai-compatible"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "nvidia-openai-chat"
+host_patterns = ["integrate.api.nvidia.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat-thinking"
+credential = "nvidia-openai-compatible"
+
+# The upstream default RAG deployment name. A public/custom AIRA_RAG_URL needs
+# the same narrow POST /generate rule with its real hostname before execution.
+[[llm_interception.tool_routes]]
+host_patterns = ["host.docker.internal"]
+ports = [8081]
+methods = ["POST"]
+path_patterns = ["/generate", "/v1/generate"]
+
+[[llm_interception.tool_routes]]
+host_patterns = ["rag-server"]
+ports = [8081]
+methods = ["POST"]
+path_patterns = ["/generate", "/v1/generate"]
+
+[[llm_interception.tool_routes]]
+host_patterns = ["api.tavily.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/search"]
+
+[[llm_interception.tool_routes]]
+host_patterns = ["pubchem.ncbi.nlm.nih.gov"]
+ports = [443]
+methods = ["GET", "POST"]
+path_patterns = ["/rest/pug/*"]
+
+[[llm_interception.tool_routes]]
+host_patterns = ["search.rcsb.org"]
+ports = [443]
+methods = ["GET", "POST"]
+path_patterns = ["/rcsbsearch/v2/query"]
+
+# rcsb-api initializes its search attribute schema during module import.
+# Its pinned client starts on HTTP; permit the metadata fetch and HTTPS redirect.
+[[llm_interception.tool_routes]]
+host_patterns = ["search.rcsb.org"]
+ports = [80, 443]
+methods = ["GET"]
+path_patterns = ["/rcsbsearch/v2/metadata/schema", "/rcsbsearch/v2/metadata/chemical/schema"]
+purpose = "metadata"
+
+[[llm_interception.tool_routes]]
+host_patterns = ["files.rcsb.org"]
+ports = [443]
+methods = ["GET"]
+path_patterns = ["/download/*"]
+
+[[llm_interception.tool_routes]]
+host_patterns = ["health.api.nvidia.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/biology/nvidia/molmim/generate", "/v1/biology/mit/diffdock"]

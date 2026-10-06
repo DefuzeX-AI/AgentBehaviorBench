@@ -1,0 +1,13 @@
+# Only use for the native ai_researcher workflow, whose llm_name is nemotron.
+# The artifact-QA endpoint (instruct_llm) is not exposed by this ABB binding.
+# This does not change the Local Judge's provider/model or bypass interception.
+[targets.biomedical_reasoning]
+provider = "nvidia"
+model = "nvidia/nemotron-3-super-120b-a12b"
+input_modalities = ["text"]
+
+[[rules]]
+id = "native-biomedical-reasoning"
+protocols = ["openai-chat-thinking"]
+input = "text"
+target = "biomedical_reasoning"

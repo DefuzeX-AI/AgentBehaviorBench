@@ -93,6 +93,33 @@ continues to use its separate OpenRouter configuration.
 
 ## Per-request model targets
 
+### Opt-in legacy thinking response format
+
+An explicit route can set `protocol_plugin = "openai-chat-thinking"` for a
+legacy OpenAI Chat client that reads `<think>…</think>` from `content` but cannot
+read a separate `reasoning_content` field. The target routing rule must name
+the same protocol. This wire still sends the original OpenAI-compatible request;
+authentication, destination selection and tool egress are unchanged.
+
+For SSE responses it serializes actual reasoning text and actual answer text into the legacy
+format; it does not generate reasoning, repair JSON or invent an answer. It
+supports one text choice, preserves finish reasons/usage, emits a dedicated
+closing-marker chunk, and rejects late reasoning, ambiguous mixed formats,
+tool-call responses and incomplete/error streams. No reasoning means no added
+thinking delimiters. Its per-call state cannot leak into another stream.
+
+Non-streaming JSON responses remain unchanged, including their separate
+`reasoning_content` field. The pinned biomedical Agent's intention/relevancy
+checks parse unary `message.content` directly as JSON; adding inline thinking
+there would invalidate an otherwise valid answer.
+
+This is **explicit opt-in only**: it has no automatic recognition signature,
+and normal `openai-chat` remains pass-through. `llm_response` records the raw
+upstream payload plus separate converted `client_payload` and the adapter tag
+`reasoning-content-to-inline-v1`. Original and converted responses must not be
+confused when analyzing artifacts. The biomedical unit uses this wire for its
+native parser; ordinary clients should retain the standard protocol.
+
 Without a routing file, replacement mode sends text and image-bearing generation
 requests to the selected run provider/model, preserving image content. No model
 capability lookup or automatic model switch is performed; choose a model that

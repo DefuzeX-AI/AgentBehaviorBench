@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import threading
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 
@@ -77,6 +78,24 @@ class RuntimeLimits:
     startup_seconds: float = 45
     execution_seconds: float = 2400
     cleanup_seconds: float = 45
+
+    @classmethod
+    def from_environment(cls, environ: Mapping[str, str]) -> "RuntimeLimits":
+        """Allow operators to budget slow first-time image preparation."""
+        overrides = {}
+        for name, key in (
+            ("build_seconds", "ABB_RUNTIME_BUILD_TIMEOUT_SEC"),
+            ("preparation_seconds", "ABB_RUNTIME_PREPARATION_TIMEOUT_SEC"),
+        ):
+            if key in environ:
+                try:
+                    value = float(environ[key])
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(f"{key} must be finite and positive") from exc
+                if not math.isfinite(value) or value <= 0:
+                    raise ValueError(f"{key} must be finite and positive")
+                overrides[name] = value
+        return cls(**overrides)
 
     def __post_init__(self) -> None:
         for name in self.__dataclass_fields__:
