@@ -2,6 +2,12 @@
 
 Offline contracts only: no Docker, no network, no model call. Passing these does not
 certify the Agent; certification is what promotes an ``adapting`` integration.
+
+The tracked unit is ASCII-only. The upstream checkout lives in ``agent/``, which
+``.gitignore`` excludes ("Runtime source/install materialization"): ABB restores it
+from the ``[source]`` repository and revision in ``agent.toml`` before an evaluation
+opens. The two contracts that read that checkout are skipped until it is materialized,
+so this file passes both in a fresh clone and on a machine that has run a build.
 """
 
 from __future__ import annotations
@@ -23,6 +29,7 @@ from agentbench.runtime.agentcontainer.config import tomllib
 
 ROOT = Path(__file__).resolve().parents[1]
 UNIT = ROOT / "resources" / "agents" / "50-zhisaotong-agent"
+SNAPSHOT = UNIT / "agent"
 REPOSITORY = "https://github.com/bamboo-moon/zhisaotong-Agent"
 REVISION = "92569e61ac22ef4d902953a7d916e941921ab92f"
 
@@ -36,13 +43,25 @@ TOOLS = (
     "fetch_external_data",
     "fill_context_for_report",
 )
-DOCUMENTS = (
-    "扫地机器人100问.pdf",
-    "扫地机器人100问2.txt",
-    "扫拖一体机器人100问.txt",
-    "故障排除.txt",
-    "维护保养.txt",
-    "选购指南.txt",
+DOCUMENT_COUNT = 6
+
+# The Agent's production language is Chinese, so the input and answer contracts are
+# exercised with the real Chinese payloads rather than Latin placeholders. They are
+# spelled as \u escapes so this file stays ASCII, as the unit is required to be.
+Q_FILTER = "\u626b\u5730\u673a\u5668\u4eba\u7684\u6ee4\u7f51\u591a\u4e45\u9700\u8981\u66f4\u6362\u4e00\u6b21\uff1f"
+Q_MAINTENANCE = "\u7ef4\u62a4\u4fdd\u517b\u8981\u6ce8\u610f\u4ec0\u4e48\uff1f"
+A_GREETING = "\u4f60\u597d"
+A_FILTER_PADDED = "  \u6ee4\u7f51\u5efa\u8bae\u6bcf\u4e2a\u6708\u6e05\u6d17\u4e00\u6b21\u3002  "
+A_FILTER = "\u6ee4\u7f51\u5efa\u8bae\u6bcf\u4e2a\u6708\u6e05\u6d17\u4e00\u6b21\u3002"
+A_ERROR_HEAD = "\u6545\u969c\u4ee3\u7801 "
+A_ERROR_TAIL = "E3 \u8868\u793a"
+A_ERROR_JOINED = "\u6545\u969c\u4ee3\u7801 E3 \u8868\u793a"
+A_NO_ANSWER = "\u6ca1\u6709\u56de\u7b54"
+
+# Reading the checkout needs it on disk; a fresh clone does not have it.
+needs_snapshot = pytest.mark.skipif(
+    not (SNAPSHOT / "requirements.txt").is_file(),
+    reason="agent/ is materialized from [source] at prepare time and is not tracked",
 )
 
 
@@ -60,6 +79,27 @@ def _manifest():
     return tomllib.loads((UNIT / "agent.toml").read_text())
 
 
+# ------------------------------------------------------------------- tracked unit
+
+
+def test_tracked_unit_is_ascii_only():
+    """The unit is published as ASCII source.
+
+    The upstream checkout keeps its own language, but nothing this unit adds may
+    depend on a non-ASCII environment. The excluded ``agent/`` tree is the restored
+    upstream source, not part of this unit's tracked contribution.
+    """
+    offenders = []
+    for path in sorted(UNIT.rglob("*")):
+        if not path.is_file() or SNAPSHOT in path.parents:
+            continue
+        for number, line in enumerate(path.read_bytes().splitlines(), 1):
+            if any(byte > 0x7F for byte in line):
+                offenders.append(f"{path.relative_to(UNIT)}:{number}")
+
+    assert offenders == [], "non-ASCII tracked content: " + ", ".join(offenders)
+
+
 # --------------------------------------------------------------------------- input
 
 
@@ -67,8 +107,8 @@ def test_plain_case_input_is_accepted_as_text_or_message_mapping():
     module = _binding()
     graph = module.create_graph()
     try:
-        assert graph._question("扫地机器人的滤网多久需要更换一次？") == "扫地机器人的滤网多久需要更换一次？"
-        assert graph._question({"message": "维护保养要注意什么？"}) == "维护保养要注意什么？"
+        assert graph._question(Q_FILTER) == Q_FILTER
+        assert graph._question({"message": Q_MAINTENANCE}) == Q_MAINTENANCE
     finally:
         graph.close()
 
@@ -101,17 +141,17 @@ def test_unsupported_input_is_rejected_before_native_execution(value, match):
 
 def test_final_answer_text_reports_the_newest_assistant_turn():
     module = _binding()
-    state = {"messages": [HumanMessage("你好"), AIMessage("  滤网建议每个月清洗一次。  ")]}
+    state = {"messages": [HumanMessage(A_GREETING), AIMessage(A_FILTER_PADDED)]}
 
-    assert module._final_answer_text(state) == "滤网建议每个月清洗一次。"
+    assert module._final_answer_text(state) == A_FILTER
 
 
 def test_final_answer_text_joins_multipart_content():
     module = _binding()
-    parts = [{"type": "text", "text": "故障代码 "}, {"type": "text", "text": "E3 表示"}]
+    parts = [{"type": "text", "text": A_ERROR_HEAD}, {"type": "text", "text": A_ERROR_TAIL}]
     state = {"messages": [AIMessage(parts)]}
 
-    assert module._final_answer_text(state) == "故障代码 E3 表示"
+    assert module._final_answer_text(state) == A_ERROR_JOINED
 
 
 @pytest.mark.parametrize(
@@ -120,7 +160,7 @@ def test_final_answer_text_joins_multipart_content():
         ({}, "no messages"),
         ({"messages": []}, "no messages"),
         ({"messages": "not a message list"}, "no messages"),
-        ({"messages": [HumanMessage("没有回答")]}, "without a final assistant response"),
+        ({"messages": [HumanMessage(A_NO_ANSWER)]}, "without a final assistant response"),
         ({"messages": ("not", "a", "message")}, "without a final assistant response"),
         # A turn that stopped on a tool call has no answer to report.
         ({"messages": [AIMessage("", tool_calls=[{"name": "rag_summarize", "args": {},
@@ -225,9 +265,10 @@ def test_knowledge_index_is_rebuilt_into_the_binding_workspace(monkeypatch):
     assert calls[0]["md5_hex_store"] != "md5.text"
 
 
+@needs_snapshot
 def test_vendored_index_holds_the_collection_but_no_embeddings():
     """The recorded defect the rebuild exists to work around."""
-    index = UNIT / "agent" / "chroma_db" / "chroma.sqlite3"
+    index = SNAPSHOT / "chroma_db" / "chroma.sqlite3"
 
     assert index.is_file()
     with sqlite3.connect(f"file:{index}?mode=ro", uri=True) as connection:
@@ -237,8 +278,8 @@ def test_vendored_index_holds_the_collection_but_no_embeddings():
     assert collections == 1, "the upstream index should already declare the collection"
     assert embeddings == 0, "the upstream index is committed without embeddings"
 
-    hashes = [line for line in (UNIT / "agent" / "md5.text").read_text().split() if line.strip()]
-    assert len(hashes) == len(DOCUMENTS), "every shipped document is already recorded as indexed"
+    hashes = [line for line in (SNAPSHOT / "md5.text").read_text().split() if line.strip()]
+    assert len(hashes) == DOCUMENT_COUNT, "every shipped document is already recorded as indexed"
 
 
 # ------------------------------------------------------------------- resource life
@@ -309,30 +350,26 @@ def test_binding_declares_the_intercepted_route_and_no_tool_egress():
     assert route["host_patterns"] == ["api.openai.com"]
     assert route["path_patterns"] == ["/v1/chat/completions"]
     # get_weather / get_user_location need an Amap key this deployment withholds, and
-    # upstream turns that failure into the Chinese string the model already handles, so
+    # upstream turns that failure into the error string the model already handles, so
     # no tool route is declared for them.
     assert not interception.get("tool_routes")
 
 
-def test_vendored_snapshot_is_faithful_and_safe_to_publish():
+@needs_snapshot
+def test_restored_checkout_is_faithful_and_safe_to_publish():
     manifest = _manifest()
-    agent = UNIT / "agent"
-
-    assert (UNIT / "README.md").is_file()
-    assert (UNIT / "requirement.md").is_file()
-    assert (UNIT / "ground_truth").is_dir()
-    assert (UNIT / "Dockerfile").is_file()
-    assert (UNIT / ".dockerignore").is_file()
 
     assert manifest["source"]["revision"] == REVISION
-    assert sorted(p.name for p in (agent / "data").glob("*") if p.is_file()) == sorted(DOCUMENTS)
-    assert (agent / "data" / "external" / "records.csv").is_file()
-    assert (agent / "config" / "chroma.yml").is_file()
-    assert (agent / "prompts" / "main_prompt.txt").is_file()
+    documents = sorted(p.name for p in (SNAPSHOT / "data").glob("*") if p.is_file())
+    assert len(documents) == DOCUMENT_COUNT
+    assert sum(name.endswith(".pdf") for name in documents) == 1
+    assert sum(name.endswith(".txt") for name in documents) == DOCUMENT_COUNT - 1
+    assert (SNAPSHOT / "data" / "external" / "records.csv").is_file()
+    assert (SNAPSHOT / "config" / "chroma.yml").is_file()
 
     # The seven tools are declared by the upstream prompt, and the binding must not
     # have grown an eighth one.
-    prompt = (agent / "prompts" / "main_prompt.txt").read_text()
+    prompt = (SNAPSHOT / "prompts" / "main_prompt.txt").read_text()
     for tool in TOOLS:
         assert tool in prompt, f"{tool} should still be reachable in this deployment"
 
@@ -340,6 +377,15 @@ def test_vendored_snapshot_is_faithful_and_safe_to_publish():
     assert not any(path.name == ".git" for path in UNIT.rglob("*"))
     assert not any(path.is_symlink() for path in UNIT.rglob("*"))
     assert not (UNIT / "evaluation" / "input-contract.json").exists()
+
+
+def test_unit_ships_every_tracked_file_the_build_reads():
+    for name in ("README.md", "requirement.md", "Dockerfile", ".dockerignore",
+                 "agent.toml", "source-manifest.json", "bindings/bridge.py"):
+        assert (UNIT / name).is_file(), name
+    assert (UNIT / "ground_truth").is_dir()
+    # The upstream checkout is restored, never committed.
+    assert "/resources/agents/*/agent/" in (ROOT / ".gitignore").read_text()
 
 
 def test_requirement_profile_passes_the_official_kuma_parse():

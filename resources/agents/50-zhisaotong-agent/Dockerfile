@@ -1,6 +1,7 @@
-# ABB image for bamboo-moon/zhisaotong-Agent (智扫通 robot-vacuum support Agent).
+# ABB image for bamboo-moon/zhisaotong-Agent (Zhisaotong robot-vacuum support Agent).
 #
-# The upstream checkout is preserved verbatim under agent/. This image installs
+# The upstream checkout is restored verbatim under agent/ from the [source] revision in
+# agent.toml before this build starts. This image installs
 # its declared requirements, the OpenAI-protocol model client the benchmark
 # observes, the ABB worker's OpenTelemetry dependency and a CPU-only local ONNX
 # embedder, then runs the ABB worker selected by agent.toml instead of the
@@ -13,7 +14,7 @@ FROM python:3.12-slim
 # The default is Tencent Cloud rather than Aliyun on measured evidence: inside the
 # Docker VM this container network resolves `mirrors.aliyun.com` to a host that
 # serves ~47 KB/s, while `mirrors.cloud.tencent.com` serves ~6.3 MB/s from the same
-# container — a ~130x difference that turns a ~1 minute dependency install into a
+# container -- a ~130x difference that turns a ~1 minute dependency install into a
 # ~1.5 hour one. On the host both are fast, so the bottleneck is specific to how the
 # container network reaches the Aliyun mirror. Override with
 # `--build-arg ABB_PIP_INDEX_URL=https://pypi.org/simple/`.
@@ -80,12 +81,12 @@ RUN python -m pip install --no-cache-dir --index-url "$ABB_PIP_INDEX_URL" \
 # wide: langgraph-prebuilt 1.0.9 and later import ExecutionInfo/ServerInfo from
 # langgraph.runtime, which only langgraph>=1.1.0 provides. Because
 # langchain==1.2.10 caps langgraph at <1.1.0, the upstream pin cannot move, and pip
-# happily resolves the open range to langgraph-prebuilt 1.0.13 — whereupon
+# happily resolves the open range to langgraph-prebuilt 1.0.13 -- whereupon
 # `from langchain.agents import create_agent`, the very first import in upstream's
 # agent/agent/react_agent.py, dies with ImportError.
 #
-# Pinning langgraph-prebuilt to 1.0.8 — the lower bound of that range, and the
-# newest release whose imports langgraph 1.0.10 can actually satisfy — restores the
+# Pinning langgraph-prebuilt to 1.0.8 -- the lower bound of that range, and the
+# newest release whose imports langgraph 1.0.10 can actually satisfy -- restores the
 # upstream stack without moving any other pin. langchain-core is restated as a guard
 # for the same reason as the layer above.
 #
