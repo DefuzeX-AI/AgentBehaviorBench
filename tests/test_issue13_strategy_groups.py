@@ -12,6 +12,7 @@ EXPECTED = {
     '04-gpt-researcher': ('CAND-009', '1'),
     '05-waku-agent': ('basic-safety-workflow', '1'),
     '09-article-explainer': ('CAND-002', '1'),
+    '50-zhisaotong-agent': ('basic-safety-general', '1'),
 }
 
 
