@@ -10,11 +10,12 @@ tools and three middlewares. ``app.py`` drives it through
 ``agent.stream(..., stream_mode="values")`` and yields the newest message text
 after every stream step, so the last yielded value is the final assistant answer.
 
-This binding invokes the same compiled graph (``ReactAgent().agent``) with
-``ainvoke`` instead of consuming the stream generator, because ``execute_stream``
-takes no ``RunnableConfig``: invoking the graph directly is what lets ABB's
-callbacks, tags and thread settings reach the native model, tool and middleware
-calls. ``agent/react_agent.py`` passes ``context={"report": False}``, and the
+This binding invokes the same compiled graph (``ReactAgent().agent``) directly
+instead of consuming the stream generator, because ``execute_stream`` takes no
+``RunnableConfig``: invoking the graph is what lets ABB's callbacks, tags and
+thread settings reach the native model, tool and middleware calls. The graph is
+driven synchronously, on a worker thread, for the reason in Adaptation 4.
+``agent/react_agent.py`` passes ``context={"report": False}``, and the
 ``report_prompt_switch`` middleware reads exactly that flag, so the binding
 supplies the same runtime context. Reasoning, prompts, tools and middleware all
 remain upstream code; no upstream file is modified.
@@ -50,6 +51,18 @@ Adaptations required by this deployment
    still carries the upstream placeholder key. The upstream implementation already
    converts those failures into the Chinese error strings it hands back to the
    model, so the tools stay enabled and degrade exactly as written.
+
+4. **Synchronous invocation.** All three upstream middlewares are written against
+   the synchronous hooks only -- ``@wrap_tool_call`` (``monitor_tool``),
+   ``@before_model`` (``log_before_model``) and ``@dynamic_prompt``
+   (``report_prompt_switch``) in ``agent/tools/middleware.py``. LangGraph refuses
+   to run such a graph asynchronously: the first tool call raises
+   ``NotImplementedError: Asynchronous implementation of awrap_tool_call is not
+   available`` from ``awrap_tool_call``. Upstream itself never drives the graph
+   asynchronously -- ``app.py`` goes through ``ReactAgent.execute_stream``, which
+   calls ``agent.stream(...)``. The binding therefore runs ``agent.invoke(...)``
+   on a worker thread, which keeps the async entry point ABB calls while leaving
+   reasoning, prompts, tools and middleware untouched.
 
 Input example: a Chinese product question, e.g. "how often should the filter be replaced?"
 Output shape: ``{"answer": "<final assistant text>"}`` -- never a fabricated answer;
@@ -252,10 +265,17 @@ class ZhisaotongGraph:
             ValueError: The Case Input is not usable text.
             RuntimeError: The Agent stopped without a final assistant response, or
                 returned an empty one. Native execution errors propagate unchanged.
+
+        The graph is driven on a worker thread by :meth:`_run`; see Adaptation 4
+        in the module docstring for why it is not ``agent.ainvoke``.
         """
+        return await asyncio.to_thread(self._run, value, config)
+
+    def _run(self, value: object, config: object = None) -> dict:
+        """Drive the native graph synchronously and return its final answer."""
         question = self._question(value)
         agent = self._load()
-        state = await agent.agent.ainvoke(
+        state = agent.agent.invoke(
             {"messages": [{"role": "user", "content": question}]},
             config=config,
             context={"report": False},
@@ -264,7 +284,7 @@ class ZhisaotongGraph:
 
     def invoke(self, value: object, config: object = None, *, context: object = None) -> dict:
         """Synchronous form of :meth:`ainvoke`, for callers without an event loop."""
-        return asyncio.run(self.ainvoke(value, config, context=context))
+        return self._run(value, config)
 
     def close(self) -> None:
         """Release the owned workspace; safe to repeat and after a partial load."""

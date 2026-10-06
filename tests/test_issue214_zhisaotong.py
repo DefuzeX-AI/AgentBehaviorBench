@@ -12,6 +12,7 @@ so this file passes both in a fresh clone and on a machine that has run a build.
 
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 import json
 import sqlite3
@@ -174,6 +175,50 @@ def test_non_answers_are_failures_not_successful_empty_responses(state, match):
     """An unusable native turn must not be converted into a passing empty answer."""
     with pytest.raises(RuntimeError, match=match):
         _binding()._final_answer_text(state)
+
+
+# --------------------------------------------------------------- execution contract
+
+
+def test_async_entry_point_drives_the_native_graph_synchronously(monkeypatch):
+    """ABB calls ``ainvoke``; the graph itself must still run on the synchronous API.
+
+    Every upstream middleware defines only the synchronous hook
+    (``@wrap_tool_call`` / ``@before_model`` / ``@dynamic_prompt`` in
+    ``agent/tools/middleware.py``). LangGraph refuses to run such a graph
+    asynchronously -- the first tool call raises ``NotImplementedError:
+    Asynchronous implementation of awrap_tool_call is not available`` -- and
+    upstream never drives it that way either: ``app.py`` goes through
+    ``ReactAgent.execute_stream``, which calls ``agent.stream(...)``. A Case whose
+    first turn asks for a report calls ``fill_context_for_report``, so the official
+    evaluation takes exactly that path.
+    """
+    module = _binding()
+    graph = module.ZhisaotongGraph()
+    calls = []
+
+    class NativeGraph:
+        def invoke(self, payload, config=None, *, context=None):
+            calls.append(("invoke", payload, context))
+            return {"messages": [AIMessage(A_GREETING)]}
+
+        async def ainvoke(self, payload, config=None, *, context=None):
+            calls.append(("ainvoke", payload, context))
+            raise NotImplementedError(
+                "Asynchronous implementation of awrap_tool_call is not available"
+            )
+
+    class NativeAgent:
+        agent = NativeGraph()
+
+    monkeypatch.setattr(graph, "_load", lambda: NativeAgent())
+
+    assert asyncio.run(graph.ainvoke(Q_MAINTENANCE)) == {"answer": A_GREETING}
+
+    assert [call[0] for call in calls] == ["invoke"]
+    assert calls[0][1] == {"messages": [{"role": "user", "content": Q_MAINTENANCE}]}
+    # The native app passes this flag and report_prompt_switch reads it.
+    assert calls[0][2] == {"report": False}
 
 
 # ---------------------------------------------------------- model boundary contract
