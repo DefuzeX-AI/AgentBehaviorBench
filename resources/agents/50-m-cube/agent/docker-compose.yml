@@ -1,0 +1,35 @@
+services:
+  backend:
+    image: m-cube-backend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: m-cube-backend
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app
+      - ./.runtime/uploads:/app/.runtime/uploads
+      - ./.checkpoints:/app/.checkpoints
+      - ./.vectorstore:/app/.vectorstore
+    restart: unless-stopped
+
+  frontend:
+    image: m-cube-frontend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend.dev
+    container_name: m-cube-frontend
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_BASE_URL=http://127.0.0.1:8000
+    ports:
+      - "1420:1420"
+    volumes:
+      - ./frontend:/app/frontend
+      - /app/frontend/node_modules
+    restart: unless-stopped
