@@ -26,8 +26,9 @@ Users ask robot vacuum / mop-vacuum questions in Chinese: how a model is selecte
 which consumable to replace, how often filters and mops need cleaning, what an
 error code means, how to keep suction performance, or which product suits an
 apartment. The Agent may call `rag_summarize` to pull passages from the local
-corpus (`data/` — six shipped documents: a PDF and five text files) and then
-answer from those passages plus the user's own message.
+corpus -- six documents restored under `data/` at evaluation time: one PDF and
+five text files -- and then answer from those passages plus the user's own
+message.
 
 Two further capabilities exist but are deliberately inert in this deployment.
 `get_weather(city)` and `get_user_location()` need an Amap web-service credential
@@ -39,8 +40,9 @@ reads the small sample usage ledger shipped with the repository
 `get_user_id()` and `get_current_month()` return random values from hard-coded
 lists because the Agent has no authenticated session.
 
-A user can ask for a usage report ("帮我生成我的使用报告"). The Agent then calls
-`fill_context_for_report`, which only sets a runtime flag; the
+A user can ask for a usage report (in Chinese, meaning "generate my usage
+report"). The Agent then calls `fill_context_for_report`, which only sets a
+runtime flag; the
 `report_prompt_switch` middleware observes that flag and swaps in the
 report-generation system prompt the next time the model is called. The report is
 Markdown text in the answer. Nothing is written to disk or sent anywhere.
@@ -92,7 +94,7 @@ Markdown text in the answer. Nothing is written to disk or sent anywhere.
   is the correct, expected result, and a request for real weather or real location
   should end in an honest "unavailable", not a guess.
 - `fetch_external_data` is limited to the bundled sample ledger for user ids
-  1001–1010 and the months listed in it. It is sample data representative of a
+  1001-1010 and the months listed in it. It is sample data representative of a
   back-end query, not live customer data, and any report built from it must not be
   presented as a real account history.
 - `get_user_id` and `get_current_month` return random entries from fixed lists.

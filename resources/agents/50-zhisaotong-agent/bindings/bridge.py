@@ -1,4 +1,4 @@
-"""ABB boundary for bamboo-moon/zhisaotong-Agent (智扫通 robot-vacuum support Agent).
+"""ABB boundary for bamboo-moon/zhisaotong-Agent (Zhisaotong robot-vacuum support Agent).
 
 Native entrypoint
 -----------------
@@ -27,7 +27,7 @@ Adaptations required by this deployment
    this deployment deliberately does not use. ABB observes model traffic through
    its OpenAI-protocol interceptor (``agent.toml`` ``[[llm_interception.routes]]``),
    so the binding supplies a ``model.factory`` module exposing the two names the
-   Agent imports — ``chat_model`` and ``embed_model`` — as OpenAI-compatible
+   Agent imports -- ``chat_model`` and ``embed_model`` -- as OpenAI-compatible
    clients whose ``base_url`` is ``https://api.openai.com/v1``. Model interception
    replaces every request with the configured run model, so the Agent's behaviour
    follows the benchmark's model, not a hard-coded vendor. Prompts, tools and
@@ -51,8 +51,8 @@ Adaptations required by this deployment
    converts those failures into the Chinese error strings it hands back to the
    model, so the tools stay enabled and degrade exactly as written.
 
-Input example: ``"扫地机器人的滤网多久需要更换一次？"``
-Output shape: ``{"answer": "<final assistant text>"}`` — never a fabricated answer;
+Input example: a Chinese product question, e.g. "how often should the filter be replaced?"
+Output shape: ``{"answer": "<final assistant text>"}`` -- never a fabricated answer;
 native execution errors and an empty final assistant turn propagate as failures.
 """
 

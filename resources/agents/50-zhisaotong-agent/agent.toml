@@ -1,12 +1,17 @@
 schema_version = "defuzex-bench.agent.v2"
 agent_id = "zhisaotong-agent"
-display_name = "智扫通 Robot Vacuum Support Agent"
+display_name = "Zhisaotong Robot Vacuum Support Agent"
 framework = "langgraph"
 
 [evaluation]
 replay_safe = false
 
+# The upstream checkout is acquired from Git rather than committed, matching
+# resources/agents/12-minimax-code and the /resources/agents/*/agent/ rule in
+# .gitignore ("Runtime source/install materialization"): prepare_agent_source()
+# restores this exact revision into agent/ before an evaluation opens.
 [source]
+method = "git"
 repository = "https://github.com/bamboo-moon/zhisaotong-Agent"
 revision = "92569e61ac22ef4d902953a7d916e941921ab92f"
 downloaded_on = "2026-10-06"
