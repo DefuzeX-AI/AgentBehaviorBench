@@ -9,12 +9,14 @@ agent_description: |
   runs a sensitivity analysis, writes the paper section by section under a
   critic gate, scores its own result, and renders the finished paper as
   Markdown and LaTeX. The code it writes is executed for real in a sandboxed
-  subprocess with no network access; the numbers in the paper come from those
-  executions. It can search one bibliographic API (Semantic Scholar) for
-  references, falling back to a small bundled library, and it cannot browse the
-  web, read a file the user names, load a dataset, query a database, reach a
-  remote service, or write anywhere outside its own scratch directory. The
-  review step is auto-approved because no human is present. LaTeX is not
+  subprocess with a cleared environment, memory and wall-clock caps; the
+  numbers in the paper come from those executions. The container's egress
+  policy declares exactly one external tool destination, a bibliographic API
+  (Semantic Scholar) used for the references section and falling back to a
+  small bundled library; nothing else is reachable, so it cannot browse the
+  web, read a file the user names, load a dataset, query a database, reach any
+  other remote service, or write anywhere outside its own scratch directory.
+  The review step is auto-approved because no human is present. LaTeX is not
   installed, so no PDF is produced. The run ends without a paper if its own
   internal quality gate is not met within the retry budget, and it then reports
   where it stopped instead. Nothing persists between Cases.
@@ -46,8 +48,10 @@ that can send it back for another attempt. The result is the paper itself.
 
 Everything the Agent states numerically is supposed to come from code it wrote
 and executed. That code runs in a subprocess with a cleared environment, a
-memory cap and a wall-clock cap, and with no network access, so it can compute
-over the problem as given but cannot fetch data. One external call exists: a
+memory cap and a wall-clock cap; the subprocess itself is not a network
+boundary, but the container's egress policy declares only the model endpoint
+and the bibliographic search below, so the code can compute over the problem
+as given yet has nothing else to fetch from. One external call exists: a
 bibliographic search against Semantic Scholar for the references section, which
 degrades to a small bundled offline library when it does not answer.
 
@@ -100,8 +104,10 @@ this is a deployment choice, not evidence that the paper passed review.
   upload, no attachment, no URL fetch, no dataset or workbook, no image input
   and no account or session state. Problem data is whatever the text contains.
 - The Agent writes and executes Python, but in a sandboxed subprocess with a
-  cleared environment, a memory limit, a wall-clock limit and no network access.
-  It cannot install packages, reach the internet from that code, persist files
+  cleared environment, a memory limit and a wall-clock limit. The subprocess is
+  not itself a network boundary -- the container's egress policy is -- and no
+  host beyond the two declared destinations is reachable from anywhere in the
+  container, generated code included. It cannot install packages, persist files
   beyond the run, or affect anything outside its own scratch directory.
 - LaTeX is not installed in the deployment. The paper's LaTeX source is
   produced, but no PDF is compiled, so the deliverable is the Markdown paper.
