@@ -1,0 +1,52 @@
+# systemd unit template for python-lingjing-ai-server.
+#
+# Install:
+#   1. Edit User=/Group= and the two paths below to match the deployment.
+#   2. sudo cp scripts/lingjing-ai-server.service /etc/systemd/system/
+#   3. sudo systemctl daemon-reload
+#   4. sudo systemctl enable --now lingjing-ai-server
+#
+# This unit does NOT use the deploy.sh start/stop wrapper — systemd manages the
+# uvicorn process directly so pid tracking is unified with the rest of the OS.
+# Use `scripts/deploy.sh bootstrap` (or `install`) once to create the venv, then
+# leave lifecycle management to systemd. Tail logs with `journalctl -u lingjing-ai-server -f`.
+
+[Unit]
+Description=python-lingjing-ai-server (FastAPI, Gym-like env runtime)
+Documentation=file://%h/python-lingjing-ai-server/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# --- Identity ----------------------------------------------------------------
+# Edit these to a non-root account that owns the project directory.
+User=lingjing
+Group=lingjing
+
+# --- Paths -------------------------------------------------------------------
+# Replace with the absolute path of the deployed project on this server.
+WorkingDirectory=/opt/python-lingjing-ai-server
+EnvironmentFile=-/opt/python-lingjing-ai-server/.env
+Environment=PYTHONUNBUFFERED=1
+
+# --- Process -----------------------------------------------------------------
+# WORKERS=1 because the bundled SQLite stores share an in-process state.
+ExecStart=/opt/python-lingjing-ai-server/.venv/bin/python -m uvicorn app.main:app \
+    --host ${APP_HOST} \
+    --port ${APP_PORT} \
+    --workers 1
+Restart=on-failure
+RestartSec=3
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+# --- Hardening (optional, comment out if your data dir lives outside WorkingDir) -
+ProtectSystem=full
+ProtectHome=true
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

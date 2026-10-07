@@ -1,0 +1,45 @@
+# Production runtime requirements for python-lingjing-ai-server.
+#
+# Pinning policy:
+#   - Lower bounds reflect versions that have been validated in CI/dev venv.
+#   - Upper caps stay within the same SemVer major so a fresh `pip install`
+#     never silently upgrades into a breaking release on a new server.
+#
+# All listed packages are imported directly by app code (or required by
+# uvicorn[standard] / fastapi at runtime). Transitive deps (anyio, starlette,
+# typing-extensions, ...) are resolved by pip from these roots.
+
+# --- Web framework + ASGI server ---------------------------------------------
+fastapi>=0.115.0,<1.0
+# uvicorn[standard] brings httptools, websockets, uvloop, watchfiles, etc.
+uvicorn[standard]>=0.30.0,<1.0
+
+# --- Config & validation -----------------------------------------------------
+# Pinned explicitly so the validators used in scenario_models / config behave
+# consistently across deployments.
+pydantic>=2.7.0,<3.0
+pydantic-settings>=2.4.0,<3.0
+
+# --- Storage -----------------------------------------------------------------
+# SQLite is the only supported backend; the sqlite3 driver ships with CPython.
+sqlalchemy>=2.0.0,<3.0
+
+# --- HTTP & I/O --------------------------------------------------------------
+httpx>=0.27.0,<1.0
+# UploadFile / multipart form parsing in agent + uav routers.
+python-multipart>=0.0.9,<1.0
+# Image decode/encode for UAV recon endpoints.
+pillow>=10.0.0,<13.0
+
+# --- Agent graph runtime -----------------------------------------------------
+langgraph>=1.2.0,<2.0
+
+# --- Scenario file parsing ---------------------------------------------------
+# Used by scenario.from_file to load YAML scenarios.
+pyyaml>=6.0.0,<7.0
+
+# --- Realtime / engine bridge ------------------------------------------------
+# Explicit pin even though uvicorn[standard] also bundles it: examples'
+# fake_engine.py and external clients import websockets directly, and the
+# realtime bridge depends on the ASGI WebSocket backend.
+websockets>=12.0,<17.0
