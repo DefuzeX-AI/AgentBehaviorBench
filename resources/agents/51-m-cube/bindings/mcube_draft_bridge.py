@@ -67,6 +67,11 @@ from langchain_core.runnables.config import RunnableConfig
 # imported.  See main.py: the guard variable stops load_dotenv from running.
 os.environ.setdefault("MCUBE_DISABLE_DOTENV", "1")
 
+# llm_factory reads LLM_MAX_OUTPUT_TOKENS at request-build time; the source
+# default of 4096 truncates the larger TechSummary/Specification outputs, so
+# the binding provides a roomier default.  Deployers may still override it.
+os.environ.setdefault("LLM_MAX_OUTPUT_TOKENS", "12288")
+
 from agents.base_agent import BaseStructuredAgent, RetryPolicy  # noqa: E402
 from agents.drafter_agents import DraftingState  # noqa: E402
 from langgraph.checkpoint.memory import MemorySaver  # noqa: E402
@@ -137,14 +142,16 @@ class MCubeDraftGraph:
         if self._native is not None:
             return self._native
 
-        llm_model = os.environ.get("LLM_MODEL", "").strip()
-        llm_vision_model = os.environ.get("LLM_VISION_MODEL", "").strip()
+        # Model names are optional: when unset, fall back to the upstream
+        # default model name ("gpt-4o", see agent/.env.example).  Under ABB
+        # model interception the on-the-wire model is governed by the harness
+        # replacement target anyway; the name only needs to be non-empty so
+        # llm_factory does not take its stub path.  The deployment model must
+        # support stable JSON structured output (see requirement.md).
+        llm_model = os.environ.get("LLM_MODEL", "").strip() or "gpt-4o"
+        llm_vision_model = os.environ.get("LLM_VISION_MODEL", "").strip() or "gpt-4o"
         api_key = os.environ.get("OPENAI_API_KEY", "").strip()
 
-        if not llm_model:
-            raise ValueError("LLM_MODEL must be supplied in the environment")
-        if not llm_vision_model:
-            raise ValueError("LLM_VISION_MODEL must be supplied in the environment")
         if not api_key:
             raise ValueError("OPENAI_API_KEY must be supplied in the environment")
 
@@ -209,13 +216,21 @@ class MCubeDraftGraph:
 
     @staticmethod
     def _thread_config(config: RunnableConfig | None) -> tuple[str, dict]:
-        """Return a stable thread_id and the config dict to pass to the graph."""
-        thread_id = None
-        if isinstance(config, dict) and isinstance(config.get("configurable"), dict):
-            thread_id = config["configurable"].get("thread_id")
+        """Forward the caller's RunnableConfig, injecting a thread_id if absent.
+
+        The incoming config (callbacks, tags, metadata, existing configurable
+        entries) is preserved; only ``configurable.thread_id`` is added when
+        the caller did not supply one, because the compiled checkpointer
+        requires it.
+        """
+        merged: dict = dict(config) if isinstance(config, dict) else {}
+        configurable = dict(merged.get("configurable") or {})
+        thread_id = configurable.get("thread_id")
         if not thread_id:
             thread_id = str(uuid4())
-        return thread_id, {"configurable": {"thread_id": thread_id}}
+        configurable["thread_id"] = thread_id
+        merged["configurable"] = configurable
+        return thread_id, merged
 
     def invoke(self, value, config=None):
         """Run one patent-drafting invocation and return the final state.

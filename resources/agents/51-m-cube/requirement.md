@@ -56,6 +56,16 @@ or interactive HITL client is involved.
 - The agent requires a real LLM credential (OPENAI_API_KEY via the harness
   interception) and never emits deterministic stub output.
 
+## Deployment Notes
+- `LLM_MODEL` / `LLM_VISION_MODEL` are optional: when unset the binding uses
+  the upstream default model name `gpt-4o`; under ABB model interception the
+  on-the-wire model is governed by the harness replacement target.
+- The deployment model must support stable JSON structured output with large,
+  deeply nested schemas. Verified working: qwen3.8-max. Known incompatible:
+  kimi-k3 (rejects the `temperature` parameter that `services/llm_factory.py`
+  always sends) and glm-5.3-flash / kimi-k2.5 (fail the `TechSummary` /
+  `ClaimsSet` structured validation).
+
 ## Known Limitations or Prohibited Behaviors
 - Input is plain text only: PDF/DOCX upload, image understanding, and RAG
   retrieval are not exercised by this evaluation; disclosure_images remains

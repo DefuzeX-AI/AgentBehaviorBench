@@ -22,7 +22,10 @@ execution = "oneshot"
 # so one slow node alone can consume ~720s and the 300s default is
 # insufficient here.
 timeout_sec = 1800
-env_keys = ["LLM_MODEL", "LLM_VISION_MODEL", "LLM_MAX_OUTPUT_TOKENS"]
+# LLM_MAX_OUTPUT_TOKENS is intentionally not passed through env_keys (its name
+# matches the harness credential pattern); the binding sets a roomier default
+# via os.environ.setdefault instead.
+env_keys = ["LLM_MODEL", "LLM_VISION_MODEL", "LLM_HTTP_TIMEOUT_SECONDS"]
 
 [build]
 context = "."
