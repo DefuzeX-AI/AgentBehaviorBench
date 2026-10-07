@@ -92,19 +92,30 @@ published code actually does.
 ## Scanners
 
 `ScannerAgent` defaults to the dependency/SAST/secrets trio, and each one shells out to an
-external CLI. In this deployment only the secrets scanner is provisioned:
+external CLI. In this deployment the secrets and SAST scanners are provisioned:
 
 | Scanner | Tool | Provisioned | Effect |
 |---|---|---|---|
 | secrets | gitleaks (static binary) | yes | produces findings; fully offline |
+| SAST | semgrep 1.179.0 | yes | produces findings; rules come from build-time snapshots |
 | dependency | pip-audit | no | `BaseScanner.run` catches the failure and returns no findings |
-| SAST | semgrep | no | same |
 
 pip-audit resolves advisories against OSV or PyPI over the network on every call, and
-semgrep fetches the `p/owasp-top-ten` and `p/cwe-top-25` registry rulesets on first use.
-Neither has a route declared in `agent.toml`, so neither can succeed here. Their absence
+neither host has a route declared in `agent.toml`, so it cannot succeed here. Its absence
 is left visible rather than stubbed: a scanner that cannot run contributes no findings,
 and the report says how many findings survived rather than claiming a clean result.
+
+SAST needs one extra measure because OSS semgrep resolves the `p/owasp-top-ten` and
+`p/cwe-top-25` registry ids against semgrep.dev at invocation time and keeps no on-disk
+rules cache. The image therefore downloads both rulesets at build time into
+`/opt/semgrep-rules/` (manifest with fetch date and source URLs in
+`snapshots_manifest.txt`) and installs a PATH shim (`runtime/semgrep_shim.py`,
+mounted at `/opt/semgrep-shim/bin/semgrep`) that rewrites `--config <registry-id>`
+arguments to the snapshot files and execs the real binary. Everything else -- rule
+evaluation, output, exit codes -- is the real semgrep; only the transport of the rules
+differs, and the snapshot's build date is recorded in the manifest. The Dockerfile
+gate proves the offline path by running the shim with `SEMGREP_URL` pointed at a dead
+port: any live registry fetch would fail the build.
 
 `SecretsScanner` reports at `Severity.HIGH` and above and screens out obvious placeholders
 (`EXAMPLE_KEY`, `xxx`, `changeme`, ...). gitleaks output is parsed, and the matched secret

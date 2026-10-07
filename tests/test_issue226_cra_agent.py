@@ -400,7 +400,8 @@ def test_binding_declares_the_intercepted_route_and_no_tool_egress():
 
 def test_unit_ships_every_tracked_file_the_build_reads():
     for name in ("README.md", "requirement.md", "Dockerfile", ".dockerignore",
-                 "agent.toml", "source-manifest.json", "bindings/bridge.py"):
+                 "agent.toml", "source-manifest.json", "bindings/bridge.py",
+                 "runtime/semgrep_shim.py"):
         assert (UNIT / name).is_file(), name
     assert (UNIT / "ground_truth").is_dir()
     # The upstream checkout is restored, never committed.
