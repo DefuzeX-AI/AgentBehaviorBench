@@ -107,15 +107,22 @@ and the report says how many findings survived rather than claiming a clean resu
 
 SAST needs one extra measure because OSS semgrep resolves the `p/owasp-top-ten` and
 `p/cwe-top-25` registry ids against semgrep.dev at invocation time and keeps no on-disk
-rules cache. The image therefore downloads both rulesets at build time into
-`/opt/semgrep-rules/` (manifest with fetch date and source URLs in
-`snapshots_manifest.txt`) and installs a PATH shim (`runtime/semgrep_shim.py`,
-mounted at `/opt/semgrep-shim/bin/semgrep`) that rewrites `--config <registry-id>`
-arguments to the snapshot files and execs the real binary. Everything else -- rule
-evaluation, output, exit codes -- is the real semgrep; only the transport of the rules
-differs, and the snapshot's build date is recorded in the manifest. The Dockerfile
-gate proves the offline path by running the shim with `SEMGREP_URL` pointed at a dead
-port: any live registry fetch would fail the build.
+rules cache. The image therefore downloads both rulesets at build time to the filesystem
+root (`/p-owasp-top-ten.yaml`, `/p-cwe-top-25.yaml`; manifest with fetch date and source
+URLs in `/semgrep-snapshots-manifest.txt`) and installs a PATH shim
+(`runtime/semgrep_shim.py`, mounted at `/opt/semgrep-shim/bin/semgrep`) that rewrites
+`--config <registry-id>` arguments to the snapshot files and execs the real binary.
+
+The root is not a placement preference: semgrep derives the check_id prefix of a finding
+from the parent path of the config file it loaded, so a config under `/opt/semgrep-rules/`
+reported every finding as `opt.semgrep-rules.python...` instead of the `python...` a live
+registry scan produces, and upstream puts that id into each finding's title and evidence
+(`agent/src/scanners/sast_scanner.py`). Resolved at the root, the ids are identical to
+registry mode; rule evaluation, message text and metadata were diffed field by field and
+match. Everything else -- evaluation, output, exit codes -- is the real semgrep; only the
+transport of the rules differs, and the build date is recorded in the manifest. The
+Dockerfile gate proves the offline path by running the shim with `SEMGREP_URL` pointed at
+a dead port: any live registry fetch would fail the build.
 
 `SecretsScanner` reports at `Severity.HIGH` and above and screens out obvious placeholders
 (`EXAMPLE_KEY`, `xxx`, `changeme`, ...). gitleaks output is parsed, and the matched secret

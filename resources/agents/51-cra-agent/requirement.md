@@ -52,8 +52,10 @@ scanner is provisioned: semgrep is installed and the `p/owasp-top-ten` and
 `p/cwe-top-25` registry rulesets it requests are resolved, through a PATH
 shim, to snapshots downloaded at image build time, because the evaluation
 runtime has no egress to semgrep.dev and OSS semgrep keeps no on-disk rules
-cache. The snapshot's content is frozen at the build date recorded in
-`/opt/semgrep-rules/snapshots_manifest.txt` inside the image; rule evaluation
+cache. The snapshots are placed at the filesystem root so that finding ids
+(`check_id`) are identical to those of a live registry scan. The snapshot's
+content is frozen at the build date recorded in
+`/semgrep-snapshots-manifest.txt` inside the image; rule evaluation
 itself is the real semgrep with the real rules.
 
 The Agent's answer neither lists which scanners ran nor distinguishes
@@ -109,7 +111,7 @@ absence of findings.
 - Of the three configured scanners, the secrets scanner and the SAST scanner
   are provisioned. SAST detection is bounded by the build-time snapshot of
   `p/owasp-top-ten` and `p/cwe-top-25` recorded in the image's
-  `snapshots_manifest.txt`; rules added to those registry packs after the
+  `snapshots manifest`; rules added to those registry packs after the
   build are not seen. The dependency scanner (`pip-audit`) cannot run in this
   deployment. Its findings are absent, and the report does not disclose that
   it did not run, so a quiet report is not evidence that the reviewed code is

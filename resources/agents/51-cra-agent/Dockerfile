@@ -110,26 +110,35 @@ RUN set -eu; \
 #
 # The trade-off is explicit: the rules are a build-time snapshot, not a live
 # registry fetch, so their content is frozen at the build date recorded in
-# snapshots_manifest.json. Everything else -- evaluation, output, exit codes
-# -- is the real semgrep. The snapshot manifest is validated in the gate at
-# the end of this file.
+# /semgrep-snapshots-manifest.txt (rebuild with --no-cache to refresh them).
+# Finding ids are not affected -- see the note below the download layer.
+# Everything else -- evaluation, output, exit codes -- is the real semgrep.
 COPY runtime/semgrep_shim.py /opt/semgrep-shim/bin/semgrep
 RUN chmod +x /opt/semgrep-shim/bin/semgrep \
-    && mkdir -p /opt/semgrep-rules \
     && for RULESET in p/owasp-top-ten p/cwe-top-25; do \
         ID="$(printf '%s' "$RULESET" | tr '/' '-')"; \
         curl -sSL --retry 5 --retry-delay 2 --retry-all-errors --max-time 300 \
-            -o "/opt/semgrep-rules/${ID}.yaml" \
+            -o "/${ID}.yaml" \
             "https://semgrep.dev/c/${RULESET}"; \
     done \
-    && python -c "from ruamel.yaml import YAML; y=YAML(typ='safe'); files=['/opt/semgrep-rules/p-owasp-top-ten.yaml','/opt/semgrep-rules/p-cwe-top-25.yaml']; data=[y.load(open(f)) for f in files]; [print(f, len(d['rules']), 'rules') for f, d in zip(files, data)]; assert all(d['rules'] for d in data), 'empty ruleset snapshot'" \
+    && python -c "from ruamel.yaml import YAML; y=YAML(typ='safe'); files=['/p-owasp-top-ten.yaml','/p-cwe-top-25.yaml']; data=[y.load(open(f)) for f in files]; [print(f, len(d['rules']), 'rules') for f, d in zip(files, data)]; assert all(d['rules'] for d in data), 'empty ruleset snapshot'" \
     && printf '%s\n' \
         "fetched_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
         "semgrep_version=1.179.0" \
-        "p-owasp-top-ten.yaml https://semgrep.dev/c/p/owasp-top-ten" \
-        "p-cwe-top-25.yaml https://semgrep.dev/c/p/cwe-top-25" \
-        > /opt/semgrep-rules/snapshots_manifest.txt \
-    && cat /opt/semgrep-rules/snapshots_manifest.txt
+        "/p-owasp-top-ten.yaml https://semgrep.dev/c/p/owasp-top-ten" \
+        "/p-cwe-top-25.yaml https://semgrep.dev/c/p/cwe-top-25" \
+        > /semgrep-snapshots-manifest.txt \
+    && cat /semgrep-snapshots-manifest.txt
+
+# Why the snapshots live at the filesystem root rather than in /opt:
+# semgrep's core derives each finding's check_id prefix from the parent path
+# of the config file it loaded. Pointing it at /opt/semgrep-rules/p-cwe-top-25.yaml
+# therefore makes every check_id read "opt.semgrep-rules.python...", while a
+# live registry scan reports "python..." -- and upstream puts check_id into
+# every finding's title and evidence (agent/src/scanners/sast_scanner.py),
+# so that prefix would be visible in every answer. A config file resolved at
+# the filesystem root produces exactly the live-registry check_id, which is
+# what this deployment wants: identical semantics, no cosmetic drift.
 
 # The scanner's subprocess call resolves "semgrep" through PATH; putting the
 # shim directory first makes every lookup hit the shim, which execs the real
