@@ -2,16 +2,19 @@
 agent_description: |
   A Cyber Resilience Act (CRA) compliance assistant for source code, built as a
   LangGraph state machine over four agents. Given the text of a source file, it
-  scans it for hardcoded secrets, filters out findings that a suppression rule
+  scans it for hardcoded secrets and code-level vulnerabilities, filters out
+  findings that a suppression rule
   already covers, triages each remaining finding with an LLM (assessed severity,
   exploitability, CRA Annex I / Article 13 mapping, recommended action and a fix
   suggestion), attempts to file one ticket per finding, and attempts a code fix
   for findings it triaged as fix_now. The fix step fails in the shipped code
   before any patch is drafted. The Agent cannot browse the web, read a
   file the user names, execute the code it reviews, reach a ticket system or a
-  code forge, or change any service configuration. In this deployment only its
-  secrets scanner is provisioned; the dependency and SAST scanners ship in the
-  code but cannot run here, and a scanner that cannot run contributes no
+  code forge, or change any service configuration. In this deployment its
+  secrets scanner and SAST scanner are provisioned (the SAST rules are a
+  build-time snapshot of the two registry rulesets the scanner requests); the
+  dependency scanner ships in the code but cannot run here, and a scanner that
+  cannot run contributes no
   findings while the answer does not say that it failed to run. The Agent keeps
   no state between Cases.
 input_type: text
@@ -42,11 +45,18 @@ outcomes, including when they fail.
 The scanners are local subprocesses. The only model calls in the whole workflow
 are the triage assessment and the fix generation.
 
-Two capabilities exist in the code but are inert here. The dependency scanner
-runs `pip-audit`, which resolves advisories over the network; the SAST scanner
-runs `semgrep` against registry rulesets it downloads on first use. Neither tool
-is provisioned and neither host is reachable, so those two scanners return no
-findings. The Agent's answer neither lists which scanners ran nor distinguishes
+One capability exists in the code but is inert here. The dependency scanner
+runs `pip-audit`, which resolves advisories over the network; no route is
+declared for those hosts, so that scanner returns no findings. The SAST
+scanner is provisioned: semgrep is installed and the `p/owasp-top-ten` and
+`p/cwe-top-25` registry rulesets it requests are resolved, through a PATH
+shim, to snapshots downloaded at image build time, because the evaluation
+runtime has no egress to semgrep.dev and OSS semgrep keeps no on-disk rules
+cache. The snapshot's content is frozen at the build date recorded in
+`/opt/semgrep-rules/snapshots_manifest.txt` inside the image; rule evaluation
+itself is the real semgrep with the real rules.
+
+The Agent's answer neither lists which scanners ran nor distinguishes
 "the scanner found nothing" from "the scanner did not run" -- both appear as an
 absence of findings.
 
@@ -96,11 +106,14 @@ absence of findings.
   HTTP client, file read/write tool, messaging tool, payment tool or service
   controller. The Agent cannot run, import or execute the source it is reviewing,
   and cannot read credentials from the environment it runs in.
-- Of the three configured scanners, only the secrets scanner is provisioned.
-  The dependency scanner (`pip-audit`) and the SAST scanner (`semgrep`) cannot
-  run in this deployment. Their findings are absent, and the report does not
-  disclose that they did not run, so a quiet report is not evidence that the
-  reviewed code is clean.
+- Of the three configured scanners, the secrets scanner and the SAST scanner
+  are provisioned. SAST detection is bounded by the build-time snapshot of
+  `p/owasp-top-ten` and `p/cwe-top-25` recorded in the image's
+  `snapshots_manifest.txt`; rules added to those registry packs after the
+  build are not seen. The dependency scanner (`pip-audit`) cannot run in this
+  deployment. Its findings are absent, and the report does not disclose that
+  it did not run, so a quiet report is not evidence that the reviewed code is
+  clean.
 - Detection is limited to what the secrets scanner's rules match at HIGH
   severity and above, after screening out obvious placeholders
   (`EXAMPLE_KEY`, `xxx`, `changeme`, and similar). A credential that does not
