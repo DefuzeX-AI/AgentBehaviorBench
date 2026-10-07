@@ -55,10 +55,13 @@ in this file.
 
 Resource ownership
 ------------------
-Each invocation constructs a fresh native `DocumentWriter` (with its own
-in-memory LangGraph checkpoint thread), so one input never continues a
-previous document session. The bridge holds no persistent native resources;
-`close()` only blocks further invocations and is safe to repeat.
+The bridge keeps one native `DocumentWriter` per thread: when ABB supplies a
+stable thread_id, the same writer and in-memory checkpoint are reused, so the
+thread continuity the harness offers is honored rather than silently dropped.
+Note that kiroku's own graph is single-shot by design — each new input starts
+a fresh document task on that thread — so cross-input memory remains limited
+by the upstream workflow itself. `close()` drops all cached writers and
+blocks further invocations; it is safe to repeat.
 """
 
 from collections.abc import Mapping
@@ -101,11 +104,30 @@ def message_from_input(value):
     return value.strip()
 
 
+def title_from_text(text):
+    """Derive a working title from the request text.
+
+    The requested topic must be visible in the specification, not only in
+    area_of_paper/hypothesis: InternetSearch.create_task builds the writing
+    task around the title, so a fixed placeholder title makes the document
+    drift off-topic. Takes the first line or sentence of the request,
+    bounded to 80 characters.
+    """
+    first = text.strip().splitlines()[0].strip() if text.strip() else ""
+    for sep in (". ", "。", "! ", "? ", "！", "？", "; ", "；"):
+        if sep in first:
+            first = first.split(sep)[0].strip()
+            break
+    return first[:80] or "Untitled Document"
+
+
 def specification_from_text(text):
     """Build the approved fixed minimal document specification.
 
     The input text is preserved verbatim in both `area_of_paper` and
-    `hypothesis`; no title, section names or paragraph counts are inferred.
+    `hypothesis`, and its first line/sentence becomes the working title so
+    the requested topic actually drives the native writing task. Section
+    names and paragraph counts remain fixed minimal values.
 
     Args:
         text: The current plain-text request.
@@ -114,7 +136,7 @@ def specification_from_text(text):
         A mapping consumed by the native Kiroku graph state.
     """
     return {
-        "title": "Untitled Document",
+        "title": title_from_text(text),
         "suggest_title": False,
         "generate_citations": False,
         "type_of_document": "technical briefing",
@@ -188,7 +210,36 @@ class KirokuBridge:
                 "TAVILY_API_KEY is required because the native internet_search "
                 "phase always runs and uses Tavily"
             )
-        self._thread_id = 0
+        # One native writer per thread: ABB passes a stable thread_id per
+        # Case, and reusing the writer keeps that thread's native checkpoint
+        # instead of silently dropping the continuity the harness offers.
+        self._writers = {}
+        self._fallback_seq = 0
+        self._closed = False
+
+    def _resolve_run_config(self, config):
+        """Merge the incoming RunnableConfig, honoring ABB's thread identity.
+
+        Callbacks, tags and metadata are preserved as supplied. The
+        configurable gains the thread identity (ABB's thread_id when present,
+        otherwise a per-invoke fallback) and the empty native instruction.
+
+        Returns:
+            (thread_key, run_config): the effective thread key and a new
+            config mapping; the caller's object is never mutated.
+        """
+        run_config = dict(config or {})
+        configurable = dict(run_config.get("configurable") or {})
+        incoming = configurable.get("thread_id")
+        if incoming:
+            thread_key = str(incoming)
+        else:
+            self._fallback_seq += 1
+            thread_key = f"kiroku-bridge-{self._fallback_seq}"
+        configurable["thread_id"] = thread_key
+        configurable["instruction"] = ""
+        run_config["configurable"] = configurable
+        return thread_key, run_config
 
     def _create_writer(self, specification):
         """Construct a fresh native DocumentWriter for one invocation.
@@ -234,61 +285,42 @@ class KirokuBridge:
         next_nodes = getattr(snapshot, "next", ()) or ()
         return next_nodes[0] if next_nodes else ""
 
-    def _run_until_complete(self, writer, initial_state, config):
-        """Drive the native graph to END through its public invoke API.
+    def _run_until_complete(self, writer, initial_state, run_config):
+        """Drive the native graph to END with the merged RunnableConfig.
 
-        DocumentWriter.invoke wraps its second argument as the inner
-        ``configurable`` mapping and pins thread_id to the writer's own id,
-        so the binding passes only ``{"instruction": ""}`` — the same call
-        shape the upstream UI uses. The empty instruction is interpreted by
-        the source conditional edges (is_plan_review_complete /
-        is_generate_review_complete) as "review complete, proceed". Residual
-        interrupt pauses are resumed through the same public API with
-        Command(resume="") when the installed langgraph provides it.
+        The initial input and every resume go through ``writer.graph.invoke``
+        directly so callbacks, tags, metadata and the thread identity from
+        the incoming config actually reach the graph. DocumentWriter.invoke
+        is deliberately bypassed: it wraps only an inner configurable mapping
+        (dropping everything else) and its ``.get("draft")`` crashes on the
+        None resume return (kiroku_app.py:212).
 
-        Incoming RunnableConfig extras (callbacks, tags, metadata) are
-        intentionally not forwarded in this deployment: the native public
-        invoke accepts only the inner configurable mapping, and although the
-        binding could reach lower-level graph APIs, config propagation is
-        deliberately disabled here to mirror the upstream UI exactly.
+        Resume mechanism (source-backed, verified against the pinned
+        langgraph==0.2.48): static interrupt_before pauses resume by invoking
+        the graph with input None and the SAME config; the conditional edges
+        (is_plan_review_complete / is_generate_review_complete) treat the
+        empty configurable.instruction as "review complete, proceed".
+        Command(resume=...) is NOT used: it targets dynamic interrupt() calls
+        and does not clear static interrupt_before pauses in this version
+        (the graph re-pauses at the same node). Resuming with None plus an
+        empty instruction fabricates no human feedback.
 
         Returns:
             (final_state, last_draft): the native final state mapping and the
-            last draft string returned by the native invoke (already cleaned
-            of ```markdown fences by DocumentWriter.invoke).
+            last draft text observed in the checkpoint.
         """
-        self._thread_id += 1
-        writer.set_thread_id(self._thread_id)
+        if initial_state is not None:
+            writer.graph.invoke(initial_state, run_config)
 
         last_draft = ""
-        if initial_state is not None:
-            last_draft = writer.invoke(initial_state, {"instruction": ""}) or ""
-
         guard = 0
         while guard < 50:
             guard += 1
             next_state = self._next_state_name(writer)
             if not next_state:
                 break
-            # Resume mechanism (source-backed, verified against the pinned
-            # langgraph==0.2.48): static interrupt_before pauses resume by
-            # invoking the graph with input None and the SAME config; the
-            # conditional edges then treat the falsy configurable.instruction
-            # as "review complete, proceed". Command(resume=...) is NOT used:
-            # it targets dynamic interrupt() calls, does not clear static
-            # interrupt_before pauses in this version (the graph re-pauses at
-            # the same node), and DocumentWriter.invoke cannot be used for
-            # resumes either because its .get("draft") crashes on the None
-            # return (kiroku_app.py:212). Resuming with None plus an empty
-            # instruction fabricates no human feedback.
-            resume_config = {
-                "configurable": {
-                    "thread_id": str(writer.get_thread_id()),
-                    "instruction": "",
-                }
-            }
-            writer.graph.invoke(None, resume_config)
-            resumed_values = writer.graph.get_state(resume_config).values or {}
+            writer.graph.invoke(None, run_config)
+            resumed_values = writer.graph.get_state(run_config).values or {}
             resumed_draft = resumed_values.get("draft", "")
             last_draft = (
                 resumed_draft.strip() if isinstance(resumed_draft, str) else ""
@@ -298,13 +330,7 @@ class KirokuBridge:
                 "Kiroku did not complete after resuming native manual-review interrupts"
             )
 
-        final_config = {
-            "configurable": {
-                "thread_id": str(writer.get_thread_id()),
-                "instruction": "",
-            }
-        }
-        final_state = writer.graph.get_state(final_config).values or {}
+        final_state = writer.graph.get_state(run_config).values or {}
         if not final_state and isinstance(writer.state, Mapping):
             final_state = writer.state
         return final_state, last_draft
@@ -314,17 +340,18 @@ class KirokuBridge:
 
         Args:
             value: Plain-text request or exactly {"message": text}.
-            config: Accepted for interface compatibility, but the native
-                public DocumentWriter.invoke wraps only an inner configurable
-                mapping, so incoming RunnableConfig extras (callbacks, tags,
-                metadata, supplied configurable values) cannot be forwarded
-                through the native API. The binding supplies exactly
-                {"instruction": ""} and lets the writer pin its own
-                thread_id; config propagation is limited by the native API.
+            config: Optional RunnableConfig. Callbacks, tags, metadata and
+                configurable.thread_id are honored and forwarded to the
+                graph (see _resolve_run_config); the binding only adds the
+                empty native ``instruction`` and a fallback thread key when
+                none is supplied. Reusing ABB's thread_id reuses the same
+                native writer and checkpoint instead of silently starting
+                from a blank thread.
 
         Returns:
-            Mapping with `draft`, `title`, and `document_specification`.
-            `draft` is the native final document text extracted from state.
+            Mapping with `draft`, `title`, `document_specification` and
+            `native_state`. `draft` is the native final document text
+            extracted from state.
 
         Raises:
             ValueError: Invalid input shape.
@@ -332,14 +359,19 @@ class KirokuBridge:
                 complete the native workflow.
             Native execution errors propagate unchanged.
         """
-        if self._thread_id < 0:
+        if self._closed:
             raise RuntimeError("Kiroku bridge is closed")
 
         text = message_from_input(value)
         specification = specification_from_text(text)
-        writer = self._create_writer(specification)
+        thread_key, run_config = self._resolve_run_config(config)
+        writer = self._writers.get(thread_key)
+        if writer is None:
+            writer = self._create_writer(specification)
+            writer.set_thread_id(thread_key)
+            self._writers[thread_key] = writer
         initial_state = initial_state_from_specification(specification)
-        final_state, last_draft = self._run_until_complete(writer, initial_state, config)
+        final_state, last_draft = self._run_until_complete(writer, initial_state, run_config)
 
         return {
             "draft": last_draft or draft_from_state(final_state),
@@ -351,11 +383,12 @@ class KirokuBridge:
     def close(self):
         """Mark this binding closed; later invoke calls raise RuntimeError.
 
-        Writers are created per invocation, so there is no persistent native
-        resource to release. No external files, databases or subprocesses are
-        created by this binding. Cleanup is safe to repeat.
+        Drops the per-thread native writers (the only state this bridge
+        holds). No external files, databases or subprocesses are created by
+        this binding. Cleanup is safe to repeat.
         """
-        self._thread_id = -1
+        self._writers = {}
+        self._closed = True
 
 
 def create_graph():
