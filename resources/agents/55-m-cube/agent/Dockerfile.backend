@@ -1,0 +1,36 @@
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1 \
+    UV_PROJECT_ENVIRONMENT=/usr/local
+
+# Bring in the uv binary from the official image (no extra Python build step).
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+
+WORKDIR /app
+
+# Install system dependencies required by DOC/DOCX conversion/image extraction in Docker.
+# - libreoffice / soffice: convert legacy .doc -> .docx for text and image extraction.
+# - fonts-dejavu-core: provide baseline fonts for headless conversion stability.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       libreoffice \
+       libreoffice-writer \
+       fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies first for better layer caching.
+# `uv sync --frozen --no-dev` reads pyproject.toml + uv.lock and installs into
+# UV_PROJECT_ENVIRONMENT (/usr/local), so `uvicorn` is on PATH directly.
+COPY pyproject.toml uv.lock /app/
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project
+
+# Copy project source.
+COPY . /app
+
+EXPOSE 8000
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
