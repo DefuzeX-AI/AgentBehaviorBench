@@ -466,8 +466,11 @@ class CRAAgentGraph:
                 suppression_store=SuppressionStore(db_path=workspace / "suppressions.db"),
             )
 
-            with set_config_context(dict(config or {})):
-                state = await orchestrator.run(commit_info, changed_files)
+            # set_config_context only sets the config inside the Context it
+            # yields (a copy of the current one), so the run must execute in
+            # that Context for the graph's callbacks to see ABB's config.
+            with set_config_context(dict(config or {})) as ctx:
+                state = await asyncio.create_task(orchestrator.run(commit_info, changed_files), context=ctx)
         finally:
             await llm_client.close()
 

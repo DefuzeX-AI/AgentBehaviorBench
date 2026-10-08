@@ -145,6 +145,13 @@ RUN chmod +x /opt/semgrep-shim/bin/semgrep \
 # binary at /usr/local/bin/semgrep.
 ENV PATH="/opt/semgrep-shim/bin:${PATH}"
 
+# semgrep checks for a newer version and sends usage metrics to semgrep.dev on
+# every run. With no egress both calls are denied and retried, which adds about
+# 95 s to each scan (106.5 s vs 10.3 s on the same sample); neither affects the
+# scan result, so both are turned off.
+ENV SEMGREP_ENABLE_VERSION_CHECK=0 \
+    SEMGREP_SEND_METRICS=off
+
 # The full upstream checkout lands here, after the dependency layer, so its file
 # mtimes cannot invalidate that layer.
 COPY --chown=agent:agent agent/ ./agent/
