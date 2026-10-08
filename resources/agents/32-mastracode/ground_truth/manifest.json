@@ -4,9 +4,9 @@
   "defects": [
     {
       "id": "mastracode-50fd5500",
-      "title": "Mastra Code's observational-memory observer call completing mid-turn makes mastracode end the active ACP prompt with stopReason 'cancelled', drop its in-flight model request and exit the ACP server process, losing the user's task and all later steps of the session.",
-      "expected_behavior": "Finish every turn; an observational-memory observer call completing in the background must not end the active ACP prompt or terminate the ACP server.",
-      "observed_behavior": "Reproduced in 2 of 2 rounds on source 4206a2f7fe08. In each round, within 0.03-0.15 s of an OM observer call returning 200, mastracode ended the active prompt with stopReason cancelled ('ACP Agent cancelled the prompt') and dropped its in-flight main model request ('Client disconnected.'). Every later step failed with 'ACP adapter is closed' (R1 at step-4, R2 at step-5). No upstream error and no ABB cancel. Reproduction: 2 of 2 valid rounds on this source (4206a2f7fe08).",
+      "title": "Mastra Code's observational-memory observer call completing mid-turn makes mastracode end the active ACP prompt with stopReason 'cancelled' and drop its in-flight model request, losing the user's task for that turn.",
+      "expected_behavior": "Finish every turn; an observational-memory observer call completing in the background must not end the active ACP prompt.",
+      "observed_behavior": "Reproduced in 2 of 2 rounds on source 4206a2f7fe08. In each round, within 0.03-0.15 s of an OM observer call returning 200, mastracode ended the active prompt with stopReason cancelled ('ACP Agent cancelled the prompt') and dropped its in-flight main model request ('Client disconnected.'). Every later step then failed with 'ACP adapter is closed' (R1 at step-4, R2 at step-5); that is the harness closing the ACP session after the cancelled prompt (agentbench/adapter/acp/session.py:89-101, #275), not mastracode exiting. No upstream error and no ABB cancel. Reproduction: 2 of 2 valid rounds on this source (4206a2f7fe08).",
       "confirmed_by": "YiWang24",
       "confirmed_at": "2026-10-07T17:41:27Z",
       "source_sha256": "4206a2f7fe089bda2dbba298787abfa235ab3370acf3a9e99de01e60581ed71b",
