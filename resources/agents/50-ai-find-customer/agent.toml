@@ -65,4 +65,11 @@ path_patterns = ["/search", "/maps"]
 host_patterns = ["r.jina.ai"]
 ports = [443]
 methods = ["GET"]
-path_patterns = ["/", "/http:/", "/https:/"]
+# The upstream JinaReaderTool builds every request as
+# f"https://r.jina.ai/{url}" (JINA_BASE + the target URL), so the request path is
+# always "/" followed by the target scheme, i.e. /https://<host>/... or
+# /http://<host>/... . fnmatch matches whole strings, so an exact "/https:/"
+# pattern only matches a path that is literally "/https:/"; the trailing
+# "/*" forms below are what actually match. Not verified against a real
+# JINA_API_KEY run.
+path_patterns = ["/https:*", "/http:*"]
