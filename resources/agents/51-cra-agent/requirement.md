@@ -31,8 +31,7 @@ asks the Agent to review it for security problems before it is merged. The Agent
 runs its local scanners over that text, drops findings already covered by a
 suppression rule, and then assesses what is left: how severe it is, how
 plausibly it could be exploited, which CRA obligation it touches, and what
-should be done about it. For a finding it judged as needing an immediate fix it
-also drafts the corrected code.
+should be done about it.
 
 The reply is a single text report: how many findings the scanners produced, how
 many survived filtering, and for each surviving finding the scanner's own
@@ -48,15 +47,9 @@ are the triage assessment and the fix generation.
 One capability exists in the code but is inert here. The dependency scanner
 runs `pip-audit`, which resolves advisories over the network; no route is
 declared for those hosts, so that scanner returns no findings. The SAST
-scanner is provisioned: semgrep is installed and the `p/owasp-top-ten` and
-`p/cwe-top-25` registry rulesets it requests are resolved, through a PATH
-shim, to snapshots downloaded at image build time, because the evaluation
-runtime has no egress to semgrep.dev and OSS semgrep keeps no on-disk rules
-cache. The snapshots are placed at the filesystem root so that finding ids
-(`check_id`) are identical to those of a live registry scan. The snapshot's
-content is frozen at the build date recorded in
-`/semgrep-snapshots-manifest.txt` inside the image; rule evaluation
-itself is the real semgrep with the real rules.
+scanner is provisioned: semgrep runs offline against build-time snapshots of
+the `p/owasp-top-ten` and `p/cwe-top-25` rulesets it requests, and reports the
+same finding ids as a live registry scan.
 
 The Agent's answer neither lists which scanners ran nor distinguishes
 "the scanner found nothing" from "the scanner did not run" -- both appear as an
