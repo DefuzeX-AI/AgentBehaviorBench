@@ -112,7 +112,8 @@ def _build(session, registry_path):
             "status": "interrupted" if isinstance(exc, KeyboardInterrupt) else "failed",
             "current_file": getattr(session, "current_path", None),
             "completed_files": list(session.completed), "error_type": type(exc).__name__,
-            "message": message, "certified": False})
+            "message": message, "certified": False,
+            **({"diagnostics": exc.diagnostics} if getattr(exc, "diagnostics", None) else {})})
         if isinstance(exc, KeyboardInterrupt):
             raise
         raise BuildError(message) from None

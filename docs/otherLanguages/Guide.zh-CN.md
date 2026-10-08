@@ -203,3 +203,9 @@ agentbench evaluate react-agent --sdk local --cases 1 --no-view
   Agent 的模型目标是 Anthropic messages 协议时必须设置。
 - 不写 `--sdk` 的命令仍然使用 `kuma`；`local` 只能按名字选择。
 - 运行目录里除常规产物外还有 `local-judge.json`，记录 Judge 模型、判决和原始回复。
+
+## 接入配置生成失败
+
+`agent add -b` 出现 schema / JSON 错误时，先看[接入指导中的排查说明](How%20To%20Add%20Agent.zh-CN.md#结构化输出生成失败时)。
+schema 字段路径和 JSON 行列错误现在会反馈给模型，按现有预算进行纠正。
+若步骤仍失败，请保留已完成文件，并检查保存的校验和 provider 诊断记录。

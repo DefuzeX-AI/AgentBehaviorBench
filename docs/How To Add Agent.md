@@ -64,6 +64,20 @@ agentbench agent add https://github.com/owner/repository -b --sdk kuma
 agentbench agent add https://github.com/owner/repository -b --sdk kuma --answers answers.txt
 ```
 
+### If structured-output generation fails
+
+Schema failures now report field paths, expected constraints and actual types.
+Invalid JSON in model content reports decoder line/column and enters the same
+bounded correction loop. Planning, file generation and review use their own
+schemas; an invalid review response is corrected without regenerating a valid
+candidate. File generation and review share the file's correction budget.
+Provider envelope failures and unfinished responses remain terminal; check saved
+diagnostics before changing provider settings or output budgets.
+Preserve completed files and attempt records. A saved response is a record,
+not an input to the next build. See
+[Structured-output generation failures](Troubleshooting.md#structured-output-generation-failures)
+for records, current null-field rules and correction-budget controls.
+
 ## 3. Understand the files
 
 The Agent unit is placed under `resources/agents/NN-name/`. The command generates
