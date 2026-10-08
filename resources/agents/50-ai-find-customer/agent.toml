@@ -16,7 +16,11 @@ downloaded_on = "2026-10-05"
 type = "docker"
 execution = "oneshot"
 timeout_sec = 900
-env_keys = ["LLM_MODEL", "REASONING_MODEL", "OPENAI_API_BASE"]
+# OPENAI_API_BASE is intentionally NOT declared in env_keys: litellm honours it,
+# so a host-provided value would send model traffic straight to that URL and
+# bypass the api.openai.com interception route above, leaving those calls
+# unrecorded. The model endpoint is owned by the interception layer.
+env_keys = ["LLM_MODEL", "REASONING_MODEL"]
 secret_env_keys = ["SERPER_API_KEY"]
 optional_secret_env_keys = ["JINA_API_KEY"]
 
