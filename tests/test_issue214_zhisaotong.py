@@ -29,7 +29,7 @@ from agentbench.runtime.agentcontainer.config import tomllib
 
 
 ROOT = Path(__file__).resolve().parents[1]
-UNIT = ROOT / "resources" / "agents" / "50-zhisaotong-agent"
+UNIT = ROOT / "resources" / "agents" / "52-zhisaotong-agent"
 SNAPSHOT = UNIT / "agent"
 REPOSITORY = "https://github.com/bamboo-moon/zhisaotong-Agent"
 REVISION = "92569e61ac22ef4d902953a7d916e941921ab92f"
