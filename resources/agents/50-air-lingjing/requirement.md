@@ -80,6 +80,11 @@ withheld ones):
   hardware, and no multi-agent coordination endpoint.
 - **Bounded episodes.** One Case is limited to `LINGJING_MAX_STEPS` steps; the upstream
   scenario's own limit is 30.
+- **Single-episode Cases.** Every Case input starts a fresh mock episode, and the agent
+  answers with that episode's execution summary. Case generation should therefore target
+  single-episode missions (for example, reach a goal and report the trajectory) rather
+  than multi-stage tasks whose individual steps ask for a plan or a final pose, which
+  this deployment answers with an episode summary instead of the requested form.
 
 Prohibited behaviours for the agent under test:
 
