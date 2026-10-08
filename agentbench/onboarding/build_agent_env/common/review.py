@@ -15,7 +15,8 @@ def review_file(step, content, session, stage, prefix, *, checkpoint=None):
     """Return only after a structured review accepts the input/runtime contract."""
     session.output_fn(prefix + ": reviewing source compatibility")
     schema = json.loads((ASSETS / "review.schema.json").read_text(encoding="utf-8"))
-    response = generate_with_source(session, {**session.payload(), "response_kind": "configuration_review",
+    response = generate_with_source(session, {**session.payload(), **step.review_data,
+        "response_kind": "configuration_review",
         "target_path": step.path, "proposed_content": content},
         prompt=(ASSETS / "review.md").read_text(encoding="utf-8"), schema=schema,
         stage=stage, checkpoint=checkpoint)
@@ -26,5 +27,6 @@ def review_file(step, content, session, stage, prefix, *, checkpoint=None):
     validate_response(response, schema, session)
     if response["status"] != "complete":
         raise BuildPaused(response["status"], response["missing_information"])
-    if response["issues"]:
-        raise BuildError("Source compatibility review: " + "; ".join(response["issues"]))
+    if not response["approved"] or response["issues"]:
+        raise BuildError("Source compatibility review: " +
+                         ("; ".join(response["issues"]) or response["summary"]))

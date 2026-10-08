@@ -21,6 +21,7 @@ class FileStep:
     response_schema: Path | None = None
     render: Callable[[dict, "BuildSession"], str] | None = None
     request_data: dict = field(default_factory=dict)
+    review_data: dict = field(default_factory=dict)
 
 
 @dataclass
