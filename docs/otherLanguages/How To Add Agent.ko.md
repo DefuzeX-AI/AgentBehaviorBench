@@ -64,6 +64,16 @@ agentbench agent add https://github.com/owner/repository -b --sdk kuma
 agentbench agent add https://github.com/owner/repository -b --sdk kuma --answers answers.txt
 ```
 
+### 구조화된 출력 생성에 실패한 경우
+
+스키마 오류는 필드 경로, 기대하는 제약 조건과 실제 타입을 표시합니다.
+모델 본문의 JSON 오류는 행과 열을 표시하며 횟수가 제한된 수정 루프에 들어갑니다.
+검토 응답의 형식이 잘못되면 유효한 후보 파일을 다시 생성하지 않고 검토만 다시 요청합니다.
+파일 생성과 검토는 해당 파일의 수정 예산을 공유합니다.
+provider 응답의 외부 형식이 잘못되었거나 생성이 끝나지 않은 경우에는 중단합니다.
+완료된 파일과 시도 기록을 보존하세요. 진단, 현재 `null` 허용 규칙 및 수정 횟수 제어는
+[상세 절차 — 영어](../Troubleshooting.md#structured-output-generation-failures)를 참조하세요.
+
 ## 3. 파일별 역할
 
 Agent 단위는 `resources/agents/NN-name/`에 위치합니다. 가져온 소스 주변에 통합 파일이 생성되므로

@@ -15,7 +15,9 @@ from agentbench.runtime.interception.config import InterceptionConfigurationErro
 from .settings import ASSETS, BuildSettings
 from .http_errors import describe_http_error
 from .request_schema import build_request_schema
-from ..common.errors import BuildError
+from ..common.errors import BuildError, ProviderResponseError
+from ..common.diagnostics import json_type
+from .response_metadata import response_metadata, content_contains_secret, decode_location
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -42,6 +44,7 @@ class OpenRouterClient:
         self.settings = settings
         self._error_environ = dict(environ)
         self.opener = build_opener(_NoRedirect())
+        self.last_response_metadata = {}
 
     def generate(self, payload: dict, *, prompt: str, schema: dict) -> dict:
         """Return one structured stage response using its supplied prompt/schema.
@@ -49,6 +52,7 @@ class OpenRouterClient:
         payload contains sanitized source evidence and an SDK contract. This makes
         a paid model request; no Agent code or Docker build is executed here.
         """
+        self.last_response_metadata = {}
         # The caller retains the full schema for validation and repair feedback.
         schema = build_request_schema(schema)
         paths = [item["path"] for item in payload.get("context", {}).get("files", [])]
@@ -85,18 +89,41 @@ class OpenRouterClient:
         raise AssertionError("unreachable")
 
     def _decode(self, raw: bytes) -> dict:
+        self.last_response_metadata = {}
         if len(raw) > self.settings.max_response_bytes:
-            raise BuildError("OpenRouter response exceeds max_response_bytes")
+            raise ProviderResponseError("OpenRouter response exceeds max_response_bytes")
         try:
             response = json.loads(raw)
-            choice = response["choices"][0]
-            if choice.get("finish_reason") != "stop":
-                raise BuildError("OpenRouter did not finish the configuration; check output token budget")
-            result = json.loads(choice["message"]["content"])
-            if not isinstance(result, dict):
-                raise ValueError
-            return result
-        except BuildError:
-            raise
-        except (KeyError, IndexError, TypeError, ValueError, UnicodeError):
-            raise BuildError("OpenRouter returned an invalid structured configuration") from None
+        except (ValueError, UnicodeError):
+            raise ProviderResponseError(
+                "OpenRouter returned an invalid structured response envelope: expected JSON") from None
+        metadata = self.last_response_metadata = response_metadata(response)
+        choices = response.get("choices") if isinstance(response, dict) else None
+        choice = choices[0] if isinstance(choices, list) and choices else None
+        message = choice.get("message") if isinstance(choice, dict) else None
+        content = message.get("content") if isinstance(message, dict) else None
+        if isinstance(content, str) and content_contains_secret(content, self._error_environ):
+            raise ProviderResponseError(
+                "Model response contains a credential; it was not saved or sent back",
+                diagnostics=metadata)
+        if isinstance(choice, dict) and choice.get("finish_reason") != "stop":
+            details = ", ".join(f"{key}={value}" for key, value in metadata.items())
+            raise ProviderResponseError(
+                f"OpenRouter did not finish the configuration: {details}; check output token budget",
+                diagnostics=metadata)
+        if not isinstance(content, str):
+            raise ProviderResponseError(
+                "OpenRouter returned an invalid structured response envelope: expected message.content string",
+                diagnostics=metadata)
+        try:
+            result = json.loads(content)
+        except json.JSONDecodeError as exc:
+            raise ProviderResponseError(
+                f"OpenRouter model content is invalid JSON: {exc.msg} "
+                f"at line {exc.lineno}, column {exc.colno} (offset {exc.pos})",
+                diagnostics={**metadata, **decode_location(exc)}, previous_content=content) from None
+        if not isinstance(result, dict):
+            raise ProviderResponseError(
+                f"OpenRouter model content must be a JSON object, got {json_type(result)}",
+                diagnostics=metadata, previous_content=content)
+        return result

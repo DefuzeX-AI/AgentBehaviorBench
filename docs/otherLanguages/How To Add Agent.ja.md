@@ -64,6 +64,16 @@ agentbench agent add https://github.com/owner/repository -b --sdk kuma
 agentbench agent add https://github.com/owner/repository -b --sdk kuma --answers answers.txt
 ```
 
+### 構造化出力の生成に失敗した場合
+
+スキーマエラーにはフィールドのパス、期待する制約、実際の型が表示されます。
+モデル本文の JSON エラーには行・列が表示され、回数制限付きの修正ループに入ります。
+レビュー応答の形式が不正な場合はレビューだけを再要求し、有効な候補ファイルは再生成しません。
+ファイル生成とレビューは同じ修正回数の予算を共有します。
+プロバイダー応答の外側の形式が不正な場合や生成が未完了の場合は停止します。
+完了済みファイルと試行記録を保持してください。診断、現在の `null` の扱い、修正回数の設定は
+[詳しい対処手順 — 英語](../Troubleshooting.md#structured-output-generation-failures)を参照してください。
+
 ## 3. 各ファイルの役割
 
 Agent 単位のディレクトリは `resources/agents/NN-name/` です。取得したソースの周囲に
