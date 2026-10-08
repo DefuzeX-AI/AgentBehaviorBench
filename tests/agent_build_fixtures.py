@@ -99,7 +99,7 @@ class Client:
     def generate(self, payload, *, prompt, schema):
         if payload.get("response_kind") == "configuration_review":
             self.reviews.append(copy.deepcopy(payload))
-            return {"status": "complete", "summary": "Source compatibility checked",
+            return {"status": "complete", "approved": True, "summary": "Source compatibility checked",
                     "evidence": ["src/pkg/graph.py"], "missing_information": [], "issues": []}
         self.requests.append(copy.deepcopy(payload))
         if self.callback:

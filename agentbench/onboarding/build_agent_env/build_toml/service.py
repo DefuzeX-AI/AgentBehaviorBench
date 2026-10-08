@@ -2,7 +2,7 @@
 from pathlib import Path
 from ..common.models import FileStep
 from .validation import validate_manifest
-from .rendering import render_manifest
+from .rendering import render_manifest, PROGRAM_OWNED_FIELDS
 from ..frameworks.registry import strategy
 from .protocols import protocol_catalog
 from .tool_routes import network_evidence, complete_routes
@@ -27,4 +27,5 @@ def step(framework="langgraph"):
     return FileStep("agent.toml", prompt,
                     validate_manifest, response_schema=selected.manifest_schema, render=render_response,
                     request_data={"response_kind": "configuration_facts",
-                                  "protocol_catalog": protocol_catalog()})
+                                  "protocol_catalog": protocol_catalog()},
+                    review_data={"program_owned_fields": list(PROGRAM_OWNED_FIELDS)})

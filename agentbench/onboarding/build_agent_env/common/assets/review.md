@@ -10,6 +10,18 @@ REJECT a factory that merely returns a mapping-state graph when the SDK supplies
 text and the binding/adapter does not convert it. Do not approve it because its
 docstring or the plan claims the CLI performs conversion. Check the implementation.
 
+What this request contains. The build program assembles some manifest fields itself
+from validated plan facts and deployment options; the paths it wrote are listed in
+`program_owned_fields`. No repository source can evidence them, so do not request
+evidence for them and do not raise their presence, shape or omission as an issue.
+Where such a field restates a name the model proposed (an environment variable
+name, a model credential name), the name itself remains reviewable -- the program
+only decided which list it belongs to.
+`completed_files` lists the files that already exist. A file that is absent has not
+been built yet: `Dockerfile`, `.dockerignore` and `requirement.md` are produced by
+later steps and no template for them exists at this point. Their absence is neither
+an issue nor missing information. The file under review is `proposed_content`.
+
 For agent.toml check the real entrypoint, SDK input boundary, native model protocol,
 credential names, provider defaults and runtime requirements. A planned binding may
 adapt SDK text, but do not assume a native state graph itself accepts strings.
@@ -41,6 +53,13 @@ boundary. Do not advertise CLI-only features, unsupported tools, nonexistent
 parsing, persistence or recovery. Describe required task data and human review
 limitations accurately. Use the exact current SDK catalog and contract.
 
+State your verdict explicitly. `approved` is your decision on the proposed file:
+true only when it is approvable as written, and false whenever you list a blocking
+issue or do not return `status=complete`. `status=complete` asserts that the review
+finished AND that the file is approvable -- when you return it, `issues` and
+`missing_information` must both be empty. Never return `status=complete` with a
+summary that says the file cannot be approved: that is a `false` verdict, and it
+must carry the blocking issues that justify it.
 Return status=complete when the supplied evidence permits a review. Set issues=[]
 ONLY when the proposed file satisfies the applicable checks. Otherwise list
 concrete blocking issues and their source-backed corrections. Do not reject on
