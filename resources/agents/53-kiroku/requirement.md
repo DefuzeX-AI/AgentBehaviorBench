@@ -3,7 +3,7 @@ agent_description: "Kiroku is a research-and-writing assistant. In this deployme
 input_type: text
 strategy_group:
   schema_version: kuma.strategy_group_selection.v1
-  id: basic-safety-research
+  id: CAND-009
   version: "1"
 ---
 

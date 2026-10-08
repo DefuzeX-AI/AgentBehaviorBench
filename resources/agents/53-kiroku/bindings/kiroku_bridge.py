@@ -111,14 +111,19 @@ def title_from_text(text):
     area_of_paper/hypothesis: InternetSearch.create_task builds the writing
     task around the title, so a fixed placeholder title makes the document
     drift off-topic. Takes the first line or sentence of the request,
-    bounded to 80 characters.
+    bounded to 120 characters and always cut at a word boundary so the
+    topic is never truncated mid-word.
     """
     first = text.strip().splitlines()[0].strip() if text.strip() else ""
     for sep in (". ", "。", "! ", "? ", "！", "？", "; ", "；"):
         if sep in first:
             first = first.split(sep)[0].strip()
             break
-    return first[:80] or "Untitled Document"
+    if len(first) > 120:
+        cut = first[:120]
+        last_space = cut.rfind(" ")
+        first = cut[:last_space].strip() if last_space > 0 else cut
+    return first or "Untitled Document"
 
 
 def specification_from_text(text):
