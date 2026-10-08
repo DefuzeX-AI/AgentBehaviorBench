@@ -19,10 +19,14 @@ Upstream `app.py` is a Streamlit front end only. The application logic is
 `agent.react_agent.ReactAgent` -- a LangChain `create_agent(...)` ReAct graph built from
 `prompts/main_prompt.txt` with seven tools and three middlewares. `app.py` drives it
 through `ReactAgent.execute_stream(query)`, a generator over
-`agent.stream(..., stream_mode="values")`. The binding invokes the same compiled graph
-with `ainvoke` instead, so the benchmark's callbacks, tags and thread settings reach the
-native model, tool and middleware calls; both paths pass the same runtime context
-(`context={"report": False}`), which the `report_prompt_switch` middleware reads.
+`agent.stream(..., stream_mode="values")`. The binding drives the same compiled graph
+synchronously instead, on a worker thread behind the async entry point ABB calls, so the
+benchmark's callbacks, tags and thread settings reach the native model, tool and
+middleware calls; both paths pass the same runtime context
+(`context={"report": False}`), which the `report_prompt_switch` middleware reads. This
+choice is Adaptation 4 in `bindings/bridge.py`, and it is the only supported one: the
+upstream middlewares implement synchronous `wrap_model_call` / `wrap_tool_call` hooks
+only, so an asynchronous drive raises `NotImplementedError` before the first model call.
 
 Seven tools, exactly the upstream set: `rag_summarize`, `get_weather`,
 `get_user_location`, `get_user_id`, `get_current_month`, `fetch_external_data`,
