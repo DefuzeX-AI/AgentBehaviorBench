@@ -7,6 +7,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/opt/abb-runtime:/opt/agent/agent \
     HOME=/home/agent
 
+# kiroku_app.py imports gradio, which reports usage to api.gradio.app on
+# import; that host is not routed, so the call is only ever denied.
+ENV GRADIO_ANALYTICS_ENABLED=False
+
 WORKDIR /opt/agent
 
 # Pandoc is required by Kiroku's document export path (README installation section);
