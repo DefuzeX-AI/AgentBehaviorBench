@@ -45,7 +45,7 @@ RUN chmod 755 /usr/local/bin/abb-chromium
 COPY zz-abb-lean /etc/chromium.d/zz-abb-lean
 USER agent
 
-# agent-browser 0.26.0 native CLI (the version Hermes pins, tools/browser_tool.py:124),
+# agent-browser 0.26.0 native CLI (the version Hermes pins, tools/browser_tool.py:149),
 # sha256-pinned; it attaches to the Chromium launch.py starts (BROWSER_CDP_URL).
 USER root
 RUN set -eu; \
