@@ -15,6 +15,26 @@ from ..common.errors import BuildError
 
 SCHEMA = strategy("langgraph").manifest_schema
 
+# Manifest paths this module writes from validated plan facts and deployment
+# options rather than from model-authored content. They are declared to the
+# configuration review so it does not ask the model to source-evidence its own
+# program's output. Fields the model proposes -- display_name, framework, the
+# adapter facts, credential names, tool routes and their destinations -- are
+# deliberately absent: those stay in review scope. `runtime.env_keys` and
+# `runtime.secret_env_keys` hold model-proposed names that the program only
+# classifies, so only the fixed keys of `runtime` are listed here.
+PROGRAM_OWNED_FIELDS = (
+    "schema_version",
+    "agent_id",
+    "source",
+    "runtime.type",
+    "runtime.execution",
+    "runtime.timeout_sec",
+    "build",
+    "launch",
+    "evaluation.replay_safe",
+)
+
 
 def render_manifest(facts, *, source, agent_id, options=None):
     """Return TOML without writing any file or invoking an Agent/model.

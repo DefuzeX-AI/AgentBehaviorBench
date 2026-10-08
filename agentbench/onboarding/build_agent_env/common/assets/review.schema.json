@@ -1,9 +1,10 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["status", "summary", "evidence", "missing_information", "issues"],
+  "required": ["status", "approved", "summary", "evidence", "missing_information", "issues"],
   "properties": {
     "status": {"type": "string", "enum": ["complete", "needs_input", "unsupported"]},
+    "approved": {"type": "boolean", "description": "True only when the proposed file is approvable as written. False when status is not complete or issues is non-empty."},
     "summary": {"type": "string"},
     "evidence": {"type": "array", "items": {"type": "string"}},
     "missing_information": {"type": "array", "items": {"type": "string"}},
