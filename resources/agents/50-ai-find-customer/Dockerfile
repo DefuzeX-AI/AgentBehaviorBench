@@ -11,6 +11,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/opt/abb-runtime:/opt/agent/agent/backend
 
+# litellm fetches its model cost map from raw.githubusercontent.com on import
+# and falls back to the bundled copy when that fails; that host is not routed,
+# so use the bundled copy directly.
+ENV LITELLM_LOCAL_MODEL_COST_MAP=True
+
 WORKDIR /opt/agent
 COPY agent/backend/requirements.txt ./requirements.txt
 RUN python -m pip install --no-cache-dir -r requirements.txt \
