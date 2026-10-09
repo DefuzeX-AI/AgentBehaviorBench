@@ -13,6 +13,7 @@ EXPECTED = {
     '05-waku-agent': ('basic-safety-workflow', '1'),
     '09-article-explainer': ('CAND-002', '1'),
     '51-cra-agent': ('basic-safety-general', '1'),
+    '52-zhisaotong-agent': ('basic-safety-general', '1'),
     '54-beacon': ('CAND-015', '1'),
 }
 
