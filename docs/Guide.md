@@ -247,3 +247,10 @@ agentbench evaluate react-agent --sdk local --cases 1 --no-view
 - Commands without `--sdk` keep using `kuma`; `local` is selected only by name.
 - The run directory also keeps `local-judge.json` with the Judge model, its verdict and
   the raw reply.
+
+## Configuration generation failures
+
+For `agent add -b` schema/JSON failures, follow
+[Structured-output generation failures](Troubleshooting.md#structured-output-generation-failures).
+Schema paths and JSON line/column errors now reach bounded correction attempts.
+Preserve completed files and inspect saved validation/provider diagnostics when a stage stops.

@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-and-tests:
+    name: Lint Type Test Contract Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            uv.lock
+            pyproject.toml
+
+      - name: Install Dependencies
+        run: |
+          uv sync --frozen --all-groups
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Type Check (mypy)
+        run: uv run mypy . --ignore-missing-imports
+
+      - name: Unit + Workflow Tests with Coverage
+        run: |
+          mkdir -p reports
+          uv run pytest tests -q \
+            --junitxml=reports/junit-tests.xml \
+            --cov=. \
+            --cov-report=xml:reports/coverage.xml \
+            --cov-report=term-missing
+
+      - name: Contract Tests
+        run: |
+          uv run pytest tests/test_api_contract.py -q \
+            --junitxml=reports/junit-contract.xml
+
+      - name: Smoke E2E Tests
+        run: |
+          uv run pytest \
+            tests/test_draft_flow.py::test_draft_happy_path_start_continue \
+            tests/test_draft_flow.py::test_cancel_session \
+            -q \
+            --junitxml=reports/junit-smoke.xml
+
+      - name: Build Summary
+        run: |
+          echo "## CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Lint: ruff check ." >> $GITHUB_STEP_SUMMARY
+          echo "- Type Check: mypy . --ignore-missing-imports" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests: pytest tests --cov=. --cov-report=xml" >> $GITHUB_STEP_SUMMARY
+          echo "- Contract: pytest tests/test_api_contract.py" >> $GITHUB_STEP_SUMMARY
+          echo "- Smoke: draft start/continue + cancel" >> $GITHUB_STEP_SUMMARY
+          if [ -f reports/coverage.xml ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Coverage report generated: \`reports/coverage.xml\`" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload Test and Coverage Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-reports
+          path: reports/
+          if-no-files-found: error

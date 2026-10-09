@@ -73,7 +73,13 @@ def record_context(session):
 def generate_with_source(session, payload, *, prompt, schema, stage, checkpoint=None):
     """Ask bounded follow-ups only after valid needs_input cites available local files."""
     for round_number in range(session.settings.source_request_rounds + 1):
-        response = session.generate(payload, prompt=prompt, schema=schema)
+        try:
+            response = session.generate(payload, prompt=prompt, schema=schema)
+        finally:
+            metadata = getattr(session.client, "last_response_metadata", None)
+            if metadata:
+                index = 1 + len(list(stage.glob("provider-*.json")))
+                save_json(stage / f"provider-{index}.json", metadata)
         if response.get('status') != 'needs_input' or round_number == session.settings.source_request_rounds:
             return response
         if contains_secret(json.dumps(response), session.environ):

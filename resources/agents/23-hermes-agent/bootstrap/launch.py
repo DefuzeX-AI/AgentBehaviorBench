@@ -68,16 +68,16 @@ def prepare(environ: dict[str, str]) -> tuple[list[str], dict[str, str], dict]:
         **environ,
         KEY_ENV: key,
         "GLM_BASE_URL": base_url,
-        # Keep the venv sealed as upstream's image does (Dockerfile:393), but let optional
-        # backends install on demand into a writable target (upstream Dockerfile:406;
-        # tools/lazy_deps.py:324-338). PyPI is reachable through the egress observer.
+        # Keep the venv sealed as upstream's image does (Dockerfile:430), but let optional
+        # backends install on demand into a writable target (upstream Dockerfile:443;
+        # tools/lazy_deps.py:325-339). PyPI is reachable through the egress observer.
         "HERMES_DISABLE_LAZY_INSTALLS": "1",
         "HERMES_LAZY_INSTALL_TARGET": os.path.join(tempfile.gettempdir(), "abb-hermes-lazy"),
         # tirith otherwise refreshes its threat database from GitHub while
         # scanning; offline mode keeps the bundled rules and makes no connection.
         "TIRITH_OFFLINE": "1",
         # Attach Hermes' browser tools to the per-Case Chromium started in main()
-        # (upstream tools/browser_tool_cdp.py:50-59).
+        # (upstream tools/browser_tool_cdp.py:51-60).
         "BROWSER_CDP_URL": "http://127.0.0.1:9222",
     }
     return [HERMES, "acp"], child, config(base_url, model)

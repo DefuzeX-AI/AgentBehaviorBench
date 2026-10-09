@@ -1,7 +1,7 @@
 # Hermes Agent ACP deployment
 
 This unit installs the pinned [Hermes Agent](https://github.com/NousResearch/hermes-agent)
-release `0.21.3` (tag `v2026.9.14`, commit `345cd2b0`, MIT license) and runs its
+release `0.21.5` (tag `v2026.9.24`, commit `f97608f1`, MIT license) and runs its
 built-in ACP adapter (`hermes acp`, equivalent to `hermes-acp` /
 `python -m acp_adapter`). ABB invokes it over ACP stdio and keeps each Case in a
 separate empty workspace. No upstream source is vendored or modified.
@@ -31,7 +31,7 @@ Why not the other channels:
   `HERMES_NIX_BUILD=1`), so `pip install git+...` fails. Setting that variable
   would bypass an upstream guard; `uv sync` with an editable project install is
   the supported source install and is exactly what upstream's own Dockerfile does.
-- The official image `nousresearch/hermes-agent:v2026.9.14` (~1 GB compressed)
+- The official image `nousresearch/hermes-agent:v2026.9.24` (~1 GB compressed)
   bundles Playwright/Chromium, ffmpeg, docker-cli and an s6-overlay PID 1
   entrypoint for its gateway/dashboard services. None of that is used over ACP,
   and it would need its entrypoint, user and `HERMES_HOME` volume overridden.
@@ -116,18 +116,6 @@ fetched at build time, not vendored), and the launcher sets
 never auto-downloads — plus `TIRITH_OFFLINE=1`, because `tirith check` otherwise
 refreshes its threat database from GitHub. Scanning stays enabled: a
 `curl … | sh` command is still flagged as HIGH risk and needs approval.
-
-## Known upstream issue: file tool calls never complete over ACP
-
-With Hermes 0.21.3, `read_file` and `write_file` emit an ACP `tool_call` but never
-the matching `tool_call_update` (`completed`), although the files are read and
-written. `search_files`, `terminal` and `execute_code` complete normally. This
-reproduces outside ABB with a plain ACP stdio client
-(`hermes acp`, prompt: read a file with `read_file`, write one with `write_file`).
-ABB records such calls as unfinished OTel spans (`otel: incomplete`), which the
-KUMA path requires to be complete, so a Case whose Agent uses these tools is not
-host-accepted even when every step succeeds. The local SDK path accepts `partial`
-traces. This is an upstream Hermes behavior; the unit does not patch it.
 
 ## Web tools
 
