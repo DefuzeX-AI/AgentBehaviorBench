@@ -4,7 +4,10 @@ English | [中文](otherLanguages/Agents.zh-CN.md) | [Français](otherLanguages/
 
 [Back to README](../README.md)
 
-The following Agent sources are currently registered.
+The following Agent integrations are currently registered. Their inner `agent/`
+source directories are ignored local material, absent from a fresh checkout.
+See [Agent source preparation](Agent-Sources.md) for pinned restoration and manual
+source prerequisites.
 
 ABB currently supports native LangGraph Agents and Agents exposed through the
 Agent Client Protocol (ACP).

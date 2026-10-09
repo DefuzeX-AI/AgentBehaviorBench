@@ -90,6 +90,12 @@ resources/agents/NN-name/
 └── evaluation/              # Optional referenced schemas or fixtures
 ```
 
+모든 내부 `agent/` 디렉터리는 Git에서 무시되며 새 ABB 체크아웃에는 포함되지 않습니다.
+외부 통합 파일과 출처만 커밋하세요. 지원되는 Git 소스는 `[source] method = "git"`과
+기록된 전체 commit SHA를 사용하고, install 모드 입력은 `install/`에 보관합니다.
+로컬 소스와 지원되지 않는 기능은 수동으로 준비해야 합니다.
+[소스 준비 문서(영어)](../Agent-Sources.md)를 참고하세요.
+
 ### `agent/` — Agent 자체 소스
 
 가져온 업스트림 또는 로컬 소스 스냅샷이 들어 있습니다. 실제 그래프, 추론과 도구 구현은 여기에 유지합니다.

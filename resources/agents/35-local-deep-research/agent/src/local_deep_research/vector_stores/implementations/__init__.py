@@ -1,1 +1,0 @@
-"""Concrete vector-store implementations."""

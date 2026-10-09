@@ -1,2 +1,0 @@
-"""Email automation foundation modules."""
-

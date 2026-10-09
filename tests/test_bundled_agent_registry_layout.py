@@ -1,6 +1,8 @@
 """Repository integration check for bundled Agent numbering and registration."""
 
 from pathlib import Path
+import shutil
+import subprocess
 
 import pytest
 
@@ -37,3 +39,23 @@ def test_bundled_agent_directories_match_registry_and_have_contiguous_numbers():
         assert registry.find(entry["agent_id"], enabled_only=False).path == (
             root / entry["path"]
         ).resolve()
+
+
+def test_agent_source_is_untracked_and_ignored_for_every_registered_unit():
+    root = Path(__file__).resolve().parents[1]
+    if not shutil.which("git") or not (root / ".git").exists():
+        pytest.skip("Requires a Git checkout")
+    tracked = subprocess.check_output(
+        ["git", "-C", str(root), "ls-files", "-z", "resources/agents"],
+        text=True, encoding="utf-8",
+    ).split("\0")
+    assert not [path for path in tracked if len(Path(path).parts) >= 4
+                and Path(path).parts[3] == "agent"], "Agent source must not be committed"
+    with (root / "resources/registry.toml").open("rb") as stream:
+        entries = tomllib.load(stream)["agents"]
+    paths = [entry["path"] + "/agent/source.txt" for entry in entries]
+    ignored = subprocess.check_output(
+        ["git", "-C", str(root), "check-ignore", "--no-index", "--stdin", "-z"],
+        input=("\0".join(paths) + "\0").encode("utf-8"),
+    ).decode("utf-8").rstrip("\0").split("\0")
+    assert ignored == paths, "Every registered Agent source must be ignored"

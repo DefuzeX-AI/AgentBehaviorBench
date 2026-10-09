@@ -90,6 +90,12 @@ resources/agents/NN-name/
 └── evaluation/              # Optional referenced schemas or fixtures
 ```
 
+すべての内側の `agent/` ディレクトリは Git に無視され、新しい ABB のチェックアウトには
+含まれません。外側の接続ファイルと出典だけをコミットしてください。対応する Git ソースは
+`[source] method = "git"` と記録済みの完全な commit SHA を使い、install モードの入力は
+`install/` に保持します。ローカルソースや未対応の機能は手動で準備します。
+[ソースの準備（英語）](../Agent-Sources.md)を参照してください。
+
 ### `agent/` — Agent 本体のソース
 
 取得した上流リポジトリを保持します。実際のグラフ、推論、ツールはここに残します。
