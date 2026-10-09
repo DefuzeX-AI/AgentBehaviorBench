@@ -4,7 +4,7 @@ Upstream: [123-qw-as/Beacon](https://github.com/123-qw-as/Beacon) at
 `36b0b7de6774bc619dc39a80a00a41639909d7e9`. The checkout is acquired from Git
 (`[source] method = "git"`) and is not committed: `prepare_agent_source()` restores this
 exact revision into `agent/` before an evaluation opens, the same way
-`resources/agents/51-cra-agent` does. No descriptor was added because upstream builds its
+`resources/agents/43-cra-agent` does. No descriptor was added because upstream builds its
 graph in Python rather than from a `langgraph.json`, so `agent.toml` declares the outer
 binding `bindings/bridge.py:create_graph` with `input_key = "message"` and
 `output_key = "answer"`.

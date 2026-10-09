@@ -6,9 +6,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-UNIT = ROOT / 'resources/agents/56-excelmind'
-if not UNIT.exists():
-    UNIT = ROOT / 'resources/agents/50-excelmind'
+UNIT = ROOT / 'resources/agents/49-excelmind'
 
 
 def test_pinned_upstream_source_unchanged():

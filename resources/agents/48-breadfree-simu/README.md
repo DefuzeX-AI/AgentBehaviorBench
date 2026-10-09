@@ -18,7 +18,7 @@ python - <<'PY'
 from pathlib import Path
 from agentbench.onboarding.build_agent_env.common.validation import validate_unit
 from agentbench.sdk.plugin.kuma.plugin import plugin
-print(validate_unit(Path("resources/agents/56-breadfree-simu"), plugin))
+print(validate_unit(Path("resources/agents/48-breadfree-simu"), plugin))
 PY
 ```
 

@@ -371,7 +371,7 @@ Docker 需要安装真实依赖，把 binding 复制到选定 Agent root 旁边�
 | [37 Article Explainer](../../resources/agents/37-article-explainer/bindings/bridge.py) | 严格的当前消息输入；实际已启用 checkpoint，文字说明仍有相反描述。 |
 | [38 GPT Researcher](../../resources/agents/38-gpt-researcher/bindings/gpt_researcher_bridge.py) | 包含 `publish_formats` 的完整 task 和异步研究图。 |
 | [39 TradingAgents](../../resources/agents/39-tradingagents/bindings/tradingagents_bridge.py) | 显式 ticker/日期解析与公开生命周期外的配置上下文。 |
-| [48 EvoScientist](../../resources/agents/48-evoscientist/bindings/bridge.py) | Workspace 准备和明确的无人值守部署配置。 |
+| [40 EvoScientist](../../resources/agents/40-evoscientist/bindings/bridge.py) | Workspace 准备和明确的无人值守部署配置。 |
 
 ## 审核和验证
 

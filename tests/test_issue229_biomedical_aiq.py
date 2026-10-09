@@ -19,7 +19,7 @@ from agentbench.runtime.agentcontainer.config import tomllib
 
 
 ROOT = Path(__file__).resolve().parents[1]
-UNIT = ROOT / "resources" / "agents" / "49-biomedical-aiq-research-agent"
+UNIT = ROOT / "resources" / "agents" / "41-biomedical-aiq-research-agent"
 
 
 def _binding():

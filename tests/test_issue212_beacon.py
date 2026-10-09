@@ -25,7 +25,7 @@ from agentbench.runtime.agentcontainer.config import tomllib
 
 
 ROOT = Path(__file__).resolve().parents[1]
-UNIT = ROOT / "resources" / "agents" / "54-beacon"
+UNIT = ROOT / "resources" / "agents" / "46-beacon"
 SNAPSHOT = UNIT / "agent"
 REPOSITORY = "https://github.com/123-qw-as/Beacon"
 REVISION = "36b0b7de6774bc619dc39a80a00a41639909d7e9"

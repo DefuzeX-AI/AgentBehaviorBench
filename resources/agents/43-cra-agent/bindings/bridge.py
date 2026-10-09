@@ -119,7 +119,7 @@ from functools import lru_cache
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-# ``resources/agents/51-cra-agent/agent/`` is the upstream repository root.
+# ``resources/agents/43-cra-agent/agent/`` is the upstream repository root.
 SOURCE_ROOT = Path(__file__).resolve().parent.parent / "agent"
 
 # The host whose OpenAI-protocol endpoint agent.toml declares to the interceptor.

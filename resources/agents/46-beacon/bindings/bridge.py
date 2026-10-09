@@ -135,7 +135,7 @@ import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 
-# ``resources/agents/54-beacon/agent/`` is the upstream repository root, and its
+# ``resources/agents/46-beacon/agent/`` is the upstream repository root, and its
 # ``src/`` directory holds the ``math_agent`` package. The binding puts that
 # directory on the import path rather than relying on an installed distribution,
 # because upstream ships templates as package data without a MANIFEST.in.

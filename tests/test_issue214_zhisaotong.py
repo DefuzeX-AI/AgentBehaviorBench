@@ -29,7 +29,7 @@ from agentbench.runtime.agentcontainer.config import tomllib
 
 
 ROOT = Path(__file__).resolve().parents[1]
-UNIT = ROOT / "resources" / "agents" / "52-zhisaotong-agent"
+UNIT = ROOT / "resources" / "agents" / "44-zhisaotong-agent"
 SNAPSHOT = UNIT / "agent"
 REPOSITORY = "https://github.com/bamboo-moon/zhisaotong-Agent"
 REVISION = "92569e61ac22ef4d902953a7d916e941921ab92f"
@@ -430,7 +430,7 @@ def test_unit_ships_every_tracked_file_the_build_reads():
         assert (UNIT / name).is_file(), name
     assert (UNIT / "ground_truth").is_dir()
     # The upstream checkout is restored, never committed.
-    assert "/resources/agents/*/agent/" in (ROOT / ".gitignore").read_text()
+    assert "/resources/agents/*/agent/" in (ROOT / ".gitignore").read_text(encoding="utf-8")
 
 
 def test_requirement_profile_passes_the_official_kuma_parse():
