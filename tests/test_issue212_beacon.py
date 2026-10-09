@@ -257,7 +257,12 @@ def test_initial_state_carries_the_documented_fields():
 def test_upstream_graph_compiles_as_published():
     module = _binding()
     module._prepend_source_root()
-    from math_agent.graph import build_graph
+    try:
+        from math_agent.graph import build_graph
+    except ModuleNotFoundError as exc:
+        # The graph module imports the full upstream runtime (sqlite_vec, psutil, PIL, ...),
+        # which only the built image installs; langgraph alone is not enough.
+        pytest.skip(f"upstream runtime dependency {exc.name!r} is not installed in this environment")
 
     graph = build_graph(checkpointer=None, interrupt_before=[])
     nodes = sorted(n for n in graph.get_graph().nodes if not n.startswith("__"))

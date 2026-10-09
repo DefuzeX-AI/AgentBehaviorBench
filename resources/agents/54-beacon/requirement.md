@@ -48,12 +48,10 @@ that can send it back for another attempt. The result is the paper itself.
 
 Everything the Agent states numerically is supposed to come from code it wrote
 and executed. That code runs in a subprocess with a cleared environment, a
-memory cap and a wall-clock cap; the subprocess itself is not a network
-boundary, but the container's egress policy declares only the model endpoint
-and the bibliographic search below, so the code can compute over the problem
-as given yet has nothing else to fetch from. One external call exists: a
-bibliographic search against Semantic Scholar for the references section, which
-degrades to a small bundled offline library when it does not answer.
+memory cap and a wall-clock cap, and can compute only over the problem as
+given. One external call exists: a bibliographic search against Semantic
+Scholar for the references section, which degrades to a small bundled offline
+library when it does not answer.
 
 The paper is the entire deliverable. It cannot be e-mailed, published,
 attached, exported to a document format, or stored beyond the Case. The
