@@ -1,0 +1,51 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "breadfree-simu"
+display_name = "BreadFree-Simu A-share investment committee"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+repository = "https://github.com/FeiCoder/BreadFree-Simu"
+revision = "6e5d9dde204728e5b93571c027a9030fb22eb94c"
+downloaded_on = "2026-10-08"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 300
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+input_key = "message"
+output_key = "answer"
+binding = "bridge.py:create_graph"
+
+[llm_interception]
+trust_plugin = "pem-env"
+tool_routes = []
+
+[[llm_interception.credentials]]
+id = "hunyuan-lkeap-key"
+agent_env = "HUNYUAN_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "hunyuan-lkeap-openai-chat"
+host_patterns = ["api.lkeap.cloud.tencent.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "hunyuan-lkeap-key"
