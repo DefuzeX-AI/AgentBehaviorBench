@@ -102,6 +102,11 @@ resources/agents/NN-name/
 └── evaluation/              # Optional referenced schemas or fixtures
 ```
 
+所有内层 `agent/` 目录都被 Git 忽略，新检出的 ABB 不包含这些源码。只提交外层接入
+文件和来源记录，不要强制加入源码。支持自动恢复的 Git 来源使用 `[source] method = "git"`
+及已记录的完整 commit SHA；安装模式把安装输入保留在 `install/`。本地来源或包含暂不
+支持的特性时，需要手动准备源码，见[Agent 源码准备（英文）](../Agent-Sources.md)。
+
 ### `agent/` — Agent 自身源码
 
 保存导入的上游或本地源码快照。真实图、推理和工具仍在这里实现。ABB 接入文件放在目录外，

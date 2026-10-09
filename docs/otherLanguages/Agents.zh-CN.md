@@ -4,7 +4,9 @@
 
 [返回 README](README.zh-CN.md)
 
-下面列出了当前已经注册到 ABB 的 Agent 源码。
+下面列出了当前已经注册到 ABB 的 Agent 接入配置。内层 `agent/` 源码目录作为本地文件
+被 Git 忽略，新检出仓库不包含这些源码。固定版本恢复和手动准备要求见
+[Agent 源码准备（英文）](../Agent-Sources.md)。
 
 ABB 目前支持原生接入 LangGraph Agent，也支持通过 Agent Client Protocol（ACP）接入兼容该
 协议的 Agent。

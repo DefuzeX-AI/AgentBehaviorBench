@@ -43,6 +43,10 @@ configuration; Docker construction and execution belong to certification/runtime
 - Keep upstream source under `resources/agents/NN-name/agent/`. Put `agent.toml`,
   `bindings/`, `Dockerfile`, `.dockerignore`, `requirement.md` and source provenance
   beside `agent/`, not inside it. Preserve upstream behavior and source files.
+  Treat every inner `agent/` as ignored local/runtime material; never commit it,
+  including with `git add -f`. Commit provenance and integration files instead.
+  Use pinned Git acquisition where supported; document manual source prerequisites
+  for local imports or repositories requiring unsupported source features.
 - Package-based units use `[source] method = "install"` and commit installation
   inputs under `install/`. Preflight generates ignored `agent/` copies before SDK
   startup. Do not commit those copies or mix them with upstream source trees.

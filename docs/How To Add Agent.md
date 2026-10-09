@@ -95,6 +95,13 @@ resources/agents/NN-name/
 └── evaluation/              # Optional referenced schemas or fixtures
 ```
 
+Every `agent/` directory is ignored by Git and absent from a fresh ABB checkout.
+Commit the outer integration files and source provenance, never the inner source.
+Use `[source] method = "git"` with the recorded full commit SHA for supported Git
+sources, or keep tracked installation inputs under `install/` for install mode.
+Local imports and sources requiring unsupported features need manually supplied
+source; see [Agent source preparation](Agent-Sources.md).
+
 ### `agent/` — the Agent's own source
 
 The imported source snapshot lives here. Its graph, reasoning and tools remain the

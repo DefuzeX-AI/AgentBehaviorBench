@@ -91,6 +91,13 @@ resources/agents/NN-name/
 └── evaluation/              # Optional referenced schemas or fixtures
 ```
 
+Tous les répertoires internes `agent/` sont ignorés par Git et absents d’un nouveau
+checkout ABB. Ne validez que les fichiers d’intégration et la provenance. Les
+sources Git compatibles utilisent `[source] method = "git"` avec le SHA complet
+enregistré ; le mode install conserve ses entrées dans `install/`. Les imports
+locaux et les fonctionnalités non prises en charge exigent une préparation
+manuelle. Voir [préparation des sources (anglais)](../Agent-Sources.md).
+
 ### `agent/` — le code de l’Agent
 
 Ce répertoire contient l’instantané importé, son graphe, son raisonnement et ses

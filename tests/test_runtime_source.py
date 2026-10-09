@@ -134,6 +134,20 @@ def test_bundled_packages_remain_unchanged(unit, tmp_path):
     assert not fetched
 
 
+def test_registry_can_discover_manual_source_but_preflight_still_requires_it(unit, tmp_path):
+    from agentbench.harness.registry import _parse_agent
+
+    root, _, fetched = unit
+    path = root / 'agent.toml'
+    path.write_text(path.read_text().replace('method = "git"', 'method = "bundled"'))
+    agent = _parse_agent(dict(agent_id='test', path='resources/agents/01-test',
+                             framework='langgraph'), root.parents[2])
+    assert agent.path == root
+    with pytest.raises(FileNotFoundError, match='Bundled Agent source is missing'):
+        prepare(root, tmp_path)
+    assert not fetched
+
+
 def test_registry_accepts_missing_git_source_without_fetching(unit):
     from agentbench.harness.registry import _parse_agent
     root, _, fetched = unit

@@ -1,3 +1,0 @@
-# Customize Table Info
-
-<!-- Placeholder -->

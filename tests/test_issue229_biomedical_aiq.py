@@ -122,10 +122,15 @@ def test_unit_source_and_registry_are_pinned_to_issue229_revision():
     assert manifest["source"]["revision"] == "b5cd7b4c7ae544c1e21ac79ef9fa67641eeff5a4"
     assert source["revision"] == manifest["source"]["revision"]
     assert source["repository"] == manifest["source"]["repository"]
-    assert (UNIT / "agent" / "LICENSE").is_file()
     assert registration.path == UNIT
     assert registration.status == "adapting"
     assert registration.enabled is False
+
+
+def test_restored_upstream_source_keeps_its_license():
+    if not (UNIT / "agent").is_dir():
+        pytest.skip("Requires manually restored Biomedical AI-Q upstream source")
+    assert (UNIT / "agent" / "LICENSE").is_file()
 
 
 def test_manifest_keeps_optional_tools_explicit_and_model_key_intercepted():
