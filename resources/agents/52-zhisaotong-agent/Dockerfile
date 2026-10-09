@@ -24,6 +24,11 @@ ARG ABB_PIP_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple
 # rag_summarize, and the tiktoken ranks langchain-openai may need. Both cache
 # variables must be set before the download and must stay readable by the
 # runtime user.
+# onnxruntime (behind the local ONNX embedder) sends usage telemetry to
+# mobile.events.data.microsoft.com; that host is not routed, so every attempt
+# was denied by the egress proxy. ORT_DISABLE_TELEMETRY turns it off.
+ENV ORT_DISABLE_TELEMETRY=1
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/opt/abb-runtime \
