@@ -153,7 +153,8 @@ class AgentGraph:
                 "env_name": ENVIRONMENT_NAME,
                 "scenario": scenario,
                 "max_steps": max_steps,
-            }
+            },
+            config=config,
         )
         return {"answer": _summarise(mission, scenario, state)}
 
