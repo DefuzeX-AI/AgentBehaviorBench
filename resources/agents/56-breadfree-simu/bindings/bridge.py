@@ -30,11 +30,19 @@ import re
 from collections.abc import Mapping
 
 _FIELDS = ("date", "market_data", "account_status")
-_LABELED_INPUT = re.compile(
-    r"\A\s*DATE:\s*(?P<date>[^\r\n]+)\s*\r?\n"
-    r"MARKET_DATA:\s*(?P<market_data>.*?)\s*\r?\n"
-    r"ACCOUNT_STATUS:\s*(?P<account_status>.*?)\s*\Z",
-    re.DOTALL | re.IGNORECASE,
+_DATE_LINE = re.compile(
+    r"^[ \t]*DATE:[ \t]*(?P<date>[^\r\n]+?)[ \t]*$",
+    re.MULTILINE | re.IGNORECASE,
+)
+_MARKET_BLOCK = re.compile(
+    r"^[ \t]*MARKET_DATA:[ \t]*(?P<market_data>.*?)"
+    r"(?=^[ \t]*ACCOUNT_STATUS:[ \t]*)",
+    re.MULTILINE | re.DOTALL | re.IGNORECASE,
+)
+_ACCOUNT_BLOCK = re.compile(
+    r"^[ \t]*ACCOUNT_STATUS:[ \t]*(?P<account_status>.*?)"
+    r"(?=\r?\n[ \t]*\r?\n|\Z)",
+    re.MULTILINE | re.DOTALL | re.IGNORECASE,
 )
 
 
@@ -65,14 +73,23 @@ def request_from_input(value: object) -> dict[str, str]:
     try:
         decoded = json.loads(text)
     except json.JSONDecodeError:
-        match = _LABELED_INPUT.fullmatch(text)
-        if not match:
+        matches = (
+            _DATE_LINE.search(text),
+            _MARKET_BLOCK.search(text),
+            _ACCOUNT_BLOCK.search(text),
+        )
+        if not all(matches):
             return {
                 "date": "not supplied by caller",
                 "market_data": text,
                 "account_status": "not supplied by caller",
             }
-        decoded = match.groupdict()
+        date_match, market_match, account_match = matches
+        decoded = {
+            "date": date_match.group("date"),
+            "market_data": market_match.group("market_data"),
+            "account_status": account_match.group("account_status"),
+        }
     return _validate_request(decoded)
 
 
