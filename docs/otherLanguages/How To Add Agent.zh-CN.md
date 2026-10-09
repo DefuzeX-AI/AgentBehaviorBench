@@ -64,6 +64,28 @@ agentbench agent add https://github.com/owner/repository -b --sdk kuma
 agentbench agent add https://github.com/owner/repository -b --sdk kuma --answers answers.txt
 ```
 
+### 结构化输出生成失败时
+
+schema 校验失败现在会给出字段路径、期望约束和实际类型；模型内容中的 JSON 语法错误会给出
+行、列及偏移位置，并进入有次数上限的纠正循环。规划、文件生成和审查分别使用现有 schema；
+审查回复格式错误时只重新请求审查，文件生成与审查共用该文件的纠正预算。
+provider 响应外层格式错误或生成未正常结束时会停止，先检查记录中的诊断再调整配置。
+
+保留已完成的接入文件和失败 attempt，检查 `build-result.json` 及失败步骤的
+`response-N.json`、`validation-N.json`；审查对应 `review-N.json` 和
+`review-validation-N.json`。规划记录使用 `plan-` 前缀。
+`provider-N.json` 保存可用的结束原因、token 用量和内容长度，不保存原始 provider 响应。
+JSON 解码失败的记录只保存诊断，经过凭证检查的原始模型内容仅用于当次纠正请求。
+
+当前 LangGraph 的 `adapter.config` 和 `adapter.graph_id` 允许原生 factory binding 使用 `null`，
+不要按 issue 中的历史案例虚构图描述文件。修改保存的响应记录不会被下一次构建当作输入。
+只在确实缺少部署信息时用 `--answers answers.txt`；provider 不兼容时可用 `--build-model MODEL`
+切换生成模型，但会使规划和审查缓存失效，可能增加付费调用。
+默认 `repair_attempts = 1` 允许追加一次纠正，覆盖模型内容 JSON 解码、schema 和本地校验失败。
+用 `--build-settings build-settings.toml`，在其 `[build]` 中设置 `repair_attempts = 0`
+可关闭纠正；首次生成、审查、补充源文件请求和网络重试仍可能调用模型。
+具体操作见[结构化输出生成失败排查（英文）](../Troubleshooting.md#structured-output-generation-failures)。
+
 ## 3. 了解每个文件的用途
 
 Agent 单元位于 `resources/agents/NN-name/`。命令在导入的源码外围生成接入文件，

@@ -16,7 +16,7 @@
 | Python 3.10 Case generation reports missing `tomllib` / `tomli` | Update ABB and rebuild the evaluation image. Worker staging installs `tomli` for Python below 3.11 into the image's selected Python environment; installing it only on the host does not repair an existing image. See [#85](https://github.com/DefuzeX-AI/AgentBehaviorBench/issues/85). |
 | Missing/invalid KUMA key | Nonempty `KUMA_API_KEY` takes precedence over `DEFUZEX_API_KEY`. Check exported variables overriding `.env` and service account access without displaying keys. |
 | Missing model / quota / provider error | `OPENROUTER_MODEL` has no runtime default. Check the slug, account access, funds/limits and tool/protocol support. A key is not a model name. |
-| `agent add -b` rejects model response | Requires strict structured outputs. Inspect `cache/onboarding/…` to distinguish schema incompatibility, output exhaustion and timeout. |
+| `agent add -b` rejects model response | See [Structured-output generation failures](#structured-output-generation-failures). Inspect field/JSON diagnostics, correction exhaustion and provider finish metadata. |
 | Tool authentication error | The Agent must declare its required keys and the CLI environment must provide them. `.env` is not mounted wholesale. |
 | Blocked route / trace rejection | Inspect the recorded host/path/protocol and declared routes. Fix source-backed route mismatches; do not disable observation or permit arbitrary traffic to obtain pass. |
 | No ready Agents | Inspect `agentbench observe --list` and the registry. `run` selects enabled ready registrations; certify adapting integrations after dependencies work. |
@@ -28,6 +28,74 @@ and `OPENROUTER_APP_TITLE` identify requests. They do not change KUMA's endpoint
 The onboarding catalog reads `KUMA_BASE_URL`, but evaluation does not forward it
 end to end and allows the default DefuzeX backend. Do not treat it as a working
 evaluation override: see [#52](https://github.com/DefuzeX-AI/AgentBehaviorBench/issues/52).
+
+## Structured-output generation failures
+
+Configuration generation with `agent add -b` validates model replies against each
+stage's full local schema. The diagnostic and correction paths address
+[#112](https://github.com/DefuzeX-AI/AgentBehaviorBench/issues/112).
+Fenced/prose JSON tolerance ([#89](https://github.com/DefuzeX-AI/AgentBehaviorBench/issues/89))
+is separate: such content must be corrected by the model rather than silently extracted.
+
+| Error | Current behavior | What to inspect |
+| --- | --- | --- |
+| `Model response schema mismatch` | Bounded diagnostics include field paths, expected constraints and actual types; corrections receive those diagnostics and the previous parsed response. | `response-N.json` and `validation-N.json`; planning uses `plan-` prefixes, review uses `review-N.json` and `review-validation-N.json`. |
+| `OpenRouter model content is invalid JSON` / `must be a JSON object` | Corrects the same stage using safe previous content and decoder line/column/offset or the actual root type. Malformed content is not saved. | Validation records hold safe diagnostics. The raw model content is kept only in memory for the correction request after credential checks. |
+| `OpenRouter returned an invalid structured response envelope` | Invalid provider envelope or missing content stops without content corrections. | Check the provider configuration; this is distinct from JSON errors inside model content. |
+| `OpenRouter did not finish the configuration` | A finish reason other than `stop` stops without content corrections. | `provider-N.json` and terminal `build-result.json` diagnostics include available finish reason, usage (including reasoning tokens) and content length. Confirm `length` before increasing output budgets. |
+
+Metadata records contain only selected finish reasons and numeric usage/length fields,
+not raw provider responses. A credential-bearing response is never saved or sent back.
+A review-format failure retries the review of the same candidate; actual compatibility
+issues can still require regenerating the file.
+
+1. Use the attempt path printed by the failed build. Preserve `build-result.json`,
+   `plan-response-N.json` / `plan-validation-N.json` when present, and the failing
+   file's `steps/<number>-<filename>/` directory. `current_file` identifies a file
+   stage when available; planning can fail before that field is set. Keep valid
+   completed integration files and the checkpoint for reuse.
+2. Inspect saved parsed responses locally against the **full local schema**, not
+   the reduced schema sent to the provider. File content uses
+   `agentbench/onboarding/build_agent_env/openrouter_provider/assets/file-response.schema.json`;
+   LangGraph `agent.toml` facts use
+   `agentbench/onboarding/build_agent_env/frameworks/langgraph/assets/manifest/analysis.schema.json`.
+   Planning and review have their own schemas. For example, `status` must be
+   `complete`, `needs_input` or `unsupported`, and a file response must include
+   `path`. Current LangGraph `adapter.config` and `adapter.graph_id` allow `null`
+   for a native factory binding; #112's older null-field failure is not the current
+   contract. Do not invent a graph descriptor to satisfy that historical example.
+3. Supply genuine missing deployment information with `--answers answers.txt`.
+   A schema or JSON decode failure is not itself a `needs_input` request. For
+   provider incompatibility, choose a model that supports strict structured output
+   using `--build-model MODEL`, then repeat the add command for the same source.
+   Reusable files are preserved; a model change invalidates planning/review caches
+   and can trigger additional paid requests. Editing a saved `response-N.json`
+   does not feed a correction into the next build.
+4. Do not increase retry budgets without identifying a change that could resolve
+   the failure. The packaged `repair_attempts = 1` permits one additional correction
+   per planning stage or file, shared across model-content JSON decoding, schema
+   checks, file validation and review. `retries` handles transient transport/HTTP
+   failures separately. To limit correction
+   calls while investigating, create `build-settings.toml` containing:
+
+   ```toml
+   [build]
+   repair_attempts = 0
+   ```
+
+   Then run:
+
+   ```bash
+   agentbench agent add https://github.com/owner/repository -b --sdk kuma --build-settings build-settings.toml
+   ```
+
+   This disables correction attempts, not initial generation, reviews, source
+   follow-ups or transport retries. It is a cost-control option, not a fix.
+
+When reporting a failure, include the checkout commit, generation model, stage,
+settings and a sanitized structural description such as `$.status: invalid enum`
+or `$.path: missing required property`. Inspect source and model responses locally;
+exclude credentials and confidential generated content from shared diagnostics.
 
 ## Interpret results on two axes
 

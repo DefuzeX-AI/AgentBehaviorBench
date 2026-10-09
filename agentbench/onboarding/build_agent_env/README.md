@@ -105,12 +105,21 @@ Conditional rules (`if`/`then`/`else`), patterns, lengths and numeric/array boun
 are enforced locally rather than sent to the provider. Unknown schema constructs
 raise an explicit error instead of silently removing structural requirements.
 
-After decoding, planning and file generation validate against the **original**
-schema before accepting a plan or installing a file. An invalid response enters
-the same bounded per-stage correction loop; exhausting `repair_attempts` stops
-that stage and preserves earlier files. This does not disable strict output,
-change models or bypass business validation. Provider model support and schema
-size/depth limits still apply.
+Planning, file generation and review validate against their **original** local
+schemas. Bounded diagnostics identify field paths, expected constraints and actual
+types without dumping instance content. Invalid model-content JSON provides
+decoder line/column/offset feedback and can be corrected using credential-checked
+content in memory; malformed content is not saved. Corrections use the existing
+`repair_attempts` setting: planning has its own budget, while generation, local
+file validation and review share one budget per file. A malformed review is retried
+as a review, without regenerating the candidate. Exhaustion stops the stage and
+preserves earlier files. HTTP retries and source requests retain their separate
+limits. Invalid provider envelopes, credentials and unfinished responses stop
+without content corrections. Available finish reason, token usage and content
+length are saved as safe provider metadata; no raw provider envelope is stored.
+See [the troubleshooting guide](../../../docs/Troubleshooting.md#structured-output-generation-failures)
+for record names. Strict output and business validation remain enabled; provider
+model support and schema size/depth limits still apply.
 
 Provider references: [Azure structured outputs](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/structured-outputs#json-schema-support-and-limitations)
 and [OpenRouter structured outputs](https://openrouter.ai/docs/guides/features/structured-outputs).

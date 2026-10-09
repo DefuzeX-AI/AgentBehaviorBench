@@ -64,6 +64,17 @@ agentbench agent add https://github.com/owner/repository -b --sdk kuma
 agentbench agent add https://github.com/owner/repository -b --sdk kuma --answers answers.txt
 ```
 
+### Échec de génération structurée
+
+Les erreurs de schéma indiquent maintenant le chemin du champ, la contrainte attendue et le type reçu.
+Les erreurs JSON du contenu du modèle indiquent la ligne et la colonne et entrent dans la boucle de
+correction bornée. Une réponse de revue invalide est corrigée sans régénérer le fichier candidat ;
+la génération et la revue partagent le budget de correction du fichier.
+Une enveloppe fournisseur invalide ou une réponse inachevée arrête la génération.
+Conservez les fichiers terminés et les journaux. Voir
+[le dépannage détaillé — anglais](../Troubleshooting.md#structured-output-generation-failures)
+pour les diagnostics, les champs acceptant `null` et les limites de correction.
+
 ## 3. Comprendre les fichiers
 
 L’unité Agent se trouve sous `resources/agents/NN-name/`. La commande génère les

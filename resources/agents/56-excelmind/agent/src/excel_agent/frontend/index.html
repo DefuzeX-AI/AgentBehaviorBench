@@ -1,0 +1,3015 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ExcelMind - Excel智能数据问答助手</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0f0f0f;
+            --bg-secondary: #1a1a1a;
+            --bg-tertiary: #252525;
+            --bg-hover: #2a2a2a;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --text-muted: #666666;
+            --accent: #6366f1;
+            --accent-hover: #818cf8;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --border: #333333;
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+            --gradient-1: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            --gradient-2: linear-gradient(135deg, #22c55e 0%, #10b981 100%);
+            --sidebar-width: 300px;
+        }
+
+        /* 亮色主题 */
+        [data-theme="light"] {
+            --bg-primary: #f0f2f5;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f8f9fa;
+            --bg-hover: #e8eaed;
+            --text-primary: #1a1a2e;
+            --text-secondary: #4a4a68;
+            --text-muted: #8e8ea0;
+            --border: #e1e4e8;
+            --shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+            --accent: #5a67d8;
+            --accent-hover: #4c51bf;
+            --success: #48bb78;
+            --warning: #ed8936;
+            --error: #f56565;
+            --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        /* 亮色主题下的特殊样式覆盖 */
+        [data-theme="light"] .message.assistant {
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+            border: 1px solid #667eea30;
+        }
+
+        [data-theme="light"] .message.user .message-content {
+            background: linear-gradient(135deg, #f0f4ff 0%, #f5f3ff 100%);
+            color: #1e1b4b;
+            border: 1px solid #c7d2fe;
+        }
+
+        [data-theme="light"] .thinking-block {
+            background: #fef3cd;
+            border-color: #ffc107;
+        }
+
+        [data-theme="light"] .thinking-header {
+            color: #856404;
+        }
+
+        [data-theme="light"] .thinking-content {
+            color: #664d03;
+        }
+
+        [data-theme="light"] .tool-block {
+            background: #e8f4fd;
+            border-color: #90cdf4;
+        }
+
+        [data-theme="light"] .tool-header {
+            color: #2b6cb0;
+        }
+
+        [data-theme="light"] .tool-name {
+            background: #3182ce;
+            color: white;
+        }
+
+        [data-theme="light"] .tool-result.success {
+            background: #c6f6d5;
+            border-color: #48bb78;
+            color: #22543d;
+        }
+
+        [data-theme="light"] .tool-result.error {
+            background: #fed7d7;
+            border-color: #fc8181;
+            color: #742a2a;
+        }
+
+        [data-theme="light"] .upload-zone {
+            background: #f8fafc;
+            border-color: #cbd5e0;
+        }
+
+        [data-theme="light"] .upload-zone:hover,
+        [data-theme="light"] .upload-zone.dragover {
+            background: #edf2f7;
+            border-color: var(--accent);
+        }
+
+        [data-theme="light"] .table-item {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+        }
+
+        [data-theme="light"] .table-item:hover {
+            background: #f7fafc;
+            border-color: #a0aec0;
+        }
+
+        [data-theme="light"] .table-item.active {
+            background: linear-gradient(135deg, #667eea10 0%, #764ba210 100%);
+            border-color: var(--accent);
+        }
+
+        [data-theme="light"] .chat-input {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            color: var(--text-primary);
+        }
+
+        [data-theme="light"] .chat-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(90, 103, 216, 0.15);
+        }
+
+        [data-theme="light"] .send-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        [data-theme="light"] .knowledge-item {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+        }
+
+        [data-theme="light"] .knowledge-item:hover {
+            background: #f7fafc;
+        }
+
+        [data-theme="light"] .btn-join {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        [data-theme="light"] .modal {
+            background: #ffffff;
+        }
+
+        [data-theme="light"] .active-table-indicator {
+            background: linear-gradient(135deg, #667eea20 0%, #764ba220 100%);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* 主题切换按钮 */
+        .theme-toggle-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+            color: var(--text-primary);
+        }
+
+        .theme-toggle-btn:hover {
+            background: var(--bg-hover);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Left Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            height: 100vh;
+        }
+
+        .sidebar-header {
+            padding: 20px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .sidebar-header h1 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sidebar-header h1::before {
+            content: "📊";
+            font-size: 1.3rem;
+        }
+
+        .sidebar-header .subtitle {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Upload Section */
+        .upload-section {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: 10px;
+            padding: 20px 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: var(--bg-tertiary);
+        }
+
+        .upload-zone:hover {
+            border-color: var(--accent);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .upload-zone.drag-over {
+            border-color: var(--accent);
+            background: rgba(99, 102, 241, 0.15);
+        }
+
+        .upload-icon {
+            font-size: 1.8rem;
+            margin-bottom: 8px;
+        }
+
+        .upload-text {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .upload-hint {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        /* Tables Section */
+        .tables-section {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tables-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding: 0 4px;
+        }
+
+        .tables-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tables-count {
+            background: var(--accent);
+            color: white;
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 8px;
+        }
+
+        .btn-clear-all {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.7rem;
+            transition: color 0.2s;
+        }
+
+        .btn-clear-all:hover {
+            color: var(--error);
+        }
+
+        .tables-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex: 1;
+        }
+
+        .table-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            gap: 8px;
+        }
+
+        .table-item:hover {
+            background: var(--bg-hover);
+            border-color: var(--border);
+        }
+
+        .table-item.active {
+            background: rgba(99, 102, 241, 0.15);
+            border-color: var(--accent);
+        }
+
+        .table-item.selected {
+            border-color: var(--warning);
+            background: rgba(245, 158, 11, 0.1);
+        }
+
+        .table-checkbox {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--warning);
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .table-item-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .table-icon {
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .table-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .table-name {
+            font-weight: 500;
+            font-size: 0.8rem;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .table-meta {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .table-delete {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1rem;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: all 0.2s;
+            flex-shrink: 0;
+            opacity: 0;
+        }
+
+        .table-item:hover .table-delete {
+            opacity: 1;
+        }
+
+        .table-delete:hover {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+        }
+
+        .tables-empty {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        /* Join Button */
+        .join-btn-container {
+            padding: 8px 0;
+            margin-top: auto;
+        }
+
+        .btn-join {
+            width: 100%;
+            padding: 10px 16px;
+            background: var(--gradient-2);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .btn-join:hover {
+            transform: scale(1.02);
+        }
+
+        .btn-join:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            width: 450px;
+            max-width: 90%;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
+        }
+
+        .modal-overlay.show .modal {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-header h2 {
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.3rem;
+            cursor: pointer;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .form-input,
+        .form-select {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            transition: border-color 0.2s;
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .form-select option {
+            background: var(--bg-tertiary);
+        }
+
+        .form-warning {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 10px 12px;
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: 8px;
+            font-size: 0.8rem;
+            color: var(--warning);
+            margin-bottom: 16px;
+        }
+
+        .table-preview {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            padding: 8px 0;
+        }
+
+        .btn-add-key {
+            background: transparent;
+            border: 1px dashed var(--accent);
+            color: var(--accent);
+            font-size: 0.7rem;
+            padding: 3px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 8px;
+        }
+
+        .btn-add-key:hover {
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .key-pair-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            margin-bottom: 10px;
+            flex-wrap: nowrap;
+        }
+
+        .key-select-group {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .key-select-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .key-pair-row select {
+            width: 100%;
+            min-width: 0;
+            padding: 8px 10px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+        }
+
+        .key-pair-row select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .key-pair-arrow {
+            font-size: 1rem;
+            color: var(--text-muted);
+            flex-shrink: 0;
+            padding-top: 18px;
+        }
+
+        .btn-remove-key {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            cursor: pointer;
+            padding: 4px 6px;
+            border-radius: 4px;
+            flex-shrink: 0;
+            padding-top: 18px;
+        }
+
+        .btn-remove-key:hover {
+            color: var(--error);
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .modal-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .btn-cancel {
+            padding: 10px 20px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-cancel:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--text-muted);
+        }
+
+        .btn-confirm {
+            padding: 10px 24px;
+            background: var(--gradient-2);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-confirm:hover {
+            transform: scale(1.02);
+        }
+
+        .btn-confirm:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            min-width: 0;
+        }
+
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .header-title {
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .active-table-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid var(--accent);
+            border-radius: 16px;
+            font-size: 0.95rem;
+            color: var(--accent);
+            max-width: 400px;
+        }
+
+        .active-table-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .active-table-indicator span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .active-table-indicator:empty {
+            display: none;
+        }
+
+        /* Upload Overlay */
+        .upload-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .upload-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .upload-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .upload-overlay-text {
+            font-size: 1.1rem;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .upload-overlay-sub {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: var(--bg-tertiary);
+            border-radius: 16px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .status-badge.loaded {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--success);
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--text-muted);
+        }
+
+        .status-badge.loaded .status-dot {
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        /* Chat Section */
+        .chat-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .chat-empty {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        .chat-empty-icon {
+            font-size: 4rem;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .chat-empty h3 {
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .message {
+            max-width: 80%;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            align-self: flex-end;
+        }
+
+        .message.assistant {
+            align-self: flex-start;
+        }
+
+        .message-content {
+            padding: 14px 18px;
+            border-radius: 16px;
+            line-height: 1.6;
+        }
+
+        .message.user .message-content {
+            background: var(--gradient-1);
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.assistant .message-content {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 4px;
+        }
+
+        .table-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            background: var(--bg-primary);
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            border: 1px solid var(--border);
+        }
+
+        .table-badge.current {
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        /* Markdown */
+        .message-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 12px 0;
+            font-size: 0.9rem;
+        }
+
+        .message-content th,
+        .message-content td {
+            border: 1px solid var(--border);
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        .message-content th {
+            background: var(--bg-hover);
+            font-weight: 600;
+        }
+
+        .message-content pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 12px 0;
+            border: 1px solid var(--border);
+        }
+
+        .message-content code {
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .message-content pre code {
+            background: transparent;
+            padding: 0;
+        }
+
+        .message-content h1,
+        .message-content h2,
+        .message-content h3,
+        .message-content h4 {
+            margin-top: 16px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .message-content ul,
+        .message-content ol {
+            padding-left: 20px;
+            margin: 8px 0;
+        }
+
+        .message-content p {
+            margin-bottom: 8px;
+        }
+
+        .message-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Thinking & Tool Blocks */
+        .thinking-block,
+        .tool-block {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            font-size: 0.875rem;
+        }
+
+        .thinking-block {
+            border-left: 3px solid var(--accent);
+        }
+
+        /* 可折叠的思考块样式 */
+        .thinking-block details {
+            cursor: pointer;
+        }
+
+        .thinking-block summary {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--accent);
+            font-weight: 500;
+            list-style: none;
+            user-select: none;
+        }
+
+        .thinking-block summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .thinking-block summary::before {
+            content: '▶';
+            font-size: 0.7rem;
+            transition: transform 0.2s;
+        }
+
+        .thinking-block details[open] summary::before {
+            transform: rotate(90deg);
+        }
+
+        .thinking-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--accent);
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .thinking-content {
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .thinking-block.finished {
+            border-left-color: var(--border);
+            opacity: 0.8;
+        }
+
+        .thinking-block.finished .thinking-header,
+        .thinking-block.finished summary {
+            color: var(--text-secondary);
+        }
+
+        .tool-block {
+            border-left: 3px solid var(--warning);
+        }
+
+        .tool-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--warning);
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .tool-name {
+            background: rgba(245, 158, 11, 0.15);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        .tool-args,
+        .tool-result {
+            background: var(--bg-primary);
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            overflow-x: auto;
+            margin-top: 8px;
+        }
+
+        .tool-result {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .tool-result.has-chart {
+            max-height: none;
+            overflow: visible;
+        }
+
+        .tool-result.success {
+            border-left: 2px solid var(--success);
+        }
+
+        .tool-result.error {
+            border-left: 2px solid var(--error);
+        }
+
+        /* 工具描述样式 */
+        .tool-description {
+            color: var(--text-primary);
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .tool-description b {
+            color: var(--accent);
+        }
+
+        .tool-details {
+            margin-top: 8px;
+        }
+
+        .tool-details summary {
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            padding: 4px 0;
+        }
+
+        .tool-details summary:hover {
+            color: var(--text-secondary);
+        }
+
+        /* 结果显示样式 */
+        .result-value {
+            color: var(--success);
+            font-weight: 600;
+        }
+
+        .result-meta {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        .result-data-preview {
+            margin-top: 8px;
+        }
+
+        .result-data-preview summary {
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+
+        .result-data-preview pre {
+            background: var(--bg-primary);
+            padding: 8px;
+            border-radius: 4px;
+            overflow-x: auto;
+            max-height: 150px;
+            font-size: 0.75rem;
+        }
+
+        .tool-result code {
+            background: rgba(99, 102, 241, 0.2);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.8rem;
+        }
+
+        /* Chart Container Styles */
+        .chart-result-container {
+            margin-top: 12px;
+        }
+
+        .chart-header {
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 400px;
+            min-height: 400px;
+            background: rgba(17, 24, 39, 0.6);
+            border-radius: 12px;
+            padding: 16px;
+            box-sizing: border-box;
+        }
+
+        /* Input Section */
+        .chat-input-container {
+            padding: 16px 24px;
+            border-top: 1px solid var(--border);
+            background: var(--bg-secondary);
+            flex-shrink: 0;
+        }
+
+        .chat-input-wrapper {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 18px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            resize: none;
+            min-height: 52px;
+            max-height: 150px;
+            line-height: 1.5;
+            transition: border-color 0.2s;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .chat-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .chat-input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .send-btn {
+            background: var(--gradient-1);
+            border: none;
+            border-radius: 12px;
+            width: 52px;
+            height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: transform 0.2s, opacity 0.2s;
+            flex-shrink: 0;
+        }
+
+        .send-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .send-btn svg {
+            width: 24px;
+            height: 24px;
+            fill: white;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        .loading-dots {
+            display: inline-flex;
+            gap: 4px;
+        }
+
+        .loading-dots span {
+            width: 6px;
+            height: 6px;
+            background: var(--text-secondary);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .loading-dots span:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+
+        .loading-dots span:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+
+        @keyframes bounce {
+
+            0%,
+            80%,
+            100% {
+                transform: scale(0);
+            }
+
+            40% {
+                transform: scale(1);
+            }
+        }
+
+        /* Right Sidebar: Knowledge Base */
+        .right-sidebar {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            height: 100vh;
+            padding: 16px;
+        }
+
+        .knowledge-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding: 0 4px;
+        }
+
+        .knowledge-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .knowledge-count {
+            background: var(--success);
+            color: white;
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 8px;
+        }
+
+        .knowledge-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        .kb-btn-small {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.8rem;
+            padding: 4px 6px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .kb-btn-small:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .knowledge-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            overflow-y: auto;
+            flex: 1;
+            margin-top: 8px;
+        }
+
+        .knowledge-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            gap: 10px;
+        }
+
+        .knowledge-item:hover {
+            background: var(--bg-hover);
+            border-color: var(--border);
+        }
+
+        .knowledge-item.selected {
+            background: rgba(34, 197, 94, 0.15);
+            border-color: var(--success);
+        }
+
+        .knowledge-icon {
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .knowledge-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .knowledge-name {
+            font-weight: 500;
+            font-size: 0.8rem;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .knowledge-meta {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .knowledge-tags {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            margin-top: 4px;
+        }
+
+        .knowledge-tag {
+            font-size: 0.6rem;
+            padding: 1px 6px;
+            background: rgba(99, 102, 241, 0.2);
+            color: var(--accent);
+            border-radius: 4px;
+        }
+
+        .knowledge-delete {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1rem;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: all 0.2s;
+            flex-shrink: 0;
+            opacity: 0;
+        }
+
+        .knowledge-item:hover .knowledge-delete {
+            opacity: 1;
+        }
+
+        .knowledge-delete:hover {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+        }
+
+        .knowledge-empty {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        .knowledge-upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 12px 8px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: var(--bg-tertiary);
+            margin-top: 8px;
+        }
+
+        .knowledge-upload-zone:hover {
+            border-color: var(--success);
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .knowledge-upload-zone.drag-over {
+            border-color: var(--success);
+            background: rgba(34, 197, 94, 0.15);
+        }
+
+        .knowledge-upload-icon {
+            font-size: 1.2rem;
+            margin-bottom: 4px;
+        }
+
+        .knowledge-upload-text {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        /* Knowledge Modal */
+        .kb-modal {
+            width: 550px;
+        }
+
+        .kb-modal-body {
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .kb-content-preview {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.6;
+        }
+
+        .kb-content-input {
+            width: 100%;
+            min-height: 150px;
+            padding: 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .kb-content-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .kb-tags-input {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        .kb-tags-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .kb-info-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .kb-info-item {
+            flex: 1;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Left Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h1>ExcelMind</h1>
+                <button id="theme-toggle" class="theme-toggle-btn" title="切换主题">🌙</button>
+            </div>
+            <div class="subtitle">Excel 智能数据问答助手</div>
+        </div>
+
+        <div class="upload-section">
+            <div class="upload-zone" id="upload-zone">
+                <div class="upload-icon">📁</div>
+                <p class="upload-text">拖拽或点击上传 Excel</p>
+                <p class="upload-hint">支持多个文件</p>
+            </div>
+            <input type="file" id="file-input" accept=".xlsx,.xls,.xlsm" multiple>
+        </div>
+
+        <div class="tables-section">
+            <div class="tables-header">
+                <div class="tables-title">
+                    数据表
+                    <span class="tables-count" id="tables-count">0</span>
+                </div>
+                <button class="btn-clear-all" id="btn-clear-all">清空</button>
+            </div>
+            <div class="tables-list" id="tables-list">
+                <div class="tables-empty" id="tables-empty">暂无数据表</div>
+            </div>
+            <div class="join-btn-container">
+                <button class="btn-join" id="btn-join" disabled>
+                    🤖 智能联表
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Join Modal -->
+    <div class="modal-overlay" id="join-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>🔗 表格联查</h2>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">新表名称</label>
+                    <input type="text" class="form-input" id="join-name" placeholder="例如：用户订单联合表">
+                </div>
+
+                <div class="table-preview" id="table1-preview"></div>
+                <div class="table-preview" id="table2-preview"></div>
+
+                <div class="form-group">
+                    <label class="form-label">连接字段 <button type="button" class="btn-add-key" id="btn-add-key">+
+                            添加字段</button></label>
+                    <div id="key-pairs-container">
+                        <!-- Key pairs will be added here dynamically -->
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">连接类型</label>
+                    <select class="form-select" id="join-type">
+                        <option value="inner">inner - 仅保留匹配行</option>
+                        <option value="left">left - 保留左表全部</option>
+                        <option value="right">right - 保留右表全部</option>
+                        <option value="outer">outer - 保留全部行</option>
+                    </select>
+                </div>
+
+                <div class="form-warning">
+                    <span>⚠️</span>
+                    <span>请确保对应的连接字段数据类型和含义一致，否则可能产生错误结果。</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" id="join-cancel">取消</button>
+                <button class="btn-confirm" id="join-confirm">确认连接</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Knowledge Base Modal -->
+    <div class="modal-overlay" id="kb-modal">
+        <div class="modal kb-modal">
+            <div class="modal-header">
+                <h2 id="kb-modal-title">📚 知识详情</h2>
+                <button class="modal-close" id="kb-modal-close">&times;</button>
+            </div>
+            <div class="modal-body kb-modal-body">
+                <div class="form-group">
+                    <label class="form-label">标题</label>
+                    <input type="text" class="form-input" id="kb-title" placeholder="知识条目标题">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">内容</label>
+                    <textarea class="kb-content-input" id="kb-content" placeholder="输入知识内容..."></textarea>
+                </div>
+                <div class="kb-info-row">
+                    <div class="kb-info-item">
+                        <label class="form-label">分类</label>
+                        <select class="form-select" id="kb-category">
+                            <option value="general">通用</option>
+                            <option value="field_rule">字段规则</option>
+                            <option value="task_pattern">任务模式</option>
+                            <option value="business_logic">业务逻辑</option>
+                        </select>
+                    </div>
+                    <div class="kb-info-item">
+                        <label class="form-label">优先级</label>
+                        <select class="form-select" id="kb-priority">
+                            <option value="normal">普通</option>
+                            <option value="high">高</option>
+                            <option value="low">低</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">标签（用逗号分隔）</label>
+                    <input type="text" class="kb-tags-input" id="kb-tags" placeholder="例如：账期, 日期格式, YYYYMM">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-cancel" id="kb-modal-cancel">取消</button>
+                <button class="btn-confirm" id="kb-modal-save">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Overlay -->
+    <div class="upload-overlay" id="upload-overlay">
+        <div class="upload-spinner"></div>
+        <div class="upload-overlay-text" id="upload-overlay-text">正在上传...</div>
+        <div class="upload-overlay-sub" id="upload-overlay-sub">请稍候，文件较大时可能需要一些时间</div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <header class="header">
+            <span class="header-title">
+                <span class="active-table-label">当前目标表：</span>
+                <div class="active-table-indicator" id="active-table-indicator">请先上传数据表</div>
+            </span>
+        </header>
+
+        <section class="chat-section">
+            <div class="chat-messages" id="chat-messages">
+                <div class="chat-empty" id="chat-empty">
+                    <div class="chat-empty-icon">💬</div>
+                    <h3>开始对话</h3>
+                    <p>在左侧上传 Excel 文件后，即可询问数据问题</p>
+                </div>
+            </div>
+            <div class="chat-input-container">
+                <div class="chat-input-wrapper">
+                    <textarea class="chat-input" id="chat-input" placeholder="请先上传 Excel 文件" rows="1"
+                        disabled></textarea>
+                    <button class="send-btn" id="send-btn" disabled>
+                        <svg viewBox="0 0 24 24">
+                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" transform="rotate(-45 12 12)" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Right Sidebar: Knowledge Base -->
+    <aside class="right-sidebar">
+        <div class="knowledge-header">
+            <div class="knowledge-title">
+                📚 知识库
+                <span class="knowledge-count" id="knowledge-count">0</span>
+            </div>
+            <div class="knowledge-actions">
+                <button class="kb-btn-small" id="kb-btn-add" title="添加知识">+</button>
+                <button class="kb-btn-small" id="kb-btn-refresh" title="刷新">↻</button>
+            </div>
+        </div>
+        <div class="knowledge-list" id="knowledge-list">
+            <div class="knowledge-empty" id="knowledge-empty">暂无知识条目</div>
+        </div>
+        <div class="knowledge-upload-zone" id="kb-upload-zone">
+            <div class="knowledge-upload-icon">📄</div>
+            <p class="knowledge-upload-text">拖拽或点击上传 (.md/.txt)</p>
+        </div>
+        <input type="file" id="kb-file-input" accept=".md,.txt,.markdown" style="display:none">
+    </aside>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+    <script>
+        marked.setOptions({ breaks: true, gfm: true });
+
+        // Elements
+        const uploadZone = document.getElementById('upload-zone');
+        const fileInput = document.getElementById('file-input');
+        const tablesList = document.getElementById('tables-list');
+        const tablesCount = document.getElementById('tables-count');
+        const chatMessages = document.getElementById('chat-messages');
+        const chatInput = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('send-btn');
+        const btnClearAll = document.getElementById('btn-clear-all');
+        const btnJoin = document.getElementById('btn-join');
+        const joinModal = document.getElementById('join-modal');
+        const modalClose = document.getElementById('modal-close');
+        const joinCancel = document.getElementById('join-cancel');
+        const joinConfirm = document.getElementById('join-confirm');
+        const joinName = document.getElementById('join-name');
+        const keyPairsContainer = document.getElementById('key-pairs-container');
+        const btnAddKey = document.getElementById('btn-add-key');
+        const joinType = document.getElementById('join-type');
+        const table1Preview = document.getElementById('table1-preview');
+        const table2Preview = document.getElementById('table2-preview');
+        const uploadOverlay = document.getElementById('upload-overlay');
+        const uploadOverlayText = document.getElementById('upload-overlay-text');
+        const uploadOverlaySub = document.getElementById('upload-overlay-sub');
+        const activeTableIndicator = document.getElementById('active-table-indicator');
+
+        let isProcessing = false;
+        let conversationHistory = [];
+        let tables = [];
+        let activeTableId = null;
+        let tableNames = {};
+        let selectedTableIds = [];
+        let table1Columns = [];
+        let table2Columns = [];
+
+        // 主题切换相关
+        const themeToggle = document.getElementById('theme-toggle');
+        let currentTheme = localStorage.getItem('theme') || 'dark';
+        const chartInstances = []; // 存储所有图表实例
+
+        // 初始化主题
+        document.documentElement.setAttribute('data-theme', currentTheme);
+        updateThemeIcon();
+
+        themeToggle.addEventListener('click', () => {
+            currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', currentTheme);
+            localStorage.setItem('theme', currentTheme);
+            updateThemeIcon();
+            updateChartsTheme();
+        });
+
+        function updateThemeIcon() {
+            themeToggle.textContent = currentTheme === 'dark' ? '☀️' : '🌙';
+        }
+
+        function updateChartsTheme() {
+            const theme = currentTheme === 'light' ? null : 'dark';
+            chartInstances.forEach(item => {
+                if (item.chart && !item.chart.isDisposed()) {
+                    const originalOption = item.originalOption || item.chart.getOption();
+                    item.chart.dispose();
+                    const newChart = echarts.init(item.container, theme);
+
+                    // 应用主题相关的颜色覆盖
+                    let chartOptions = { ...originalOption };
+                    if (currentTheme === 'light') {
+                        chartOptions = {
+                            ...chartOptions,
+                            backgroundColor: '#ffffff',
+                            textStyle: { color: '#333333' },
+                            title: { ...chartOptions.title, textStyle: { color: '#1a1a2e' } },
+                            legend: { ...chartOptions.legend, textStyle: { color: '#4a4a68' } },
+                            xAxis: Array.isArray(chartOptions.xAxis)
+                                ? chartOptions.xAxis.map(x => ({ ...x, axisLine: { lineStyle: { color: '#ccc' } }, axisLabel: { color: '#666' } }))
+                                : { ...chartOptions.xAxis, axisLine: { lineStyle: { color: '#ccc' } }, axisLabel: { color: '#666' } },
+                            yAxis: Array.isArray(chartOptions.yAxis)
+                                ? chartOptions.yAxis.map(y => ({ ...y, axisLine: { lineStyle: { color: '#ccc' } }, axisLabel: { color: '#666' }, splitLine: { lineStyle: { color: '#eee' } } }))
+                                : { ...chartOptions.yAxis, axisLine: { lineStyle: { color: '#ccc' } }, axisLabel: { color: '#666' }, splitLine: { lineStyle: { color: '#eee' } } }
+                        };
+                    }
+
+                    newChart.setOption(chartOptions);
+                    item.chart = newChart;
+                }
+            });
+        }
+
+
+        // Upload handlers
+        uploadZone.addEventListener('click', () => fileInput.click());
+        uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+        uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('drag-over');
+            if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
+        });
+        fileInput.addEventListener('change', (e) => { if (e.target.files.length > 0) handleFiles(e.target.files); });
+        btnClearAll.addEventListener('click', async () => { if (confirm('确定清空所有表？')) await resetAgent(); });
+
+        async function handleFiles(files) {
+            const validFiles = Array.from(files).filter(f => {
+                const ext = '.' + f.name.split('.').pop().toLowerCase();
+                return ['.xlsx', '.xls', '.xlsm'].includes(ext);
+            });
+
+            if (validFiles.length === 0) return;
+
+            // 显示上传遮罩
+            uploadOverlay.classList.add('show');
+
+            for (let i = 0; i < validFiles.length; i++) {
+                const file = validFiles[i];
+                uploadOverlayText.textContent = `正在上传 (${i + 1}/${validFiles.length}): ${file.name}`;
+                uploadOverlaySub.textContent = '请稍候，文件较大时可能需要一些时间';
+                await uploadFile(file);
+            }
+
+            // 隐藏上传遮罩
+            uploadOverlay.classList.remove('show');
+        }
+
+        async function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                const response = await fetch('/upload', { method: 'POST', body: formData });
+                if (!response.ok) throw new Error((await response.json()).detail || '上传失败');
+                const data = await response.json();
+                if (data.tables) updateTablesList(data.tables);
+                if (data.table_id) {
+                    activeTableId = data.table_id;
+                    tableNames[data.table_id] = file.name;
+                }
+            } catch (error) {
+                alert('上传失败: ' + error.message);
+            }
+            updateStatus();
+        }
+
+        function updateTablesList(tablesData) {
+            tables = tablesData;
+            tablesCount.textContent = tables.length;
+            selectedTableIds = selectedTableIds.filter(id => tables.some(t => t.id === id));
+            updateJoinButton();
+
+            if (tables.length === 0) {
+                tablesList.innerHTML = '<div class="tables-empty">暂无数据表</div>';
+                return;
+            }
+
+            tablesList.innerHTML = '';
+            tables.forEach(table => {
+                tableNames[table.id] = table.filename;
+                const isSelected = selectedTableIds.includes(table.id);
+                const icon = table.is_joined ? '🔗' : '📊';
+                const tooltip = table.is_joined && table.source_tables
+                    ? `连接表：${table.source_tables.join(' + ')}`
+                    : table.filename;
+
+                const item = document.createElement('div');
+                item.className = `table-item${table.is_active ? ' active' : ''}${isSelected ? ' selected' : ''}`;
+                item.dataset.id = table.id;
+                item.innerHTML = `
+                    <input type="checkbox" class="table-checkbox" ${isSelected ? 'checked' : ''} ${table.is_joined ? 'disabled' : ''}>
+                    <div class="table-item-left">
+                        <span class="table-icon">${icon}</span>
+                        <div class="table-info">
+                            <div class="table-name" title="${tooltip}">${table.filename}</div>
+                            <div class="table-meta">${table.total_rows}行 × ${table.total_columns}列</div>
+                        </div>
+                    </div>
+                    <button class="table-delete" title="删除">×</button>
+                `;
+
+                const checkbox = item.querySelector('.table-checkbox');
+                checkbox.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleTableSelection(table.id, checkbox.checked);
+                });
+
+                item.addEventListener('click', async (e) => {
+                    if (e.target.classList.contains('table-delete') || e.target.classList.contains('table-checkbox')) return;
+                    await setActiveTable(table.id);
+                });
+
+                item.querySelector('.table-delete').addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    await deleteTable(table.id);
+                });
+
+                tablesList.appendChild(item);
+                if (table.is_active) activeTableId = table.id;
+            });
+
+            enableChat();
+        }
+
+        function toggleTableSelection(tableId, isChecked) {
+            if (isChecked) {
+                if (selectedTableIds.length < 2) {
+                    selectedTableIds.push(tableId);
+                } else {
+                    // 只允许选2个，取消最早选的
+                    selectedTableIds.shift();
+                    selectedTableIds.push(tableId);
+                    // 更新UI
+                    updateTablesList(tables);
+                }
+            } else {
+                selectedTableIds = selectedTableIds.filter(id => id !== tableId);
+            }
+            updateJoinButton();
+            updateTableItemStyles();
+        }
+
+        function updateTableItemStyles() {
+            document.querySelectorAll('.table-item').forEach(item => {
+                const id = item.dataset.id;
+                const checkbox = item.querySelector('.table-checkbox');
+                if (selectedTableIds.includes(id)) {
+                    item.classList.add('selected');
+                    if (checkbox) checkbox.checked = true;
+                } else {
+                    item.classList.remove('selected');
+                    if (checkbox) checkbox.checked = false;
+                }
+            });
+        }
+
+        function updateJoinButton() {
+            btnJoin.disabled = selectedTableIds.length !== 2;
+            if (selectedTableIds.length === 2) {
+                const t1 = tables.find(t => t.id === selectedTableIds[0]);
+                const t2 = tables.find(t => t.id === selectedTableIds[1]);
+                btnJoin.innerHTML = `🤖 智能联表: ${t1?.filename?.substring(0, 6) || '表1'}... + ${t2?.filename?.substring(0, 6) || '表2'}...`;
+            } else {
+                btnJoin.innerHTML = selectedTableIds.length === 0
+                    ? '🤖 智能联表 (选择2张表)'
+                    : `🤖 智能联表 (已选${selectedTableIds.length}/2)`;
+            }
+        }
+
+        // Join Modal
+        btnJoin.addEventListener('click', openJoinModal);
+        modalClose.addEventListener('click', closeJoinModal);
+        joinCancel.addEventListener('click', closeJoinModal);
+        joinModal.addEventListener('click', (e) => { if (e.target === joinModal) closeJoinModal(); });
+        btnAddKey.addEventListener('click', () => addKeyPair());
+
+        function addKeyPair(key1Value = '', key2Value = '') {
+            const row = document.createElement('div');
+            row.className = 'key-pair-row';
+            row.innerHTML = `
+                <div class="key-select-group">
+                    <span class="key-select-label">表1字段</span>
+                    <select class="key1-select">
+                        ${table1Columns.map(c => `<option value="${c}" ${c === key1Value ? 'selected' : ''}>${c}</option>`).join('')}
+                    </select>
+                </div>
+                <span class="key-pair-arrow">↔</span>
+                <div class="key-select-group">
+                    <span class="key-select-label">表2字段</span>
+                    <select class="key2-select">
+                        ${table2Columns.map(c => `<option value="${c}" ${c === key2Value ? 'selected' : ''}>${c}</option>`).join('')}
+                    </select>
+                </div>
+                <button type="button" class="btn-remove-key" title="移除">×</button>
+            `;
+
+            row.querySelector('.btn-remove-key').addEventListener('click', () => {
+                if (keyPairsContainer.children.length > 1) {
+                    row.remove();
+                } else {
+                    alert('至少需要一个连接字段');
+                }
+            });
+
+            keyPairsContainer.appendChild(row);
+        }
+
+        async function openJoinModal() {
+            if (selectedTableIds.length !== 2) return;
+
+            const [id1, id2] = selectedTableIds;
+            const t1 = tables.find(t => t.id === id1);
+            const t2 = tables.find(t => t.id === id2);
+
+            // 显示AI分析遮罩
+            uploadOverlayText.textContent = '🤖 AI 正在分析表结构...';
+            uploadOverlaySub.textContent = '请稍候，AI正在智能匹配联表字段';
+            uploadOverlay.classList.add('show');
+
+            table1Preview.textContent = `表1: ${t1?.filename} (${t1?.total_rows}行)`;
+            table2Preview.textContent = `表2: ${t2?.filename} (${t2?.total_rows}行)`;
+
+            // 获取列名
+            try {
+                const [cols1, cols2] = await Promise.all([
+                    fetch(`/tables/${id1}/columns`).then(r => r.json()),
+                    fetch(`/tables/${id2}/columns`).then(r => r.json())
+                ]);
+
+                table1Columns = cols1.columns || [];
+                table2Columns = cols2.columns || [];
+            } catch (e) {
+                uploadOverlay.classList.remove('show');
+                alert('获取列信息失败');
+                return;
+            }
+
+            // 调用AI建议API
+            let aiSuggestion = null;
+            try {
+                const response = await fetch('/tables/suggest-join', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ table1_id: id1, table2_id: id2 })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    aiSuggestion = data.suggestion;
+                }
+            } catch (e) {
+                console.warn('AI建议获取失败，使用默认值', e);
+            }
+
+            uploadOverlay.classList.remove('show');
+
+            // 清空并添加字段对
+            keyPairsContainer.innerHTML = '';
+
+            if (aiSuggestion && aiSuggestion.keys1 && aiSuggestion.keys2) {
+                // 使用AI建议预填充
+                joinName.value = aiSuggestion.new_name || `${t1?.filename?.split('.')[0]}_${t2?.filename?.split('.')[0]}_联合`;
+                joinType.value = aiSuggestion.join_type || 'inner';
+
+                // 添加AI建议的字段对
+                for (let i = 0; i < aiSuggestion.keys1.length; i++) {
+                    addKeyPair(aiSuggestion.keys1[i], aiSuggestion.keys2[i]);
+                }
+
+                // 显示AI建议原因
+                if (aiSuggestion.reason) {
+                    console.log('AI建议原因:', aiSuggestion.reason);
+                }
+            } else {
+                // 默认值
+                joinName.value = `${t1?.filename?.split('.')[0] || '表1'}_${t2?.filename?.split('.')[0] || '表2'}_联合`;
+                addKeyPair();
+            }
+
+            joinModal.classList.add('show');
+        }
+
+        function closeJoinModal() {
+            joinModal.classList.remove('show');
+        }
+
+        joinConfirm.addEventListener('click', async () => {
+            const name = joinName.value.trim();
+            if (!name) { alert('请输入新表名称'); return; }
+
+            // 收集所有字段对
+            const keyRows = keyPairsContainer.querySelectorAll('.key-pair-row');
+            const keys1 = [];
+            const keys2 = [];
+
+            keyRows.forEach(row => {
+                keys1.push(row.querySelector('.key1-select').value);
+                keys2.push(row.querySelector('.key2-select').value);
+            });
+
+            if (keys1.length === 0) {
+                alert('至少需要一个连接字段');
+                return;
+            }
+
+            joinConfirm.disabled = true;
+            joinConfirm.textContent = '连接中...';
+
+            try {
+                const response = await fetch('/tables/join', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        table1_id: selectedTableIds[0],
+                        table2_id: selectedTableIds[1],
+                        keys1: keys1,
+                        keys2: keys2,
+                        join_type: joinType.value,
+                        new_name: name
+                    })
+                });
+
+                if (!response.ok) throw new Error((await response.json()).detail || '连接失败');
+
+                const data = await response.json();
+                selectedTableIds = [];
+                if (data.tables) updateTablesList(data.tables);
+                closeJoinModal();
+                updateStatus();
+            } catch (error) {
+                alert('连接失败: ' + error.message);
+            } finally {
+                joinConfirm.disabled = false;
+                joinConfirm.textContent = '确认连接';
+            }
+        });
+
+        async function setActiveTable(tableId) {
+            try {
+                const response = await fetch('/tables/active', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ table_id: tableId })
+                });
+                if (!response.ok) throw new Error((await response.json()).detail);
+                const data = await response.json();
+                activeTableId = tableId;
+                if (data.tables) updateTablesList(data.tables);
+                updateStatus();
+            } catch (error) {
+                alert('切换失败: ' + error.message);
+            }
+        }
+
+        async function deleteTable(tableId) {
+            try {
+                const response = await fetch(`/tables/${tableId}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error((await response.json()).detail);
+                const data = await response.json();
+                activeTableId = data.active_table_id;
+                selectedTableIds = selectedTableIds.filter(id => id !== tableId);
+                if (data.tables) updateTablesList(data.tables);
+                updateStatus();
+                if (tables.length === 0) disableChat();
+            } catch (error) {
+                alert('删除失败: ' + error.message);
+            }
+        }
+
+        function updateStatus() {
+            if (tables.length === 0) {
+                activeTableIndicator.innerHTML = '请先上传数据表';
+            } else {
+                const activeTable = tables.find(t => t.is_active);
+                // 更新活跃表指示器
+                if (activeTable) {
+                    const icon = activeTable.is_joined ? '🔗' : '📊';
+                    activeTableIndicator.innerHTML = `${icon} <span title="${activeTable.filename}">${activeTable.filename}</span>`;
+                } else {
+                    activeTableIndicator.innerHTML = '请选择一张表';
+                }
+            }
+        }
+
+        function enableChat() {
+            chatInput.disabled = false;
+            sendBtn.disabled = false;
+            chatInput.placeholder = '输入问题，例如：这个表有多少行？';
+            chatInput.focus();
+        }
+
+        function disableChat() {
+            chatInput.disabled = true;
+            sendBtn.disabled = true;
+            chatInput.placeholder = '请先上传 Excel 文件';
+        }
+
+        async function resetAgent() {
+            try {
+                await fetch('/reset', { method: 'POST' });
+                tables = [];
+                activeTableId = null;
+                tableNames = {};
+                conversationHistory = [];
+                selectedTableIds = [];
+                tablesList.innerHTML = '<div class="tables-empty">暂无数据表</div>';
+                tablesCount.textContent = '0';
+                statusBadge.classList.remove('loaded');
+                statusText.textContent = '未加载文件';
+                disableChat();
+                updateJoinButton();
+                chatMessages.innerHTML = `
+                    <div class="chat-empty" id="chat-empty">
+                        <div class="chat-empty-icon">💬</div>
+                        <h3>开始对话</h3>
+                        <p>在左侧上传 Excel 文件后，即可询问数据问题</p>
+                    </div>
+                `;
+            } catch (error) { console.error('Reset failed:', error); }
+        }
+
+        // Chat handlers
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+        });
+        chatInput.addEventListener('input', () => {
+            chatInput.style.height = 'auto';
+            chatInput.style.height = Math.min(chatInput.scrollHeight, 150) + 'px';
+        });
+        sendBtn.addEventListener('click', sendMessage);
+
+        const toolBlockMap = new Map();
+
+        async function sendMessage() {
+            const message = chatInput.value.trim();
+            if (!message || isProcessing || tables.length === 0) return;
+
+            isProcessing = true;
+            chatInput.value = '';
+            chatInput.style.height = 'auto';
+            sendBtn.disabled = true;
+            toolBlockMap.clear();
+
+            const emptyState = document.getElementById('chat-empty');
+            if (emptyState) emptyState.remove();
+
+            const currentTableId = activeTableId;
+            const currentTableName = tableNames[currentTableId] || '未知表';
+
+            addMessage('user', message, currentTableId, currentTableName);
+            conversationHistory.push({ role: 'user', content: message, tableId: currentTableId });
+
+            const assistantMsg = addMessage('assistant', '', currentTableId, currentTableName);
+            const contentDiv = assistantMsg.querySelector('.message-content');
+
+            let currentThinkingBlock = null;
+            let currentToolBlock = null;
+            let responseContainer = document.createElement('div');
+            contentDiv.appendChild(responseContainer);
+
+            let responseTableId = currentTableId;
+
+            try {
+                const response = await fetch('/chat/stream', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message,
+                        history: conversationHistory.slice(0, -1).map(h => ({
+                            role: h.role,
+                            content: h.content,
+                            tableName: tableNames[h.tableId] || ''
+                        }))
+                    })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let responseText = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const event = JSON.parse(line.slice(6));
+                                if (event.type === 'table_info') { responseTableId = event.table_id; continue; }
+                                handleStreamEvent(event, contentDiv, {
+                                    getThinkingBlock: () => {
+                                        if (!currentThinkingBlock) {
+                                            currentThinkingBlock = createThinkingBlock();
+                                            contentDiv.insertBefore(currentThinkingBlock, responseContainer);
+                                        }
+                                        return currentThinkingBlock;
+                                    },
+                                    removeThinkingBlock: () => {
+                                        if (currentThinkingBlock) {
+                                            currentThinkingBlock.remove();
+                                            currentThinkingBlock = null;
+                                        }
+                                    },
+                                    finishThinkingBlock: () => {
+                                        if (currentThinkingBlock) {
+                                            currentThinkingBlock.classList.add('finished');
+                                            // 隐藏加载动画
+                                            const dots = currentThinkingBlock.querySelector('.loading-dots');
+                                            if (dots) dots.remove();
+                                            // 更新标题文本
+                                            const titleSpan = currentThinkingBlock.querySelector('.thinking-title');
+                                            if (titleSpan) titleSpan.textContent = '思考过程';
+                                            // 自动折叠 details 元素
+                                            const details = currentThinkingBlock.querySelector('details');
+                                            if (details) details.removeAttribute('open');
+                                            currentThinkingBlock = null;
+                                        }
+                                    },
+                                    createToolBlock: (name, args) => {
+                                        const block = createToolBlock(name, args);
+                                        contentDiv.insertBefore(block, responseContainer);
+                                        return block;
+                                    },
+                                    getCurrentToolBlock: () => currentToolBlock,
+                                    setCurrentToolBlock: (block) => { currentToolBlock = block; },
+                                    appendResponse: (text) => { responseText += text; responseContainer.innerHTML = formatMarkdown(responseText); },
+                                    setResponse: (text) => { responseText = text; responseContainer.innerHTML = formatMarkdown(responseText); }
+                                });
+                            } catch (e) { console.error('Parse error:', e); }
+                        }
+                    }
+                }
+
+                if (responseText) {
+                    conversationHistory.push({ role: 'assistant', content: responseText, tableId: responseTableId });
+                }
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            } catch (error) {
+                responseContainer.innerHTML = `<span style="color: var(--error)">错误: ${error.message}</span>`;
+            } finally {
+                isProcessing = false;
+                sendBtn.disabled = false;
+                chatInput.focus();
+            }
+        }
+
+        function handleStreamEvent(event, contentDiv, ctx) {
+            switch (event.type) {
+                case 'thinking':
+                    const tb = ctx.getThinkingBlock();
+                    tb.querySelector('.thinking-content').textContent = event.content;
+                    tb.style.display = 'block';
+                    break;
+                case 'thinking_done': ctx.finishThinkingBlock(); break;
+
+                // 新增：清除思考块 (用于当思考过程其实就是最终回答时，避免重复显示)
+                case 'clear_thinking':
+                    ctx.removeThinkingBlock();
+                    break;
+
+                case 'tool_call':
+                    ctx.finishThinkingBlock();
+                    const toolBlock = ctx.createToolBlock(event.name, event.args);
+                    toolBlockMap.set(event.name, toolBlock);
+                    ctx.setCurrentToolBlock(toolBlock);
+                    break;
+                case 'tool_result':
+                    let targetBlock = toolBlockMap.get(event.name) || ctx.getCurrentToolBlock();
+                    if (targetBlock) addToolResult(targetBlock, event.result);
+                    break;
+                case 'token': ctx.finishThinkingBlock(); ctx.appendResponse(event.content); break;
+                case 'done': if (event.content) ctx.setResponse(event.content); break;
+                case 'error': ctx.setResponse(`<span style="color: var(--error)">${event.content}</span>`); break;
+            }
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function addMessage(role, content, tableId, tableName) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${role}`;
+            msgDiv.dataset.tableId = tableId || '';
+
+            let tableBadge = '';
+            if (tableId && tableName && role === 'assistant') {
+                const isCurrentTable = tableId === activeTableId;
+                tableBadge = `<div class="table-badge${isCurrentTable ? ' current' : ''}">📊 ${tableName}</div>`;
+            }
+
+            msgDiv.innerHTML = `<div class="message-content">${tableBadge}${formatMarkdown(content)}</div>`;
+            chatMessages.appendChild(msgDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            return msgDiv;
+        }
+
+        function createThinkingBlock() {
+            const div = document.createElement('div');
+            div.className = 'thinking-block';
+            div.innerHTML = `
+                <details open>
+                    <summary>
+                        <span>🧠</span>
+                        <span class="thinking-title">思考中</span>
+                        <div class="loading-dots"><span></span><span></span><span></span></div>
+                    </summary>
+                    <div class="thinking-content"></div>
+                </details>
+            `;
+            return div;
+        }
+
+        function createToolBlock(name, args) {
+            const div = document.createElement('div');
+            div.className = 'tool-block';
+
+            // 生成自然语言描述
+            const description = getToolDescription(name, args);
+
+            div.innerHTML = `
+                <div class="tool-header"><span>🔧</span><span>执行操作:</span><span class="tool-name">${getToolDisplayName(name)}</span></div>
+                <div class="tool-description">${description}</div>
+                <details class="tool-details">
+                    <summary>查看详细参数</summary>
+                    <div class="tool-args">${JSON.stringify(args, null, 2)}</div>
+                </details>
+            `;
+            return div;
+        }
+
+        // 获取工具的中文显示名称
+        function getToolDisplayName(name) {
+            const names = {
+                'filter_data': '数据筛选',
+                'aggregate_data': '数据聚合',
+                'group_and_aggregate': '分组统计',
+                'sort_data': '数据排序',
+                'search_data': '数据搜索',
+                'get_column_stats': '列统计',
+                'get_unique_values': '获取唯一值',
+                'get_data_preview': '数据预览',
+                'get_current_time': '获取时间',
+                'calculate': '数学计算',
+                'generate_chart': '📊 生成图表'
+            };
+            return names[name] || name;
+        }
+
+        // 将工具调用参数转换为自然语言描述
+        function getToolDescription(name, args) {
+            switch (name) {
+                case 'filter_data': {
+                    const parts = [];
+                    if (args.filters && args.filters.length > 0) {
+                        const conditions = args.filters.map(f => formatCondition(f.column, f.operator, f.value));
+                        parts.push(`筛选条件: ${conditions.join(' 且 ')}`);
+                    } else if (args.column && args.operator) {
+                        parts.push(`筛选条件: ${formatCondition(args.column, args.operator, args.value)}`);
+                    }
+                    if (args.select_columns && args.select_columns.length > 0) {
+                        parts.push(`返回列: ${args.select_columns.join(', ')}`);
+                    }
+                    if (args.limit) parts.push(`最多返回 ${args.limit} 条`);
+                    return parts.join('<br>') || '筛选数据';
+                }
+                case 'aggregate_data': {
+                    const parts = [];
+                    const funcName = { sum: '求和', mean: '平均值', count: '计数', min: '最小值', max: '最大值', median: '中位数', std: '标准差' };
+                    parts.push(`对 <b>${args.column}</b> 列计算 <b>${funcName[args.agg_func] || args.agg_func}</b>`);
+                    if (args.filters && args.filters.length > 0) {
+                        const conditions = args.filters.map(f => formatCondition(f.column, f.operator, f.value));
+                        parts.push(`筛选条件: ${conditions.join(' 且 ')}`);
+                    }
+                    return parts.join('<br>');
+                }
+                case 'group_and_aggregate': {
+                    const funcName = { sum: '求和', mean: '平均值', count: '计数', min: '最小值', max: '最大值' };
+                    const parts = [`按 <b>${args.group_by}</b> 分组，对 <b>${args.agg_column}</b> 计算 <b>${funcName[args.agg_func] || args.agg_func}</b>`];
+                    if (args.filters && args.filters.length > 0) {
+                        const conditions = args.filters.map(f => formatCondition(f.column, f.operator, f.value));
+                        parts.push(`筛选条件: ${conditions.join(' 且 ')}`);
+                    }
+                    return parts.join('<br>');
+                }
+                case 'sort_data': {
+                    const order = args.ascending === false ? '降序' : '升序';
+                    const parts = [`按 <b>${args.column}</b> ${order}排序`];
+                    if (args.filters && args.filters.length > 0) {
+                        const conditions = args.filters.map(f => formatCondition(f.column, f.operator, f.value));
+                        parts.push(`筛选条件: ${conditions.join(' 且 ')}`);
+                    }
+                    return parts.join('<br>');
+                }
+                case 'search_data':
+                    return `搜索关键词: <b>${args.keyword}</b>` + (args.columns ? ` (在 ${args.columns.join(', ')} 列中)` : ' (全表)');
+                case 'get_column_stats': {
+                    const parts = [`获取 <b>${args.column}</b> 列的统计信息`];
+                    if (args.filters && args.filters.length > 0) {
+                        const conditions = args.filters.map(f => formatCondition(f.column, f.operator, f.value));
+                        parts.push(`筛选条件: ${conditions.join(' 且 ')}`);
+                    }
+                    return parts.join('<br>');
+                }
+                case 'get_unique_values': {
+                    const parts = [`获取 <b>${args.column}</b> 列的唯一值`];
+                    if (args.filters && args.filters.length > 0) {
+                        const conditions = args.filters.map(f => formatCondition(f.column, f.operator, f.value));
+                        parts.push(`筛选条件: ${conditions.join(' 且 ')}`);
+                    }
+                    return parts.join('<br>');
+                }
+                case 'get_data_preview':
+                    return `预览前 ${args.n_rows || 10} 行数据`;
+                case 'get_current_time':
+                    return '获取当前系统时间';
+                case 'calculate':
+                    if (args.expressions && args.expressions.length > 0) {
+                        return `计算表达式: ${args.expressions.map(e => `<code>${e}</code>`).join(', ')}`;
+                    }
+                    return '执行数学计算';
+                case 'generate_chart': {
+                    const chartTypes = { bar: '柱状图', line: '折线图', pie: '饼图', scatter: '散点图', radar: '雷达图', funnel: '漏斗图', auto: '自动推荐' };
+                    const parts = [`生成 <b>${chartTypes[args.chart_type] || args.chart_type || '自动推荐'}</b>`];
+                    if (args.title) parts.push(`标题: ${args.title}`);
+                    if (args.x_column) parts.push(`X轴: ${args.x_column}`);
+                    if (args.y_column) parts.push(`Y轴: ${args.y_column}`);
+                    if (args.group_by) parts.push(`分组: ${args.group_by}`);
+                    return parts.join(', ');
+                }
+                default:
+                    return JSON.stringify(args);
+            }
+        }
+
+        // 格式化筛选条件为自然语言
+        function formatCondition(column, operator, value) {
+            const opNames = {
+                '==': '等于',
+                '!=': '不等于',
+                '>': '大于',
+                '<': '小于',
+                '>=': '大于等于',
+                '<=': '小于等于',
+                'contains': '包含',
+                'startswith': '开头是',
+                'endswith': '结尾是'
+            };
+            return `<b>${column}</b> ${opNames[operator] || operator} <b>${value}</b>`;
+        }
+
+        function addToolResult(toolBlock, result) {
+            const resultDiv = document.createElement('div');
+            const isError = result && result.error;
+            const hasChart = result && result.chart;
+            resultDiv.className = `tool-result ${isError ? 'error' : 'success'}${hasChart ? ' has-chart' : ''}`;
+
+            if (isError) {
+                resultDiv.innerHTML = `<strong>❌ 错误:</strong> ${result.error}`;
+            } else {
+                // 生成友好的结果描述
+                resultDiv.innerHTML = formatToolResult(result);
+            }
+            toolBlock.appendChild(resultDiv);
+        }
+
+        // 将工具结果转换为友好格式
+        function formatToolResult(result) {
+            if (!result || typeof result !== 'object') {
+                return `<strong>✓ 结果:</strong> ${result}`;
+            }
+
+            // 处理图表结果
+            if (result.chart) {
+                const chartId = 'echart-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                const chartHtml = `
+                    <div class="chart-result-container">
+                        <div class="chart-header"><strong>📊 ${result.message || '图表已生成'}</strong></div>
+                        <div class="chart-container" id="${chartId}"></div>
+                    </div>
+                `;
+                // 延迟渲染图表，确保 DOM 已插入
+                setTimeout(() => {
+                    const container = document.getElementById(chartId);
+                    if (container && typeof echarts !== 'undefined') {
+                        const theme = currentTheme === 'light' ? null : 'dark';
+                        const chart = echarts.init(container, theme);
+
+                        // 在亮色模式下覆盖一些选项以确保可读性
+                        let chartOptions = { ...result.chart };
+                        if (currentTheme === 'light') {
+                            chartOptions = {
+                                ...chartOptions,
+                                backgroundColor: '#ffffff',
+                                textStyle: { color: '#333333' },
+                                title: { ...chartOptions.title, textStyle: { color: '#1a1a2e' } },
+                                legend: { ...chartOptions.legend, textStyle: { color: '#4a4a68' } },
+                                xAxis: Array.isArray(chartOptions.xAxis)
+                                    ? chartOptions.xAxis.map(x => ({ ...x, axisLine: { lineStyle: { color: '#ccc' } }, axisLabel: { color: '#666' } }))
+                                    : { ...chartOptions.xAxis, axisLine: { lineStyle: { color: '#ccc' } }, axisLabel: { color: '#666' } },
+                                yAxis: Array.isArray(chartOptions.yAxis)
+                                    ? chartOptions.yAxis.map(y => ({ ...y, axisLine: { lineStyle: { color: '#ccc' } }, axisLabel: { color: '#666' }, splitLine: { lineStyle: { color: '#eee' } } }))
+                                    : { ...chartOptions.yAxis, axisLine: { lineStyle: { color: '#ccc' } }, axisLabel: { color: '#666' }, splitLine: { lineStyle: { color: '#eee' } } }
+                            };
+                        }
+
+                        chart.setOption(chartOptions);
+                        // 追踪图表实例以便主题切换时更新
+                        chartInstances.push({ chart, container, originalOption: result.chart });
+                        // 响应式调整
+                        const resizeObserver = new ResizeObserver(() => chart.resize());
+                        resizeObserver.observe(container);
+                    }
+                }, 100);
+                return chartHtml;
+            }
+
+            const parts = ['<strong>✓ 执行成功</strong>'];
+
+            // 处理聚合结果
+            if (result.result !== undefined && result.column && result.function) {
+                const funcNames = { sum: '总和', mean: '平均值', count: '数量', min: '最小值', max: '最大值', median: '中位数', std: '标准差' };
+                parts.push(`<b>${result.column}</b> 的${funcNames[result.function] || result.function}: <span class="result-value">${formatNumber(result.result)}</span>`);
+                if (result.filtered_rows) {
+                    parts.push(`<span class="result-meta">(基于 ${result.filtered_rows} 条数据)</span>`);
+                }
+                return parts.join(' ');
+            }
+
+            // 处理时间结果
+            if (result.current_time) {
+                return `<strong>✓ 当前时间:</strong> <span class="result-value">${result.current_time}</span> (${result.weekday || ''})`;
+            }
+
+            // 处理计算结果
+            if (result.results && typeof result.results === 'object') {
+                const calcParts = ['<strong>✓ 计算结果:</strong><br>'];
+                for (const [expr, val] of Object.entries(result.results)) {
+                    calcParts.push(`<code>${expr}</code> = <span class="result-value">${formatNumber(val)}</span><br>`);
+                }
+                return calcParts.join('');
+            }
+
+            // 处理数据列表结果
+            if (result.data && Array.isArray(result.data)) {
+                const summary = [`<strong>✓ 查询到 ${result.total_rows || result.data.length} 条数据</strong>`];
+                if (result.returned_rows && result.returned_rows < result.total_rows) {
+                    summary.push(`<span class="result-meta">(显示前 ${result.returned_rows} 条)</span>`);
+                }
+                if (result.columns) {
+                    summary.push(`<br><span class="result-meta">包含列: ${result.columns.join(', ')}</span>`);
+                }
+                // 显示前几条数据的简要预览
+                if (result.data.length > 0) {
+                    const preview = result.data.slice(0, 3);
+                    summary.push('<details class="result-data-preview"><summary>查看数据预览</summary><pre>' + JSON.stringify(preview, null, 2) + '</pre></details>');
+                }
+                return summary.join(' ');
+            }
+
+            // 处理统计信息
+            if (result.column && (result.count !== undefined || result.unique_count !== undefined)) {
+                const statParts = [`<strong>✓ ${result.column} 列统计:</strong><br>`];
+                if (result.count !== undefined) statParts.push(`总数: <b>${result.count}</b> `);
+                if (result.unique_count !== undefined) statParts.push(`唯一值: <b>${result.unique_count}</b> `);
+                if (result.null_count !== undefined) statParts.push(`空值: <b>${result.null_count}</b><br>`);
+                if (result.min !== undefined) statParts.push(`最小: <b>${formatNumber(result.min)}</b> `);
+                if (result.max !== undefined) statParts.push(`最大: <b>${formatNumber(result.max)}</b> `);
+                if (result.mean !== undefined) statParts.push(`平均: <b>${formatNumber(result.mean)}</b>`);
+                return statParts.join('');
+            }
+
+            // 处理唯一值结果
+            if (result.values && Array.isArray(result.values)) {
+                const valueParts = [`<strong>✓ ${result.column} 列有 ${result.total_unique} 个唯一值</strong>`];
+                if (result.values.length > 0) {
+                    const topValues = result.values.slice(0, 5).map(v => `${v.value} (${v.count})`).join(', ');
+                    valueParts.push(`<br><span class="result-meta">前几个: ${topValues}${result.values.length > 5 ? '...' : ''}</span>`);
+                }
+                return valueParts.join('');
+            }
+
+            // 默认：紧凑显示 JSON
+            return `<strong>✓ 结果:</strong><details><summary>查看详情</summary><pre>${JSON.stringify(result, null, 2)}</pre></details>`;
+        }
+
+        // 格式化数字
+        function formatNumber(num) {
+            if (num === null || num === undefined) return 'N/A';
+            if (typeof num !== 'number') return num;
+            if (Number.isInteger(num)) return num.toLocaleString();
+            return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
+        }
+
+        function formatMarkdown(text) {
+            if (!text) return '';
+            try { return marked.parse(text); }
+            catch (e) { return text; }
+        }
+
+        async function checkStatus() {
+            try {
+                const response = await fetch('/status');
+                const data = await response.json();
+                if (data.excel_loaded && data.tables) {
+                    updateTablesList(data.tables);
+                    updateStatus();
+                }
+            } catch (error) { console.error('Status check failed:', error); }
+        }
+
+        checkStatus();
+
+        // ============ Knowledge Base Management ============
+
+        const kbList = document.getElementById('knowledge-list');
+        const kbCount = document.getElementById('knowledge-count');
+        const kbEmpty = document.getElementById('knowledge-empty');
+        const kbUploadZone = document.getElementById('kb-upload-zone');
+        const kbFileInput = document.getElementById('kb-file-input');
+        const kbBtnAdd = document.getElementById('kb-btn-add');
+        const kbBtnRefresh = document.getElementById('kb-btn-refresh');
+        const kbModal = document.getElementById('kb-modal');
+        const kbModalTitle = document.getElementById('kb-modal-title');
+        const kbModalClose = document.getElementById('kb-modal-close');
+        const kbModalCancel = document.getElementById('kb-modal-cancel');
+        const kbModalSave = document.getElementById('kb-modal-save');
+        const kbTitleInput = document.getElementById('kb-title');
+        const kbContentInput = document.getElementById('kb-content');
+        const kbCategorySelect = document.getElementById('kb-category');
+        const kbPrioritySelect = document.getElementById('kb-priority');
+        const kbTagsInput = document.getElementById('kb-tags');
+
+        let knowledgeEntries = [];
+        let currentKbEditId = null;
+
+        // Upload handlers for knowledge files
+        kbUploadZone.addEventListener('click', () => kbFileInput.click());
+        kbUploadZone.addEventListener('dragover', (e) => { e.preventDefault(); kbUploadZone.classList.add('drag-over'); });
+        kbUploadZone.addEventListener('dragleave', () => kbUploadZone.classList.remove('drag-over'));
+        kbUploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            kbUploadZone.classList.remove('drag-over');
+            if (e.dataTransfer.files.length > 0) handleKbFiles(e.dataTransfer.files);
+        });
+        kbFileInput.addEventListener('change', (e) => { if (e.target.files.length > 0) handleKbFiles(e.target.files); });
+
+        // Button handlers
+        kbBtnAdd.addEventListener('click', () => openKbModal());
+        kbBtnRefresh.addEventListener('click', () => loadKnowledgeEntries());
+        kbModalClose.addEventListener('click', () => closeKbModal());
+        kbModalCancel.addEventListener('click', () => closeKbModal());
+        kbModalSave.addEventListener('click', () => saveKnowledgeEntry());
+
+        async function handleKbFiles(files) {
+            const validFiles = Array.from(files).filter(f => {
+                const ext = '.' + f.name.split('.').pop().toLowerCase();
+                return ['.md', '.txt', '.markdown'].includes(ext);
+            });
+
+            if (validFiles.length === 0) {
+                alert('仅支持 .md, .txt, .markdown 文件');
+                return;
+            }
+
+            for (const file of validFiles) {
+                await uploadKbFile(file);
+            }
+            loadKnowledgeEntries();
+        }
+
+        async function uploadKbFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                const response = await fetch('/knowledge/upload', { method: 'POST', body: formData });
+                if (!response.ok) throw new Error((await response.json()).detail || '上传失败');
+                const data = await response.json();
+                if (data.success) {
+                    console.log('知识文件上传成功:', data.title);
+                }
+            } catch (error) {
+                alert('上传失败: ' + error.message);
+            }
+        }
+
+        async function loadKnowledgeEntries() {
+            try {
+                const response = await fetch('/knowledge');
+                const data = await response.json();
+                if (data.entries) {
+                    knowledgeEntries = data.entries;
+                    renderKnowledgeList();
+                }
+            } catch (error) {
+                console.error('加载知识库失败:', error);
+            }
+        }
+
+        function renderKnowledgeList() {
+            kbCount.textContent = knowledgeEntries.length;
+
+            if (knowledgeEntries.length === 0) {
+                kbList.innerHTML = '<div class="knowledge-empty">暂无知识条目</div>';
+                return;
+            }
+
+            kbList.innerHTML = knowledgeEntries.map(entry => {
+                const categoryLabel = {
+                    'general': '通用',
+                    'field_rule': '字段',
+                    'task_pattern': '任务',
+                    'business_logic': '业务'
+                }[entry.category] || entry.category;
+
+                const tagsHtml = (entry.tags || [])
+                    .filter(t => t && t.trim())
+                    .slice(0, 3)
+                    .map(t => `<span class="knowledge-tag">${t}</span>`)
+                    .join('');
+
+                return `
+                    <div class="knowledge-item" data-id="${entry.id}" onclick="viewKnowledgeEntry('${entry.id}')">
+                        <span class="knowledge-icon">📄</span>
+                        <div class="knowledge-info">
+                            <div class="knowledge-name">${entry.title || '未命名'}</div>
+                            <div class="knowledge-meta">${categoryLabel}</div>
+                            ${tagsHtml ? `<div class="knowledge-tags">${tagsHtml}</div>` : ''}
+                        </div>
+                        <button class="knowledge-delete" onclick="event.stopPropagation(); deleteKnowledgeEntry('${entry.id}')" title="删除">×</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function viewKnowledgeEntry(id) {
+            try {
+                const response = await fetch(`/knowledge/${id}`);
+                if (!response.ok) throw new Error('获取失败');
+                const entry = await response.json();
+
+                currentKbEditId = id;
+                kbModalTitle.textContent = '📝 编辑知识';
+                kbTitleInput.value = entry.title || '';
+                kbContentInput.value = entry.content || '';
+                kbCategorySelect.value = entry.category || 'general';
+                kbPrioritySelect.value = entry.priority || 'normal';
+                kbTagsInput.value = (entry.tags || []).join(', ');
+
+                kbModal.classList.add('show');
+            } catch (error) {
+                alert('获取知识详情失败: ' + error.message);
+            }
+        }
+
+        function openKbModal() {
+            currentKbEditId = null;
+            kbModalTitle.textContent = '📚 添加知识';
+            kbTitleInput.value = '';
+            kbContentInput.value = '';
+            kbCategorySelect.value = 'general';
+            kbPrioritySelect.value = 'normal';
+            kbTagsInput.value = '';
+            kbModal.classList.add('show');
+        }
+
+        function closeKbModal() {
+            kbModal.classList.remove('show');
+            currentKbEditId = null;
+        }
+
+        async function saveKnowledgeEntry() {
+            const content = kbContentInput.value.trim();
+            if (!content) {
+                alert('请输入知识内容');
+                return;
+            }
+
+            const tags = kbTagsInput.value.split(',').map(t => t.trim()).filter(t => t);
+            const data = {
+                content: content,
+                title: kbTitleInput.value.trim() || null,
+                category: kbCategorySelect.value,
+                priority: kbPrioritySelect.value,
+                tags: tags
+            };
+
+            try {
+                let response;
+                if (currentKbEditId) {
+                    // Update existing
+                    response = await fetch(`/knowledge/${currentKbEditId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                } else {
+                    // Create new
+                    response = await fetch('/knowledge', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                }
+
+                if (!response.ok) throw new Error((await response.json()).detail || '保存失败');
+
+                closeKbModal();
+                loadKnowledgeEntries();
+            } catch (error) {
+                alert('保存失败: ' + error.message);
+            }
+        }
+
+        async function deleteKnowledgeEntry(id) {
+            if (!confirm('确定删除此知识条目？')) return;
+
+            try {
+                const response = await fetch(`/knowledge/${id}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error((await response.json()).detail || '删除失败');
+                loadKnowledgeEntries();
+            } catch (error) {
+                alert('删除失败: ' + error.message);
+            }
+        }
+
+        // Make functions globally accessible
+        window.viewKnowledgeEntry = viewKnowledgeEntry;
+        window.deleteKnowledgeEntry = deleteKnowledgeEntry;
+
+        // Load knowledge entries on page load
+        loadKnowledgeEntries();
+    </script>
+</body>
+
+</html>
