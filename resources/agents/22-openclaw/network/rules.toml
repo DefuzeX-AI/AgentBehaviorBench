@@ -32,3 +32,24 @@ methods = ["GET"]
 path_patterns = ["/v1/feeds/plugins"]
 purpose = "metadata"
 required = false
+
+# web_search / web_extract through the official @openclaw/tavily-plugin (installed at
+# build time; launch.py selects it as the web search provider).
+[[tool_routes]]
+host_patterns = ["api.tavily.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/search", "/extract"]
+purpose = "tool"
+required = false
+
+# Chrome DevTools Protocol of the Agent's headless Chromium on a pinned loopback port.
+# The runtime redirects loopback TCP to the interceptor too, so the port is declared
+# (HTTP discovery + the WebSocket upgrade are GETs).
+[[tool_routes]]
+host_patterns = ["127.0.0.1"]
+ports = [18810]
+methods = ["GET", "PUT"]
+path_patterns = ["/json", "/json/*", "/devtools/*"]
+purpose = "tool"
+required = false

@@ -22,7 +22,7 @@ The interception manifest admits only the tested model route:
 A different OpenAI-compatible provider needs an explicit reviewed route update;
 changing environment variables alone does not broaden container egress.
 
-`network/rules.toml` adds two non-model routes, both `required = false`:
+`network/rules.toml` adds four non-model routes, all `required = false`:
 
 - `GET 127.0.0.1:18799 /` (purpose `tool`): the bridge's WebSocket upgrade to
   the in-container Gateway. The runtime redirects every non-root TCP connection,
@@ -34,6 +34,16 @@ changing environment variables alone does not broaden container egress.
   post-ready dashboard prewarm (`listManagedPlugins`) fetches the public ClawHub
   plugin catalog feed. v2026.9.5 exposes no config or env switch for it; OpenClaw
   falls back to its bundled catalog when the call fails.
+- `POST api.tavily.com:443 /search, /extract` (purpose `tool`): `web_search` through
+  the official `@openclaw/tavily-plugin` 2026.9.5 (installed at build time; 2026.9.7
+  requires a newer OpenClaw). The key comes from the optional `TAVILY_API_KEY`;
+  without it `web_search` reports a missing key, as it previously reported having no
+  provider at all.
+- `GET/PUT 127.0.0.1:18810 /json, /json/*, /devtools/*` (purpose `tool`): the
+  bundled browser plugin's DevTools connection to the image's headless Chromium
+  (Debian `chromium`), pinned to profile port 18810. `abb-chromium` imports the
+  interceptor CA into Chromium's NSS store (Chromium ignores `SSL_CERT_FILE`);
+  `zz-abb-lean` keeps Chromium within the container's 128-pid budget (#158).
 
 ## Why there are two processes
 
