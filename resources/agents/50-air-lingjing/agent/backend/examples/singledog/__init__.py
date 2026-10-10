@@ -1,2 +1,0 @@
-"""Single-dog navigation example."""
-

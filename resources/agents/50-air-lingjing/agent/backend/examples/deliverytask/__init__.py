@@ -1,1 +1,0 @@
-"""Delivery task example package."""

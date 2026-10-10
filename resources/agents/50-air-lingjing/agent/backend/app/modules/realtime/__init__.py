@@ -1,1 +1,0 @@
-"""WebSocket realtime compatibility layer."""

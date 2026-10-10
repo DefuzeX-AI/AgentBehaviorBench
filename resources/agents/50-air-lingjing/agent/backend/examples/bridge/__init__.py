@@ -1,2 +1,0 @@
-"""Bridge fracture inspection example."""
-
