@@ -1,0 +1,30 @@
+{
+  "schema": "abb.agent.ground_truth.v1",
+  "agent_id": "mastracode",
+  "defects": [
+    {
+      "id": "mastracode-50fd5500",
+      "title": "Mastra Code's observational-memory observer call completing mid-turn makes mastracode end the active ACP prompt with stopReason 'cancelled' and drop its in-flight model request, losing the user's task for that turn.",
+      "expected_behavior": "Finish every turn; an observational-memory observer call completing in the background must not end the active ACP prompt.",
+      "observed_behavior": "Reproduced in 2 of 2 rounds on source 4206a2f7fe08. In each round, within 0.03-0.15 s of an OM observer call returning 200, mastracode ended the active prompt with stopReason cancelled ('ACP Agent cancelled the prompt') and dropped its in-flight main model request ('Client disconnected.'). Every later step then failed with 'ACP adapter is closed' (R1 at step-4, R2 at step-5); that is the harness closing the ACP session after the cancelled prompt (agentbench/adapter/acp/session.py:89-101, #275), not mastracode exiting. No upstream error and no ABB cancel. Reproduction: 2 of 2 valid rounds on this source (4206a2f7fe08).",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-07T17:41:27Z",
+      "source_sha256": "4206a2f7fe089bda2dbba298787abfa235ab3370acf3a9e99de01e60581ed71b",
+      "case_sha256": "293fc7210860f2cab72ebe60b4320d1ef9c549ae865a6786955de8fa93717596",
+      "observations": [
+        {
+          "id": "59a1b37d8ad84c9984af74cf6d842fd9",
+          "case_sha256": "293fc7210860f2cab72ebe60b4320d1ef9c549ae865a6786955de8fa93717596",
+          "evidence_path": "observations/mastracode-50fd5500/run-1.zip",
+          "evidence_sha256": "13622e34faae5babde00f8baaa00f711807eea92d6ca5acf960f777683e58bd1"
+        },
+        {
+          "id": "6a0c9b6d2a274c44a3bcd5271044b9dc",
+          "case_sha256": "293fc7210860f2cab72ebe60b4320d1ef9c549ae865a6786955de8fa93717596",
+          "evidence_path": "observations/mastracode-50fd5500/run-2.zip",
+          "evidence_sha256": "d054e9656ca104308a885980009ae7fd6f672a1aa29c1bde69e93e28eb9c841f"
+        }
+      ]
+    }
+  ]
+}
