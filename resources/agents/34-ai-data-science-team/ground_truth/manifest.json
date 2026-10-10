@@ -1,0 +1,36 @@
+{
+  "schema": "abb.agent.ground_truth.v1",
+  "agent_id": "ai-data-science-team",
+  "defects": [
+    {
+      "id": "ai-data-science-team-38f730a6",
+      "title": "Reports the shape and columns of its own wrangled frame, which has self-derived flag columns, as the raw dataset's row and column counts. It also does not carry state across steps: 'return the result as a table' dumps the whole dataset instead of the previous top-5 result.",
+      "expected_behavior": "Step-1 should report the raw dataset shape (13149 rows x 5 columns: date, bike_model, price, quantity_sold, extended_sales). Step-4 should return the step-3 top-5 result as a table.",
+      "observed_behavior": "On source 9b9ab4ac8fd1, in 3 rounds (152440Z/round-2, 165816Z/round-1, 165816Z/round-2) the agent reported its own wrangled frame, with self-added flag columns, as the dataset: '13149 rows x 7 cols' (negative_value_flag, total_mismatch_flag) at step-1; '13149 rows x 8 cols' (three *_outlier_flag) at step-1; and 10 columns (five *_negative/mismatch/duplicate flags) at step-2 'Identify the columns available'. The raw data has 5 columns. In the 2 rounds where step-4 ran (165816Z round-1/2), 'Return the result as a table' returned the full 13149-row dataset instead of the step-3 top-5 that had just been computed correctly. In 152440Z/round-2, steps 2-4 were blocked by zhipu 429. Reproduction: 3 of 3 valid rounds on this source (9b9ab4ac8fd1). Step-4 state loss: 2 of 2 rounds where it ran. Flag columns reported as dataset shape or columns: 3 of 3 (step-1 twice, step-2 once)..",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-06T20:30:44Z",
+      "source_sha256": "9b9ab4ac8fd18fb1a186648f20ce101a089f2a078a214d99a3165880dba3d26e",
+      "case_sha256": "7835b0ae6fbf3275a0850585051e18071c1aea82710e2ac7094380cd04463033",
+      "observations": [
+        {
+          "id": "0492efeae0cd4e01bb64c9b0bfbd2d64",
+          "case_sha256": "7835b0ae6fbf3275a0850585051e18071c1aea82710e2ac7094380cd04463033",
+          "evidence_path": "observations/ai-data-science-team-38f730a6/run-1.zip",
+          "evidence_sha256": "5a8b00949a447fdd1c88220dd82ee5aec9153117fc6287daf15f28e6ec12b582"
+        },
+        {
+          "id": "92d0b2e5efbc44d886117d021692968d",
+          "case_sha256": "7835b0ae6fbf3275a0850585051e18071c1aea82710e2ac7094380cd04463033",
+          "evidence_path": "observations/ai-data-science-team-38f730a6/run-2.zip",
+          "evidence_sha256": "3809a0e8171a171456d10f7e91526585bd7591920100ace49327873f2dcb7796"
+        },
+        {
+          "id": "f3bff2180fbf4f1fb9d6309ecd01ecc4",
+          "case_sha256": "7835b0ae6fbf3275a0850585051e18071c1aea82710e2ac7094380cd04463033",
+          "evidence_path": "observations/ai-data-science-team-38f730a6/run-3.zip",
+          "evidence_sha256": "59607827f2d8633326c2acd6c8d874d7741d95801608216108a261d13ea08bee"
+        }
+      ]
+    }
+  ]
+}
