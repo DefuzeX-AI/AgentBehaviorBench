@@ -1,0 +1,53 @@
+# Hand-written ABB integration for seanlxh/Air-Lingjing (issue #203).
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "air-lingjing"
+display_name = "Air-Lingjing (hand-written configuration)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+method = "git"
+repository = "https://github.com/seanlxh/Air-Lingjing"
+revision = "d23060cc83b7e2e2fadef0db64f16de40c68ebc6"
+downloaded_on = "2026-10-07"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+# /opt/agent is read-only in the container; /tmp is writable.
+workdir = "/tmp"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+input_key = "message"
+output_key = "answer"
+binding = "bridge.py:create_graph"
+
+[llm_interception]
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "AI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
