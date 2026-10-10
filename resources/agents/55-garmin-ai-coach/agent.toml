@@ -1,0 +1,50 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "garmin-ai-coach"
+display_name = "Garmin AI Coach — snapshot-based endurance analysis and planning"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+method = "git"
+repository = "https://github.com/leonzzz435/garmin-ai-coach"
+revision = "54a64942d52a04d624df4bb7cbc7fdc28c39113e"
+downloaded_on = "2026-10-09"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 1800
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+binding = "bridge.py:create_graph"
+output_key = "answer"
+
+[llm_interception]
+trust_plugin = "pem-env"
+tool_routes = []
+
+[[llm_interception.credentials]]
+id = "openrouter"
+agent_env = "OPENROUTER_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openrouter-chat"
+host_patterns = ["openrouter.ai"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/api/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openrouter"
