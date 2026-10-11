@@ -1,0 +1,90 @@
+# ABB manifest for kaymen99/langgraph-email-automation.
+#
+# Derived from BBA's generated draft for this source, then corrected by hand to
+# resolve the source-compatibility review findings. Upstream source under
+# agent/ is unchanged.
+#
+# Source entrypoint: main.py builds the initial GraphState and streams
+# src/graph.py:Workflow().app. Nodes.categorize_email consumes state["emails"][-1]
+# and reads .body, so the Case input is the customer email body and the binding
+# constructs the native initial state itself (no adapter input_key: the native
+# `current_email` field is an Email object, not raw text).
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "langgraph-email-automation"
+display_name = "Customer Support Email Automation"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+# The inner agent/ directory is ignored local material. ABB fetches this exact
+# commit into cache/sources/ and restores agent/ before SDK startup.
+method = "git"
+repository = "https://github.com/kaymen99/langgraph-email-automation"
+revision = "9ea0f54cb30a493bbc25114cfc1769a25d45169a"
+downloaded_on = "2026-10-07"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 300
+# MY_EMAIL is read directly by GmailToolsClass._should_skip_email.
+env_keys = ["MY_EMAIL"]
+# Google embeddings run against the real service, not the run target model
+# (see the tool_routes note below), so this one secret is injected for real.
+secret_env_keys = ["GOOGLE_API_KEY"]
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+binding = "bridge.py:create_graph"
+output_key = "generated_email"
+
+[llm_interception]
+trust_plugin = "pem-env"
+
+# Upstream's reasoning model. langchain_groq calls api.groq.com, so this route is
+# what lets the interceptor substitute the run target model for Groq's.
+[[llm_interception.credentials]]
+id = "openai-groq-api-key"
+agent_env = "GROQ_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat-groq"
+host_patterns = ["api.groq.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai-groq-api-key"
+
+# Google embeddings are deliberately NOT a substituted model route.
+#
+# src/agents.py builds the RAG retriever with
+# GoogleGenerativeAIEmbeddings("models/text-embedding-004"), and the committed
+# Chroma index at agent/db (collection "langchain", dimension 768, L2) was built
+# with that same model. The run target model cannot serve this call, and no other
+# embedding model produces vectors compatible with that index. The endpoint is
+# therefore a declared non-model tool dependency that is reached for real, using
+# the credential from runtime.secret_env_keys.
+#
+# src/agents.py also constructs ChatGoogleGenerativeAI("gemini-1.5-flash"), but
+# that client is never invoked by any chain (every chain uses the Groq model), so
+# no intercepted Gemini chat route is declared.
+[[llm_interception.tool_routes]]
+host_patterns = ["generativelanguage.googleapis.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1beta/models/*:embedContent", "/v1beta/models/*:batchEmbedContents"]
+purpose = "tool"
+required = true
