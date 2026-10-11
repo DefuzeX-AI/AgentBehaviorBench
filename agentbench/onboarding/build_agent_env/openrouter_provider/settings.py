@@ -12,6 +12,7 @@ ASSETS = Path(__file__).parent / "assets"
 @dataclass(frozen=True)
 class BuildSettings:
     model: str
+    thinking: str
     max_files: int
     max_file_bytes: int
     max_context_bytes: int
@@ -36,7 +37,10 @@ def load_settings(path: Path | None = None) -> BuildSettings:
     if set(values) != {item.name for item in fields(BuildSettings)}:
         raise BuildError("Unknown or missing build settings")
     for key, value in values.items():
-        if key == "model":
+        if key == "thinking":
+            if value not in ("", "enabled", "disabled"):
+                raise BuildError("build.thinking must be empty, enabled or disabled")
+        elif key == "model":
             if not isinstance(value, str):
                 raise BuildError("build.model must be a string")
         elif type(value) is not int or value < (0 if key in {"retries", "repair_attempts", "source_request_rounds"} else 1):

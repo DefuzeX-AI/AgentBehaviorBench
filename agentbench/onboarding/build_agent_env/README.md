@@ -84,6 +84,29 @@ Static checks do not establish that dependencies install or that the Agent runs.
 Those are tested by the existing certification pipeline after configuration is
 complete. No `evaluation/` folder is required for text-input Agents.
 
+If generation or source review stops with `finish_reason=length`, the provider
+exhausted the completion budget. For reasoning models this may include reasoning
+tokens as well as the final JSON. The error reports numeric usage when supplied
+by the provider, without exposing response content. Create a local settings file:
+
+```toml
+[build]
+max_output_tokens = 32768
+timeout_seconds = 300
+```
+
+Retry the same add command with `--build-settings /path/to/build-settings.toml`.
+Choose a budget supported by your provider; larger budgets may increase cost and
+latency. Completed files remain available. Other finish reasons, such as
+`content_filter`, do not establish token exhaustion and need separate diagnosis.
+
+For endpoints supporting the DeepSeek `thinking.type` parameter, an explicit
+`thinking = "disabled"` in `[build]` can reserve generation for the final JSON.
+The default empty value sends no toggle; unsupported providers should keep that
+default. This option affects onboarding only, invalidates cached model reviews,
+and does not change the benchmark Agent's model settings or skip validation.
+See [DeepSeek thinking mode](https://api-docs.deepseek.com/guides/thinking_mode/).
+
 When a valid `needs_input` response asks for concrete files already in `agent/`,
 the builder reads those files safely and resubmits the request automatically.
 It never imports source, follows unsafe symlinks or sends actual `.env` contents.

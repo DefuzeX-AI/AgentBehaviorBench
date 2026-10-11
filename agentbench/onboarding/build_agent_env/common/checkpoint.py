@@ -55,6 +55,7 @@ class Checkpoint:
         fingerprint = digest(json.dumps({
             "context": session.context, "answers": session.answers,
             "generation_model": session.generation_model,
+            "generation_thinking": session.settings.thinking,
             "native_environment_presence": environment_presence(session.context, session.environ),
             "source_request_contract": "bounded-existing-files-v1",
             "sdk": session.sdk.onboarding_requirements(),

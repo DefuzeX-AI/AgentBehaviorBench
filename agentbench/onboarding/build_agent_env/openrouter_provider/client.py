@@ -65,6 +65,8 @@ class OpenRouterClient:
                 "provider": {"require_parameters": True},
                 "response_format": {"type": "json_schema", "json_schema": {
                     "name": "agent_environment", "strict": True, "schema": schema}}}
+        if self.settings.thinking:
+            body["thinking"] = {"type": self.settings.thinking}
         request = Request(self.target.base_url + "/chat/completions",
                           data=json.dumps(body).encode(), method="POST", headers={
                               **self.target.headers, "Content-Type": "application/json",
@@ -107,9 +109,12 @@ class OpenRouterClient:
                 "Model response contains a credential; it was not saved or sent back",
                 diagnostics=metadata)
         if isinstance(choice, dict) and choice.get("finish_reason") != "stop":
+            metadata = {**metadata, "max_output_tokens": self.settings.max_output_tokens}
+            hint = ("increase [build].max_output_tokens using --build-settings"
+                    if choice.get("finish_reason") == "length" else "check provider finish reason")
             details = ", ".join(f"{key}={value}" for key, value in metadata.items())
             raise ProviderResponseError(
-                f"OpenRouter did not finish the configuration: {details}; check output token budget",
+                f"OpenRouter did not finish the configuration: {details}; {hint}",
                 diagnostics=metadata)
         if not isinstance(content, str):
             raise ProviderResponseError(
