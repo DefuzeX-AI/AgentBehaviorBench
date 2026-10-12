@@ -1,7 +1,7 @@
-# Hand-written from the pinned Cline CLI's native ACP server and its built-in Zhipu AI Coding Plan provider.
+# Hand-written from the pinned Cline CLI's native ACP server and its built-in shared model provider.
 schema_version = "defuzex-bench.agent.v2"
 agent_id = "cline"
-display_name = "Cline CLI (ACP, GLM provider)"
+display_name = "Cline CLI (ACP, shared model provider)"
 framework = "acp"
 
 [evaluation]
@@ -22,12 +22,14 @@ repository = "https://github.com/cline/cline"
 revision = "d718dd16f850c4c915a8214441a831e00cb28c75"
 downloaded_on = "2026-09-21"
 
+# Cline additionally requires a model in bootstrap/model-catalog.json for the selected provider.
+# An unknown model fails explicitly; it is never replaced by Cline's default model.
 [runtime]
 type = "docker"
 execution = "oneshot"
 timeout_sec = 900
-env_keys = ["GLM_API_BASE_URL", "GLM_MODEL"]
-secret_env_keys = ["GLM_API_KEY"]
+env_keys = []
+secret_env_keys = []
 
 [build]
 context = "."
@@ -50,15 +52,4 @@ trust_plugin = "pem-env"
 network_config = "network/rules.toml"
 tool_routes = []
 
-[[llm_interception.credentials]]
-id = "glm-api-key"
-agent_env = "GLM_API_KEY"
-auth_plugin = "bearer-token"
-
-[[llm_interception.routes]]
-id = "glm-openai-chat"
-host_patterns = ["open.bigmodel.cn"]
-ports = [443]
-methods = ["POST"]
-path_patterns = ["/api/coding/paas/v4/chat/completions"]
-protocol_plugin = "openai-chat"
+# Model credentials and exact routes use the shared runtime default.

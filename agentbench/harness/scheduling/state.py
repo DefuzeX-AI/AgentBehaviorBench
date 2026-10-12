@@ -20,6 +20,11 @@ class AgentSeed:
     retries: dict[int, int] = field(default_factory=dict)
     retry_at: dict[int, float] = field(default_factory=dict)
     waiting_results: dict[int, CaseResult] = field(default_factory=dict)
+    preparation_attempts: int = 0
+    preparation_until: float = 0
+    dependency_until: float = 0
+    dependency_count: int = 0
+    dependency_blocked: dict | None = None
 
 
 @dataclass
@@ -28,6 +33,8 @@ class AgentState:
     started: bool = False
     completed: bool = False
     preparation_error: EvaluationFailure | None = None
+    preparation_attempts: int = 0
+    preparation_until: float = 0
     pending: deque = field(default_factory=deque)
     results: dict = field(default_factory=dict)
     identities: dict = field(default_factory=dict)
@@ -36,6 +43,9 @@ class AgentState:
     retries: dict = field(default_factory=dict)
     recoveries: dict = field(default_factory=dict)
     waiting_results: dict = field(default_factory=dict)
+    dependency_until: float = 0
+    dependency_count: int = 0
+    dependency_blocked: dict | None = None
 
     def __post_init__(self):
         parent = self.preparation.identity
@@ -44,6 +54,11 @@ class AgentState:
             for index in range(self.preparation.registration.case_count)}
 
     def initialize(self, seed: AgentSeed):
+        self.preparation_attempts = seed.preparation_attempts
+        self.preparation_until = seed.preparation_until
+        self.dependency_until = seed.dependency_until
+        self.dependency_count = seed.dependency_count
+        self.dependency_blocked = seed.dependency_blocked
         self.results.update(seed.results)
         self.prepared.update(seed.prepared)
         self.attempts.update(seed.attempts)

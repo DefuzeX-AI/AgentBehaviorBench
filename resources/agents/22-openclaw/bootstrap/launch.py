@@ -14,9 +14,9 @@ import time
 from urllib.parse import urlsplit
 
 
-KEY_ENV = "GLM_API_KEY"
-BASE_URL_ENV = "GLM_API_BASE_URL"
-MODEL_ENV = "GLM_MODEL"
+KEY_ENV = "ABB_AGENT_MODEL_API_KEY"
+BASE_URL_ENV = "ABB_AGENT_MODEL_BASE_URL"
+MODEL_ENV = "ABB_AGENT_MODEL"
 TOKEN_ENV = "OPENCLAW_GATEWAY_TOKEN"
 OPENCLAW = Path(__file__).resolve().parents[1] / "agent/node_modules/.bin/openclaw"
 # Fixed because network/rules.toml admits exactly this loopback port: the runtime
@@ -55,7 +55,7 @@ def gateway_config(base_url: str, model: str, port: int, workdir: str) -> dict:
         },
         "agents": {
             "defaults": {
-                "model": {"primary": f"glm/{model}"},
+                "model": {"primary": f"abb/{model}"},
                 # Coding tools run in the ABB Case workspace; OpenClaw's own
                 # managed workspace (memory, persona files) stays in HOME.
                 "cwd": workdir,
@@ -71,7 +71,7 @@ def gateway_config(base_url: str, model: str, port: int, workdir: str) -> dict:
             "catalogRefresh": {"enabled": False},
             "mode": "merge",
             "providers": {
-                "glm": {
+                "abb": {
                     "baseUrl": base_url,
                     "apiKey": "${" + KEY_ENV + "}",
                     "api": "openai-completions",

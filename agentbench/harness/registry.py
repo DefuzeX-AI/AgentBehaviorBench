@@ -107,8 +107,10 @@ def _parse_agent(item: dict[str, object], repo_root: Path) -> AgentRegistration:
     if isinstance(acquisition, InstallSource):
         from agentbench.runtime.source.installation import installation_files
         installation_files(agent_path)
-    if not source_path.is_dir() and acquisition is None:
-        raise FileNotFoundError(f"Agent source directory does not exist: {source_path}")
+    # Discovery reads integration metadata only. Source preparation validates
+    # selected units before SDK startup, including manually supplied sources.
+    if source_path.exists() and not source_path.is_dir():
+        raise ValueError(f"Agent source path is not a directory: {source_path}")
 
     from agentbench.runtime.agentcontainer.config import manifest_runtime_type, docker_structure
     if manifest_runtime_type(manifest) == "docker":

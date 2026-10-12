@@ -8,6 +8,7 @@ from ..observation.capture import ResponseCapture
 from ..registry import load_protocols, load_wires
 from ..routing.automatic import AutomaticModelRouter
 from ..error import ErrorCode, TargetRoutingError
+from ..contracts import StreamCompletionProtocol
 from ..security.redaction import redact, _secret_key
 
 
@@ -84,6 +85,7 @@ class ObserveInterceptor(CommonInterceptor):
                 if chunk:
                     capture.write(chunk)
                 else:
+                    flow.metadata.pop('defuzex_capture', None)
                     self._record_response(flow, capture.finish())
                     flow.metadata['observe_recorded'] = True
             except Exception:
@@ -98,12 +100,18 @@ class ObserveInterceptor(CommonInterceptor):
                 or flow.metadata.get('observe_blocked')):
             return
         if flow.metadata.get('observe_protocol') or flow.metadata.get('abb_tool'):
+            flow.metadata['observe_recorded'] = True
+            capture = flow.metadata.pop('defuzex_capture', None)
             try:
-                self._record_response(flow, flow.response.raw_content or b'')
+                content = capture.finish() if capture is not None else flow.response.raw_content or b''
+                self._record_response(flow, content)
             except Exception:
                 self._capture_error(flow)
+            finally:
+                if capture is not None:
+                    capture.close()
 
-    def _record_response(self, flow, content):
+    def _record_response(self, flow, content, *, client_closed_early=False):
         response = flow.response.copy()
         response.raw_content = content
         decoded = response.content or b''
@@ -120,6 +128,8 @@ class ObserveInterceptor(CommonInterceptor):
                 # Raw evidence is still available. Parsing is not model execution.
                 body['decode_status'] = 'unparsed'
         fields = self._tool_fields(flow) if tool else self._fields(flow)
+        if client_closed_early:
+            fields['client_closed_early'] = True
         events.emit(name, **fields, **body, status=response.status_code, source='native',
                     latency_ms=round((time.monotonic()-flow.metadata['defuzex_started'])*1000, 3))
 
@@ -143,20 +153,57 @@ class ObserveInterceptor(CommonInterceptor):
         flow.metadata['observe_blocked'] = True
         super()._error(flow, message, status, code=code)
 
+    def _complete_stream(self, flow, content):
+        protocol = self.protocols.get(flow.metadata.get('observe_protocol'))
+        if (flow.response is None or flow.metadata.get('source_grpc')
+                or flow.metadata.get('abb_tool') or flow.metadata.get('observe_auxiliary')
+                or not 200 <= flow.response.status_code < 300
+                or not isinstance(protocol, StreamCompletionProtocol)):
+            return False
+        try:
+            response = flow.response.copy()
+            response.raw_content = content
+            # Decode Content-Encoding on a copy, exactly as for ordinary evidence.
+            return protocol.stream_complete(response.content or b'', response.headers.get('content-type', ''))
+        except Exception:
+            # An unknown encoding/protocol cannot prove a complete native response.
+            return False
+
     def error(self, flow):
         capture = flow.metadata.pop('defuzex_capture', None)
-        if capture:
-            capture.close()
         if 'defuzex_call_id' not in flow.metadata:
-            return
-        name = ('tool_error' if flow.metadata.get('abb_tool') else
-                'model_auxiliary_error' if flow.metadata.get('observe_auxiliary') else 'llm_error')
-        fields = self._tool_fields(flow) if flow.metadata.get('abb_tool') else self._fields(flow)
-        events.emit(name, **fields, error_code='transport_error', source='native',
-                    error=redact(str(flow.error), self.secrets))
-        # Preserve a failed connection, rather than mitmproxy's synthetic HTML 502.
-        if flow.killable:
-            flow.kill()
+            if capture is not None:
+                capture.close()
+            return  # Egress handoffs are owned by the observer, including disconnects.
+        try:
+            if flow.metadata.get('observe_recorded'):
+                return
+            flow.metadata['observe_recorded'] = True
+            error = str(flow.error)
+            client_closed = error.lower().startswith(('client disconnected', 'stream reset by client'))
+            if capture is not None and client_closed:
+                try:
+                    content = capture.finish()
+                except Exception:
+                    self._capture_error(flow)
+                    return
+                if self._complete_stream(flow, content):
+                    try:
+                        self._record_response(flow, content, client_closed_early=True)
+                    except Exception:
+                        self._capture_error(flow)
+                    return
+            name = ('tool_error' if flow.metadata.get('abb_tool') else
+                    'model_auxiliary_error' if flow.metadata.get('observe_auxiliary') else 'llm_error')
+            fields = self._tool_fields(flow) if flow.metadata.get('abb_tool') else self._fields(flow)
+            events.emit(name, **fields, error_code='transport_error', source='native',
+                        error=redact(error, self.secrets))
+        finally:
+            if capture is not None:
+                capture.close()
+            # Preserve the disconnect; never synthesize a reply to the Agent.
+            if flow.killable:
+                flow.kill()
 
     def _remember_secrets(self, request):
         values = []

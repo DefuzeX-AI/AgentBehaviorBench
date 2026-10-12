@@ -102,7 +102,7 @@ def test_close_while_waiting_for_writer_lock_never_dispatches(tmp_path, monkeypa
 def test_no_view_run_does_not_register_background_controller(tmp_path, monkeypatch):
     agent = make_agent(tmp_path, 1)
     runner = SuiteRunner(runner_factory=Factory())
-    monkeypatch.setattr(configuration, 'runner_configuration', lambda value: {})
+    monkeypatch.setattr(configuration, 'runner_configuration', lambda value, agents: {})
     def unexpected(*args, **kwargs):
         pytest.fail('A no-view run must not create a recovery controller')
     monkeypatch.setattr(control, 'register_control', unexpected)
@@ -117,7 +117,7 @@ def test_no_view_run_does_not_register_background_controller(tmp_path, monkeypat
 def test_failed_viewer_start_closes_registered_controller_before_run(tmp_path, monkeypatch):
     agent = make_agent(tmp_path, 1)
     runner = SuiteRunner(runner_factory=Factory())
-    monkeypatch.setattr(configuration, 'runner_configuration', lambda value: {})
+    monkeypatch.setattr(configuration, 'runner_configuration', lambda value, agents: {})
     registered = []
     original = control.register_control
     def register(*args):
@@ -152,7 +152,7 @@ def test_running_viewer_stop_releases_its_controller_and_http_resources(tmp_path
 def test_session_quit_closes_control_even_for_injected_viewer(tmp_path, monkeypatch):
     agent = make_agent(tmp_path, 1)
     runner = SuiteRunner(runner_factory=Factory())
-    monkeypatch.setattr(configuration, 'runner_configuration', lambda value: {})
+    monkeypatch.setattr(configuration, 'runner_configuration', lambda value, agents: {})
     stopped = []
     injected = SimpleNamespace(url='http://127.0.0.1/', stop=lambda: stopped.append(True))
     outcome = execution.run_benchmark_session((agent,), runner=runner, output_path=tmp_path / 'result.json',
@@ -187,7 +187,7 @@ def test_failed_fresh_suite_index_closes_writer_before_any_dispatch(tmp_path, mo
     agent = make_agent(tmp_path, 1)
     factory = Factory()
     runner = SuiteRunner(runner_factory=factory)
-    monkeypatch.setattr(configuration, 'runner_configuration', lambda value: {})
+    monkeypatch.setattr(configuration, 'runner_configuration', lambda value, agents: {})
     def failed_index(*args, **kwargs):
         raise OSError('Cannot publish Suite reference')
     monkeypatch.setattr(fresh, 'register_suite_reference', failed_index)

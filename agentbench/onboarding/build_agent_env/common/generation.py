@@ -3,13 +3,12 @@
 import json
 from pathlib import Path
 
-from .errors import BuildError, BuildPaused
-from .responses import validate_response
+from .errors import BuildError, BuildPaused, StageResponseError
+from .repair import RepairBudget, request_response
 from .writer import confined, install_file, save_json
 from .review import review_file
 from .checkpoint import digest
 from ..openrouter_provider.privacy import contains_secret, redact
-from ..openrouter_provider.source_requests import generate_with_source
 
 SCHEMA = Path(__file__).parents[1] / "openrouter_provider/assets/file-response.schema.json"
 
@@ -59,33 +58,24 @@ def generate_file(step, session, stage, prefix, *, checkpoint=None):
     schema["properties"]["path"]["enum"] = [step.path]
     base_payload = {**session.payload(), **step.request_data, "target_path": step.path}
     payload = base_payload
-    for index in range(session.settings.repair_attempts + 1):
-        session.output_fn(prefix + (": generating" if index == 0 else ": correcting current file"))
-        response = generate_with_source(session, payload, prompt=step.prompt, schema=schema,
-                                        stage=stage, checkpoint=checkpoint)
-        if contains_secret(json.dumps(response), session.environ):
-            raise BuildError("Model response contains a credential; it was not saved or sent back")
-        save_json(stage / f"response-{index + 1}.json", response)
+    budget = RepairBudget(session.settings.repair_attempts)
+    while True:
+        session.output_fn(prefix + (": generating" if payload is base_payload else ": correcting current file"))
+        response = request_response(session, payload, prompt=step.prompt, schema=schema,
+                                    stage=stage, checkpoint=checkpoint, budget=budget)
         try:
-            validate_response(response, schema, session)
             if response["status"] != "complete":
                 raise BuildPaused(response["status"], response["missing_information"])
             content = step.render(response, session) if step.render else response["content"]
             if contains_secret(content, session.environ):
-                raise BuildError("Rendered file contains credentials")
+                raise StageResponseError("Rendered file contains credentials")
             if not content.strip():
                 raise BuildError("Generated file content is empty")
             (stage / "candidate").write_text(content, encoding="utf-8")
             step.validate(content, session)
-            review_file(step, content, session, stage, prefix, checkpoint=checkpoint)
+            review_file(step, content, session, stage, prefix, checkpoint=checkpoint, budget=budget)
             return content
-        except BuildPaused:
+        except (BuildPaused, StageResponseError):
             raise
         except (ValueError, OSError, SyntaxError) as exc:
-            message = redact(str(exc), session.environ)
-            save_json(stage / f"validation-{index + 1}.json", {"path": step.path, "error": message})
-            if index == session.settings.repair_attempts:
-                raise BuildError(f"{step.path}: {message}") from None
-            payload = {**base_payload,
-                       "previous_response": response, "validation_error": message}
-    raise AssertionError("unreachable")
+            payload = budget.correction(session, stage, "validation", base_payload, exc, response)

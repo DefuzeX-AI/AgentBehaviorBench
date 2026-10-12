@@ -1,4 +1,4 @@
-"""Map an OpenAI-compatible GLM profile onto Kode's model-profile config and start its ACP server."""
+"""Map the selected OpenAI-compatible model profile onto Kode's model-profile config and start its ACP server."""
 from __future__ import annotations
 
 import json
@@ -10,12 +10,11 @@ import time
 from urllib.parse import urlsplit
 
 
-KEY_ENV = "GLM_API_KEY"
-BASE_URL_ENV = "GLM_API_BASE_URL"
-MODEL_ENV = "GLM_MODEL"
-# Kode's built-in provider id for Zhipu's OpenAI-compatible GLM Coding Plan
-# endpoint; it selects the Chat Completions adapter for glm-5.x models.
-PROVIDER = "glm-coding"
+KEY_ENV = "ABB_AGENT_MODEL_API_KEY"
+BASE_URL_ENV = "ABB_AGENT_MODEL_BASE_URL"
+MODEL_ENV = "ABB_AGENT_MODEL"
+# Kode's native custom-openai provider selects its Chat Completions adapter.
+PROVIDER = "custom-openai"
 AGENT_DIR = Path(__file__).resolve().parents[1] / "agent"
 KODE_ENTRY = AGENT_DIR / "node_modules/@shareai-lab/kode/dist/index.js"
 
@@ -46,8 +45,7 @@ def prepare(environ: dict[str, str]) -> tuple[list[str], dict[str, str], dict]:
         # Kode reads the credential only from the model profile (there is no
         # environment-variable reference for custom profiles), so it is written
         # to a 0600 file in the disposable per-Case HOME, never to the image,
-        # argv or this unit. Under ABB interception this is the runtime's
-        # surrogate credential, not the upstream key.
+        # argv or this unit. Observe mode uses the selected upstream credential.
         "modelProfiles": [{
             "name": model,
             "provider": PROVIDER,
@@ -59,7 +57,7 @@ def prepare(environ: dict[str, str]) -> tuple[list[str], dict[str, str], dict]:
             "isActive": True,
             "createdAt": int(time.time() * 1000),
         }],
-        # ACP session/new does not pick a model; every Kode role uses GLM.
+        # ACP session/new does not pick a model; every Kode role uses the selected model.
         "modelPointers": {"main": model, "task": model, "compact": model, "quick": model},
     }
     child = {

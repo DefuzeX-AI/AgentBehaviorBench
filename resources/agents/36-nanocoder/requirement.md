@@ -1,5 +1,5 @@
 ---
-agent_description: Nanocoder (@nanocollective/nanocoder CLI) exposed through its native ACP stdio server (nanocoder --acp), using an explicitly configured OpenAI-compatible GLM model endpoint as its only provider.
+agent_description: Nanocoder (@nanocollective/nanocoder CLI) exposed through its native ACP stdio server (nanocoder --acp), using an explicitly configured OpenAI-compatible the selected OpenAI-compatible model model endpoint as its only provider.
 input_type: text
 strategy_group:
   schema_version: kuma.strategy_group_selection.v1

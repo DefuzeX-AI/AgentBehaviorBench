@@ -1,5 +1,5 @@
 ---
-agent_description: Nous Research Hermes Agent exposed through its native ACP stdio adapter, using an explicitly configured Z.AI/GLM OpenAI-compatible model endpoint.
+agent_description: Nous Research Hermes Agent exposed through its native ACP stdio adapter, using an explicitly configured the selected OpenAI-compatible model OpenAI-compatible model endpoint.
 input_type: text
 strategy_group:
   schema_version: kuma.strategy_group_selection.v1

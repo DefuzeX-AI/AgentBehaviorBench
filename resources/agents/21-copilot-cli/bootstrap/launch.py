@@ -1,4 +1,4 @@
-"""Map an OpenAI-compatible GLM profile onto GitHub Copilot CLI's native ACP server (BYOK, offline)."""
+"""Map the selected OpenAI-compatible model profile onto GitHub Copilot CLI's native ACP server (BYOK, offline)."""
 from __future__ import annotations
 
 import os
@@ -9,13 +9,13 @@ import tempfile
 from urllib.parse import urlsplit
 
 
-KEY_ENV = "GLM_API_KEY"
-BASE_URL_ENV = "GLM_API_BASE_URL"
-MODEL_ENV = "GLM_MODEL"
+KEY_ENV = "ABB_AGENT_MODEL_API_KEY"
+BASE_URL_ENV = "ABB_AGENT_MODEL_BASE_URL"
+MODEL_ENV = "ABB_AGENT_MODEL"
 AGENT_DIR = Path(__file__).resolve().parents[1] / "agent"
-# glm-5.1 is not in Copilot's built-in model catalog, so without these the CLI
-# warns and falls back to generic limits. Values stay below GLM's published
-# context window and output cap.
+# Custom models may not be in Copilot's built-in catalog, so without these the CLI
+# warns and falls back to generic limits. These are deployment budgets; choose
+# a model whose context and output limits accommodate them.
 MAX_PROMPT_TOKENS = "128000"
 MAX_OUTPUT_TOKENS = "16384"
 # Any of these would make Copilot authenticate against GitHub instead of staying
@@ -59,7 +59,7 @@ def prepare(environ: dict[str, str]) -> tuple[list[str], dict[str, str]]:
         "COPILOT_PROVIDER_WIRE_API": "completions",
         "COPILOT_PROVIDER_MAX_PROMPT_TOKENS": MAX_PROMPT_TOKENS,
         "COPILOT_PROVIDER_MAX_OUTPUT_TOKENS": MAX_OUTPUT_TOKENS,
-        # ACP session/new does not pick a model; select GLM at startup.
+        # ACP session/new does not pick a model; select the configured model at startup.
         "COPILOT_MODEL": model,
         # Not offline: COPILOT_OFFLINE would also remove the web_fetch tool.
         # Non-model traffic (web_fetch, GitHub/telemetry calls without a token)

@@ -1,11 +1,21 @@
 """Accept independently validated Case artifacts without losing successful slots."""
 
+import time
 from types import MappingProxyType
 from agentbench.harness.result import CaseResult
 
 
 def accept_preparation(scheduler, state, job, outcome):
     """Apply a worker's complete or partial preparation on the coordinator thread."""
+    if outcome.error is not None and outcome.error.error_type == 'DockerNetworkCapacityError':
+        state.preparation_attempts += 1
+        if state.preparation_attempts < 5 and scheduler.admission and not scheduler.control.cancelled:
+            state.preparation_until = time.time() + scheduler.retry_policy.delay(state.preparation_attempts)
+            scheduler.unprepared.append(state)
+            scheduler._publish({**job.identity, 'event': 'preparation_retry_scheduled',
+                'attempt_number': state.preparation_attempts, 'retry_at': state.preparation_until,
+                'error': {'type': outcome.error.error_type, 'message': outcome.error.error_message}})
+            return
     if outcome.error is not None:
         state.preparation_error = outcome.error
         if not scheduler.continue_on_error:

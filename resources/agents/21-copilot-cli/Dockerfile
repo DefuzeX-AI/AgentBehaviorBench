@@ -8,7 +8,8 @@ ENV PATH=/opt/agent/agent/node_modules/.bin:/opt/venv/bin:$PATH PYTHONPATH=/opt/
     PYTHONUNBUFFERED=1 HOME=/home/agent
 WORKDIR /opt/agent
 COPY agent/ ./agent/
-RUN cd agent && npm ci --omit=dev --no-audit --no-fund && npm cache clean --force \
+RUN cd agent && npm ci --omit=dev --include=optional --no-audit --no-fund \
+    && ./node_modules/.bin/copilot --version && npm cache clean --force \
     && python -m pip install --no-cache-dir 'opentelemetry-sdk>=1.30,<2' 'jsonschema>=4.23,<5' 'python-dotenv>=1,<2' \
     && useradd --create-home --uid 10001 agent \
     && mkdir -p /home/agent/workspace \

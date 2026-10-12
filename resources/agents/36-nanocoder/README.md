@@ -13,29 +13,15 @@ installs the unmodified npm package and its dependencies at build time.
 
 ## Model provider
 
-The acceptance profile uses Zhipu GLM's OpenAI-compatible coding endpoint.
-Supply these variables only at runtime:
+This unit uses default model selection; no `[model]` declaration is needed. Configure the selected provider in
+`.env`: OpenRouter -> DeepSeek -> GLM, choosing the first nonempty API key, or set
+`ABB_MODEL_PROVIDER` explicitly. Supply the selected provider's model name as well.
+See [model selection](../../../docs/Model-Selection.md) for variables and constraints.
 
-- `GLM_API_BASE_URL`: the OpenAI-style base URL, e.g.
-  `https://open.bigmodel.cn/api/coding/paas/v4`.
-- `GLM_MODEL`: the exact provider model ID, such as `glm-5.1`.
-- `GLM_API_KEY`: the Bearer credential. It is never written into this unit.
-
-The launcher sets `NANOCODER_PROVIDERS` (Nanocoder's highest-precedence provider
-source, above global and project `agents.config.json`) to one provider:
-
-```json
-[{"name": "abb-glm", "sdkProvider": "openai-compatible",
-  "baseUrl": "$GLM_API_BASE_URL", "apiKey": "${GLM_API_KEY}", "models": ["$GLM_MODEL"]}]
-```
-
-`apiKey` is the literal reference `${GLM_API_KEY}`, which Nanocoder expands from its
-own environment when it loads providers, so the key is never written to disk or
-argv. It starts `nanocoder --acp --provider abb-glm --model $GLM_MODEL`.
-`@ai-sdk/openai-compatible` sends `POST <baseUrl>/chat/completions`, exactly the
-admitted route `POST https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`.
-A different provider needs an explicit reviewed route update; changing environment
-variables alone does not broaden container egress.
+ABB passes the resolved configuration through internal `ABB_AGENT_MODEL_API_KEY`,
+`ABB_AGENT_MODEL_BASE_URL`, `ABB_AGENT_MODEL` and `ABB_AGENT_MODEL_PROVIDER` variables.
+Users do not fill these internal variables. Only the selected credential reaches the
+launcher. The runtime derives the exact observed model route from the selected URL.
 
 ## Distribution
 
@@ -87,8 +73,13 @@ are captured by ABB's workspace file evidence, and model traffic by the intercep
   when the agent changed nothing.
 - Nanocoder loads a `.env` file and a project `agents.config.json` from the
   working directory if a Case creates them; the launcher's environment provider
-  still takes precedence for `abb-glm`.
+  still takes precedence for `abb-shared`.
 
 ## Installation inputs
 
 Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.
+
+## Validation scope
+
+Earlier acceptance records describe the previous fixed-provider deployment. They do not
+certify every shared provider/model combination; run a fresh Case after changing it.

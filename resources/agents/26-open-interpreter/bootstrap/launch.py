@@ -1,4 +1,4 @@
-"""Map an OpenAI-compatible GLM profile onto Open Interpreter's native ACP server."""
+"""Map the selected OpenAI-compatible model profile onto Open Interpreter's native ACP server."""
 from __future__ import annotations
 
 import json
@@ -12,24 +12,17 @@ import threading
 from urllib.parse import urlsplit
 
 
-KEY_ENV = "GLM_API_KEY"
-BASE_URL_ENV = "GLM_API_BASE_URL"
-MODEL_ENV = "GLM_MODEL"
+KEY_ENV = "ABB_AGENT_MODEL_API_KEY"
+BASE_URL_ENV = "ABB_AGENT_MODEL_BASE_URL"
+MODEL_ENV = "ABB_AGENT_MODEL"
 INTERPRETER_BIN = "/opt/open-interpreter/bin/interpreter"
-PROVIDER_ID = "abb_glm"
+PROVIDER_ID = "abb_shared"
 # Open Interpreter installs its apply_patch helper aliases under
 # INTERPRETER_HOME but refuses to do so below the system temp dir, so the
 # per-Case home lives in this image directory (mode 1777) instead of /tmp.
 STATE_ROOT = "/var/lib/abb-open-interpreter"
-# Context windows for GLM models (Zhipu/Z.AI published limits). Unknown models
-# keep Open Interpreter's own default.
-CONTEXT_LIMITS = {
-    "glm-5.1": 200_000,
-    "glm-5": 204_800,
-    "glm-5-turbo": 200_000,
-    "glm-4.7": 204_800,
-    "glm-4.6": 204_800,
-}
+# Conservative deployment budget; do not reuse the previous GLM model catalog.
+CONTEXT_LIMIT = 128_000
 
 
 def toml_string(value: str) -> str:
@@ -51,8 +44,7 @@ def config_toml(base_url: str, model: str) -> str:
         # to PATH; shell tools therefore run as non-login `bash -c`.
         "allow_login_shell = false",
     ]
-    if model in CONTEXT_LIMITS:
-        lines.append(f"model_context_window = {CONTEXT_LIMITS[model]}")
+    lines.append(f"model_context_window = {CONTEXT_LIMIT}")
     lines += [
         "",
         # Stable-on features that call hosted OpenAI/ChatGPT services at session
@@ -77,13 +69,13 @@ def config_toml(base_url: str, model: str) -> str:
         "enabled = false",
         "",
         f"[model_providers.{PROVIDER_ID}]",
-        'name = "GLM (ABB)"',
+        'name = "ABB selected model"',
         f"base_url = {toml_string(base_url)}",
         # Open Interpreter reads the credential from this variable at request
         # time; the key itself is never written into the file.
         f"env_key = {toml_string(KEY_ENV)}",
-        # The GLM coding endpoint is OpenAI Chat Completions compatible; the
-        # chat wire appends /chat/completions, which is the admitted route.
+        # The native chat wire appends /chat/completions to the selected base URL,
+        # matching the route resolved by the host.
         'wire_api = "chat"',
         "",
     ]

@@ -105,12 +105,21 @@ Conditional rules (`if`/`then`/`else`), patterns, lengths and numeric/array boun
 are enforced locally rather than sent to the provider. Unknown schema constructs
 raise an explicit error instead of silently removing structural requirements.
 
-After decoding, planning and file generation validate against the **original**
-schema before accepting a plan or installing a file. An invalid response enters
-the same bounded per-stage correction loop; exhausting `repair_attempts` stops
-that stage and preserves earlier files. This does not disable strict output,
-change models or bypass business validation. Provider model support and schema
-size/depth limits still apply.
+Planning, file generation and review validate against their **original** local
+schemas. Bounded diagnostics identify field paths, expected constraints and actual
+types without dumping instance content. Invalid model-content JSON provides
+decoder line/column/offset feedback and can be corrected using credential-checked
+content in memory; malformed content is not saved. Corrections use the existing
+`repair_attempts` setting: planning has its own budget, while generation, local
+file validation and review share one budget per file. A malformed review is retried
+as a review, without regenerating the candidate. Exhaustion stops the stage and
+preserves earlier files. HTTP retries and source requests retain their separate
+limits. Invalid provider envelopes, credentials and unfinished responses stop
+without content corrections. Available finish reason, token usage and content
+length are saved as safe provider metadata; no raw provider envelope is stored.
+See [the troubleshooting guide](../../../docs/Troubleshooting.md#structured-output-generation-failures)
+for record names. Strict output and business validation remain enabled; provider
+model support and schema size/depth limits still apply.
 
 Provider references: [Azure structured outputs](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/structured-outputs#json-schema-support-and-limitations)
 and [OpenRouter structured outputs](https://openrouter.ai/docs/guides/features/structured-outputs).
@@ -174,3 +183,22 @@ The generic worker overlay installs registered adapter requirements into the
 worker's interpreter. SDK plugin dependencies remain owned by their SDK overlay.
 Source snapshots materialize contained regular-file symlinks; external, broken,
 cyclic and directory links are rejected. The imported source is not modified.
+
+## Durable source and installation inputs
+
+Before source evidence is collected, apply any existing outer `install/` inputs
+using the runtime's conflict-preserving, per-unit locked copier. Combined validation
+repeats this check and validates the source acquisition declaration before registry
+writes. This applies to Git, bundled/manual and install-only units. Install-only
+units require nonempty inputs; optional inputs must also be safe and nonempty.
+
+ABB-owned graph descriptors use `abb-*.json`: a descriptor present only inside
+ignored `agent/` is rejected. Save it under `install/` at the same relative path.
+Do not invent a descriptor during generation; use an existing upstream descriptor
+or a source-backed outer binding without config/graph_id. Bindings remain outer
+`bindings/*.py`. Differing installation copies stop generation before model calls.
+
+Manifest provenance sets method=git for supported full-SHA GitHub imports, bundled
+for local/manual prerequisites (including submodules, symlinks and LFS declarations),
+and preserves existing explicit methods. The source and generated files are never
+silently rewritten to change an existing unit's acquisition policy.

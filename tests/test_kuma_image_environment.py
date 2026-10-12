@@ -38,7 +38,8 @@ def test_overlay_preserves_native_environment_and_other_tables(tmp_path, runtime
             assert 'DATABASE_HOST' in keys
         assert parsed['runtime']['secret_env_keys'] == ['DATABASE_PASSWORD']
         assert parsed['other']['env_keys'] == ['KEEP_ME']
-        assert parsed['launch']['argv'][-1] == 'agentbench.sdk.plugin.kuma.worker'
+        assert parsed['launch']['argv'][:3] == ['python', '-I', '-c']
+        assert 'agentbench.sdk.plugin.kuma.worker' in parsed['launch']['argv'][-1]
     assert manifest.read_text() == source
 
 
@@ -82,6 +83,10 @@ cwd="/workspace"
         env = child_environment(ACPConfig.from_agent_dir(staged.path))
         assert env['NATIVE_SETTING'] == 'value'
         assert 'KUMA_API_KEY' not in env and 'DEFUZEX_API_KEY' not in env
-        worker = AgentContainerConfig.from_agent_dir(staged.path, secret_resolver=None,
-            environ={'KUMA_API_KEY': 'synthetic-sdk-secret', 'NATIVE_SETTING': 'value'})
+        from agentbench.runtime.contracts import EnvironmentSecretResolver
+        values = {'KUMA_API_KEY': 'synthetic-sdk-secret', 'NATIVE_SETTING': 'value',
+                  'OPENROUTER_API_KEY': 'synthetic-model-secret', 'OPENROUTER_MODEL': 'test-model'}
+        worker = AgentContainerConfig.from_agent_dir(staged.path,
+            secret_resolver=EnvironmentSecretResolver(values), environ=values)
+        assert worker.environment['ABB_AGENT_MODEL_API_KEY'] == 'synthetic-model-secret'
         assert worker.environment['KUMA_API_KEY'] == 'synthetic-sdk-secret'

@@ -97,15 +97,16 @@ def reuse_inputs(directory, *, environ, model=None, max_steps=None, runner=None,
     configuration = deepcopy(plan['configuration'])
     if model is not None:
         configuration['model'] = model
+        configuration['model_override'] = model
     if max_steps is not None:
         configuration['sdk_options'] = {**configuration.get('sdk_options', {}), 'max_steps': max_steps}
     injected = runner is not None
     runner = runner or build_saved_runner(configuration, environ)
-    current = runner_configuration(runner)
+    current = runner_configuration(runner, selected)
     if injected and (model is not None or max_steps is not None):
         if current is None:
             raise ValueError('An injected runner must report its applied configuration to accept overrides')
-        if (model is not None and current.get('model') != model
+        if (model is not None and current.get('model_override', current.get('model')) != model
                 or max_steps is not None and (current.get('sdk_options') or {}).get('max_steps') != max_steps):
             raise ValueError('Injected runner configuration does not match the requested overrides')
     # The builder uses saved semantic options but current code/dependencies.

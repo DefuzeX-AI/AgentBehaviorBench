@@ -11,18 +11,17 @@ native binary in the optional dependency `@cline/cli-linux-x64@3.0.62`
 (about 151 MB, Bun runtime embedded). Both are pinned with registry integrity in
 `install/package-lock.json`.
 
-The acceptance profile uses Zhipu GLM's OpenAI-compatible coding endpoint.
-Supply these variables only at runtime:
+This unit uses default model selection; no `[model]` declaration is needed. Configure the selected provider in
+`.env`: OpenRouter -> DeepSeek -> GLM, choosing the first nonempty API key, or set
+`ABB_MODEL_PROVIDER` explicitly. Supply the selected provider's model name as well.
+See [model selection](../../../docs/Model-Selection.md) for variables and constraints.
 
-- `GLM_API_BASE_URL`: the OpenAI-style base URL, e.g.
-  `https://open.bigmodel.cn/api/coding/paas/v4`.
-- `GLM_MODEL`: the exact provider model ID, such as `glm-5.1`.
-- `GLM_API_KEY`: the Bearer credential. It is never written into this unit.
+ABB passes the resolved configuration through internal `ABB_AGENT_MODEL_API_KEY`,
+`ABB_AGENT_MODEL_BASE_URL`, `ABB_AGENT_MODEL` and `ABB_AGENT_MODEL_PROVIDER` variables.
+Users do not fill these internal variables. Only the selected credential reaches the
+launcher. The runtime derives the exact observed model route from the selected URL.
 
-The interception manifest admits only the tested route:
-`POST https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`.
-A different OpenAI-compatible provider needs an explicit reviewed route update;
-changing environment variables alone does not broaden container egress.
+The runtime admits the exact `POST <selected-base>/chat/completions` route.
 
 ## Launcher behavior
 
@@ -35,18 +34,19 @@ under `/tmp` for every Case (Cline's settings, session database and logs must be
 writable by whichever unprivileged uid the runtime chooses) and starts
 `cline --acp`:
 
-- **Provider.** It selects Cline's built-in `zhipuai-coding-plan` provider with
+- **Provider.** It selects Cline's native `openrouter`, `deepseek` or `zhipuai` provider with
   `CLINE_PROVIDER` / `CLINE_MODEL`, and writes `~/.cline/data/settings/providers.json`
-  (mode 0600, no key inside) whose `baseUrl` is `GLM_API_BASE_URL`, so the endpoint
+  (mode 0600, no key inside) whose `baseUrl` is `ABB_AGENT_MODEL_BASE_URL`, so the endpoint
   is taken from the runtime profile rather than the provider default. The generic
   `openai-compatible` provider was not used: in ACP mode it silently ran
   `gpt-4o` instead of the requested model.
 - **Model check.** Cline replaces a model ID it does not know with the provider
-  default (`glm-5.3-flash`) without an error. The launcher therefore rejects
-  `GLM_MODEL` values that are not in the pinned 3.0.62 catalog for this provider.
+  default without an error. The launcher therefore rejects
+  `ABB_AGENT_MODEL` values absent from the selected provider in the pinned 3.0.62 catalog
+  (`bootstrap/model-catalog.json`).
 - **Credential.** ACP `session/new` answers "Authentication required" unless
   `CLINE_API_KEY` is set; Cline then uses it as the selected provider's key. The
-  launcher sets it from `GLM_API_KEY` in the child environment only (not argv,
+  launcher sets it from `ABB_AGENT_MODEL_API_KEY` in the child environment only (not argv,
   not a file).
 - **Egress switches.** Upstream contacts `otel.cline.bot` (telemetry) and
   `data.cline.bot` (PostHog feature flags) at startup and may check npm for
@@ -74,13 +74,14 @@ writable by whichever unprivileged uid the runtime chooses) and starts
 Cline keeps its session index in a SQLite database under the disposable `HOME`;
 it is discarded with the container.
 
-Cline's bundled AI SDK prints `DeprecationWarning: AI SDK Warning
-(zhipuai-coding-plan.chat / glm-5.1): Deprecated: "providerOptions key ..."` and
-an "AI SDK Warning System" banner on stderr for each model call. They come from
-the upstream provider wiring, do not affect requests, and appear only in ACP
-stderr evidence. No background title or summary model calls were observed: every
-recorded model request belongs to a prompt turn and completed before ACP closed.
+Earlier fixed-provider runs recorded SDK deprecation warnings on stderr. These
+are historical observations and do not establish behavior for a new model.
 
 ## Installation inputs
 
 Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.
+
+## Validation scope
+
+Earlier acceptance records describe the previous fixed-provider deployment. They do not
+certify every shared provider/model combination; run a fresh Case after changing it.

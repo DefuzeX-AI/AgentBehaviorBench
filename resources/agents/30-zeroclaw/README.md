@@ -11,44 +11,42 @@ License: `MIT OR Apache-2.0` (the workspace `Cargo.toml`, `LICENSE-MIT`,
 ZeroClaw is a general-purpose personal assistant runtime (not a coding agent),
 so the profile selects KUMA's `basic-safety-general` strategy group.
 
-The acceptance profile uses Zhipu GLM's OpenAI-compatible coding endpoint.
-Supply these variables only at runtime:
+This unit uses default model selection; no `[model]` declaration is needed. Configure the selected provider in
+`.env`: OpenRouter -> DeepSeek -> GLM, choosing the first nonempty API key, or set
+`ABB_MODEL_PROVIDER` explicitly. Supply the selected provider's model name as well.
+See [model selection](../../../docs/Model-Selection.md) for variables and constraints.
 
-- `GLM_API_BASE_URL`: the OpenAI-style base URL, e.g.
-  `https://open.bigmodel.cn/api/coding/paas/v4`.
-- `GLM_MODEL`: the exact provider model ID, such as `glm-5.1`.
-- `GLM_API_KEY`: the Bearer credential. It is never written into this unit.
+ABB passes the resolved configuration through internal `ABB_AGENT_MODEL_API_KEY`,
+`ABB_AGENT_MODEL_BASE_URL`, `ABB_AGENT_MODEL` and `ABB_AGENT_MODEL_PROVIDER` variables.
+Users do not fill these internal variables. Only the selected credential reaches the
+launcher. The runtime derives the exact observed model route from the selected URL.
 
-The interception manifest admits only the tested model route:
-`POST https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`.
-A different OpenAI-compatible provider needs an explicit reviewed route update;
-changing environment variables alone does not broaden container egress.
+The runtime admits the exact `POST <selected-base>/chat/completions` route.
 
 ## Launcher
 
 `bootstrap/launch.py`:
 
-1. validates the three `GLM_*` variables (HTTPS base URL, no query/fragment);
+1. validates the three `ABB_AGENT_MODEL_*` variables (HTTPS base URL, no query/fragment);
 2. creates a disposable `HOME` under `/tmp` and writes
    `$HOME/.zeroclaw/config.toml` (schema v3) there, so ZeroClaw's config,
    SQLite ACP session store, runtime trace and audit log are writable by
    whichever unprivileged uid the runtime selects and isolated per Case;
 3. passes the key through ZeroClaw's schema-mirror environment override
    `ZEROCLAW_providers__models__custom__abb__api_key`, so it is never written to
-   disk or placed in argv; the original `GLM_API_KEY` is not forwarded;
+   disk or placed in argv; the original `ABB_AGENT_MODEL_API_KEY` is not forwarded;
 4. runs `zeroclaw --config-dir $HOME/.zeroclaw acp` as a child and relays ACP
    stdio (see "Permission options" below).
 
 ## Config choices
 
 - Provider `[providers.models.custom.abb]` (ZeroClaw's catch-all
-  OpenAI-compatible slot) with `uri = $GLM_API_BASE_URL`, `model = $GLM_MODEL`,
+  OpenAI-compatible slot) with `uri = $ABB_AGENT_MODEL_BASE_URL`, `model = $ABB_AGENT_MODEL`,
   `wire_api = "chat_completions"` and `native_tools = true`. Without
   `native_tools` the `custom` slot uses ZeroClaw's prompt-guided text fallback
-  (tool calls as `<tool_call>` text, no `tools` array in the request). GLM
-  supports OpenAI function calling, so the default `auto` dispatcher then sends
+  (tool calls as `<tool_call>` text, no `tools` array in the request). The selected model must support OpenAI function calling, so the default `auto` dispatcher then sends
   real tool schemas and receives structured `tool_calls`. In the first KUMA
-  trial without it, GLM once wrote fabricated `<function_results>` text instead
+  trial with the previous GLM deployment, the model wrote fabricated `<function_results>` text instead
   of a `<tool_call>` block, so nothing ran while the reply claimed files were
   written.
 - One agent `[agents.abb]` (auto-selected by ACP `session/new` as the sole
@@ -93,21 +91,26 @@ approval handling are unchanged. All other ACP traffic is relayed unchanged.
 
 ## Observed network
 
-In the validation runs the only container egress was the admitted GLM route.
+In the validation runs the only container egress was the admitted model route.
 ZeroClaw's gateway update check applies only to `zeroclaw daemon`/`gateway`,
 which this unit never starts. `network/rules.toml` therefore declares no extra
 routes.
 
 ## Known non-blocking notes
 
-- ZeroClaw streams `agent_thought_chunk` updates (GLM reasoning); ABB records
+- ZeroClaw streams `agent_thought_chunk` updates (model reasoning); ABB records
   them as protocol events. The final answer is the `agent_message_chunk` text.
 - ZeroClaw's tool updates carry extra `name`/`body` fields and the prompt
   result carries an extra `content` string (documented ZeroClaw extensions);
   the ACP client ignores them.
-- GLM's coding endpoint may report a different served model name (for example
-  `glm-5.3`) in responses than the `glm-5.1` requested.
+- Earlier GLM acceptance observed a served-model alias in responses. This is
+  historical evidence, not evidence for other provider/model combinations.
 
 ## Installation inputs
 
 Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.
+
+## Validation scope
+
+Earlier acceptance records describe the previous fixed-provider deployment. They do not
+certify every shared provider/model combination; run a fresh Case after changing it.

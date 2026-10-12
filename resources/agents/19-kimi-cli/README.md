@@ -8,19 +8,17 @@ separate empty workspace. No upstream source is vendored or modified.
 License: the upstream repository `LICENSE` at the pinned commit is Apache-2.0
 (the ACP agent registry lists it as MIT; the repository file is authoritative).
 
-The acceptance profile uses Zhipu GLM's OpenAI-compatible coding endpoint.
-Supply these variables only at runtime:
+This unit uses default model selection; no `[model]` declaration is needed. Configure the selected provider in
+`.env`: OpenRouter -> DeepSeek -> GLM, choosing the first nonempty API key, or set
+`ABB_MODEL_PROVIDER` explicitly. Supply the selected provider's model name as well.
+See [model selection](../../../docs/Model-Selection.md) for variables and constraints.
 
-- `GLM_API_BASE_URL`: the OpenAI-style base URL, e.g.
-  `https://open.bigmodel.cn/api/coding/paas/v4`.
-- `GLM_MODEL`: the exact provider model ID, such as `glm-5.1`.
-- `GLM_API_KEY`: the Bearer credential. It is never written into this unit or to
-  disk inside the container.
+ABB passes the resolved configuration through internal `ABB_AGENT_MODEL_API_KEY`,
+`ABB_AGENT_MODEL_BASE_URL`, `ABB_AGENT_MODEL` and `ABB_AGENT_MODEL_PROVIDER` variables.
+Users do not fill these internal variables. Only the selected credential reaches the
+launcher. The runtime derives the exact observed model route from the selected URL.
 
-The interception manifest admits only the tested route:
-`POST https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`.
-A different OpenAI-compatible provider needs an explicit reviewed route update;
-changing environment variables alone does not broaden container egress.
+The runtime admits the exact `POST <selected-base>/chat/completions` route.
 
 ## Installation
 
@@ -44,8 +42,8 @@ The disposable `HOME` keeps `~/.kimi` (config, sessions, logs) writable by which
 unprivileged uid the runtime chooses and isolates Cases. It writes:
 
 - `~/.kimi/config.toml`: an `openai_legacy` provider pointing at
-  `GLM_API_BASE_URL` and a default model `glm` mapped to `GLM_MODEL`, so ACP
-  `session/new` uses GLM without a model choice. `default_thinking = false`,
+  `ABB_AGENT_MODEL_BASE_URL` and a default model `abb` mapped to `ABB_AGENT_MODEL`, so ACP
+  `session/new` uses the selected model without an ACP model choice. `default_thinking = false`,
   `telemetry = false`. `api_key` is left empty: the credential is passed as
   `OPENAI_API_KEY` (plus `OPENAI_BASE_URL`), which Kimi's `openai_legacy`
   provider prefers over the file, so it never appears in argv or on disk.
@@ -80,7 +78,7 @@ switch to skip this for third-party providers. The launcher writes a placeholder
 It is only read by that presence check. No managed Kimi provider or Moonshot
 service is configured, so nothing uses it for authentication, and the empty
 `refresh_token` stops the background OAuth refresher from contacting Kimi's auth
-server. `network.jsonl` of the acceptance runs shows only the GLM route.
+server. `network.jsonl` of the acceptance runs shows only the configured model route.
 
 ### Client terminals are not advertised to Kimi
 
@@ -112,3 +110,8 @@ background model call after a turn.
 ## Installation inputs
 
 Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.
+
+## Validation scope
+
+Earlier acceptance records describe the previous fixed-provider deployment. They do not
+certify every shared provider/model combination; run a fresh Case after changing it.

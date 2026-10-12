@@ -9,18 +9,17 @@ vendored or modified.
 License: MIT (the repository's `LICENSE` file and the npm package's `license`
 field). GitHub's license detection reports `NOASSERTION` for the repository.
 
-The acceptance profile uses Zhipu GLM's OpenAI-compatible coding endpoint.
-Supply these variables only at runtime:
+This unit uses default model selection; no `[model]` declaration is needed. Configure the selected provider in
+`.env`: OpenRouter -> DeepSeek -> GLM, choosing the first nonempty API key, or set
+`ABB_MODEL_PROVIDER` explicitly. Supply the selected provider's model name as well.
+See [model selection](../../../docs/Model-Selection.md) for variables and constraints.
 
-- `GLM_API_BASE_URL`: the OpenAI-style base URL, e.g.
-  `https://open.bigmodel.cn/api/coding/paas/v4`.
-- `GLM_MODEL`: the exact provider model ID, such as `glm-5.1`.
-- `GLM_API_KEY`: the Bearer credential. It is never written into this unit.
+ABB passes the resolved configuration through internal `ABB_AGENT_MODEL_API_KEY`,
+`ABB_AGENT_MODEL_BASE_URL`, `ABB_AGENT_MODEL` and `ABB_AGENT_MODEL_PROVIDER` variables.
+Users do not fill these internal variables. Only the selected credential reaches the
+launcher. The runtime derives the exact observed model route from the selected URL.
 
-The interception manifest admits only the tested model route:
-`POST https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`.
-A different OpenAI-compatible provider needs an explicit reviewed route update;
-changing environment variables alone does not broaden container egress.
+The runtime admits the exact `POST <selected-base>/chat/completions` route.
 
 `network/rules.toml` adds two non-model routes, both `required = false`:
 
@@ -42,7 +41,7 @@ WebSocket to an OpenClaw Gateway, and the Gateway runs the agent loop and makes
 the model calls. So `bootstrap/launch.py` runs a private Gateway inside the
 container for each Case:
 
-1. validates the three `GLM_*` variables (HTTPS base URL, no query/fragment);
+1. validates the three `ABB_AGENT_MODEL_*` variables (HTTPS base URL, no query/fragment);
 2. creates a disposable `HOME` under `/tmp` and writes `~/.openclaw/openclaw.json`
    there, keeping OpenClaw's config, state and sessions writable by whichever
    unprivileged uid the runtime chooses and isolated per Case;
@@ -55,15 +54,15 @@ container for each Case:
    with inherited stdio, forwards SIGTERM/SIGINT to it, and stops the Gateway
    when the bridge exits (ABB also kills the whole process group).
 
-The GLM key reaches only the Gateway, through its environment; the config
-references it as `${GLM_API_KEY}` and OpenClaw expands it at load time, so the
+The selected key reaches only the Gateway, through its environment; the config
+references it as `${ABB_AGENT_MODEL_API_KEY}` and OpenClaw expands it at load time, so the
 key is never written to disk or placed in argv. The bridge gets neither the key
 nor the token variable (it reads the token file).
 
 ## Config choices
 
-- `models.providers.glm` (`api: openai-completions`) with
-  `agents.defaults.model.primary = glm/$GLM_MODEL`, so the model is chosen at
+- `models.providers.abb` (`api: openai-completions`) with
+  `agents.defaults.model.primary = abb/$ABB_AGENT_MODEL`, so the model is chosen at
   startup (ACP `session/new` cannot select one).
 - `update.checkOnStart=false`, `update.auto.enabled=false`, `telemetry.enabled=false`,
   `models.catalogRefresh.enabled=false` and `OPENCLAW_DISABLE_BONJOUR=1`: update
@@ -98,7 +97,7 @@ The package requires Node `>=24.16 <25 || >=26.1`;
 ## Known non-blocking noise
 
 - The bridge logs `[config] warnings: ... env var "OPENCLAW_GATEWAY_TOKEN" /
-  "GLM_API_KEY" - feature using this value will be unavailable` on stderr. It loads
+  "ABB_AGENT_MODEL_API_KEY" - feature using this value will be unavailable` on stderr. It loads
   the shared config but deliberately does not receive those variables.
 - The Gateway may warn about pending plugin state migrations and about missing
   vector embeddings for memory search; neither makes network calls.
@@ -114,3 +113,8 @@ The package requires Node `>=24.16 <25 || >=26.1`;
 ## Installation inputs
 
 Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.
+
+## Validation scope
+
+Earlier acceptance records describe the previous fixed-provider deployment. They do not
+certify every shared provider/model combination; run a fresh Case after changing it.

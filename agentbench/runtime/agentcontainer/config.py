@@ -7,6 +7,10 @@ import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from agentbench.runtime.interception.providers import ModelTargetConfig, ModelTargetProvider
 
 try:
     import tomllib
@@ -30,6 +34,9 @@ class AgentContainerConfig:
     workdir: str
     timeout_sec: float
     environment: Mapping[str, str]
+    model_target: ModelTargetConfig | None = None
+    model_metadata_paths: tuple[str, ...] = ()
+    replacement_model_provider: ModelTargetProvider | None = None
 
     @classmethod
     def from_agent_dir(
@@ -38,6 +45,8 @@ class AgentContainerConfig:
         *,
         secret_resolver: SecretResolver,
         environ: Mapping[str, str] | None = None,
+        model_provider=None,
+        resolve_model: bool = True,
     ) -> "AgentContainerConfig":
         root = Path(agent_root).resolve()
         with (root / "agent.toml").open("rb") as stream:
@@ -60,6 +69,16 @@ class AgentContainerConfig:
             if values.get(key):
                 environment[key] = secret_resolver.require(key)
 
+        from agentbench.runtime.interception.native_model import (
+            model_declaration, resolve_shared_model, model_environment, select_model_provider,
+        )
+        source, metadata_paths = model_declaration(manifest)
+        replacement_provider = (select_model_provider(manifest, values, model_provider)
+                                if resolve_model and source == "replace" else None)
+        target = resolve_shared_model(manifest, values, model_provider) if resolve_model else None
+        if target is not None:
+            environment.update(model_environment(target, secret_resolver))
+
         timeout = runtime.get("timeout_sec", 60)
         if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not math.isfinite(timeout) or timeout <= 0:
             raise ContainerConfigurationError("runtime.timeout_sec must be positive")
@@ -73,6 +92,9 @@ class AgentContainerConfig:
             workdir=_optional_string(launch, "workdir") or "/opt/agent",
             timeout_sec=float(timeout),
             environment=environment,
+            model_target=target,
+            model_metadata_paths=metadata_paths,
+            replacement_model_provider=replacement_provider,
         )
 
 

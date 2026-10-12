@@ -33,7 +33,9 @@ def classify_failure(artifacts):
     if error.get('code') in AUTOMATIC_RETRY_BLOCKED:
         return {**blocked, 'reason': 'SDK error prohibits automatic retry; preserve the original request'}
     native = artifacts.get('native_failure') or {}
-    transient_agent_failure = (native.get('error_type') in TRANSIENT_AGENT_ERRORS
+    dependency = artifacts.get('dependency_failure') or {}
+    transient_agent_failure = ((native.get('error_type') in TRANSIENT_AGENT_ERRORS
+                                or dependency.get('automatic') is True)
                                and (artifacts.get('completion') or {}).get('execution') == 'failed')
     container_timeout = (artifacts.get('host_error_type') == 'TimeoutExpired'
                          and artifacts.get('host_phase') == 'execute' and phase != 'judge')
@@ -49,8 +51,8 @@ def classify_failure(artifacts):
             or artifacts.get('host_trace_validation') != 'succeeded'):
         return {**blocked, 'reason': 'Original cleanup and host trace acceptance are required before recovery'}
     evidence = artifacts.get('completion') or {}
-    if any(evidence.get(key) != value for key, value in (
-        ('execution', 'succeeded'), ('otel', 'complete'),
+    if evidence.get('execution') not in ('succeeded', 'failed') or any(evidence.get(key) != value for key, value in (
+        ('otel', 'complete'),
         ('submission', 'committed'), ('evidence', 'captured'))):
         return {**blocked, 'reason': 'Original Agent execution and submitted evidence are incomplete'}
     if (phase != 'judge' or request.get('request_type') != 'judgment'

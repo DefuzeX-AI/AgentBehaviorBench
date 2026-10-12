@@ -12,18 +12,17 @@ workspace. No upstream source is vendored or modified.
 evaluated agent. The adapter pin (`svkozak/pi-acp` @
 `1bfcb394088ed879db8fd936b570bb626017f878`) is recorded here and in the npm lock.
 
-The acceptance profile uses Zhipu GLM's OpenAI-compatible coding endpoint.
-Supply these variables only at runtime:
+This unit uses default model selection; no `[model]` declaration is needed. Configure the selected provider in
+`.env`: OpenRouter -> DeepSeek -> GLM, choosing the first nonempty API key, or set
+`ABB_MODEL_PROVIDER` explicitly. Supply the selected provider's model name as well.
+See [model selection](../../../docs/Model-Selection.md) for variables and constraints.
 
-- `GLM_API_BASE_URL`: the OpenAI-style base URL, e.g.
-  `https://open.bigmodel.cn/api/coding/paas/v4`.
-- `GLM_MODEL`: the exact provider model ID, such as `glm-5.1`.
-- `GLM_API_KEY`: the Bearer credential. It is never written into this unit.
+ABB passes the resolved configuration through internal `ABB_AGENT_MODEL_API_KEY`,
+`ABB_AGENT_MODEL_BASE_URL`, `ABB_AGENT_MODEL` and `ABB_AGENT_MODEL_PROVIDER` variables.
+Users do not fill these internal variables. Only the selected credential reaches the
+launcher. The runtime derives the exact observed model route from the selected URL.
 
-The interception manifest admits only the tested route:
-`POST https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`.
-A different OpenAI-compatible provider needs an explicit reviewed route update;
-changing environment variables alone does not broaden container egress.
+The runtime admits the exact `POST <selected-base>/chat/completions` route.
 
 ## Launcher behavior
 
@@ -36,14 +35,15 @@ For every Case `bootstrap/launch.py` validates the three variables, creates a
 disposable `HOME` under `/tmp` and writes Pi's native config there
 (`~/.pi/agent`, also passed as `PI_CODING_AGENT_DIR`, files mode 0600):
 
-- `models.json` declares a custom `glm` provider with `api: openai-completions`,
-  the base URL, and one model `$GLM_MODEL` (`reasoning: true`, 200k context,
-  32k max output). `apiKey` is the literal string `"$GLM_API_KEY"`, which Pi
+- `models.json` declares a custom `abb` provider with `api: openai-completions`,
+  the base URL, and one model `$ABB_AGENT_MODEL` (`reasoning: true`, 200k context,
+  32k max output). `apiKey` is the literal string `"$ABB_AGENT_MODEL_API_KEY"`, which Pi
   resolves from the environment at request time, so the credential never touches
   disk or argv. `compat.supportsDeveloperRole: false` keeps the system prompt in
-  the `system` role (GLM does not accept `developer`), and
-  `compat.thinkingFormat: "zai"` sends GLM's thinking parameter format.
-- `settings.json` sets `defaultProvider: glm` and `defaultModel: $GLM_MODEL`,
+  the `system` role (DeepSeek does not accept `developer`), and
+  `compat.thinkingFormat` is `deepseek` for DeepSeek and `zai` for GLM;
+  no service-specific thinking override is applied to OpenRouter.
+- `settings.json` sets `defaultProvider: abb` and `defaultModel: $ABB_AGENT_MODEL`,
   because ACP `session/new` does not select a model; plus `quietStartup` and
   `enableInstallTelemetry: false`.
 
@@ -78,3 +78,8 @@ container's `--cap-drop=ALL` limits. pi-acp discards the child's stderr.
 ## Installation inputs
 
 Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.
+
+## Validation scope
+
+Earlier acceptance records describe the previous fixed-provider deployment. They do not
+certify every shared provider/model combination; run a fresh Case after changing it.

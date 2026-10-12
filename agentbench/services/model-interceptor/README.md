@@ -22,6 +22,21 @@ Streaming responses are relayed immediately and recorded completely. The legacy
 `max_trace_bytes` setting is an in-memory spool threshold, not a capture limit:
 larger streams spill to temporary storage. Storage failures fail visibly.
 
+In observe mode, a client may disconnect after consuming a complete SSE answer
+but before HTTP end-of-stream. If the captured response contains its protocol's
+terminal event, ABB records one `llm_response` with `client_closed_early: true`,
+retaining the raw stream, decoded payload and usage. OpenAI Chat (including the
+thinking variant), OpenAI Responses and Anthropic Messages recognize `[DONE]`,
+`response.completed` and `message_stop` respectively. Completion checks use the
+existing SSE parser, including its 16 MiB per-event limit. They run only on the
+captured copy and never alter response bytes or headers sent to the Agent.
+
+Missing/malformed terminal frames, trailing partial data, native error events,
+unsupported protocols and non-client transport failures remain `transport_error`.
+A `finish_reason` alone does not prove that the final usage and terminal frames
+were received. Capture failures still emit `observation_error`; repeated terminal
+callbacks cannot duplicate the recorded result.
+
 Replacement-mode SSE parsing allows up to 16 MiB per event by default, including
 the Gemini compatibility stream adapter. This is a per-event framing limit, not
 a total response or trace limit. Oversized events fail explicitly; they are not

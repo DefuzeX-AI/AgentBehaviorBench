@@ -125,7 +125,6 @@ def test_run_surfaces_a_missing_registry_file_with_its_path(
     ("missing_name", "expected_message"),
     [
         ("agent.toml", "Agent manifest does not exist"),
-        ("agent", "Agent source directory does not exist"),
         ("requirement.md", "Agent requirement does not exist"),
     ],
 )
@@ -148,6 +147,25 @@ def test_run_reports_missing_required_agent_files(
         run_feature.run(RunConfiguration())
 
     assert str(missing_path.resolve()) in str(error.value)
+
+
+def test_registry_discovers_units_without_manually_supplied_source(tmp_path):
+    from agentbench.harness.registry import load_registry
+
+    registry_path, agents = write_registry(tmp_path)
+    (agents["ready-agent"] / "agent").rmdir()
+    assert load_registry(registry_path).find("ready-agent").path == agents["ready-agent"]
+
+
+def test_registry_rejects_a_file_in_place_of_source(tmp_path):
+    from agentbench.harness.registry import load_registry
+
+    registry_path, agents = write_registry(tmp_path)
+    source = agents["ready-agent"] / "agent"
+    source.rmdir()
+    source.write_text("not a source directory", encoding="utf-8")
+    with pytest.raises(ValueError, match="Agent source path is not a directory"):
+        load_registry(registry_path)
 
 
 def test_run_surfaces_an_unsupported_registry_schema(

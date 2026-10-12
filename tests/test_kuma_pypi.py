@@ -76,7 +76,7 @@ def test_overlay_installs_pypi_requirements_without_sdk_source(echo_agent):
         assert {item.name for item in requirements.parent.iterdir()} == {'requirements.txt'}
         assert 'agentbench.sdk.plugin.kuma.worker' in (staged.path / 'agent.toml').read_text()
         assert not (staged.path / '.abb-sdk/src').exists()
-        assert (staged.path / 'agent/.gitignore').read_text().strip() == '/.kuma/'
+        assert not (staged.path / 'agent/.gitignore').exists()
     assert (echo_agent.path / 'agent.toml').read_bytes() == original_manifest
     assert (echo_agent.path / 'Dockerfile').read_bytes() == original_dockerfile
     assert not (echo_agent.path / '.abb-sdk').exists()
@@ -108,7 +108,7 @@ def test_overlay_preserves_utf8_files_with_gbk_host_default(echo_agent, monkeypa
             for name in originals:
                 content = (staged.path / name).read_bytes().decode('utf-8')
                 assert content.splitlines()[0] == comment.rstrip('\n')
-            assert '/.kuma/' in (staged.path / 'agent/.gitignore').read_bytes().decode('utf-8')
+            assert (staged.path / 'agent/.gitignore').read_bytes() == originals['agent/.gitignore']
             assert 'agentbench.sdk.plugin.kuma.worker' in (
                 staged.path / 'agent.toml').read_bytes().decode('utf-8')
             assert 'COPY .abb-sdk/ /opt/abb-sdk/' in (
@@ -358,7 +358,9 @@ def test_service_retains_identity_trace_and_diagnostics_on_cleanup_failure(
         stdout='stdout evidence', stderr='stderr evidence',
         trace_checkpoint=lambda: 0, validate_trace=lambda checkpoint: None,
     )
+    closed = []
     def close():
+        closed.append(True)
         if cleanup_failure:
             raise DockerCleanupError('container fixture still exists')
     session.close = close
@@ -367,7 +369,7 @@ def test_service_retains_identity_trace_and_diagnostics_on_cleanup_failure(
 
     def runtime(**kwargs):
         runtime_options.append(kwargs)
-        def start(agent, *, invocation, preparation_deadline):
+        def start(agent, *, invocation, preparation_deadline, argv=None, exclude_environment=()):
             preparation_deadline.check()
             event = TraceEvent('llm_response', {
                 'call_id': 'shared-call-id', 'agent_id': 'untrusted-agent',
@@ -404,7 +406,10 @@ def test_service_retains_identity_trace_and_diagnostics_on_cleanup_failure(
     diagnostics = json.loads((directory / 'diagnostics.json').read_text())
     assert diagnostics['stdout'] == 'stdout evidence'
     assert runtime_options[0]['control'] is control
-    trace = json.loads((directory / 'network.jsonl').read_text())
+    assert len(closed) == 2
+    traces = [json.loads(line) for line in (directory / 'network.jsonl').read_text().splitlines()]
+    assert len(traces) == 2
+    trace = traces[0]
     assert trace['data']['agent_id'] == echo_agent.agent_id
     assert trace['data']['payload']['output_text'].endswith('x' * 2000)
     assert 'secret-snapshot' not in json.dumps(trace)
@@ -440,7 +445,8 @@ def test_real_pypi_overlay_and_offline_case_judge(echo_agent):
         config = AgentContainerConfig.from_agent_dir(
             staged.path, secret_resolver=EnvironmentSecretResolver({}),
             environ={'ABB_ACCEPTANCE_NATIVE_SETTING': 'preserved'})
-        assert config.argv[-1] == 'agentbench.sdk.plugin.kuma.worker'
+        assert config.argv[:3] == ('python', '-I', '-c')
+        assert 'agentbench.sdk.plugin.kuma.worker' in config.argv[-1]
         assert config.environment == {'ABB_ACCEPTANCE_NATIVE_SETTING': 'preserved'}
         (output / 'Dockerfile').write_text((staged.path / 'Dockerfile').read_text())
         requirements = (staged.path / '.abb-sdk/requirements.txt').read_text()
@@ -464,7 +470,11 @@ def test_real_pypi_overlay_and_offline_case_judge(echo_agent):
     (output / 'container.log').write_text(result.stdout + result.stderr, encoding='utf-8')
     assert result.returncode == 0, f'See {output / "container.log"}'
     package = json.loads((output / 'package.json').read_text())
-    assert 'kuma-defuzex[otel]' in requirements.splitlines()
+    from packaging.requirements import Requirement
+    sdk_requirement = next(Requirement(line) for line in requirements.splitlines()
+                           if line.startswith('kuma-defuzex'))
+    assert 'otel' in sdk_requirement.extras
+    assert package['version'] in sdk_requirement.specifier
     expected_version = package['version']
     assert expected_version
     assert package['adapter'] == 'agentbench.sdk.plugin.kuma.plugin:plugin'

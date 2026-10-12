@@ -15,7 +15,7 @@ RUN set -eu; \
     test "$(git -C /opt/hermes rev-parse HEAD)" = "$(field commit)"; \
     rm -rf /opt/hermes/.git; \
     cd /opt/hermes && UV_PYTHON=/usr/local/bin/python3.13 UV_PYTHON_DOWNLOADS=never UV_NO_CACHE=1 \
-        /opt/uv/bin/uv sync --frozen --no-dev --extra acp; \
+        /opt/uv/bin/uv sync --frozen --no-dev --extra acp --extra bedrock --extra vertex; \
     /opt/hermes/.venv/bin/python -m ensurepip --default-pip; \
     rm -rf /opt/uv; \
     url="$(python -c "import json;print(json.load(open('/opt/agent/agent/tirith.json'))['url'])")"; \
@@ -45,7 +45,7 @@ RUN chmod 755 /usr/local/bin/abb-chromium
 COPY zz-abb-lean /etc/chromium.d/zz-abb-lean
 USER agent
 
-# agent-browser 0.26.0 native CLI (the version Hermes pins, tools/browser_tool.py:124),
+# agent-browser 0.26.0 native CLI (the version Hermes pins, tools/browser_tool.py:149),
 # sha256-pinned; it attaches to the Chromium launch.py starts (BROWSER_CDP_URL).
 USER root
 RUN set -eu; \

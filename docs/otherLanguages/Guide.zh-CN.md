@@ -119,12 +119,11 @@ OPENROUTER_MODEL=openai/gpt-4.1-mini
 若使用 GLM，请确认 `GLM_API_BASE_URL` 与你的账号及所用 API 服务对应。
 需要网页搜索的 Agent 还需填写 `TAVILY_API_KEY`，具体以该 Agent 的配置为准。
 
-**ACP Agent**：这些 Agent 通常有各自推荐或已配置的模型服务。请在 `.env` 中找到对应
-Agent 的注释段，填写所需 API key；如有模型名称和 API 地址，也按该 Agent 的要求填写。
-例如 MiniMax Code 使用 `MINIMAX_API_KEY`，Qwen Code 使用 `DASHSCOPE_API_KEY`，
-使用 GLM 的 Agent 则填写 `GLM_API_KEY`、`GLM_MODEL` 和 `GLM_API_BASE_URL`。
-具体要求可查看对应 `resources/agents/<目录>/README.md`，模板见
-[`.env.example`](../../.env.example)。
+**ACP Agent**：编号 15–32 和 36 使用同一套 OpenRouter → DeepSeek → GLM 选择规则，
+无需强制填写 DeepSeek Key。有限制的部署保留独立配置：MiniMax Code 使用 `MINIMAX_API_KEY`；
+Claude ACP 使用支持 Anthropic Messages 的 `CODEX_*` 配置；Qwen Code 的原生网页搜索
+依赖 DashScope，因此仍需 `DASHSCOPE_API_KEY` 和 `QWEN_*`。Cline 还要求模型存在于其固定版本目录中。
+详见 [模型选择规则（英文）](../Model-Selection.md) 和 [`.env.example`](../../.env.example)。
 
 ### 3. 使用 KUMA 进行评测
 
@@ -203,3 +202,9 @@ agentbench evaluate react-agent --sdk local --cases 1 --no-view
   Agent 的模型目标是 Anthropic messages 协议时必须设置。
 - 不写 `--sdk` 的命令仍然使用 `kuma`；`local` 只能按名字选择。
 - 运行目录里除常规产物外还有 `local-judge.json`，记录 Judge 模型、判决和原始回复。
+
+## 接入配置生成失败
+
+`agent add -b` 出现 schema / JSON 错误时，先看[接入指导中的排查说明](How%20To%20Add%20Agent.zh-CN.md#结构化输出生成失败时)。
+schema 字段路径和 JSON 行列错误现在会反馈给模型，按现有预算进行纠正。
+若步骤仍失败，请保留已完成文件，并检查保存的校验和 provider 诊断记录。

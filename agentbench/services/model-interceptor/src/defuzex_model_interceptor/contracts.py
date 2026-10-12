@@ -45,6 +45,17 @@ class ProtocolPlugin(Protocol):
 
 
 @runtime_checkable
+class StreamCompletionProtocol(Protocol):
+    """Optional evidence-only check for a complete, decoded native response.
+
+    Unknown or incomplete streams must return False. This never changes bytes
+    sent to the client and does not authorize a destination or replace a model.
+    """
+    def stream_complete(self, content: bytes, content_type: str) -> bool:
+        ...
+
+
+@runtime_checkable
 class AuthenticationPlugin(Protocol):
     name: str
 

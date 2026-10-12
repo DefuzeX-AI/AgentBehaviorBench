@@ -50,7 +50,7 @@ class OfflineBackend:
         return {'operation_id': 'operation-judge-offline', 'status': 'queued', 'poll_after_ms': 100}
 
 
-def stage_task(root, *, native_failure=False):
+def stage_task(root, *, native_failure=False, stop_early=False):
     from kuma import create_run
     from kuma.otel import configure_trace_evidence
     from opentelemetry.sdk.trace import TracerProvider
@@ -59,7 +59,8 @@ def stage_task(root, *, native_failure=False):
     repo = root / 'repo'
     run = create_run(repo_path=repo, agent_profile_path=profile(repo), allow_local=True,
         case_provider=lambda _: {'case_id': 'deferred-case', 'inputs': ['remember blue', 'recall']},
-        judge=False, max_steps=2, track_files=True, upload_diff=True, trace_evidence=capture)
+        judge=False, max_steps=2, track_files=True, upload_diff=True, trace_evidence=capture,
+        on_failure='stop' if stop_early else 'continue')
     directory = root / 'attempt'
     evaluation = directory / 'evaluation'
     case_json = run_case(run)
@@ -77,7 +78,8 @@ def stage_task(root, *, native_failure=False):
         return {'schema': 'abb.result.v1', 'agent_id': agent_id, 'run_id': invocation,
                 'status': 'failed' if native_failure else 'succeeded',
                 **({} if native_failure else {'output': 'blue'}),
-                **({'error_type': 'QuotaError', 'error': 'native quota exhausted'} if native_failure else {})}
+                **({'error_type': 'QuotaError', 'error': 'native quota exhausted'} if native_failure else {}),
+                **({'session_usable': False} if stop_early else {})}
     try:
         summary = asyncio.run(drive_run(run, invoke, evaluation, provider=provider,
             repo_path=repo, file_evidence_required=True, defer_judge=True))
@@ -456,3 +458,35 @@ def test_viewer_revalidates_old_failed_reports_without_changing_logs_or_artifact
     files.save('run.json', host)
     files.save('evaluation/inputs/0001/result.json', {})
     assert reconcile_reports(plan, rows, suite_snapshot(plan, rows)) is rows
+
+
+def test_terminated_prefix_survives_host_judge_and_preserves_unexecuted_inputs(tmp_path, monkeypatch):
+    runner, agent, case, ticket, summary = stage_task(tmp_path, native_failure=True, stop_early=True)
+    assert len(summary['steps']) == 1
+    assert len(summary['unexecuted_inputs']) == 1
+    backend = OfflineBackend(case.case_id, 'insufficient_evidence')
+    monkeypatch.setattr('kuma.transport.backend.BackendClient', lambda **kwargs: backend)
+    benchmark = judge_task(runner, agent, case, ticket)
+    assert benchmark.history_count == 1 and len(benchmark.failures) == 1
+    assert list(benchmark.report.extensions['abb_unexecuted_inputs']) == summary['unexecuted_inputs']
+    assert len(backend.posts) == 1
+
+
+@pytest.mark.parametrize('damage', ['missing_termination', 'wrong_tail', 'session_still_usable'])
+def test_early_termination_cannot_hide_missing_evidence(tmp_path, damage):
+    from agentbench.sdk.plugin.kuma.judge_tasks import validate_execution
+    _, _, case, ticket, _ = stage_task(tmp_path, native_failure=True, stop_early=True)
+    manifest = ticket.directory / 'evaluation/manifest.json'
+    data = json.loads(manifest.read_text())
+    if damage == 'missing_termination':
+        data.pop('termination')
+    elif damage == 'wrong_tail':
+        data['unexecuted_inputs'] = []
+    else:
+        result = ticket.directory / 'evaluation/inputs/0001/result.json'
+        native = json.loads(result.read_text())
+        native['session_usable'] = True
+        result.write_text(json.dumps(native))
+    manifest.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match='Incomplete'):
+        validate_execution(ticket.directory, case)

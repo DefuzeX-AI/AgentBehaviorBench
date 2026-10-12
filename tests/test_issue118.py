@@ -23,7 +23,7 @@ def isolate_history(tmp_path, monkeypatch):
 def test_directory_is_created_at_exact_requested_location_and_reopens(tmp_path, monkeypatch, name):
     directory = tmp_path / name
     agent = make_agent(tmp_path, 1)
-    monkeypatch.setattr(configuration, 'runner_configuration', lambda _: {'sdk': 'fixture'})
+    monkeypatch.setattr(configuration, 'runner_configuration', lambda _, agents: {'sdk': 'fixture'})
     runner = SuiteRunner(runner_factory=Factory())
     lines = []
     # Start at the real session entry. The fake workers do not need Docker or a service.

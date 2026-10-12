@@ -1,4 +1,4 @@
-"""Map an OpenAI-compatible GLM profile onto Nanocoder's provider config and start `nanocoder --acp`."""
+"""Map the selected OpenAI-compatible model profile onto Nanocoder's provider config and start `nanocoder --acp`."""
 from __future__ import annotations
 
 import json
@@ -10,10 +10,10 @@ import time
 from urllib.parse import urlsplit
 
 
-KEY_ENV = "GLM_API_KEY"
-BASE_URL_ENV = "GLM_API_BASE_URL"
-MODEL_ENV = "GLM_MODEL"
-PROVIDER_NAME = "abb-glm"
+KEY_ENV = "ABB_AGENT_MODEL_API_KEY"
+BASE_URL_ENV = "ABB_AGENT_MODEL_BASE_URL"
+MODEL_ENV = "ABB_AGENT_MODEL"
+PROVIDER_NAME = "abb-shared"
 NANOCODER_CLI = (Path(__file__).resolve().parents[1]
                  / "agent/node_modules/@nanocollective/nanocoder/dist/cli.js")
 # Environment variables that would change Nanocoder's stdout or provider set if
@@ -29,7 +29,7 @@ DROPPED_ENV = (
 def providers_document(base_url: str, model: str) -> list[dict[str, object]]:
     """Return the NANOCODER_PROVIDERS value: one OpenAI-compatible provider.
 
-    ``apiKey`` is the literal reference ``${GLM_API_KEY}``; Nanocoder expands it
+    ``apiKey`` is the literal reference ``${ABB_AGENT_MODEL_API_KEY}``; Nanocoder expands it
     from its own environment when it loads the provider (config/env-substitution),
     so the credential is never written to disk or argv.
     """

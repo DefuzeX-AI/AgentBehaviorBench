@@ -82,11 +82,6 @@ def prepare_workspace(root, destination, policy):
             entries.append((relative.as_posix(), hashlib.sha256(data).hexdigest()))
             target.write_bytes(data)
             shutil.copymode(item, target)
-    # KUMA otherwise changes .gitignore at create_run, perturbing initial state.
-    ignore = destination / '.gitignore'
-    previous = ignore.read_text() if ignore.exists() else ''
-    if '/.kuma/' not in previous.splitlines():
-        ignore.write_text(previous + '\n/.kuma/\n')
     return {'schema': 'abb.workspace.v1', 'path': policy.path,
             'initial_state': policy.initial_state,
             'fixture_sha256': hashlib.sha256(json.dumps(entries, separators=(',', ':')).encode()).hexdigest()}

@@ -7,6 +7,7 @@ from agentbench.harness.progress import emit_progress
 from agentbench.sdk.common.artifacts import Artifacts
 from agentbench.sdk.common.case_identity import case_content_sha256
 
+from .error_artifacts import exception_record
 from .case_files import artifact_digest
 from .diagnostics import collect_artifacts, read_diagnostic
 from .request_recovery import inspect_requests, recover_request
@@ -123,14 +124,13 @@ def recover_case(runner, registration, case, *, previous_result, validator, on_p
             try:
                 latest = inspect_requests(repository, client_id)
                 _check_request(latest, summary, client_id)
-                current_error = {'type': type(exc).__name__, 'message': str(exc),
-                                 'code': getattr(exc, 'code', None), 'retryable': getattr(exc, 'retryable', None),
-                                 'client_request_id': getattr(exc, 'client_request_id', None) or client_id,
-                                 'request_id': getattr(exc, 'request_id', None)}
+                current_error = exception_record(exc, phase='judge')
                 files.save('evaluation/manifest.json', {**summary, 'request': latest, 'error': current_error})
             except Exception:
                 pass
-            files.save(f'{prefix}/error.json', {'error_type': type(exc).__name__, 'error_message': str(exc)})
+            recovery_error = exception_record(exc, phase='judge')
+            files.save(f'{prefix}/error.json', {**recovery_error,
+                'error_type': recovery_error['type'], 'error_message': recovery_error['message']})
             exc.artifacts = collect_artifacts(directory, host, environ=runner.environ)
             if validating:
                 exc.artifacts['recovery'] = {'action': 'blocked', 'automatic': False,

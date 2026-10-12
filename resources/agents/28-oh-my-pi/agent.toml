@@ -1,7 +1,7 @@
 # Hand-written from the pinned oh-my-pi release's native ACP server (`omp acp`) and its custom-provider (models.yml) contract.
 schema_version = "defuzex-bench.agent.v2"
 agent_id = "oh-my-pi"
-display_name = "oh-my-pi (omp native ACP, GLM provider)"
+display_name = "oh-my-pi (omp native ACP, shared model provider)"
 framework = "acp"
 
 [evaluation]
@@ -26,8 +26,8 @@ downloaded_on = "2026-09-23"
 type = "docker"
 execution = "oneshot"
 timeout_sec = 900
-env_keys = ["GLM_API_BASE_URL", "GLM_MODEL"]
-secret_env_keys = ["GLM_API_KEY"]
+env_keys = []
+secret_env_keys = []
 # Optional: Tavily backend for omp's web_search tool (see network/rules.toml).
 optional_secret_env_keys = ["TAVILY_API_KEY"]
 
@@ -52,15 +52,4 @@ trust_plugin = "pem-env"
 network_config = "network/rules.toml"
 tool_routes = []
 
-[[llm_interception.credentials]]
-id = "glm-api-key"
-agent_env = "GLM_API_KEY"
-auth_plugin = "bearer-token"
-
-[[llm_interception.routes]]
-id = "glm-openai-chat"
-host_patterns = ["open.bigmodel.cn"]
-ports = [443]
-methods = ["POST"]
-path_patterns = ["/api/coding/paas/v4/chat/completions"]
-protocol_plugin = "openai-chat"
+# Model credentials and exact routes use the shared runtime default.

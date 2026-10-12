@@ -1,3 +1,0 @@
-# Cleanup Error Trace
-
-<!-- Placeholder -->

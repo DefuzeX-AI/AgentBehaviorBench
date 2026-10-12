@@ -1,4 +1,4 @@
-"""Map an OpenAI-compatible GLM profile onto oh-my-pi's custom-provider config and start `omp acp`."""
+"""Map the selected OpenAI-compatible model profile onto oh-my-pi's custom-provider config and start `omp acp`."""
 from __future__ import annotations
 
 import json
@@ -9,10 +9,10 @@ import tempfile
 from urllib.parse import urlsplit
 
 
-KEY_ENV = "GLM_API_KEY"
-BASE_URL_ENV = "GLM_API_BASE_URL"
-MODEL_ENV = "GLM_MODEL"
-PROVIDER = "glm"
+KEY_ENV = "ABB_AGENT_MODEL_API_KEY"
+BASE_URL_ENV = "ABB_AGENT_MODEL_BASE_URL"
+MODEL_ENV = "ABB_AGENT_MODEL"
+PROVIDER = "abb"
 AGENT_DIR = Path(__file__).resolve().parents[1] / "agent"
 BIN_DIR = AGENT_DIR / "node_modules/.bin"
 OMP_CLI = AGENT_DIR / "node_modules/@oh-my-pi/pi-coding-agent/dist/cli.js"
@@ -70,13 +70,17 @@ def prepare(environ: dict[str, str], builtin: list[str]) -> tuple[list[str], dic
                     "reasoning": True,
                     "contextWindow": 200000,
                     "maxTokens": 32000,
-                    # GLM rejects the OpenAI "developer" role.
-                    "compat": {"supportsDeveloperRole": False},
+                    # Avoid a developer role for compatibility; DeepSeek also needs tool reasoning.
+                    "compat": {
+                        "supportsDeveloperRole": False,
+                        **({"requiresReasoningContentForToolCalls": True, "supportsToolChoice": False}
+                           if environ.get("ABB_AGENT_MODEL_PROVIDER") == "deepseek" else {}),
+                    },
                 }],
             }
         }
     }
-    # ACP session/new does not pick a model, so omp must start on GLM by default.
+    # ACP session/new does not pick a model, so omp must start on the selected model by default.
     config = {
         "modelRoles": {"default": f"{PROVIDER}/{model}"},
         "disabledProviders": disabled_providers(builtin),

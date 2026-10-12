@@ -1,4 +1,4 @@
-"""Map an OpenAI-compatible GLM profile onto Kilo Code CLI's native ACP server."""
+"""Map the selected OpenAI-compatible model profile onto Kilo Code CLI's native ACP server."""
 from __future__ import annotations
 
 import json
@@ -9,10 +9,10 @@ import tempfile
 from urllib.parse import urlsplit
 
 
-KEY_ENV = "GLM_API_KEY"
-BASE_URL_ENV = "GLM_API_BASE_URL"
-MODEL_ENV = "GLM_MODEL"
-PROVIDER_ID = "glm"
+KEY_ENV = "ABB_AGENT_MODEL_API_KEY"
+BASE_URL_ENV = "ABB_AGENT_MODEL_BASE_URL"
+MODEL_ENV = "ABB_AGENT_MODEL"
+PROVIDER_ID = "abb"
 # `kilo acp` starts Kilo's HTTP server on loopback and bridges ACP onto its
 # REST/SSE API. The port is pinned so network/rules.toml can admit exactly it.
 SERVER_HOST = "127.0.0.1"
@@ -41,10 +41,10 @@ QUIET_ENV = {
 
 
 def config(base_url: str, model: str) -> dict:
-    """Return Kilo's global config: one OpenAI-compatible GLM provider, nothing else."""
+    """Return Kilo's global config: one selected OpenAI-compatible provider, nothing else."""
     return {
         "$schema": "https://app.kilo.ai/config.json",
-        # ACP session/new does not choose a model, so the default must be GLM.
+        # ACP session/new does not choose a model, so the default must be the selected model.
         "model": f"{PROVIDER_ID}/{model}",
         "small_model": f"{PROVIDER_ID}/{model}",
         "autoupdate": False,
@@ -56,7 +56,7 @@ def config(base_url: str, model: str) -> dict:
             PROVIDER_ID: {
                 # Bundled in the Kilo binary; no runtime npm install happens.
                 "npm": "@ai-sdk/openai-compatible",
-                "name": "Zhipu GLM",
+                "name": "ABB selected model",
                 # Kilo substitutes {env:...} at load time, so the key is not
                 # written to disk.
                 "options": {"baseURL": base_url, "apiKey": "{env:" + KEY_ENV + "}"},

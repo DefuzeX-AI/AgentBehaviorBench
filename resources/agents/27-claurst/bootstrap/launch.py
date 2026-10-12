@@ -1,4 +1,4 @@
-"""Map an OpenAI-compatible GLM profile onto Claurst's native ACP server."""
+"""Map the selected OpenAI-compatible model profile onto Claurst's native ACP server."""
 from __future__ import annotations
 
 import json
@@ -9,19 +9,19 @@ import tempfile
 from urllib.parse import urlsplit
 
 
-KEY_ENV = "GLM_API_KEY"
-BASE_URL_ENV = "GLM_API_BASE_URL"
-MODEL_ENV = "GLM_MODEL"
+KEY_ENV = "ABB_AGENT_MODEL_API_KEY"
+BASE_URL_ENV = "ABB_AGENT_MODEL_BASE_URL"
+MODEL_ENV = "ABB_AGENT_MODEL"
 CLAURST_BIN = "/opt/claurst/bin/claurst"
 # Claurst's generic OpenAI-compatible provider. Unlike the built-in `zhipu`
 # provider it uses api_base verbatim (no `/v1` suffix is appended) and posts to
-# `<api_base>/chat/completions`, which is exactly the admitted GLM route.
+# `<api_base>/chat/completions`, which is exactly the resolved model route.
 PROVIDER_ID = "custom-openai"
 PROVIDER_KEY_ENV = "CUSTOM_OPENAI_API_KEY"
 
 
 def settings(base_url: str, model: str) -> dict[str, object]:
-    """Return settings.json selecting the GLM endpoint; the key stays in the environment."""
+    """Return settings.json selecting the configured endpoint; the key stays in the environment."""
     # Claurst silently falls back to default settings (Anthropic) when this
     # file does not deserialize, and its `config` object has no serde
     # defaults, so every non-optional field is written with its default value.

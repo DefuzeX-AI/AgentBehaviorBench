@@ -1,4 +1,4 @@
-"""Map an OpenAI-compatible GLM profile onto Cline CLI's native ACP server."""
+"""Map the selected OpenAI-compatible model profile onto Cline CLI's native ACP server."""
 from __future__ import annotations
 
 import json
@@ -9,19 +9,13 @@ import tempfile
 from urllib.parse import urlsplit
 
 
-KEY_ENV = "GLM_API_KEY"
-BASE_URL_ENV = "GLM_API_BASE_URL"
-MODEL_ENV = "GLM_MODEL"
-# Cline's built-in provider for Zhipu's OpenAI-compatible coding endpoint. The
-# generic "openai-compatible" provider ignores CLINE_MODEL in ACP mode and
-# silently falls back to its own default model.
-PROVIDER = "zhipuai-coding-plan"
-# Model IDs in the pinned Cline 3.0.62 catalog for this provider. An unknown ID is
-# silently replaced by the provider default (glm-5.3-flash), so reject it here.
-KNOWN_MODELS = frozenset({
-    "glm-5.3-flash", "glm-5.3", "glm-5.3-highspeed", "glm-5.2", "glm-5.2-highspeed",
-    "glm-5v-turbo", "glm-5.1", "glm-5-turbo", "glm-4.7", "glm-4.6v",
-})
+KEY_ENV = "ABB_AGENT_MODEL_API_KEY"
+BASE_URL_ENV = "ABB_AGENT_MODEL_BASE_URL"
+MODEL_ENV = "ABB_AGENT_MODEL"
+# The pinned ACP CLI silently defaults unknown models. Select a native provider
+# and validate its bundled catalog instead of using its generic-provider fallback.
+PROVIDERS = {"openrouter": "openrouter", "deepseek": "deepseek", "glm": "zhipuai"}
+CATALOG = json.loads((Path(__file__).with_name("model-catalog.json")).read_text(encoding="utf-8"))["models"]
 GLOBAL_SETTINGS = {
     # Cline sends OpenTelemetry to otel.cline.bot unless the user opts out, and
     # checks npm for updates; both are egress outside the admitted model route.
@@ -30,18 +24,19 @@ GLOBAL_SETTINGS = {
 }
 
 
-def provider_settings(base_url: str, model: str) -> dict:
+def provider_settings(base_url: str, model: str, provider: str) -> dict:
     """Cline's providers.json with the base URL override; the key stays in env."""
     return {
         "version": 1,
         "providers": {
-            PROVIDER: {
-                "settings": {"provider": PROVIDER, "baseUrl": base_url, "model": model},
+            provider: {
+                "settings": {"provider": provider, "baseUrl": base_url, "model": model,
+                             "modelCatalog": {"loadLatestOnInit": False, "loadPrivateOnAuth": False}},
                 "updatedAt": "2026-09-21T00:00:00.000Z",
                 "tokenSource": "manual",
             }
         },
-        "lastUsedProvider": PROVIDER,
+        "lastUsedProvider": provider,
     }
 
 
@@ -59,8 +54,12 @@ def prepare(environ: dict[str, str]) -> tuple[list[str], dict[str, str], str, st
     parsed = urlsplit(base_url)
     if parsed.scheme != "https" or not parsed.hostname or parsed.query or parsed.fragment:
         raise ValueError(f"{BASE_URL_ENV} must be an HTTPS URL without query or fragment")
-    if model not in KNOWN_MODELS:
-        raise ValueError(f"{MODEL_ENV}={model!r} is not in Cline's {PROVIDER} catalog")
+
+    provider = PROVIDERS.get(environ.get("ABB_AGENT_MODEL_PROVIDER", ""))
+    if provider is None:
+        raise ValueError("Cline supports shared openrouter, deepseek and glm profiles")
+    if model not in CATALOG[provider]:
+        raise ValueError(f"Requested model is not in Cline's pinned {provider} catalog; no fallback was made")
 
     child = {
         **environ,
@@ -68,7 +67,7 @@ def prepare(environ: dict[str, str]) -> tuple[list[str], dict[str, str], str, st
         # is set; Cline then uses it as the selected provider's key. Passing it
         # through the environment keeps it out of argv and out of files.
         "CLINE_API_KEY": key,
-        "CLINE_PROVIDER": PROVIDER,
+        "CLINE_PROVIDER": provider,
         "CLINE_MODEL": model,
         "CLINE_NO_AUTO_UPDATE": "1",
         "DO_NOT_TRACK": "1",
@@ -98,7 +97,7 @@ def main() -> int:
         settings.mkdir(parents=True)
         (settings / "global-settings.json").write_text(json.dumps(GLOBAL_SETTINGS, indent=2))
         providers = settings / "providers.json"
-        providers.write_text(json.dumps(provider_settings(base_url, model), indent=2))
+        providers.write_text(json.dumps(provider_settings(base_url, model, environ["CLINE_PROVIDER"]), indent=2))
         providers.chmod(0o600)
         environ["HOME"] = str(home)
         os.execvpe(command[0], command, environ)

@@ -202,6 +202,7 @@ def _case_result(job, benchmark):
     return CaseResult(job.registration.agent_id, job.case.case_index, str(job.identity['job_id']),
                       'succeeded' if benchmark.passed else 'failed', case_id=job.case.case_id,
                       benchmark=benchmark,
+                      artifacts={'dependency_failure': benchmark.dependency_failure} if benchmark.dependency_failure else None,
                       error_type=failure.error_type if failure else None,
                       error_message=failure.error_message if failure else None,
                       attempt_id=job.identity.get('attempt_id'),

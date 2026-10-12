@@ -60,6 +60,13 @@ class DockerRuntimeError(RuntimeError):
     """Raised when an isolated Docker session cannot be started."""
 
 
+class DockerNetworkCapacityError(DockerRuntimeError):
+    """No network was allocated; preparation can wait without executing an Agent."""
+    code = 'docker_network_capacity'
+    recovery = {'action': 'replay_case', 'automatic': True, 'phase': 'preparation',
+                'reason': 'Docker network allocation failed before any Agent execution'}
+
+
 class DockerUnavailableError(DockerRuntimeError, RuntimeInfrastructureError):
     """A shared Docker daemon failure must stop further Suite dispatch."""
 
@@ -135,10 +142,11 @@ class DockerRuntime:
 
     def invocation_timeout(self, agent):
         return self._timeout_override or AgentContainerConfig.from_agent_dir(
-            agent.path, secret_resolver=self._secret_resolver, environ=self._environ).timeout_sec
+            agent.path, secret_resolver=self._secret_resolver, environ=self._environ,
+            model_provider=self._model_provider).timeout_sec
 
     @timed('Prepare Docker session', kind='preparation')
-    def start(self, agent: AgentDescriptor, *, invocation=None,
+    def start(self, agent: AgentDescriptor, *, invocation=None, argv=None, exclude_environment=(),
               preparation_deadline: Deadline | None = None) -> RuntimeSession:
         # Check cancellation, the preparation deadline, and Docker availability first.
         self.control.check()
@@ -150,12 +158,15 @@ class DockerRuntime:
             agent.path,
             secret_resolver=self._secret_resolver,
             environ=self._environ,
+            model_provider=self._model_provider,
         )
         interception = InterceptionConfig.from_agent_dir(agent.path)
+        from agentbench.runtime.interception.native_model import bind_model_routes
+        interception = bind_model_routes(interception, config.model_target, config.model_metadata_paths)
         if interception is not None and interception.mode == 'replace':
             # Validate the model service and credentials before enabling interception.
             from agentbench.runtime.interception.target_routing import resolve_target_routing
-            plan = resolve_target_routing(self._environ, self._model_provider)
+            plan = resolve_target_routing(self._environ, config.replacement_model_provider)
             for target in plan.targets.values():
                 self._secret_resolver.require(target.credential_env)
         if invocation is not None:
@@ -177,6 +188,11 @@ class DockerRuntime:
         self.control.check()
 
 
+        owned = getattr(self._policy, 'owned_directories', None)
+        if owned is not None:
+            from .mount_permissions import prepare_mounts
+            shared = getattr(self._policy, 'shared_directories', lambda: ())()
+            prepare_mounts(self, image, owned(), preparation, shared=shared)
         # Use unique container and network names to isolate concurrent jobs.
         suffix = uuid4().hex
         network_name = f"defuzex-{suffix}-egress"
@@ -264,6 +280,7 @@ class DockerRuntime:
                 interceptor, token_environment = self._start_interceptor(
                     agent_id=config.agent_id,
                     interception=interception,
+                    model_provider=config.replacement_model_provider,
                     suffix=suffix,
                     network_name=network_name,
                     trace_state=trace_state,
@@ -341,8 +358,10 @@ class DockerRuntime:
             )
             # Add environment variables, image, and launch command to the container arguments.
             for key, value in sorted(agent_environment.items()):
+                if key in exclude_environment:
+                    continue
                 command.extend(("--env", f"{key}={value}"))
-            command.extend((image, *config.argv))
+            command.extend((image, *(config.argv if argv is None else argv)))
 
             # Register and create the Agent container so failures can clean it up reliably.
             self._plan_resource("container", agent_name, "agent", suffix)
@@ -410,6 +429,7 @@ class DockerRuntime:
         trace_state: InterceptionTraceState,
         deadline: Deadline | None = None,
         egress_proxy: tuple[str, int] | None = None,
+        model_provider: ModelTargetProvider | None = None,
     ) -> tuple[RunningModelInterceptor, dict[str, str]]:
         if deadline is not None:
             deadline.check()
@@ -434,7 +454,7 @@ class DockerRuntime:
             service_data, token_environment = prepare_service_config(
                 interception, agent_id=agent_id, max_trace_bytes=self._trace_max_bytes,
                 secret_dir=secret_dir, secret_resolver=self._secret_resolver,
-                environ=self._environ, model_provider=self._model_provider, egress_proxy=egress_proxy)
+                environ=self._environ, model_provider=model_provider or self._model_provider, egress_proxy=egress_proxy)
             config_file.write_text(json.dumps(service_data, ensure_ascii=False), encoding='utf-8')
 
             command = [
@@ -752,6 +772,8 @@ class DockerRuntime:
             raise DockerRuntimeError("Docker executable was not found")
         if result.returncode != 0:
             detail = (result.stderr or result.stdout).strip()
+            if args[:2] == ('network', 'create') and 'all predefined address pools have been fully subnetted' in detail.lower():
+                raise DockerNetworkCapacityError('Docker address pool exhausted; wait for owned networks to be released')
             raise DockerRuntimeError(f"Docker command failed: {detail}")
         return result
 

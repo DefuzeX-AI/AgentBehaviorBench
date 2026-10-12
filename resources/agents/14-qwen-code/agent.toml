@@ -22,6 +22,14 @@ repository = "https://github.com/QwenLM/qwen-code"
 revision = "1026c4a50f4a32f77da98bdacfba2e5faa8cc70a"
 downloaded_on = "2026-09-21"
 
+# Required: DASHSCOPE_API_KEY. QWEN_MODEL defaults to qwen3-coder-plus.
+# QWEN_API_BASE_URL defaults to https://dashscope.aliyuncs.com/compatible-mode/v1.
+# Native web_search also calls DashScope Responses, so switching only chat providers is insufficient.
+[model]
+provider = "dashscope"
+source = "native"
+reason = "Native web_search uses DashScope Responses and its key in addition to the configured chat model."
+
 [runtime]
 type = "docker"
 execution = "oneshot"

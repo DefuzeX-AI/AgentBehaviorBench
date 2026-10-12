@@ -29,11 +29,25 @@ Their repository/revision fields describe provenance and do not trigger a clone.
 For example, OpenHands keeps requirements.txt in install/; OpenClaw keeps
 package.json and package-lock.json there. Dockerfiles still consume agent/.
 
+Git and bundled/manual units may also provide an outer `install/` directory for ABB-owned
+integration inputs such as `abb-langgraph.json`. After restoring or verifying the
+pinned source (or checking that manual source exists), preflight copies these inputs into `agent/` under the same unit
+lock. This also runs when reusing cached or unmanaged local source. The upstream
+inventory remains separate; added integration files are checked against `install/`
+on every preparation. Missing copies are repaired without downloading source;
+conflicting existing files fail instead of being overwritten. Keep Git units in
+`method = "git"`; `method = "install"` alone does not acquire upstream source.
+
 Edit install/, not its generated agent/ copy. If the copy differs, preparation
 fails without overwriting it; move agent/ aside and rerun to regenerate. Missing
-files are repaired automatically. Missing/empty install/ is a configuration error.
-The root .gitignore excludes resources/agents/*/agent/. Already tracked legacy
-source remains tracked; it is not removed as part of the package-unit migration.
+files are repaired automatically. A present empty or unsafe install/ is an error for every method; an absent
+install/ is required only for method="install". Bundled source must already exist.
+The root .gitignore excludes every resources/agents/*/agent/ directory. ABB tracks
+outer integration and installation files, not inner Agent source. Fresh checkouts
+contain no inner source files. See [Agent source preparation](../../../docs/Agent-Sources.md)
+for units requiring manual source, including local imports, symbolic links and LFS.
+Registry discovery permits missing local source; preparation still requires it
+for selected units using bundled/manual mode.
 
 ## Preparation and ownership
 
@@ -73,7 +87,7 @@ for removal and retry.
 
 Version one rejects Git submodules and source symlinks instead of constructing
 an incomplete or escaping tree. Git LFS materialization is not supported.
-Use bundled source for these repositories. Package installation stays in each
+Use manually supplied, ignored local source for these repositories. Package installation stays in each
 Agent's Dockerfile. No Agent container or paid model call is needed for the
 local regression tests:
 

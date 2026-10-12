@@ -13,7 +13,7 @@ def profile(repo):
 
 
 @contextmanager
-def sdk_run(repo, inputs):
+def sdk_run(repo, inputs, **options):
     from kuma import create_run
     from kuma.otel import configure_trace_evidence
     from opentelemetry.sdk.trace import TracerProvider
@@ -23,7 +23,7 @@ def sdk_run(repo, inputs):
         case_provider=lambda ctx: {'case_id': 'offline-case', 'input_type': 'text',
             'inputs': [{'input_id': f'input-{i}', 'payload_type': 'text', 'payload': text} for i, text in enumerate(inputs)]},
         judge_provider=lambda ctx: {'status': 'pass', 'summary': 'Offline contract test', 'issues': []},
-        allow_local=True, track_files=False, trace_evidence=capture, max_steps=len(inputs))
+        allow_local=True, track_files=False, trace_evidence=capture, max_steps=len(inputs), **options)
     try:
         yield run, provider
     finally:

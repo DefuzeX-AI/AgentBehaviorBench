@@ -57,6 +57,15 @@ def suite_snapshot(plan, events):
             if kind in {'attempt_dispatched', 'case_started', 'case_attempt_started', 'retry_scheduled', 'case_retry_scheduled',
                         'case_recovery_started', 'case_reconciling', 'judge_queued'}:
                 state, summary, error = 'running', None, None
+        if kind == 'preparation_retry_scheduled':
+            job['preparation_wait'] = {'until': event.get('retry_at') or 0,
+                                       'count': event.get('attempt_number', 0)}
+        if kind == 'agent_dependency_wait':
+            job['dependency_wait'] = {'until': event.get('retry_at') or 0,
+                'count': event.get('dependency_count', 0), 'automatic': event.get('automatic'),
+                'dependency': deepcopy(event.get('dependency'))}
+        elif kind == 'agent_dependency_released':
+            job.setdefault('dependency_wait', {})['until'] = 0
         if kind == 'agent_completed':
             item = event.get('item') or {}
             for result in item.get('case_results', ()):

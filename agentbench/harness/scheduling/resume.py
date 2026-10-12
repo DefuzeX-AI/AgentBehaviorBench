@@ -29,7 +29,13 @@ def resume_seeds(store, *, selection=None, replay=False):
     for job in snapshot['jobs']:
         agent = job['agent_id']
         prepared = {}
-        seed = AgentSeed(prepared=prepared)
+        preparation = job.get('preparation_wait') or {}
+        cooldown = job.get('dependency_wait') or {}
+        seed = AgentSeed(prepared=prepared,
+            preparation_until=preparation.get('until', 0),
+            preparation_attempts=preparation.get('count', 0),
+            dependency_until=cooldown.get('until', 0) if cooldown.get('automatic') else 0,
+            dependency_count=cooldown.get('count', 0))
         for case in job['cases']:
             index = case['case_index']
             attempts = case.get('attempts') or []

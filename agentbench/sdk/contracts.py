@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
+    from agentbench.sdk.integration.protocols import ArtifactStore
     from agentbench.sdk.judgment import DeferredJudgment
     from agentbench.harness.registry import AgentRegistration
     from agentbench.harness.result import BenchmarkResult
@@ -118,6 +119,18 @@ class StrategyCheck:
     display_name: str | None = None
     reason: str = ''
     catalog_release: str | None = None
+
+
+@runtime_checkable
+class SDKExecutionConfiguration(Protocol):
+    """Optional offline public provenance for SDK-owned execution, such as judging.
+
+    Return JSON-compatible settings without credentials. Resolve current defaults
+    with the same precedence as execution; do not perform network I/O.
+    """
+    def execution_configuration(
+        self, *, environ: Mapping[str, str], model: str | None, options: Mapping[str, object],
+    ) -> Mapping[str, object]: ...
 
 
 @runtime_checkable
@@ -305,6 +318,7 @@ class SDKRunnerContext:
     build_coordinator: BuildCoordinator | None = None
     job_context: Mapping[str, object] | None = None
     runtime_services: RuntimeServices | None = None
+    artifacts: ArtifactStore | None = None
 
 
 @runtime_checkable

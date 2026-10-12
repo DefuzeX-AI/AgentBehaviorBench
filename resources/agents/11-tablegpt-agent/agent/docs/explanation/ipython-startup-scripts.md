@@ -1,3 +1,0 @@
-# IPython Startup Scripts
-
-<!-- Placeholder -->
