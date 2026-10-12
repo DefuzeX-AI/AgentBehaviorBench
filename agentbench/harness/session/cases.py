@@ -4,7 +4,6 @@ from dataclasses import replace
 import hashlib
 from pathlib import Path
 
-from .atomic import atomic_bytes
 from .codec import prepared_from_json
 from .plan import SuiteProvenanceError
 
@@ -42,6 +41,6 @@ def retain_prepared(directory, agent_id, case, existing=None):
     path = Path(directory) / 'cases' / agent_directory / str(case.case_index) / 'case.json'
     if path.exists() and path.read_bytes() != data:
         raise SuiteProvenanceError('A previously published Case artifact cannot be overwritten')
-    if not path.exists():
-        atomic_bytes(path, data)
+    from agentbench.sdk.integration.artifacts import FileCaseArtifacts
+    FileCaseArtifacts(path.parent).publish_case(data)
     return replace(case, artifact_path=path.resolve(), artifact_sha256=digest)

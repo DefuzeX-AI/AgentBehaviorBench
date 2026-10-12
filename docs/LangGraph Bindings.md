@@ -371,7 +371,7 @@ These links identify useful implementation patterns. Review the source and manif
 | [37 Article Explainer](../resources/agents/37-article-explainer/bindings/bridge.py) | Strict current-message input; implementation enables a checkpoint although its descriptive text says otherwise. |
 | [38 GPT Researcher](../resources/agents/38-gpt-researcher/bindings/gpt_researcher_bridge.py) | Complete task with `publish_formats` and async research graph. |
 | [39 TradingAgents](../resources/agents/39-tradingagents/bindings/tradingagents_bridge.py) | Explicit ticker/date parsing and config context around a public lifecycle. |
-| [48 EvoScientist](../resources/agents/48-evoscientist/bindings/bridge.py) | Workspace setup and explicit unattended deployment configuration. |
+| [40 EvoScientist](../resources/agents/40-evoscientist/bindings/bridge.py) | Workspace setup and explicit unattended deployment configuration. |
 
 ## Review and validate
 

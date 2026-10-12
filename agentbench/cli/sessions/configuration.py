@@ -10,31 +10,35 @@ from agentbench.harness.scheduling import RetryPolicy
 from agentbench.sdk.plugins import resolve_sdk
 
 
-def runner_configuration(runner):
+def runner_configuration(runner, registrations):
     """Return public options for directory plugins, or None for injected objects."""
     factory = getattr(runner, '_runner_factory', None)
     plan = getattr(factory, 'plan', None)
     reference = getattr(getattr(plan, 'selection', None), 'reference', None)
     if reference is None or reference.source != 'directory':
         return None
-    from agentbench.runtime.interception.providers import resolve_model_provider
-    from agentbench.runtime.interception.config import InterceptionConfigurationError
     from agentbench.harness.session.plan import source_digest
-    try:
-        target = resolve_model_provider(model=factory.model, environ=factory.environ).resolve(factory.environ)
-    except InterceptionConfigurationError:
-        # Native observe-only runs need no replacement target; runtime validates replace runs.
-        target = None
+    from agentbench.sdk.contracts import SDKExecutionConfiguration
+    from .model_configuration import agent_model_configuration
+    models = agent_model_configuration(registrations, environ=factory.environ, model=factory.model)
+    # A single replacement target remains a useful summary for existing viewers.
+    targets = [entry['routing']['targets'] for entry in models.values() if 'routing' in entry]
+    target = targets[0].get('default') if targets and len(targets[0]) == 1 else None
+    plugin = plan.selection.value
+    sdk_configuration = (plugin.execution_configuration(environ=factory.environ, model=factory.model,
+                         options=plan.options) if isinstance(plugin, SDKExecutionConfiguration) else {})
     return {'sdk': reference.name, 'sdk_options': dict(plan.options),
-            'model': target.model if target else factory.model,
-            'model_provider': target.provider_id if target else None,
+            'model': target['model'] if target else None,
+            'model_override': factory.model,
+            'agent_models': models, 'sdk_configuration': sdk_configuration,
+            'model_provider': target['provider_id'] if target else None,
             'trace_max_bytes': factory.trace_max_bytes,
             'workers': runner.concurrency.max_parallel_cases,
             'judge_workers': runner.concurrency.max_parallel_judges,
             'judge_queue_capacity': runner.concurrency.judge_queue_capacity,
             'retry_policy': asdict(runner.retry_policy),
             'sdk_distributions': installed_sdk_distributions(reference),
-            'provider_base_url': target.base_url if target else None,
+            'provider_base_url': target['base_url'] if target else None,
             'runtime_source_sha256': source_digest(Path(__file__).resolve().parents[2])}
 
 
@@ -70,7 +74,7 @@ def build_saved_runner(configuration, environ, *, activity_sink=None):
     """Reconstruct a directory SDK runner without putting credentials in a plan."""
     from agentbench.cli.trace_runtime import build_trace_suite_runner
     runner = build_trace_suite_runner(
-        max_bytes=configuration['trace_max_bytes'], model=configuration.get('model'),
+        max_bytes=configuration['trace_max_bytes'], model=configuration.get('model_override', configuration.get('model')),
         sdk_selection=resolve_sdk(configuration['sdk']), sdk_options=configuration.get('sdk_options'),
         concurrency=ConcurrencySettings(configuration['workers'], configuration.get('judge_workers', 2),
                                         configuration.get('judge_queue_capacity', 8)), environ=environ,

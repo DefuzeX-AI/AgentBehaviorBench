@@ -49,6 +49,7 @@ class BenchmarkResult:
     host_acceptance: str = "unknown"
     host_trace_validation: str = "unknown"
     failures: tuple[BenchmarkStepFailure, ...] = ()
+    dependency_failure: dict | None = None
 
     @property
     def execution_status(self) -> str:

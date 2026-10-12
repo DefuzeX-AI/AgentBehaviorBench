@@ -102,7 +102,7 @@ def test_invalid_target_urls_do_not_expose_secrets(url):
     assert url not in str(failure.value)
 
 
-def test_suite_configuration_records_selected_provider():
+def test_suite_configuration_records_selected_provider(tmp_path):
     from types import SimpleNamespace
     from agentbench.cli.sessions.configuration import runner_configuration
     from agentbench.harness.scheduling import RetryPolicy
@@ -110,16 +110,25 @@ def test_suite_configuration_records_selected_provider():
     factory = SimpleNamespace(model=None, trace_max_bytes=4096,
         environ={'DEEPSEEK_API_KEY': 'test-secret', 'DEEPSEEK_MODEL': 'ds-model'},
         plan=SimpleNamespace(options={}, selection=SimpleNamespace(
-            reference=SimpleNamespace(source='directory', name='local'))))
+            reference=SimpleNamespace(source='directory', name='kuma'), value=object())))
     runner = SimpleNamespace(_runner_factory=factory, retry_policy=RetryPolicy(),
                              concurrency=ConcurrencySettings(max_parallel_cases=1))
-    result = runner_configuration(runner)
+    from agentbench.harness.registry import AgentRegistration
+    (tmp_path / 'agent.toml').write_text('''schema_version = "defuzex-bench.agent.v2"
+framework = "langgraph"
+[llm_interception]
+trust_plugin = "pem-env"
+credentials = [{id = "native", agent_env = "OPENAI_API_KEY", auth_plugin = "bearer-token"}]
+''')
+    agents = [AgentRegistration('fixture', tmp_path, True, 'ready', 'langgraph', 'fixture')]
+    result = runner_configuration(runner, agents)
     assert result['model_provider'] == 'deepseek'
     assert result['model'] == 'ds-model'
     assert result['provider_base_url'] == 'https://api.deepseek.com'
     assert 'test-secret' not in repr(result)
     factory.environ = {}
-    assert runner_configuration(runner)['model_provider'] is None
+    with pytest.raises(InterceptionConfigurationError):
+        runner_configuration(runner, agents)
 
 
 @pytest.mark.parametrize('sdk_name', ['kuma', 'local'])

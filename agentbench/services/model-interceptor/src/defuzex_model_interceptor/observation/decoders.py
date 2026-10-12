@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import json
 
+from ..transport.sse import SSEDecoder
+
 
 class JsonHttpProtocol:
     name = "json-http"
+    stream_terminal = None
 
     def decode_request(self, content: bytes, content_type: str) -> object:
         return _decode(content, content_type)
@@ -14,21 +17,35 @@ class JsonHttpProtocol:
     def decode_response(self, content: bytes, content_type: str) -> object:
         return _decode(content, content_type)
 
+    def stream_complete(self, content: bytes, content_type: str) -> bool:
+        if self.stream_terminal is None or 'text/event-stream' not in content_type.lower():
+            return False
+        parser = SSEDecoder(self.stream_terminal)
+        try:
+            parser.feed(content)
+            parser.feed(b'')  # Require a complete final frame and no trailing partial data.
+        except (ValueError, UnicodeError):
+            return False
+        return parser.done
+
 
 class OpenAIChatProtocol(JsonHttpProtocol):
     name = "openai-chat"
+    stream_terminal = "done"
 
 
-class ThinkingChatProtocol(JsonHttpProtocol):
+class ThinkingChatProtocol(OpenAIChatProtocol):
     name = "openai-chat-thinking"
 
 
 class OpenAIResponsesProtocol(JsonHttpProtocol):
     name = "openai-responses"
+    stream_terminal = "response.completed"
 
 
 class AnthropicMessagesProtocol(JsonHttpProtocol):
     name = "anthropic-messages"
+    stream_terminal = "message_stop"
 
 
 def _decode(content: bytes, content_type: str) -> object:

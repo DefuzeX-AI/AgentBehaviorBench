@@ -35,7 +35,7 @@ class SSEDecoder:
                 raise ValueError("SSE payload must be an object")
             if value.get("error") or value.get("type") in {"error", "response.failed", "response.incomplete"}:
                 raise ValueError("Upstream stream reported an error")
-            if value.get("type") == self.terminal:
+            if self.terminal != "done" and value.get("type") == self.terminal:
                 self.done = True
             events.append(value)
         if len(self.buffer) > self.maximum:

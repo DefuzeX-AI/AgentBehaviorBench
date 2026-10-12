@@ -77,6 +77,7 @@ def benchmark_to_json(benchmark):
             'host_trace_validation': benchmark.host_trace_validation,
             **({'execution_status': benchmark.execution_status,
                 'failures': json_value(benchmark.failures)} if benchmark.failures else {}),
+            **({'dependency_failure': json_value(benchmark.dependency_failure)} if benchmark.dependency_failure else {}),
             'history_count': benchmark.history_count, 'report': report_to_json(benchmark.report),
             'steps': [{'input_id': step.input_id, 'payload': json_value(step.payload),
                        'output': json_value(step.invocation.output),
@@ -129,7 +130,8 @@ def benchmark_from_json(value):
                            evidence_status=value.get('evidence_status', 'unknown'),
                            host_acceptance=value.get('host_acceptance', 'unknown'),
                            host_trace_validation=value.get('host_trace_validation', 'unknown'),
-                           failures=tuple(BenchmarkStepFailure(**failure) for failure in value.get('failures', ())))
+                           failures=tuple(BenchmarkStepFailure(**failure) for failure in value.get('failures', ())),
+                           dependency_failure=value.get('dependency_failure'))
 
 
 def case_from_json(value):

@@ -31,7 +31,7 @@ OPENROUTER_MODEL=openai/gpt-4.1-mini
 # OPENROUTER_BUILD_MODEL=
 ```
 
-대상 Agent 실행 모델은 별도로 설정합니다. LangGraph는 OpenRouter, DeepSeek 또는 GLM을 사용할 수 있고 네이티브 ACP는 Agent가 선언한 서비스 인증 정보를 사용합니다. 시작 가이드를 참조하세요. `--build-model`은 생성 모델, `--model`은 인증 시 ABB 대체 대상 모델입니다. 셸 변수가 `.env`보다 우선하며 키를 소스나 생성 파일에 넣지 마세요.
+대상 모델은 별도로 설정합니다. 일반 LangGraph와 설정 가능한 ACP는 OpenRouter → DeepSeek → GLM 선택을 공유합니다. agent.toml의 고정 공급자가 전역 선택보다 우선하며 제약이 있는 네이티브 통합은 전용 자격 증명을 유지합니다. `--build-model`은 생성 모델, `--model`은 인증 시 공통 대상 모델을 지정합니다. 셸 변수가 `.env`보다 우선하며 키를 소스나 생성 파일에 넣지 마세요.
 
 웹 뷰어에는 npm과 Node.js 20.x의 20.19 이상 또는 22.12 이상이 필요합니다. 프런트엔드를 빌드하세요. `--no-view` 평가는 Node나 `web/dist`가 필요하지 않습니다.
 
@@ -64,6 +64,16 @@ agentbench agent add https://github.com/owner/repository -b --sdk kuma
 agentbench agent add https://github.com/owner/repository -b --sdk kuma --answers answers.txt
 ```
 
+### 구조화된 출력 생성에 실패한 경우
+
+스키마 오류는 필드 경로, 기대하는 제약 조건과 실제 타입을 표시합니다.
+모델 본문의 JSON 오류는 행과 열을 표시하며 횟수가 제한된 수정 루프에 들어갑니다.
+검토 응답의 형식이 잘못되면 유효한 후보 파일을 다시 생성하지 않고 검토만 다시 요청합니다.
+파일 생성과 검토는 해당 파일의 수정 예산을 공유합니다.
+provider 응답의 외부 형식이 잘못되었거나 생성이 끝나지 않은 경우에는 중단합니다.
+완료된 파일과 시도 기록을 보존하세요. 진단, 현재 `null` 허용 규칙 및 수정 횟수 제어는
+[상세 절차 — 영어](../Troubleshooting.md#structured-output-generation-failures)를 참조하세요.
+
 ## 3. 파일별 역할
 
 Agent 단위는 `resources/agents/NN-name/`에 위치합니다. 가져온 소스 주변에 통합 파일이 생성되므로
@@ -79,6 +89,27 @@ resources/agents/NN-name/
 ├── requirement.md           # Evaluation description for the selected SDK
 └── evaluation/              # Optional referenced schemas or fixtures
 ```
+
+모든 내부 `agent/` 디렉터리는 Git에서 무시되며 새 ABB 체크아웃에는 포함되지 않습니다.
+외부 통합 파일과 출처만 커밋하세요. 지원되는 Git 소스는 `[source] method = "git"`과
+기록된 전체 commit SHA를 사용하고, install 모드 입력은 `install/`에 보관합니다.
+로컬 소스와 지원되지 않는 기능은 수동으로 준비해야 합니다.
+[소스 준비 문서(영어)](../Agent-Sources.md)를 참고하세요.
+
+### `install/`: ABB 추가 파일의 영구 원본
+
+모든 방식(`git`, `install`, `bundled`, method 생략)은 바깥 `install/`을 같은
+상대 경로의 `agent/`로 복사합니다. ABB 설정은 `abb-*.json`으로 이름 짓고
+`install/`에 보관합니다. `adapter.config`는 계속 `agent/` 기준입니다.
+생성된 복사본은 커밋하지 않습니다. 원래 설정은 upstream에, binding은 바깥에 둡니다.
+
+`agent add -b`는 생성 전과 등록 전에 검사합니다. 무시되는 소스에만 있는 ABB 설정은
+등록할 수 없습니다. 누락은 복구하고 내용 충돌, 안전하지 않은 경로, 빈 install은 오류로
+처리합니다. install 방식은 입력이 필수이며 bundled에는 수동 소스가 필요합니다.
+지원되는 새 GitHub 가져오기는 전체 SHA의 `method="git"`을 쓰고 기존 명시적 방식은
+보존합니다. 로컬 및 미지원 submodule/symlink/LFS 구성은 bundled를 사용합니다.
+제출 전에 바깥 파일만 별도 깨끗한 디렉터리에 복사해 소스 준비와 설정 로딩을 확인하고,
+bundled에는 수동 소스를 제공한 뒤 아래 실행 검증을 수행하세요.
 
 ### `agent/` — Agent 자체 소스
 
@@ -203,3 +234,5 @@ Export JSON은 스냅샷이며 전체 추적 또는 독립 HTML 보고서가 아
 Trace UI not built이면 `web/`를 빌드하세요. Docker 오류는 같은 사용자로 `docker info`, SDK 가져오기 오류는 ABB 가상 환경의 SDK 설치를 확인하세요. 모델·키 오류는 서비스, 모델명 및 셸 우선순위를 확인하세요. 계획 오류나 needs_input은 저장 기록을 확인하고 실제 정보를 보완하세요.
 
 [CLI 문서](cli.ko.md) · [상세 문제 해결 — 영어](../Troubleshooting.md)
+
+일반 Agent는 `[model]`을 생략하며 OpenRouter → DeepSeek → GLM 순서로 선택합니다. `provider="..."`를 지정하면 전역 선택보다 우선하여 해당 공급자를 고정하고, 키가 없으면 오류를 냅니다. 설정 가능한 ACP 외부 실행기는 런타임 설정을 받습니다. 제약이 있는 네이티브 통합은 `source="native"`, 사유와 전용 자격 증명도 선언합니다. 불필요한 기본 선언과 반복 주석은 생성하지 않습니다. [모델 선택 규칙(영문)](../Model-Selection.md)을 참조하세요.

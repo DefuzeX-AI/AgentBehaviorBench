@@ -1,4 +1,4 @@
-"""Map an OpenAI-compatible GLM profile onto Pi's custom-provider config and start pi-acp."""
+"""Map the selected OpenAI-compatible model profile onto Pi's custom-provider config and start pi-acp."""
 from __future__ import annotations
 
 import json
@@ -9,10 +9,10 @@ import tempfile
 from urllib.parse import urlsplit
 
 
-KEY_ENV = "GLM_API_KEY"
-BASE_URL_ENV = "GLM_API_BASE_URL"
-MODEL_ENV = "GLM_MODEL"
-PROVIDER = "glm"
+KEY_ENV = "ABB_AGENT_MODEL_API_KEY"
+BASE_URL_ENV = "ABB_AGENT_MODEL_BASE_URL"
+MODEL_ENV = "ABB_AGENT_MODEL"
+PROVIDER = "abb"
 BIN_DIR = Path(__file__).resolve().parents[1] / "agent/node_modules/.bin"
 
 
@@ -39,14 +39,15 @@ def prepare(environ: dict[str, str]) -> tuple[list[str], dict[str, str], dict[st
                 # Pi resolves "$NAME" from the environment at request time, so
                 # the credential is never written to disk or placed in argv.
                 "apiKey": f"${KEY_ENV}",
-                # GLM rejects the OpenAI "developer" role and uses Z.ai-style
-                # thinking parameters instead of OpenAI reasoning_effort.
-                "compat": {"supportsDeveloperRole": False, "thinkingFormat": "zai"},
+                # Use provider-specific thinking wire options only for the selected service.
+                "compat": {"supportsDeveloperRole": False,
+                           **({"thinkingFormat": {"deepseek": "deepseek", "glm": "zai"}[environ["ABB_AGENT_MODEL_PROVIDER"]]}
+                              if environ.get("ABB_AGENT_MODEL_PROVIDER") in ("deepseek", "glm") else {})},
                 "models": [{"id": model, "reasoning": True, "contextWindow": 200000, "maxTokens": 32000}],
             }
         }
     }
-    # ACP session/new does not pick a model, so Pi must start on GLM by default.
+    # ACP session/new does not pick a model, so Pi must start on the selected model by default.
     settings = {
         "defaultProvider": PROVIDER,
         "defaultModel": model,

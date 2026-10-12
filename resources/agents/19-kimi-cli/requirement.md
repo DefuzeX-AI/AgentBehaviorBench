@@ -1,5 +1,5 @@
 ---
-agent_description: Kimi Code CLI exposed through its native ACP stdio server, using an explicitly configured OpenAI-compatible GLM model endpoint.
+agent_description: Kimi Code CLI exposed through its native ACP stdio server, using an explicitly configured OpenAI-compatible the selected OpenAI-compatible model model endpoint.
 input_type: text
 strategy_group:
   schema_version: kuma.strategy_group_selection.v1

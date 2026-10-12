@@ -10,18 +10,17 @@ empty workspace. No upstream source is vendored or modified.
 `agent.toml` `[source]` and `source-manifest.json` pin the repository commit that
 npm `18.2.11` was published from.
 
-The acceptance profile uses Zhipu GLM's OpenAI-compatible coding endpoint.
-Supply these variables only at runtime:
+This unit uses default model selection; no `[model]` declaration is needed. Configure the selected provider in
+`.env`: OpenRouter -> DeepSeek -> GLM, choosing the first nonempty API key, or set
+`ABB_MODEL_PROVIDER` explicitly. Supply the selected provider's model name as well.
+See [model selection](../../../docs/Model-Selection.md) for variables and constraints.
 
-- `GLM_API_BASE_URL`: the OpenAI-style base URL, e.g.
-  `https://open.bigmodel.cn/api/coding/paas/v4`.
-- `GLM_MODEL`: the exact provider model ID, such as `glm-5.1`.
-- `GLM_API_KEY`: the Bearer credential. It is never written into this unit.
+ABB passes the resolved configuration through internal `ABB_AGENT_MODEL_API_KEY`,
+`ABB_AGENT_MODEL_BASE_URL`, `ABB_AGENT_MODEL` and `ABB_AGENT_MODEL_PROVIDER` variables.
+Users do not fill these internal variables. Only the selected credential reaches the
+launcher. The runtime derives the exact observed model route from the selected URL.
 
-The interception manifest admits only the tested route:
-`POST https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`.
-A different OpenAI-compatible provider needs an explicit reviewed route update;
-changing environment variables alone does not broaden container egress.
+The runtime admits the exact `POST <selected-base>/chat/completions` route.
 
 ## Installation
 
@@ -45,12 +44,12 @@ For every Case `bootstrap/launch.py` validates the three variables, creates a
 disposable `HOME` under `/tmp` and writes omp's native config there
 (`~/.omp/agent`, also passed as `PI_CODING_AGENT_DIR`, files mode 0600):
 
-- `models.yml` declares a custom `glm` provider with `api: openai-completions`,
-  the base URL, and one model `$GLM_MODEL` (`reasoning: true`, 200k context,
-  32k max output, `compat.supportsDeveloperRole: false` because GLM rejects the
-  `developer` role). `apiKey` is the environment variable *name* `GLM_API_KEY`,
+- `models.yml` declares a custom `abb` provider with `api: openai-completions`,
+  the base URL, and one model `$ABB_AGENT_MODEL` (`reasoning: true`, 200k context,
+  32k max output, `compat.supportsDeveloperRole: false` because DeepSeek rejects the
+  `developer` role). `apiKey` is the environment variable *name* `ABB_AGENT_MODEL_API_KEY`,
   which omp resolves at request time, so the credential never touches disk or argv.
-- `config.yml` sets `modelRoles.default: glm/$GLM_MODEL`, because ACP
+- `config.yml` sets `modelRoles.default: abb/$ABB_AGENT_MODEL`, because ACP
   `session/new` does not select a model, and `disabledProviders` to every
   built-in provider id from `builtin-providers.json` plus the implicit local
   providers (`ollama`, `llama.cpp`, `lm-studio`), except the built-in `web`
@@ -64,7 +63,7 @@ host acceptance with `egress_denied` for `GET catalog.stencil.so/models.json.zst
 `api.venice.ai/api/v1/models`, `api.kilo.ai/api/gateway/models`,
 `zenmux.ai/api/v1/models` and `api.commandcode.ai/provider/v1/models`. omp has no
 offline switch for this refresh; disabling the unused providers through its own
-setting leaves only the configured `glm` provider and needs no extra egress.
+setting leaves only the configured `abb` provider and needs no extra egress.
 
 The launcher also sets `OTEL_SDK_DISABLED=true` (omp's own OTLP exporter stays
 off; ABB's evidence comes from ACP events and model interception) and
@@ -104,3 +103,8 @@ container's `--cap-drop=ALL` limits.
 ## Installation inputs
 
 Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.
+
+## Validation scope
+
+Earlier acceptance records describe the previous fixed-provider deployment. They do not
+certify every shared provider/model combination; run a fresh Case after changing it.

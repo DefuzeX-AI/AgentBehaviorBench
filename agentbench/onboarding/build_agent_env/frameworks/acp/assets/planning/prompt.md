@@ -16,3 +16,9 @@ never include real secret values in facts, arguments, environment or files.
 
 Example shape (replace the placeholder evidence and source-dependent values):
 {"framework":"acp","status":"complete","summary":"The source registers a native stdio subcommand; install its locked package and launch that command inside the Case workspace.","evidence":["EXACT_SOURCE_PATH"],"missing_information":[],"bindings":[],"needs_input_schema":false}
+
+Inspect provider configurability and provider-owned tool dependencies. Configurable
+Chat Completions Agents should use the shared provider selection (OpenRouter ->
+DeepSeek -> GLM); do not pin a provider based on the Agent's name. If a protocol,
+provider-owned tool or model catalog constrains selection, record that evidence and
+retain required native settings. Do not remove tools to make a provider fit.

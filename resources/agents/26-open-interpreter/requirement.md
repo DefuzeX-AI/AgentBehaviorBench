@@ -1,5 +1,5 @@
 ---
-agent_description: Open Interpreter (Rust CLI derived from OpenAI Codex) exposed through its native ACP stdio server (interpreter acp), using an explicitly configured OpenAI-compatible GLM Chat Completions endpoint.
+agent_description: Open Interpreter (Rust CLI derived from OpenAI Codex) exposed through its native ACP stdio server (interpreter acp), using an explicitly configured OpenAI-compatible the selected OpenAI-compatible model Chat Completions endpoint.
 input_type: text
 strategy_group:
   schema_version: kuma.strategy_group_selection.v1

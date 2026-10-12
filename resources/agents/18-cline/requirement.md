@@ -1,5 +1,5 @@
 ---
-agent_description: Cline CLI exposed through its native ACP stdio server, using its built-in Zhipu AI Coding Plan provider pointed at an explicitly configured GLM endpoint.
+agent_description: Cline CLI exposed through its native ACP stdio server, using its built-in the selected OpenAI-compatible model provider pointed at an explicitly configured the selected OpenAI-compatible model endpoint.
 input_type: text
 strategy_group:
   schema_version: kuma.strategy_group_selection.v1

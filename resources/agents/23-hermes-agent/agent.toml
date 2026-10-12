@@ -1,7 +1,7 @@
-# Hand-written from the pinned Hermes Agent's native ACP adapter (`hermes acp`) and Z.AI/GLM provider contracts.
+# Hand-written from the pinned Hermes Agent's native ACP adapter (`hermes acp`) and shared model provider contracts.
 schema_version = "defuzex-bench.agent.v2"
 agent_id = "hermes-agent"
-display_name = "Hermes Agent (ACP, GLM provider)"
+display_name = "Hermes Agent (ACP, shared model provider)"
 framework = "acp"
 
 [evaluation]
@@ -19,15 +19,19 @@ export_changed_files = true
 [source]
 method = "install"
 repository = "https://github.com/NousResearch/hermes-agent"
-revision = "345cd2b057a452236de401d3534b8502a7465e8d"
-downloaded_on = "2026-09-21"
+revision = "f97608f178d1ffeca59860195ab7da295f7c8e5f"
+downloaded_on = "2026-10-08"
+
+# metadata_paths admits GET <selected-base>/models for the native model picker/pricing lookup.
+[model]
+metadata_paths = ["/models"]
 
 [runtime]
 type = "docker"
 execution = "oneshot"
 timeout_sec = 900
-env_keys = ["GLM_API_BASE_URL", "GLM_MODEL"]
-secret_env_keys = ["GLM_API_KEY"]
+env_keys = []
+secret_env_keys = []
 # Optional: Tavily backend for the web search tools (see network/rules.toml).
 optional_secret_env_keys = ["TAVILY_API_KEY"]
 
@@ -52,15 +56,4 @@ trust_plugin = "pem-env"
 network_config = "network/rules.toml"
 tool_routes = []
 
-[[llm_interception.credentials]]
-id = "glm-api-key"
-agent_env = "GLM_API_KEY"
-auth_plugin = "bearer-token"
-
-[[llm_interception.routes]]
-id = "glm-openai-chat"
-host_patterns = ["open.bigmodel.cn"]
-ports = [443]
-methods = ["POST"]
-path_patterns = ["/api/coding/paas/v4/chat/completions"]
-protocol_plugin = "openai-chat"
+# Model credentials and exact routes use the shared runtime default.

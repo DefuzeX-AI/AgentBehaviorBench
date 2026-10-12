@@ -6,19 +6,17 @@ built-in ACP server (`openhands acp`). It pulls OpenHands SDK/tools `1.21.0`. AB
 it over ACP stdio and keeps each Case in a separate empty workspace. No upstream source is
 vendored or modified.
 
-The acceptance profile uses Zhipu GLM's OpenAI-compatible coding endpoint.
-Supply these variables only at runtime:
+This unit uses default model selection; no `[model]` declaration is needed. Configure the selected provider in
+`.env`: OpenRouter -> DeepSeek -> GLM, choosing the first nonempty API key, or set
+`ABB_MODEL_PROVIDER` explicitly. Supply the selected provider's model name as well.
+See [model selection](../../../docs/Model-Selection.md) for variables and constraints.
 
-- `GLM_API_BASE_URL`: the OpenAI-style base URL, e.g.
-  `https://open.bigmodel.cn/api/coding/paas/v4`.
-- `GLM_MODEL`: the exact provider model ID, such as `glm-5.1`.
-- `GLM_API_KEY`: the Bearer credential. It is never written into this unit.
+ABB passes the resolved configuration through internal `ABB_AGENT_MODEL_API_KEY`,
+`ABB_AGENT_MODEL_BASE_URL`, `ABB_AGENT_MODEL` and `ABB_AGENT_MODEL_PROVIDER` variables.
+Users do not fill these internal variables. Only the selected credential reaches the
+launcher. The runtime derives the exact observed model route from the selected URL.
 
-The interception manifest admits only the tested route:
-`POST https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`
-(LiteLLM's `openai/` provider posts to `<base>/chat/completions`).
-A different OpenAI-compatible provider needs an explicit reviewed route update;
-changing environment variables alone does not broaden container egress.
+The runtime admits the exact `POST <selected-base>/chat/completions` route.
 
 ## What is pinned
 
@@ -42,9 +40,9 @@ For every Case `bootstrap/launch.py` validates the three variables, creates a di
    In ACP mode OpenHands 1.16.0 answers `session/new` with "Authentication required" unless
    that file exists, and `openhands acp --override-with-envs` is ignored. The launcher runs
    the CLI's own `AgentStore().save(AgentStore().load_or_create(env_overrides_enabled=True))`
-   with `LLM_API_KEY`, `LLM_BASE_URL` and `LLM_MODEL=openai/$GLM_MODEL` in that one child's
+   with `LLM_API_KEY`, `LLM_BASE_URL` and `LLM_MODEL=openai/$ABB_AGENT_MODEL` in that one child's
    environment. The resulting file holds the credential, so it lives only in the disposable
-   `HOME` with mode `0600`; the key is never on argv. `GLM_API_KEY`/`LLM_API_KEY` are then
+   `HOME` with mode `0600`; the key is never on argv. `ABB_AGENT_MODEL_API_KEY`/`LLM_API_KEY` are then
    removed from the ACP server's environment, so the agent's terminal cannot echo it.
 2. **Removes startup egress.** Any undeclared request makes the host reject the trace:
    - `LITELLM_LOCAL_MODEL_COST_MAP=True` stops LiteLLM from downloading its cost map from
@@ -73,3 +71,8 @@ For every Case `bootstrap/launch.py` validates the three variables, creates a di
 ## Installation inputs
 
 Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.
+
+## Validation scope
+
+Earlier acceptance records describe the previous fixed-provider deployment. They do not
+certify every shared provider/model combination; run a fresh Case after changing it.

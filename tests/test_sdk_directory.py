@@ -588,3 +588,15 @@ def test_directory_adapter_retains_real_container_run(adapter_directory):
     assert len(set(run_ids)) == agent.case_count
     assert execution.result_log.path.is_file()
     print(f"Acceptance artifacts retained: {output}")
+
+
+def test_custom_sdk_without_runtime_manifest_can_save_configuration(adapter_directory, tmp_path):
+    from agentbench.cli.sessions.configuration import runner_configuration
+    from agentbench.cli.trace_runtime import build_trace_suite_runner
+    from agentbench.harness import AgentRegistration
+    add_adapter(adapter_directory)
+    runner = build_trace_suite_runner(max_bytes=1024, environ={})
+    agent = AgentRegistration('custom', tmp_path, True, 'ready', 'custom-framework', 'fixture')
+    config = runner_configuration(runner, [agent])
+    assert config['agent_models'] == {'custom': {'mode': 'sdk'}}
+    assert config['provider_base_url'] is None

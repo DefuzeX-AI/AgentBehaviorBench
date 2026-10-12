@@ -163,3 +163,12 @@ def test_cleanup_terminates_agent_descendants(adapter):
             return
         time.sleep(0.01)
     pytest.fail('Agent descendant survived process group cleanup')
+
+
+def test_native_abort_preserves_partial_output_and_closes_only_agent_session(adapter):
+    from agentbench.adapter.acp.errors import AgentAborted
+    with pytest.raises(AgentAborted) as raised:
+        adapter.invoke('abort')
+    assert raised.value.raw_output['partial_text'] == '1:abort'
+    assert not adapter.is_loaded
+    assert raised.value.code == 'agent_aborted'

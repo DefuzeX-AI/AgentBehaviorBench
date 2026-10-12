@@ -31,7 +31,7 @@ OPENROUTER_MODEL=openai/gpt-4.1-mini
 # OPENROUTER_BUILD_MODEL=
 ```
 
-Configurez séparément le modèle de l’Agent : LangGraph peut utiliser OpenRouter, DeepSeek ou GLM ; les Agents ACP natifs utilisent leurs identifiants déclarés. Consultez le guide de démarrage. `--build-model` choisit le modèle de génération ; `--model`, le modèle cible de substitution ABB pour la certification. Les variables du shell priment sur `.env`. Ne placez pas de clés dans les sources ou fichiers générés.
+Le modèle cible est configuré séparément : LangGraph et les intégrations ACP configurables partagent la sélection OpenRouter → DeepSeek → GLM. Un fournisseur fixé dans agent.toml prime sur la sélection globale ; les intégrations natives contraintes conservent leurs identifiants dédiés. `--build-model` sélectionne le modèle de génération ; `--model` remplace le modèle cible partagé pour la certification. Les variables du shell priment sur `.env`. Gardez les clés hors des sources et fichiers générés.
 
 Pour le visualiseur, utilisez npm avec Node.js 20.19+ sur 20.x ou 22.12+, puis construisez le frontend. Une évaluation avec `--no-view` ne nécessite ni Node ni `web/dist`.
 
@@ -64,6 +64,17 @@ agentbench agent add https://github.com/owner/repository -b --sdk kuma
 agentbench agent add https://github.com/owner/repository -b --sdk kuma --answers answers.txt
 ```
 
+### Échec de génération structurée
+
+Les erreurs de schéma indiquent maintenant le chemin du champ, la contrainte attendue et le type reçu.
+Les erreurs JSON du contenu du modèle indiquent la ligne et la colonne et entrent dans la boucle de
+correction bornée. Une réponse de revue invalide est corrigée sans régénérer le fichier candidat ;
+la génération et la revue partagent le budget de correction du fichier.
+Une enveloppe fournisseur invalide ou une réponse inachevée arrête la génération.
+Conservez les fichiers terminés et les journaux. Voir
+[le dépannage détaillé — anglais](../Troubleshooting.md#structured-output-generation-failures)
+pour les diagnostics, les champs acceptant `null` et les limites de correction.
+
 ## 3. Comprendre les fichiers
 
 L’unité Agent se trouve sous `resources/agents/NN-name/`. La commande génère les
@@ -79,6 +90,32 @@ resources/agents/NN-name/
 ├── requirement.md           # Evaluation description for the selected SDK
 └── evaluation/              # Optional referenced schemas or fixtures
 ```
+
+Tous les répertoires internes `agent/` sont ignorés par Git et absents d’un nouveau
+checkout ABB. Ne validez que les fichiers d’intégration et la provenance. Les
+sources Git compatibles utilisent `[source] method = "git"` avec le SHA complet
+enregistré ; le mode install conserve ses entrées dans `install/`. Les imports
+locaux et les fonctionnalités non prises en charge exigent une préparation
+manuelle. Voir [préparation des sources (anglais)](../Agent-Sources.md).
+
+### `install/` : fichiers durables ajoutés par ABB
+
+Tous les modes (`git`, `install`, `bundled`, ou méthode absente) copient `install/`
+vers `agent/` aux mêmes chemins relatifs. Enregistrez les descripteurs ABB
+`abb-*.json` dans `install/` ; `adapter.config` reste relatif à `agent/`.
+Versionnez les entrées externes, jamais les copies générées. Les descripteurs
+natifs restent en amont et les bindings dans `bindings/`.
+
+`agent add -b` prépare ces fichiers avant la génération et les vérifie avant
+l’enregistrement. Un descripteur ABB présent uniquement dans le répertoire ignoré
+est refusé. Les copies manquantes sont réparées ; conflits, chemins dangereux et
+répertoires install vides bloquent l’opération. Le mode install exige ces entrées ;
+bundled exige toujours les sources manuelles. Les nouveaux imports GitHub pris en
+charge utilisent `method="git"` avec le SHA complet ; les méthodes explicites sont
+conservées. Les sources locales et les configurations submodule/symlink/LFS non
+prises en charge utilisent bundled. Avant soumission, vérifiez la préparation et
+le chargement de configuration dans une copie propre des fichiers externes, avec
+sources manuelles pour bundled, puis exécutez les tests ci-dessous.
 
 ### `agent/` — le code de l’Agent
 
@@ -212,3 +249,5 @@ Export JSON produit un instantané, pas toutes les traces ni un rapport HTML aut
 Trace UI not built : construisez `web/`. Erreurs Docker : `docker info` avec le même utilisateur. Imports SDK : installez le SDK dans l’environnement ABB. Modèle/clé : vérifiez service, modèle et priorité du shell. Planification ou needs_input : consultez le journal et fournissez des réponses factuelles.
 
 [Référence CLI](cli.fr.md) · [Dépannage détaillé — anglais](../Troubleshooting.md)
+
+Sans `[model]`, la sélection par défaut suit OpenRouter → DeepSeek → GLM. `provider="..."` fixe le fournisseur et prime sur la sélection globale ; une clé absente provoque une erreur. Le lanceur ACP configurable reçoit les paramètres du runtime. Une intégration native contrainte déclare aussi `source="native"`, sa justification et ses identifiants dédiés. Évitez les déclarations par défaut et commentaires répétés. Voir les [règles de sélection (anglais)](../Model-Selection.md).

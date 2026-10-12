@@ -1,5 +1,5 @@
 ---
-agent_description: jcode (Rust coding agent harness) exposed through its native ACP adapter (jcode acp) backed by a per-Case jcode daemon, using an explicitly configured OpenAI-compatible GLM model endpoint.
+agent_description: jcode (Rust coding agent harness) exposed through its native ACP adapter (jcode acp) backed by a per-Case jcode daemon, using an explicitly configured OpenAI-compatible the selected OpenAI-compatible model model endpoint.
 input_type: text
 strategy_group:
   schema_version: kuma.strategy_group_selection.v1

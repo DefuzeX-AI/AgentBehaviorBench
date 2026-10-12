@@ -1,6 +1,5 @@
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
-import shutil
 
 import pytest
 
@@ -9,7 +8,8 @@ from agentbench.runtime.interception.config import InterceptionConfig
 
 
 ROOT = Path(__file__).parents[1]
-UNIT = ROOT / "resources/agents/13-claude-agent-acp"
+from tests.registered_agents import unit, require_source
+UNIT = unit("claude-agent-acp")
 
 
 def launch_module():
@@ -93,7 +93,12 @@ def test_interceptor_dns_environment_rejects_hostnames():
 
 def test_build_patch_waits_for_background_session_title(tmp_path):
     source = tmp_path / "session-titles.ts"
-    shutil.copyfile(UNIT / "agent/src/session-titles.ts", source)
+    source.write_text("""async function updateTitle(session, fallback) {
+      void this.requestGenerateTitle(session, fallback).catch((error) => {
+        this.agent.logger.error(`Session ${this.sessionId}: session title update failed: ${error}`);
+      });
+}
+""", encoding="utf-8")
     patch = spec_from_file_location("claude_agent_acp_patch", UNIT / "bootstrap/patch_source.py")
     module = module_from_spec(patch)
     assert patch.loader is not None
@@ -106,3 +111,14 @@ def test_build_patch_waits_for_background_session_title(tmp_path):
     assert "void this.requestGenerateTitle(session, fallback).catch" not in transformed
     with pytest.raises(RuntimeError, match="expected source block"):
         module.patch(source)
+
+
+def test_build_patch_matches_pinned_native_source(tmp_path):
+    original = require_source('claude-agent-acp', 'src/session-titles.ts')
+    source = tmp_path / 'session-titles.ts'
+    source.write_bytes(original.read_bytes())
+    spec = spec_from_file_location('claude_pinned_patch', UNIT / 'bootstrap/patch_source.py')
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.patch(source)
+    assert 'await this.requestGenerateTitle(session, fallback);' in source.read_text()

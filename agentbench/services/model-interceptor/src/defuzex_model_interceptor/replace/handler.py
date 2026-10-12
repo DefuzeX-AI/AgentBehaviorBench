@@ -196,8 +196,13 @@ class ReplaceInterceptor(CommonInterceptor):
             flow.metadata["client_payload"] = translated
             self._emit_response(flow, content, streaming=False)
         except Exception as exc:
-            self._error(flow, "Response conversion failed: " + str(exc), 502,
-                        code=ErrorCode.RESPONSE_CONVERSION_FAILED)
+            if status >= 400:
+                self._emit_response(flow, content, streaming=False)
+                self._error(flow, content.decode('utf-8', errors='replace') or f'Upstream HTTP {status}',
+                            status, code=ErrorCode.UPSTREAM_ERROR)
+            else:
+                self._error(flow, "Response conversion failed: " + str(exc), 502,
+                            code=ErrorCode.RESPONSE_CONVERSION_FAILED)
 
     def _local_count(self, flow, reply):
         """Reply locally only after authentication; never install real credentials."""
@@ -212,8 +217,13 @@ class ReplaceInterceptor(CommonInterceptor):
     def _emit_response(self, flow, content, *, streaming):
         route = flow.metadata["defuzex_resolved_route"]
         decoder = self.protocols.get(route.protocol_plugin, self.protocols["json-http"])
-        payload = decoder.decode_response(
-            content, flow.metadata.get("upstream_content_type", flow.response.headers.get("content-type", "")))
+        try:
+            payload = decoder.decode_response(
+                content, flow.metadata.get("upstream_content_type", flow.response.headers.get("content-type", "")))
+        except (ValueError, UnicodeError):
+            if flow.metadata.get('upstream_status', flow.response.status_code) < 400:
+                raise
+            payload = {'error': content.decode('utf-8', errors='replace')}
         events.emit("llm_response", **self._fields(flow),
              model=_model(payload) or flow.metadata.get("defuzex_target_model"),
              status=flow.metadata.get("upstream_status", flow.response.status_code),

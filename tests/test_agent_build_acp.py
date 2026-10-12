@@ -49,6 +49,8 @@ def test_acp_generates_without_bindings_and_reuses_checkpoint(source, plan):
     client = ACPClient(plan, files=files)
     assert build(source, plan, client=client).status == 'generated'
     manifest = tomllib.loads((source.directory / 'agent.toml').read_text())
+    assert 'model' not in manifest
+    assert '# Model setup:' not in (source.directory / 'agent.toml').read_text()
     assert manifest['adapter']['type'] == 'acp'
     assert manifest['adapter']['transport'] == 'stdio'
     assert 'mode' not in manifest['adapter'] and 'config' not in manifest['adapter']
@@ -92,3 +94,29 @@ def test_node_source_entrypoints_and_imports_are_collected_without_execution(tmp
     source = DownloadedAgent(tmp_path, 'https://github.com/example/cli', 'revision', discover_files(root))
     context = collect_context(source, load_settings(None), {})
     assert {'src/main.ts', 'src/server.ts'} <= {f['path'] for f in context['files']}
+
+
+@pytest.mark.parametrize('selection', ['shared', 'pinned', 'native'])
+def test_acp_model_policy_is_generated_and_validated_without_credentials(source, selection):
+    from agentbench.onboarding.build_agent_env.build_toml.rendering import render_manifest
+    from agentbench.onboarding.build_agent_env.build_toml.validation import validate_manifest
+    facts = {
+        'display_name': 'Configurable ACP', 'framework': 'acp',
+        'adapter': {'command': ['python', '/opt/agent/bootstrap/launch.py'],
+                    'cwd': '/home/agent/workspace', 'input_key': None,
+                    'permission_policy': 'deny', 'auth_method': None},
+        'env_keys': [], 'secret_env_keys': [], 'models': [], 'tool_routes': [], 'input_fields': [],
+        'model': ({'metadata_paths': ['/models']} if selection == 'shared' else
+                  {'provider': 'deepseek'} if selection == 'pinned' else
+                  {'provider': 'minimax', 'source': 'native', 'reason': 'Dedicated protocol'}),
+    }
+    content = render_manifest(facts, source=source, agent_id='my-agent')
+    validate_manifest(content, SimpleNamespace(source=source, agent_id='my-agent', plan={'framework':'acp','bindings':[]}))
+    manifest = tomllib.loads(content)
+    assert manifest['model'] == facts['model']
+    if selection != 'native':
+        assert manifest['llm_interception']['routes'] == []
+        assert manifest['llm_interception']['credentials'] == []
+        facts['models'] = [{'protocol': 'openai-chat', 'agent_env': 'DEEPSEEK_API_KEY', 'endpoint': None}]
+        with pytest.raises(BuildError, match='fixed model credentials'):
+            render_manifest(facts, source=source, agent_id='my-agent')

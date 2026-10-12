@@ -1,4 +1,4 @@
-"""Map an OpenAI-compatible GLM profile onto deepagents-code's native ACP server."""
+"""Map the selected OpenAI-compatible model profile onto deepagents-code's native ACP server."""
 from __future__ import annotations
 
 import json
@@ -10,9 +10,9 @@ import tempfile
 from urllib.parse import urlsplit
 
 
-KEY_ENV = "GLM_API_KEY"
-BASE_URL_ENV = "GLM_API_BASE_URL"
-MODEL_ENV = "GLM_MODEL"
+KEY_ENV = "ABB_AGENT_MODEL_API_KEY"
+BASE_URL_ENV = "ABB_AGENT_MODEL_BASE_URL"
+MODEL_ENV = "ABB_AGENT_MODEL"
 AGENT_BIN = "/opt/agent-venv/bin/deepagents-code"
 MODEL_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._\-/]*")
 
@@ -30,8 +30,8 @@ def config_toml(base_url: str, model: str) -> str:
         f"models = [{json.dumps(model)}]",
         "",
         "[models.providers.openai.params]",
-        # Without this langchain-openai uses the Responses API (POST .../responses),
-        # which the GLM coding endpoint does not serve (404).
+        # Keep langchain-openai on the Chat Completions wire declared by this
+        # deployment, rather than selecting the Responses API.
         "use_responses_api = false",
         "",
         "[update]",

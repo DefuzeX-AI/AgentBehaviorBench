@@ -33,7 +33,16 @@ class ACPObserver:
             update = data['update']
             if update.get('sessionUpdate') in ('tool_call', 'tool_call_update'):
                 self._tool(update)
-        self.summary['incomplete_tools'] = [key for key, state in self.tools.items() if not state['ended']]
+        if name in ('prompt_completed', 'failure'):
+            # The prompt boundary ends observation, not the native tool outcome.
+            # Preserve the missing outcome explicitly rather than fabricating success.
+            for state in self.tools.values():
+                if state['started'] and not state['ended']:
+                    state.update(ended=True, boundary_closed=True)
+                    self.store.record('span_control', span_id=state['span'],
+                                      control='acp_outcome_not_observed')
+        self.summary['incomplete_tools'] = [key for key, state in self.tools.items()
+                                          if not state['ended'] or state.get('boundary_closed')]
         atomic_json(self.directory / 'acp-summary.json', redact(self.summary, self.secrets))
 
     def _tool(self, update):

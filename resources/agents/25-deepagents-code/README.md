@@ -6,18 +6,17 @@ CLI release `0.1.72` (PyPI `deepagents-code`, formerly `deepagents-cli`; tag
 ACP server (`deepagents-code --acp`). ABB invokes it over ACP stdio and keeps each
 Case in a separate empty workspace. No upstream source is vendored or modified.
 
-The acceptance profile uses Zhipu GLM's OpenAI-compatible coding endpoint.
-Supply these variables only at runtime:
+This unit uses default model selection; no `[model]` declaration is needed. Configure the selected provider in
+`.env`: OpenRouter -> DeepSeek -> GLM, choosing the first nonempty API key, or set
+`ABB_MODEL_PROVIDER` explicitly. Supply the selected provider's model name as well.
+See [model selection](../../../docs/Model-Selection.md) for variables and constraints.
 
-- `GLM_API_BASE_URL`: the OpenAI-style base URL, e.g.
-  `https://open.bigmodel.cn/api/coding/paas/v4`.
-- `GLM_MODEL`: the exact provider model ID, such as `glm-5.1`.
-- `GLM_API_KEY`: the Bearer credential. It is never written into this unit.
+ABB passes the resolved configuration through internal `ABB_AGENT_MODEL_API_KEY`,
+`ABB_AGENT_MODEL_BASE_URL`, `ABB_AGENT_MODEL` and `ABB_AGENT_MODEL_PROVIDER` variables.
+Users do not fill these internal variables. Only the selected credential reaches the
+launcher. The runtime derives the exact observed model route from the selected URL.
 
-The interception manifest admits only the tested route:
-`POST https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`.
-A different OpenAI-compatible provider needs an explicit reviewed route update;
-changing environment variables alone does not broaden container egress.
+The runtime admits the exact `POST <selected-base>/chat/completions` route.
 
 ## Installation
 
@@ -38,13 +37,13 @@ a disposable `HOME` (and XDG dirs) under `/tmp` and writes
 store and state writable by whichever unprivileged uid the runtime chooses and
 isolates Cases. It then execs `/opt/agent-venv/bin/deepagents-code --acp`.
 
-- The config sets `[models].default = "openai:$GLM_MODEL"` and an `openai`
-  provider with `base_url = $GLM_API_BASE_URL` and `api_key_env = "GLM_API_KEY"`,
+- The config sets `[models].default = "openai:$ABB_AGENT_MODEL"` and an `openai`
+  provider with `base_url = $ABB_AGENT_MODEL_BASE_URL` and `api_key_env = "ABB_AGENT_MODEL_API_KEY"`,
   so the credential is read from the environment and never appears in argv or on
   disk. ACP `session/new` does not choose a model, so this default is what runs.
 - `[models.providers.openai.params] use_responses_api = false` is required:
-  otherwise langchain-openai calls `POST .../v4/responses`, which the GLM coding
-  endpoint answers with 404.
+  otherwise langchain-openai may use the Responses API instead of the configured
+  Chat Completions route.
 - `[update] check = false` and `prices_auto_update = false` (plus the matching
   `DEEPAGENTS_CODE_NO_UPDATE_CHECK`, `_AUTO_UPDATE=0`, `_PRICES_AUTO_UPDATE=0`,
   `_PLUGIN_AUTO_UPDATE=0` variables) stop the PyPI update check and the
@@ -95,3 +94,8 @@ in `egress.jsonl`; a refusal does not reject the Case (#137).
 ## Installation inputs
 
 Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.
+
+## Validation scope
+
+Earlier acceptance records describe the previous fixed-provider deployment. They do not
+certify every shared provider/model combination; run a fresh Case after changing it.

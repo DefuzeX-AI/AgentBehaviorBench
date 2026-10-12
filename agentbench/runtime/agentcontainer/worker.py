@@ -44,6 +44,36 @@ def configure_trust():
             os.environ[key] = str(bundle)
 
 
+def exception_details(exc):
+    """Read optional transport metadata without replacing the original failure."""
+    def get(value, name, default=None):
+        try:
+            return getattr(value, name, default)
+        except Exception:
+            return default
+    details = {}
+    if get(exc, 'code') is not None:
+        details['error_code'] = str(get(exc, 'code'))
+    if get(exc, 'raw_output') is not None:
+        details['raw_output'] = get(exc, 'raw_output')
+    response = get(exc, 'response')
+    status = get(exc, 'status_code') or get(response, 'status_code')
+    if type(status) is int:
+        details['http_status'] = status
+    request = get(exc, 'request') or get(response, 'request')
+    host = get(get(request, 'url'), 'host')
+    if isinstance(host, str):
+        details['dependency_host'] = host
+    headers = get(response, 'headers', {})
+    try:
+        retry_after = headers.get('retry-after')
+    except Exception:
+        retry_after = None
+    if retry_after is not None:
+        details['retry_after'] = str(retry_after)[:100]
+    return details
+
+
 async def execute(root: Path, request: Path, output: Path, *, provider=None, session=None):
     """Execute one current Input, optionally in an existing Case's Agent session.
 
@@ -103,16 +133,26 @@ async def execute(root: Path, request: Path, output: Path, *, provider=None, ses
         result.update(status="succeeded", output=invocation.output, raw_output=invocation.raw_output)
         store.record("execution_end", output=invocation.output)
     except BaseException as exc:
-        status = ('cancelled' if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt)) else
+        from agentbench.adapter.acp.errors import AgentAborted
+        status = ('aborted' if isinstance(exc, AgentAborted) else
+                  'cancelled' if isinstance(exc, (asyncio.CancelledError, KeyboardInterrupt)) else
                   'timeout' if isinstance(exc, TimeoutError) else 'failed')
         result.update(status=status, error_type=type(exc).__name__, error=str(exc))
+        if envelope['framework'] == 'acp':
+            session_adapter = getattr(session, 'adapter', None)
+            session_usable = getattr(session_adapter, 'is_loaded', None)
+            if isinstance(session_usable, bool):
+                result['session_usable'] = session_usable
+        result.update(exception_details(exc))
         store.record("execution_error", error_type=type(exc).__name__, error=str(exc))
     finally:
         if owned_session:
             try:
                 await session.aclose()
             except Exception as exc:
-                result.update(status="failed", error_type=type(exc).__name__, error=str(exc))
+                result["cleanup_error"] = {"type": type(exc).__name__, "message": str(exc)}
+                if result.get("status") == "succeeded":
+                    result.update(status="failed", error_type=type(exc).__name__, error=str(exc))
         result, receipt = sanitize_result(result, environment_secrets())
         atomic_json(output / "result-redaction.json", receipt)
         atomic_json(output / "result.json", result)

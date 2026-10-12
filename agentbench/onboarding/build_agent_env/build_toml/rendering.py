@@ -42,7 +42,15 @@ def render_manifest(facts, *, source, agent_id, options=None):
         "launch": {"argv": ["python", "-m", "agentbench.runtime.agentcontainer.worker"],
                    "workdir": "/opt/agent"}, "adapter": adapter,
     }
-    interception = interception_for(facts["models"], facts["tool_routes"])
+    if facts["framework"] == "acp" and facts.get("model", {}).get("source") != "native":
+        if facts["models"]:
+            raise BuildError("Shared native models must not include fixed model credentials or routes")
+        interception = {"trust_plugin": "pem-env", "credentials": [], "routes": [],
+                        "tool_routes": deepcopy(facts["tool_routes"])}
+    else:
+        interception = interception_for(facts["models"], facts["tool_routes"])
+    if "model" in facts:
+        manifest["model"] = deepcopy(facts["model"])
     from agentbench.adapter.factory import DEFAULT_ADAPTER_FACTORY
     manifest["runtime"].update(runtime_environment(facts["env_keys"], facts["secret_env_keys"], interception,
         network_mode=DEFAULT_ADAPTER_FACTORY.network_mode(facts['framework'])))
@@ -57,4 +65,6 @@ def render_manifest(facts, *, source, agent_id, options=None):
             for item in fields] if all(item["type"] == "string" for item in fields) else []}
     if interception is not None:
         manifest["llm_interception"] = interception
+    from agentbench.runtime.interception.native_model import model_declaration
+    model_declaration(manifest)
     return encode_manifest(manifest)

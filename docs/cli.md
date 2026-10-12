@@ -341,6 +341,12 @@ agentbench reuse results/suites/SUITE_ID --output-root results/reruns --max-step
 
 ## `clean`
 
+Suite registration and history cleanup share a project-wide file lock. Concurrent
+commands wait up to 30 seconds for this short critical section, even when their
+result directories differ. A timeout reports the lock path. Agent execution
+continues concurrently after registration; attempting to run or resume the same
+Suite while another coordinator owns it still fails immediately.
+
 Archive unreferenced top-level history from the project results directory into cache/history-trash. Preserve saved Suites and referenced artifacts. Preview first; stop runs and viewers before actual cleanup.
 
 ```text

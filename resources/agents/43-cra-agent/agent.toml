@@ -1,0 +1,72 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "cra-agent"
+display_name = "CRA Compliance Monitoring Agent"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+# The upstream checkout is acquired from Git rather than committed, matching
+# resources/agents/12-minimax-code and the /resources/agents/*/agent/ rule in
+# .gitignore ("Runtime source/install materialization"): prepare_agent_source()
+# restores this exact revision into agent/ before an evaluation opens.
+[source]
+method = "git"
+repository = "https://github.com/kulkarnirohit123/cra-agent"
+revision = "4d819a56d825ca14013997958eeb3d0e13ab7ebb"
+downloaded_on = "2026-10-07"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 600
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+# Upstream has no single request/response entrypoint: src/main.py runs a git
+# polling loop beside a FastAPI webhook server, and the application logic behind
+# both is CRAOrchestrator.run(commit_info, changed_files). The outer binding is
+# therefore the entrypoint, and no adapter config/graph_id is declared because
+# the graph is built in Python by CRAOrchestrator._build_graph rather than by a
+# langgraph.json descriptor.
+[adapter]
+type = "langgraph"
+mode = "in_process"
+binding = "bridge.py:create_graph"
+output_key = "answer"
+
+# The Agent reaches a model from exactly two places -- TriageAgent.triage_finding
+# and FixerAgent._generate_fix -- both through LLMClient.generate_json, which
+# builds a ChatOpenAI against the base_url below. That single route is the
+# Agent's whole model boundary. The scanners are local subprocesses and make no
+# model call.
+[llm_interception]
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
+
+# Jira, GitHub and the EU Vulnerability Database are declared nowhere. No
+# credential and no egress is provided for any of them, and upstream already
+# converts those failures into its own documented outcomes:
+# JiraAgent.create_ticket returns a FAILED ticket, GitClient.push returns False,
+# GitClient.create_pull_request is upstream's own placeholder, and
+# FixerAgent.fix_finding returns Action(success=False). Those paths are the
+# intended, expected result of this deployment.

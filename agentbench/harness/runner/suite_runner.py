@@ -71,7 +71,7 @@ class SuiteRunner:
             continue_on_error=True, on_agent_start=None, on_agent_complete=None,
             on_progress=None, on_step_start=None, on_step_complete=None,
             on_step_failure=None, on_event=None, on_tick=None, resume_state=None,
-            retain_case=None, retry_policy=None, run_control=None) -> BenchmarkSuiteResult:
+            retain_case=None, retry_policy=None, run_control=None, artifact_store=None) -> BenchmarkSuiteResult:
         """Run one Suite: validate Agents, prepare Cases, schedule jobs, and collect results.
 
         This method waits for the Suite to finish. CaseScheduler creates the
@@ -197,6 +197,8 @@ class SuiteRunner:
             if self._runner_factory is not None:
                 # Open resources owned by this Suite, using its ID and control.
                 session = self._runner_factory.open_suite(suite_id, control)
+                if artifact_store is not None and hasattr(session, 'bind_artifacts'):
+                    session.bind_artifacts(artifact_store)
 
             def create_runner(registration, identity):
                 """Return a task runner for an Agent and its Suite/job identity.

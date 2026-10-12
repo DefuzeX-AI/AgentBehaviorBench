@@ -34,3 +34,10 @@ an existing, reviewed outer file; do not invent a hook based on log timestamps.
 The callable accepts the native session ID and returns a bounded list of native
 call metadata. The adapter deduplicates session/call IDs and records reader
 failures separately. It does not change ACP input or provider traffic.
+
+Model policy is separate from observation. Omit [model] for default shared selection
+(OpenRouter -> DeepSeek -> GLM). model.provider explicitly pins a provider. The host
+generates exact routes and requires an existing outer launcher implementing the
+ABB_AGENT_MODEL_* contract. Fixed native integrations declare provider, source="native"
+and a reason, retaining dedicated protocol, credentials and tools. Do not generate
+source="shared" or boilerplate model comments in every manifest.

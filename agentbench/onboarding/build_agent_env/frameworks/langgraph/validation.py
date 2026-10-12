@@ -1,5 +1,6 @@
 """Validate LangGraph source facts and outer bindings, without imports."""
 import re
+from pathlib import PurePosixPath
 from agentbench.adapter.langgraph.config import LangGraphAdapterConfig
 from ...common.errors import BuildError
 from ...common.paths import file_path
@@ -22,6 +23,12 @@ def validate_manifest(manifest, session):
     config_path = safe_file(source, config_name) if isinstance(config_name, str) else None
     if config_path is None:
         raise BuildError("adapter.config must reference an existing file inside agent/; for a source-backed Python factory without a JSON descriptor, set config and graph_id to null and use the planned outer binding")
+    installed = safe_file(session.source.directory / "install", config_name)
+    if PurePosixPath(config_name).name.startswith("abb-") and installed is None:
+        raise BuildError("ABB-owned adapter.config must be saved under outer install/" + config_name +
+                         "; agent/ is ignored and cannot be the only copy")
+    if installed is not None and installed.read_bytes() != config_path.read_bytes():
+        raise BuildError("adapter.config differs from install/" + config_name + "; existing source will not be overwritten")
     # The temporary unit holds only manifest and graph descriptor.
     return config_name, config_path
 

@@ -282,7 +282,8 @@ def test_overlay_forwards_no_kuma_setting_and_admits_no_backend(tmp_path):
     with evaluation_agent(agent, **OVERLAY) as staged:
         manifest = tomllib.loads((staged.path / 'agent.toml').read_text())
         dockerfile = (staged.path / 'Dockerfile').read_text()
-    assert manifest['launch']['argv'] == ['python', '-m', 'agentbench.sdk.plugin.local.worker']
+    assert manifest['launch']['argv'][:3] == ['python', '-I', '-c']
+    assert 'agentbench.sdk.plugin.local.worker' in manifest['launch']['argv'][-1]
     assert manifest['runtime']['env_keys'] == ['OPENAI_BASE_URL']
     hosts = {host for route in manifest['llm_interception']['tool_routes'] for host in route['host_patterns']}
     assert hosts == {'api.github.com'}

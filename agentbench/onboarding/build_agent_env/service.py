@@ -1,11 +1,12 @@
 """Coordinate a resumable plan and sequential file builders; never certify here."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from agentbench.harness.session.locking import SuiteLock
 from agentbench.onboarding.source import DownloadedAgent
+from agentbench.onboarding.discovery import discover_files
 from agentbench.sdk.contracts import SDKOnboarding
 
 from .build_blinding.service import steps as binding_steps
@@ -20,6 +21,7 @@ from .common.registry import register_agent
 from .common.records import records_directory
 from .common.sdk_context import load_sdk_context
 from .common.validation import validate_unit
+from .common.source_inputs import prepare_inputs
 from .common.writer import confined, save_json, start_attempt
 from .openrouter_provider.client import OpenRouterClient
 from .openrouter_provider.context import collect_context
@@ -75,6 +77,9 @@ def build_agent_environment(
     lock = SuiteLock(records)
     lock.acquire()
     try:
+        prepare_inputs(source.directory)
+        if (source.directory / "install").is_dir():
+            source = replace(source, files=discover_files(source.directory / "agent"))
         attempt = start_attempt(records)
         session = BuildSession(source=source, sdk=sdk, settings=settings, environ=environ,
             context=collect_context(source, settings, environ), answers=answers, attempt=attempt,
@@ -112,7 +117,8 @@ def _build(session, registry_path):
             "status": "interrupted" if isinstance(exc, KeyboardInterrupt) else "failed",
             "current_file": getattr(session, "current_path", None),
             "completed_files": list(session.completed), "error_type": type(exc).__name__,
-            "message": message, "certified": False})
+            "message": message, "certified": False,
+            **({"diagnostics": exc.diagnostics} if getattr(exc, "diagnostics", None) else {})})
         if isinstance(exc, KeyboardInterrupt):
             raise
         raise BuildError(message) from None

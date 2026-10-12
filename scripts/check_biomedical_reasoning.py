@@ -20,7 +20,7 @@ from dotenv import dotenv_values
 from langchain_core.utils.json import parse_json_markdown
 
 ROOT = Path(__file__).resolve().parents[1]
-UNIT = ROOT / "resources/agents/49-biomedical-aiq-research-agent"
+UNIT = ROOT / "resources/agents/41-biomedical-aiq-research-agent"
 MODEL = "nvidia/nemotron-3-super-120b-a12b"
 URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 

@@ -1,4 +1,4 @@
-"""Materialize tracked installation inputs without cloning upstream repositories."""
+"""Materialize tracked installation inputs without overwriting existing source."""
 import hashlib
 import os
 from pathlib import Path
@@ -28,6 +28,10 @@ def installation_files(root):
 def prepare_installation(root, *, check):
     files = installation_files(root)
     target = root/'agent'
+    if target.is_symlink() or not target.resolve().is_relative_to(root.resolve()):
+        raise ValueError('Agent source must be an unlinked directory inside its unit')
+    if target.exists() and not target.is_dir():
+        raise ValueError('Agent source path is not a directory: ' + str(target))
     with tempfile.TemporaryDirectory(prefix='.abb-install-', dir=root) as temporary:
         staged = Path(temporary)/'agent'
         staged.mkdir()

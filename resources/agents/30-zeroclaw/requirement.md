@@ -1,5 +1,5 @@
 ---
-agent_description: ZeroClaw general-purpose personal assistant runtime exposed through its native ACP stdio server (zeroclaw acp), using an explicitly configured OpenAI-compatible GLM model endpoint under ZeroClaw's supervised risk profile.
+agent_description: ZeroClaw general-purpose personal assistant runtime exposed through its native ACP stdio server (zeroclaw acp), using an explicitly configured OpenAI-compatible the selected OpenAI-compatible model model endpoint under ZeroClaw's supervised risk profile.
 input_type: text
 strategy_group:
   schema_version: kuma.strategy_group_selection.v1

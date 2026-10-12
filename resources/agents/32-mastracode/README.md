@@ -18,22 +18,15 @@ does not use the `ee/` agent-builder or auth features.
 
 ## Model provider
 
-The acceptance profile uses Zhipu GLM's OpenAI-compatible coding endpoint.
-Supply these variables only at runtime:
+This unit uses default model selection; no `[model]` declaration is needed. Configure the selected provider in
+`.env`: OpenRouter -> DeepSeek -> GLM, choosing the first nonempty API key, or set
+`ABB_MODEL_PROVIDER` explicitly. Supply the selected provider's model name as well.
+See [model selection](../../../docs/Model-Selection.md) for variables and constraints.
 
-- `GLM_API_BASE_URL`: the OpenAI-style base URL, e.g.
-  `https://open.bigmodel.cn/api/coding/paas/v4`.
-- `GLM_MODEL`: the exact provider model ID, such as `glm-5.1`.
-- `GLM_API_KEY`: the Bearer credential. It is never written into this unit.
-
-Mastra Code routes models as `<provider>/<model>`. The launcher registers one
-custom provider `abb-glm` (Mastra Code's "custom OpenAI-compatible provider"
-setting: `name`, `url`, `apiKey`, `models`), which Mastra Code serves through
-`@ai-sdk/openai-compatible` as `POST <url>/chat/completions`, exactly the
-admitted route
-`POST https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`.
-A different OpenAI-compatible provider needs an explicit reviewed route update;
-changing environment variables alone does not broaden container egress.
+ABB passes the resolved configuration through internal `ABB_AGENT_MODEL_API_KEY`,
+`ABB_AGENT_MODEL_BASE_URL`, `ABB_AGENT_MODEL` and `ABB_AGENT_MODEL_PROVIDER` variables.
+Users do not fill these internal variables. Only the selected credential reaches the
+launcher. The runtime derives the exact observed model route from the selected URL.
 
 ## Distribution
 
@@ -53,14 +46,14 @@ forwarded signals, relaying its stdout line by line (see "stdout relay" below).
 
 `settings.json` (mode 0600, only in the disposable directory) contains:
 
-- `customProviders: [{name: "abb-glm", url: $GLM_API_BASE_URL, apiKey: <runtime
-  credential>, models: [$GLM_MODEL]}]`. Mastra Code reads a custom provider's key
+- `customProviders: [{name: "abb-shared", url: $ABB_AGENT_MODEL_BASE_URL, apiKey: <runtime
+  credential>, models: [$ABB_AGENT_MODEL]}]`. Mastra Code reads a custom provider's key
   only from this file (there is no env-var indirection for custom providers).
-  Inside ABB the runtime value is the interceptor's surrogate credential, and the
+  Inside ABB the runtime value is the selected upstream credential, and the
   file is discarded with the container;
 - `models.modeDefaults` for the three ACP modes (`build`, `plan`, `fast`) and the
   observational-memory observer/reflector and `/goal` judge models, all set to
-  `abb-glm/$GLM_MODEL`, so no role falls back to a built-in pack on another
+  `abb-shared/$ABB_AGENT_MODEL`, so no role falls back to a built-in pack on another
   provider;
 - a completed `onboarding` record so no first-run pack picker or login is needed.
 
@@ -135,3 +128,8 @@ NSS store (Chromium ignores `SSL_CERT_FILE`) and `zz-abb-lean` keeps Chromium wi
 ## Installation inputs
 
 Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.
+
+## Validation scope
+
+Earlier acceptance records describe the previous fixed-provider deployment. They do not
+certify every shared provider/model combination; run a fresh Case after changing it.

@@ -26,7 +26,7 @@ def build_evaluation_runner(
     control=None,
     build_coordinator=None,
     job_context: Mapping[str, object] | None = None,
-    runtime_services=None,
+    runtime_services=None, artifacts=None,
 ) -> EvaluationRunner:
     """Build the selected runner without leaking selection into orchestration."""
 
@@ -39,7 +39,7 @@ def build_evaluation_runner(
         control=control,
         build_coordinator=build_coordinator,
         job_context=MappingProxyType(dict(job_context or {})),
-        runtime_services=runtime_services,
+        runtime_services=runtime_services, artifacts=artifacts,
     )
 
     execution = plugin_execution(selected)
@@ -122,6 +122,10 @@ class SuiteRunnerFactory:
         self.control = control
         self.runtime_services = RuntimeServices(environ=factory.environ)
         self._closed = False
+        self.artifacts = None
+
+    def bind_artifacts(self, store):
+        self.artifacts = store
 
     def create(self, registration, job_context, trace_sink=None):
         if self._closed:
@@ -141,7 +145,7 @@ class SuiteRunnerFactory:
             trace_max_bytes=self.factory.trace_max_bytes, environ=self.factory.environ,
             control=self.control,
             build_coordinator=self.runtime_services.build_coordinator,
-            job_context=identity, runtime_services=self.runtime_services,
+            job_context=identity, runtime_services=self.runtime_services, artifacts=self.artifacts,
         )
 
     def close(self):

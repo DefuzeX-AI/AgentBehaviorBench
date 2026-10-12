@@ -1,4 +1,4 @@
-"""Map an OpenAI-compatible GLM profile onto OpenCode's native ACP server."""
+"""Map an selected OpenAI-compatible profile onto OpenCode's native ACP server."""
 from __future__ import annotations
 
 import json
@@ -10,10 +10,10 @@ import tempfile
 from urllib.parse import urlsplit
 
 
-KEY_ENV = "GLM_API_KEY"
-BASE_URL_ENV = "GLM_API_BASE_URL"
-MODEL_ENV = "GLM_MODEL"
-PROVIDER_ID = "glm"
+KEY_ENV = "ABB_AGENT_MODEL_API_KEY"
+BASE_URL_ENV = "ABB_AGENT_MODEL_BASE_URL"
+MODEL_ENV = "ABB_AGENT_MODEL"
+PROVIDER_ID = "abb"
 DISTRIBUTION = Path(__file__).resolve().parents[1] / "agent"
 # `opencode acp` is a thin ACP front end over OpenCode's own HTTP server,
 # started in-process on this loopback port (see network/rules.toml).
@@ -54,7 +54,7 @@ def config(base_url: str, model: str) -> dict:
             PROVIDER_ID: {
                 # Bundled in the OpenCode binary, so no provider package is fetched.
                 "npm": "@ai-sdk/openai-compatible",
-                "name": "Zhipu GLM",
+                "name": "ABB selected provider",
                 "options": {"baseURL": base_url, "apiKey": "{env:" + KEY_ENV + "}"},
                 "models": {model: {"name": model}},
             }
@@ -77,7 +77,7 @@ def prepare(environ: dict[str, str]) -> tuple[list[str], dict[str, str], dict]:
     if parsed.scheme != "https" or not parsed.hostname or parsed.query or parsed.fragment:
         raise ValueError(f"{BASE_URL_ENV} must be an HTTPS URL without query or fragment")
 
-    # OpenCode resolves {env:GLM_API_KEY} itself, so the key is passed only via
+    # OpenCode resolves {env:ABB_AGENT_MODEL_API_KEY} itself, so the key is passed only via
     # the environment and never lands in argv or in the written config file.
     child = {**environ, KEY_ENV: key, **FLAGS}
     # The server address is pinned so the loopback tool route stays exact.

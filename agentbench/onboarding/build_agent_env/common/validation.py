@@ -9,18 +9,20 @@ from ..build_dockerfile.service import validate as validate_dockerfile
 from ..openrouter_provider.context import safe_file
 from .errors import BuildError
 from .paths import REQUIRED_FILES
+from .source_inputs import prepare_inputs
 
 
 def validate_unit(root, sdk, *, expected_id=None, sdk_context=None):
     for name in REQUIRED_FILES:
         if safe_file(root, name) is None:
             raise BuildError(f"Missing or unsafe integration file: {name}")
+    manifest = tomllib.loads((root / "agent.toml").read_text(encoding="utf-8"))
+    prepare_inputs(root, manifest)
     session = SimpleNamespace(source=SimpleNamespace(directory=root), agent_id=expected_id, sdk=sdk,
                               plan={"bindings": []})
     validate_manifest((root / "agent.toml").read_text(encoding="utf-8"), session)
-    manifest = tomllib.loads((root / "agent.toml").read_text(encoding="utf-8"))
     strategy(manifest.get("framework")).validate_unit(root, manifest, session)
-    container = AgentContainerConfig.from_agent_dir(root, secret_resolver=_PlaceholderSecrets(), environ={})
+    container = AgentContainerConfig.from_agent_dir(root, secret_resolver=_PlaceholderSecrets(), environ={}, resolve_model=False)
     validate_dockerfile(container.dockerfile.read_text(encoding="utf-8"), session)
     sdk.validate_onboarding(root)
     if sdk_context is not None and isinstance(sdk, SDKOnboardingContext):

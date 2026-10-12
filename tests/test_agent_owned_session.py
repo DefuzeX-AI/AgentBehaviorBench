@@ -68,7 +68,8 @@ def test_agent_failure_or_cancellation_closes_native_sqlite(tmp_path, terminal, 
     output = tmp_path / "output"
     check = asyncio.run(execute_case(root, tmp_path / "work", output,
         ["remember blue", "recall", terminal], ["blue", "blue", None]))
-    assert check["exit_code"] == 1
+    # The workflow completed and Judge received the native failure evidence.
+    assert check["exit_code"] == 0
     assert check["results"][-1]["status"] == status
     assert check["outputs"][:2] == ["blue", "blue"]
     assert check["session"]["closed"] is True

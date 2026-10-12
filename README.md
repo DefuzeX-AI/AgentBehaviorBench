@@ -84,6 +84,11 @@ rejection, missing reports, and incomplete work cannot pass it.
 
 ## Resources
 
+Agent integrations and source provenance are included; inner `agent/` source
+folders are ignored local material. Supported Git sources are restored at their
+pinned commits before execution. See [Agent source preparation](docs/Agent-Sources.md)
+for installation inputs and manual source prerequisites.
+
 - [Included Agents](docs/Agents.md) — Target Agents, source repositories, and selected revisions.
 - [Understanding the Agent registry](docs/Registry.md) — `registry.toml` fields, Agent selection, and Case budgets.
 - [How to add an Agent](docs/How%20To%20Add%20Agent.md)

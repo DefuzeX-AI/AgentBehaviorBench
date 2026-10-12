@@ -110,7 +110,7 @@ def test_model_and_sdk_step_overrides_reach_the_normal_runner_builder(tmp_path, 
         captured.append(configuration)
         return SimpleNamespace(configuration={**configuration, 'runtime_source_sha256': 'current-code'})
     monkeypatch.setattr(reuse, 'build_saved_runner', build)
-    monkeypatch.setattr(reuse, 'runner_configuration', lambda runner: runner.configuration)
+    monkeypatch.setattr(reuse, 'runner_configuration', lambda runner, agents: runner.configuration)
     directory, _ = prepare_reuse(source, environ={}, model='provider/new', max_steps=5,
                                  suite_id='suite_overrides')
     assert captured[0]['model'] == 'provider/new'

@@ -135,7 +135,8 @@ def run_benchmark_once(
                 environ = getattr(getattr(runner, "_runner_factory", None), "environ", None)
                 from .sessions.configuration import runner_configuration
                 from .sessions.fresh import begin_result_log
-                saved_configuration = runner_configuration(runner)
+                saved_configuration = (runner_configuration(runner, agents)
+                                       if all(isinstance(agent, AgentRegistration) for agent in agents) else None)
                 if saved_configuration is not None and all(isinstance(agent, AgentRegistration) for agent in agents):
                     result_log = begin_result_log(output_path, suite_id, agents,
                         configuration=saved_configuration, environ=environ, results_dir=directory)
@@ -214,6 +215,8 @@ def run_benchmark_once(
         recovery_options = {}
         if result_log is not None and hasattr(result_log, 'store'):
             recovery_options['retain_case'] = result_log.store.retain_case
+            from agentbench.cli.sessions.recovery import artifact_options
+            recovery_options.update(artifact_options(runner, result_log.store, environ))
         result = runner.run(
             agents,  # Agents under evaluation.
             suite_id=suite_id,

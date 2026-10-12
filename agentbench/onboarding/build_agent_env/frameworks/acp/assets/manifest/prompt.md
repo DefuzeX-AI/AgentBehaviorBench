@@ -8,9 +8,20 @@ or an in_process adapter. Identity, launch, source metadata and SDK settings are
 assembled by BBA. Include no credentials or guessed command switches.
 
 Follow framework_requirements.acp. Native observation preserves the actual CLI's
-model, endpoint and authentication; do not configure an OpenRouter replacement.
-Declare native model credential variable names in models.agent_env so BBA retains
-them as runtime secrets. Never invent a dummy key or assume a model API key also
+requests; do not enable proxy replacement. Ordinary configurable Agents OMIT facts.model:
+absence means shared selection, OpenRouter -> DeepSeek -> GLM. Do not emit source="shared"
+or repeated setup comments. The verified outer launcher must already consume
+ABB_AGENT_MODEL_API_KEY, ABB_AGENT_MODEL_BASE_URL, ABB_AGENT_MODEL and
+ABB_AGENT_MODEL_PROVIDER and map them to the native CLI. Set models=[]; do not list
+internal ABB_AGENT_MODEL_* variables as runtime inputs. Only add model.metadata_paths
+if evidence demonstrates GET <selected-base>/models. Preserve tool_routes.
+If a configurable Agent lacks that launcher, return needs_input identifying the
+missing outer integration rather than pinning a provider or inventing a launcher.
+An explicit model.provider pins the selected provider and wins over global selection.
+For provider/protocol/tool-constrained native integrations, declare model.provider,
+source="native" and reason. These retain their dedicated configuration; declare
+native model credentials in
+models.agent_env so BBA retains them as runtime secrets. Never invent a dummy key or assume a model API key also
 authenticates the CLI's vendor login. Only
 list tool_routes supported by source evidence. Runtime env_keys declare required
 nonsecret CLI configuration. Native text input normally has input_fields=[];

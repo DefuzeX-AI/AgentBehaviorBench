@@ -1,4 +1,4 @@
-"""Map an OpenAI-compatible GLM profile onto jcode's native ACP adapter and own its daemon.
+"""Map the selected OpenAI-compatible model profile onto jcode's native ACP adapter and own its daemon.
 
 `jcode acp` is a thin ACP front end: on the first `session/new` it spawns the
 jcode daemon (`jcode serve`, detached with setsid) and talks to it over a Unix
@@ -18,22 +18,12 @@ import time
 from urllib.parse import urlsplit
 
 
-KEY_ENV = "GLM_API_KEY"
-BASE_URL_ENV = "GLM_API_BASE_URL"
-MODEL_ENV = "GLM_MODEL"
+KEY_ENV = "ABB_AGENT_MODEL_API_KEY"
+BASE_URL_ENV = "ABB_AGENT_MODEL_BASE_URL"
+MODEL_ENV = "ABB_AGENT_MODEL"
 JCODE_BIN = "/opt/jcode/bin/jcode"
-PROFILE_ID = "abb-glm"
-# Context windows of Zhipu GLM models (same values as upstream's bundled
-# Z.AI metadata). Unknown models fall back to a conservative 128k window.
-CONTEXT_LIMITS = {
-    "glm-5.1": 200_000,
-    "glm-5": 204_800,
-    "glm-5-turbo": 200_000,
-    "glm-4.7": 204_800,
-    "glm-4.6": 204_800,
-    "glm-4.5": 131_072,
-    "glm-4.5-air": 131_072,
-}
+PROFILE_ID = "abb-shared"
+# Conservative deployment budget; do not reuse the previous provider catalog.
 DEFAULT_CONTEXT_LIMIT = 128_000
 
 
@@ -48,7 +38,7 @@ def config_toml(base_url: str, model: str) -> str:
 
     The key is referenced by environment-variable name only; it is never written.
     """
-    context = CONTEXT_LIMITS.get(model, DEFAULT_CONTEXT_LIMIT)
+    context = DEFAULT_CONTEXT_LIMIT
     return "\n".join([
         "[features]",
         # No self-update, no memory sidecar/recall model calls, no swarm workers.

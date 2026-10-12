@@ -1,5 +1,4 @@
 """Agent evaluation directories are optional; requirement.md remains mandatory."""
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -22,10 +21,7 @@ def test_preflight_still_requires_sdk_requirement(tmp_path):
 
 
 def test_registered_units_no_longer_require_an_identity_marker():
-    root = Path(__file__).resolve().parents[1]/'resources/agents'
-    assert not list(root.glob('*/evaluation/input-contract.json'))
-    for name in ('02-company-research-agent', '03-react-agent', '03-trading-agents', '04-gpt-researcher'):
-        assert not (root / name / 'evaluation').exists()
-    # Schemas and useful fixtures survive removal of the obsolete marker.
-    assert (root / '05-waku-agent/evaluation/smoke-input.json').is_file()
-    assert (root / '09-article-explainer/evaluation/smoke-input.json').is_file()
+    from tests.registered_agents import registrations
+    for agent in registrations():
+        assert (agent.path / 'requirement.md').is_file()
+        assert not (agent.path / 'evaluation/input-contract.json').exists()

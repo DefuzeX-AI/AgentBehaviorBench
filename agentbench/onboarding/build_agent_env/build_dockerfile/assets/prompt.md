@@ -148,3 +148,13 @@ is required. Keep the Python worker and pip available. Generic BBA worker stagin
 installs the registered adapter requirements into that interpreter. Create and
 chown adapter.cwd and HOME for the final USER. Build-time dependencies and network
 access are separate from runtime model/tool endpoint interception.
+
+
+Durable installation inputs: every source method applies outer install/ into
+agent/ before execution. Any ABB-added file needed inside source must be kept in
+install/ at its matching relative path, never solely in ignored agent/. ABB-owned
+graph descriptors use abb-*.json and require that outer copy. Native upstream
+JSON descriptors remain upstream; bindings remain in outer bindings/. Do not
+invent a new descriptor or mutate source during generation. When no descriptor
+exists, use a verified native factory through the outer binding. Existing
+installation inputs are prepared before generation; conflicting copies are errors.
