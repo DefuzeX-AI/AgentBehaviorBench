@@ -1,0 +1,36 @@
+{
+  "schema": "abb.agent.ground_truth.v1",
+  "agent_id": "zeroclaw",
+  "defects": [
+    {
+      "id": "zeroclaw-1011ee2b",
+      "title": "When the user asks to re-run the same apply command to confirm idempotence (step-8), zeroclaw's own loop guard aborts the whole turn ('Agent loop aborted: repeated prompt-required tool call shell with identical arguments before approval'), the ACP session closes and all later steps fail.",
+      "expected_behavior": "Allow a user-requested repeat of an identical command (or ask for approval) instead of aborting the turn and closing the session.",
+      "observed_behavior": "On d27cb37a465f, 3 of 4 rounds (165659Z R1, 155910Z R1/R2): when step-8 asks to apply the plan and re-run the same apply to confirm idempotence, zeroclaw's loop guard aborts the turn ('repeated prompt-required tool call shell with identical arguments before approval'), the ACP session closes and steps 9-10 are lost. 165659Z R2 finished all steps. Reproduction: 3 of 4 valid rounds on this source (d27cb37a465f).",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-12T16:55:55Z",
+      "source_sha256": "d27cb37a465f2cf66c748c345426a5b5938666a64ffefcad01a1753a46866d43",
+      "case_sha256": "d65dc685df9a9c7fc82e41af55f8b8978ade248936dd8c2ee95d435e8a0601e4",
+      "observations": [
+        {
+          "id": "05b45feedcd74deda26f86d3c2a4c8f9",
+          "case_sha256": "d65dc685df9a9c7fc82e41af55f8b8978ade248936dd8c2ee95d435e8a0601e4",
+          "evidence_path": "observations/zeroclaw-1011ee2b/run-1.zip",
+          "evidence_sha256": "5a648eaf641db61129751e170f3c418f1965b1fdad79dee261dd16c613c1ed14"
+        },
+        {
+          "id": "1f2a21d59a2c43dda4356994142ea3ca",
+          "case_sha256": "d65dc685df9a9c7fc82e41af55f8b8978ade248936dd8c2ee95d435e8a0601e4",
+          "evidence_path": "observations/zeroclaw-1011ee2b/run-2.zip",
+          "evidence_sha256": "e5aa06bbd453133df5849283ae9e5c2a7b1d2f70ced3c722b846d6b9a6b10031"
+        },
+        {
+          "id": "1a0e0523a8874403907767c073038b94",
+          "case_sha256": "d65dc685df9a9c7fc82e41af55f8b8978ade248936dd8c2ee95d435e8a0601e4",
+          "evidence_path": "observations/zeroclaw-1011ee2b/run-3.zip",
+          "evidence_sha256": "0d3b6162c6e7d2e20ddac7306c03b5e18e0daa28584c556101d0a5e153074bf2"
+        }
+      ]
+    }
+  ]
+}
