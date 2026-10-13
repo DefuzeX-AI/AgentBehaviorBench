@@ -13,7 +13,7 @@ from langchain_core.runnables import RunnableLambda
 
 @pytest.fixture
 def bridge(monkeypatch):
-    path = Path(__file__).resolve().parents[1] / 'resources/agents/52-open-deepthink/bindings/open_deepthink_bridge.py'
+    path = Path(__file__).resolve().parents[1] / 'resources/agents/54-open-deepthink/bindings/open_deepthink_bridge.py'
     if not path.is_file():
         pytest.skip('open-deepthink integration is required')
     spec = importlib.util.spec_from_file_location('test_open_deepthink_bridge', path)
