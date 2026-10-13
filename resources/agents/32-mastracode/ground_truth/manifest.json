@@ -25,6 +25,30 @@
           "evidence_sha256": "d054e9656ca104308a885980009ae7fd6f672a1aa29c1bde69e93e28eb9c841f"
         }
       ]
+    },
+    {
+      "id": "mastracode-8f066f51",
+      "title": "Mastra Code's observational-memory observer call completing mid-turn makes mastracode end the active ACP prompt with stopReason 'cancelled', drop its in-flight model request and exit the ACP server process, losing the user's task and all later steps of the session.",
+      "expected_behavior": "Finish every turn; an observational-memory observer call completing in the background must not end the active ACP prompt or terminate the ACP server.",
+      "observed_behavior": "Reproduced in 2 of 2 rounds on source 4206a2f7fe08. In both rounds, in step-3 (the same step as the original run), 0.35-0.61 s after an OM observer call returned 200, mastracode ended the prompt with stopReason cancelled ('ACP Agent cancelled the prompt'). Steps 4-9 (six steps) then failed with 'ACP adapter is closed'. No upstream error. Reproduction: 2 of 2 valid rounds on this source (4206a2f7fe08).",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-13T12:54:14Z",
+      "source_sha256": "4206a2f7fe089bda2dbba298787abfa235ab3370acf3a9e99de01e60581ed71b",
+      "case_sha256": "d1d9e533d59418a532a6f2daf57fdd59ef2f1f10b08dd8837a9f007c9c283e6c",
+      "observations": [
+        {
+          "id": "0c756624283c4586aef86dde3917dd24",
+          "case_sha256": "d1d9e533d59418a532a6f2daf57fdd59ef2f1f10b08dd8837a9f007c9c283e6c",
+          "evidence_path": "observations/mastracode-8f066f51/run-1.zip",
+          "evidence_sha256": "01a62504c68628bc2841cb063abc2e6a4b0f2a0634bfb18c8f5f149091f1d3fa"
+        },
+        {
+          "id": "b2b07e59c8554a1684d0076553c27684",
+          "case_sha256": "d1d9e533d59418a532a6f2daf57fdd59ef2f1f10b08dd8837a9f007c9c283e6c",
+          "evidence_path": "observations/mastracode-8f066f51/run-2.zip",
+          "evidence_sha256": "446b9b42846f76fb8d4e41e8358bcd57b88f710b8246635ced94f5765cb1a600"
+        }
+      ]
     }
   ]
 }
