@@ -133,7 +133,26 @@ def _json_safe(value: Any) -> Any:
     return str(value)
 
 
+def _message_text(value: Any) -> str | None:
+    """Return the text of a LangChain message (or its dumped form), else None."""
+
+    content = value.get("content") if isinstance(value, Mapping) and "type" in value else (
+        getattr(value, "content", None)
+    )
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            str(part.get("text", "")) if isinstance(part, Mapping) else str(part)
+            for part in content
+        )
+    return None
+
+
 def _as_answer(value: Any) -> str:
+    text = _message_text(value)
+    if text is not None:
+        return text
     safe = _json_safe(value)
     if isinstance(safe, str):
         return safe
@@ -227,8 +246,12 @@ class GarminAICoachSession:
 
         ChatOpenAI.with_structured_output = compatible_structured_output
         try:
-            with set_config_context(dict(config or {})):
-                return await run_complete_analysis_and_planning(**request)
+            # set_config_context only binds ABB's config (callbacks) inside the Context it
+            # yields; run the workflow in that Context so LangGraph node callbacks fire.
+            with set_config_context(dict(config or {})) as invocation_context:
+                return await asyncio.create_task(
+                    run_complete_analysis_and_planning(**request), context=invocation_context
+                )
         finally:
             ChatOpenAI.with_structured_output = original_structured_output
 

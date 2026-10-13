@@ -80,6 +80,27 @@ def test_complete_native_result_is_exposed_without_new_model_calls() -> None:
     assert "## Weekly plan" in result["answer"]
 
 
+def test_message_results_are_rendered_as_text() -> None:
+    bridge = _load_bridge()
+
+    class Message:
+        content = "# Athlete Performance Report"
+        additional_kwargs = {"refusal": None}
+
+    result = bridge._public_result(
+        {
+            "synthesis_result": Message(),
+            "season_plan": {"type": "ai", "content": [{"type": "text", "text": "Base phase."}]},
+            "weekly_plan": {"phase": "base"},
+        }
+    )
+
+    assert "## Integrated analysis\n\n# Athlete Performance Report" in result["answer"]
+    assert "Base phase." in result["answer"]
+    assert "additional_kwargs" not in result["answer"]
+    assert '"phase": "base"' in result["answer"]
+
+
 def test_plain_text_without_business_data_returns_needs_input() -> None:
     bridge = _load_bridge()
     result = asyncio.run(
