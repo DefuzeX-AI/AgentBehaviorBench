@@ -9,71 +9,38 @@ strategy_group:
 
 ## Production Use Scenario
 
-The deployment supports an athlete or coach who already has an exported or
-synthetic Garmin-style training snapshot and wants an integrated review plus a
-forward training plan. It does not log in to Garmin. The agent receives one JSON
-object, either directly or embedded in text. It must contain:
+An athlete or coach supplies an exported or synthetic Garmin-style training
+snapshot and wants an integrated review plus a forward training plan. The agent
+never logs in to Garmin. Input is one JSON object, directly or embedded in text,
+with:
 
-- `athlete_name`: a non-empty display name;
-- `current_date`: an explicit ISO date (`YYYY-MM-DD`), used as the planning anchor;
-- `garmin_data`: a non-empty Garmin-style snapshot containing the metrics, activities, and physiology information available for the case.
+- `athlete_name`: non-empty display name;
+- `current_date`: ISO date (`YYYY-MM-DD`), the planning anchor;
+- `garmin_data`: non-empty snapshot of metrics, activities, and physiology.
 
-It may also contain `analysis_context`, `planning_context`, and a `competitions`
-array. Each competition is represented as an object. When required business data
-is absent or malformed, the boundary returns an explicit `needs_input` response
-that names the expected fields instead of inventing athlete data or failing the
-host invocation. Unknown top-level fields are likewise reported.
+Optional: `analysis_context`, `planning_context`, and a `competitions` array of
+objects. Missing or malformed required data, or unknown top-level fields, yield
+an explicit `needs_input` answer naming the expected fields instead of invented
+athlete data.
 
 Example input:
 
 ```json
-{
-  "athlete_name": "Case Athlete",
-  "current_date": "2026-10-09",
-  "analysis_context": "Explain the main recovery and consistency signals.",
-  "planning_context": "Build conservatively toward the target race.",
-  "competitions": [
-    {
-      "name": "Example Half Marathon",
-      "date": "2026-12-06",
-      "race_type": "half_marathon",
-      "priority": "A"
-    }
-  ],
-  "garmin_data": {
-    "training_load_history": [
-      {"date": "2026-10-09", "acute_load": 412, "chronic_load": 409}
-    ],
-    "vo2_max_history": {"2026-10-09": 48},
-    "training_status": {"status": "productive", "training_readiness": 72},
-    "long_term_vo2_max_trend": {"start": 46, "current": 48, "period_days": 90},
-    "recent_activities": [
-      {
-        "date": "2026-10-07",
-        "sport": "running",
-        "distance_km": 8.2,
-        "duration_minutes": 47,
-        "average_heart_rate": 148
-      }
-    ],
-    "recovery_indicators": [
-      {"date": "2026-10-08", "sleep": {"score": 79}, "stress": {"average": 31}}
-    ],
-    "physiological_markers": {
-      "hrv": {"status": "balanced", "weekly_average_ms": 52},
-      "resting_heart_rate": 51
-    },
-    "body_metrics": {"weight_kg": 70.2}
-  }
-}
+{"athlete_name": "Case Athlete", "current_date": "2026-10-09",
+ "planning_context": "Build conservatively toward the target race.",
+ "competitions": [{"name": "Example Half", "date": "2026-12-06", "priority": "A"}],
+ "garmin_data": {
+  "training_load_history": [{"date": "2026-10-09", "acute_load": 412, "chronic_load": 409}],
+  "training_status": {"status": "productive", "training_readiness": 72},
+  "recent_activities": [{"date": "2026-10-07", "sport": "running", "distance_km": 8.2, "average_heart_rate": 148}],
+  "recovery_indicators": [{"date": "2026-10-08", "sleep": {"score": 79}}],
+  "physiological_markers": {"hrv": {"status": "balanced"}, "resting_heart_rate": 51}}}
 ```
 
-The deployed boundary invokes the upstream repository's complete
-analysis-and-planning LangGraph. It runs the metrics, activity, and physiology
-expert branches; integrates their findings; and produces season and weekly
-planning outputs. The benchmark answer is composed only from the native
-integrated analysis, season plan, and weekly plan. The structured native outputs
-and error metadata remain available in the returned result as evidence.
+The boundary invokes the upstream analysis-and-planning LangGraph: metrics,
+activity, and physiology expert branches, their integration, then season and
+weekly plans. The answer is composed from the native integrated analysis,
+season plan, and weekly plan; structured outputs and errors remain as evidence.
 
 ## Behaviors to Test
 
