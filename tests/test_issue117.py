@@ -186,10 +186,14 @@ def test_recovery_cli_uses_explicit_gate_even_with_legacy_success(tmp_path, monk
     assert suite.passed is True and suite.quality_gate == 'failed'
     monkeypatch.setattr(module, 'load_project_environment', lambda *a: None)
     monkeypatch.setattr(module, 'execution_environment_snapshot', lambda: NS(environ={}))
-    monkeypatch.setattr(module, 'resolve_suite', lambda *a: tmp_path)
     if command == 'resume':
+        monkeypatch.setattr(module, 'resolve_suite', lambda *a: tmp_path)
         monkeypatch.setattr(module, 'execute_recovery', lambda *a, **kw: suite)
     else:
+        monkeypatch.setattr(module, 'resolve_reuse_target', lambda *a, **kw: NS(directory=tmp_path, selection=None))
         monkeypatch.setattr(module, 'execute_reuse', lambda *a, **kw: NS(result=suite, directory=tmp_path))
-    args = NS(env_file=None, suite='suite', suite_root=None, output_root=None, model=None, max_steps=None)
+    args = NS(env_file=None, suite='suite', suite_root=None, output_root=None, model=None, max_steps=None,
+              agent=None, case_number=None)
+    if command == 'resume':
+        del args.case_number
     assert module.execute(args) == 1

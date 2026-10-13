@@ -6,13 +6,15 @@ built-in ACP adapter (`hermes acp`, equivalent to `hermes-acp` /
 `python -m acp_adapter`). ABB invokes it over ACP stdio and keeps each Case in a
 separate empty workspace. No upstream source is vendored or modified.
 
-The acceptance profile uses Zhipu GLM's OpenAI-compatible coding endpoint.
-Supply these variables only at runtime:
+This unit uses default model selection; no `[model]` declaration is needed. Configure the selected provider in
+`.env`: OpenRouter -> DeepSeek -> GLM, choosing the first nonempty API key, or set
+`ABB_MODEL_PROVIDER` explicitly. Supply the selected provider's model name as well.
+See [model selection](../../../docs/Model-Selection.md) for variables and constraints.
 
-- `GLM_API_BASE_URL`: the OpenAI-style base URL, e.g.
-  `https://open.bigmodel.cn/api/coding/paas/v4`.
-- `GLM_MODEL`: the exact provider model ID, such as `glm-5.1`.
-- `GLM_API_KEY`: the Bearer credential. It is never written into this unit.
+ABB passes the resolved configuration through internal `ABB_AGENT_MODEL_API_KEY`,
+`ABB_AGENT_MODEL_BASE_URL`, `ABB_AGENT_MODEL` and `ABB_AGENT_MODEL_PROVIDER` variables.
+Users do not fill these internal variables. Only the selected credential reaches the
+launcher. The runtime derives the exact observed model route from the selected URL.
 
 ## How it is installed
 
@@ -43,11 +45,11 @@ a disposable `HOME` under `/tmp` with `HERMES_HOME=$HOME/.hermes` (the container
 may run as a uid that cannot write `/home/agent`; this also isolates Hermes'
 SQLite session store, memories and logs per Case). It writes
 `$HERMES_HOME/config.yaml` and starts `hermes acp`. The key reaches Hermes only
-through its native `GLM_API_KEY` variable, never argv or a file.
+through its native `OPENAI_API_KEY` variable, never argv or a file.
 
-The config selects Hermes' built-in `zai` provider with `model.default=$GLM_MODEL`
-and `model.base_url=$GLM_API_BASE_URL` (also exported as `GLM_BASE_URL`, which
-makes Hermes skip its Z.AI endpoint-detection probes). The remaining settings
+The config selects Hermes' built-in `openai-api` provider with `model.default=$ABB_AGENT_MODEL`
+and `model.base_url=$ABB_AGENT_MODEL_BASE_URL`, also exported through Hermes' native
+`OPENAI_BASE_URL` setting. The remaining settings
 switch off calls outside the evaluated model route:
 
 - `model_catalog.enabled: false` stops the remote Nous model catalog fetch
@@ -72,10 +74,10 @@ switch off calls outside the evaluated model route:
   image removes `uv`). PyPI is on the egress observer's default allowlist.
 
 The interception manifest admits one model route:
-`POST https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`.
+`POST <selected-base>/chat/completions`.
 
-`network/rules.toml` adds one optional metadata route,
-`GET https://open.bigmodel.cn/api/coding/paas/v4/models` (exact path, GET only,
+`[model] metadata_paths` adds one optional metadata route at runtime,
+`GET <selected-base>/models` (exact path, GET only,
 `required = false`). Hermes calls it at most twice per process and has no config
 switch for either call at this tag: the ACP session model picker lists the
 configured provider's live models at `session/new`, and per-turn cost estimation
@@ -83,8 +85,7 @@ reads pricing from the same endpoint. Both fall back to bundled data when the
 call fails, so the route is not needed for a turn to complete; it is admitted so
 the trace is not rejected over read-only catalog metadata.
 
-A different provider needs an explicit reviewed route update; changing
-environment variables alone does not broaden container egress.
+The exact model and metadata routes follow the resolved provider URL.
 
 ## Known non-blocking noise
 
@@ -130,3 +131,8 @@ in `egress.jsonl`; a refusal does not reject the Case (#137).
 ## Installation inputs
 
 Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.
+
+## Validation scope
+
+Earlier acceptance records describe the previous fixed-provider deployment. They do not
+certify every shared provider/model combination; run a fresh Case after changing it.

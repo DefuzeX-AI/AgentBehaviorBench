@@ -1,4 +1,4 @@
-"""Map an OpenAI-compatible GLM profile onto Mastra Code's custom provider and start `mastracode --acp`."""
+"""Map the selected OpenAI-compatible model profile onto Mastra Code's custom provider and start `mastracode --acp`."""
 from __future__ import annotations
 
 import json
@@ -11,10 +11,10 @@ import tempfile
 from urllib.parse import urlsplit
 
 
-KEY_ENV = "GLM_API_KEY"
-BASE_URL_ENV = "GLM_API_BASE_URL"
-MODEL_ENV = "GLM_MODEL"
-PROVIDER_NAME = "abb-glm"
+KEY_ENV = "ABB_AGENT_MODEL_API_KEY"
+BASE_URL_ENV = "ABB_AGENT_MODEL_BASE_URL"
+MODEL_ENV = "ABB_AGENT_MODEL"
+PROVIDER_NAME = "abb-shared"
 MASTRACODE_BIN = Path(__file__).resolve().parents[1] / "agent/node_modules/.bin/mastracode"
 # Mastra Code's ACP server offers these modes (mastracode/sdk/src/acp/index.ts).
 MODES = ("build", "plan", "fast")
@@ -25,7 +25,7 @@ def settings_document(base_url: str, model: str, key: str) -> dict[str, object]:
 
     Mastra Code reads a custom provider's credential only from settings.json (or
     its auth store); there is no environment-variable indirection. Inside ABB
-    the value is the interceptor's surrogate credential, and the file lives in a
+    the value is the selected upstream credential, and the file lives in a
     disposable per-Case directory with mode 0600.
     """
     model_id = f"{PROVIDER_NAME}/{model}"

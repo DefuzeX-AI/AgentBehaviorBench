@@ -1,5 +1,5 @@
 ---
-agent_description: Mastra Code (mastracode CLI) exposed through its native ACP stdio server (mastracode --acp), using an explicitly configured OpenAI-compatible GLM model endpoint as a custom provider.
+agent_description: Mastra Code (mastracode CLI) exposed through its native ACP stdio server (mastracode --acp), using an explicitly configured OpenAI-compatible the selected OpenAI-compatible model model endpoint as a custom provider.
 input_type: text
 strategy_group:
   schema_version: kuma.strategy_group_selection.v1

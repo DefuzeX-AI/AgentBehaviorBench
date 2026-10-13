@@ -1,4 +1,4 @@
-"""Map an OpenAI-compatible GLM profile onto the OpenHands CLI's native ACP server."""
+"""Map the selected OpenAI-compatible model profile onto the OpenHands CLI's native ACP server."""
 from __future__ import annotations
 
 import os
@@ -9,9 +9,9 @@ import tempfile
 from urllib.parse import urlsplit
 
 
-KEY_ENV = "GLM_API_KEY"
-BASE_URL_ENV = "GLM_API_BASE_URL"
-MODEL_ENV = "GLM_MODEL"
+KEY_ENV = "ABB_AGENT_MODEL_API_KEY"
+BASE_URL_ENV = "ABB_AGENT_MODEL_BASE_URL"
+MODEL_ENV = "ABB_AGENT_MODEL"
 OPENHANDS_BIN = Path("/opt/openhands/bin")
 EXTENSIONS_URL = "https://github.com/OpenHands/extensions"
 EXTENSIONS_MIRROR = "file:///opt/openhands-extensions.git"

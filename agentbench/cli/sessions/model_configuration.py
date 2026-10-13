@@ -6,7 +6,7 @@ from agentbench.runtime.interception.target_routing import resolve_target_routin
 
 
 def agent_model_configuration(registrations, *, environ, model):
-    """Resolve only targets that these Agents use; never resolve observe targets.
+    """Resolve only targets these Agents use, including default ACP model selection.
 
     Native Agents receive their declared runtime settings plus manifest overrides.
     Secret declarations are authoritative even when their names look non-secret.
@@ -19,7 +19,6 @@ def agent_model_configuration(registrations, *, environ, model):
     if model is not None:
         environ['ABB_MODEL'] = model
     result = {}
-    routing = None
     for agent in registrations:
         manifest_path = agent.path / 'agent.toml'
         if not manifest_path.is_file():
@@ -31,21 +30,23 @@ def agent_model_configuration(registrations, *, environ, model):
         interception = InterceptionConfig.from_agent_dir(agent.path)
         mode = interception.mode if interception is not None else 'direct'
         if interception is not None and mode == 'replace':
-            if routing is None:
-                resolved = resolve_target_routing(environ)
-                secrets = (*environment_secrets(environ),
-                           *(environ.get(target.credential_env, '') for target in resolved.targets.values()))
-                routing = public_configuration({
-                    'targets': {name: {
-                        'provider_id': target.provider_id, 'model': target.model,
-                        'base_url': target.base_url, 'target_plugin': target.target_plugin,
-                        'endpoint_paths': dict(target.endpoint_paths) if target.endpoint_paths is not None else None,
-                        'headers': dict(target.headers),
-                    } for name, target in resolved.targets.items()},
-                    'inputs': resolved.inputs, 'rules': resolved.rules, 'explicit': resolved.explicit,
-                }, secrets)
+            from agentbench.runtime.interception.native_model import select_model_provider
+            resolved = resolve_target_routing(environ, select_model_provider(manifest, environ))
+            secrets = (*environment_secrets(environ),
+                       *(environ.get(target.credential_env, '') for target in resolved.targets.values()))
+            routing = public_configuration({
+                'targets': {name: {
+                    'provider_id': target.provider_id, 'model': target.model,
+                    'base_url': target.base_url, 'target_plugin': target.target_plugin,
+                    'endpoint_paths': dict(target.endpoint_paths) if target.endpoint_paths is not None else None,
+                    'headers': dict(target.headers),
+                } for name, target in resolved.targets.items()},
+                'inputs': resolved.inputs, 'rules': resolved.rules, 'explicit': resolved.explicit,
+            }, secrets)
             result[agent.agent_id] = {'mode': mode, 'routing': routing}
             continue
+        from agentbench.runtime.interception.native_model import resolve_shared_model
+        shared = resolve_shared_model(manifest, environ)
         runtime = manifest.get('runtime', {})
         private = set(runtime.get('secret_env_keys', ())) | set(runtime.get('optional_secret_env_keys', ()))
         if interception is not None:
@@ -59,4 +60,12 @@ def agent_model_configuration(registrations, *, environ, model):
                     if name not in private and not is_secret_field(name)}
         result[agent.agent_id] = {'mode': mode,
                                   'runtime_settings': public_configuration(settings, secrets)}
+        if manifest.get('model', {}).get('provider'):
+            result[agent.agent_id]['provider_pin'] = manifest['model']['provider']
+        if shared is not None:
+            result[agent.agent_id]['model_source'] = 'shared'
+            result[agent.agent_id]['target'] = public_configuration({
+                'provider_id': shared.provider_id, 'model': shared.model,
+                'base_url': shared.base_url, 'target_plugin': shared.target_plugin,
+            }, (*secrets, environ.get(shared.credential_env, '')))
     return result

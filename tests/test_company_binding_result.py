@@ -1,10 +1,10 @@
 """The outer Company binding preserves the upstream report success condition."""
 import asyncio
-import importlib.util
-from pathlib import Path
 import sys
-from types import ModuleType
+from collections import defaultdict
+from types import ModuleType, SimpleNamespace
 import pytest
+from tests.registered_agents import binding as registered_binding
 
 
 @pytest.fixture
@@ -13,6 +13,8 @@ def binding(monkeypatch):
     class Graph:
         def __init__(self, **inputs):
             observed.append(inputs)
+            self.briefing = SimpleNamespace(llm=SimpleNamespace(
+                client=SimpleNamespace(transport=SimpleNamespace(close=lambda: None))))
         async def run(self, thread):
             observed.append(thread)
             yield {"grounding": {"company": "Acme"}}
@@ -24,11 +26,18 @@ def binding(monkeypatch):
     graph.Graph = Graph
     monkeypatch.setitem(sys.modules, "backend", backend)
     monkeypatch.setitem(sys.modules, "backend.graph", graph)
-    path = Path(__file__).resolve().parents[1] / "resources/agents/02-company-research-agent/bindings/bridge.py"
-    spec = importlib.util.spec_from_file_location("company_binding_test", path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module.create_graph(), Graph, observed
+    classes = ModuleType("backend.classes")
+    state = ModuleType("backend.classes.state")
+    state.job_status = defaultdict(dict)
+    monkeypatch.setitem(sys.modules, "backend.classes", classes)
+    monkeypatch.setitem(sys.modules, "backend.classes.state", state)
+    instance = registered_binding('company-research-agent').create_graph()
+    try:
+        yield instance, Graph, observed
+    finally:
+        instance.close()
+        assert not state.job_status
+
 
 
 def test_actual_input_config_and_native_report_are_preserved(binding):
@@ -36,8 +45,8 @@ def test_actual_input_config_and_native_report_are_preserved(binding):
     config = {"metadata": {"test": "forward"}}
     result = asyncio.run(instance.ainvoke({"company": "Acme", "company_url": "https://example.com"}, config))
     assert observed[0]["company"] == "Acme" and observed[0]["url"] == "https://example.com"
-    assert observed[1] is config
-    assert result["editor"]["report"] == "Native research report"
+    assert observed[1]["metadata"]["test"] == config["metadata"]["test"]
+    assert result["report"] == "Native research report"
 
 
 @pytest.mark.parametrize("result", [{}, {"report": ""}, {"report": "  "}, {"report": None}])

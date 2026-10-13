@@ -54,7 +54,8 @@ Before exit, the worker adds read permission to regular files it owns in the
 explicit evaluation output mount, and read/traverse permission to its output
 directories. This also covers partial results and startup diagnostics. It does
 not change file contents, follow symlinks, grant additional write permission,
-or modify the SDK's private ledger. The host's containing run directory stays
+or grant write access to SDK records. The controller also publishes read access
+to its private SDK ledger for recovery. The host's containing run directory stays
 private (0700). This is necessary because atomic JSON writes create 0600 files,
 which are otherwise unreadable when host and container UIDs differ.
 
@@ -107,3 +108,22 @@ Only public check results are cached under `cache/strategy-checks/`. The Agent
 overview shows the last CLI check, its SDK, and timestamp; it does not perform a
 network request on page load. A changed `requirement.md` invalidates the cached
 result. Historical Case selections remain separate from the current profile.
+
+## Private artifacts and isolated execution
+
+See [SDK integration facilities](integration/README.md) for the plugin Protocols,
+Suite/Case/Attempt storage lifecycle, and the KUMA controller/Agent boundary.
+
+## SDK error diagnostics
+
+KUMA errors retain public JSON fields, including structured `details` and future
+SDK fields, in worker errors, execution manifests, generation attempt failures,
+and host diagnostics. Errors record their phase and current input ID when known.
+Private exception attributes and transport objects are not dumped. Credentials
+are redacted before persistence; immutable SDK mappings become ordinary JSON.
+
+Error snapshots have bounded size, item count, and nesting. Any truncation or
+unsupported value is explicitly recorded in `abb_diagnostic_omissions`. Full
+error messages are retained within that budget; the CLI uses a separate short
+summary with the phase, input ID, and a preview of the details. Saving diagnostics
+does not change SDK privacy decisions or authorize retrying a rejected request.

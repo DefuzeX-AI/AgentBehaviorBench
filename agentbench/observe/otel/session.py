@@ -112,6 +112,8 @@ class OtelSession:
                     span.set_status(Status(StatusCode.ERROR, 'Agent step raised an exception'))
                 elif event == 'span_control':
                     self.exporter.annotate(span, {'abb.control_flow': data['control']})
+                    if data['control'] == 'acp_outcome_not_observed':
+                        self.exporter.annotate(span, {'abb.tool_result_omission': 'not_observed'})
                 span.end()
             elif event in ('execution_end', 'execution_error') and self.root:
                 label = 'output' if event == 'execution_end' else 'error'

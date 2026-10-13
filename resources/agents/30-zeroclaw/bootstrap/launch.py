@@ -1,4 +1,4 @@
-"""Map an OpenAI-compatible GLM profile onto ZeroClaw's native ACP server and relay its stdio."""
+"""Map the selected OpenAI-compatible model profile onto ZeroClaw's native ACP server and relay its stdio."""
 from __future__ import annotations
 
 import json
@@ -12,9 +12,9 @@ import threading
 from urllib.parse import urlsplit
 
 
-KEY_ENV = "GLM_API_KEY"
-BASE_URL_ENV = "GLM_API_BASE_URL"
-MODEL_ENV = "GLM_MODEL"
+KEY_ENV = "ABB_AGENT_MODEL_API_KEY"
+BASE_URL_ENV = "ABB_AGENT_MODEL_BASE_URL"
+MODEL_ENV = "ABB_AGENT_MODEL"
 ZEROCLAW = "/opt/zeroclaw/bin/zeroclaw"
 # Provider slot `custom` (OpenAI chat-completions wire) with alias `abb`.
 PROVIDER = "custom.abb"
@@ -42,7 +42,7 @@ def config_toml(base_url: str, model: str, search_provider: str = "duckduckgo") 
         f"model = {toml_str(model)}",
         # Explicit chat-completions wire: the admitted route is /chat/completions.
         'wire_api = "chat_completions"',
-        # GLM's chat-completions endpoint supports OpenAI function calling, but
+        # The selected chat-completions model must support OpenAI function calling, but
         # ZeroClaw's `custom` slot defaults to its prompt-guided text fallback
         # (tool calls as <tool_call> text, no `tools` in the request). With
         # native tools the default "auto" dispatcher sends real tool schemas

@@ -71,6 +71,7 @@ class SuiteStore:
         try:
             if (store.directory / 'plan.json').exists():
                 raise FileExistsError('Suite already exists; open it for recovery')
+            store.directory.chmod(0o700)
             store._plan = build_plan(suite_id, registrations, configuration=configuration,
                                      secrets=store._secrets, result_log_path=store.path,
                                      origin_suite_id=origin_suite_id)

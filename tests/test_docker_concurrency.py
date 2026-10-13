@@ -289,7 +289,8 @@ def fake_agent_runtime(tmp_path, monkeypatch):
                                              identity={"suite_id": "suite-1", "job_id": "job-1"})
     config = SimpleNamespace(build_context=tmp_path, dockerfile=tmp_path / "Dockerfile",
                              agent_id="test-agent", environment={}, workdir="/app",
-                             argv=["echo", "test"], timeout_sec=3)
+                             argv=["echo", "test"], timeout_sec=3,
+                             model_target=None, model_metadata_paths=(), replacement_model_provider=None)
     monkeypatch.setattr(module.AgentContainerConfig, "from_agent_dir", lambda *args, **kwargs: config)
     monkeypatch.setattr(module.InterceptionConfig, "from_agent_dir", lambda *args, **kwargs: None)
     runtime._images = SimpleNamespace(build=lambda **kwargs: "image:cached")
@@ -382,3 +383,16 @@ def test_interrupted_creation_with_unknown_daemon_state_does_not_claim_cleanup_s
     with pytest.raises(DockerCleanupError, match="delayed create"):
         runtime.start(agent)
     assert any(item["status"] == "cleanup_failed" for item in services.resource_registry.snapshot())
+
+
+def test_address_pool_capacity_is_distinct_from_daemon_and_build_failure(monkeypatch):
+    from agentbench.runtime.docker.runtime import DockerNetworkCapacityError, DockerRuntimeError
+    runtime = DockerRuntime(environ={})
+    monkeypatch.setattr(runtime, '_run_quiet', lambda *a, **k: subprocess.CompletedProcess(
+        ['docker'], 1, '', 'Error: all predefined address pools have been fully subnetted'))
+    with pytest.raises(DockerNetworkCapacityError) as raised:
+        runtime._run('network', 'create', 'owned-network')
+    assert raised.value.recovery['automatic'] is True
+    with pytest.raises(DockerRuntimeError) as unrelated:
+        runtime._run('build', '.')
+    assert not isinstance(unrelated.value, DockerNetworkCapacityError)

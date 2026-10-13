@@ -135,13 +135,12 @@ If you configure several services, set `ABB_MODEL_PROVIDER=deepseek` or
 `GLM_API_BASE_URL` matches your account and API service. Agents using web search
 also need `TAVILY_API_KEY`, as specified by their configuration.
 
-**ACP Agents**: these Agents typically have their own recommended or configured
-model service. Find the Agent's commented section in `.env` and fill in its API key,
-plus any required model name and API URL. For example, MiniMax Code uses
-`MINIMAX_API_KEY`, Qwen Code uses `DASHSCOPE_API_KEY`, and GLM-based Agents use
-`GLM_API_KEY`, `GLM_MODEL`, and `GLM_API_BASE_URL`. See the corresponding
-`resources/agents/<directory>/README.md` for requirements and
-[`.env.example`](../.env.example) for the template.
+**ACP Agents**: units 15-32 and 36 use the same OpenRouter -> DeepSeek -> GLM
+selection. DeepSeek is optional. Constrained deployments retain dedicated settings:
+MiniMax Code requires `MINIMAX_API_KEY`; Claude ACP needs its Anthropic Messages
+`CODEX_*` endpoint; Qwen Code's native web search requires DashScope and `QWEN_*` settings.
+Cline also requires a model in its pinned provider catalog.
+See [model selection](Model-Selection.md) and [`.env.example`](../.env.example).
 
 ### 3. Evaluate with KUMA
 

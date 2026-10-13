@@ -128,7 +128,7 @@ def test_malformed_attempt_reference_metadata_fails_closed(tmp_path):
 def test_creation_and_cleanup_guard_excludes_another_process(tmp_path):
     program = (
         'import sys\nfrom agentbench.harness.session.references import history_guard\n'
-        'try:\n with history_guard(sys.argv[1]): print("acquired")\n'
+        'try:\n with history_guard(sys.argv[1], timeout=0.1): print("acquired")\n'
         'except RuntimeError: print("locked")\n')
     with history_guard(tmp_path):
         output = subprocess.check_output([sys.executable, '-c', program, str(tmp_path)], text=True)

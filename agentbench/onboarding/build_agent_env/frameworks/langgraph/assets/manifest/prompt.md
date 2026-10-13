@@ -108,3 +108,18 @@ The evidence paths must be exact entries from THIS request's context.files.
 Return needs_input/unsupported with facts=null and specific missing_information
 when no complete supported configuration can be established. Do not generate a
 partial fake success. Human-written existing files are preserved by the workflow.
+
+
+Durable installation inputs: every source method applies outer install/ into
+agent/ before execution. Any ABB-added file needed inside source must be kept in
+install/ at its matching relative path, never solely in ignored agent/. ABB-owned
+graph descriptors use abb-*.json and require that outer copy. Native upstream
+JSON descriptors remain upstream; bindings remain in outer bindings/. Do not
+invent a new descriptor or mutate source during generation. When no descriptor
+exists, use a verified native factory through the outer binding. Existing
+installation inputs are prepared before generation; conflicting copies are errors.
+
+Omit facts.model for default run-level selection (OpenRouter -> DeepSeek -> GLM).
+Only emit model.provider when evidence or deployment policy requires a fixed provider.
+A pin overrides run-level provider selection and never falls back on missing credentials.
+Do not generate redundant default model declarations or boilerplate setup comments.

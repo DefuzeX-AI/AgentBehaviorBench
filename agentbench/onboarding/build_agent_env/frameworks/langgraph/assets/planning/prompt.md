@@ -119,3 +119,13 @@ a colon, a source directory or a native symbol in that list.
 - Ask only for facts that prevent a truthful integration: missing required business
   values without defaults, unknown custom service endpoints, missing source, or an
   unsupported runtime. Do not ask the user to choose arbitrary implementation names.
+
+
+Durable installation inputs: every source method applies outer install/ into
+agent/ before execution. Any ABB-added file needed inside source must be kept in
+install/ at its matching relative path, never solely in ignored agent/. ABB-owned
+graph descriptors use abb-*.json and require that outer copy. Native upstream
+JSON descriptors remain upstream; bindings remain in outer bindings/. Do not
+invent a new descriptor or mutate source during generation. When no descriptor
+exists, use a verified native factory through the outer binding. Existing
+installation inputs are prepared before generation; conflicting copies are errors.

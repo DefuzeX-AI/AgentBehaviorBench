@@ -28,6 +28,8 @@ trust_plugin = "pem-env"
 credentials = [{{id = "native", agent_env = "OPENAI_API_KEY", auth_plugin = "bearer-token"}}]
 routes = []
 '''
+    if framework == 'acp':
+        manifest += '\n[model]\nprovider = "glm"\nsource = "native"\n'
     if fixed_model:
         manifest += f'\n[llm_interception.environment]\nGLM_MODEL = "{fixed_model}"\n'
     (root / 'agent.toml').write_text(manifest)

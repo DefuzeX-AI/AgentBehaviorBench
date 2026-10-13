@@ -6,18 +6,17 @@ Linux binary and runs its built-in ACP server (`goose acp`). ABB invokes it over
 ACP stdio and keeps each Case in a separate empty workspace. No upstream source is
 vendored or modified.
 
-The acceptance profile uses Zhipu GLM's OpenAI-compatible coding endpoint.
-Supply these variables only at runtime:
+This unit uses default model selection; no `[model]` declaration is needed. Configure the selected provider in
+`.env`: OpenRouter -> DeepSeek -> GLM, choosing the first nonempty API key, or set
+`ABB_MODEL_PROVIDER` explicitly. Supply the selected provider's model name as well.
+See [model selection](../../../docs/Model-Selection.md) for variables and constraints.
 
-- `GLM_API_BASE_URL`: the OpenAI-style base URL, e.g.
-  `https://open.bigmodel.cn/api/coding/paas/v4`.
-- `GLM_MODEL`: the exact provider model ID, such as `glm-5.1`.
-- `GLM_API_KEY`: the Bearer credential. It is never written into this unit.
+ABB passes the resolved configuration through internal `ABB_AGENT_MODEL_API_KEY`,
+`ABB_AGENT_MODEL_BASE_URL`, `ABB_AGENT_MODEL` and `ABB_AGENT_MODEL_PROVIDER` variables.
+Users do not fill these internal variables. Only the selected credential reaches the
+launcher. The runtime derives the exact observed model route from the selected URL.
 
-The interception manifest admits only the tested route:
-`POST https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`.
-A different OpenAI-compatible provider needs an explicit reviewed route update;
-changing environment variables alone does not broaden container egress.
+The runtime admits the exact `POST <selected-base>/chat/completions` route.
 
 ## Distribution
 
@@ -40,18 +39,17 @@ runtime chooses and isolates Cases.
 Goose reads its settings from upper-case environment variables, so no
 `config.yaml` is written. The launcher sets:
 
-- a custom OpenAI-engine provider `abb_glm`, written to
-  `~/.config/goose/custom_providers/abb_glm.json` in the disposable `HOME`, with
-  `base_url = $GLM_API_BASE_URL`, `api_key_env = "GLM_API_KEY"` (the key stays in
-  the environment, not the file), a static one-entry model list for `$GLM_MODEL`
+- a custom OpenAI-engine provider `abb_shared`, written to
+  `~/.config/goose/custom_providers/abb_shared.json` in the disposable `HOME`, with
+  `base_url = $ABB_AGENT_MODEL_BASE_URL`, `api_key_env = "ABB_AGENT_MODEL_API_KEY"` (the key stays in
+  the environment, not the file), a static one-entry model list for `$ABB_AGENT_MODEL`
   with an explicit context window, and `dynamic_models = false`. With Goose's
   built-in `openai` provider, `goose acp` calls `GET <base>/models` at session
   start (provider inventory refresh) and again for context-window discovery;
   that path is outside the admitted route and the interceptor rejects the trace
   as `egress_denied`. The static custom provider removes both calls. Context
-  windows come from upstream's bundled Z.AI definition (`glm-5.1` = 200000);
-  unknown models use Goose's default 128000;
-- `GOOSE_PROVIDER=abb_glm` and `GOOSE_MODEL=$GLM_MODEL`, so the model is selected
+  windows use a conservative 128000-token deployment budget;
+- `GOOSE_PROVIDER=abb_shared` and `GOOSE_MODEL=$ABB_AGENT_MODEL`, so the model is selected
   at startup (ACP `session/new` does not choose one). The OpenAI engine appends
   `/chat/completions` to the base URL, which is exactly the admitted route;
 - `GOOSE_TELEMETRY_OFF=1`: upstream otherwise sends usage events to PostHog
@@ -86,3 +84,8 @@ unchanged. File reads/writes continue to use ACP `fs/*` delegation.
 ## Installation inputs
 
 Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.
+
+## Validation scope
+
+Earlier acceptance records describe the previous fixed-provider deployment. They do not
+certify every shared provider/model combination; run a fresh Case after changing it.

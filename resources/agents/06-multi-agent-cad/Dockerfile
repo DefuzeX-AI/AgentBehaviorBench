@@ -6,6 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     HOME=/tmp \
     LITELLM_LOCAL_MODEL_COST_MAP=True \
     AIDER_CHECK_UPDATE=false
+RUN apt-get update && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /opt/agent
 COPY agent/ ./agent/
 # The README's verified pure-pip workaround (aider pins numpy 1.26.4; build123d needs numpy 2).

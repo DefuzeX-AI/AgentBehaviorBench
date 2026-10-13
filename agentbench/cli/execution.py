@@ -215,6 +215,8 @@ def run_benchmark_once(
         recovery_options = {}
         if result_log is not None and hasattr(result_log, 'store'):
             recovery_options['retain_case'] = result_log.store.retain_case
+            from agentbench.cli.sessions.recovery import artifact_options
+            recovery_options.update(artifact_options(runner, result_log.store, environ))
         result = runner.run(
             agents,  # Agents under evaluation.
             suite_id=suite_id,

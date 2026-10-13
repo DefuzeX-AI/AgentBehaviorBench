@@ -16,14 +16,15 @@ in a separate empty workspace.
 > image build time**. Nothing from upstream is vendored in this unit or modified, and
 > the built image must not be redistributed standalone.
 
-The acceptance profile uses Zhipu GLM's OpenAI-compatible coding endpoint through
-Copilot's BYOK provider support. No GitHub account, login or token is used. Supply
-these variables only at runtime:
+This unit uses default model selection; no `[model]` declaration is needed. Configure the selected provider in
+`.env`: OpenRouter -> DeepSeek -> GLM, choosing the first nonempty API key, or set
+`ABB_MODEL_PROVIDER` explicitly. Supply the selected provider's model name as well.
+See [model selection](../../../docs/Model-Selection.md) for variables and constraints.
 
-- `GLM_API_BASE_URL`: the OpenAI-style base URL, e.g.
-  `https://open.bigmodel.cn/api/coding/paas/v4`.
-- `GLM_MODEL`: the exact provider model ID, such as `glm-5.1`.
-- `GLM_API_KEY`: the Bearer credential. It is never written into this unit.
+ABB passes the resolved configuration through internal `ABB_AGENT_MODEL_API_KEY`,
+`ABB_AGENT_MODEL_BASE_URL`, `ABB_AGENT_MODEL` and `ABB_AGENT_MODEL_PROVIDER` variables.
+Users do not fill these internal variables. Only the selected credential reaches the
+launcher. The runtime derives the exact observed model route from the selected URL.
 
 ## Launcher behavior
 
@@ -31,17 +32,17 @@ these variables only at runtime:
 `@github/copilot@1.0.86` (and, through the lock, the matching platform packages with
 their registry integrity hashes); the image installs them with `npm ci`.
 
-`bootstrap/launch.py` validates the three GLM variables and maps them onto Copilot's
+`bootstrap/launch.py` validates the runtime model variables and maps them onto Copilot's
 documented environment contract (`copilot help environment`), never onto argv:
 
 - `COPILOT_PROVIDER_BASE_URL`, `COPILOT_PROVIDER_API_KEY`,
   `COPILOT_PROVIDER_TYPE=openai`, `COPILOT_PROVIDER_WIRE_API=completions` — BYOK
   mode; upstream: "the CLI uses this provider instead of GitHub Copilot's model
   routing. GitHub authentication is not required."
-- `COPILOT_MODEL=$GLM_MODEL` — ACP `session/new` does not choose a model, so GLM is
+- `COPILOT_MODEL=$ABB_AGENT_MODEL` — ACP `session/new` does not choose a model, so the configured model is
   selected at startup.
 - `COPILOT_PROVIDER_MAX_PROMPT_TOKENS=128000`, `COPILOT_PROVIDER_MAX_OUTPUT_TOKENS=16384`
-  — `glm-5.1` is not in Copilot's model catalog; without these the CLI warns and
+  — custom models may not be in Copilot's model catalog; without these the CLI warns and
   uses generic defaults.
 - `COPILOT_AUTO_UPDATE=false` and `--no-auto-update` — no self-update.
 - `COPILOT_OFFLINE` is not set, so the `web_fetch` tool is available. Its requests go
@@ -66,10 +67,7 @@ under the container's memory limit.
 Tool permission requests are answered by ABB's ACP adapter (`allow_once`);
 `COPILOT_ALLOW_ALL` is deliberately not set.
 
-The interception manifest admits only the tested route:
-`POST https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`.
-A different OpenAI-compatible provider needs an explicit reviewed route update;
-changing environment variables alone does not broaden container egress.
+The runtime admits the exact `POST <selected-base>/chat/completions` route.
 
 ## Known non-blocking noise
 
@@ -85,3 +83,8 @@ error.
 ## Installation inputs
 
 Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.
+
+## Validation scope
+
+Earlier acceptance records describe the previous fixed-provider deployment. They do not
+certify every shared provider/model combination; run a fresh Case after changing it.

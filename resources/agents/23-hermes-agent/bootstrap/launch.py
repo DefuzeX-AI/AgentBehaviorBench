@@ -1,4 +1,4 @@
-"""Map an OpenAI-compatible GLM profile onto Hermes Agent's native ACP adapter."""
+"""Map the selected OpenAI-compatible model profile onto Hermes Agent's native ACP adapter."""
 from __future__ import annotations
 
 import json
@@ -10,9 +10,9 @@ import tempfile
 from urllib.parse import urlsplit
 
 
-KEY_ENV = "GLM_API_KEY"
-BASE_URL_ENV = "GLM_API_BASE_URL"
-MODEL_ENV = "GLM_MODEL"
+KEY_ENV = "ABB_AGENT_MODEL_API_KEY"
+BASE_URL_ENV = "ABB_AGENT_MODEL_BASE_URL"
+MODEL_ENV = "ABB_AGENT_MODEL"
 HERMES = "/opt/hermes/.venv/bin/hermes"
 # Pinned tirith release installed at build time (agent/tirith.json).
 TIRITH = "/opt/tirith/bin/tirith"
@@ -24,8 +24,8 @@ EXCLUDED_PROVIDERS = ["opencode-free", "opencode-zen", "opencode-go"]
 def config(base_url: str, model: str) -> dict:
     """Hermes config.yaml (JSON is valid YAML) for one Case."""
     return {
-        # Hermes' built-in Z.AI/GLM provider speaks OpenAI chat completions.
-        "model": {"provider": "zai", "default": model, "base_url": base_url},
+        # Hermes' native OpenAI API provider supports an explicit compatible base URL.
+        "model": {"provider": "openai-api", "default": model, "base_url": base_url},
         # The remote Nous model catalog and models.dev are startup metadata
         # fetches outside the evaluated model route. models.dev has no off
         # switch; a file:// URL makes requests fail locally (no connection
@@ -62,12 +62,13 @@ def prepare(environ: dict[str, str]) -> tuple[list[str], dict[str, str], dict]:
     if parsed.scheme != "https" or not parsed.hostname or parsed.query or parsed.fragment:
         raise ValueError(f"{BASE_URL_ENV} must be an HTTPS URL without query or fragment")
 
-    # Hermes' Z.AI provider reads GLM_API_KEY natively; an explicit GLM_BASE_URL
-    # also skips its endpoint auto-detection probes. The key never enters argv.
+    # Map the selected key and URL to Hermes' native OpenAI-compatible provider.
+    # The key never enters argv.
     child = {
         **environ,
         KEY_ENV: key,
-        "GLM_BASE_URL": base_url,
+        "OPENAI_API_KEY": key,
+        "OPENAI_BASE_URL": base_url,
         # Keep the venv sealed as upstream's image does (Dockerfile:430), but let optional
         # backends install on demand into a writable target (upstream Dockerfile:443;
         # tools/lazy_deps.py:325-339). PyPI is reachable through the egress observer.
@@ -109,7 +110,7 @@ def main() -> int:
                 ["sh", "-c", 'while :; do /usr/local/bin/abb-chromium --headless=new --remote-debugging-port=9222 '
                              '--user-data-dir="$HOME/.abb-chromium" about:blank; sleep 1; done'],
                 stdin=subprocess.DEVNULL, stdout=chromium_log, stderr=chromium_log, start_new_session=True,
-                env={k: v for k, v in environ.items() if k != KEY_ENV})
+                env={k: v for k, v in environ.items() if k not in (KEY_ENV, "OPENAI_API_KEY")})
         os.execvpe(command[0], command, environ)
     except (OSError, ValueError) as exc:
         message = str(exc).replace(os.environ.get(KEY_ENV) or "\0", "[REDACTED]")

@@ -42,7 +42,7 @@ def test_defaults_and_download_provenance_are_program_owned(source, facts):
     assert value["evaluation"]["replay_safe"] is False
     assert "observe" not in value and "context" not in value["adapter"]
     assert value["source"] == {"repository": source.repository, "revision": source.revision,
-                               "downloaded_on": "2026-09-08"}
+                               "downloaded_on": "2026-09-08", "method": "bundled"}
     assert value["launch"]["argv"] == ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
 
 
@@ -147,3 +147,9 @@ def test_cli_observe_option_reaches_generated_manifest(source, plan, monkeypatch
                 "--agents-dir", str(source.directory.parent), "--registry", str(source.directory.parents[1] / "registry.toml")]) == 0
     value = tomllib.loads((source.directory / "agent.toml").read_text())
     assert value["runtime"]["timeout_sec"] == 450 and value["observe"]["input_fields"][0]["name"] == "message"
+
+
+def test_generated_model_selection_is_default_unless_explicitly_pinned(source, facts):
+    assert 'model' not in render(source, facts)
+    facts['model'] = {'provider': 'deepseek'}
+    assert render(source, facts)['model'] == {'provider': 'deepseek'}

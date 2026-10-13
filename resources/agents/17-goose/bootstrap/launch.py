@@ -1,4 +1,4 @@
-"""Map an OpenAI-compatible GLM profile onto Goose's native ACP server and relay its stdio."""
+"""Map the selected OpenAI-compatible model profile onto Goose's native ACP server and relay its stdio."""
 from __future__ import annotations
 
 import json
@@ -12,23 +12,12 @@ import threading
 from urllib.parse import urlsplit
 
 
-KEY_ENV = "GLM_API_KEY"
-BASE_URL_ENV = "GLM_API_BASE_URL"
-MODEL_ENV = "GLM_MODEL"
+KEY_ENV = "ABB_AGENT_MODEL_API_KEY"
+BASE_URL_ENV = "ABB_AGENT_MODEL_BASE_URL"
+MODEL_ENV = "ABB_AGENT_MODEL"
 GOOSE_BIN = "/opt/goose/bin/goose"
-PROVIDER_ID = "abb_glm"
-# Context windows copied from upstream's bundled Z.AI provider definition
-# (crates/goose-providers/src/declarative/definitions/zai.json at the pinned
-# tag). Unknown models fall back to Goose's DEFAULT_CONTEXT_LIMIT.
-CONTEXT_LIMITS = {
-    "glm-5.1": 200_000,
-    "glm-5": 204_800,
-    "glm-5-turbo": 200_000,
-    "glm-4.7": 204_800,
-    "glm-4.6": 204_800,
-    "glm-4.5": 131_072,
-    "glm-4.5-air": 131_072,
-}
+PROVIDER_ID = "abb_shared"
+# Conservative deployment budget; do not reuse the previous provider catalog.
 DEFAULT_CONTEXT_LIMIT = 128_000
 
 
@@ -37,8 +26,8 @@ def provider_config(base_url: str, model: str) -> dict[str, object]:
     return {
         "name": PROVIDER_ID,
         "engine": "openai",
-        "display_name": "GLM (ABB)",
-        "description": "OpenAI-compatible GLM endpoint configured by ABB",
+        "display_name": "ABB selected model",
+        "description": "OpenAI-compatible endpoint selected by ABB",
         # Goose resolves the credential from this environment variable at
         # request time; the key itself is never written into the file.
         "api_key_env": KEY_ENV,
@@ -46,7 +35,7 @@ def provider_config(base_url: str, model: str) -> dict[str, object]:
         # A static model list with an explicit context window keeps Goose from
         # calling GET <base>/models (session-init inventory refresh and the
         # context-window probe), which is outside the admitted model route.
-        "models": [{"name": model, "context_limit": CONTEXT_LIMITS.get(model, DEFAULT_CONTEXT_LIMIT)}],
+        "models": [{"name": model, "context_limit": DEFAULT_CONTEXT_LIMIT}],
         "dynamic_models": False,
         "supports_streaming": True,
     }
@@ -69,7 +58,7 @@ def prepare(environ: dict[str, str]) -> tuple[list[str], dict[str, str], dict[st
 
     # Goose reads its config keys from upper-case environment variables, so no
     # config.yaml is needed. The OpenAI engine appends /chat/completions to the
-    # base URL (the GLM URL has no /v1 suffix), which is exactly the admitted route.
+    # configured base URL, matching the resolved model route.
     child = {
         **environ,
         KEY_ENV: key,

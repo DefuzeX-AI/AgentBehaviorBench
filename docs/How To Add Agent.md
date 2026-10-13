@@ -31,7 +31,7 @@ OPENROUTER_MODEL=openai/gpt-4.1-mini
 # OPENROUTER_BUILD_MODEL=
 ```
 
-The target Agent’s runtime model is configured separately: LangGraph integrations can use OpenRouter, DeepSeek or GLM; native ACP Agents use their own declared service credentials. See the startup guide. `--build-model` selects the generation model; `--model` selects ABB’s replacement target model for certification. Exported shell variables override `.env`. Keep keys out of source and generated files.
+The target Agent model is configured separately: ordinary LangGraph and configurable ACP integrations share OpenRouter -> DeepSeek -> GLM selection. A provider pin in agent.toml overrides the global provider; constrained native integrations keep dedicated credentials. `--build-model` selects the generation model; `--model` overrides the shared target model for certification. Exported shell variables override `.env`. Keep keys out of source and generated files.
 
 For the web viewer, use Node.js 20.19+ on 20.x or 22.12+, with npm, then build the frontend. Headless evaluation with `--no-view` does not require Node or `web/dist`.
 
@@ -101,6 +101,29 @@ Use `[source] method = "git"` with the recorded full commit SHA for supported Gi
 sources, or keep tracked installation inputs under `install/` for install mode.
 Local imports and sources requiring unsupported features need manually supplied
 source; see [Agent source preparation](Agent-Sources.md).
+
+### `install/` — durable files added by ABB
+
+All source methods (`git`, `install`, `bundled`, or omitted method) apply this
+outer directory into `agent/` at matching relative paths. For example, save an
+ABB descriptor as `install/abb-langgraph.json`; keep `adapter.config` set to
+`"abb-langgraph.json"`. Commit `install/`, never its generated `agent/` copies.
+Native upstream descriptors remain upstream and bindings remain in `bindings/`.
+
+`agent add -b` prepares these inputs before generation and checks them again
+before registration. ABB-owned descriptors use `abb-*.json`; keeping their only
+copy inside ignored source is rejected. Missing copies are repaired; differing
+existing files, unsafe paths or empty install directories stop the operation.
+Install mode requires `install/`; Git and bundled units may omit it. Bundled units
+still require manually supplied source.
+
+New supported GitHub imports automatically use `method="git"` with their recorded
+full commit SHA. Existing explicit methods are preserved. Local imports and
+unsupported submodule/symlink/LFS layouts use `bundled` and need manual source.
+Before submitting a new integration, verify preparation in a separate clean copy
+of the outer unit with no `agent/` (supply manual source for bundled), then load
+its adapter configuration. Include all outer inputs in the change. This catches
+files present only on your machine; follow with the smoke/certification steps below.
 
 ### `agent/` — the Agent's own source
 
@@ -238,3 +261,5 @@ Export JSON saves a snapshot, not all traces or a standalone HTML report. Preser
 If the viewer reports Trace UI not built, build `web/`. For Docker errors, run `docker info` as the same user. For SDK import errors, install the SDK in ABB’s virtual environment. For model/key errors, check the selected service, model and shell-over-file precedence. For planning errors or needs_input, inspect the saved build record and supply factual answers.
 
 [CLI reference](cli.md) · [Detailed troubleshooting](Troubleshooting.md)
+
+Model selection defaults to OpenRouter -> DeepSeek -> GLM; omit `[model]` for ordinary Agents. An explicit `[model] provider="..."` fixes the provider and overrides global selection. Configurable ACP launchers must consume runtime model settings. Constrained native integrations additionally declare `source="native"`, a reason and dedicated credentials. Do not generate redundant default declarations or repeated setup comments. See [model selection](Model-Selection.md).

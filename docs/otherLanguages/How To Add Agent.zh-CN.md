@@ -31,7 +31,7 @@ OPENROUTER_MODEL=openai/gpt-4.1-mini
 # OPENROUTER_BUILD_MODEL=
 ```
 
-被测 Agent 的运行模型单独配置：LangGraph 接入可使用 OpenRouter、DeepSeek 或 GLM；原生 ACP Agent 使用自身声明的服务凭据，见启动指南。`--build-model` 选择配置生成模型，`--model` 选择认证时 ABB 转发目标的模型。Shell 导出的变量优先于 `.env`，不要把真实 key 写入源码或生成文件。
+目标 Agent 的运行模型单独配置：普通 LangGraph 和支持自定义模型的 ACP 共用 OpenRouter → DeepSeek → GLM 选择；agent.toml 中显式固定的 provider 优先，受限原生接入保留专属凭据。`--build-model` 选择配置生成模型；`--model` 覆盖认证时的公共目标模型。Shell 环境变量优先于 `.env`，不要把密钥写入源码或生成文件。
 
 网页需要 npm，以及 Node.js 20.x 至少 20.19 或 22.12+；随后构建网页。使用 `--no-view` 的无界面评测不要求 Node 或 `web/dist`。
 
@@ -106,6 +106,21 @@ resources/agents/NN-name/
 文件和来源记录，不要强制加入源码。支持自动恢复的 Git 来源使用 `[source] method = "git"`
 及已记录的完整 commit SHA；安装模式把安装输入保留在 `install/`。本地来源或包含暂不
 支持的特性时，需要手动准备源码，见[Agent 源码准备（英文）](../Agent-Sources.md)。
+
+### `install/`：ABB 新增文件的持久副本
+
+所有来源方式（`git`、`install`、`bundled` 或未写 method）都会将外层
+`install/` 按相对路径复制到 `agent/`。ABB 新增图配置使用 `abb-*.json`：例如
+保存 `install/abb-langgraph.json`，`adapter.config` 仍写 `"abb-langgraph.json"`。
+提交外层副本；原生上游配置保留在上游，binding 保留在外层 `bindings/`。
+
+`agent add -b` 在生成前准备这些文件，在注册前再次检查。ABB 图配置只有忽略目录中的
+副本时禁止注册。缺失副本会补齐，内容冲突、不安全路径或空 install 目录会报错，不会覆盖。
+install 模式必须提供非空 `install/`；Git 和 bundled 可省略。bundled 仍需手动提供源码。
+新建且受支持的 GitHub 导入自动使用完整 SHA 的 `method="git"`；已有显式方式保留。
+本地来源及暂不支持的 submodule、symlink、LFS 布局使用 bundled 并记录手动准备要求。
+提交前在单独干净目录仅复制外层文件，验证源码准备和适配器配置加载（bundled 另提供源码），
+再执行下方 smoke/certification。静态检查不代表 Agent 已执行成功。
 
 ### `agent/` — Agent 自身源码
 
@@ -232,3 +247,5 @@ Export JSON 只导出快照，不打包全部轨迹或独立 HTML。保留 Suite
 网页提示 Trace UI not built 时构建 `web/`；Docker 错误时用同一用户检查 `docker info`；SDK 导入错误时在 ABB 的虚拟环境中安装 SDK；模型/key 错误时检查服务、模型名称及 Shell 变量优先级；规划错误或 needs_input 时查看保存记录并补充真实信息。
 
 [CLI 文档](cli.zh-CN.md) · [详细故障排查（英文）](../Troubleshooting.md)
+
+普通 Agent 不写 `[model]`，默认按 OpenRouter → DeepSeek → GLM 选择；显式写 `provider="..."` 则固定该提供商，优先于全局选择，缺少凭据时报错。支持自定义模型的 ACP 外层启动器接收运行时模型配置；受限的原生接入额外声明 `source="native"`、原因和专属凭据。新增 Agent 不再生成多余的默认声明或重复注释，详见[模型选择规则（英文）](../Model-Selection.md)。

@@ -87,5 +87,5 @@ for line in sys.stdin:
         else:
             notify(f'{turn}:')
             notify(text)
-        stop = 'max_tokens' if text == 'limit' else 'refusal' if text == 'refuse' else 'end_turn'
+        stop = 'cancelled' if text == 'abort' else 'max_tokens' if text == 'limit' else 'refusal' if text == 'refuse' else 'end_turn'
         send({'id': ident, 'result': {'stopReason': stop}})

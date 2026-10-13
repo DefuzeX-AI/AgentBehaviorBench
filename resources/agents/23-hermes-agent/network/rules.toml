@@ -6,21 +6,7 @@ schema_version = "abb.network.v1"
 # OpenCode relay catalog) are disabled in the per-Case config written by
 # bootstrap/launch.py instead of being allowlisted here.
 #
-# Model metadata, GET only, exact path, optional: Hermes lists the configured
-# provider's models with `GET <base_url>/models` in two places that have no
-# config switch at v2026.9.24 -- the ACP session model picker at session/new
-# (hermes_cli/models.py _profile_live_catalog -> ProviderProfile.fetch_models)
-# and per-turn cost estimation (agent/usage_pricing.py get_pricing_entry ->
-# agent/model_metadata.py fetch_endpoint_model_metadata). Each runs at most once
-# per process (memoized). Both fall back to the bundled catalog / "unknown cost"
-# when the call fails, so the route is not required for a turn to complete.
-[[tool_routes]]
-host_patterns = ["open.bigmodel.cn"]
-ports = [443]
-methods = ["GET"]
-path_patterns = ["/api/coding/paas/v4/models"]
-purpose = "metadata"
-required = false
+# Optional model-list metadata routes follow the selected provider via [model].
 
 # `web_search` and `web_extract` use Tavily when TAVILY_API_KEY is supplied (optional_secret_env_keys).
 [[tool_routes]]

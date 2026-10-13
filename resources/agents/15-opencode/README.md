@@ -24,18 +24,17 @@ release `1.18.31` (tag `v1.18.31`, commit `014614d3`, MIT) from npm and runs its
 built-in ACP server (`opencode acp`). ABB invokes it over ACP stdio and keeps each
 Case in a separate empty workspace. No upstream source is vendored or modified.
 
-The acceptance profile uses Zhipu GLM's OpenAI-compatible coding endpoint.
-Supply these variables only at runtime:
+This unit uses default model selection; no `[model]` declaration is needed. Configure the selected provider in
+`.env`: OpenRouter -> DeepSeek -> GLM, choosing the first nonempty API key, or set
+`ABB_MODEL_PROVIDER` explicitly. Supply the selected provider's model name as well.
+See [model selection](../../../docs/Model-Selection.md) for variables and constraints.
 
-- `GLM_API_BASE_URL`: the OpenAI-style base URL, e.g.
-  `https://open.bigmodel.cn/api/coding/paas/v4`.
-- `GLM_MODEL`: the exact provider model ID, such as `glm-5.1`.
-- `GLM_API_KEY`: the Bearer credential. It is never written into this unit.
+ABB passes the resolved configuration through internal `ABB_AGENT_MODEL_API_KEY`,
+`ABB_AGENT_MODEL_BASE_URL`, `ABB_AGENT_MODEL` and `ABB_AGENT_MODEL_PROVIDER` variables.
+Users do not fill these internal variables. Only the selected credential reaches the
+launcher. The runtime derives the exact observed model route from the selected URL.
 
-The interception manifest admits only the tested route:
-`POST https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`.
-A different OpenAI-compatible provider needs an explicit reviewed route update;
-changing environment variables alone does not broaden container egress.
+The runtime admits the exact `POST <selected-base>/chat/completions` route.
 
 ## Distribution
 
@@ -58,13 +57,13 @@ SQLite session store and cache writable by whichever unprivileged uid the runtim
 chooses, and isolates Cases. It then writes `$XDG_CONFIG_HOME/opencode/opencode.json`
 and execs `opencode acp`.
 
-The config declares a `glm` provider on the bundled `@ai-sdk/openai-compatible`
+The config declares a `abb` provider on the bundled `@ai-sdk/openai-compatible`
 SDK (compiled into the OpenCode binary, so no provider package is fetched) with
-`baseURL` from `GLM_API_BASE_URL` and `apiKey` set to the literal reference
-`{env:GLM_API_KEY}`, which OpenCode resolves itself. The key is passed only through
+`baseURL` from `ABB_AGENT_MODEL_BASE_URL` and `apiKey` set to the literal reference
+`{env:ABB_AGENT_MODEL_API_KEY}`, which OpenCode resolves itself. The key is passed only through
 the environment, never argv or a file. `model` and `small_model` are
-`glm/$GLM_MODEL`, so the model is selected at startup; `enabled_providers` is
-limited to `glm`.
+`abb/$ABB_AGENT_MODEL`, so the model is selected at startup; `enabled_providers` is
+limited to `abb`.
 
 Each remaining setting removes a startup or background network call that is not an
 agent tool, or a background model call (these switches predate #137, when any
@@ -116,3 +115,8 @@ the host accepts the trace.
 ## Installation inputs
 
 Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.
+
+## Validation scope
+
+Earlier acceptance records describe the previous fixed-provider deployment. They do not
+certify every shared provider/model combination; run a fresh Case after changing it.

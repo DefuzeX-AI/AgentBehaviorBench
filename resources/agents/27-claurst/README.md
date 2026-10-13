@@ -11,18 +11,17 @@ separate empty workspace. No upstream source is vendored or modified.
 upstream release binary inside the evaluation image; nothing from Claurst is
 redistributed in this repository.
 
-The acceptance profile uses Zhipu GLM's OpenAI-compatible coding endpoint.
-Supply these variables only at runtime:
+This unit uses default model selection; no `[model]` declaration is needed. Configure the selected provider in
+`.env`: OpenRouter -> DeepSeek -> GLM, choosing the first nonempty API key, or set
+`ABB_MODEL_PROVIDER` explicitly. Supply the selected provider's model name as well.
+See [model selection](../../../docs/Model-Selection.md) for variables and constraints.
 
-- `GLM_API_BASE_URL`: the OpenAI-style base URL, e.g.
-  `https://open.bigmodel.cn/api/coding/paas/v4`.
-- `GLM_MODEL`: the exact provider model ID, such as `glm-5.1`.
-- `GLM_API_KEY`: the Bearer credential. It is never written into this unit.
+ABB passes the resolved configuration through internal `ABB_AGENT_MODEL_API_KEY`,
+`ABB_AGENT_MODEL_BASE_URL`, `ABB_AGENT_MODEL` and `ABB_AGENT_MODEL_PROVIDER` variables.
+Users do not fill these internal variables. Only the selected credential reaches the
+launcher. The runtime derives the exact observed model route from the selected URL.
 
-The interception manifest admits only the tested model route:
-`POST https://open.bigmodel.cn/api/coding/paas/v4/chat/completions`.
-A different OpenAI-compatible provider needs an explicit reviewed route update;
-changing environment variables alone does not broaden container egress.
+The runtime admits the exact `POST <selected-base>/chat/completions` route.
 
 ## Distribution
 
@@ -43,12 +42,12 @@ or fragment) and prepares, for every Case, a disposable `HOME` and `CLAURST_HOME
 under `/tmp`. It writes `settings.json` there with:
 
 - `provider = "custom-openai"` and `providers.custom-openai.api_base =
-  $GLM_API_BASE_URL`. Claurst's generic OpenAI-compatible provider uses the base URL
+  $ABB_AGENT_MODEL_BASE_URL`. Claurst's generic OpenAI-compatible provider uses the base URL
   verbatim and posts to `<base>/chat/completions`, exactly the admitted route. (The
   built-in `zhipu` provider appends `/v1` to an overridden base, which does not
-  match the GLM coding endpoint.) The key is passed as `CUSTOM_OPENAI_API_KEY` in the
+  match the exact configured Chat Completions path.) The key is passed as `CUSTOM_OPENAI_API_KEY` in the
   child environment, not written to the file;
-- `config.model = $GLM_MODEL`. Claurst silently falls back to default settings
+- `config.model = $ABB_AGENT_MODEL`. Claurst silently falls back to default settings
   (the Anthropic provider) when `settings.json` does not deserialize, and its
   `config` object has no serde defaults, so every required field is written with its
   default value.
@@ -83,3 +82,8 @@ this unit originally answered the two tools' ACP permission requests with
 ## Installation inputs
 
 Tracked installation manifests live in install/. Before the evaluation SDK starts, ABB prepares their copies in the ignored agent/ directory (source.method = install). Docker builds use those generated copies. Do not edit agent/; edit install/ instead. If an existing copy differs, move agent/ aside and rerun to regenerate it.
+
+## Validation scope
+
+Earlier acceptance records describe the previous fixed-provider deployment. They do not
+certify every shared provider/model combination; run a fresh Case after changing it.

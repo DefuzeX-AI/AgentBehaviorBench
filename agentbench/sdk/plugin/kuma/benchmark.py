@@ -42,7 +42,7 @@ class KumaContainerRunner:
 
     def __init__(self, *, environ=None, options=None, trace_sink=None, trace_max_bytes=262144,
                  control=None, build_coordinator=None, job_context=None,
-                 runtime_services=None):
+                 runtime_services=None, artifacts=None):
         self.environ = dict(os.environ if environ is None else environ)
         options = dict(options or {})
         unknown = set(options) - {'output', 'timeout', 'max_steps', 'case_collection', 'sdk_request_options'}
@@ -67,6 +67,27 @@ class KumaContainerRunner:
         self.build_coordinator = build_coordinator
         self.job_context = dict(job_context or {})
         self.runtime_services = runtime_services
+        self.artifacts = artifacts
+
+    def dependency_hosts(self, registration):
+        """Conservative host grouping, without exposing or hashing credentials."""
+        from urllib.parse import urlsplit
+        from agentbench.runtime.interception import InterceptionConfig
+        from agentbench.runtime.agentcontainer.config import tomllib
+        manifest_path = registration.path / 'agent.toml'
+        if not manifest_path.is_file():
+            return set()
+        manifest = tomllib.loads(manifest_path.read_text(encoding='utf-8'))
+        hosts = set()
+        for key in manifest.get('runtime', {}).get('env_keys', []):
+            value = self.environ.get(key, '')
+            if isinstance(value, str) and value.startswith(('https://', 'http://')):
+                hosts.add(urlsplit(value).hostname)
+        config = InterceptionConfig.from_agent_dir(registration.path)
+        if config:
+            hosts.update(host for route in (*config.routes, *config.tool_routes)
+                         for host in route.host_patterns if '*' not in host)
+        return hosts
 
     def _identity(self, registration, **fields):
         return {**self.job_context, 'agent_id': registration.agent_id, **fields}
@@ -74,6 +95,7 @@ class KumaContainerRunner:
     def _runtime_options(self, identity):
         return dict(control=self.control, build_coordinator=self.build_coordinator,
                     runtime_services=self.runtime_services, identity=identity,
+                    **({"artifact_store": self.artifacts} if self.artifacts is not None else {}),
                     sdk_request_options=self.sdk_request_options)
 
     def _artifacts_ready(self, registration, on_progress, path, identity, detail):
@@ -252,6 +274,8 @@ def replay_input_events(directory, result, on_start, on_complete, on_failure):
     outcomes = {step.input_id: (step, on_complete) for step in result.steps}
     outcomes.update({failure.input_id: (failure, on_failure) for failure in result.failures})
     for item in case['inputs']:
+        if item['input_id'] not in outcomes:
+            continue  # Explicitly unexecuted tail of a terminated Case.
         outcome, callback = outcomes[item['input_id']]
         if on_start:
             on_start(result.agent_id, outcome.input_id, outcome.payload)
@@ -302,9 +326,9 @@ def read_result(directory, agent_id, *, recovered_report=None, provider_mode='of
     if (case['case_id'] != summary['case_id'] or report['run_id'] != summary['run_id']
         or report.get('extensions', {}).get('case_id') != summary['case_id']):
         raise RuntimeError('Case / Judge identity mismatch')
-    expected_ids = [item['input_id'] for item in case['inputs']]
-    if not expected_ids or [s['input_id'] for s in summary['steps']] != expected_ids or len(set(expected_ids)) != len(expected_ids):
-        raise RuntimeError('Incomplete or duplicate submitted Inputs')
+    from .completion import validate_input_prefix
+    last = summary['steps'][-1] if summary.get('steps') else {}
+    validate_input_prefix(case, summary, read(f"evaluation/{last['directory']}/result.json") if last else {})
     steps, failures = [], []
     for step, expected_input in zip(summary['steps'], case['inputs']):
         prefix = 'evaluation/' + step['directory']
@@ -339,9 +363,11 @@ def read_result(directory, agent_id, *, recovered_report=None, provider_mode='of
         raise RuntimeError('Execution summary does not match the submitted Inputs')
     normalized = Report(report['status'], report.get('confidence'), tuple(report.get('issues', [])),
                         tuple(report.get('evidence_gaps', [])), report['report_id'], report['run_id'],
-                        {**report.get('extensions', {}), 'abb_artifact_directory': str(directory)})
+                        {**report.get('extensions', {}), 'abb_artifact_directory': str(directory),
+                         'abb_unexecuted_inputs': summary.get('unexecuted_inputs', [])})
     return BenchmarkResult(agent_id, 'container-' + 'sdk', summary['run_id'], 'report_ready',
                            normalized, tuple(steps), len(summary['steps']), provider_mode,
                            evidence_status=summary['evidence'], host_acceptance='accepted',
                            host_trace_validation=host.get('host_trace_validation', 'unknown'),
-                           failures=tuple(failures))
+                           failures=tuple(failures),
+                           dependency_failure=collect_artifacts(directory, host).get('dependency_failure'))

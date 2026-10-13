@@ -58,6 +58,8 @@ def prepare_batch(runner, registration, *, evaluator, case_indices=None,
         except Exception as exc:
             if not allow_partial or directory is None:
                 raise
+            if getattr(exc, 'code', None) == 'docker_network_capacity':
+                raise
             primary_error = exc
     else:
         directory = runner.output.resolve() / uuid4().hex

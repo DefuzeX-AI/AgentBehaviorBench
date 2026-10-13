@@ -24,6 +24,7 @@ from .result import CaseResult, EvaluationFailure, SuiteAgentResult
 from .scheduling import AgentState, AgentSeed, RetryPolicy
 from .scheduling.preparation import accept_preparation
 from .scheduling.judgment import JudgmentQueue
+from .scheduling.dependencies import pause_dependency, next_ready
 
 CaseJobFactory = Callable[[PreparationJob, PreparedCase, Mapping[str, object]], CaseJob]
 
@@ -92,6 +93,10 @@ class CaseScheduler:
                         if self.judgments.pending and not self.control.cancelled:
                             continue
                         if not self.delayed:
+                            if self.ready or self.unprepared:
+                                self.bus.drain(discard=self.consumer_failed)
+                                self.control.wait(0.1)
+                                continue
                             break
                         self.bus.drain(discard=self.consumer_failed)
                         self.control.wait(min(0.1, max(0, self.delayed[0][0] - time.monotonic())))
@@ -165,8 +170,8 @@ class CaseScheduler:
         while self.admission and not self.control.cancelled and self._execution_count() < self.workers:
             if not self.judgments.can_execute(self._execution_count()):
                 break
-            if self.ready:
-                state = self.ready.popleft()
+            state = next_ready(self)
+            if state is not None:
                 case = state.pending.popleft()
                 if state.pending:
                     self.ready.append(state)
@@ -201,7 +206,11 @@ class CaseScheduler:
 
             # Prepare Cases for an Agent that does not have them yet.
             elif self.unprepared:
-                state = self.unprepared.popleft()
+                state = next((candidate for candidate in self.unprepared
+                              if candidate.preparation_until <= time.time()), None)
+                if state is None:
+                    break
+                self.unprepared.remove(state)
                 job = state.preparation
                 
                 function = run_preparation_job
@@ -248,6 +257,7 @@ class CaseScheduler:
         else:
             if outcome.judgment is not None:
                 ticket = outcome.judgment
+                pause_dependency(self, state, ticket.dependency_failure)
                 deferred = JudgmentJob(**job.__dict__, ticket=ticket)
                 self.judgments.append(state, deferred)
                 state.waiting_results[job.case.case_index] = CaseResult(
@@ -262,9 +272,13 @@ class CaseScheduler:
                     'artifact_directory': str(ticket.directory), 'artifact_run_id': ticket.directory.name})
                 return
             result = outcome.result
+            # Deferred tickets already applied the cooldown before Judge dispatch.
+            if not isinstance(job, JudgmentJob):
+                pause_dependency(self, state, (result.artifacts or {}).get('dependency_failure'))
             state.waiting_results.pop(result.case_index, None)
             retries = state.retries.get(result.case_index, 0)
             if (outcome.fatal is None and self.admission and self.continue_on_error
+                    and not state.dependency_blocked
                     and self.retry_policy.permits(result, retries)):
                 recovery = (result.artifacts or {})['recovery']
                 if recovery['action'] != 'resume_request' or callable(getattr(job.runner, 'recover_case', None)):

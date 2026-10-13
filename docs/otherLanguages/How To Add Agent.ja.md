@@ -31,7 +31,7 @@ OPENROUTER_MODEL=openai/gpt-4.1-mini
 # OPENROUTER_BUILD_MODEL=
 ```
 
-対象 Agent の実行モデルは別設定です。LangGraph は OpenRouter、DeepSeek、GLM を利用でき、ネイティブ ACP は各 Agent のサービス認証情報を使います。起動ガイドを参照してください。`--build-model` は生成モデル、`--model` は認証時の ABB 置換先モデルです。シェルの変数が `.env` より優先されます。キーをソースや生成ファイルに書かないでください。
+対象モデルは別設定です。通常の LangGraph と設定可能な ACP は OpenRouter → DeepSeek → GLM の選択を共有します。agent.toml の固定プロバイダーが全体設定より優先され、制約のあるネイティブ統合は専用認証情報を保持します。`--build-model` は生成モデル、`--model` は認証時の共通対象モデルを指定します。シェルの変数が `.env` より優先されます。キーをソースや生成ファイルに書かないでください。
 
 Web ビューアーには npm と Node.js 20.x の 20.19 以上、または 22.12 以上が必要です。フロントエンドをビルドしてください。`--no-view` の評価には Node や `web/dist` は不要です。
 
@@ -95,6 +95,21 @@ resources/agents/NN-name/
 `[source] method = "git"` と記録済みの完全な commit SHA を使い、install モードの入力は
 `install/` に保持します。ローカルソースや未対応の機能は手動で準備します。
 [ソースの準備（英語）](../Agent-Sources.md)を参照してください。
+
+### `install/`：ABB が追加するファイルの保存先
+
+すべての方式（`git`、`install`、`bundled`、method 省略）で外側の `install/`
+から同じ相対パスの `agent/` へコピーします。ABB の設定は `abb-*.json` とし、
+`install/` に保存します。`adapter.config` は引き続き `agent/` 基準です。
+生成されたコピーはコミットせず、上流設定は上流、binding は外側に保持します。
+
+`agent add -b` は生成前と登録前に確認します。無視対象の中だけにある ABB 設定は
+登録できません。欠落は補完し、内容の競合・危険なパス・空の install はエラーにします。
+install 方式には入力が必須で、bundled は別途手動ソースが必要です。
+対応する新規 GitHub 導入は完全 SHA の `method="git"` を設定し、既存の明示的方式は
+保持します。ローカルや未対応の submodule/symlink/LFS 構成は bundled を使います。
+提出前に外側のファイルだけを別のクリーンな場所へコピーして準備と設定読み込みを確認し、
+bundled には手動ソースを提供してください。その後、以下の実行検証を行います。
 
 ### `agent/` — Agent 本体のソース
 
@@ -220,3 +235,5 @@ Export JSON はスナップショットで、全トレースや独立 HTML で�
 Trace UI not built は `web/` をビルドします。Docker エラーは同じユーザーで `docker info`、SDK インポートエラーは ABB の仮想環境への SDK インストールを確認します。モデル・キーはサービス、モデル名、シェル変数優先順位を確認します。計画エラーや needs_input は保存記録と実際の情報を確認します。
 
 [CLI リファレンス](cli.ja.md) · [詳しいトラブル対処 — 英語](../Troubleshooting.md)
+
+通常は `[model]` を省略し、OpenRouter → DeepSeek → GLM の順で選択します。`provider="..."` を指定すると、そのプロバイダーを固定し、全体設定より優先します。認証情報がなければエラーになります。設定可能な ACP の外側ランチャーは実行時設定を受け取ります。制約のあるネイティブ統合では `source="native"`、理由、専用認証情報も宣言します。不要な既定値や定型コメントは生成しません。[モデル選択規則（英語）](../Model-Selection.md)を参照してください。

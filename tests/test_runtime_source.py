@@ -106,11 +106,14 @@ def test_failed_download_leaves_no_source_or_reusable_archive(unit, tmp_path, mo
 
 def test_concurrent_restoration_downloads_once(unit, tmp_path):
     root, _, fetched = unit
+    (root/'install').mkdir()
+    (root/'install/abb-langgraph.json').write_text('{}')
     with ThreadPoolExecutor(max_workers=2) as pool:
         jobs = [pool.submit(prepare, root, tmp_path) for _ in range(2)]
         for job in jobs:
             job.result()
     assert len(fetched) == 1
+    assert (root/'agent/abb-langgraph.json').read_text() == '{}'
 
 
 def test_missing_integration_config_fails_before_download(unit, tmp_path):
@@ -244,12 +247,14 @@ def test_install_mode_requires_tracked_inputs(unit, tmp_path):
     assert not fetched
 
 
-@pytest.mark.parametrize('number',range(18,30))
-def test_migrated_acp_unit_can_prepare_from_install_only(number,tmp_path):
+@pytest.mark.parametrize('unit', [path.parent for path in
+    sorted((Path(__file__).resolve().parents[1]/'resources/agents').glob('*/agent.toml'))
+    if tomllib.loads(path.read_text(encoding='utf-8')).get('source', {}).get('method') == 'install'],
+    ids=lambda unit: unit.name)
+def test_migrated_acp_unit_can_prepare_from_install_only(unit,tmp_path):
     import shutil
     from agentbench.harness.registry import _parse_agent
     base=Path(__file__).resolve().parents[1]
-    unit=next((base/'resources/agents').glob(str(number)+'-*'))
     root=tmp_path/'resources/agents'/unit.name
     shutil.copytree(unit,root,ignore=lambda directory,names: {'agent'} if Path(directory)==unit else set())
     manifest=tomllib.loads((root/'agent.toml').read_text(encoding='utf-8'))
@@ -290,3 +295,122 @@ def test_live_source_progress_replaces_running_line(capsys):
     assert f'Checking Agent files .... {ANSI_GREEN}OK' in finished
     assert finished.endswith('\n')
     printer.close()
+
+
+def test_git_source_applies_install_inputs_on_restore_reuse_and_repair(unit, tmp_path):
+    root, revision, fetched = unit
+    (root/'install').mkdir()
+    descriptor = '{"graphs":{"agent":"app:graph"}}\n'
+    (root/'install/abb-langgraph.json').write_text(descriptor)
+    prepare(root, tmp_path)
+    assert (root/'agent/app.py').read_text() == 'version = 1\n'
+    assert (root/'agent/abb-langgraph.json').read_text() == descriptor
+    prepare(root, tmp_path)
+    (root/'agent/abb-langgraph.json').unlink()
+    prepare(root, tmp_path)
+    assert (root/'agent/abb-langgraph.json').read_text() == descriptor
+    (root/'agent/app.py').unlink()
+    prepare(root, tmp_path)
+    assert (root/'agent/app.py').read_text() == 'version = 1\n'
+    assert (root/'agent/abb-langgraph.json').read_text() == descriptor
+    assert fetched == [revision]
+
+
+def test_git_source_applies_install_to_existing_unmanaged_checkout(unit, tmp_path):
+    root, _, fetched = unit
+    (root/'agent').mkdir()
+    (root/'agent/app.py').write_text('local source')
+    (root/'install').mkdir()
+    (root/'install/abb-langgraph.json').write_text('{}')
+    prepare(root, tmp_path)
+    assert (root/'agent/app.py').read_text() == 'local source'
+    assert (root/'agent/abb-langgraph.json').read_text() == '{}'
+    assert not fetched
+    (root/'agent/abb-langgraph.json').write_text('local config edit')
+    with pytest.raises(ValueError, match='modified'):
+        prepare(root, tmp_path)
+    assert (root/'agent/abb-langgraph.json').read_text() == 'local config edit'
+
+
+def test_git_install_inputs_do_not_overwrite_upstream_files(unit, tmp_path):
+    root, _, _ = unit
+    (root/'install').mkdir()
+    (root/'install/app.py').write_text('replacement')
+    with pytest.raises(ValueError, match='modified'):
+        prepare(root, tmp_path)
+    assert (root/'agent/app.py').read_text() == 'version = 1\n'
+
+
+def test_git_install_inputs_are_applied_when_added_after_source_restore(unit, tmp_path):
+    root, revision, fetched = unit
+    prepare(root, tmp_path)
+    (root/'install').mkdir()
+    (root/'install/abb-langgraph.json').write_text('{}')
+    prepare(root, tmp_path)
+    assert (root/'agent/abb-langgraph.json').read_text() == '{}'
+    assert fetched == [revision]
+
+
+@pytest.mark.parametrize('unit_name', [
+    '04-ai-hedge-fund-crypto', '05-labscript-ai', '06-multi-agent-cad',
+    '07-autoresearch-agents', '08-langchain-streamlit-template', '09-curiosity',
+    '10-readwren', '11-tablegpt-agent', '33-open-notebook',
+    '34-ai-data-science-team', '35-local-deep-research', '37-article-explainer',
+    '39-tradingagents',
+])
+def test_registered_abb_descriptor_loads_after_clean_source_preparation(unit_name, tmp_path, monkeypatch):
+    import shutil
+    from agentbench.adapter.langgraph.config import LangGraphAdapterConfig
+    from agentbench.runtime.source import preparation
+
+    source = Path(__file__).resolve().parents[1]/'resources/agents'/unit_name
+    root = tmp_path/'unit'
+    shutil.copytree(source, root, ignore=lambda directory, names: {'agent'} if Path(directory)==source else set())
+    archive = tmp_path/'upstream.zip'
+    with zipfile.ZipFile(archive, 'w') as file:
+        # Upstream has no ABB descriptor; preparation must add the tracked input.
+        file.writestr('README.md', 'upstream snapshot')
+    monkeypatch.setattr(preparation, 'source_archive', lambda *args: archive)
+    prepare(root, tmp_path)
+    config = LangGraphAdapterConfig.from_agent_dir(root)
+    expected_graph = 'article_explainer' if unit_name == '37-article-explainer' else 'agent'
+    assert config.graph_id == expected_graph
+    assert config.binding
+    assert (root/'agent/abb-langgraph.json').read_bytes() == (root/'install/abb-langgraph.json').read_bytes()
+
+
+@pytest.mark.parametrize('method', ['bundled', None])
+def test_local_source_applies_install_and_preserves_manual_files(unit, tmp_path, method):
+    root, _, fetched = unit
+    manifest = root/'agent.toml'
+    manifest.write_text(manifest.read_text().replace('method = "git"',
+                        'method = "bundled"' if method else ''))
+    (root/'install').mkdir()
+    (root/'install/abb-langgraph.json').write_text('{}')
+    # An overlay does not substitute for manually supplied source.
+    with pytest.raises(FileNotFoundError, match='Bundled'):
+        prepare(root, tmp_path)
+    (root/'agent').mkdir()
+    (root/'agent/app.py').write_text('manual source')
+    prepare(root, tmp_path)
+    (root/'agent/abb-langgraph.json').unlink()
+    prepare(root, tmp_path)
+    assert (root/'agent/abb-langgraph.json').read_text() == '{}'
+    (root/'agent/abb-langgraph.json').write_text('local change')
+    with pytest.raises(ValueError, match='modified'):
+        prepare(root, tmp_path)
+    assert (root/'agent/abb-langgraph.json').read_text() == 'local change'
+    assert (root/'agent/app.py').read_text() == 'manual source'
+    assert not fetched
+
+
+@pytest.mark.parametrize('method', ['git', 'install', 'bundled'])
+def test_every_method_rejects_empty_install(unit, tmp_path, method):
+    root, _, _ = unit
+    manifest = root/'agent.toml'
+    manifest.write_text(manifest.read_text().replace('method = "git"', f'method = "{method}"'))
+    (root/'agent').mkdir()
+    (root/'agent/app.py').write_text('local')
+    (root/'install').mkdir()
+    with pytest.raises(ValueError, match='empty'):
+        prepare(root, tmp_path)

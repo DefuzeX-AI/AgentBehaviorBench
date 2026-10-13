@@ -5,7 +5,7 @@ import os
 from acp import PROTOCOL_VERSION, connect_to_agent, text_block
 from acp.schema import ClientCapabilities, FileSystemCapabilities, Implementation
 from .client import ACPClient, plain
-from .errors import ACPError
+from .errors import ACPError, AgentAborted
 from .process import child_environment, terminate_group
 
 
@@ -88,7 +88,8 @@ class ACPSession:
             self.emit('prompt_completed', plain(response))
             stop = response.stop_reason
             if stop == 'cancelled':
-                raise asyncio.CancelledError('ACP Agent cancelled the prompt')
+                raise AgentAborted(raw_output={'partial_text': ''.join(self.client.parts),
+                                                 'stop_reason': stop, 'prompt_response': plain(response)})
             if stop not in ('end_turn', 'refusal'):
                 raise ACPError(f'ACP stopped before completion: {stop}', code=stop)
             return ''.join(self.client.parts), {**self.info, 'session_id': self.client.session_id,

@@ -1,4 +1,4 @@
-"""Map an OpenAI-compatible GLM profile onto Kimi Code CLI's native ACP server."""
+"""Map the selected OpenAI-compatible model profile onto Kimi Code CLI's native ACP server."""
 from __future__ import annotations
 
 import json
@@ -12,12 +12,12 @@ import threading
 from urllib.parse import urlsplit
 
 
-KEY_ENV = "GLM_API_KEY"
+KEY_ENV = "ABB_AGENT_MODEL_API_KEY"
 # Target of certifi's cacert.pem link in the image (see Dockerfile).
 CERTIFI_BUNDLE = Path("/tmp/abb-kimi-certifi.pem")
 CERTIFI_ORIGINAL = "cacert.orig.pem"
-BASE_URL_ENV = "GLM_API_BASE_URL"
-MODEL_ENV = "GLM_MODEL"
+BASE_URL_ENV = "ABB_AGENT_MODEL_BASE_URL"
+MODEL_ENV = "ABB_AGENT_MODEL"
 KIMI = "/opt/kimi/bin/kimi"
 
 # Kimi's ACP `session/new` refuses to start unless a Kimi Code OAuth token file
@@ -40,25 +40,24 @@ def _toml_str(value: str) -> str:
 
 
 def render_config(base_url: str, model: str) -> str:
-    """Return Kimi's config.toml selecting the GLM model by default."""
+    """Return Kimi's config.toml selecting the configured model by default."""
     return "\n".join(
         [
-            'default_model = "glm"',
-            # GLM thinking output is not needed for the evaluated behaviour and
-            # slows every step; keep the upstream default (off) explicit.
+            'default_model = "abb"',
+            # Preserve the upstream default with thinking disabled.
             "default_thinking = false",
             # Telemetry is sent to telemetry-logs.kimi.com, outside the model route.
             "telemetry = false",
             "",
-            "[providers.zhipu]",
+            "[providers.abb]",
             'type = "openai_legacy"',
             f"base_url = {_toml_str(base_url)}",
             # The key comes from OPENAI_API_KEY in the environment, which Kimi's
             # openai_legacy provider prefers over this field; it is never written here.
             'api_key = ""',
             "",
-            "[models.glm]",
-            'provider = "zhipu"',
+            "[models.abb]",
+            'provider = "abb"',
             f"model = {_toml_str(model)}",
             "max_context_size = 200000",
             "",

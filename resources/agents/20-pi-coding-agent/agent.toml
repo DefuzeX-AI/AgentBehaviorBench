@@ -1,7 +1,7 @@
 # Hand-written from the pinned Pi coding agent's RPC mode, the pi-acp ACP adapter, and Pi's custom-provider (models.json) contract.
 schema_version = "defuzex-bench.agent.v2"
 agent_id = "pi-coding-agent"
-display_name = "Pi coding agent (pi-acp, GLM provider)"
+display_name = "Pi coding agent (pi-acp, shared model provider)"
 framework = "acp"
 
 [evaluation]
@@ -26,8 +26,8 @@ downloaded_on = "2026-09-21"
 type = "docker"
 execution = "oneshot"
 timeout_sec = 900
-env_keys = ["GLM_API_BASE_URL", "GLM_MODEL"]
-secret_env_keys = ["GLM_API_KEY"]
+env_keys = []
+secret_env_keys = []
 
 [build]
 context = "."
@@ -50,15 +50,4 @@ trust_plugin = "pem-env"
 network_config = "network/rules.toml"
 tool_routes = []
 
-[[llm_interception.credentials]]
-id = "glm-api-key"
-agent_env = "GLM_API_KEY"
-auth_plugin = "bearer-token"
-
-[[llm_interception.routes]]
-id = "glm-openai-chat"
-host_patterns = ["open.bigmodel.cn"]
-ports = [443]
-methods = ["POST"]
-path_patterns = ["/api/coding/paas/v4/chat/completions"]
-protocol_plugin = "openai-chat"
+# Model credentials and exact routes use the shared runtime default.

@@ -10,5 +10,6 @@ def build_context(unit):
         if path.is_dir() or safe_file(unit, path.name) is not None:
             entries.append(path.name + ("/" if path.is_dir() else ""))
     return {"context_root": ".", "source_root": "agent/", "evidence_path_base": "agent/",
+            "installation_inputs": "install/ -> agent/ (all source methods; missing files only, conflicts fail)",
             "outer_entries": entries, "injected_at_build": [".abb-runtime/"],
             "contract": "Docker COPY sources are relative to context_root. All context.files paths refer to files beneath source_root; use their build_context_path for COPY. WORKDIR does not change this base."}

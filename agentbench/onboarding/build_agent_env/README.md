@@ -183,3 +183,22 @@ The generic worker overlay installs registered adapter requirements into the
 worker's interpreter. SDK plugin dependencies remain owned by their SDK overlay.
 Source snapshots materialize contained regular-file symlinks; external, broken,
 cyclic and directory links are rejected. The imported source is not modified.
+
+## Durable source and installation inputs
+
+Before source evidence is collected, apply any existing outer `install/` inputs
+using the runtime's conflict-preserving, per-unit locked copier. Combined validation
+repeats this check and validates the source acquisition declaration before registry
+writes. This applies to Git, bundled/manual and install-only units. Install-only
+units require nonempty inputs; optional inputs must also be safe and nonempty.
+
+ABB-owned graph descriptors use `abb-*.json`: a descriptor present only inside
+ignored `agent/` is rejected. Save it under `install/` at the same relative path.
+Do not invent a descriptor during generation; use an existing upstream descriptor
+or a source-backed outer binding without config/graph_id. Bindings remain outer
+`bindings/*.py`. Differing installation copies stop generation before model calls.
+
+Manifest provenance sets method=git for supported full-SHA GitHub imports, bundled
+for local/manual prerequisites (including submodules, symlinks and LFS declarations),
+and preserves existing explicit methods. The source and generated files are never
+silently rewritten to change an existing unit's acquisition policy.

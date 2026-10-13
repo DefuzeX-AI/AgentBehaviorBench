@@ -31,6 +31,8 @@ def validate_manifest(content, session):
         raise BuildError("Generated agent_id differs from the requested unit")
     if manifest.get("schema_version") != "defuzex-bench.agent.v2":
         raise BuildError("Expected a v2 Agent manifest")
+    from agentbench.runtime.source.config import source_spec
+    source_spec(manifest)
     read_config = config_reader(manifest.get("framework"))
     adapter = manifest.get("adapter")
     if not isinstance(adapter, dict):
@@ -53,7 +55,7 @@ def validate_manifest(content, session):
         selected.stage_validation(root, config_name, config_path)
         (root / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
         parsed = read_config(root)
-        AgentContainerConfig.from_agent_dir(root, secret_resolver=_PlaceholderSecrets(), environ={})
+        AgentContainerConfig.from_agent_dir(root, secret_resolver=_PlaceholderSecrets(), environ={}, resolve_model=False)
         execution_strategy(root)
         interception = InterceptionConfig.from_agent_dir(root)
     selected.validate_selection(parsed, session)

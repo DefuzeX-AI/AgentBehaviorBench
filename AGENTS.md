@@ -49,7 +49,20 @@ configuration; Docker construction and execution belong to certification/runtime
   for local imports or repositories requiring unsupported source features.
 - Package-based units use `[source] method = "install"` and commit installation
   inputs under `install/`. Preflight generates ignored `agent/` copies before SDK
-  startup. Do not commit those copies or mix them with upstream source trees.
+  startup. Do not commit those copies or switch Git units to install-only mode.
+  All source methods (`git`, `bundled`, omitted method, and `install`) apply outer
+  `install/` inputs before execution; bundled source must still be supplied manually.
+  Put ABB-added files that must live inside agent/ in outer `install/` at the same
+  relative path, including `install/abb-langgraph.json`. Reserve `abb-*.json` for
+  ABB-owned descriptors. Do not keep their only copy in ignored source. Keep native
+  upstream descriptors upstream and outer bindings in `bindings/`.
+  Add-agent prepares these inputs before generation and checks them again before
+  registration; missing required install inputs, unsafe paths and differing local
+  copies block the operation. It never overwrites upstream or local edits.
+  New supported GitHub imports use pinned `method="git"`; local sources and
+  unsupported submodule/symlink/LFS layouts use `bundled` with manual prerequisites.
+  Preserve an existing explicit source method. Verify a clean source preparation
+  plus configuration load before claiming an integration is reproducible.
 - Generate `agent.toml` programmatically from validated source facts and options.
   Other model-generated files are requested individually, validated and saved
   before advancing. `.dockerignore` comes from a local template.
@@ -97,6 +110,15 @@ for stage ordering, checkpoints and extension points.
 - Preserve full response schemas for local validation. Project a separate
   provider-compatible schema for requests. Model replies still pass the full
   local contract and bounded repair loop before any generated file is installed.
+- Select models by declared capability, not framework/vendor name. Provider-constrained
+  deployments declare `[model] provider="..."`, retain `source="native"`, a reason
+  and dedicated credentials. Ordinary Agents omit [model]: OpenRouter -> DeepSeek
+  -> GLM is the default. An explicit model.provider pins that provider and wins over
+  run-level selection; missing credentials fail without fallback. Configurable ACP
+  launchers consume runtime-owned ABB_AGENT_MODEL_* settings. Do not hardcode a service, weaken its tools, add static provider routes,
+  or copy provider secrets into shared launchers. Record the effective selection in
+  provenance; preserve actual protocol and model-catalog constraints. See
+  [model selection](docs/Model-Selection.md).
 - Keep protocol recognition in registered interceptor adapters. Explicit routes,
   authentication and tool egress rules remain separate concerns. Do not bypass
   interception, credential checks or evidence collection to make one Agent pass.

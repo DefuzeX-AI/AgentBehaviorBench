@@ -2,6 +2,7 @@
 import io
 import json
 from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -16,6 +17,28 @@ QUERY = [{"query": "CFTR evidence", "report_section": "Evidence", "rationale": "
 
 
 class BiomedicalReasoningTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        unit = Path(directory.name)
+        source = unit / 'agent/aira/src/aiq_aira/prompts.py'
+        source.parent.mkdir(parents=True)
+        source.write_text(
+            'import unavailable_agent_dependency\n'
+            'query_writer_instructions = "Generate {number_of_queries} search queries for {topic}. {report_organization}"\n',
+            encoding='utf-8')
+        patcher = patch('scripts.check_biomedical_reasoning.UNIT', unit)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def test_pinned_native_prompt_contract(self):
+        from tests.registered_agents import unit, require_source
+        require_source('biomedical-aiq-research-agent', 'aira/src/aiq_aira/prompts.py')
+        with patch('scripts.check_biomedical_reasoning.UNIT', unit('biomedical-aiq-research-agent')):
+            prompt = native_prompt()
+        self.assertIn('Generate 1 search queries', prompt)
+        self.assertIn('CFTR cystic fibrosis treatment', prompt)
+
     def test_catalog_listing_is_get_only_and_filters_non_generation_models(self):
         response = io.BytesIO(json.dumps({"data": [
             {"id": "nvidia/nemotron-3-super-120b-a12b"},

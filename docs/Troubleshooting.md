@@ -173,3 +173,46 @@ Stop runs/viewers before confirming. Agent source, `.env`, registry, images and
 custom output paths are untouched. To restore, stop runs and move archived files
 back without overwriting newer results. This is history archiving, not a universal
 cache reset.
+
+
+## Generation, native aborts and dependency waits
+
+Case generation makes at most five total attempts per rejected candidate slot.
+Successfully saved Cases keep their original indices. Each attempt is recorded in
+`case-collection.json`; after the fifth failure the remaining slots for that Agent
+are left unattempted and its generation container is closed. Other Agents continue.
+Invalid credentials and ambiguous remote acceptance do not trigger five blind
+requests: inspect the saved SDK request identity before attempting recovery.
+
+An ACP peer returning `stopReason=cancelled` is an Agent abort, distinct from a
+host cancellation request. ACP closes failed sessions, so ABB stops delivering
+later Inputs to them. The original Case remains intact; `termination.json` and
+`manifest.json` name the committed prefix and unexecuted tail. Judge receives the
+original committed evidence. A missing tool completion at the prompt boundary is
+recorded as `not_observed`, never as a successful tool result. Receiving a Judge
+report does not turn a native failure into a passing execution.
+
+Recognized native dependency errors pause subsequent Case dispatch for the affected
+Agent. The coordinator releases execution slots, tries other Agents, and returns
+the waiting Agent to the ready queue after `Retry-After` or bounded backoff. If the
+exception names a dependency host, other unfinished Agents declaring that host
+share the cooldown; this is conservative host grouping, not per-credential rate
+limiting. Cooldown timestamps and budgets survive Suite resume. Existing in-flight
+Cases finish normally. A generic step-budget timeout alone does not prove an
+upstream outage.
+
+Quota exhaustion or invalid credentials block dependent pending work until an
+explicit recovery after configuration is repaired. Automatic cooldown is bounded
+by the Suite retry policy; waits over one hour require explicit recovery. Completed
+reports are retained. Failed Cases are replayed only when their existing recovery
+contract explicitly permits isolated replay. This mechanism schedules whole Cases;
+it does not checkpoint arbitrary Agent memory or resume a failed turn in place.
+LangGraph's current Case retains its existing continue-on-failure policy.
+
+Docker address-pool exhaustion before container startup is separately classified.
+Generation preparation waits and retries up to five total attempts; execution
+startup uses the normal bounded Case retry budget because no Agent has run yet.
+Only this attempt's owned resources are cleaned up. ABB does not prune unrelated
+networks or change Docker's global address pools. Build downloads, unknown Docker
+client interruptions and missing API keys require their actual cause to be fixed.
+The container memory policy is unchanged.
