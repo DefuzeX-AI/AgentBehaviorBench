@@ -42,7 +42,7 @@ class KumaContainerRunner:
 
     def __init__(self, *, environ=None, options=None, trace_sink=None, trace_max_bytes=262144,
                  control=None, build_coordinator=None, job_context=None,
-                 runtime_services=None):
+                 runtime_services=None, artifacts=None):
         self.environ = dict(os.environ if environ is None else environ)
         options = dict(options or {})
         unknown = set(options) - {'output', 'timeout', 'max_steps', 'case_collection', 'sdk_request_options'}
@@ -67,6 +67,7 @@ class KumaContainerRunner:
         self.build_coordinator = build_coordinator
         self.job_context = dict(job_context or {})
         self.runtime_services = runtime_services
+        self.artifacts = artifacts
 
     def dependency_hosts(self, registration):
         """Conservative host grouping, without exposing or hashing credentials."""
@@ -94,6 +95,7 @@ class KumaContainerRunner:
     def _runtime_options(self, identity):
         return dict(control=self.control, build_coordinator=self.build_coordinator,
                     runtime_services=self.runtime_services, identity=identity,
+                    **({"artifact_store": self.artifacts} if self.artifacts is not None else {}),
                     sdk_request_options=self.sdk_request_options)
 
     def _artifacts_ready(self, registration, on_progress, path, identity, detail):

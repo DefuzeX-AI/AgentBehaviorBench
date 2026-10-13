@@ -6,6 +6,7 @@ import unicodedata
 
 from agentbench.sdk.common.artifacts import Artifacts
 from agentbench.observe.store import redact
+from .error_artifacts import error_snapshot
 
 
 def artifact_path(directory, relative):
@@ -126,9 +127,7 @@ def collect_artifacts(directory, host, *, environ=None):
     if unreadable:
         result['unreadable_artifacts'] = [_text(reason) for reason in unreadable]
     if error:
-        result['sdk_error'] = {key: (value if isinstance(value, bool) else _text(value))
-                               for key in ('type', 'message', 'code', 'retryable', 'request_id', 'client_request_id')
-                               if (value := error.get(key)) is not None}
+        result['sdk_error'] = error_snapshot(error, environ=environ)
     steps = summary.get('steps')
     for step in steps if isinstance(steps, list) else ():
         if not isinstance(step, dict) or not isinstance(step.get('directory'), str):
@@ -214,7 +213,14 @@ def failure_message(artifacts):
     error = artifacts.get('sdk_error', {})
     parts = [f'unreadable artifact {reason}' for reason in artifacts.get('unreadable_artifacts', ())]
     if error:
-        parts.append(f"{error.get('type', 'SDK error')} [{error.get('code', 'unknown')}]: {error.get('message', '')}")
+        location = ' '.join(filter(None, (_text(error.get('phase'), 80), _text(error.get('input_id'), 80))))
+        parts.append(f"{_text(error.get('type', 'SDK error'), 80)} [{_text(error.get('code', 'unknown'), 80)}]"
+                     f"{(' ' + location) if location else ''}: {_text(error.get('message', '')) or ''}")
+        details = error.get('details')
+        if isinstance(details, dict) and details:
+            parts.append('details=' + _text(json.dumps(details, ensure_ascii=False), 300))
+        if error.get('abb_diagnostic_omissions'):
+            parts.append('SDK diagnostics truncated or omitted; inspect saved error metadata')
         if error.get('code') in ('network_error', 'network_timeout') and artifacts.get('sdk_base_url'):
             # A client-side resolution or connect failure never reaches the interceptor,
             # so no related network event names the Backend; the SDK's own record does.

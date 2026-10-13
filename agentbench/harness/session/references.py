@@ -31,20 +31,21 @@ def _cache(project_root, *, create=False):
 
 
 @contextmanager
-def history_guard(project_root):
+def history_guard(project_root, *, timeout=30.0):
     """Serialize fresh Suite publication against history moves, across processes.
 
     Hold this only while creating/indexing a Suite or checking/moving cleanup
     targets. A running Suite's protected references need no long-lived lock.
+    Concurrent publishers wait up to timeout seconds for this short section.
     """
     directory = _cache(project_root, create=True) / 'history-guard'
     if directory.is_symlink() or (directory / '.writer.lock').is_symlink():
         raise ValueError('History coordination lock must not be a symlink')
     lock = SuiteLock(directory)
     try:
-        lock.acquire()
+        lock.acquire(timeout=timeout)
     except SuiteLockedError as exc:
-        raise RuntimeError('History cleanup or Suite creation is already in progress; try again') from exc
+        raise RuntimeError(f'Timed out after {timeout:g}s waiting for history coordination lock: {lock.path}') from exc
     try:
         yield
     finally:

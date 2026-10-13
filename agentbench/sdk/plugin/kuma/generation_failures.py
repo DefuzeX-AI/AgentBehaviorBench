@@ -1,5 +1,7 @@
 """Stable generation diagnostics; never infer retry permission from a message."""
 
+from .error_artifacts import exception_record
+
 # Codes from the pinned SDK's public error mapping. A credential/service-wide
 # block pauses remaining slots; an ordinary Case rejection affects its own slot.
 SHARED_GENERATION_BLOCKS = frozenset({
@@ -11,12 +13,8 @@ SHARED_GENERATION_BLOCKS = frozenset({
 
 def failure_record(error, case_index, *, repo=None):
     """Return only public diagnostic fields, redacted by the artifact writer."""
-    result = {
-        'case_index': case_index, 'phase': 'case_generation',
-        'error_type': type(error).__name__, 'error_message': str(error),
-        **{key: getattr(error, key, None) for key in (
-            'code', 'retryable', 'client_request_id', 'request_id')},
-    }
+    result = exception_record(error, phase='case_generation')
+    result.update(case_index=case_index, error_type=result.pop('type'), error_message=result.pop('message'))
     client_id = result.get('client_request_id')
     if client_id and repo is not None:
         from .request_recovery import inspect_requests

@@ -9,6 +9,7 @@ from agentbench.observe.timing import timing_session, span
 from agentbench.sdk.common.artifacts import Artifacts
 from agentbench.sdk.common.case_identity import case_content_sha256
 from agentbench.sdk.judgment import DeferredJudgment
+from .error_artifacts import exception_record
 from .diagnostics import artifact_path, read_diagnostic, collect_artifacts
 from .configuration import api_key, request_options
 
@@ -235,8 +236,7 @@ def _judge_task(runner, registration, case, ticket, *, on_progress=None):
             current = read_diagnostic(directory, 'evaluation/manifest.json') or summary
             if current.get('judge') != 'received':
                 files.save('evaluation/manifest.json', {**current, 'phase': 'judge', 'judge': 'failed',
-                    'request': request, 'error': {'type': type(exc).__name__, 'message': str(exc),
-                    'code': getattr(exc, 'code', None), 'retryable': getattr(exc, 'retryable', None)}})
+                    'request': request, 'error': exception_record(exc, phase='judge')})
             from agentbench.runtime.contracts.execution import RunCancelled
             resumable_request = (request.get('status') in {'prepared', 'queued', 'running', 'succeeded'}
                 if request is not None else isinstance(exc, (RunCancelled, KeyboardInterrupt))

@@ -3,6 +3,7 @@ from agentbench.observe.timing import span
 from contextlib import contextmanager
 from pathlib import Path
 import re
+import json
 import shutil
 import tempfile
 from types import SimpleNamespace
@@ -75,22 +76,16 @@ def evaluation_agent(agent, *, control=None, deadline=None, backend=DEFAULT_BASE
             materialize_file_links(root, check)
             if any(p.is_symlink() for p in root.rglob('*')):
                 raise ValueError('Agent source must not contain symlinks')
-            # SDK atomically updates .gitignore unless this rule already exists.
-            # Prepare it in the build copy so the runtime source remains read-only.
-            ignore_file = root / 'agent/.gitignore'
-            if ignore_file.is_symlink():
-                raise ValueError('Agent ignore file cannot be a symlink')
-            existing = ignore_file.read_text(encoding='utf-8') if ignore_file.exists() else ''
-            if not {'.kuma/', '/.kuma/'}.intersection(line.strip() for line in existing.splitlines()):
-                ignore_file.write_text(existing + '\n/.kuma/\n', encoding='utf-8')
             staged_sdk = root / '.abb-sdk'
             staged_sdk.mkdir()
             shutil.copy2(requirements, staged_sdk / 'requirements.txt')
             if any(p.is_symlink() for p in root.rglob('*')):
                 raise ValueError('Evaluation build must not contain symlinks')
             source = (root / 'agent.toml').read_text(encoding='utf-8')
+            controller = ("import runpy,sys; sys.path.insert(0, '/opt/abb-sdk-runtime'); "
+                          + f"runpy.run_module({worker_package + '.worker'!r}, run_name='__main__')")
             source, count = re.subn(r'(?m)^argv = .*$',
-                                   f'argv = ["python", "-m", "{worker_package}.worker"]', source)
+                                   lambda _: 'argv = ' + json.dumps(['python', '-I', '-c', controller]), source)
             if count != 1:
                 raise ValueError('Expected one explicit launch.argv')
             if sdk_environment:
@@ -112,7 +107,7 @@ def evaluation_agent(agent, *, control=None, deadline=None, backend=DEFAULT_BASE
             profile_copy = ('COPY requirement.md /opt/agent/requirement.md\n'
                             if require_profile or (root / 'requirement.md').is_file() else '')
             dockerfile.write_text(original + '\nENV KUMA_DISABLE_UPDATE_CHECK=1\nUSER root\nCOPY .abb-sdk/ /opt/abb-sdk/\n'
-                                 + SDK_INSTALL + profile_copy
+                                 + SDK_INSTALL + 'COPY .abb-runtime/ /opt/abb-sdk-runtime/\n' + profile_copy
                                  + evaluation_copy + 'USER ' + users[-1] + '\n', encoding='utf-8')
             check()
         yield SimpleNamespace(path=root, agent_id=agent.agent_id, framework=agent.framework)

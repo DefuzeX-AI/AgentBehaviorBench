@@ -3,7 +3,7 @@
 The SDK has no batch entry point: a Case is created by ``create_run`` and becomes
 reusable only through ``Run.save_case`` / ``create_run(case_path=...)``. Preparation
 therefore creates one Run per requested Case, saves that Case as a
-``kuma.case_artifact.v1`` file inside the Run repository, and cancels the Run without
+``kuma.case_artifact.v1`` file in private SDK storage, and cancels the Run without
 executing the Agent. Execution later reuses those files.
 """
 import json
@@ -33,7 +33,7 @@ def selected_indices(count, case_indices=None):
 
 def generate_collection(create_run, *, count, options, files, repo,
                         case_indices=None, allow_partial=False, case_options=None, workspace=None,
-                        max_attempts=1, retry_wait=time.sleep):
+                        max_attempts=1, retry_wait=time.sleep, case_publications=None):
     """Save each requested slot once, preserving successes across later failures.
 
     ``count`` is the total registered count, while ``case_indices`` selects the
@@ -62,11 +62,18 @@ def generate_collection(create_run, *, count, options, files, repo,
             files.save('case-collection.json', collection)
             try:
                 slot_options = options if case_options is None else {**options, **case_options(index)}
+                publication = (case_publications or {}).get(str(index))
                 with span('Generate Case', kind='generation', case_index=index):
-                    entry = _generate_case(create_run, slot_options, files, index)
+                    from .integration import published_case
+                    entry = published_case(publication, index, workspace, files) if publication else None
+                    if entry is None:
+                        entry = _generate_case(create_run, slot_options, files, index)
                 if workspace is not None:
                     entry['workspace'] = workspace
                 validate_entries([*collection['cases'], entry], count=count)
+                if publication:
+                    from .integration import publish_case
+                    publish_case(publication, entry, workspace, files)
                 collection['cases'].append(entry)
             except Exception as exc:
                 failure = {**failure_record(exc, index, repo=repo), 'attempt_number': attempt}

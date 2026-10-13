@@ -1,4 +1,4 @@
-"""Official KUMA and the existing Agent worker, in one container process."""
+"""Trusted KUMA controller; production Agents execute in a separate container."""
 import argparse
 from agentbench.observe.timing import span, timing_session
 import asyncio
@@ -14,6 +14,7 @@ from importlib.metadata import version
 from agentbench.sdk.common.artifacts import Artifacts
 from agentbench.sdk.common.output_permissions import share_output
 from .runner import drive_run
+from .error_artifacts import exception_record
 from .configuration import SDK_REPOSITORY, request_options, api_key
 from .compatibility import run_case
 from agentbench.runtime.agentcontainer.session import AgentSession
@@ -31,11 +32,13 @@ async def execute(root, output, settings=None, sdk_repo=None, *, providers=None)
         # Includes the final timing record and partial/error artifacts. Both
         # local and official KUMA reuse this worker with the image's native UID.
         share_output(output)
+        if settings and settings.get("private_storage"):
+            share_output(settings["private_storage"])
 
 
 async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None):
-    # sdk_repo is the SDK repository/ledger root, mounted apart from the Agent tree
-    # so the image's own /opt/agent/agent stays visible; in place when omitted.
+    # sdk_repo identifies the tracked source tree. Private storage is supplied
+    # independently in settings by the host.
     # providers, when given, replaces the official Case and Judge with local SDK
     # providers: it supplies name, max_steps, case_options(index) and
     # judge_provider(output). The Backend is then never called, so no credential.
@@ -77,8 +80,12 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
         run = None
         exporter = None
         replay = None
-        agent_session = AgentSession()
         settings = dict(settings or {})
+        if settings.get('isolated_agent'):
+            from agentbench.sdk.integration.channel import DirectoryAgentSession
+            agent_session = DirectoryAgentSession(timeout=settings.get('agent_timeout', 2400))
+        else:
+            agent_session = AgentSession()
     try:
         # Pass each current input directly to the adapter. The Agent owns history
         # and memory, so no per-Agent input contract is required.
@@ -108,6 +115,9 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
 
                        api_key=credential, trace_evidence=capture,
                        **request_options(settings.get('sdk_request_options')))
+        if settings.get('private_storage'):
+            from .integration import storage_options
+            options.update(storage_options(create_run, settings['private_storage']))
         if settings.get('max_steps') is not None:
             options['max_steps'] = settings['max_steps']
 
@@ -129,6 +139,7 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
                     create_run, count=settings['count'], files=files, repo=repository,
                     workspace=settings.get('workspace'), max_attempts=5,
                     case_indices=settings.get('case_indices'), allow_partial=settings.get('allow_partial', False),
+                    case_publications=settings.get('case_publications'),
                     **generation)
             complete = not collection['failures'] and not collection['unattempted_indices']
             files.save('manifest.json', {'phase': 'batch_generated' if complete else 'batch_partial',
@@ -141,7 +152,7 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
         # Execution mode requires a previously saved Case artifact.
         if settings.get('case_artifact') is None:
             raise ValueError('Evaluation requires a prepared Case artifact; generation belongs to batch preparation')
-        # The SDK reuses a Case only from a saved artifact file inside the Run repository,
+        # The SDK reuses a Case from the selected private storage root,
         # and rejects a Profile or strategy alongside it: the Case is already decided.
         # Create the SDK Run from the saved Case without generating another one.
         # A saved Case accepts a Judge provider; only a Case provider conflicts with it.
@@ -203,7 +214,11 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
             if replay is not None:
                 replay.checkpoint('input_start', observed_input.get('input_id'))
             try:
-                await invoke_agent(root, request, folder, provider=shared_provider, session=agent_session)
+                if settings.get('isolated_agent'):
+                    from .integration import KumaEvidenceSink
+                    await agent_session.invoke(json.loads(request.read_text()), folder, KumaEvidenceSink(capture))
+                else:
+                    await invoke_agent(root, request, folder, provider=shared_provider, session=agent_session)
             finally:
                 if replay is not None:
                     replay.checkpoint('input_end', observed_input.get('input_id'))
@@ -211,7 +226,8 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
             return json.loads((folder / 'result.json').read_text())
         # Drive the Case by receiving inputs, invoking the Agent, submitting
         # outputs, and collecting the Judge report.
-        summary = await drive_run(run, invoke, output, provider=provider, repo_path=repository,
+        summary = await drive_run(run, invoke, output, provider=provider,
+                                  repo_path=Path(settings.get('private_storage') or repository),
                                   file_evidence_required=workspace.track_files, defer_judge=deferred)
         if deferred and summary['judge'] == 'queued':
             from .judge_bundle import export_context
@@ -227,10 +243,7 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
                      and summary['files'] in ('disabled', 'complete', 'partial')) else 1
     except Exception as exc:
         # Persist error details and return exit code 1 to the host.
-        files.save('error.json', {'phase': 'case_generation' if run is None else 'evaluation',
-                   'type': type(exc).__name__, 'message': str(exc), 'code': getattr(exc, 'code', None),
-                   'retryable': getattr(exc, 'retryable', None), 'client_request_id': getattr(exc, 'client_request_id', None),
-                   'request_id': getattr(exc, 'request_id', None)})
+        files.save('error.json', exception_record(exc, phase='case_generation' if run is None else 'evaluation'))
         return 1
     finally:
         # Always close the Agent session and save its final state.
@@ -300,14 +313,15 @@ def main(providers=None):
     # Read generation or execution settings from the host-mounted evaluation.json.
     try:
         settings = read_settings(args.settings)
+        if settings.get('mode') != 'generate' and not settings.get('isolated_agent'):
+            raise EvaluationSettingsError('Execution requires the isolated Agent channel')
         from agentbench.runtime.contracts.environment import ENVIRONMENT_FILE
         environment_path = args.settings.parent / ENVIRONMENT_FILE
         if environment_path.exists():
             settings['execution_environment'] = read_settings(environment_path)
     except EvaluationSettingsError as exc:
         # The host reads error.json; stderr alone only reaches diagnostics.json.
-        Artifacts(args.output).save('error.json', {
-            'phase': 'startup', 'type': type(exc).__name__, 'message': str(exc)})
+        Artifacts(args.output).save('error.json', exception_record(exc, phase='startup'))
         share_output(args.output)
         print(exc, file=sys.stderr, flush=True)
         return 1
@@ -321,8 +335,7 @@ def main(providers=None):
         # the interpreter the evaluation overlay installed into, so name it.
         traceback.print_exc()
         message = f'{exc} (interpreter {sys.executable})'
-        Artifacts(args.output).save('error.json', {
-            'phase': 'startup', 'type': type(exc).__name__, 'message': message})
+        Artifacts(args.output).save('error.json', {**exception_record(exc, phase='startup'), 'message': message})
         share_output(args.output)
         print(message, file=sys.stderr, flush=True)
         return 1

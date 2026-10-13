@@ -6,6 +6,7 @@ from agentbench.observe.timing import span, timed
 from agentbench.sdk.common.artifacts import Artifacts, plain
 from agentbench.observe.store import TraceStore
 from agentbench.observe.result import sanitize_result
+from .error_artifacts import exception_record
 
 
 @timed('Case dialogue', kind='case')
@@ -33,13 +34,16 @@ async def drive_run(run, invoke, directory, *, provider, repo_path=None, file_ev
     summary = {'run_id': run.run_id, 'case_id': run.case_id, 'phase': 'input',
                'execution': 'pending', 'otel': 'pending', 'submission': 'pending',
                'judge': 'pending', 'evidence': 'pending', 'files': 'pending' if file_evidence_required else 'disabled', 'steps': []}
+    active_input_id = None
     try:
         while True:
+            active_input_id = None
             summary['phase'] = 'input'
             with span('Get next input', kind='sdk'):
                 item = run.get_input(full=True)
             if item is None:
                 break
+            active_input_id = item.input_id
             number = len(summary['steps']) + 1
             relative = f'inputs/{number:04d}'
             files.save(f'{relative}/input.json', item)
@@ -143,6 +147,7 @@ async def drive_run(run, invoke, directory, *, provider, repo_path=None, file_ev
                                       'status': result['status'], 'reason': 'session_unusable'}
             summary['unexecuted_inputs'] = [item['input_id'] for item in inputs[len(summary['steps']):]]
             files.save('termination.json', summary['termination'])
+        active_input_id = None
         summary['phase'] = 'judge'
         if not defer_judge and run.report is None and run.state == 'completed':
             run.judge()
@@ -157,11 +162,7 @@ async def drive_run(run, invoke, directory, *, provider, repo_path=None, file_ev
         else:
             summary['judge'] = 'missing'
     except Exception as exc:
-        summary['error'] = {'type': type(exc).__name__, 'message': str(exc),
-                            'code': getattr(exc, 'code', None),
-                            'retryable': getattr(exc, 'retryable', None),
-                            'client_request_id': getattr(exc, 'client_request_id', None),
-                            'request_id': getattr(exc, 'request_id', None)}
+        summary['error'] = exception_record(exc, phase=summary['phase'], input_id=active_input_id)
         if summary['phase'] == 'judge':
             summary['judge'] = 'failed'
             request_id = getattr(exc, 'client_request_id', None)

@@ -20,7 +20,8 @@ def test_policy_mounts_actual_workspace_and_preserves_ledger(tmp_path):
     args = EvaluationPolicy(tmp_path / 'sdk-repo/.kuma', repository=root,
                             target=policy.path, writable=True).run_arguments()
     assert f'type=bind,source={root},target=/home/agent/workspace' in args
-    assert f'type=bind,source={tmp_path / "sdk-repo" / ".kuma"},target=/home/agent/workspace/.kuma' in args
+    assert f'type=bind,source={tmp_path / "sdk-repo"},target=/run/abb-sdk-storage' in args
+    assert list(root.iterdir()) == []
     assert contract == prepare_workspace(tmp_path, tmp_path / 'another', policy)
     assert workspace_policy({}).track_files is False
 

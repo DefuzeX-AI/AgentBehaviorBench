@@ -38,7 +38,8 @@ def test_overlay_preserves_native_environment_and_other_tables(tmp_path, runtime
             assert 'DATABASE_HOST' in keys
         assert parsed['runtime']['secret_env_keys'] == ['DATABASE_PASSWORD']
         assert parsed['other']['env_keys'] == ['KEEP_ME']
-        assert parsed['launch']['argv'][-1] == 'agentbench.sdk.plugin.kuma.worker'
+        assert parsed['launch']['argv'][:3] == ['python', '-I', '-c']
+        assert 'agentbench.sdk.plugin.kuma.worker' in parsed['launch']['argv'][-1]
     assert manifest.read_text() == source
 
 

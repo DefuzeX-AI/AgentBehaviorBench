@@ -87,7 +87,7 @@ class KumaEvaluationSDK:
             control=context.control,
             build_coordinator=context.build_coordinator,
             job_context=context.job_context,
-            runtime_services=context.runtime_services,
+            runtime_services=context.runtime_services, artifacts=context.artifacts,
         )
 
 

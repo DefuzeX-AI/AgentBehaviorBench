@@ -79,6 +79,7 @@ def execute_in_store(store, *, environ, selection=None, replay=False, command_id
         else:
             result = runner.run(store.registrations, suite_id=store.suite_id, resume_state=seeds,
                                 retain_case=store.retain_case, on_event=observe,
+                                **artifact_options(runner, store, environ),
                                 **({'run_control': run_control} if run_control is not None else {}),
                                 **({'on_tick': on_tick} if on_tick is not None else {}))
         writer.append_partial_results(result.items)
@@ -97,3 +98,11 @@ def execute_in_store(store, *, environ, selection=None, replay=False, command_id
     finally:
         if on_runner:
             on_runner(None)
+
+
+def artifact_options(runner, store, environ):
+    from agentbench.harness.runner.suite_runner import SuiteRunner
+    from agentbench.sdk.integration.artifacts import FileArtifactStore
+    if isinstance(runner, SuiteRunner):
+        return {'artifact_store': FileArtifactStore(store.directory, environ=environ)}
+    return {}

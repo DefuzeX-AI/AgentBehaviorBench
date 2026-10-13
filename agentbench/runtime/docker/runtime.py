@@ -146,7 +146,7 @@ class DockerRuntime:
             model_provider=self._model_provider).timeout_sec
 
     @timed('Prepare Docker session', kind='preparation')
-    def start(self, agent: AgentDescriptor, *, invocation=None,
+    def start(self, agent: AgentDescriptor, *, invocation=None, argv=None, exclude_environment=(),
               preparation_deadline: Deadline | None = None) -> RuntimeSession:
         # Check cancellation, the preparation deadline, and Docker availability first.
         self.control.check()
@@ -188,6 +188,11 @@ class DockerRuntime:
         self.control.check()
 
 
+        owned = getattr(self._policy, 'owned_directories', None)
+        if owned is not None:
+            from .mount_permissions import prepare_mounts
+            shared = getattr(self._policy, 'shared_directories', lambda: ())()
+            prepare_mounts(self, image, owned(), preparation, shared=shared)
         # Use unique container and network names to isolate concurrent jobs.
         suffix = uuid4().hex
         network_name = f"defuzex-{suffix}-egress"
@@ -353,8 +358,10 @@ class DockerRuntime:
             )
             # Add environment variables, image, and launch command to the container arguments.
             for key, value in sorted(agent_environment.items()):
+                if key in exclude_environment:
+                    continue
                 command.extend(("--env", f"{key}={value}"))
-            command.extend((image, *config.argv))
+            command.extend((image, *(config.argv if argv is None else argv)))
 
             # Register and create the Agent container so failures can clean it up reliably.
             self._plan_resource("container", agent_name, "agent", suffix)

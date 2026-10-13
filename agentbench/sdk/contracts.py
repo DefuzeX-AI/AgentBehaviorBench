@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
+    from agentbench.sdk.integration.protocols import ArtifactStore
     from agentbench.sdk.judgment import DeferredJudgment
     from agentbench.harness.registry import AgentRegistration
     from agentbench.harness.result import BenchmarkResult
@@ -317,6 +318,7 @@ class SDKRunnerContext:
     build_coordinator: BuildCoordinator | None = None
     job_context: Mapping[str, object] | None = None
     runtime_services: RuntimeServices | None = None
+    artifacts: ArtifactStore | None = None
 
 
 @runtime_checkable

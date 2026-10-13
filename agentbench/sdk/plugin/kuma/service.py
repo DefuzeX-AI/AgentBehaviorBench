@@ -23,18 +23,29 @@ from agentbench.runtime.docker.worker_build import _ignore
 
 
 class EvaluationPolicy:
-    def __init__(self, state, *, repository=None, target=SDK_REPOSITORY, writable=False, replay=None):
+    def __init__(self, state, *, repository=None, target=SDK_REPOSITORY, writable=False, replay=None, channel=None, publications=()):
         self.state = state.resolve()
         self.repository = (repository or state.parent).resolve()
         self.target, self.writable = target, writable
         self.replay = replay
+        self.channel = channel
+        self.publications = publications
+
+    def owned_directories(self):
+        return (self.state.parent, self.state)
+
+    def shared_directories(self):
+        return tuple(path for _, path in self.publications)
 
     def run_arguments(self):
         from agentbench.runtime.workspace_replay import REPLAY_MOUNT
         recording = ('--mount', f'type=bind,source={self.replay},target={REPLAY_MOUNT}') if self.replay else ()
         return (*DockerPolicy().run_arguments(), '--mount',
                 f'type=bind,source={self.repository},target={self.target}' + ('' if self.writable else ',readonly'), '--mount',
-                f'type=bind,source={self.state},target={self.target}/.kuma', *recording)
+                f'type=bind,source={self.state.parent},target=/run/abb-sdk-storage', *recording,
+                *(self.channel.mounts(controller=True) if self.channel else ()),
+                *(arg for index, path in self.publications for arg in (
+                    '--mount', f'type=bind,source={path},target=/run/abb-published/{index}')))
 
 
 def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max_bytes=262144,
@@ -44,7 +55,8 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
              runtime_services=None, expected_case_id=None, expected_content_sha256=None,
              sdk_request_options=None, generation_indices=None, partial_generation=False,
              expected_environment_sha256=None,
-             safe_case_replay=False, require_credentials=True, overlay=None, defer_judge=False):
+             safe_case_replay=False, require_credentials=True, overlay=None, defer_judge=False,
+             artifact_store=None):
     """
     
     Run the Kuma worker in Docker and return its host artifact directory.
@@ -145,14 +157,17 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
         raise ValueError('KUMA_API_KEY or DEFUZEX_API_KEY is required')
 
     # Create the artifact directory for this task.
-    directory = output.resolve() / uuid4().hex
-    directory.mkdir(parents=True, mode=0o700)
+    from agentbench.sdk.integration.lifecycle import allocate_run
+    directory = allocate_run(output, artifact_store, agent.agent_id, {**dict(job_context or {}), **dict(identity or {})},
+                             generation_indices if generation_indices is not None else
+                             (tuple(range(generation_count)) if generation_count is not None else None))
+    directory.mkdir(parents=True, mode=0o700, exist_ok=True)
     files = Artifacts(directory, environ=environ)
     with timing_session(directory / 'timing.jsonl', source='host', name='Evaluation',
                         identity={**dict(job_context or {}), **dict(identity or {}), 'agent_id': agent.agent_id}) as timing_root:
         inputs = directory / 'request'; inputs.mkdir()
-        # The Case artifact is addressed inside the Run repository; the host copies the
-        # prepared file into the repository ledger below, before the container starts.
+        # The Case is addressed inside private SDK storage; the host copies it
+        # before starting the controller, never into an Agent mount.
         reused = f'.kuma/{Path(case_artifact).name}' if case_artifact is not None else None
         files.save('request/evaluation.json', {
             'defer_judge': defer_judge,
@@ -176,6 +191,8 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
                   'safe_case_replay': safe_case_replay is True}
         files.save('run.json', status)
         session = None
+        agent_process = None
+        agent_checkpoint = None
         workspace_temp = None
         primary_error = None
         try:
@@ -187,9 +204,9 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
             overlay_options = dict(backend=backend_url(environ)) if overlay is None else dict(overlay)
             with evaluation_agent(agent, control=control, deadline=preparation,
                                   **overlay_options) as descriptor:
-                # SDK requires repo and its ledger on the same filesystem. Mount the
-                # actual staged Agent source read-only, with only its .kuma writable.
-                repository = directory / 'sdk-repo'
+                # Keep the tracked source/workspace separate from private SDK storage.
+                # Only the trusted controller mounts the ledger.
+                repository = directory / 'sdk-source'
                 def checked_copy(source, target):
                     control.check()
                     preparation.check()
@@ -203,9 +220,9 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
                 with span('Prepare Case workspace', kind='preparation'):
                     policy = workspace_policy(tomllib.loads((descriptor.path / 'agent.toml').read_text()))
                     target = policy.path or SDK_REPOSITORY
-                    ledger_root = repository
+                    ledger_root = directory / 'sdk-repo'
+                    ledger_root.mkdir()
                     if policy.path:
-                        ledger_root.mkdir()
                         workspace_temp = tempfile.TemporaryDirectory(prefix='.abb-workspace-', dir=directory.parent)
                         repository = Path(workspace_temp.name)
                         contract = prepare_workspace(descriptor.path, repository, policy)
@@ -225,7 +242,7 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
                     else:
                         shutil.copytree(descriptor.path / 'agent', repository, ignore=_ignore,
                                         copy_function=checked_copy)
-                    state = ledger_root / '.kuma'; state.mkdir(mode=0o777); state.chmod(0o777)
+                    state = ledger_root / '.kuma'; state.mkdir(mode=0o700); state.chmod(0o700)
                     if case_artifact is not None:
                         shutil.copyfile(case_artifact, state / Path(case_artifact).name)
                 store = TraceStore(directory / 'network.jsonl', directory.name,
@@ -243,8 +260,21 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
                     replay_directory = directory / 'replay'
                     replay_directory.mkdir(mode=0o777)
                     replay_directory.chmod(0o777)
+                from agentbench.sdk.integration.context import ExecutionChannel
+                channel = ExecutionChannel.create(directory / 'channel') if generation_count is None else None
+                settings = json.loads((directory / 'request/evaluation.json').read_text())
+                publications = ()
+                if artifact_store is not None and generation_count is not None:
+                    indices = generation_indices if generation_indices is not None else range(generation_count)
+                    publications = tuple((index, artifact_store.case(agent.agent_id, index).directory)
+                                         for index in indices)
+                    settings['case_publications'] = {str(index): f'/run/abb-published/{index}'
+                                                     for index, _ in publications}
+                settings.update(private_storage='/run/abb-sdk-storage',
+                                isolated_agent=channel is not None, agent_timeout=timeout)
+                files.save('request/evaluation.json', settings)
                 runtime_options = dict(
-                    environ=environ, policy=EvaluationPolicy(state, repository=repository, target=target, writable=bool(policy.path), replay=replay_directory), trace_sink=Sink(),
+                    environ=environ, policy=EvaluationPolicy(state, repository=repository, target=target, writable=bool(policy.path), replay=replay_directory, channel=channel, publications=publications), trace_sink=Sink(),
                     trace_max_bytes=trace_max_bytes, control=control, identity=identity,
                     timeout_sec=timeout,
                     run_id=directory.name, artifact_root=directory,
@@ -254,6 +284,28 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
                 else:
                     runtime = DockerRuntime(build_coordinator=build_coordinator, **runtime_options)
                 control.check()
+                if channel is not None:
+                    from agentbench.runtime.docker.execution_policy import AgentExecutionPolicy
+                    public_inputs = directory / 'agent-request'
+                    public_inputs.mkdir()
+                    agent_outputs = directory / 'agent-output'
+                    agent_outputs.mkdir(mode=0o700)
+                    options = dict(runtime_options)
+                    options['policy'] = AgentExecutionPolicy(repository, target, bool(policy.path), channel, agent_outputs)
+                    options['artifact_root'] = directory / 'agent-runtime'
+                    options['artifact_root'].mkdir()
+                    options['run_id'] = directory.name + '-agent'
+                    agent_runtime = (runtime_services.create_docker_runtime(**options)
+                                     if runtime_services is not None else
+                                     DockerRuntime(build_coordinator=build_coordinator, **options))
+                    agent_process = agent_runtime.start(
+                        descriptor, invocation=(public_inputs, agent_outputs),
+                        argv=('python', '-m', 'agentbench.runtime.agentcontainer.channel'),
+                        exclude_environment=tuple(tomllib.loads((descriptor.path / 'agent.toml').read_text())
+                                                  .get('runtime', {}).get('worker_env_keys', ())) +
+                                            ('KUMA_API_KEY', 'DEFUZEX_API_KEY', 'KUMA_BASE_URL'),
+                        preparation_deadline=preparation)
+                    agent_checkpoint = agent_process.trace_checkpoint()
 
                 # Start the container process, then wait for its generation/execution mode.
                 session = runtime.start(descriptor,
@@ -276,6 +328,8 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
                         status['host_trace_validation'] = 'failed'
                         with span('Validate network evidence', kind='evidence'):
                             session.validate_trace(checkpoint)
+                            if agent_process is not None:
+                                agent_process.validate_trace(agent_checkpoint)
                         status['host_trace_validation'] = 'succeeded'
                 status['status'] = 'succeeded' if code == 0 else 'failed'
         except BaseException as exc:
@@ -288,24 +342,25 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
             raise
         finally:
             try:
-                if session is not None:
+                errors = []
+                for active, label in ((session, 'controller'), (agent_process, 'agent')):
+                    if active is None:
+                        continue
                     try:
-                        with span('Cleanup containers and network', kind='cleanup'):
-                            session.close()
-                        status['cleanup_status'] = 'succeeded'
+                        with span('Cleanup ' + label + ' container', kind='cleanup'):
+                            active.close()
                     except BaseException as exc:
-                        status.update(status='failed', cleanup_status='failed',
-                                      cleanup_error_type=type(exc).__name__, cleanup_error=str(exc))
-                        raise
+                        errors.append(exc)
                     finally:
-                        files.save('diagnostics.json', {
-                            'stdout': session.stdout, 'stderr': session.stderr,
-                            'cleanup_status': status['cleanup_status'],
-                            'cleanup_error': status.get('cleanup_error'), **identity,
-                        })
-                else:
-                    if status['cleanup_status'] != 'failed':
-                        status['cleanup_status'] = 'not_started'
+                        files.save('diagnostics.json' if label == 'controller' else 'agent-diagnostics.json',
+                                   {'stdout': active.stdout, 'stderr': active.stderr, **identity})
+                if errors:
+                    exc = errors[0]
+                    status.update(status='failed', cleanup_status='failed',
+                                  cleanup_error_type=type(exc).__name__, cleanup_error=str(exc))
+                    raise exc
+                if status['cleanup_status'] != 'failed':
+                    status['cleanup_status'] = 'succeeded' if session or agent_process else 'not_started'
             finally:
                 from .diagnostics import collect_artifacts
                 status['artifacts'] = collect_artifacts(directory, status, environ=environ)
