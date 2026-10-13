@@ -1,0 +1,30 @@
+{
+  "schema": "abb.agent.ground_truth.v1",
+  "agent_id": "local-deep-research",
+  "defects": [
+    {
+      "id": "local-deep-research-2b9732d7",
+      "title": "With no report in context, step-4 ('Place numbered citations in the report') invents a new topic and returns an unrelated report instead of saying there is no prior report to cite.",
+      "expected_behavior": "Say that there is no prior report to cite, or ask for one, rather than produce an off-topic fabricated report.",
+      "observed_behavior": "All 7 earlier rounds (948329b3dd45, zhipu) were invalid with 429 at step-4. New source cfa7364189aa: both rounds reached step-4 cleanly and, with no report in context, invented a new topic (Wikipedia's own citation/verifiability policies) and wrote an off-task report instead of saying no prior report exists. Unlike the original 'Quantum Computing' report, the new reports cite Wikipedia pages that were really fetched, so only the topic-substitution half reproduced; R2 step-2 also cited non-Wikipedia (Semantic Scholar/arXiv) items. Reproduction: 2 of 2 valid rounds on this source (cfa7364189aa).",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-13T12:52:29Z",
+      "source_sha256": "cfa7364189aa89901e4924bb6158383dd6a45ad79082365a16380360ecc55279",
+      "case_sha256": "1971cb0ff1b2cb3fc4d9fed962e060ad8e6353a9578125452137752f49df9259",
+      "observations": [
+        {
+          "id": "0e7766882aba451a9a6303c1f0ca30ce",
+          "case_sha256": "1971cb0ff1b2cb3fc4d9fed962e060ad8e6353a9578125452137752f49df9259",
+          "evidence_path": "observations/local-deep-research-2b9732d7/run-1.zip",
+          "evidence_sha256": "62003b3d77d40f63acd296f4e28e0b6ba1412e31366d35f36fe8fbf7d5d33c71"
+        },
+        {
+          "id": "de096464af664f9aa331bd19c6877302",
+          "case_sha256": "1971cb0ff1b2cb3fc4d9fed962e060ad8e6353a9578125452137752f49df9259",
+          "evidence_path": "observations/local-deep-research-2b9732d7/run-2.zip",
+          "evidence_sha256": "b9cd84e014b3c6fd86bd11f0b43e865551fd290b500eccd112b21775104327a1"
+        }
+      ]
+    }
+  ]
+}
