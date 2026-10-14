@@ -423,6 +423,10 @@ class TimeSeriesScientistWorkflow:
         from config.default_config import DEFAULT_CONFIG
 
         config = {key: value for key, value in DEFAULT_CONFIG.items()}
+        # Upstream records environment credentials in this unused snapshot and
+        # embeds the full config in the report prompt. Authentication still reads
+        # os.environ; never forward that snapshot to any model or generated report.
+        config.pop("env_vars", None)
         config["num_slices"] = 1
         config["data_path"] = _resolve_data_path()
         config["output_dir"] = self._workspace()

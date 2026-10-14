@@ -188,6 +188,20 @@ class Issue384(unittest.TestCase):
         self.assertEqual(self._config_fixture({'TSCI_DEPLOY_NUM_SLICES':'2'},
                                              {'num_slices':4})['num_slices'],4)
 
+    def test_unused_credential_snapshot_is_not_forwarded_to_model_facing_config(self):
+        fake=types.ModuleType('config.default_config')
+        snapshot={'OPENAI_API_KEY':'offline-fixture-key','GOOGLE_API_KEY':None}
+        fake.DEFAULT_CONFIG={'llm_model':'fixture','debug':False,'num_slices':10,
+                             'input_length':512,'horizon':96,'k_models':3,
+                             'env_vars':snapshot}
+        with patch.dict(sys.modules,{'config.default_config':fake}), \
+             patch.dict(os.environ,{'OPENAI_API_KEY':'offline-fixture-key'}), \
+             patch.object(self.module,'_resolve_data_path',return_value='/fixture.csv'):
+            config=self.workflow._build_config({})
+            self.assertEqual(os.environ['OPENAI_API_KEY'],'offline-fixture-key')
+        self.assertNotIn('env_vars',config)
+        self.assertIs(fake.DEFAULT_CONFIG['env_vars'],snapshot)
+
     def test_closed_workflow_rejects_later_invocation(self):
         self.workflow.close()
         with self.assertRaisesRegex(RuntimeError, 'closed'):

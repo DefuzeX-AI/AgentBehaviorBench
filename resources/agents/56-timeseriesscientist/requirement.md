@@ -72,6 +72,8 @@ This Profile describes what to evaluate; it does not claim that the Agent passes
 - The deployment defaults to one slice instead of upstream's ten; other native
   numeric defaults remain unchanged. TSCI_DEPLOY_* settings override deployment
   defaults, and explicit supported Case parameters take final precedence.
+- The unused native env_vars credential snapshot is excluded from model-facing
+  configuration; model authentication still reads the deployment environment.
 - Real model clients share a deployment call budget (24 by default), a per-call
   output cap (1024 tokens by default; TSCI_MODEL_OUTPUT_LIMIT), a 60000-character input limit, no automatic
   model retries and a 60-second request timeout. Optional TSCI_REASONING_EFFORT
