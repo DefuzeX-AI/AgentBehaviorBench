@@ -158,6 +158,36 @@ class Issue384(unittest.TestCase):
         self.assertNotEqual(config['output_dir'], '/tmp/other')
         self.assertEqual(fake.DEFAULT_CONFIG['horizon'],96)
 
+    def _config_fixture(self, deployment=None, overrides=None):
+        fake = types.ModuleType('config.default_config')
+        fake.DEFAULT_CONFIG = {'llm_model':'fixture','debug':False,'num_slices':10,
+                               'input_length':512,'horizon':96,'k_models':3}
+        # Isolate deployment controls from the invoking shell.
+        env = {k:v for k,v in os.environ.items() if not k.startswith('TSCI_DEPLOY_')}
+        env.update({'OPENAI_API_KEY':'fixture', **(deployment or {})})
+        with patch.dict(sys.modules, {'config.default_config': fake}), \
+             patch.dict(os.environ, env, clear=True), \
+             patch.object(self.module, '_resolve_data_path', return_value='/fixture.csv'):
+            config = self.workflow._build_config(overrides or {})
+        self.assertEqual(fake.DEFAULT_CONFIG['num_slices'],10)
+        return config
+
+    def test_default_workflow_uses_one_slice_and_preserves_other_native_defaults(self):
+        config = self._config_fixture()
+        self.assertEqual(config['num_slices'],1)
+        self.assertEqual((config['input_length'],config['horizon'],config['k_models']),
+                         (512,96,3))
+
+    def test_deployment_slice_count_overrides_bounded_default(self):
+        self.assertEqual(self._config_fixture({'TSCI_DEPLOY_NUM_SLICES':'2'})['num_slices'],2)
+        with self.assertRaises(ValueError):
+            self._config_fixture({'TSCI_DEPLOY_NUM_SLICES':'0'})
+
+    def test_case_slice_count_wins_over_deployment_and_bounded_defaults(self):
+        self.assertEqual(self._config_fixture(overrides={'num_slices':4})['num_slices'],4)
+        self.assertEqual(self._config_fixture({'TSCI_DEPLOY_NUM_SLICES':'2'},
+                                             {'num_slices':4})['num_slices'],4)
+
     def test_closed_workflow_rejects_later_invocation(self):
         self.workflow.close()
         with self.assertRaisesRegex(RuntimeError, 'closed'):
@@ -212,6 +242,24 @@ class Issue384(unittest.TestCase):
         parsed = object();llm, runnable = self._structured_fixture(parsed=parsed)
         with patch.object(llm.client, 'with_structured_output', return_value=runnable):
             self.assertIs(llm.with_structured_output(dict).invoke(['fixture']), parsed)
+
+    def test_structured_default_uses_function_calling_without_changing_schema_or_budget(self):
+        schema=object();parsed=object();llm,runnable=self._structured_fixture(parsed=parsed)
+        with patch.object(llm.client,'with_structured_output',return_value=runnable) as make:
+            structured=llm.with_structured_output(schema)
+            self.assertEqual(make.call_args.args,(schema,))
+            self.assertEqual(make.call_args.kwargs,
+                             {'method':'function_calling','include_raw':True})
+            self.assertIs(structured.budget,llm.budget)
+            self.assertIs(structured.invoke(['fixture']),parsed)
+            self.assertEqual(llm.budget.used,1)
+
+    def test_explicit_structured_method_is_preserved(self):
+        llm,runnable=self._structured_fixture(parsed={'model':'fixture'})
+        with patch.object(llm.client,'with_structured_output',return_value=runnable) as make:
+            llm.with_structured_output(dict,method='json_schema',strict=True)
+            self.assertEqual(make.call_args.kwargs['method'],'json_schema')
+            self.assertTrue(make.call_args.kwargs['strict'])
 
     def test_explicit_structured_raw_contract_is_preserved(self):
         error=ValueError('fixture parse error');llm, runnable = self._structured_fixture(error=error)

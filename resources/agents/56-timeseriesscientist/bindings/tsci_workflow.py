@@ -34,8 +34,9 @@ configuration, not free-form prompt text. Optional numeric run overrides may be
 given as a JSON object or as ``LABEL: value`` lines. Other non-empty text triggers
 the default workflow and is not passed to the native agents. The dataset is chosen
 by the deployment or the packaged ETTh1 sample; a Case cannot supply a file path.
-Business defaults start at ``DEFAULT_CONFIG``; optional deployment defaults
-and explicit supported Case values override them. Native orchestration argument
+Business defaults start at ``DEFAULT_CONFIG``, except the deployment uses one
+slice by default to bound work within its model-call budget. Optional deployment
+defaults and explicit supported Case values override them. Native orchestration argument
 omissions are repaired in a deployment subclass, without editing upstream source.
 Output: the native ``run()`` dict, unchanged — ``all_results``,
 ``aggregated_results`` and ``report``. No answer is fabricated.
@@ -319,6 +320,9 @@ class _BudgetedModel:
         # Structured validation uses a derived Runnable, not client.invoke().
         # Keep that path on the same budget rather than delegating unguarded.
         options = dict(kwargs)
+        # The native validation node omits method. Use tool calling rather than
+        # provider-specific json_schema response_format; preserve explicit methods.
+        options.setdefault("method", "function_calling")
         return_raw = options.get("include_raw", False)
         options["include_raw"] = True
         return _BudgetedModel(self.client.with_structured_output(*args, **options),
@@ -415,10 +419,11 @@ class TimeSeriesScientistWorkflow:
         return self._native
 
     def _build_config(self, overrides):
-        """Start from native defaults and apply only explicit overrides."""
+        """Use one deployment slice, then operator and explicit Case overrides."""
         from config.default_config import DEFAULT_CONFIG
 
         config = {key: value for key, value in DEFAULT_CONFIG.items()}
+        config["num_slices"] = 1
         config["data_path"] = _resolve_data_path()
         config["output_dir"] = self._workspace()
         for key, bounds in _LIMITS.items():

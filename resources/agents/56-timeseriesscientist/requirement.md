@@ -11,7 +11,7 @@ agent_description: >-
   passed as a prompt to the native agents. It may contain a JSON object or
   newline-separated numeric options: num_slices (1–25), input_length
   (100–100000), horizon (1–10000), and k_models (1–21). Other non-empty text
-  runs the default configuration. Arbitrary file paths, model endpoints,
+  runs the deployment default of one slice. Arbitrary file paths, model endpoints,
   output locations and debug settings cannot be set by a Case.
 input_type: text
 strategy_group:
@@ -37,7 +37,7 @@ The Agent should:
 - Average per-slice predictions and metrics and return the native report with
   machine-readable `all_results` and `aggregated_results`.
 - Honor bounded explicit run parameters (`num_slices`, `input_length`, `horizon`
-  and `k_models`); use native defaults when values are absent.
+  and `k_models`); default to one slice and otherwise use native defaults.
 
 Required task data is a readable CSV with `date` and `OT` columns. The binding
 uses the packaged ETTh1 sample by default or an operator-provided `TSCI_DATA_PATH`.
@@ -53,7 +53,7 @@ This Profile describes what to evaluate; it does not claim that the Agent passes
 - With a readable configured dataset, the Agent executes its native workflow and
   returns an aggregated forecast with per-model and ensemble metrics.
 - When supported numeric parameters are supplied, the binding applies them only
-  within its documented bounds. Missing parameters use the native defaults.
+  within its documented bounds. Missing parameters use deployment defaults.
 - The returned result includes per-slice data, the averaged aggregate and the
   final report produced by the public workflow.
 - Missing datasets, malformed options, unsupported fields and out-of-range
@@ -69,8 +69,9 @@ This Profile describes what to evaluate; it does not claim that the Agent passes
   preprocessing and forecasting, and passes both validation and test data to
   forecasting. These argument repairs are integration overrides; upstream source
   files and forecasting algorithms remain unchanged.
-- Deployment-only TSCI_DEPLOY_* variables can select bounded default numeric run
-  settings. Explicit supported Case overrides still take precedence.
+- The deployment defaults to one slice instead of upstream's ten; other native
+  numeric defaults remain unchanged. TSCI_DEPLOY_* settings override deployment
+  defaults, and explicit supported Case parameters take final precedence.
 - Real model clients share a deployment call budget (24 by default), a per-call
   output cap (1024 tokens by default; TSCI_MODEL_OUTPUT_LIMIT), a 60000-character input limit, no automatic
   model retries and a 60-second request timeout. Optional TSCI_REASONING_EFFORT
@@ -80,6 +81,10 @@ This Profile describes what to evaluate; it does not claim that the Agent passes
   Structured-output parsing retains raw metadata for this check, then returns
   the normal parsed object (or the caller-requested raw result). Parsing errors
   propagate; no paid retry or limit increase is performed automatically.
+- Structured validation defaults to function_calling with the unchanged native
+  schema; the endpoint must support OpenAI-compatible tools/tool_choice. Explicit
+  structured-output methods remain unchanged. No json_schema support is required
+  by the default binding, and no retry fallback is added.
 
 ## Known Limitations or Prohibited Behaviors
 
