@@ -1,0 +1,6 @@
+# Sourced by Debian's /usr/bin/chromium launcher. Agent containers get --pids-limit=128
+# (#158) and a stock headless Chromium peaks at ~125 pids with one page open; these flags
+# and pinning the launcher to one CPU bring that to ~70. --single-process crashes on 154.
+CHROMIUM_FLAGS="$CHROMIUM_FLAGS --disable-gpu --disable-software-rasterizer --in-process-gpu --renderer-process-limit=1 --no-zygote --num-raster-threads=1 --disable-component-update --mute-audio --enable-features=NetworkServiceInProcess2 --disable-features=site-per-process,IsolateOrigins,Translate,MediaRouter,OptimizationHints,AudioServiceOutOfProcess"
+abb_cpu=$(taskset -pc $$ 2>/dev/null | sed "s/.*: //; s/[,-].*//")
+[ -n "$abb_cpu" ] && taskset -pc "$abb_cpu" $$ >/dev/null 2>&1 || true
