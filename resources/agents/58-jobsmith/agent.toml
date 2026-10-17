@@ -1,0 +1,53 @@
+# Manual ABB integration for kevin333353/jobsmith.
+# DeepSeek direct API cannot drive -b json_schema generation; files follow
+# validated LangGraph unit conventions used by ready Agents.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "jobsmith"
+display_name = "Jobsmith Taiwan Job Copilot"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+method = "git"
+repository = "https://github.com/kevin333353/jobsmith"
+revision = "f5427c156d4d0289463f048a2beedb87c80e802b"
+downloaded_on = "2026-10-17"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+env_keys = ["OPENAI_MODEL", "LLM_BACKEND", "OPENAI_BASE_URL"]
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+binding = "bridge.py:create_graph"
+output_key = "cover_letter"
+
+[llm_interception]
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
