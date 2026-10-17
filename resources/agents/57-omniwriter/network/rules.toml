@@ -1,0 +1,12 @@
+schema_version = "abb.network.v1"
+
+# The binding starts the pinned Elasticsearch node in the Agent container on
+# loopback. ABB redirects non-root loopback TCP through the interceptor, so the
+# native Python client needs this explicit route. Traffic never leaves the Case.
+[[tool_routes]]
+host_patterns = ["127.0.0.1"]
+ports = [9200]
+methods = ["HEAD", "GET", "POST", "PUT", "DELETE"]
+path_patterns = ["/", "/default_index*"]
+purpose = "tool"
+required = false
