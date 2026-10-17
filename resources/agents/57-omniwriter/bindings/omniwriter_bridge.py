@@ -19,11 +19,11 @@ Adaptations (reasoning, prompts, tools and model choices stay in the Agent):
   optional native fields ``demand``, ``thread_id`` and ``is_lookup_outline``
   with their native defaults when absent. No demand text, session ID, outline
   feedback or answer is ever invented for a text Case.
-- Output: the complete native final state dictionary (``thread_id``,
-  ``status``, ``user_query``, ``outline_content``, ``chapter_content``,
-  ``messages``, ``article_file_path``, ``error``, ...). Native ``status`` and
-  ``error`` values are returned unchanged, and an ``is_lookup_outline`` run
-  surfaces the native outline-review interrupt instead of approving it.
+- Output: a successful new-article run returns only the assembled article text;
+  retrieved documents, database state and pipeline metadata remain internal. A
+  failed run returns its native public ``status`` and ``error`` only, while an
+  explicit ``is_lookup_outline`` run returns the generated outline for review
+  instead of approving it.
 - Config: the public ``run`` method takes no config parameter, so callbacks,
   tags and metadata are published through LangChain's config context
   (``set_config_context``), which the nested native ``graph.ainvoke`` call
@@ -45,11 +45,7 @@ Adaptations (reasoning, prompts, tools and model choices stay in the Agent):
 
 Example input: ``{'topic': 'Write a 1500-word article about adopting AI
 coding assistants in small teams', 'demand': 'professional tone'}``.
-Example output shape (all values come from the native run, never from this
-binding): ``{'thread_id': '...', 'status': 'success', 'user_query': '...',
-'depth_demand': '...', 'next_node': '...', 'outline_content': {...},
-'chapter_content': [...], 'article_file_path': '...', 'messages': [...],
-'error': None, ...}``.
+Example output: the article Markdown assembled from the native chapter results.
 """
 
 import asyncio
@@ -61,11 +57,111 @@ import subprocess
 import sys
 import time
 from collections.abc import Mapping
+from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import RLock
 
 _INPUT_FIELDS = frozenset({'topic', 'demand', 'thread_id', 'is_lookup_outline'})
+
+
+def _downstream_requirements(state):
+    """Keep the sanitized core task attached to downstream outline planning."""
+    query = state.get('user_query') if isinstance(state, Mapping) else None
+    demand = state.get('depth_demand') if isinstance(state, Mapping) else None
+    parts = []
+    if isinstance(query, str) and query.strip():
+        parts.append(f'核心写作任务：{query.strip()}')
+    if isinstance(demand, str) and demand.strip():
+        parts.append(f'额外要求：{demand.strip()}')
+    return '\n'.join(parts)
+
+
+def _article_text(chapters):
+    """Assemble unique native chapters without exposing internal identifiers."""
+    if not isinstance(chapters, list):
+        return ''
+    seen_ids = set()
+    seen_content = set()
+    article = []
+    for chapter in chapters:
+        if not isinstance(chapter, Mapping):
+            continue
+        chapter_id = chapter.get('chapter_id') or chapter.get('section_id')
+        content = chapter.get('content')
+        if not isinstance(content, str) or not content.strip():
+            continue
+        normalized = content.strip()
+        if chapter_id in seen_ids or normalized in seen_content:
+            continue
+        if chapter_id:
+            seen_ids.add(chapter_id)
+        seen_content.add(normalized)
+        article.append(normalized)
+    return '\n\n'.join(article)
+
+
+def _public_output(result, *, is_lookup_outline=False):
+    """Project native state onto user-facing content without pipeline leakage."""
+    if not isinstance(result, Mapping):
+        return result
+    if is_lookup_outline and result.get('outline_content'):
+        return {
+            'status': result.get('status'),
+            'outline': result.get('outline_content'),
+            'error': result.get('error'),
+        }
+    status = result.get('status')
+    if status and status != 'success':
+        return {'status': status, 'error': result.get('error')}
+    final_article = result.get('final_article')
+    if isinstance(final_article, str) and final_article.strip():
+        return final_article.strip()
+    article = _article_text(result.get('chapter_content'))
+    if article:
+        return article
+    return {'status': result.get('status'), 'error': result.get('error')}
+
+
+def _compatible_model_types(chat_type, embeddings_type):
+    """Return constructors compatible with the deployment's provider APIs.
+
+    The Ark embedding endpoint expects strings, while LangChain otherwise
+    pre-tokenizes long inputs into integer arrays. Disabling its context-length
+    preprocessing preserves those strings. The chat constructor is returned
+    untouched: the selected GLM model requires thinking to remain enabled.
+
+    Explicit native embedding options still win. No endpoint, credential,
+    model, prompt, response or tool behavior is replaced here.
+    """
+
+    class CompatibleOpenAIEmbeddings(embeddings_type):
+        def __init__(self, *args, **kwargs):
+            kwargs.setdefault('check_embedding_ctx_length', False)
+            super().__init__(*args, **kwargs)
+
+    CompatibleOpenAIEmbeddings.__name__ = embeddings_type.__name__
+    CompatibleOpenAIEmbeddings.__qualname__ = embeddings_type.__qualname__
+    return chat_type, CompatibleOpenAIEmbeddings
+
+
+@contextmanager
+def _model_constructor_compatibility():
+    """Expose compatible constructors while native modules bind their imports."""
+    import langchain_openai
+
+    original_chat = langchain_openai.ChatOpenAI
+    original_embeddings = langchain_openai.OpenAIEmbeddings
+    compatible_chat, compatible_embeddings = _compatible_model_types(
+        original_chat, original_embeddings
+    )
+    langchain_openai.ChatOpenAI = compatible_chat
+    langchain_openai.OpenAIEmbeddings = compatible_embeddings
+    try:
+        yield
+    finally:
+        langchain_openai.ChatOpenAI = original_chat
+        langchain_openai.OpenAIEmbeddings = original_embeddings
 
 
 def _escape_native_format_template(template, field_names):
@@ -130,6 +226,62 @@ def _install_elasticsearch_compatibility():
 
     compatible_constructor._abb_timeout_compatible = True
     module.Elasticsearch = compatible_constructor
+
+
+def _install_graph_state_compatibility():
+    """Preserve the core task and bound state/memory at native nodes.
+
+    The outline node receives summaries and ``depth_demand`` but omits the
+    sanitized ``user_query``; concrete entity relationships can disappear
+    before writing. The assembly node mutates and returns the complete state,
+    causing LangGraph's additive ``chapter_content`` reducer to append every
+    chapter a second time. Four simultaneous chapter retrieval clients also
+    exceed the 1 GiB Case limit non-deterministically, so the native chapter
+    writer calls share a one-at-a-time gate. Prompts, retrieval, model calls
+    and chapter results remain native.
+    """
+    package = importlib.import_module('src.pipeline.agents')
+    outline_module = importlib.import_module(
+        'src.pipeline.agents.outline_generate_agent'
+    )
+    write_module = importlib.import_module('src.pipeline.agents.write_chapter_agent')
+
+    write_chapter = write_module.SingleChapterWriter.write_chapter
+    if not getattr(write_chapter, '_abb_memory_bounded', False):
+        gate = asyncio.Semaphore(1)
+
+        async def compatible_write_chapter(self, *args, **kwargs):
+            async with gate:
+                return await write_chapter(self, *args, **kwargs)
+
+        compatible_write_chapter._abb_memory_bounded = True
+        write_module.SingleChapterWriter.write_chapter = compatible_write_chapter
+
+    outline_node = outline_module.outline_generate_node
+    if not getattr(outline_node, '_abb_task_preserving', False):
+        async def compatible_outline_node(state):
+            scoped = dict(state)
+            scoped['depth_demand'] = _downstream_requirements(scoped)
+            return await outline_node(scoped)
+
+        compatible_outline_node._abb_task_preserving = True
+        outline_module.outline_generate_node = compatible_outline_node
+        package.outline_generate_node = compatible_outline_node
+
+    assemble_node = write_module.assemble_article_node
+    if not getattr(assemble_node, '_abb_reducer_safe', False):
+        async def compatible_assemble_node(state):
+            result = await assemble_node(dict(state))
+            # Returning chapter_content here would feed the already accumulated
+            # list through operator.add for a second time.
+            return {
+                'status': result.get('status'),
+                'error': result.get('error'),
+            }
+
+        compatible_assemble_node._abb_reducer_safe = True
+        write_module.assemble_article_node = compatible_assemble_node
+        package.assemble_article_node = compatible_assemble_node
 
 
 def _wait_for_elasticsearch(process, timeout=90):
@@ -223,21 +375,23 @@ def _load_orchestrator_class():
     # annotation but omits its import. Supplying that type through builtins only
     # while Python executes the module is equivalent to its missing type import;
     # it does not replace a node, prompt, model, tool or execution result.
-    from src.pipeline.state_model import MessageState
+    with _model_constructor_compatibility():
+        from src.pipeline.state_model import MessageState
 
-    missing = object()
-    previous = getattr(builtins, 'MessageState', missing)
-    builtins.MessageState = MessageState
-    try:
-        from src.pipeline.orchestrator import WriterAgentOrchestrator
-        _install_prompt_format_compatibility()
-        _install_elasticsearch_compatibility()
-        return WriterAgentOrchestrator
-    finally:
-        if previous is missing:
-            del builtins.MessageState
-        else:
-            builtins.MessageState = previous
+        missing = object()
+        previous = getattr(builtins, 'MessageState', missing)
+        builtins.MessageState = MessageState
+        try:
+            _install_graph_state_compatibility()
+            from src.pipeline.orchestrator import WriterAgentOrchestrator
+            _install_prompt_format_compatibility()
+            _install_elasticsearch_compatibility()
+            return WriterAgentOrchestrator
+        finally:
+            if previous is missing:
+                del builtins.MessageState
+            else:
+                builtins.MessageState = previous
 
 
 class OmniWriterBinding:
@@ -282,6 +436,12 @@ class OmniWriterBinding:
                 os.environ.setdefault('LANGSMITH_TRACING', 'false')
                 os.environ.setdefault('LANGSMITH_API_KEY', '')
                 os.environ.setdefault('LANGSMITH_PROJECT', 'OmniWriter')
+                # Upstream's example deployment allocates 10,000 completion
+                # tokens, while the selected mandatory-thinking GLM exhausted
+                # even that budget on the largest outline prompt in a real Case.
+                # Give reasoning plus the required JSON a bounded 16,000-token
+                # budget instead of the source's insufficient 4,000 fallback.
+                os.environ.setdefault('DEFAULT_LLM_MAX_TOKENS', '16000')
                 # controller_agent.py constructs its configurable secondary client
                 # at import time. Point that native client at the same intercepted
                 # endpoint/credential without embedding either value in the unit.
@@ -303,10 +463,11 @@ class OmniWriterBinding:
                 elasticsearch_env.setdefault('AWS_EC2_METADATA_DISABLED', 'true')
                 # ABB gives the complete Case container 1 GiB. The image-level
                 # 512 MiB heap plus Elasticsearch direct memory and OmniWriter's
-                # Python process crosses that cgroup limit after the full graph
-                # imports, killing Elasticsearch before RagTool is constructed.
-                # The Case corpus is tiny, so a 256 MiB single-node heap is ample.
-                elasticsearch_env['ES_JAVA_OPTS'] = '-Xms256m -Xmx256m'
+                # Python process crosses that cgroup limit. Even 256 MiB becomes
+                # unsustainable after successful Chroma/ES ingestion loads the
+                # full retrieval and writing graph. The Case corpus has only a
+                # few dozen chunks, so a 128 MiB single-node heap is sufficient.
+                elasticsearch_env['ES_JAVA_OPTS'] = '-Xms128m -Xmx128m'
                 self._elasticsearch = subprocess.Popen(
                     [
                         '/opt/elasticsearch/bin/elasticsearch',
@@ -346,10 +507,9 @@ class OmniWriterBinding:
                 ``configurable.thread_id`` is forwarded as the native
                 ``thread_id`` argument. The config object is never serialized.
         Returns:
-            The complete native final state dictionary with ``thread_id``
-            attached, exactly as the upstream run lifecycle returns it; native
-            ``status``/``error`` values are preserved and no answer is
-            manufactured here.
+            Article text for a successful writing run; an explicit outline
+            review projection; or native public failure status/error. Internal
+            retrieval and pipeline state is never exposed as the answer.
         Raises:
             ValueError: Invalid input shape.
             RuntimeError: Invocation after close().
@@ -364,12 +524,13 @@ class OmniWriterBinding:
         from langchain_core.runnables.config import set_config_context
 
         with set_config_context(run_config):
-            return await native.run(
+            result = await native.run(
                 topic=topic,
                 demand=demand,
                 thread_id=resolved_thread_id,
                 is_lookup_outline=is_lookup_outline,
             )
+        return _public_output(result, is_lookup_outline=is_lookup_outline)
 
     def invoke(self, value, config=None):
         """Synchronous bridge for callers without a running event loop.

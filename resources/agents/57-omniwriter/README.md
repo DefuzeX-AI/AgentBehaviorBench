@@ -49,11 +49,35 @@ The locked Python Elasticsearch 9.3.0 client removed the legacy `timeout`
 constructor alias that upstream passes in addition to `request_timeout`. The
 binding drops only that duplicate retired keyword before delegating to the
 locked client. ABB limits the complete Case container to 1 GiB, so the binding
-runs this small single-node index with a 256 MiB heap and disables unused
-Elasticsearch ML/Watcher modules; the upstream 512 MiB setting otherwise causes
-the Java process to be killed after the full Python graph is imported. The
-binding waits for the real HTTP socket and suppresses the bundled S3 module's
-irrelevant EC2 metadata probe.
+runs this small single-node index with a 128 MiB heap and disables unused
+Elasticsearch ML/Watcher modules; larger heaps cause the Java process to be
+killed after the full Python retrieval and writing graph is loaded. The binding
+waits for the real HTTP socket and suppresses the bundled S3 module's irrelevant
+EC2 metadata probe.
+
+The deployment sets `DEFAULT_LLM_MAX_TOKENS=16000`, a bounded extension of
+upstream's documented 10,000-token example. Without it, the source falls back
+to 4,000 tokens, and the selected GLM model requires thinking; the official
+Case exhausted 4,000 and a later regression exhausted 10,000 before producing
+the strict JSON exchanged by graph nodes. At the native LangChain embedding
+constructor boundary, the binding also disables token-array preprocessing so
+Ark receives the original strings its endpoint requires. Explicit embedding
+options from upstream take precedence; prompts, models, responses and graph
+nodes remain native.
+
+Two native state-boundary defects are corrected at import time. The sanitized
+core writing task is retained when the outline node receives its downstream
+requirements, so concrete company/project relationships are not lost after
+research. The assembly node returns only its changed fields, preventing the
+additive chapter reducer from appending every chapter twice. A successful run
+exposes only the deduplicated article Markdown; search material, outline state,
+database details and other pipeline metadata remain internal.
+
+The native graph schedules all chapter writers concurrently, but four full
+hybrid-retrieval clients can push Elasticsearch out of the 1 GiB Case cgroup.
+This deployment therefore gates the otherwise unchanged native chapter writer
+calls to one at a time. That trades latency for deterministic completion while
+remaining inside the 1,800-second run limit.
 
 The native DeepAgents branch is not a supported benchmark path:
 the pinned graph routes to it without ever initializing its required

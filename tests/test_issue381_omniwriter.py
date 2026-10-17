@@ -60,6 +60,8 @@ def test_binding_uses_production_orchestrator_not_upstream_test_graph():
     assert "test/search_user_agent.py" not in text
     assert manifest["adapter"]["binding"] == "omniwriter_bridge.py:create_graph"
     assert "graph_id" not in manifest["adapter"]
+    assert "_install_graph_state_compatibility()" in text
+    assert "gate = asyncio.Semaphore(1)" in text
 
 
 @pytest.mark.parametrize(
@@ -90,6 +92,48 @@ def test_native_prompt_compatibility_preserves_json_and_fills_declared_slots():
     )
 
 
+def test_core_task_is_preserved_for_outline_planning():
+    requirements = _binding()._downstream_requirements(
+        {
+            "user_query": "Write about Nimbus Labs and Project Aurora",
+            "depth_demand": "About 300 words; public release",
+        }
+    )
+
+    assert "Nimbus Labs and Project Aurora" in requirements
+    assert "About 300 words; public release" in requirements
+
+
+def test_public_output_returns_one_article_without_internal_state():
+    result = {
+        "status": "success",
+        "search_results": [{"database_key": "must-not-leak"}],
+        "outline_content": {"internal": "must-not-leak"},
+        "chapter_content": [
+            {"chapter_id": "chap_01", "content": "# Nimbus Labs"},
+            {"chapter_id": "chap_02", "content": "Project Aurora is a research initiative."},
+            {"chapter_id": "chap_01", "content": "# Nimbus Labs"},
+        ],
+    }
+
+    output = _binding()._public_output(result)
+
+    assert output == "# Nimbus Labs\n\nProject Aurora is a research initiative."
+    assert "database_key" not in output
+    assert output.count("# Nimbus Labs") == 1
+
+
+def test_public_output_limits_failures_and_supports_outline_review():
+    module = _binding()
+    assert module._public_output(
+        {"status": "failed", "error": "native failure", "search_results": ["private"]}
+    ) == {"status": "failed", "error": "native failure"}
+    assert module._public_output(
+        {"status": "success", "outline_content": {"outline": []}},
+        is_lookup_outline=True,
+    ) == {"status": "success", "outline": {"outline": []}, "error": None}
+
+
 def test_locked_elasticsearch_compatibility_drops_only_retired_timeout(monkeypatch):
     module = _binding()
     calls = []
@@ -105,6 +149,56 @@ def test_locked_elasticsearch_compatibility_drops_only_retired_timeout(monkeypat
 
     assert FakeESModule.Elasticsearch("host", timeout=180, request_timeout=180) == "client"
     assert calls == [(('host',), {"request_timeout": 180})]
+
+
+def test_model_compatibility_preserves_chat_and_string_embeddings():
+    module = _binding()
+    calls = []
+
+    class FakeChatOpenAI:
+        def __init__(self, *args, **kwargs):
+            calls.append(("chat", args, kwargs))
+
+    class FakeOpenAIEmbeddings:
+        def __init__(self, *args, **kwargs):
+            calls.append(("embeddings", args, kwargs))
+
+    chat_type, embeddings_type = module._compatible_model_types(
+        FakeChatOpenAI, FakeOpenAIEmbeddings
+    )
+    assert chat_type is FakeChatOpenAI
+    embeddings_type(model="vectors")
+
+    assert calls == [
+        (
+            "embeddings",
+            (),
+            {"model": "vectors", "check_embedding_ctx_length": False},
+        ),
+    ]
+
+
+def test_embedding_compatibility_preserves_explicit_native_option():
+    module = _binding()
+    calls = []
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            calls.append(kwargs)
+
+    chat_type, embeddings_type = module._compatible_model_types(FakeClient, FakeClient)
+    assert chat_type is FakeClient
+    embeddings_type(check_embedding_ctx_length=True)
+
+    assert calls == [{"check_embedding_ctx_length": True}]
+
+
+def test_binding_extends_upstream_completion_budget_for_thinking_model():
+    binding = (UNIT / "bindings" / "omniwriter_bridge.py").read_text()
+    upstream_example = (UNIT / "agent" / ".env.example").read_text()
+
+    assert "DEFAULT_LLM_MAX_TOKENS=10000" in upstream_example
+    assert "os.environ.setdefault('DEFAULT_LLM_MAX_TOKENS', '16000')" in binding
 
 
 def test_elasticsearch_wait_requires_a_listening_http_socket(monkeypatch):
@@ -163,7 +257,7 @@ def test_embedded_elasticsearch_and_network_are_explicit():
     assert "elasticsearch-plugin install --batch analysis-icu" in dockerfile
     assert "USER agent" in dockerfile
     assert "AWS_EC2_METADATA_DISABLED" in binding
-    assert "-Xms256m -Xmx256m" in binding
+    assert "-Xms128m -Xmx128m" in binding
     assert "-Expack.ml.enabled=false" in binding
     assert route["host_patterns"] == ["127.0.0.1"]
     assert route["ports"] == [9200]
