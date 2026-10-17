@@ -71,6 +71,10 @@ class EgressSettings:
         return self.mode in ("observe", "open")
 
 
+MEMORY_ENV = "ABB_DOCKER_MEMORY"
+CPUS_ENV = "ABB_DOCKER_CPUS"
+
+
 @dataclass(frozen=True, slots=True)
 class DockerPolicy:
     cpus: float = 1.0
@@ -79,6 +83,16 @@ class DockerPolicy:
     # Capacity limit, not a reservation; tmpfs usage also counts toward memory.
     tmpfs_size: str = "1g"
     egress: EgressSettings = EgressSettings()
+
+    def __post_init__(self) -> None:
+        import os
+        if self.memory == "1g" and os.environ.get(MEMORY_ENV):
+            object.__setattr__(self, "memory", os.environ[MEMORY_ENV])
+        if self.cpus == 1.0 and os.environ.get(CPUS_ENV):
+            try:
+                object.__setattr__(self, "cpus", float(os.environ[CPUS_ENV]))
+            except ValueError:
+                pass
 
     def run_arguments(self) -> tuple[str, ...]:
         return (
