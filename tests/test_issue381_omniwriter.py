@@ -137,6 +137,7 @@ def test_public_output_limits_failures_and_supports_outline_review():
 def test_locked_elasticsearch_compatibility_drops_only_retired_timeout(monkeypatch):
     module = _binding()
     calls = []
+    health_checks = []
 
     class FakeESModule:
         @staticmethod
@@ -145,10 +146,11 @@ def test_locked_elasticsearch_compatibility_drops_only_retired_timeout(monkeypat
             return "client"
 
     monkeypatch.setattr(module.importlib, "import_module", lambda name: FakeESModule)
-    module._install_elasticsearch_compatibility()
+    module._install_elasticsearch_compatibility(lambda: health_checks.append("checked"))
 
     assert FakeESModule.Elasticsearch("host", timeout=180, request_timeout=180) == "client"
     assert calls == [(('host',), {"request_timeout": 180})]
+    assert health_checks == ["checked"]
 
 
 def test_model_compatibility_preserves_chat_and_string_embeddings():
@@ -238,6 +240,26 @@ def test_elasticsearch_wait_requires_a_listening_http_socket(monkeypatch):
     assert listening.closed is True
 
 
+def test_stopped_embedded_elasticsearch_is_restarted(monkeypatch):
+    module = _binding()
+    binding = module.OmniWriterBinding()
+    starts = []
+
+    class StoppedProcess:
+        returncode = 137
+
+        @staticmethod
+        def poll():
+            return 137
+
+    binding._elasticsearch = StoppedProcess()
+    monkeypatch.setattr(binding, "_start_elasticsearch", lambda: starts.append("start"))
+
+    binding._ensure_elasticsearch()
+
+    assert starts == ["start"]
+
+
 @pytest.mark.parametrize(
     "value",
     ["", "   ", {}, {"topic": "x", "invented": True}, {"topic": "x", "thread_id": ""}],
@@ -257,7 +279,9 @@ def test_embedded_elasticsearch_and_network_are_explicit():
     assert "elasticsearch-plugin install --batch analysis-icu" in dockerfile
     assert "USER agent" in dockerfile
     assert "AWS_EC2_METADATA_DISABLED" in binding
-    assert "-Xms128m -Xmx128m" in binding
+    assert "-Xms96m -Xmx96m -XX:MaxDirectMemorySize=32m" in binding
+    assert "-Enode.store.allow_mmap=false" in binding
+    assert "self._ensure_elasticsearch" in binding
     assert "-Expack.ml.enabled=false" in binding
     assert route["host_patterns"] == ["127.0.0.1"]
     assert route["ports"] == [9200]

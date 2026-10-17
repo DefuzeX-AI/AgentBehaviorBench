@@ -207,13 +207,17 @@ def _install_prompt_format_compatibility():
         module.load_prompt = compatible_loader
 
 
-def _install_elasticsearch_compatibility():
-    """Drop one constructor option removed by upstream's locked ES client.
+def _install_elasticsearch_compatibility(ensure_running=None):
+    """Keep the embedded service alive and drop one retired client option.
 
     OmniWriter locks ``elasticsearch==9.3.0`` but its ESClient still supplies
     the legacy alias ``timeout`` alongside ``request_timeout``. The former is
-    rejected before any connection. Keep the native client method intact and
-    remove only that retired duplicate keyword at its imported constructor.
+    rejected before any connection. The 1 GiB Case container may also reclaim
+    the embedded Elasticsearch process while the mandatory-thinking model is
+    producing a long outline. Check that process immediately before each
+    native client is constructed, restarting it against the same data path if
+    necessary. Keep the native client method intact and remove only that
+    retired duplicate keyword at its imported constructor.
     """
     module = importlib.import_module('src.core.es_client')
     constructor = module.Elasticsearch
@@ -221,6 +225,8 @@ def _install_elasticsearch_compatibility():
         return
 
     def compatible_constructor(*args, **kwargs):
+        if ensure_running is not None:
+            ensure_running()
         kwargs.pop('timeout', None)
         return constructor(*args, **kwargs)
 
@@ -356,7 +362,7 @@ def _case_thread_id(config):
     return None
 
 
-def _load_orchestrator_class():
+def _load_orchestrator_class(ensure_elasticsearch=None):
     """Import the native orchestrator, tolerating an uninstalled source root.
 
     ``uv sync`` installs the top-level ``src`` package declared in
@@ -385,7 +391,7 @@ def _load_orchestrator_class():
             _install_graph_state_compatibility()
             from src.pipeline.orchestrator import WriterAgentOrchestrator
             _install_prompt_format_compatibility()
-            _install_elasticsearch_compatibility()
+            _install_elasticsearch_compatibility(ensure_elasticsearch)
             return WriterAgentOrchestrator
         finally:
             if previous is missing:
@@ -409,8 +415,37 @@ class OmniWriterBinding:
         self._previous_cwd = None
         self._elasticsearch = None
         self._elasticsearch_log = None
+        self._elasticsearch_command = None
+        self._elasticsearch_env = None
+        self._elasticsearch_cwd = None
         self._closed = False
         self._lock = RLock()
+
+    def _start_elasticsearch(self):
+        """Start Elasticsearch using the prepared persistent run paths."""
+        self._elasticsearch = subprocess.Popen(
+            self._elasticsearch_command,
+            stdout=self._elasticsearch_log,
+            stderr=subprocess.STDOUT,
+            cwd=self._elasticsearch_cwd,
+            env=self._elasticsearch_env,
+        )
+        _wait_for_elasticsearch(self._elasticsearch)
+
+    def _ensure_elasticsearch(self):
+        """Restart an OOM-reclaimed Elasticsearch before native retrieval."""
+        with self._lock:
+            if self._closed:
+                raise RuntimeError('OmniWriter binding is closed')
+            process = self._elasticsearch
+            if process is not None and process.poll() is None:
+                return
+            exit_code = process.returncode if process is not None else None
+            print(
+                f'Embedded Elasticsearch stopped (code={exit_code}); restarting',
+                file=sys.stderr,
+            )
+            self._start_elasticsearch()
 
     def _load(self):
         """Construct the native orchestrator once, with a writable home.
@@ -466,10 +501,12 @@ class OmniWriterBinding:
                 # Python process crosses that cgroup limit. Even 256 MiB becomes
                 # unsustainable after successful Chroma/ES ingestion loads the
                 # full retrieval and writing graph. The Case corpus has only a
-                # few dozen chunks, so a 128 MiB single-node heap is sufficient.
-                elasticsearch_env['ES_JAVA_OPTS'] = '-Xms128m -Xmx128m'
-                self._elasticsearch = subprocess.Popen(
-                    [
+                # few dozen chunks, so a 96 MiB heap and bounded direct memory
+                # are sufficient; mmap is disabled to reduce cgroup pressure.
+                elasticsearch_env['ES_JAVA_OPTS'] = (
+                    '-Xms96m -Xmx96m -XX:MaxDirectMemorySize=32m'
+                )
+                self._elasticsearch_command = [
                         '/opt/elasticsearch/bin/elasticsearch',
                         '-Ediscovery.type=single-node',
                         '-Expack.security.enabled=false',
@@ -481,14 +518,14 @@ class OmniWriterBinding:
                         f'-Epath.data={es_data}',
                         f'-Epath.logs={es_logs}',
                         '-Eingest.geoip.downloader.enabled=false',
-                    ],
-                    stdout=self._elasticsearch_log,
-                    stderr=subprocess.STDOUT,
-                    cwd=workspace,
-                    env=elasticsearch_env,
-                )
-                _wait_for_elasticsearch(self._elasticsearch)
-                self._native = _load_orchestrator_class()()
+                        '-Enode.store.allow_mmap=false',
+                    ]
+                self._elasticsearch_env = elasticsearch_env
+                self._elasticsearch_cwd = workspace
+                self._start_elasticsearch()
+                self._native = _load_orchestrator_class(
+                    self._ensure_elasticsearch
+                )()
             except BaseException:
                 self.close()
                 raise
