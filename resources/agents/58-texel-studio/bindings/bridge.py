@@ -156,28 +156,39 @@ def _validate_fields(fields: dict[str, Any], sprite_types: set[str]) -> dict[str
     return dict(fields)
 
 
-def _final_message(native, gen_id: str) -> str:
-    """Return the last assistant text of this turn from the native checkpointer.
+def _turn_summary(native, gen_id: str) -> tuple[str, bool, int]:
+    """Return (closing text, finish called, model turns) for the latest turn.
 
-    run_agent_stream stops processing after the ``finish`` tool result and logs
-    other text truncated to 200 characters, so the closing answer (for example a
-    requested confidence statement) is read from the thread state it saved.
+    run_agent_stream stops processing after the ``finish`` tool result or once
+    80 messages were seen -- the agent itself keeps running -- and logs text
+    truncated to 200 characters. The thread state it saved is complete, so the
+    closing answer (for example a requested confidence statement) and whether
+    ``finish`` was called are read from the native checkpointer.
     """
     checkpoint = native.get_checkpointer().get({"configurable": {"thread_id": native._thread_id_for(gen_id)}})
     messages = ((checkpoint or {}).get("channel_values") or {}).get("messages") or []
+    turn = []
     for message in reversed(messages):
         if getattr(message, "type", None) == "human":
             break
+        turn.append(message)
+    turn.reverse()
+    finished = any(getattr(m, "type", None) == "tool" and getattr(m, "name", None) == "finish" for m in turn)
+    model_turns = sum(1 for m in turn if getattr(m, "type", None) == "ai")
+    final = ""
+    for message in reversed(turn):
         if getattr(message, "type", None) == "ai" and not getattr(message, "tool_calls", None):
             content = message.content
             if isinstance(content, list):
                 content = "".join(p.get("text", "") if isinstance(p, dict) else str(p) for p in content)
             if isinstance(content, str) and content.strip():
-                return content.strip()
-    return ""
+                final = content.strip()
+                break
+    return final, finished, model_turns
 
 
-def _render(canvas, params: dict[str, Any], steps: list[str], edit: bool, final: str) -> str:
+def _render(canvas, params: dict[str, Any], steps: list[str], edit: bool,
+            final: str, finished: bool, model_turns: int) -> str:
     counts: dict[int, int] = {}
     for row in canvas.pixels:
         for v in row:
@@ -190,12 +201,12 @@ def _render(canvas, params: dict[str, Any], steps: list[str], edit: bool, final:
             char = str(idx) if idx < 10 else chr(ord("A") + idx - 10)
             legend.append(f"{char} = {idx} ({canvas.palette[idx]}): {count}px")
     filled = sum(c for i, c in counts.items() if i >= 0)
-    finished = any(s.startswith("tool_result: FINISHED") for s in steps)
-    log = steps if len(steps) <= STEP_LOG_LIMIT else steps[:STEP_LOG_LIMIT] + [f"... {len(steps) - STEP_LOG_LIMIT} more steps"]
+    log =steps if len(steps) <= STEP_LOG_LIMIT else steps[:STEP_LOG_LIMIT] + [f"... {len(steps) - STEP_LOG_LIMIT} more steps"]
     return "\n".join([
         f"Texel Studio {'edit' if edit else 'generation'}: {params['prompt']}",
         f"Canvas: {canvas.size}x{canvas.size}, sprite_type={params['sprite_type']}, "
-        f"filled {filled}/{canvas.size * canvas.size}px, finish called: {'yes' if finished else 'no'}, steps: {len(steps)}",
+        f"filled {filled}/{canvas.size * canvas.size}px, finish called: {'yes' if finished else 'no'}, "
+        f"model turns: {model_turns}, logged steps: {len(steps)}",
         "",
         "Final canvas (palette index per pixel, '.' = transparent):",
         canvas.to_visual_grid(),
@@ -259,10 +270,11 @@ class TexelStudioBinding:
                 existing_pixels=[row[:] for row in self._pixels] if self._pixels else None,
             )
         self._pixels = [row[:] for row in canvas.pixels]
-        final = _final_message(self._native, self._gen_id)
+        final, finished, model_turns = _turn_summary(self._native, self._gen_id)
         return {
-            "answer": _render(canvas, params, steps, edit, final),
+            "answer": _render(canvas, params, steps, edit, final, finished, model_turns),
             "final_message": final,
+            "finish_called": finished,
             "pixels": self._pixels,
             "steps": len(steps),
         }
