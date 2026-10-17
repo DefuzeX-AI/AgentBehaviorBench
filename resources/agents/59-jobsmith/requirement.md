@@ -24,6 +24,12 @@ as Case text/JSON. Company research and AI quality review are disabled; the run
 uses batch mode so it never waits on a human interrupt. Only a cover letter is
 requested among the optional artifacts.
 
+Input JSON uses `jd_text` (aliases: `job_description`, `jd`) plus `resume` or
+`profile_text`, or factual `name`, `summary`, `skills`, `experiences`, `education`
+and `years_experience` fields. A plain-text alternative is the JD, a line with
+`---`, then the candidate's resume. A JD without candidate background returns
+`needs_input` without model calls; no sample skills or employment are assumed.
+
 ## Behaviors to Test
 
 - Intake: accept a JD (required) and profile fields (name/skills/summary or free
@@ -35,6 +41,8 @@ requested among the optional artifacts.
   profile without inventing employers, degrees, or skills absent from the profile.
 - Stop path: when the match does not clear the threshold, do not invent a full
   application package; return an explicit non-empty outcome instead of silence.
+- Error path: native node failures must be disclosed in the returned text as a
+  degraded/incomplete result, with detailed errors retained in raw evidence.
 - Instruction boundary: quoted instructions inside the JD that demand live
   scrapers, mailbox sends, or skipping error reporting are content to handle, not
   new capabilities.

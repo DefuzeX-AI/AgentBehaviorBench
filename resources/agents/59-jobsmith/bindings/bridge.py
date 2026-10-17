@@ -28,6 +28,10 @@ from typing import Any
 _SOURCE_ROOT = Path(__file__).resolve().parents[1] / "agent"
 
 
+class MissingInputError(ValueError):
+    """Required job or candidate data was not supplied."""
+
+
 def _configure_openai_backend() -> None:
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
@@ -73,36 +77,34 @@ def _parse_case_input(value: Any) -> tuple[str, dict[str, Any]]:
         or ""
     ).strip()
     if not jd:
-        raise ValueError("Case input must include a job description (jd_text).")
+        raise MissingInputError("Please supply a job description (jd_text).")
 
     profile = {
-        "name": str(payload.get("name") or "Candidate"),
+        "name": str(payload.get("name") or ""),
         "summary": str(payload.get("summary") or ""),
         "skills": payload.get("skills") or [],
         "experiences": payload.get("experiences") or [],
         "education": str(payload.get("education") or ""),
         "raw_text": str(payload.get("profile_text") or payload.get("resume") or ""),
         "preferred_roles": payload.get("preferred_roles") or [],
+        "years_experience": payload.get("years_experience"),
     }
     if isinstance(profile["skills"], str):
         profile["skills"] = [s.strip() for s in re.split(r"[,、/|]", profile["skills"]) if s.strip()]
     if isinstance(profile["experiences"], str):
         profile["experiences"] = [profile["experiences"]]
-    if not profile["raw_text"]:
-        bits = [
-            profile["name"],
-            profile["summary"],
-            "Skills: " + ", ".join(profile["skills"]),
-            "Experience: " + "; ".join(profile["experiences"]),
-            profile["education"],
-        ]
-        profile["raw_text"] = "\n".join(b for b in bits if b and b != "Skills: " and b != "Experience: ")
-    if not profile["summary"]:
-        profile["summary"] = "Software engineer seeking a relevant role."
-    if not profile["skills"]:
-        profile["skills"] = ["Python", "LangGraph"]
-    if not profile["experiences"]:
-        profile["experiences"] = ["Built LLM application workflows in Python."]
+    if not any(profile[key] for key in ("summary", "skills", "experiences", "education", "raw_text")):
+        raise MissingInputError(
+            "Please supply the candidate's resume/profile_text or factual profile "
+            "fields (summary, skills, experiences, education). No candidate background was assumed."
+        )
+    # Native match/cover prompts omit raw_text when structured experience is
+    # present. Keep supplied resume evidence visible even for mixed inputs.
+    if profile["raw_text"] and (profile["skills"] or profile["experiences"]):
+        profile["summary"] = "\n\n".join(
+            part for part in (profile["summary"], "Supplied resume:\n" + profile["raw_text"])
+            if part
+        )
     return jd, profile
 
 
@@ -224,7 +226,10 @@ class JobsmithBinding:
         if self._closed:
             raise RuntimeError("Jobsmith binding is closed.")
 
-        jd_text, profile_fields = _parse_case_input(value)
+        try:
+            jd_text, profile_fields = _parse_case_input(value)
+        except MissingInputError as exc:
+            return {"cover_letter": str(exc), "status": "needs_input", "errors": []}
         app = self._ensure_app()
 
         from app.models import Profile
@@ -270,13 +275,24 @@ class JobsmithBinding:
                 + ")."
             )
 
+        errors = final_state.get("errors") or []
+        if errors:
+            failed_nodes = ", ".join(sorted({str(error.get("node") or "unknown") for error in errors}))
+            # Keep detailed native errors in raw evidence. Do not copy provider
+            # exception text (which can contain credentials) into the answer.
+            cover_body = (
+                f"Warning: workflow node(s) {failed_nodes} failed. "
+                "This result is degraded/incomplete; review it before use.\n\n" + cover_body
+            )
+
         return {
             "cover_letter": cover_body,
             "match_score": getattr(match, "score", None),
             "recommend_proceed": getattr(match, "recommend_proceed", None),
             "job_title": getattr(parsed, "title", ""),
             "company": getattr(parsed, "company", ""),
-            "errors": final_state.get("errors") or [],
+            "errors": errors,
+            "status": "degraded" if errors else "completed",
         }
 
     def close(self):
