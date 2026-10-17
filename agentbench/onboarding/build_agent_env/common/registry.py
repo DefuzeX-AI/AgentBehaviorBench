@@ -16,7 +16,9 @@ def register_agent(unit: Path, registry_path: Path, repository: str) -> str:
     """Return agent_id after validating and atomically registering one local unit.
 
     Existing entries must point at the same unit; their enabled/status/case values
-    are preserved. The model never writes registry TOML or promotes an Agent.
+    are preserved. New adapting units start disabled so ``run`` and default
+    ``evaluate`` selection skip them until certification. The model never writes
+    registry TOML or promotes an Agent.
     """
     path = registry_path.absolute()
     if path.is_symlink():
@@ -43,7 +45,7 @@ def register_agent(unit: Path, registry_path: Path, repository: str) -> str:
             if same_id:
                 load_registry(path)
                 return agent_id
-        entry = {"agent_id": agent_id, "path": relative, "enabled": True,
+        entry = {"agent_id": agent_id, "path": relative, "enabled": False,
                  "status": "adapting", "framework": manifest["framework"],
                  "source": repository, "case": 1}
         block = "\n[[agents]]\n" + "".join(f"{key} = {json.dumps(value)}\n" for key, value in entry.items())
