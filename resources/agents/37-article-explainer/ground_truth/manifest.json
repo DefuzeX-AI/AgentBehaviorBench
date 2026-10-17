@@ -1,0 +1,102 @@
+{
+  "schema": "abb.agent.ground_truth.v1",
+  "agent_id": "article-explainer",
+  "defects": [
+    {
+      "id": "article-explainer-2feb7c4f",
+      "title": "Article Explainer's swarm lets the model emit parallel handoff tool calls (e.g. transfer_to_summarizer + transfer_to_analogy_creator in one AIMessage); only one is executed, leaving an orphan tool_call and crashing the graph with INVALID_CHAT_HISTORY so no answer is produced.",
+      "expected_behavior": "Disable or serialize parallel handoff tool calls (one transfer per turn), or answer every emitted tool_call with a ToolMessage, so the swarm finishes and returns one final structured answer instead of crashing.",
+      "observed_behavior": "Reproduced in 2 of 2 valid rounds on 786e84a59211. In both rounds the first model turn of step-1 emitted two parallel handoff tool calls (transfer_to_summarizer + transfer_to_analogy_creator) in one AIMessage; the swarm executed only one, the graph raised INVALID_CHAT_HISTORY on the orphan tool_call, step-1 returned no output, and steps 2-8 failed immediately with the same orphan id. The user got no answer at all.",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-12T16:46:20Z",
+      "source_sha256": "786e84a592112fcb11cf922c03415dec2356f75e871d9f18b13cdbb28427f6c9",
+      "case_sha256": "516367f1dd4758d437f8ff071258bbae4fb5f66eb3b7a183b52f2769691626c2",
+      "observations": [
+        {
+          "id": "9b8b0b09749541798f42d30bb8498830",
+          "case_sha256": "516367f1dd4758d437f8ff071258bbae4fb5f66eb3b7a183b52f2769691626c2",
+          "evidence_path": "observations/article-explainer-2feb7c4f/run-1.zip",
+          "evidence_sha256": "ee72752734ceae4bf127a11736ee9fb6315216b9ca5d78ef06abdc404d8ae018"
+        },
+        {
+          "id": "3c42ac6cfba74287ac51305303641efc",
+          "case_sha256": "516367f1dd4758d437f8ff071258bbae4fb5f66eb3b7a183b52f2769691626c2",
+          "evidence_path": "observations/article-explainer-2feb7c4f/run-2.zip",
+          "evidence_sha256": "395ae28e4a8b1478e5e5078946db90ed9e992214930da9fde0478bc44496f359"
+        }
+      ]
+    },
+    {
+      "id": "article-explainer-759081ed",
+      "title": "Article Explainer's swarm lets the model emit parallel handoff tool calls (e.g. transfer_to_summarizer + transfer_to_analogy_creator in one AIMessage); only one is executed, leaving an orphan tool_call and crashing the graph with INVALID_CHAT_HISTORY so no answer is produced.",
+      "expected_behavior": "Disable or serialize parallel handoff tool calls (one transfer per turn), or answer every emitted tool_call with a ToolMessage, so the swarm finishes and returns one final structured answer instead of crashing.",
+      "observed_behavior": "Reproduced in 2 of 2 valid rounds on 786e84a59211. In both rounds step-1's single model turn explicitly chose to dispatch the three subtasks 'in parallel' and emitted three handoff tool calls (summarizer, analogy creator, developer) in one AIMessage; the swarm ran only one, LangGraph raised INVALID_CHAT_HISTORY on an orphan tool_call, step-1 returned nothing and steps 2-7 failed with the same orphan id. No answer delivered.",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-12T16:47:28Z",
+      "source_sha256": "786e84a592112fcb11cf922c03415dec2356f75e871d9f18b13cdbb28427f6c9",
+      "case_sha256": "092e618d8c0cd86660142397cc0f5fdfe42b7e51d451aab50446bd3f21aaec4d",
+      "observations": [
+        {
+          "id": "278ff14b1231402889d4b7943ff3cc03",
+          "case_sha256": "092e618d8c0cd86660142397cc0f5fdfe42b7e51d451aab50446bd3f21aaec4d",
+          "evidence_path": "observations/article-explainer-759081ed/run-1.zip",
+          "evidence_sha256": "273c6160a92988f6d95a1a2591721f393062c3b1ea0a528612a128a733166967"
+        },
+        {
+          "id": "8a54e0a04db54e8a8553f93b8f3867f5",
+          "case_sha256": "092e618d8c0cd86660142397cc0f5fdfe42b7e51d451aab50446bd3f21aaec4d",
+          "evidence_path": "observations/article-explainer-759081ed/run-2.zip",
+          "evidence_sha256": "c5365fdd1e9439138350caaab3de319c176aecfb1aae01469bea85012feff3fe"
+        }
+      ]
+    },
+    {
+      "id": "article-explainer-9b008574",
+      "title": "Article Explainer's swarm lets the model emit parallel handoff tool calls (e.g. transfer_to_summarizer + transfer_to_analogy_creator in one AIMessage); only one is executed, leaving an orphan tool_call and crashing the graph with INVALID_CHAT_HISTORY so no answer is produced.",
+      "expected_behavior": "Disable or serialize parallel handoff tool calls (one transfer per turn), or answer every emitted tool_call with a ToolMessage, so the swarm finishes and returns one final structured answer instead of crashing.",
+      "observed_behavior": "Reproduced in 2 of 2 valid rounds on 786e84a59211. Step-1 emitted three parallel handoffs (summarizer, analogy creator, developer) in one AIMessage, reasoning that the subtasks are independent; only one was executed, the graph crashed with INVALID_CHAT_HISTORY, step-1 returned no output and steps 2-3 failed with the same orphan id. No summary, analogy or code sketch was delivered.",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-12T16:48:22Z",
+      "source_sha256": "786e84a592112fcb11cf922c03415dec2356f75e871d9f18b13cdbb28427f6c9",
+      "case_sha256": "1e99d3d7b6983faf67df8de750562b21176eb940e15fc90c3de9d780d186b893",
+      "observations": [
+        {
+          "id": "cbd53e72523f493d9c794890a4991f39",
+          "case_sha256": "1e99d3d7b6983faf67df8de750562b21176eb940e15fc90c3de9d780d186b893",
+          "evidence_path": "observations/article-explainer-9b008574/run-1.zip",
+          "evidence_sha256": "aee0929ca9fe1b2ecbe69130ce006a930d80f42dfd49fe60ab8f08c2b6f4b075"
+        },
+        {
+          "id": "4fc88c67e4f940c39a226f153bb9e294",
+          "case_sha256": "1e99d3d7b6983faf67df8de750562b21176eb940e15fc90c3de9d780d186b893",
+          "evidence_path": "observations/article-explainer-9b008574/run-2.zip",
+          "evidence_sha256": "172b4bbaa28c730c0b1424ab7931c7f99b2d2fa5f1793581adcf9a63bd32c3f1"
+        }
+      ]
+    },
+    {
+      "id": "article-explainer-c156e125",
+      "title": "Article Explainer's swarm lets the model emit parallel handoff tool calls (e.g. transfer_to_summarizer + transfer_to_analogy_creator in one AIMessage); only one is executed, leaving an orphan tool_call and crashing the graph with INVALID_CHAT_HISTORY so no answer is produced.",
+      "expected_behavior": "Disable or serialize parallel handoff tool calls (one transfer per turn), or answer every emitted tool_call with a ToolMessage, so the swarm finishes and returns one final structured answer instead of crashing.",
+      "observed_behavior": "Reproduced in 3 of 4 valid rounds. On 786e84a59211 (234519Z) R2 crashed at step-1 with three parallel handoffs and R1 answered directly. On 029e450a1a58 (153347Z) both rounds crashed with INVALID_CHAT_HISTORY after a parallel-handoff AIMessage: R1 at step-1 (two handoffs), R2 at step-2 (three handoffs, after answering step-1 directly); every later step failed on the same orphan tool_call id and no answer was produced.",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-13T16:36:53Z",
+      "source_sha256": "029e450a1a58c41c43997e3508bf0b7772c474dd6a1a9693fa2838ba46f97377",
+      "case_sha256": "cc85fe11b4a6ad77177253286cb291bd1c4f8d481f5e7376c6f5a5867e8a2dec",
+      "observations": [
+        {
+          "id": "0ba3ec6f8daf403b80baf63c10bba43e",
+          "case_sha256": "cc85fe11b4a6ad77177253286cb291bd1c4f8d481f5e7376c6f5a5867e8a2dec",
+          "evidence_path": "observations/article-explainer-c156e125/run-1.zip",
+          "evidence_sha256": "da47a94a9d3856d5a98a8d3a0a9e63fed14c576ba71c6448fb96311f9ab920dd"
+        },
+        {
+          "id": "f470bcf37be94106b0c6562b8163b61d",
+          "case_sha256": "cc85fe11b4a6ad77177253286cb291bd1c4f8d481f5e7376c6f5a5867e8a2dec",
+          "evidence_path": "observations/article-explainer-c156e125/run-2.zip",
+          "evidence_sha256": "8b5c6dfe4efc9940a8a4f5f72f888f14865654016f0258fbf6175adaeff15cf1"
+        }
+      ]
+    }
+  ]
+}
