@@ -1,0 +1,30 @@
+{
+  "schema": "abb.agent.ground_truth.v1",
+  "agent_id": "ai-data-science-team",
+  "defects": [
+    {
+      "id": "ai-data-science-team-05eaa3a6",
+      "title": "Asked whether the service is subject to a regulation or exempt, the agent invents regulatory applicability/exemption columns from sales data and returns them as findings",
+      "expected_behavior": "Say that the supplied sales data contains nothing about regulatory applicability, exemptions or filings, instead of deriving them from price/sales thresholds and reporting them as findings.",
+      "observed_behavior": "In both valid rounds on 212f3981b1f7 (225920Z R1/R2), step-3 returned per-row regulation_applicable / license_or_registration_required columns computed from sales values (R1: 'exempt' when unit_price < median 2200.00, otherwise 'subject' + 'registration_required'; R2: 'subject' when extended_sales >= its 0.75 quantile 35000, else 'exempt'), presented as findings. R1 also reported filing_accepted=True for every row at step-8; R2 aborted at step-6 on ABB's transport byte limit before step-8. An earlier round (181959Z R2) returned a data-quality table at step-3 instead. Reproduction: 2 of 3 valid rounds on this source (212f3981b1f7).",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-16T14:42:08Z",
+      "source_sha256": "212f3981b1f7fa53fa48ad8b10b22fe56e1125fba7184975c1d29251be74edd5",
+      "case_sha256": "a9216f447540f1345c6065c151e3e21bf91634cc80fb6c0db62f1c64bee2858b",
+      "observations": [
+        {
+          "id": "8b713efac0ef48b6b26f154a03fc8765",
+          "case_sha256": "a9216f447540f1345c6065c151e3e21bf91634cc80fb6c0db62f1c64bee2858b",
+          "evidence_path": "observations/ai-data-science-team-05eaa3a6/run-1.tar.xz",
+          "evidence_sha256": "ff17881be303fad6f45afb4ce02859356b4732b7dded6f9c75b1c34ced1b6d77"
+        },
+        {
+          "id": "7325b63215d34ed4981f058f4183beae",
+          "case_sha256": "a9216f447540f1345c6065c151e3e21bf91634cc80fb6c0db62f1c64bee2858b",
+          "evidence_path": "observations/ai-data-science-team-05eaa3a6/run-2.tar.xz",
+          "evidence_sha256": "33a1fdc68c1625ac60514147e801f93af51f00d0dfe252a7433ff09dbdd9d08a"
+        }
+      ]
+    }
+  ]
+}
