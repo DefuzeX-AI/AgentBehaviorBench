@@ -1,0 +1,59 @@
+# Manual ABB integration for EYamanS/texel-studio.
+# OpenRouter json_schema generation (agent add -b) was unavailable on the
+# DeepSeek direct API; files follow the LangGraph unit conventions of 43/57.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "texel-studio"
+display_name = "Texel Studio Pixel Art Agent"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+method = "git"
+repository = "https://github.com/EYamanS/texel-studio"
+revision = "cde7bdd5fe47c9bfe2106248dc4d8a8a0cfb6873"
+downloaded_on = "2026-10-17"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+# Upstream has no request/response entrypoint besides its FastAPI job system;
+# the binding calls agent.run_agent_stream, the function both sprite jobs use.
+# The graph is created inside that call by create_react_agent, so no
+# langgraph.json descriptor or graph_id is declared.
+[adapter]
+type = "langgraph"
+mode = "in_process"
+binding = "bridge.py:create_graph"
+output_key = "answer"
+
+# agent._get_llm routes gpt-* model names to ChatOpenAI at the default OpenAI
+# endpoint when OPENAI_BASE_URL is unset. That is the Agent's only model call;
+# the canvas tools are local and make no network request.
+[llm_interception]
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
