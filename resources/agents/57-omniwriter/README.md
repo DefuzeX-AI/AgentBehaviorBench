@@ -71,13 +71,16 @@ Required non-secret variables:
 Required secrets:
 
 - `LLM_BASE_API_KEY` (declared as the intercepted chat credential)
-- `EMBEDDING_BASE_API_KEY`
+- `EMBEDDING_BASE_API_KEY` (declared as the intercepted vector credential and
+  selected as the host-side credential for the vector target)
 - `TAVILY_API_KEY`
 
 The chat route is OpenAI-compatible `POST
-ark.cn-beijing.volces.com/api/coding/v3/chat/completions`. Tool egress is
-limited to Tavily search, the Ark embeddings route and the loopback
-Elasticsearch root/default-index paths used by the upstream client.
+ark.cn-beijing.volces.com/api/coding/v3/chat/completions`. The committed
+`model-routing.toml` keeps chat on the selected run target and sends recognized
+OpenAI-compatible embedding calls to the dedicated Ark vector target. Ordinary
+tool egress is limited to Tavily search and the loopback Elasticsearch
+root/default-index paths used by the upstream client.
 
 ## Verification
 
@@ -96,5 +99,6 @@ pytest -q tests/test_issue381_omniwriter.py
 The real one-Case smoke test (requires all variables above) is:
 
 ```bash
-python -m agentbench evaluate omniwriter --cases 1 --sdk local --no-view
+ABB_MODEL_ROUTING_CONFIG="$PWD/resources/agents/57-omniwriter/model-routing.toml" \
+  python -m agentbench evaluate omniwriter --cases 1 --sdk local --no-view
 ```

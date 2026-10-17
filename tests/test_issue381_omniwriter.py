@@ -173,18 +173,32 @@ def test_embedded_elasticsearch_and_network_are_explicit():
 
 def test_manifest_declares_only_real_external_routes_and_secrets():
     manifest = tomllib.loads((UNIT / "agent.toml").read_text())
+    routing = tomllib.loads((UNIT / "model-routing.toml").read_text())
     runtime = manifest["runtime"]
     interception = manifest["llm_interception"]
 
-    assert runtime["secret_env_keys"] == ["EMBEDDING_BASE_API_KEY", "TAVILY_API_KEY"]
-    assert interception["credentials"][0]["agent_env"] == "LLM_BASE_API_KEY"
+    assert runtime["secret_env_keys"] == ["TAVILY_API_KEY"]
+    assert {item["agent_env"] for item in interception["credentials"]} == {
+        "LLM_BASE_API_KEY",
+        "EMBEDDING_BASE_API_KEY",
+    }
     assert interception["network_config"] == "network/rules.toml"
     tool_hosts = {
         host
         for route in interception["tool_routes"]
         for host in route["host_patterns"]
     }
-    assert tool_hosts == {"api.tavily.com", "ark.cn-beijing.volces.com"}
+    assert tool_hosts == {"api.tavily.com"}
+    assert routing["targets"]["conversation"] == {"use_run_target": True}
+    assert routing["targets"]["vectors"]["credential_env"] == "EMBEDDING_BASE_API_KEY"
+    assert routing["targets"]["vectors"]["model"] == "doubao-embedding-vision-251215"
+    assert routing["targets"]["vectors"]["endpoint_paths"] == {
+        "/embeddings": "/embeddings"
+    }
+    assert {tuple(rule["protocols"]) for rule in routing["rules"]} == {
+        ("openai-chat",),
+        ("openai-embeddings",),
+    }
 
 
 def test_requirement_matches_the_native_branch_topology():
@@ -215,6 +229,7 @@ def test_unit_ships_every_outer_build_input_without_secrets():
         "Dockerfile",
         ".dockerignore",
         "agent.toml",
+        "model-routing.toml",
         "source-manifest.json",
         "bindings/omniwriter_bridge.py",
         "network/rules.toml",

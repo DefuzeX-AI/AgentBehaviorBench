@@ -18,7 +18,7 @@ type = "docker"
 execution = "oneshot"
 timeout_sec = 1800
 env_keys = ["LLM_BASE_URL", "EMBEDDING_BASE_URL", "EMBEDDING_MODEL"]
-secret_env_keys = ["EMBEDDING_BASE_API_KEY", "TAVILY_API_KEY"]
+secret_env_keys = ["TAVILY_API_KEY"]
 
 [build]
 context = "."
@@ -43,6 +43,11 @@ id = "openai-llm-base-api-key"
 agent_env = "LLM_BASE_API_KEY"
 auth_plugin = "bearer-token"
 
+[[llm_interception.credentials]]
+id = "openai-embedding-base-api-key"
+agent_env = "EMBEDDING_BASE_API_KEY"
+auth_plugin = "bearer-token"
+
 [[llm_interception.routes]]
 id = "openai-chat"
 host_patterns = ["ark.cn-beijing.volces.com"]
@@ -56,10 +61,4 @@ credential = "openai-llm-base-api-key"
 host_patterns = ["api.tavily.com"]
 methods = ["POST"]
 path_patterns = ["/search"]
-ports = [443]
-
-[[llm_interception.tool_routes]]
-host_patterns = ["ark.cn-beijing.volces.com"]
-methods = ["POST"]
-path_patterns = ["/api/coding/v3/embeddings"]
 ports = [443]
