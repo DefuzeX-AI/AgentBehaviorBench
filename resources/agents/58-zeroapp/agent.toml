@@ -1,0 +1,68 @@
+# Manual ABB integration for shodan1q/zeroapp (ZeroDev).
+# The upstream repository is a LangGraph project but ships no langgraph.json,
+# so the outer binding calls the real Python factory in agent/ directly.
+# Files follow the validated LangGraph unit conventions used by ready Agents.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "zeroapp"
+display_name = "ZeroDev App Factory (LangGraph)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+method = "git"
+repository = "https://github.com/shodan1q/zeroapp"
+revision = "e081199fe9e9005715891860f43188e214acf163"
+downloaded_on = "2026-10-17"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+# One app brief fans out into a plan plus several concurrent asset-generation
+# calls, and the supervisor may rework a rejected app once, so the budget has
+# to cover two full generation rounds plus the headless-DOM runtime gate.
+timeout_sec = 1800
+env_keys = ["OPENAI_MODEL"]
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+binding = "bridge.py:create_graph"
+output_key = "answer"
+
+[llm_interception]
+trust_plugin = "pem-env"
+tool_routes = []
+
+# ZeroDev resolves its provider as settings.json > environment > registry
+# default, and the registry default is the Anthropic SDK path. Pinning the
+# OpenAI-compatible provider routes every generation call through the
+# Chat Completions endpoint below, which is what the interceptor observes.
+# OPENAI_API_KEY stays out of this table: it is credential-owned.
+[llm_interception.environment]
+LLM_PROVIDER = "openai"
+OPENAI_BASE_URL = "https://api.openai.com/v1"
+PIPELINE_CHECKPOINT_BACKEND = "memory"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
