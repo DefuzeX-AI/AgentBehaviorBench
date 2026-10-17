@@ -47,8 +47,10 @@ Native contract (source under ``agent/`` is unchanged):
    the native ``MemorySaver``) and PNG export.
 
 Output: ``{"answer": <report>}`` built from the returned ``Canvas`` -- the
-upstream ``to_visual_grid`` rendering, palette legend, fill statistics and the
-step log the native ``on_step`` callback emitted. Native exceptions propagate.
+upstream ``to_visual_grid`` rendering, palette legend, fill statistics, the
+agent's closing message (read from the native checkpointer, because the stream
+loop drops or truncates it) and the step log the native ``on_step`` callback
+emitted. Native exceptions propagate.
 """
 
 from __future__ import annotations
@@ -154,7 +156,28 @@ def _validate_fields(fields: dict[str, Any], sprite_types: set[str]) -> dict[str
     return dict(fields)
 
 
-def _render(canvas, params: dict[str, Any], steps: list[str], edit: bool) -> str:
+def _final_message(native, gen_id: str) -> str:
+    """Return the last assistant text of this turn from the native checkpointer.
+
+    run_agent_stream stops processing after the ``finish`` tool result and logs
+    other text truncated to 200 characters, so the closing answer (for example a
+    requested confidence statement) is read from the thread state it saved.
+    """
+    checkpoint = native.get_checkpointer().get({"configurable": {"thread_id": native._thread_id_for(gen_id)}})
+    messages = ((checkpoint or {}).get("channel_values") or {}).get("messages") or []
+    for message in reversed(messages):
+        if getattr(message, "type", None) == "human":
+            break
+        if getattr(message, "type", None) == "ai" and not getattr(message, "tool_calls", None):
+            content = message.content
+            if isinstance(content, list):
+                content = "".join(p.get("text", "") if isinstance(p, dict) else str(p) for p in content)
+            if isinstance(content, str) and content.strip():
+                return content.strip()
+    return ""
+
+
+def _render(canvas, params: dict[str, Any], steps: list[str], edit: bool, final: str) -> str:
     counts: dict[int, int] = {}
     for row in canvas.pixels:
         for v in row:
@@ -178,6 +201,9 @@ def _render(canvas, params: dict[str, Any], steps: list[str], edit: bool) -> str
         canvas.to_visual_grid(),
         "",
         "Legend: " + "; ".join(legend),
+        "",
+        "Agent final message:",
+        final or "(none)",
         "",
         "Agent steps:",
         *log,
@@ -233,7 +259,13 @@ class TexelStudioBinding:
                 existing_pixels=[row[:] for row in self._pixels] if self._pixels else None,
             )
         self._pixels = [row[:] for row in canvas.pixels]
-        return {"answer": _render(canvas, params, steps, edit), "pixels": self._pixels, "steps": len(steps)}
+        final = _final_message(self._native, self._gen_id)
+        return {
+            "answer": _render(canvas, params, steps, edit, final),
+            "final_message": final,
+            "pixels": self._pixels,
+            "steps": len(steps),
+        }
 
     def close(self):
         self._closed = True
