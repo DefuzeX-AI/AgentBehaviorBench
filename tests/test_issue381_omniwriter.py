@@ -1,0 +1,440 @@
+import importlib.util
+import json
+import sys
+import tomllib
+from pathlib import Path
+
+import pytest
+
+from agentbench.harness.registry import load_registry
+
+
+ROOT = Path(__file__).parents[1]
+UNIT = ROOT / "resources" / "agents" / "58-omniwriter"
+REPOSITORY = "https://github.com/twanew/OmniWriter"
+REVISION = "2d0aedc00552795bfa366fcbc123888042493dea"
+
+
+def _binding():
+    name = "issue381_omniwriter_binding"
+    if name in sys.modules:
+        return sys.modules[name]
+    spec = importlib.util.spec_from_file_location(
+        name, UNIT / "bindings" / "omniwriter_bridge.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_source_registry_and_runtime_are_pinned_for_issue381():
+    manifest = tomllib.loads((UNIT / "agent.toml").read_text())
+    source = json.loads((UNIT / "source-manifest.json").read_text())
+    registration = load_registry(ROOT / "resources" / "registry.toml").find(
+        "omniwriter", enabled_only=False
+    )
+
+    assert manifest["source"] == {
+        "repository": REPOSITORY,
+        "revision": REVISION,
+        "downloaded_on": "2026-10-16",
+        "method": "git",
+    }
+    assert source["repository"] == REPOSITORY
+    assert source["revision"] == REVISION
+    assert registration.path == UNIT
+    assert registration.status == "adapting"
+    assert registration.enabled is False
+    assert registration.max_steps == 1
+    assert manifest["runtime"]["timeout_sec"] == 1800
+
+
+def test_binding_uses_production_orchestrator_not_upstream_test_graph():
+    text = (UNIT / "bindings" / "omniwriter_bridge.py").read_text()
+    manifest = tomllib.loads((UNIT / "agent.toml").read_text())
+
+    assert "src.pipeline.orchestrator import WriterAgentOrchestrator" in text
+    assert "from src.pipeline.state_model import MessageState" in text
+    assert "builtins.MessageState = MessageState" in text
+    assert "test/search_user_agent.py" not in text
+    assert manifest["adapter"]["binding"] == "omniwriter_bridge.py:create_graph"
+    assert "graph_id" not in manifest["adapter"]
+    assert "_install_graph_state_compatibility()" in text
+    assert "gate = asyncio.Semaphore(1)" in text
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("write about retrieval", ("write about retrieval", None, None, False)),
+        (
+            {
+                "topic": "write about retrieval",
+                "demand": "concise",
+                "thread_id": "case-381",
+                "is_lookup_outline": True,
+            },
+            ("write about retrieval", "concise", "case-381", True),
+        ),
+    ],
+)
+def test_boundary_preserves_native_input_fields(value, expected):
+    assert _binding().request_from_input(value) == expected
+
+
+def test_native_prompt_compatibility_preserves_json_and_fills_declared_slots():
+    template = '{\n  "route_to": "title_decomposer"\n}\nTopic: {{ user_query }}'
+    escaped = _binding()._escape_native_format_template(template, ("user_query",))
+
+    assert escaped.format(user_query="retrieval") == (
+        '{\n  "route_to": "title_decomposer"\n}\nTopic: retrieval'
+    )
+
+
+def test_core_task_is_preserved_for_outline_planning():
+    requirements = _binding()._downstream_requirements(
+        {
+            "user_query": "Write about Nimbus Labs and Project Aurora",
+            "depth_demand": "About 300 words; public release",
+        }
+    )
+
+    assert "Nimbus Labs and Project Aurora" in requirements
+    assert "About 300 words; public release" in requirements
+
+
+def test_public_output_returns_one_article_without_internal_state():
+    result = {
+        "status": "success",
+        "search_results": [{"database_key": "must-not-leak"}],
+        "outline_content": {"internal": "must-not-leak"},
+        "chapter_content": [
+            {"chapter_id": "chap_01", "content": "# Nimbus Labs"},
+            {"chapter_id": "chap_02", "content": "Project Aurora is a research initiative."},
+            {"chapter_id": "chap_01", "content": "# Nimbus Labs"},
+        ],
+    }
+
+    output = _binding()._public_output(result)
+
+    assert output == "# Nimbus Labs\n\nProject Aurora is a research initiative."
+    assert "database_key" not in output
+    assert output.count("# Nimbus Labs") == 1
+
+
+def test_public_output_limits_failures_and_supports_outline_review():
+    module = _binding()
+    assert module._public_output(
+        {"status": "failed", "error": "native failure", "search_results": ["private"]}
+    ) == {"status": "failed", "error": "native failure"}
+    assert module._public_output(
+        {"status": "success", "outline_content": {"outline": []}},
+        is_lookup_outline=True,
+    ) == {"status": "success", "outline": {"outline": []}, "error": None}
+
+
+def test_locked_elasticsearch_compatibility_drops_only_retired_timeout(monkeypatch):
+    module = _binding()
+    calls = []
+    health_checks = []
+
+    class FakeESModule:
+        class ESClient:
+            index_exists = lambda self: None
+            create_index = lambda self: None
+            upsert_document = lambda self: None
+            search = lambda self: None
+
+        @staticmethod
+        def Elasticsearch(*args, **kwargs):
+            calls.append((args, kwargs))
+            return "client"
+
+    monkeypatch.setattr(module.importlib, "import_module", lambda name: FakeESModule)
+    module._install_elasticsearch_compatibility(lambda: health_checks.append("checked"))
+
+    assert FakeESModule.Elasticsearch("host", timeout=180, request_timeout=180) == "client"
+    assert calls == [(('host',), {"request_timeout": 180})]
+    assert health_checks == ["checked"]
+
+
+def test_elasticsearch_connection_operation_restarts_and_retries(monkeypatch):
+    module = _binding()
+    health_checks = []
+    operation_calls = []
+    rebuilt_clients = []
+
+    class OldClient:
+        def close(self):
+            rebuilt_clients.append("closed")
+
+    class FakeESModule:
+        Elasticsearch = staticmethod(lambda *args, **kwargs: None)
+
+        class ESClient:
+            index_exists = lambda self: None
+            create_index = lambda self: None
+            search = lambda self: None
+
+            def upsert_document(self, *args, **kwargs):
+                operation_calls.append((args, kwargs))
+                if len(operation_calls) == 1:
+                    raise ConnectionError("connection refused")
+                return "stored"
+
+            def _create_client(self):
+                rebuilt_clients.append("created")
+                return object()
+
+    monkeypatch.setattr(module.importlib, "import_module", lambda name: FakeESModule)
+    module._install_elasticsearch_compatibility(lambda: health_checks.append("checked"))
+    client = FakeESModule.ESClient()
+    client.client = OldClient()
+
+    assert client.upsert_document("index", {"content": "text"}) == "stored"
+    assert health_checks == ["checked"]
+    assert rebuilt_clients == ["closed", "created"]
+    assert len(operation_calls) == 2
+
+
+def test_model_compatibility_preserves_chat_and_string_embeddings():
+    module = _binding()
+    calls = []
+
+    class FakeChatOpenAI:
+        def __init__(self, *args, **kwargs):
+            calls.append(("chat", args, kwargs))
+
+    class FakeOpenAIEmbeddings:
+        def __init__(self, *args, **kwargs):
+            calls.append(("embeddings", args, kwargs))
+
+    chat_type, embeddings_type = module._compatible_model_types(
+        FakeChatOpenAI, FakeOpenAIEmbeddings
+    )
+    assert chat_type is FakeChatOpenAI
+    embeddings_type(model="vectors")
+
+    assert calls == [
+        (
+            "embeddings",
+            (),
+            {"model": "vectors", "check_embedding_ctx_length": False},
+        ),
+    ]
+
+
+def test_embedding_compatibility_preserves_explicit_native_option():
+    module = _binding()
+    calls = []
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            calls.append(kwargs)
+
+    chat_type, embeddings_type = module._compatible_model_types(FakeClient, FakeClient)
+    assert chat_type is FakeClient
+    embeddings_type(check_embedding_ctx_length=True)
+
+    assert calls == [{"check_embedding_ctx_length": True}]
+
+
+def test_binding_extends_upstream_completion_budget_for_thinking_model():
+    binding = (UNIT / "bindings" / "omniwriter_bridge.py").read_text()
+    upstream_example = (UNIT / "agent" / ".env.example").read_text()
+
+    assert "DEFAULT_LLM_MAX_TOKENS=10000" in upstream_example
+    assert "os.environ.setdefault('DEFAULT_LLM_MAX_TOKENS', '16000')" in binding
+
+
+def test_elasticsearch_wait_requires_a_listening_http_socket(monkeypatch):
+    module = _binding()
+
+    class RunningProcess:
+        returncode = None
+
+        @staticmethod
+        def poll():
+            return None
+
+    ticks = iter((0.0, 0.0, 2.0))
+    monkeypatch.setattr(module.time, "monotonic", lambda: next(ticks))
+    monkeypatch.setattr(module.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(
+        module.socket,
+        "create_connection",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(ConnectionRefusedError()),
+    )
+
+    with pytest.raises(TimeoutError):
+        module._wait_for_elasticsearch(RunningProcess(), timeout=1)
+
+    class ListeningSocket:
+        closed = False
+
+        def close(self):
+            self.closed = True
+
+    listening = ListeningSocket()
+    monkeypatch.setattr(module.time, "monotonic", lambda: 0.0)
+    monkeypatch.setattr(
+        module.socket, "create_connection", lambda *_args, **_kwargs: listening
+    )
+    module._wait_for_elasticsearch(RunningProcess(), timeout=1)
+    assert listening.closed is True
+
+
+def test_elasticsearch_health_waits_for_recovered_cluster_state(monkeypatch):
+    module = _binding()
+
+    class RunningProcess:
+        returncode = None
+
+        @staticmethod
+        def poll():
+            return None
+
+    class Response:
+        status = 200
+
+        @staticmethod
+        def read():
+            return b'{}'
+
+    class Connection:
+        def __init__(self, *args, **kwargs):
+            self.request_args = None
+
+        def request(self, *args):
+            self.request_args = args
+
+        @staticmethod
+        def getresponse():
+            return Response()
+
+        @staticmethod
+        def close():
+            pass
+
+    monkeypatch.setattr(module.http.client, "HTTPConnection", Connection)
+    monkeypatch.setattr(module.time, "monotonic", lambda: 0.0)
+
+    module._wait_for_elasticsearch_health(RunningProcess(), timeout=1)
+
+
+def test_stopped_embedded_elasticsearch_is_restarted(monkeypatch):
+    module = _binding()
+    binding = module.OmniWriterBinding()
+    starts = []
+
+    class StoppedProcess:
+        returncode = 137
+
+        @staticmethod
+        def poll():
+            return 137
+
+    binding._elasticsearch = StoppedProcess()
+    monkeypatch.setattr(binding, "_start_elasticsearch", lambda: starts.append("start"))
+
+    binding._ensure_elasticsearch()
+
+    assert starts == ["start"]
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["", "   ", {}, {"topic": "x", "invented": True}, {"topic": "x", "thread_id": ""}],
+)
+def test_boundary_rejects_invalid_or_invented_input(value):
+    with pytest.raises(ValueError):
+        _binding().request_from_input(value)
+
+
+def test_embedded_elasticsearch_and_network_are_explicit():
+    dockerfile = (UNIT / "Dockerfile").read_text()
+    binding = (UNIT / "bindings" / "omniwriter_bridge.py").read_text()
+    rules = tomllib.loads((UNIT / "network" / "rules.toml").read_text())
+    route = rules["tool_routes"][0]
+
+    assert "docker.elastic.co/elasticsearch/elasticsearch:9.3.0" in dockerfile
+    assert "elasticsearch-plugin install --batch analysis-icu" in dockerfile
+    assert "USER agent" in dockerfile
+    assert "AWS_EC2_METADATA_DISABLED" in binding
+    assert "-Xms128m -Xmx128m -XX:MaxDirectMemorySize=32m" in binding
+    assert "-Enode.store.allow_mmap=false" in binding
+    assert "self._ensure_elasticsearch" in binding
+    assert "-Expack.ml.enabled=false" in binding
+    assert route["host_patterns"] == ["127.0.0.1"]
+    assert route["ports"] == [9200]
+    assert route["path_patterns"] == ["/", "/_cluster/health*", "/default_index*"]
+    assert {"HEAD", "GET", "POST", "PUT", "DELETE"} <= set(route["methods"])
+
+
+def test_manifest_declares_only_real_external_routes_and_secrets():
+    manifest = tomllib.loads((UNIT / "agent.toml").read_text())
+    routing = tomllib.loads((UNIT / "model-routing.toml").read_text())
+    runtime = manifest["runtime"]
+    interception = manifest["llm_interception"]
+
+    assert runtime["secret_env_keys"] == ["TAVILY_API_KEY"]
+    assert {item["agent_env"] for item in interception["credentials"]} == {
+        "LLM_BASE_API_KEY",
+        "EMBEDDING_BASE_API_KEY",
+    }
+    assert interception["network_config"] == "network/rules.toml"
+    tool_hosts = {
+        host
+        for route in interception["tool_routes"]
+        for host in route["host_patterns"]
+    }
+    assert tool_hosts == {"api.tavily.com"}
+    assert routing["targets"]["conversation"] == {"use_run_target": True}
+    assert routing["targets"]["vectors"]["credential_env"] == "EMBEDDING_BASE_API_KEY"
+    assert routing["targets"]["vectors"]["model"] == "doubao-embedding-vision-251215"
+    assert routing["targets"]["vectors"]["endpoint_paths"] == {
+        "/embeddings": "/embeddings"
+    }
+    assert {tuple(rule["protocols"]) for rule in routing["rules"]} == {
+        ("openai-chat",),
+        ("openai-embeddings",),
+    }
+
+
+def test_requirement_matches_the_native_branch_topology():
+    requirement = (UNIT / "requirement.md").read_text()
+
+    assert "not an automatic final stage" in requirement
+    assert "article_post_process" in requirement
+    assert "1,800-second execution window" in requirement
+    assert "finishes with polishing" not in requirement
+
+
+def test_restored_source_keeps_license_and_real_topology():
+    snapshot = UNIT / "agent"
+    if not snapshot.is_dir():
+        pytest.skip("Requires the source-manifest checkout")
+
+    assert (snapshot / "LICENSE").is_file()
+    orchestrator = (snapshot / "src" / "pipeline" / "orchestrator.py").read_text()
+    assert 'builder.add_edge("assemble_article_node", END)' in orchestrator
+    assert 'builder.add_edge("deepagents_node", END)' in orchestrator
+    assert 'builder.add_edge("assemble_article_node", "deepagents_node")' not in orchestrator
+
+
+def test_unit_ships_every_outer_build_input_without_secrets():
+    for relative in (
+        "README.md",
+        "requirement.md",
+        "Dockerfile",
+        ".dockerignore",
+        "agent.toml",
+        "model-routing.toml",
+        "source-manifest.json",
+        "bindings/omniwriter_bridge.py",
+        "network/rules.toml",
+    ):
+        assert (UNIT / relative).is_file(), relative
+    assert not any(path.name == ".env" for path in UNIT.rglob("*"))
+    assert "/resources/agents/*/agent/" in (ROOT / ".gitignore").read_text()

@@ -1,0 +1,27 @@
+# OmniWriter needs separate chat and vector destinations. The OpenAI-compatible
+# embedding request is model traffic, not ordinary tool egress, so ABB routes it
+# through a dedicated target with its own host-side credential.
+
+[targets.conversation]
+use_run_target = true
+
+[targets.vectors]
+provider = "glm"
+model = "doubao-embedding-vision-251215"
+credential_env = "EMBEDDING_BASE_API_KEY"
+base_url = "https://ark.cn-beijing.volces.com/api/coding/v3"
+
+[targets.vectors.endpoint_paths]
+"/embeddings" = "/embeddings"
+
+[[rules]]
+id = "conversation"
+protocols = ["openai-chat"]
+input = "text"
+target = "conversation"
+
+[[rules]]
+id = "vectors"
+protocols = ["openai-embeddings"]
+input = "text"
+target = "vectors"
