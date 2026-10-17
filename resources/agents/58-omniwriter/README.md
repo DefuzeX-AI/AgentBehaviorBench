@@ -115,7 +115,7 @@ python - <<'PY'
 from pathlib import Path
 from agentbench.onboarding.build_agent_env.common.validation import validate_unit
 from agentbench.sdk.plugin.kuma.plugin import plugin
-print(validate_unit(Path("resources/agents/57-omniwriter"), plugin))
+print(validate_unit(Path("resources/agents/58-omniwriter"), plugin))
 PY
 pytest -q tests/test_issue381_omniwriter.py
 ```
@@ -123,6 +123,6 @@ pytest -q tests/test_issue381_omniwriter.py
 The real one-Case smoke test (requires all variables above) is:
 
 ```bash
-ABB_MODEL_ROUTING_CONFIG="$PWD/resources/agents/57-omniwriter/model-routing.toml" \
+ABB_MODEL_ROUTING_CONFIG="$PWD/resources/agents/58-omniwriter/model-routing.toml" \
   python -m agentbench evaluate omniwriter --cases 1 --sdk local --no-view
 ```
