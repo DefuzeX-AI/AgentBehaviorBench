@@ -609,9 +609,13 @@ class OmniWriterBinding:
                 self._elasticsearch_env = elasticsearch_env
                 self._elasticsearch_cwd = workspace
                 self._start_elasticsearch()
+                # Langfuse is not part of this deployment. When enabled, the
+                # native graph binds callbacks=[langfuse_handler] via
+                # with_config, which replaces ABB's trace callbacks and leaves
+                # the run without LangGraph node spans.
                 self._native = _load_orchestrator_class(
                     self._ensure_elasticsearch
-                )()
+                )(enable_langfuse=False)
             except BaseException:
                 self.close()
                 raise
