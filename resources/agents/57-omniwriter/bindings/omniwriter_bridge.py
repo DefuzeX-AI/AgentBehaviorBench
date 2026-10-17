@@ -50,6 +50,7 @@ Example output: the article Markdown assembled from the native chapter results.
 
 import asyncio
 import builtins
+import http.client
 import importlib
 import os
 import socket
@@ -233,6 +234,56 @@ def _install_elasticsearch_compatibility(ensure_running=None):
     compatible_constructor._abb_timeout_compatible = True
     module.Elasticsearch = compatible_constructor
 
+    def connection_failure(error):
+        names = {type(error).__name__.lower()}
+        cause = getattr(error, '__cause__', None)
+        if cause is not None:
+            names.add(type(cause).__name__.lower())
+        message = str(error).lower()
+        return any('connection' in name or 'timeout' in name for name in names) or any(
+            marker in message
+            for marker in (
+                'connection refused',
+                'failed to establish a new connection',
+                'connection error',
+                'connection timeout',
+            )
+        )
+
+    # These are the four native ESClient operations used by article creation.
+    # Upsert and search are safe to repeat (the former uses a stable document
+    # ID); index creation treats the recovery race as an already-existing index.
+    for method_name in ('index_exists', 'create_index', 'upsert_document', 'search'):
+        operation = getattr(module.ESClient, method_name)
+        if getattr(operation, '_abb_restart_compatible', False):
+            continue
+
+        def compatible_operation(
+            self, *args, _operation=operation, _method_name=method_name, **kwargs
+        ):
+            try:
+                return _operation(self, *args, **kwargs)
+            except Exception as error:
+                if (
+                    _method_name == 'create_index'
+                    and 'resource_already_exists_exception' in str(error)
+                ):
+                    return False
+                if ensure_running is None or not connection_failure(error):
+                    raise
+                ensure_running()
+                close = getattr(getattr(self, 'client', None), 'close', None)
+                if callable(close):
+                    try:
+                        close()
+                    except Exception:
+                        pass
+                self.client = self._create_client()
+                return _operation(self, *args, **kwargs)
+
+        compatible_operation._abb_restart_compatible = True
+        setattr(module.ESClient, method_name, compatible_operation)
+
 
 def _install_graph_state_compatibility():
     """Preserve the core task and bound state/memory at native nodes.
@@ -307,6 +358,31 @@ def _wait_for_elasticsearch(process, timeout=90):
             return
         time.sleep(0.25)
     raise TimeoutError('Elasticsearch did not accept HTTP connections within 90 seconds')
+
+
+def _wait_for_elasticsearch_health(process, timeout=90):
+    """Wait for recovered cluster state, not merely an accepting socket."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise RuntimeError(
+                f'Elasticsearch exited before health check with code {process.returncode}'
+            )
+        connection = http.client.HTTPConnection('127.0.0.1', 9200, timeout=1)
+        try:
+            connection.request(
+                'GET', '/_cluster/health?wait_for_status=yellow&timeout=1s'
+            )
+            response = connection.getresponse()
+            response.read()
+            if response.status == 200:
+                return
+        except (OSError, http.client.HTTPException):
+            pass
+        finally:
+            connection.close()
+        time.sleep(0.25)
+    raise TimeoutError('Elasticsearch cluster did not become healthy within 90 seconds')
 
 
 def request_from_input(value):
@@ -431,6 +507,7 @@ class OmniWriterBinding:
             env=self._elasticsearch_env,
         )
         _wait_for_elasticsearch(self._elasticsearch)
+        _wait_for_elasticsearch_health(self._elasticsearch)
 
     def _ensure_elasticsearch(self):
         """Restart an OOM-reclaimed Elasticsearch before native retrieval."""
@@ -439,7 +516,16 @@ class OmniWriterBinding:
                 raise RuntimeError('OmniWriter binding is closed')
             process = self._elasticsearch
             if process is not None and process.poll() is None:
-                return
+                try:
+                    _wait_for_elasticsearch_health(process, timeout=10)
+                    return
+                except TimeoutError:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait(timeout=5)
             exit_code = process.returncode if process is not None else None
             print(
                 f'Embedded Elasticsearch stopped (code={exit_code}); restarting',
@@ -501,10 +587,10 @@ class OmniWriterBinding:
                 # Python process crosses that cgroup limit. Even 256 MiB becomes
                 # unsustainable after successful Chroma/ES ingestion loads the
                 # full retrieval and writing graph. The Case corpus has only a
-                # few dozen chunks, so a 96 MiB heap and bounded direct memory
+                # few dozen chunks, so a 128 MiB heap and bounded direct memory
                 # are sufficient; mmap is disabled to reduce cgroup pressure.
                 elasticsearch_env['ES_JAVA_OPTS'] = (
-                    '-Xms96m -Xmx96m -XX:MaxDirectMemorySize=32m'
+                    '-Xms128m -Xmx128m -XX:MaxDirectMemorySize=32m'
                 )
                 self._elasticsearch_command = [
                         '/opt/elasticsearch/bin/elasticsearch',

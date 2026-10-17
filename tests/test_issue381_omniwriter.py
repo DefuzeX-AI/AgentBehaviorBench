@@ -140,6 +140,12 @@ def test_locked_elasticsearch_compatibility_drops_only_retired_timeout(monkeypat
     health_checks = []
 
     class FakeESModule:
+        class ESClient:
+            index_exists = lambda self: None
+            create_index = lambda self: None
+            upsert_document = lambda self: None
+            search = lambda self: None
+
         @staticmethod
         def Elasticsearch(*args, **kwargs):
             calls.append((args, kwargs))
@@ -151,6 +157,45 @@ def test_locked_elasticsearch_compatibility_drops_only_retired_timeout(monkeypat
     assert FakeESModule.Elasticsearch("host", timeout=180, request_timeout=180) == "client"
     assert calls == [(('host',), {"request_timeout": 180})]
     assert health_checks == ["checked"]
+
+
+def test_elasticsearch_connection_operation_restarts_and_retries(monkeypatch):
+    module = _binding()
+    health_checks = []
+    operation_calls = []
+    rebuilt_clients = []
+
+    class OldClient:
+        def close(self):
+            rebuilt_clients.append("closed")
+
+    class FakeESModule:
+        Elasticsearch = staticmethod(lambda *args, **kwargs: None)
+
+        class ESClient:
+            index_exists = lambda self: None
+            create_index = lambda self: None
+            search = lambda self: None
+
+            def upsert_document(self, *args, **kwargs):
+                operation_calls.append((args, kwargs))
+                if len(operation_calls) == 1:
+                    raise ConnectionError("connection refused")
+                return "stored"
+
+            def _create_client(self):
+                rebuilt_clients.append("created")
+                return object()
+
+    monkeypatch.setattr(module.importlib, "import_module", lambda name: FakeESModule)
+    module._install_elasticsearch_compatibility(lambda: health_checks.append("checked"))
+    client = FakeESModule.ESClient()
+    client.client = OldClient()
+
+    assert client.upsert_document("index", {"content": "text"}) == "stored"
+    assert health_checks == ["checked"]
+    assert rebuilt_clients == ["closed", "created"]
+    assert len(operation_calls) == 2
 
 
 def test_model_compatibility_preserves_chat_and_string_embeddings():
@@ -240,6 +285,44 @@ def test_elasticsearch_wait_requires_a_listening_http_socket(monkeypatch):
     assert listening.closed is True
 
 
+def test_elasticsearch_health_waits_for_recovered_cluster_state(monkeypatch):
+    module = _binding()
+
+    class RunningProcess:
+        returncode = None
+
+        @staticmethod
+        def poll():
+            return None
+
+    class Response:
+        status = 200
+
+        @staticmethod
+        def read():
+            return b'{}'
+
+    class Connection:
+        def __init__(self, *args, **kwargs):
+            self.request_args = None
+
+        def request(self, *args):
+            self.request_args = args
+
+        @staticmethod
+        def getresponse():
+            return Response()
+
+        @staticmethod
+        def close():
+            pass
+
+    monkeypatch.setattr(module.http.client, "HTTPConnection", Connection)
+    monkeypatch.setattr(module.time, "monotonic", lambda: 0.0)
+
+    module._wait_for_elasticsearch_health(RunningProcess(), timeout=1)
+
+
 def test_stopped_embedded_elasticsearch_is_restarted(monkeypatch):
     module = _binding()
     binding = module.OmniWriterBinding()
@@ -279,13 +362,13 @@ def test_embedded_elasticsearch_and_network_are_explicit():
     assert "elasticsearch-plugin install --batch analysis-icu" in dockerfile
     assert "USER agent" in dockerfile
     assert "AWS_EC2_METADATA_DISABLED" in binding
-    assert "-Xms96m -Xmx96m -XX:MaxDirectMemorySize=32m" in binding
+    assert "-Xms128m -Xmx128m -XX:MaxDirectMemorySize=32m" in binding
     assert "-Enode.store.allow_mmap=false" in binding
     assert "self._ensure_elasticsearch" in binding
     assert "-Expack.ml.enabled=false" in binding
     assert route["host_patterns"] == ["127.0.0.1"]
     assert route["ports"] == [9200]
-    assert route["path_patterns"] == ["/", "/default_index*"]
+    assert route["path_patterns"] == ["/", "/_cluster/health*", "/default_index*"]
     assert {"HEAD", "GET", "POST", "PUT", "DELETE"} <= set(route["methods"])
 
 
