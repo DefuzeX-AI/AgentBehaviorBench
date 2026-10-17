@@ -8,7 +8,7 @@ agent_description: >-
 input_type: text
 strategy_group:
   schema_version: kuma.strategy_group_selection.v1
-  id: CAND-013
+  id: CAND-017
   version: "1"
 ---
 
