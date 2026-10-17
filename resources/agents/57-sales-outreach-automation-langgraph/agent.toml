@@ -1,0 +1,53 @@
+# Manual ABB integration for kaymen99/sales-outreach-automation-langgraph.
+# OpenRouter json_schema generation was unavailable on DeepSeek direct API;
+# files follow validated LangGraph unit conventions used by ready Agents.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "sales-outreach-automation-langgraph"
+display_name = "Sales Outreach Automation (LangGraph)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+method = "git"
+repository = "https://github.com/kaymen99/sales-outreach-automation-langgraph"
+revision = "2e2761ccc16c26fe20adf101b4ec702cd0876b15"
+downloaded_on = "2026-10-17"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+env_keys = ["OPENAI_MODEL"]
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+binding = "bridge.py:create_graph"
+output_key = "personalized_email"
+
+[llm_interception]
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
