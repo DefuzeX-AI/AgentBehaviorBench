@@ -349,27 +349,40 @@ class SuiteRunCatalogAPI:
                                        extensions.get('abb_artifact_directory'),
                                        {**event, **{key: extensions[key] for key in
                                         ('case_id', 'case_index', 'artifact_run_id') if key in extensions}}))
-        entries = {}
+        entries, artifacts = {}, {}
         for agent_id, value, identity in references:
             if agent_id not in selected or not isinstance(value, str):
                 continue
             directory = Path(value)
-            if not directory.is_absolute() or directory.is_symlink():
+            if not directory.is_absolute():
                 continue
             try:
-                api = RunViewAPI(directory)
-                metadata = api.read('run.json')
-                if (not isinstance(metadata, dict) or metadata.get('agent_id') != agent_id
-                    or metadata.get('run_id') != directory.name
-                    or metadata.get('schema') not in ('abb.observe.run.v1', 'abb.evaluate.run.v1', 'abb.case_collection.import.v1')
-                    or not re.fullmatch(r'[a-zA-Z0-9_-]+', directory.name)):
+                if directory not in artifacts:
+                    # Read once per listing, including unavailable artifacts. A later
+                    # listing must see metadata created or updated after Suite events.
+                    artifacts[directory] = None
+                    if directory.is_symlink():
+                        continue
+                    api = RunViewAPI(directory)
+                    metadata = api.read('run.json')
+                    if (not isinstance(metadata, dict) or metadata.get('run_id') != directory.name
+                        or metadata.get('schema') not in ('abb.observe.run.v1', 'abb.evaluate.run.v1', 'abb.case_collection.import.v1')
+                        or not re.fullmatch(r'[a-zA-Z0-9_-]+', directory.name)):
+                        continue
+                    updated = datetime.fromtimestamp(api.file('run.json').stat().st_mtime, timezone.utc).isoformat()
+                    artifacts[directory] = api, metadata, updated
+                artifact = artifacts[directory]
+                if artifact is None:
+                    continue
+                api, metadata, updated = artifact
+                # Reference identities are independent even when their path is shared.
+                if metadata.get('agent_id') != agent_id:
                     continue
                 if (identity.get('artifact_run_id') not in (None, directory.name)
                     or any(metadata.get(key) is not None and identity.get(key) is not None
                            and metadata[key] != identity[key]
                            for key in ('suite_id', 'case_index', 'attempt_id'))):
                     continue
-                updated = datetime.fromtimestamp(api.file('run.json').stat().st_mtime, timezone.utc).isoformat()
                 details = dict(entries.get(directory.name, (None, {}))[1])
                 details.update({'id': directory.name, 'agent': agent_id,
                                 'status': metadata.get('status'), 'updated': updated})

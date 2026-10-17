@@ -252,40 +252,72 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                               cleanup_error=str(exc))
             raise
         finally:
+            cleanup_errors = []
+            artifact_error = None
+
+            def record_artifact_error(exc):
+                nonlocal artifact_error
+                if artifact_error is None:
+                    artifact_error = exc
+                    status.update(artifact_error_type=type(exc).__name__, artifact_error=str(exc))
+                    if primary_error is None:
+                        status.update(status='failed', error_type=type(exc).__name__, error=str(exc))
+
+            # Evidence writes must never interrupt cleanup of the other process.
+            for active, label in ((session, 'controller'), (agent_process, 'agent')):
+                if active is None:
+                    continue
+                try:
+                    with span('Cleanup ' + label + ' container', kind='cleanup'):
+                        active.close()
+                except BaseException as exc:
+                    cleanup_errors.append(exc)
+                try:
+                    files.save('diagnostics.json' if label == 'controller' else 'agent-diagnostics.json',
+                               {'stdout': active.stdout, 'stderr': active.stderr, **identity})
+                except BaseException as exc:
+                    record_artifact_error(exc)
+            if workspace_temp is not None:
+                try:
+                    workspace_temp.cleanup()
+                except BaseException as exc:
+                    cleanup_errors.append(exc)
+            # Unconfirmed Docker cleanup must keep its infrastructure-failure
+            # type even when another resource reports an ordinary I/O error.
+            cleanup_error = next((exc for exc in (primary_error, *cleanup_errors)
+                                  if isinstance(exc, DockerCleanupError)),
+                                 cleanup_errors[0] if cleanup_errors else None)
+            if cleanup_error is not None:
+                status.update(status='failed', cleanup_status='failed',
+                              cleanup_error_type=type(cleanup_error).__name__, cleanup_error=str(cleanup_error))
+            elif status['cleanup_status'] != 'failed':
+                status['cleanup_status'] = 'succeeded' if session or agent_process else 'not_started'
+
             try:
-                errors = []
-                for active, label in ((session, 'controller'), (agent_process, 'agent')):
-                    if active is None:
-                        continue
-                    try:
-                        with span('Cleanup ' + label + ' container', kind='cleanup'):
-                            active.close()
-                    except BaseException as exc:
-                        errors.append(exc)
-                    finally:
-                        files.save('diagnostics.json' if label == 'controller' else 'agent-diagnostics.json',
-                                   {'stdout': active.stdout, 'stderr': active.stderr, **identity})
-                if errors:
-                    exc = errors[0]
-                    status.update(status='failed', cleanup_status='failed',
-                                  cleanup_error_type=type(exc).__name__, cleanup_error=str(exc))
-                    raise exc
-                if status['cleanup_status'] != 'failed':
-                    status['cleanup_status'] = 'succeeded' if session or agent_process else 'not_started'
-            finally:
                 status['artifacts'] = (collect_artifacts(directory, status, environ=environ)
                                        if collect_artifacts is not None else {'directory': str(directory)})
-                if primary_error is not None:
-                    primary_error.artifacts = status['artifacts']
+            except BaseException as exc:
+                record_artifact_error(exc)
+            try:
                 manifest = destination / 'manifest.json'
                 if Path(manifest).is_file() and not Path(manifest).is_symlink():
-                    try:
-                        status['sdk_run_id'] = json.loads(Path(manifest).read_text()).get('run_id')
-                    except (OSError, ValueError, AttributeError):
-                        pass  # Preserve the original container/validation outcome.
+                    status['sdk_run_id'] = json.loads(Path(manifest).read_text()).get('run_id')
+            except (OSError, ValueError, AttributeError):
+                pass  # Preserve the original container/validation outcome.
+            try:
                 files.save('run.json', status)
-                if workspace_temp is not None:
-                    workspace_temp.cleanup()
+            except BaseException as exc:
+                record_artifact_error(exc)
+            if 'artifacts' in status:
+                for exc in (primary_error, artifact_error, *cleanup_errors):
+                    if exc is not None:
+                        exc.artifacts = status['artifacts']
+            # Cleanup failures remain fatal to the Suite. Otherwise preserve the
+            # execution error, and fail successful executions on persistence loss.
+            if cleanup_error is not None and cleanup_error is not primary_error:
+                raise cleanup_error
+            if primary_error is None and artifact_error is not None:
+                raise artifact_error
         timing_root.status = status['status']
         return directory
 
