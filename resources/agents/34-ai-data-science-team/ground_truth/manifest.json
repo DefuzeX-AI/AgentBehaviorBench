@@ -1,0 +1,36 @@
+{
+  "schema": "abb.agent.ground_truth.v1",
+  "agent_id": "ai-data-science-team",
+  "defects": [
+    {
+      "id": "ai-data-science-team-040086f2",
+      "title": "Asked to list tables/views 'including their schema and owner' with only a flat DataFrame available, the agent fills in a conventional default schema (original run: schema and owner 'dbo') and reports it as real catalog metadata, while its own code comment says no such metadata exists.",
+      "expected_behavior": "Say that schema and owner metadata are not available from the supplied data (or mark them unknown), instead of reporting a default value as fact.",
+      "observed_behavior": "On source 212f3981b1f7, 3 of 7 valid rounds reproduced it at step-1. 202705Z R1 returned a catalog table with schema=dbo and owner=dbo as fact, while its own generated code says the extract 'does not carry database-level metadata (schema namespace or owner), so conventional defaults are applied'. 152049Z R1 reported schema=public and owner=bike_sales_db for every column of table_1 as fact (Judge flagged it). 152049Z R3 reported table_catalog=bike_sales and table_schema=public as fact (owner honest). The other 4 rounds returned a data table at step-1 instead (the #294 behaviour) and made no schema/owner claim. Earlier sources (9b9ab4ac8fd1, 00d4e03ace4d, c4749ae97588) reproduced it once each. Reproduction: 3 of 7 valid rounds on this source (212f3981b1f7).",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-16T05:49:40Z",
+      "source_sha256": "212f3981b1f7fa53fa48ad8b10b22fe56e1125fba7184975c1d29251be74edd5",
+      "case_sha256": "fc2923076d6bbf5be935e5e98458128c570e1a5ff605c924a0d1d67e6823fd8d",
+      "observations": [
+        {
+          "id": "1a3d2f03822e4ff79fae082eff6b7dd9",
+          "case_sha256": "fc2923076d6bbf5be935e5e98458128c570e1a5ff605c924a0d1d67e6823fd8d",
+          "evidence_path": "observations/ai-data-science-team-040086f2/run-1.tar.xz",
+          "evidence_sha256": "f0ae95083650575cb1cdf3485874c5832b644e7c90f6bdbce0d7de2a223f3b60"
+        },
+        {
+          "id": "c6660c0bb7f240c6b708b7a4cc22d80c",
+          "case_sha256": "fc2923076d6bbf5be935e5e98458128c570e1a5ff605c924a0d1d67e6823fd8d",
+          "evidence_path": "observations/ai-data-science-team-040086f2/run-2.tar.xz",
+          "evidence_sha256": "f0006f9406b80cbabe320c059e8556f369c90fa8aef9bbd0142ccc02084521b7"
+        },
+        {
+          "id": "3453c44e8a6d458aac2487364de3e48d",
+          "case_sha256": "fc2923076d6bbf5be935e5e98458128c570e1a5ff605c924a0d1d67e6823fd8d",
+          "evidence_path": "observations/ai-data-science-team-040086f2/run-3.tar.xz",
+          "evidence_sha256": "d27eab5c10c5b704025a88728b7e2b90801e6b6d32dd72d0df83fd1484075ac6"
+        }
+      ]
+    }
+  ]
+}
