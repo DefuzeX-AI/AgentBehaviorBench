@@ -611,7 +611,7 @@ class SalesOutreachBinding:
             personalized = (
                 f"Lead not qualified (score {score or 'n/a'} < 7); "
                 "no outreach email drafted. "
-                "CRM status set to ATTEMPTED_TO_CONTACT.\n\n"
+                "No live CRM is connected, so no CRM record was updated.\n\n"
                 f"Parsed lead fields:\n{json.dumps(parsed_lead, ensure_ascii=False)}"
             )
         return {
