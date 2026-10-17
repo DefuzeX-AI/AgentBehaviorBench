@@ -24,14 +24,6 @@ def _ensure_source_on_path():
             if str(candidate) not in sys.path:
                 sys.path.insert(0, str(candidate))
             break
-    for name in ("config", "resource", "fonts", "data"):
-        src_dir = agent_dir / name
-        dst_link = root / name
-        if src_dir.is_dir() and not dst_link.exists():
-            try:
-                dst_link.symlink_to(src_dir)
-            except Exception:
-                pass
 
 
 
