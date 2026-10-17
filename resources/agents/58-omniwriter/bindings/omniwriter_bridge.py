@@ -646,12 +646,18 @@ class OmniWriterBinding:
         run_config = dict(config or {})
         from langchain_core.runnables.config import set_config_context
 
-        with set_config_context(run_config):
-            result = await native.run(
-                topic=topic,
-                demand=demand,
-                thread_id=resolved_thread_id,
-                is_lookup_outline=is_lookup_outline,
+        # set_config_context only binds the config (and ABB's trace callbacks)
+        # inside the Context it yields; run the native call in that Context so
+        # the nested graph.ainvoke inherits it and its nodes are traced.
+        with set_config_context(run_config) as invocation_context:
+            result = await asyncio.create_task(
+                native.run(
+                    topic=topic,
+                    demand=demand,
+                    thread_id=resolved_thread_id,
+                    is_lookup_outline=is_lookup_outline,
+                ),
+                context=invocation_context,
             )
         return _public_output(result, is_lookup_outline=is_lookup_outline)
 
