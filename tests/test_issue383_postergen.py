@@ -283,6 +283,44 @@ def test_upstream_pipeline_topology():
     assert expected_nodes.issubset(nodes), f"Missing nodes: {expected_nodes - nodes}"
 
 
+def test_configure_marker_runtime_offline(monkeypatch):
+    """Verify _configure_marker_runtime sets PdfProvider.pdftext_workers = 1.
+
+    Regression test for Marker multiprocessing deadlock in ABB in-process container channel:
+    Marker's default pdftext_workers=4 forks child processes via ProcessPoolExecutor,
+    which deadlocks in futex_wait_queue inside multi-threaded in-process channel workers.
+    Setting PdfProvider.pdftext_workers=1 forces inline single-process parsing.
+    This test runs completely offline without requiring Marker installed on host.
+    """
+    import types
+    module = _binding()
+
+    mock_marker = types.ModuleType("marker")
+    mock_providers = types.ModuleType("marker.providers")
+    mock_pdf = types.ModuleType("marker.providers.pdf")
+
+    class MockPdfProvider:
+        pdftext_workers = 4
+
+    mock_pdf.PdfProvider = MockPdfProvider
+    mock_providers.pdf = mock_pdf
+    mock_marker.providers = mock_providers
+
+    monkeypatch.setitem(sys.modules, "marker", mock_marker)
+    monkeypatch.setitem(sys.modules, "marker.providers", mock_providers)
+    monkeypatch.setitem(sys.modules, "marker.providers.pdf", mock_pdf)
+
+    assert MockPdfProvider.pdftext_workers == 4
+    module._configure_marker_runtime()
+    assert MockPdfProvider.pdftext_workers == 1
+
+    # Also verify create_graph invokes configuration
+    MockPdfProvider.pdftext_workers = 8
+    instance = module.create_graph()
+    assert MockPdfProvider.pdftext_workers == 1
+    instance.close()
+
+
 # ------------------------------------------------------------------- Dockerfile Contract
 
 def test_dockerfile_static_configuration():

@@ -103,6 +103,25 @@ def _ensure_source_on_path():
             break
 
 
+def _configure_marker_runtime():
+    """Configures Marker runtime settings for ABB in-process container stability.
+
+    ABB runs agents inside an in-process container channel with background asyncio loops
+    and active threads. Marker's PdfProvider by default sets pdftext_workers=4, which invokes
+    ProcessPoolExecutor (multiprocessing.fork). In a multi-threaded process, forking child
+    workers causes worker deadlocks in futex_wait_queue.
+    Setting PdfProvider.pdftext_workers=1 enforces single-process in-line PDF text extraction,
+    completely eliminating child worker forks and deadlocks without altering upstream code snapshots.
+    This is an ABB in-process container compatibility requirement, not a performance tuning.
+    """
+    try:
+        from marker.providers.pdf import PdfProvider
+        PdfProvider.pdftext_workers = 1
+        logger.info("Configured Marker PdfProvider.pdftext_workers = 1 for in-process container stability")
+    except (ImportError, AttributeError) as exc:
+        logger.debug("Marker PdfProvider not available for runtime configuration: %s", exc)
+
+
 def _is_safe_path_candidate(path_obj: Union[str, Path, None]) -> bool:
     """Validates whether path_obj can safely be tested against filesystem without OSError [Errno 36]."""
     if not path_obj:
@@ -467,6 +486,7 @@ class PosterGenBinding:
     def _get_workflow(self):
         if self._compiled_workflow is None:
             _ensure_source_on_path()
+            _configure_marker_runtime()
             from src.workflow.pipeline import create_workflow_graph
             graph = create_workflow_graph()
             self._compiled_workflow = graph.compile()
@@ -610,4 +630,5 @@ class PosterGenBinding:
 
 def create_graph() -> PosterGenBinding:
     """Factory function returning a new PosterGenBinding instance."""
+    _configure_marker_runtime()
     return PosterGenBinding()
