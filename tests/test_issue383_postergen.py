@@ -647,6 +647,107 @@ def test_explicit_bundled_sample_paper_resolves_correctly(monkeypatch):
     instance.close()
 
 
+def test_long_natural_language_request_with_valid_pdf_resolves_correctly(monkeypatch):
+    """Long natural language requests (>150, 200, 250 chars) specifying valid PDFs must resolve correctly.
+
+    Regression test for review finding [High]: previous bridge logic classified any prompt >150 chars or containing
+    newlines as 'is_free_form' and rejected bundled sample papers even when the file existed and was valid.
+    This test verifies that long natural language prompts containing newline formatting, design requirements,
+    and valid PDF paths (both direct data/ paths and folder references) resolve to valid, readable PDF files
+    with genuine %PDF- headers without being rejected by text length checks.
+    """
+    from unittest.mock import MagicMock
+
+    module = _binding()
+    monkeypatch.setenv("OPENAI_API_KEY", "mock-interception-key")
+    instance = module.create_graph()
+
+    sample_folder = "Active_Geospatial_Search_for_Efficient_Tenant_Eviction_Outreach"
+
+    # 1. 246+ char natural language request with newlines and design requirements
+    long_prompt_246 = (
+        f"请使用 data/{sample_folder}/paper.pdf 生成学术海报，"
+        "要求整体设计美观大气，视觉层次清晰，突出核心研究贡献与实验结果，"
+        "配色方案需符合学术顶会规范，排版整洁分栏明确，并在海报底部保留作者信息与单位标志。\n"
+        "额外设计要求：\n"
+        "1. 使用无衬线字体以确保远距离清晰可读。\n"
+        "2. 重点突出关键指标对比柱状图与消融实验结论。"
+    )
+    assert len(long_prompt_246) > 200
+    assert "\n" in long_prompt_246
+
+    # 2. English long research request (~350 chars)
+    long_prompt_en = (
+        f"Please generate a comprehensive conference presentation poster using the research paper located at "
+        f"data/{sample_folder}/paper.pdf. The poster must feature a clear 3-column layout, emphasize our "
+        f"novel methodological contributions and evaluation results on standard benchmark datasets, and use "
+        f"an academic navy-and-gold color palette suitable for ACM/IEEE conferences."
+    )
+    assert len(long_prompt_en) > 300
+
+    # 3. Directory reference in long prompt
+    long_prompt_dir = (
+        f"Please synthesize a scientific poster based on data/{sample_folder}. "
+        "Ensure all figures and mathematical formulations are faithfully represented in the generated layout."
+    )
+
+    test_vectors = [
+        long_prompt_246,
+        {"text": long_prompt_246},
+        {"messages": [{"role": "user", "content": long_prompt_246}]},
+        long_prompt_en,
+        {"paper_path": f"data/{sample_folder}/paper.pdf", "text": long_prompt_en},
+        long_prompt_dir,
+    ]
+
+    for req in test_vectors:
+        norm = instance._normalize_input(req)
+        resolved_pdf, width, height, url, logo, aff_logo = instance._resolve_paper_input(norm)
+        assert Path(resolved_pdf).is_file()
+        assert resolved_pdf.endswith("paper.pdf")
+        assert sample_folder in resolved_pdf
+        with open(resolved_pdf, "rb") as f:
+            header = f.read(10)
+            assert header.startswith(b"%PDF-")
+
+    # Also verify that invoke() dispatches to workflow rather than returning conversational text or error
+    mock_pipeline = MagicMock()
+    mock_state_module = MagicMock()
+    mock_timing = MagicMock()
+    fake_out_dir = Path("/tmp/mock_postergen_out")
+    fake_out_dir.mkdir(parents=True, exist_ok=True)
+    fake_pptx = fake_out_dir / "poster.pptx"
+    fake_png = fake_out_dir / "poster.png"
+    fake_log = fake_out_dir / "timing_cost_log.json"
+    fake_pptx.touch()
+    fake_png.touch()
+    fake_log.touch()
+
+    mock_state_dict = {
+        "timing_metrics": mock_timing,
+        "output_dir": str(fake_out_dir),
+        "poster_name": "poster",
+        "final_presentation_path": str(fake_pptx),
+        "final_image_path": str(fake_png),
+        "errors": [],
+    }
+    mock_state_module.create_state.return_value = mock_state_dict
+    monkeypatch.setitem(sys.modules, "src.state.poster_state", mock_state_module)
+    monkeypatch.setitem(sys.modules, "src.workflow.pipeline", mock_pipeline)
+
+    mock_workflow = MagicMock()
+    mock_workflow.invoke.return_value = mock_state_dict
+    monkeypatch.setattr(instance, "_get_workflow", lambda: mock_workflow)
+    monkeypatch.setattr(instance, "_deliver_artifacts", lambda artifacts, dests: [])
+
+    res = instance.invoke(long_prompt_246)
+    assert res.get("status") in ("completed", "success")
+    assert mock_workflow.invoke.called
+    assert "Successfully generated poster" in (res.get("answer") or "")
+
+    instance.close()
+
+
 # ------------------------------------------------------------------- Long Prompt & OSError Resilience (KUMA Evaluation Defense)
 
 def test_long_conversational_prompts_return_capabilities_without_oserror(monkeypatch):

@@ -304,27 +304,25 @@ class PosterGenBinding:
             if pdf_match:
                 raw_path = pdf_match.group(1).strip().strip("'\"")
 
-        candidate = Path(raw_path) if _is_safe_path_candidate(raw_path) else None
+        # Resolve candidate path: direct, or relative to sample_data_dir, agent_dir, or parent
+        candidate = None
+        if _is_safe_path_candidate(raw_path):
+            p = Path(raw_path)
+            if _safe_exists(p):
+                candidate = p
+            elif _safe_exists(sample_data_dir / p):
+                candidate = sample_data_dir / p
+            elif _safe_exists(agent_dir / p):
+                candidate = agent_dir / p
+            elif _safe_exists(sample_data_dir.parent / p):
+                candidate = sample_data_dir.parent / p
+            else:
+                candidate = p
+
         paper_dir = None
         resolved_pdf = None
 
-        is_free_form = bool("\n" in raw_text or len(raw_text.strip()) > 150)
-
         if candidate and _safe_is_file(candidate):
-            is_sample = False
-            if _safe_is_dir(sample_data_dir):
-                try:
-                    candidate.resolve().relative_to(sample_data_dir.resolve())
-                    is_sample = True
-                except (ValueError, OSError):
-                    is_sample = False
-            if is_free_form and is_sample:
-                display_path = (raw_path[:120] + "...") if len(raw_path) > 120 else raw_path
-                raise ValueError(
-                    f"Could not resolve research paper PDF from input: '{display_path}'. "
-                    f"The specified path does not exist or is not a recognized paper manuscript."
-                )
-
             if candidate.suffix.lower() != ".pdf":
                 raise ValueError(
                     f"Provided paper file '{raw_path}' is not a PDF file. "
@@ -335,42 +333,49 @@ class PosterGenBinding:
                     f"Provided paper PDF '{raw_path}' is empty (0 bytes). "
                     f"Please provide a valid, non-empty research paper."
                 )
+            try:
+                with open(candidate, "rb") as f:
+                    header = f.read(1024)
+                    if not header.startswith(b"%PDF-"):
+                        raise ValueError(
+                            f"Provided paper file '{raw_path}' does not have a valid PDF header. "
+                            f"Please provide a valid PDF research paper."
+                        )
+            except OSError as e:
+                raise ValueError(f"Could not read research paper PDF '{raw_path}': {e}")
             resolved_pdf = str(candidate.resolve())
             paper_dir = candidate.parent
         elif candidate and _safe_is_dir(candidate):
-            is_sample = False
-            if _safe_is_dir(sample_data_dir):
-                try:
-                    candidate.resolve().relative_to(sample_data_dir.resolve())
-                    is_sample = True
-                except (ValueError, OSError):
-                    is_sample = False
-            if is_free_form and is_sample:
-                display_path = (raw_path[:120] + "...") if len(raw_path) > 120 else raw_path
-                raise ValueError(
-                    f"Could not resolve research paper PDF from input: '{display_path}'. "
-                    f"The specified path does not exist or is not a recognized paper manuscript."
-                )
-
             pdf_file = candidate / "paper.pdf"
             if not _safe_is_file(pdf_file):
                 raise ValueError(f"Directory '{raw_path}' does not contain 'paper.pdf'.")
             if pdf_file.stat().st_size == 0:
                 raise ValueError(f"Paper PDF in directory '{raw_path}' is empty (0 bytes).")
+            try:
+                with open(pdf_file, "rb") as f:
+                    header = f.read(1024)
+                    if not header.startswith(b"%PDF-"):
+                        raise ValueError(
+                            f"Paper PDF in directory '{raw_path}' does not have a valid PDF header."
+                        )
+            except OSError as e:
+                raise ValueError(f"Could not read paper PDF in directory '{raw_path}': {e}")
             resolved_pdf = str(pdf_file.resolve())
             paper_dir = candidate.resolve()
         else:
-            # Match against bundled sample data ONLY by explicit folder name and NOT from free-form text
+            # Match against bundled sample data by explicit folder name or embedded folder reference
             matched_sub = None
-            if not is_free_form and _safe_is_dir(sample_data_dir) and raw_path and _is_safe_path_candidate(raw_path):
-                clean_name = candidate.name.lower() if candidate else ""
-                parent_name = candidate.parent.name.lower() if candidate else ""
+            if _safe_is_dir(sample_data_dir):
+                clean_name = candidate.name.lower() if (candidate and _is_safe_path_candidate(candidate)) else ""
+                parent_name = candidate.parent.name.lower() if (candidate and _is_safe_path_candidate(candidate)) else ""
                 for sub in sorted(sample_data_dir.iterdir()):
                     if sub.is_dir() and (sub / "paper.pdf").is_file():
+                        sub_name_lower = sub.name.lower()
                         if (
-                            (clean_name and clean_name == sub.name.lower())
-                            or (parent_name and parent_name == sub.name.lower())
-                            or raw_path.lower() == sub.name.lower()
+                            (clean_name and clean_name == sub_name_lower)
+                            or (parent_name and parent_name == sub_name_lower)
+                            or (raw_path and raw_path.lower() == sub_name_lower)
+                            or (len(sub_name_lower) >= 10 and sub_name_lower in raw_text.lower())
                         ):
                             matched_sub = sub
                             break
@@ -379,6 +384,15 @@ class PosterGenBinding:
                 pdf_file = matched_sub / "paper.pdf"
                 if pdf_file.stat().st_size == 0:
                     raise ValueError(f"Paper PDF in sample directory '{matched_sub.name}' is empty (0 bytes).")
+                try:
+                    with open(pdf_file, "rb") as f:
+                        header = f.read(1024)
+                        if not header.startswith(b"%PDF-"):
+                            raise ValueError(
+                                f"Paper PDF in sample directory '{matched_sub.name}' does not have a valid PDF header."
+                            )
+                except OSError as e:
+                    raise ValueError(f"Could not read paper PDF in sample directory '{matched_sub.name}': {e}")
                 resolved_pdf = str(pdf_file.resolve())
                 paper_dir = matched_sub.resolve()
             else:
