@@ -1,0 +1,68 @@
+# Hand-written ABB integration for IatomicreactorI/CSGOTrading (issue #367).
+#
+# `agent add -b` is not usable on this account: the builder requires strict
+# json_schema structured output and the DeepSeek provider answers HTTP 400
+# ("This response_format type is unavailable now") for that response_format, with
+# no config-only workaround. These files follow the validated LangGraph unit
+# conventions instead and were verified with agentbench's static validator.
+#
+# Model capability: upstream requests structured output through function calling
+# (with_structured_output(..., method="function_calling")), which forces a
+# tool_choice. DeepSeek thinking models (deepseek-flash, deepseek-v4-pro,
+# deepseek-reasoner) reject a forced tool choice with HTTP 400 "Thinking mode does
+# not support this tool_choice", after which upstream silently returns its error
+# default. Run this Agent with a target model that accepts a forced tool choice,
+# e.g. `--model deepseek-chat`.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "csgotrading"
+display_name = "CSGOTrading (CS2 item trading desk)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+method = "git"
+repository = "https://github.com/IatomicreactorI/CSGOTrading"
+revision = "d3f67c1c2379fbf04442011664dff3e844278ea6"
+downloaded_on = "2026-10-18"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+input_key = "message"
+output_key = "summary"
+binding = "bridge.py:create_graph"
+
+[llm_interception]
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "deepseek"
+agent_env = "DEEPSEEK_API_KEY"
+auth_plugin = "bearer-token"
+
+# langchain_deepseek posts to <base_url>/chat/completions with the default base
+# url https://api.deepseek.com/v1; both spellings are declared so the route keeps
+# matching if DEEPSEEK_API_BASE is changed to the bare host.
+[[llm_interception.routes]]
+id = "deepseek-chat"
+host_patterns = ["api.deepseek.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions", "/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "deepseek"
