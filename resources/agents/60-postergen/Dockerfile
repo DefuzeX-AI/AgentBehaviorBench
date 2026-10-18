@@ -35,7 +35,8 @@ RUN python -m pip install --no-cache-dir --upgrade pip \
 RUN cp -r /root/.cache/datalab /home/agent/.cache/datalab \
     && python -c "from marker.util import download_font; download_font()" \
     && mkdir -p /usr/local/lib/python3.11/site-packages/static \
-    && chmod -R 777 /usr/local/lib/python3.11/site-packages/static \
+    && chown -R agent:agent /usr/local/lib/python3.11/site-packages/static \
+    && chmod 755 /usr/local/lib/python3.11/site-packages/static \
     && ln -s /opt/agent/agent/config /opt/agent/config \
     && ln -s /opt/agent/agent/resource /opt/agent/resource \
     && ln -s /opt/agent/agent/fonts /opt/agent/fonts \

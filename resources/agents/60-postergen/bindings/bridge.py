@@ -7,13 +7,90 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
+import re
 import shutil
 import sys
 import time
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
+
+logger = logging.getLogger("postergen.bridge")
+if not logger.handlers:
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+
+CONVERSATIONAL_PATTERNS = [
+    # 1. Greetings & Salutations
+    r"\b(?:hello|hi|hey|howdy|greetings|salutations)\b",
+    r"\bgood\s+(?:morning|afternoon|evening|day)\b",
+    r"\bhow\s+are\s+you\b",
+    r"\bhow\s+do\s+you\s+do\b",
+    r"\bhow'?s\s+it\s+going\b",
+    r"\bnice\s+to\s+meet\s+you\b",
+
+    # 2. Self-Introduction & Identity Inquiries
+    r"\bintroduce\b",
+    r"\bintroduction\b",
+    r"\bwho\s+are\s+you\b",
+    r"\bwho\s+is\s+(?:this|the)?\s*agent\b",
+    r"\bwhat\s+are\s+you\b",
+    r"\bwhat\s+is\s+(?:this|the)?\s*(?:agent|tool|system|service|postergen)\b",
+    r"\bwhat\s+is\s+this\b",
+    r"\babout\s+yourself\b",
+    r"\btell\s+me\s+about\s+yourself\b",
+    r"\bdescribe\s+yourself\b",
+    r"\bexplain\s+yourself\b",
+    r"\bwho\s+made\s+you\b",
+    r"\bwhat\s+kind\s+of\s+agent\b",
+
+    # 3. Capabilities, Functionality & Feature Inquiries
+    r"\bcapable\b",
+    r"\bcapabilities\b",
+    r"\bcapability\b",
+    r"\bfunctionality\b",
+    r"\bfeatures\b",
+    r"\bfunctions\b",
+    r"\bwhat\s+(?:can|does|do)\s+(?:[\w\-]+\s+){0,2}do\b",
+    r"\bwhat\s+(?:you|this\s+\w+)\s+(?:can\s+)?do\b",
+    r"\bwhat\s+can\s+i\s+do\b",
+    r"\bcan\s+you\s+describe\b",
+    r"\bwhat\s+is\s+your\s+(?:purpose|role|function|mission)\b",
+    r"\bwhat\s+are\s+your\s+(?:purpose|role|functions|features|capabilities)\b",
+
+    # 4. Usage, Instructions, How-It-Works & Help Inquiries
+    r"\bhow\s+(?:does|do)\s+(?:[\w\-]+\s+){0,2}work\b",
+    r"\bhow\s+this\s+works?\b",
+    r"\bhow\s+it\s+works?\b",
+    r"\bhow\s+to\s+use\b",
+    r"\bhow\s+(?:do|can)\s+i\s+use\b",
+    r"\bhelp\b",
+    r"\binstructions\b",
+    r"\buser\s+guide\b",
+    r"\bquickstart\b",
+    r"\boverview\b",
+]
+CONVERSATIONAL_REGEX = re.compile("|".join(CONVERSATIONAL_PATTERNS), re.IGNORECASE)
+
+IMPERATIVE_POSTER_REGEX = re.compile(
+    r"^\s*(?:please\s+)?(?:generate|make|create|build|render|produce|synthesize|design)\s+(?:a\s+|an\s+)?poster\b",
+    re.IGNORECASE
+)
+
+POSTERGEN_CAPABILITIES_TEXT = (
+    "I am PosterGen, an automated multi-agent AI system designed to transform scientific research papers "
+    "into publication-ready academic conference posters. I coordinate specialized agents built on LangGraph to:\n"
+    "1. Parse research papers in PDF format and extract structured text, figures, and tables (via Marker/Surya).\n"
+    "2. Curate and summarize key narratives, methodology, and experimental results into structured poster sections.\n"
+    "3. Optimize spatial layout, color schemes, and typography tailored for academic presentation.\n"
+    "4. Render complete presentation-ready posters in PowerPoint (.pptx) and high-resolution image (.png) formats.\n\n"
+    "To generate an academic poster, please provide an accessible research paper in PDF format "
+    "(e.g. specify 'paper_path' pointing to a valid .pdf file)."
+)
 
 
 def _ensure_source_on_path():
@@ -25,6 +102,56 @@ def _ensure_source_on_path():
                 sys.path.insert(0, str(candidate))
             break
 
+
+def _is_safe_path_candidate(path_obj: Union[str, Path, None]) -> bool:
+    """Validates whether path_obj can safely be tested against filesystem without OSError [Errno 36]."""
+    if not path_obj:
+        return False
+    try:
+        raw = os.fspath(path_obj)
+        if not raw or "\0" in raw:
+            return False
+        raw_bytes = os.fsencode(raw)
+        # POSIX PATH_MAX limit (4096 bytes)
+        if len(raw_bytes) > 4096:
+            return False
+        # POSIX NAME_MAX limit per component (255 bytes)
+        components = raw_bytes.split(b"/")
+        if any(len(c) > 255 for c in components):
+            return False
+        return True
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def _safe_exists(target: Union[str, Path, None]) -> bool:
+    """Safely checks if target exists, catching all OSErrors, ValueErrors, and length violations."""
+    if not _is_safe_path_candidate(target):
+        return False
+    try:
+        return os.path.exists(target)
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def _safe_is_file(target: Union[str, Path, None]) -> bool:
+    """Safely checks if target is a regular file, catching all OSErrors and length violations."""
+    if not _is_safe_path_candidate(target):
+        return False
+    try:
+        return os.path.isfile(target)
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def _safe_is_dir(target: Union[str, Path, None]) -> bool:
+    """Safely checks if target is a directory, catching all OSErrors and length violations."""
+    if not _is_safe_path_candidate(target):
+        return False
+    try:
+        return os.path.isdir(target)
+    except (OSError, ValueError, TypeError):
+        return False
 
 
 class PosterGenBinding:
@@ -65,6 +192,86 @@ class PosterGenBinding:
 
         raise ValueError(f"Unsupported input type: {type(value)}")
 
+    def _extract_text_and_candidate(self, norm: Dict[str, Any]) -> tuple[str, str]:
+        """Extracts text content and raw paper candidate path from normalized input."""
+        explicit_paper = str(norm.get("paper_path") or "").strip()
+        msg_text = ""
+        messages = norm.get("messages")
+        if isinstance(messages, list) and messages:
+            last = messages[-1]
+            if isinstance(last, dict) and "content" in last:
+                msg_text = str(last["content"]).strip()
+
+        raw_text = str(
+            msg_text
+            or norm.get("text")
+            or norm.get("message")
+            or norm.get("input")
+            or norm.get("prompt")
+            or norm.get("query")
+            or explicit_paper
+            or ""
+        ).strip()
+
+        candidate = explicit_paper or raw_text
+        return raw_text, candidate
+
+    def _is_conversational_request(self, raw_text: str, candidate: str) -> bool:
+        """Determines if the request is conversational without valid paper references."""
+        if not raw_text:
+            return False
+
+        cand_clean = candidate.strip().strip("'\"")
+
+        # 1. Existing file or directory on filesystem is a paper input (valid or invalid), never conversational
+        if cand_clean and _safe_exists(cand_clean):
+            return False
+
+        # 2. Embedded or explicit .pdf reference in raw_text or candidate indicates a paper request
+        combined_text = f"{raw_text} {candidate}"
+        if re.search(r'[\w\-./\\]+\.pdf\b', combined_text, re.IGNORECASE):
+            return False
+
+        # 3. Path-like candidate with non-PDF file extension indicates an invalid paper input attempt
+        if _is_safe_path_candidate(cand_clean):
+            cand_path = Path(cand_clean)
+            cand_ext = cand_path.suffix.lower()
+            is_valid_ext = bool(re.match(r"^\.[a-zA-Z0-9]{1,10}$", cand_ext))
+            non_pdf_exts = {
+                ".txt", ".docx", ".doc", ".png", ".jpg", ".jpeg",
+                ".tex", ".md", ".zip", ".tar", ".gz", ".csv", ".json",
+            }
+            if cand_ext in non_pdf_exts:
+                return False
+            if ("/" in cand_clean or "\\" in cand_clean) and is_valid_ext:
+                return False
+
+        # 4. Explicit bundled sample data reference indicates a paper request
+        root = Path(__file__).resolve().parents[1]
+        agent_dir = root / "agent" if (root / "agent").is_dir() else root
+        sample_data_dir = agent_dir / "data"
+        if _safe_is_dir(sample_data_dir) and cand_clean:
+            cand_path = Path(cand_clean) if _is_safe_path_candidate(cand_clean) else None
+            clean_name = cand_path.name.lower() if cand_path else ""
+            parent_name = cand_path.parent.name.lower() if cand_path else ""
+            for sub in sample_data_dir.iterdir():
+                if sub.is_dir() and (sub / "paper.pdf").is_file():
+                    sub_name_lower = sub.name.lower()
+                    if (
+                        (clean_name and clean_name == sub_name_lower)
+                        or (parent_name and parent_name == sub_name_lower)
+                        or cand_clean.lower() == sub_name_lower
+                        or sub_name_lower in raw_text.lower()
+                    ):
+                        return False
+
+        # 5. Explicit imperative request to generate/make/create a poster is a paper generation attempt
+        if IMPERATIVE_POSTER_REGEX.search(raw_text):
+            return False
+
+        # 6. Evaluate conversational patterns
+        return bool(CONVERSATIONAL_REGEX.search(raw_text))
+
     def _resolve_paper_input(self, norm: Dict[str, Any]) -> tuple[str, float, float, str, str, str]:
         """Resolves input into (pdf_path, width, height, url, logo, aff_logo)."""
         root = Path(__file__).resolve().parents[1]
@@ -83,42 +290,106 @@ class PosterGenBinding:
         url = str(norm.get("url", ""))
         logo = str(norm.get("logo", ""))
         aff_logo = str(norm.get("aff_logo", ""))
-        raw_path = str(norm.get("paper_path") or norm.get("input") or norm.get("text") or "")
 
-        candidate = Path(raw_path)
+        raw_text, raw_path = self._extract_text_and_candidate(norm)
+        raw_path = raw_path.strip().strip("'\"")
+
+        if not raw_path:
+            raise ValueError("No research paper input specified. Please provide a path to a PDF file.")
+
+        # If raw_path is free-form text, look for an embedded .pdf path
+        sample_cand = sample_data_dir / raw_path if _is_safe_path_candidate(raw_path) else None
+        if not _safe_exists(raw_path) and not _safe_is_dir(sample_cand):
+            pdf_match = re.search(r'([^\s"\'<>*|?]+\.pdf)\b', raw_path, re.IGNORECASE)
+            if pdf_match:
+                raw_path = pdf_match.group(1).strip().strip("'\"")
+
+        candidate = Path(raw_path) if _is_safe_path_candidate(raw_path) else None
         paper_dir = None
         resolved_pdf = None
 
-        if candidate.is_file():
+        is_free_form = bool("\n" in raw_text or len(raw_text.strip()) > 150)
+
+        if candidate and _safe_is_file(candidate):
+            is_sample = False
+            if _safe_is_dir(sample_data_dir):
+                try:
+                    candidate.resolve().relative_to(sample_data_dir.resolve())
+                    is_sample = True
+                except (ValueError, OSError):
+                    is_sample = False
+            if is_free_form and is_sample:
+                display_path = (raw_path[:120] + "...") if len(raw_path) > 120 else raw_path
+                raise ValueError(
+                    f"Could not resolve research paper PDF from input: '{display_path}'. "
+                    f"The specified path does not exist or is not a recognized paper manuscript."
+                )
+
+            if candidate.suffix.lower() != ".pdf":
+                raise ValueError(
+                    f"Provided paper file '{raw_path}' is not a PDF file. "
+                    f"PosterGen requires research paper manuscripts in PDF format (.pdf)."
+                )
+            if candidate.stat().st_size == 0:
+                raise ValueError(
+                    f"Provided paper PDF '{raw_path}' is empty (0 bytes). "
+                    f"Please provide a valid, non-empty research paper."
+                )
             resolved_pdf = str(candidate.resolve())
             paper_dir = candidate.parent
-        elif candidate.is_dir() and (candidate / "paper.pdf").is_file():
-            resolved_pdf = str((candidate / "paper.pdf").resolve())
+        elif candidate and _safe_is_dir(candidate):
+            is_sample = False
+            if _safe_is_dir(sample_data_dir):
+                try:
+                    candidate.resolve().relative_to(sample_data_dir.resolve())
+                    is_sample = True
+                except (ValueError, OSError):
+                    is_sample = False
+            if is_free_form and is_sample:
+                display_path = (raw_path[:120] + "...") if len(raw_path) > 120 else raw_path
+                raise ValueError(
+                    f"Could not resolve research paper PDF from input: '{display_path}'. "
+                    f"The specified path does not exist or is not a recognized paper manuscript."
+                )
+
+            pdf_file = candidate / "paper.pdf"
+            if not _safe_is_file(pdf_file):
+                raise ValueError(f"Directory '{raw_path}' does not contain 'paper.pdf'.")
+            if pdf_file.stat().st_size == 0:
+                raise ValueError(f"Paper PDF in directory '{raw_path}' is empty (0 bytes).")
+            resolved_pdf = str(pdf_file.resolve())
             paper_dir = candidate.resolve()
         else:
-            # Match against bundled sample data
+            # Match against bundled sample data ONLY by explicit folder name and NOT from free-form text
             matched_sub = None
-            if sample_data_dir.is_dir():
-                search_term = raw_path.lower()
+            if not is_free_form and _safe_is_dir(sample_data_dir) and raw_path and _is_safe_path_candidate(raw_path):
+                clean_name = candidate.name.lower() if candidate else ""
+                parent_name = candidate.parent.name.lower() if candidate else ""
                 for sub in sorted(sample_data_dir.iterdir()):
                     if sub.is_dir() and (sub / "paper.pdf").is_file():
-                        if search_term and search_term in sub.name.lower():
+                        if (
+                            (clean_name and clean_name == sub.name.lower())
+                            or (parent_name and parent_name == sub.name.lower())
+                            or raw_path.lower() == sub.name.lower()
+                        ):
                             matched_sub = sub
                             break
-                if matched_sub is None:
-                    # Default to the first available sample paper
-                    for sub in sorted(sample_data_dir.iterdir()):
-                        if sub.is_dir() and (sub / "paper.pdf").is_file():
-                            matched_sub = sub
-                            break
+
             if matched_sub is not None:
-                resolved_pdf = str((matched_sub / "paper.pdf").resolve())
+                pdf_file = matched_sub / "paper.pdf"
+                if pdf_file.stat().st_size == 0:
+                    raise ValueError(f"Paper PDF in sample directory '{matched_sub.name}' is empty (0 bytes).")
+                resolved_pdf = str(pdf_file.resolve())
                 paper_dir = matched_sub.resolve()
             else:
-                raise ValueError(f"Could not resolve paper PDF from input: {raw_path}")
+                display_path = (raw_path[:120] + "...") if len(raw_path) > 120 else raw_path
+                raise ValueError(
+                    f"Could not resolve research paper PDF from input: '{display_path}'. "
+                    f"The specified path does not exist or is not a recognized paper manuscript."
+                )
 
         # Resolve logo
-        if not logo or not Path(logo).is_file():
+        if not logo or not _safe_is_file(logo):
             if paper_dir and (paper_dir / "logo.png").is_file():
                 logo = str((paper_dir / "logo.png").resolve())
             elif (agent_dir / "resource" / "logo.png").is_file():
@@ -127,13 +398,46 @@ class PosterGenBinding:
                 logo = ""
 
         # Resolve affiliation logo
-        if not aff_logo or not Path(aff_logo).is_file():
+        if not aff_logo or not _safe_is_file(aff_logo):
             if paper_dir and (paper_dir / "aff.png").is_file():
                 aff_logo = str((paper_dir / "aff.png").resolve())
             else:
                 aff_logo = logo
 
         return resolved_pdf, width, height, url, logo, aff_logo
+
+    def _get_destinations(self) -> list[Path]:
+        destinations = []
+        abb_output = Path("/run/abb-output")
+        if abb_output.is_dir():
+            destinations.append(abb_output)
+        abb_channel = Path("/run/abb-channel/response")
+        if abb_channel.is_dir():
+            try:
+                for child in sorted(abb_channel.iterdir()):
+                    if child.is_dir():
+                        destinations.append(child)
+            except Exception as exc:
+                logger.error("Failed to list channel response directories in %s: %s", abb_channel, exc)
+        return destinations
+
+    def _deliver_artifacts(self, artifact_files: list[Path], destinations: list[Path]) -> list[str]:
+        delivery_errors = []
+        for dest in destinations:
+            for artifact in artifact_files:
+                if artifact.is_file():
+                    target = dest / artifact.name
+                    try:
+                        shutil.copy2(artifact, target)
+                        logger.info("Successfully delivered artifact %s to %s", artifact.name, target)
+                    except Exception as exc:
+                        err_msg = f"Failed to deliver artifact '{artifact.name}' to '{target}': {type(exc).__name__}: {exc}"
+                        logger.error(err_msg, exc_info=True)
+                        delivery_errors.append(err_msg)
+
+        if delivery_errors and destinations:
+            raise RuntimeError(f"Artifact delivery failed for one or more files: {'; '.join(delivery_errors)}")
+        return delivery_errors
 
     def _get_workflow(self):
         if self._compiled_workflow is None:
@@ -156,8 +460,58 @@ class PosterGenBinding:
             raise RuntimeError("OPENAI_API_KEY environment variable is required")
 
         norm = self._normalize_input(value)
-        pdf_path, width, height, url, logo, aff_logo = self._resolve_paper_input(norm)
+        raw_text, candidate = self._extract_text_and_candidate(norm)
 
+        # 1. Fast conversational / introductory response without invoking pipeline
+        if self._is_conversational_request(raw_text, candidate):
+            logger.info("Handling conversational / introductory request without poster synthesis")
+            return {
+                "final_output": {
+                    "answer": POSTERGEN_CAPABILITIES_TEXT,
+                    "poster_name": None,
+                    "pptx_path": None,
+                    "png_path": None,
+                    "artifacts": [],
+                    "status": "completed",
+                },
+                "answer": POSTERGEN_CAPABILITIES_TEXT,
+                "poster_name": None,
+                "pptx_path": None,
+                "png_path": None,
+                "artifacts": [],
+                "status": "completed",
+            }
+
+        # 2. Paper input resolution with clear diagnostic error per requirement.md
+        try:
+            pdf_path, width, height, url, logo, aff_logo = self._resolve_paper_input(norm)
+        except (ValueError, FileNotFoundError, OSError) as err:
+            diagnostic_msg = (
+                f"Error: Unable to generate poster. Invalid or missing paper input: {err}\n"
+                f"Requirement: PosterGen requires a valid, accessible research paper in PDF format (.pdf) "
+                f"to perform content extraction and poster synthesis. No unrequested sample synthesis was executed."
+            )
+            logger.warning("Paper resolution failed: %s", err)
+            return {
+                "final_output": {
+                    "answer": diagnostic_msg,
+                    "error": str(err),
+                    "poster_name": None,
+                    "pptx_path": None,
+                    "png_path": None,
+                    "artifacts": [],
+                    "status": "error",
+                },
+                "answer": diagnostic_msg,
+                "error": str(err),
+                "poster_name": None,
+                "pptx_path": None,
+                "png_path": None,
+                "artifacts": [],
+                "status": "error",
+            }
+
+        # 3. Poster generation pipeline execution
         _ensure_source_on_path()
         from src.state.poster_state import create_state
         from src.workflow.pipeline import save_timing_log
@@ -188,47 +542,15 @@ class PosterGenBinding:
         png_path = output_dir / f"{poster_name}.png"
         log_path = output_dir / "timing_cost_log.json"
 
-        # Copy generated poster files to ABB output / channel response destinations
-        destinations = []
-        abb_output = Path("/run/abb-output")
-        if abb_output.is_dir():
-            destinations.append(abb_output)
-        abb_channel = Path("/run/abb-channel/response")
-        if abb_channel.is_dir():
-            for child in abb_channel.iterdir():
-                if child.is_dir():
-                    destinations.append(child)
-
+        # Deliver generated poster files to ABB output / channel response destinations
+        destinations = self._get_destinations()
         artifact_files = [pptx_path, png_path, log_path]
-        for dest in destinations:
-            for artifact in artifact_files:
-                if artifact.is_file():
-                    try:
-                        shutil.copy2(artifact, dest / artifact.name)
-                    except Exception:
-                        pass
+        self._deliver_artifacts(artifact_files, destinations)
 
-        raw_text = str(norm.get("paper_path") or norm.get("input") or norm.get("text") or norm.get("message") or "")
-        is_intro = any(kw in raw_text.lower() for kw in ("introduce", "who are you", "what can you do", "help with", "hello", "hi", "about yourself"))
-        if is_intro:
-            result_message = (
-                f"I am PosterGen, an automated multi-agent AI system designed to transform scientific research papers "
-                f"into publication-ready academic conference posters. I can help you:\n"
-                f"1. Parse research papers in PDF format and extract structured text, figures, and tables.\n"
-                f"2. Curate and summarize key narratives, methodology, and experimental results into poster sections.\n"
-                f"3. Optimize spatial layout, color schemes, and typography for academic presentation.\n"
-                f"4. Render complete presentation-ready posters in PowerPoint (.pptx) and high-resolution image (.png) formats.\n\n"
-                f"For this request, I have processed the paper and generated the academic poster "
-                f"'{poster_name}'.\n"
-                f"- PowerPoint: {pptx_path}\n"
-                f"- Preview Image: {png_path if png_path.exists() else 'N/A'}\n"
-                f"- Timing & Cost Log: {log_path if log_path.exists() else 'N/A'}"
-            )
-        else:
-            result_message = (
-                f"Successfully generated poster '{poster_name}' in PowerPoint format: {pptx_path}. "
-                f"Preview image: {png_path if png_path.exists() else 'N/A'}."
-            )
+        result_message = (
+            f"Successfully generated poster '{poster_name}' in PowerPoint format: {pptx_path}. "
+            f"Preview image: {png_path if png_path.exists() else 'N/A'}."
+        )
 
         captured_artifacts = [p.name for p in artifact_files if p.exists()]
 
@@ -245,6 +567,8 @@ class PosterGenBinding:
             "poster_name": poster_name,
             "pptx_path": str(pptx_path),
             "png_path": str(png_path) if png_path.exists() else None,
+            "artifacts": captured_artifacts,
+            "status": "completed",
             "timing_metrics": {
                 "total_time": final_state["timing_metrics"].get_total_time(),
                 "api_calls": final_state["timing_metrics"].get_api_call_count(),
