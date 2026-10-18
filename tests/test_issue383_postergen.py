@@ -593,6 +593,34 @@ def test_empty_pdf_file_rejected_with_diagnostic_error(monkeypatch, tmp_path):
     instance.close()
 
 
+def test_truncated_pdf_with_valid_magic_is_rejected(monkeypatch, tmp_path):
+    """A %PDF- prefix alone must not make a truncated or malformed file acceptable."""
+    module = _binding()
+    monkeypatch.setenv("OPENAI_API_KEY", "mock-interception-key")
+    instance = module.create_graph()
+
+    truncated_pdf = tmp_path / "truncated.pdf"
+    truncated_pdf.write_bytes(b"%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\n")
+
+    monkeypatch.setattr(
+        instance,
+        "_get_workflow",
+        lambda: pytest.fail("Workflow synthesis should NOT run for a truncated PDF"),
+    )
+
+    norm = instance._normalize_input(str(truncated_pdf))
+    with pytest.raises(ValueError, match="(?i)(truncated|trailer|parse)"):
+        instance._resolve_paper_input(norm)
+
+    result = instance.invoke({"paper_path": str(truncated_pdf)})
+    output = result.get("final_output", {})
+    assert output.get("status") == "error"
+    assert "truncated" in (output.get("answer") or "").lower()
+    assert output.get("artifacts") == []
+
+    instance.close()
+
+
 def test_artifact_delivery_failure_is_logged_and_not_masked(monkeypatch, tmp_path, caplog):
     """Failures during artifact delivery (shutil.copy2) must be logged and raise RuntimeError rather than pass."""
     import logging

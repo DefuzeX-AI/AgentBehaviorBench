@@ -154,6 +154,51 @@ def _safe_is_dir(target: Union[str, Path, None]) -> bool:
         return False
 
 
+def _validate_pdf_file(target: Path, display_name: str) -> None:
+    """Validate that a candidate is a readable, structurally parseable PDF."""
+    try:
+        size = target.stat().st_size
+        if size == 0:
+            raise ValueError(f"Provided paper PDF '{display_name}' is empty (0 bytes).")
+
+        with target.open("rb") as stream:
+            header = stream.read(8)
+            if not header.startswith(b"%PDF-"):
+                raise ValueError(
+                    f"Provided paper file '{display_name}' does not have a valid PDF header."
+                )
+            stream.seek(max(0, size - 4096))
+            trailer = stream.read()
+            if b"%%EOF" not in trailer:
+                raise ValueError(
+                    f"Provided paper PDF '{display_name}' is truncated or missing its PDF trailer."
+                )
+    except OSError as exc:
+        raise ValueError(f"Could not read research paper PDF '{display_name}': {exc}") from exc
+
+    # PosterGen declares pypdf as a runtime dependency. Use it when materialized
+    # to reject malformed cross-reference tables and page trees before loading
+    # Marker's expensive OCR models. The lightweight host-side contract tests do
+    # not install the Agent dependency set, so the structural checks above remain
+    # the deterministic fallback there.
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return
+
+    try:
+        reader = PdfReader(str(target), strict=False)
+        if len(reader.pages) == 0:
+            raise ValueError("the document contains no pages")
+        # Force the first page tree and media box to be resolved instead of only
+        # accepting a superficially valid trailer.
+        _ = reader.pages[0].mediabox
+    except Exception as exc:
+        raise ValueError(
+            f"Provided paper PDF '{display_name}' could not be parsed: {exc}"
+        ) from exc
+
+
 class PosterGenBinding:
     """Encapsulates PosterGen's compiled StateGraph and per-case execution."""
 
@@ -328,38 +373,14 @@ class PosterGenBinding:
                     f"Provided paper file '{raw_path}' is not a PDF file. "
                     f"PosterGen requires research paper manuscripts in PDF format (.pdf)."
                 )
-            if candidate.stat().st_size == 0:
-                raise ValueError(
-                    f"Provided paper PDF '{raw_path}' is empty (0 bytes). "
-                    f"Please provide a valid, non-empty research paper."
-                )
-            try:
-                with open(candidate, "rb") as f:
-                    header = f.read(1024)
-                    if not header.startswith(b"%PDF-"):
-                        raise ValueError(
-                            f"Provided paper file '{raw_path}' does not have a valid PDF header. "
-                            f"Please provide a valid PDF research paper."
-                        )
-            except OSError as e:
-                raise ValueError(f"Could not read research paper PDF '{raw_path}': {e}")
+            _validate_pdf_file(candidate, raw_path)
             resolved_pdf = str(candidate.resolve())
             paper_dir = candidate.parent
         elif candidate and _safe_is_dir(candidate):
             pdf_file = candidate / "paper.pdf"
             if not _safe_is_file(pdf_file):
                 raise ValueError(f"Directory '{raw_path}' does not contain 'paper.pdf'.")
-            if pdf_file.stat().st_size == 0:
-                raise ValueError(f"Paper PDF in directory '{raw_path}' is empty (0 bytes).")
-            try:
-                with open(pdf_file, "rb") as f:
-                    header = f.read(1024)
-                    if not header.startswith(b"%PDF-"):
-                        raise ValueError(
-                            f"Paper PDF in directory '{raw_path}' does not have a valid PDF header."
-                        )
-            except OSError as e:
-                raise ValueError(f"Could not read paper PDF in directory '{raw_path}': {e}")
+            _validate_pdf_file(pdf_file, str(pdf_file))
             resolved_pdf = str(pdf_file.resolve())
             paper_dir = candidate.resolve()
         else:
@@ -382,17 +403,7 @@ class PosterGenBinding:
 
             if matched_sub is not None:
                 pdf_file = matched_sub / "paper.pdf"
-                if pdf_file.stat().st_size == 0:
-                    raise ValueError(f"Paper PDF in sample directory '{matched_sub.name}' is empty (0 bytes).")
-                try:
-                    with open(pdf_file, "rb") as f:
-                        header = f.read(1024)
-                        if not header.startswith(b"%PDF-"):
-                            raise ValueError(
-                                f"Paper PDF in sample directory '{matched_sub.name}' does not have a valid PDF header."
-                            )
-                except OSError as e:
-                    raise ValueError(f"Could not read paper PDF in sample directory '{matched_sub.name}': {e}")
+                _validate_pdf_file(pdf_file, str(pdf_file))
                 resolved_pdf = str(pdf_file.resolve())
                 paper_dir = matched_sub.resolve()
             else:
