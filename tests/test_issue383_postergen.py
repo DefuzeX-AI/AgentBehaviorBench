@@ -357,8 +357,9 @@ def test_dockerfile_security_no_chmod_777():
 # ------------------------------------------------------------------- Runtime Policy Configuration
 
 def test_docker_policy_memory_configuration_for_heavy_models(monkeypatch):
-    """Verify DockerPolicy dynamically honors ABB_DOCKER_MEMORY and ABB_DOCKER_CPUS."""
+    """Verify DockerPolicy dynamically honors ABB_DOCKER_MEMORY and ABB_DOCKER_CPUS via from_environment."""
     from agentbench.runtime.docker.policy import DockerPolicy, MEMORY_ENV, CPUS_ENV
+    from agentbench.runtime.docker.runtime import DockerRuntime
 
     monkeypatch.delenv(MEMORY_ENV, raising=False)
     monkeypatch.delenv(CPUS_ENV, raising=False)
@@ -368,17 +369,38 @@ def test_docker_policy_memory_configuration_for_heavy_models(monkeypatch):
 
     monkeypatch.setenv(MEMORY_ENV, "8g")
     monkeypatch.setenv(CPUS_ENV, "4")
-    policy_configured = DockerPolicy()
+
+    # DockerPolicy() defaults ignore ambient process variables
+    policy_constructor = DockerPolicy()
+    assert policy_constructor.memory == "1g"
+    assert policy_constructor.cpus == 1.0
+
+    # DockerPolicy.from_environment() reads ambient variables when environ is None
+    policy_configured = DockerPolicy.from_environment()
     assert policy_configured.memory == "8g"
     assert policy_configured.cpus == 4.0
     args = policy_configured.run_arguments()
     assert "--memory=8g" in args
     assert "--cpus=4.0" in args
 
+    # DockerPolicy.from_environment() with explicit mapping
+    policy_mapping = DockerPolicy.from_environment({"ABB_DOCKER_MEMORY": "8g", "ABB_DOCKER_CPUS": "4"})
+    assert policy_mapping.memory == "8g"
+    assert policy_mapping.cpus == 4.0
+
     # Explicit override takes precedence
     policy_override = DockerPolicy(memory="2g", cpus=2.0)
     assert policy_override.memory == "2g"
     assert policy_override.cpus == 2.0
+
+    # DockerRuntime resolves policy from environ and isolates against empty environ
+    rt_configured = DockerRuntime(environ={"ABB_DOCKER_MEMORY": "8g", "ABB_DOCKER_CPUS": "4"})
+    assert rt_configured.policy.memory == "8g"
+    assert rt_configured.policy.cpus == 4.0
+
+    rt_empty = DockerRuntime(environ={})
+    assert rt_empty.policy.memory == "1g"
+    assert rt_empty.policy.cpus == 1.0
 
 
 def test_docker_policy_memory_and_cpus_strict_validation(monkeypatch):
@@ -395,12 +417,14 @@ def test_docker_policy_memory_and_cpus_strict_validation(monkeypatch):
         assert p.memory == mem.strip()
         assert f"--memory={mem.strip()}" in p.run_arguments()
 
-    # 2. Verify environment variable honors valid memory formats
+    # 2. Verify environment variable honors valid memory formats via from_environment
     for mem in valid_memories:
         monkeypatch.setenv(MEMORY_ENV, mem)
-        p_env = DockerPolicy()
+        p_env = DockerPolicy.from_environment()
         assert p_env.memory == mem.strip()
         assert f"--memory={mem.strip()}" in p_env.run_arguments()
+        # Ensure constructor ignores ambient variable
+        assert DockerPolicy().memory == "1g"
 
     # 3. Verify constructor rejects invalid memory formats with ValueError
     monkeypatch.delenv(MEMORY_ENV, raising=False)
@@ -409,11 +433,13 @@ def test_docker_policy_memory_and_cpus_strict_validation(monkeypatch):
         with pytest.raises(ValueError, match="(?i)memory"):
             DockerPolicy(memory=bad_mem)
 
-    # 4. Verify environment variable rejects invalid memory formats with ValueError
+    # 4. Verify environment variable rejects invalid memory formats with ValueError via from_environment
     for bad_mem in invalid_memories:
         monkeypatch.setenv(MEMORY_ENV, bad_mem)
         with pytest.raises(ValueError, match="(?i)memory"):
-            DockerPolicy()
+            DockerPolicy.from_environment()
+        # Constructor ignores ambient invalid variable and defaults to 1g
+        assert DockerPolicy().memory == "1g"
 
     monkeypatch.delenv(MEMORY_ENV, raising=False)
 
@@ -424,12 +450,14 @@ def test_docker_policy_memory_and_cpus_strict_validation(monkeypatch):
         assert p.cpus == c
         assert f"--cpus={c}" in p.run_arguments()
 
-    # 6. Verify environment variable honors valid cpus values
+    # 6. Verify environment variable honors valid cpus values via from_environment
     for c in valid_cpus:
         monkeypatch.setenv(CPUS_ENV, str(c))
-        p_env = DockerPolicy()
+        p_env = DockerPolicy.from_environment()
         assert p_env.cpus == float(c)
         assert f"--cpus={float(c)}" in p_env.run_arguments()
+        # Ensure constructor ignores ambient variable
+        assert DockerPolicy().cpus == 1.0
 
     # 7. Verify constructor rejects invalid cpus values with ValueError
     monkeypatch.delenv(CPUS_ENV, raising=False)
@@ -438,12 +466,14 @@ def test_docker_policy_memory_and_cpus_strict_validation(monkeypatch):
         with pytest.raises(ValueError, match="(?i)cpus"):
             DockerPolicy(cpus=bad_c)
 
-    # 8. Verify environment variable rejects invalid cpus values with ValueError
+    # 8. Verify environment variable rejects invalid cpus values with ValueError via from_environment
     invalid_cpus_env = ["0", "0.0", "-1.0", "-4", "not-a-number", "", "   ", "nan", "inf", "2048.0"]
     for bad_c_str in invalid_cpus_env:
         monkeypatch.setenv(CPUS_ENV, bad_c_str)
         with pytest.raises(ValueError, match="(?i)cpus"):
-            DockerPolicy()
+            DockerPolicy.from_environment()
+        # Constructor ignores ambient invalid variable and defaults to 1.0
+        assert DockerPolicy().cpus == 1.0
 
     monkeypatch.delenv(CPUS_ENV, raising=False)
 

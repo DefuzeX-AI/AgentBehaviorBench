@@ -113,7 +113,7 @@ class DockerRuntime:
         self._secret_resolver = secret_resolver or EnvironmentSecretResolver(
             self._environ
         )
-        self._policy = policy or DockerPolicy()
+        self._policy = policy or DockerPolicy.from_environment(self._environ)
         self._interceptor_policy = (
             interceptor_policy or InterceptorPolicy.from_environment(self._environ)
         )
@@ -139,6 +139,11 @@ class DockerRuntime:
         self.artifact_root = artifact_root
         self._timeout_override = timeout_sec
         self.run_id = run_id
+
+    @property
+    def policy(self) -> DockerPolicy:
+        """The DockerPolicy applied to containers launched by this runtime."""
+        return self._policy
 
     def invocation_timeout(self, agent):
         return self._timeout_override or AgentContainerConfig.from_agent_dir(

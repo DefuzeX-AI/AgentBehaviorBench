@@ -175,20 +175,52 @@ class DockerPolicy:
     egress: EgressSettings = EgressSettings()
 
     def __post_init__(self) -> None:
-        mem = self.memory
-        if self.memory == "1g" and MEMORY_ENV in os.environ:
-            mem = os.environ[MEMORY_ENV]
-        validated_mem = _validate_docker_memory(mem)
+        validated_mem = _validate_docker_memory(self.memory)
         object.__setattr__(self, "memory", validated_mem)
 
-        c = self.cpus
-        if self.cpus == 1.0 and CPUS_ENV in os.environ:
-            raw_cpus = os.environ[CPUS_ENV].strip()
-            parsed_c = _validate_docker_cpus(raw_cpus)
-            c = float(parsed_c) if not isinstance(parsed_c, float) else parsed_c
-        else:
-            c = _validate_docker_cpus(c)
-        object.__setattr__(self, "cpus", c)
+        validated_cpus = _validate_docker_cpus(self.cpus)
+        object.__setattr__(self, "cpus", validated_cpus)
+
+    @classmethod
+    def from_environment(
+        cls,
+        environ: Mapping[str, str] | None = None,
+        base: DockerPolicy | None = None,
+    ) -> DockerPolicy:
+        """Construct DockerPolicy from an explicit environment mapping or ambient process environment.
+
+        Args:
+            environ: Environment mapping to resolve limits from. If None, falls back to os.environ.
+                If an empty mapping ({}) is passed, default limits (1g memory, 1.0 CPU) are used
+                without ambient environment bleed.
+            base: Optional base DockerPolicy providing default values for unconfigured settings.
+
+        Returns:
+            Validated DockerPolicy instance.
+        """
+        env = os.environ if environ is None else environ
+        base_policy = base or cls()
+
+        mem = base_policy.memory
+        if MEMORY_ENV in env:
+            mem = env[MEMORY_ENV]
+
+        cpus = base_policy.cpus
+        if CPUS_ENV in env:
+            raw_cpus = env[CPUS_ENV]
+            if isinstance(raw_cpus, str):
+                raw_cpus = raw_cpus.strip()
+            cpus = _validate_docker_cpus(raw_cpus)
+
+        egress = EgressSettings.from_environment(env, base=base_policy.egress)
+
+        return cls(
+            cpus=cpus,
+            memory=mem,
+            pids_limit=base_policy.pids_limit,
+            tmpfs_size=base_policy.tmpfs_size,
+            egress=egress,
+        )
 
     def run_arguments(self) -> tuple[str, ...]:
         return (
