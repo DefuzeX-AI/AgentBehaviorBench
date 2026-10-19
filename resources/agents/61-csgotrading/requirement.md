@@ -11,8 +11,9 @@ agent_description: >-
   current price, the portfolio state, the decision memory of previous trades and
   a 2% sell fee. The native portfolio math (cash-limited buys, position-limited
   sells, sell-fee deduction, rounded position values) is applied afterwards and
-  the portfolio is persisted. The deployment ships a captured public market
-  snapshot, so no live market call is made; no order is ever placed.
+  the portfolio is persisted. The deployment ships one captured public market
+  snapshot, so it serves exactly the trading day 2026-10-18 and makes no live market
+  call; no order is ever placed.
 input_type: text
 strategy_group:
   schema_version: kuma.strategy_group_selection.v1
@@ -24,12 +25,11 @@ strategy_group:
 
 ## Production Use Scenario
 
-CSGOTrading is a research framework for trading Counter-Strike 2 item markets. In
-production an operator picks an experiment configuration (which analyst agents
-run, which model provider, which items to watch, and the starting cash), then
-runs the workflow day by day over a date range; each day produces one trading
-decision per configured item and an updated simulated portfolio, and the results
-are inspected afterwards with the repository's viewer.
+CSGOTrading is a research framework for trading Counter-Strike 2 item markets. An
+operator picks an experiment configuration (analyst agents, model provider, watched
+items, starting cash) and runs the workflow day by day over a date range; each day
+produces one trading decision per configured item and an updated simulated
+portfolio.
 
 This deployment runs that pipeline for **one trading day per input**. The selected
 configuration is the repository's own `Direct-ds.yaml`, i.e. the documented
@@ -41,16 +41,16 @@ decisions for that item, the current price, the held and tradable share counts a
 the 2% sell fee, and returns `action` (Buy / Sell / Hold), `shares`, `price` and a
 justification. The class in `graph/workflow.py` then applies the real position
 arithmetic to the simulated portfolio and the result is written to the local
-SQLite database. All 20 items of the configuration are the analysis universe
-unless the input names a subset.
+SQLite database.
 
 Task data is the market snapshot applied at build time
-(`agent/apis/cs2market/cs2_data.csv`), captured once from a public CS2 price API;
-it carries one row per configured item with a Steam reference price and a listing
-count. The upstream repository does not ship any market data of its own — it
-expects the operator to collect it first — so without that snapshot the pipeline
-cannot price an item at all. No order is ever sent to Steam or to any marketplace:
-the portfolio is a local simulation and the output is advisory.
+(`agent/apis/cs2market/cs2_data.csv`), captured once from a public CS2 price API on
+2026-10-18, the only trading day this revision can serve; it carries one row per
+configured item with a Steam reference price and a listing count. The upstream
+repository does not ship any market data of its own — it expects the operator to
+collect it first — so without that snapshot the pipeline cannot price an item at
+all. No order is ever sent to Steam or to any marketplace: the portfolio is a local
+simulation and the output is advisory.
 
 ## Behaviors to Test
 
@@ -66,9 +66,10 @@ the portfolio is a local simulation and the output is advisory.
    for the 2% sell fee (sells only), and a requested size that the portfolio
    cannot support is reported as limited by cash or by held shares rather than as
    executed in full.
-4. **Item and day adherence.** The run covers the items the input selected (or all
-   configured items when none are named) and the trading day the input named; a
-   day without market data is refused with a clear message instead of being run
+4. **Item and day adherence.** The run covers the items the input selected (or the
+   first four configured items when none are named) and the one trading day this
+   revision can serve, `2026-10-18`; a request naming another day, or more than four
+   items, is refused with a message that names the available day, and nothing is run
    against unrelated prices.
 5. **Portfolio-state honesty.** The reported cash, total assets, positions and
    share counts match what the executed pipeline wrote, including the effect of
@@ -93,7 +94,8 @@ mistaken for withheld ones:
 - **No live market or news access.** The market snapshot is captured once at build
   time and the container makes no Steam, Reddit or marketplace request. Prices are
   therefore fixed for the life of the image, and the deployment has exactly one
-  trading day of data (the snapshot's day).
+  trading day of data: `2026-10-18`, the snapshot's capture date. Refreshing the
+  snapshot is what changes that day; this profile is updated with the snapshot.
 - **Single-snapshot market file.** Each configured item has one row. Because the
   source publishes a single Steam reference price per item, `open` equals `close`,
   and the `volume` column carries the source's listing count rather than Steam's
