@@ -45,6 +45,15 @@ needs_upstream_deps = pytest.mark.skipif(
     reason=f"upstream runtime dependency '{_MISSING}' is not installed in this environment",
 )
 
+MINIMAL_VALID_PDF = (
+    b"%PDF-1.4\n"
+    b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+    b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+    b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>\nendobj\n"
+    b"xref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000058 00000 n \n0000000115 00000 n \n"
+    b"trailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n183\n%%EOF\n"
+)
+
 
 def _binding():
     spec = importlib.util.spec_from_file_location(
@@ -176,6 +185,7 @@ def test_manifest_adapter_and_interception():
 
 # ------------------------------------------------------------------- Static Unit Validation
 
+@needs_snapshot
 def test_validate_unit_passes_with_kuma_plugin():
     agent_id = validate_unit(UNIT, plugin)
     assert agent_id == "postergen"
@@ -719,6 +729,7 @@ def test_artifact_delivery_failure_is_logged_and_not_masked(monkeypatch, tmp_pat
     instance.close()
 
 
+@needs_snapshot
 def test_explicit_bundled_sample_paper_resolves_correctly(monkeypatch):
     """Explicitly requested bundled sample papers must resolve to valid paper.pdf."""
     module = _binding()
@@ -743,6 +754,7 @@ def test_explicit_bundled_sample_paper_resolves_correctly(monkeypatch):
     instance.close()
 
 
+@needs_snapshot
 def test_long_natural_language_request_with_valid_pdf_resolves_correctly(monkeypatch):
     """Long natural language requests (>150, 200, 250 chars) specifying valid PDFs must resolve correctly.
 
@@ -840,6 +852,192 @@ def test_long_natural_language_request_with_valid_pdf_resolves_correctly(monkeyp
     assert res.get("status") in ("completed", "success")
     assert mock_workflow.invoke.called
     assert "Successfully generated poster" in (res.get("answer") or "")
+
+    instance.close()
+
+
+# ------------------------------------------------------------------- Self-Contained Offline Regression Tests (Independent of agent/ snapshot)
+
+def test_offline_explicit_pdf_path_resolves_correctly(tmp_path):
+    """Verify path resolution and PDF validation on a clean temporary PDF file without untracked snapshot."""
+    pdf_file = tmp_path / "offline_sample_paper.pdf"
+    pdf_file.write_bytes(MINIMAL_VALID_PDF)
+
+    module = _binding()
+    module._validate_pdf_file(pdf_file, "offline_sample_paper.pdf")
+
+    instance = module.create_graph()
+
+    test_inputs = [
+        str(pdf_file),
+        {"paper_path": str(pdf_file)},
+        {"text": f"Generate a poster from {pdf_file}"},
+        {"paper_path": str(pdf_file), "text": "Please create a scientific poster"},
+    ]
+
+    for inp in test_inputs:
+        norm = instance._normalize_input(inp)
+        resolved = instance._resolve_paper_input(norm)
+        resolved_path = Path(resolved[0])
+        assert resolved_path.is_file()
+        assert resolved_path.resolve() == pdf_file.resolve()
+        with open(resolved_path, "rb") as f:
+            header = f.read(10)
+            assert header.startswith(b"%PDF-")
+
+    instance.close()
+
+
+def test_offline_long_natural_language_request_with_valid_pdf_fixture(tmp_path, monkeypatch):
+    """Verify long prompts referencing the valid PDF fixture resolve without depending on agent/data/."""
+    from unittest.mock import MagicMock
+
+    pdf_file = tmp_path / "offline_academic_paper.pdf"
+    pdf_file.write_bytes(MINIMAL_VALID_PDF)
+
+    module = _binding()
+    monkeypatch.setenv("OPENAI_API_KEY", "mock-interception-key")
+    instance = module.create_graph()
+
+    long_prompt_zh = (
+        f"请使用 {pdf_file} 生成学术顶会海报，"
+        "要求整体设计美观大气，视觉层次清晰，突出核心研究贡献与实验结果，"
+        "配色方案需符合学术顶会规范，排版整洁分栏明确，并在海报底部保留作者信息与单位标志。\n"
+        "额外设计要求：\n"
+        "1. 使用无衬线字体以确保远距离清晰可读。\n"
+        "2. 重点突出关键指标对比柱状图与消融实验结论。"
+    )
+    assert len(long_prompt_zh) > 200
+    assert "\n" in long_prompt_zh
+
+    long_prompt_en = (
+        f"Please generate a comprehensive conference presentation poster using the research paper located at "
+        f"{pdf_file}. The poster must feature a clear 3-column layout, emphasize our "
+        f"novel methodological contributions and evaluation results on standard benchmark datasets, and use "
+        f"an academic navy-and-gold color palette suitable for ACM/IEEE conferences."
+    )
+    assert len(long_prompt_en) > 250
+
+    test_vectors = [
+        long_prompt_zh,
+        {"text": long_prompt_zh},
+        {"messages": [{"role": "user", "content": long_prompt_zh}]},
+        long_prompt_en,
+        {"paper_path": str(pdf_file), "text": long_prompt_en},
+    ]
+
+    for req in test_vectors:
+        norm = instance._normalize_input(req)
+        resolved_pdf, width, height, url, logo, aff_logo = instance._resolve_paper_input(norm)
+        assert Path(resolved_pdf).is_file()
+        assert Path(resolved_pdf).resolve() == pdf_file.resolve()
+        with open(resolved_pdf, "rb") as f:
+            header = f.read(10)
+            assert header.startswith(b"%PDF-")
+
+    # Verify invoke dispatches to workflow rather than returning conversational capabilities text or error
+    mock_pipeline = MagicMock()
+    mock_state_module = MagicMock()
+    mock_timing = MagicMock()
+    fake_out_dir = tmp_path / "mock_postergen_out"
+    fake_out_dir.mkdir(parents=True, exist_ok=True)
+    fake_pptx = fake_out_dir / "poster.pptx"
+    fake_png = fake_out_dir / "poster.png"
+    fake_pptx.touch()
+    fake_png.touch()
+
+    mock_state_dict = {
+        "timing_metrics": mock_timing,
+        "output_dir": str(fake_out_dir),
+        "poster_name": "poster",
+        "final_presentation_path": str(fake_pptx),
+        "final_image_path": str(fake_png),
+        "errors": [],
+    }
+    mock_state_module.create_state.return_value = mock_state_dict
+    monkeypatch.setitem(sys.modules, "src.state.poster_state", mock_state_module)
+    monkeypatch.setitem(sys.modules, "src.workflow.pipeline", mock_pipeline)
+
+    mock_workflow = MagicMock()
+    mock_workflow.invoke.return_value = mock_state_dict
+    monkeypatch.setattr(instance, "_get_workflow", lambda: mock_workflow)
+    monkeypatch.setattr(instance, "_deliver_artifacts", lambda artifacts, dests: [])
+
+    res = instance.invoke(long_prompt_zh)
+    assert res.get("status") in ("completed", "success")
+    assert mock_workflow.invoke.called
+    assert "Successfully generated poster" in (res.get("answer") or "")
+
+    instance.close()
+
+
+def test_paper_request_with_introduce_or_features_not_short_circuited(tmp_path, monkeypatch):
+    """Verify prompts like 'This paper introduces novel architectural features...' are NOT short-circuited."""
+    from unittest.mock import MagicMock
+
+    pdf_file = tmp_path / "novel_features_paper.pdf"
+    pdf_file.write_bytes(MINIMAL_VALID_PDF)
+
+    module = _binding()
+    monkeypatch.setenv("OPENAI_API_KEY", "mock-interception-key")
+    instance = module.create_graph()
+
+    prompts = [
+        f"This paper introduces novel architectural features. Please generate a poster from {pdf_file}",
+        f"Can you create a poster that introduces the key features of {pdf_file}?",
+        {"paper_path": str(pdf_file), "text": "This paper introduces several key features. Please design a presentation poster."},
+        {"text": f"Please design a poster summarizing the key features introduced in {pdf_file}"},
+    ]
+
+    mock_pipeline = MagicMock()
+    mock_state_module = MagicMock()
+    mock_timing = MagicMock()
+    fake_out_dir = tmp_path / "mock_postergen_out"
+    fake_out_dir.mkdir(parents=True, exist_ok=True)
+    fake_pptx = fake_out_dir / "poster.pptx"
+    fake_png = fake_out_dir / "poster.png"
+    fake_pptx.touch()
+    fake_png.touch()
+
+    mock_state_dict = {
+        "timing_metrics": mock_timing,
+        "output_dir": str(fake_out_dir),
+        "poster_name": "poster",
+        "final_presentation_path": str(fake_pptx),
+        "final_image_path": str(fake_png),
+        "errors": [],
+    }
+    mock_state_module.create_state.return_value = mock_state_dict
+    monkeypatch.setitem(sys.modules, "src.state.poster_state", mock_state_module)
+    monkeypatch.setitem(sys.modules, "src.workflow.pipeline", mock_pipeline)
+
+    mock_workflow = MagicMock()
+    mock_workflow.invoke.return_value = mock_state_dict
+    monkeypatch.setattr(instance, "_get_workflow", lambda: mock_workflow)
+    monkeypatch.setattr(instance, "_deliver_artifacts", lambda artifacts, dests: [])
+
+    for prompt in prompts:
+        norm = instance._normalize_input(prompt)
+        raw_text, candidate = instance._extract_text_and_candidate(norm)
+
+        # 1. Must NOT be classified as conversational
+        assert not instance._is_conversational_request(raw_text, candidate, norm=norm), (
+            f"Prompt unexpectedly classified as conversational: {prompt}"
+        )
+
+        # 2. Must resolve paper input cleanly to our temporary fixture
+        resolved_pdf, *_ = instance._resolve_paper_input(norm)
+        assert Path(resolved_pdf).resolve() == pdf_file.resolve()
+
+        # 3. Must invoke pipeline, NOT short-circuit to POSTERGEN_CAPABILITIES_TEXT
+        mock_workflow.invoke.reset_mock()
+        res = instance.invoke(prompt)
+        assert mock_workflow.invoke.called, f"Workflow invoke was not called for: {prompt}"
+        answer = (res.get("final_output") or {}).get("answer") or res.get("answer") or ""
+        assert answer != module.POSTERGEN_CAPABILITIES_TEXT, (
+            f"Prompt was short-circuited to capabilities text: {prompt}"
+        )
+        assert "Successfully generated poster" in answer
 
     instance.close()
 

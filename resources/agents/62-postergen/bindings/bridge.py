@@ -34,8 +34,10 @@ CONVERSATIONAL_PATTERNS = [
     r"\bnice\s+to\s+meet\s+you\b",
 
     # 2. Self-Introduction & Identity Inquiries
-    r"\bintroduce\b",
-    r"\bintroduction\b",
+    r"\bintroduce\s+yourself\b",
+    r"\bintroduce\s+(?:the\s+)?(?:agent|tool|postergen|system)\b",
+    r"\bself[- ]introduction\b",
+    r"\b(?:give\s+me\s+an\s+)?introduction\s+to\s+(?:postergen|this\s+agent|this\s+tool|the\s+system)\b",
     r"\bwho\s+are\s+you\b",
     r"\bwho\s+is\s+(?:this|the)?\s*agent\b",
     r"\bwhat\s+are\s+you\b",
@@ -53,8 +55,10 @@ CONVERSATIONAL_PATTERNS = [
     r"\bcapabilities\b",
     r"\bcapability\b",
     r"\bfunctionality\b",
-    r"\bfeatures\b",
-    r"\bfunctions\b",
+    r"\b(?:what\s+are\s+the\s+)?features\s+of\s+(?:postergen|this\s+agent|this\s+tool|the\s+system)\b",
+    r"\bwhat\s+(?:features|capabilities)\s+do\s+you\s+have\b",
+    r"\bwhat\s+are\s+(?:the|your)\s+(?:features|functions)\b",
+    r"\bfunctions\s+of\s+(?:postergen|this\s+agent|this\s+tool|the\s+system)\b",
     r"\bwhat\s+(?:can|does|do)\s+(?:[\w\-]+\s+){0,2}do\b",
     r"\bwhat\s+(?:you|this\s+\w+)\s+(?:can\s+)?do\b",
     r"\bwhat\s+can\s+i\s+do\b",
@@ -77,7 +81,7 @@ CONVERSATIONAL_PATTERNS = [
 CONVERSATIONAL_REGEX = re.compile("|".join(CONVERSATIONAL_PATTERNS), re.IGNORECASE)
 
 IMPERATIVE_POSTER_REGEX = re.compile(
-    r"^\s*(?:please\s+)?(?:generate|make|create|build|render|produce|synthesize|design)\s+(?:a\s+|an\s+)?poster\b",
+    r"\b(?:generate|make|create|build|render|produce|synthesize|design)\s+(?:a\s+|an\s+)?poster\b",
     re.IGNORECASE
 )
 
@@ -234,7 +238,10 @@ class PosterGenBinding:
         if isinstance(value, Mapping):
             if not value:
                 raise ValueError("Input mapping cannot be empty")
-            return dict(value)
+            d = dict(value)
+            if "paper_path" in value:
+                d["_explicit_paper_path"] = True
+            return d
 
         if isinstance(value, str):
             text = value.strip()
@@ -244,6 +251,8 @@ class PosterGenBinding:
                 try:
                     parsed = json.loads(text)
                     if isinstance(parsed, dict) and parsed:
+                        if "paper_path" in parsed:
+                            parsed["_explicit_paper_path"] = True
                         return parsed
                 except Exception:
                     pass
@@ -280,23 +289,39 @@ class PosterGenBinding:
         candidate = explicit_paper or raw_text
         return raw_text, candidate
 
-    def _is_conversational_request(self, raw_text: str, candidate: str) -> bool:
+    def _is_conversational_request(
+        self,
+        raw_text: str,
+        candidate: str,
+        norm: Optional[Dict[str, Any]] = None,
+    ) -> bool:
         """Determines if the request is conversational without valid paper references."""
         if not raw_text:
             return False
 
+        # 1. If paper_path is explicitly provided in an input dictionary, return False immediately
+        if norm is not None and (
+            norm.get("_explicit_paper_path")
+            or (norm.get("paper_path") and norm.get("paper_path") != raw_text)
+        ):
+            return False
+
         cand_clean = candidate.strip().strip("'\"")
 
-        # 1. Existing file or directory on filesystem is a paper input (valid or invalid), never conversational
+        # 2. Existing file or directory on filesystem is a paper input (valid or invalid), never conversational
         if cand_clean and _safe_exists(cand_clean):
             return False
 
-        # 2. Embedded or explicit .pdf reference in raw_text or candidate indicates a paper request
+        # 3. Embedded or explicit .pdf reference in raw_text or candidate indicates a paper request
         combined_text = f"{raw_text} {candidate}"
         if re.search(r'[\w\-./\\]+\.pdf\b', combined_text, re.IGNORECASE):
             return False
 
-        # 3. Path-like candidate with non-PDF file extension indicates an invalid paper input attempt
+        # 4. Poster generation actions/intent alongside or within a paper request
+        if IMPERATIVE_POSTER_REGEX.search(raw_text):
+            return False
+
+        # 5. Path-like candidate with non-PDF file extension indicates an invalid paper input attempt
         if _is_safe_path_candidate(cand_clean):
             cand_path = Path(cand_clean)
             cand_ext = cand_path.suffix.lower()
@@ -310,7 +335,7 @@ class PosterGenBinding:
             if ("/" in cand_clean or "\\" in cand_clean) and is_valid_ext:
                 return False
 
-        # 4. Explicit bundled sample data reference indicates a paper request
+        # 6. Explicit bundled sample data reference indicates a paper request
         root = Path(__file__).resolve().parents[1]
         agent_dir = root / "agent" if (root / "agent").is_dir() else root
         sample_data_dir = agent_dir / "data"
@@ -329,11 +354,7 @@ class PosterGenBinding:
                     ):
                         return False
 
-        # 5. Explicit imperative request to generate/make/create a poster is a paper generation attempt
-        if IMPERATIVE_POSTER_REGEX.search(raw_text):
-            return False
-
-        # 6. Evaluate conversational patterns
+        # 7. Evaluate conversational patterns
         return bool(CONVERSATIONAL_REGEX.search(raw_text))
 
     def _resolve_paper_input(self, norm: Dict[str, Any]) -> tuple[str, float, float, str, str, str]:
@@ -523,7 +544,7 @@ class PosterGenBinding:
         raw_text, candidate = self._extract_text_and_candidate(norm)
 
         # 1. Fast conversational / introductory response without invoking pipeline
-        if self._is_conversational_request(raw_text, candidate):
+        if self._is_conversational_request(raw_text, candidate, norm=norm):
             logger.info("Handling conversational / introductory request without poster synthesis")
             return {
                 "final_output": {
