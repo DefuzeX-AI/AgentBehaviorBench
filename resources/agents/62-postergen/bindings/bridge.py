@@ -492,12 +492,27 @@ class PosterGenBinding:
             self._compiled_workflow = graph.compile()
         return self._compiled_workflow
 
-    async def ainvoke(self, value: Any, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def ainvoke(
+        self,
+        value: Any,
+        config: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
         """Asynchronous execution bridge."""
-        return await asyncio.to_thread(self.invoke, value, config)
+        if config is None and "run_config" in kwargs:
+            config = kwargs.pop("run_config")
+        return await asyncio.to_thread(self.invoke, value, config, **kwargs)
 
-    def invoke(self, value: Any, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def invoke(
+        self,
+        value: Any,
+        config: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
         """Synchronous execution bridge."""
+        if config is None and "run_config" in kwargs:
+            config = kwargs.pop("run_config")
+
         if self._closed:
             raise RuntimeError("PosterGenBinding is closed")
 
@@ -574,7 +589,7 @@ class PosterGenBinding:
 
         state["timing_metrics"].pipeline_start = time.time()
         workflow = self._get_workflow()
-        final_state = workflow.invoke(state)
+        final_state = workflow.invoke(state, config=config)
         final_state["timing_metrics"].pipeline_end = time.time()
 
         if final_state.get("errors"):

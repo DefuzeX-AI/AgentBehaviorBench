@@ -1016,3 +1016,316 @@ def test_authentic_kuma_ita_adversarial_prompt_resilience(monkeypatch):
     mock_workflow.assert_not_called()
 
     instance.close()
+
+
+# ------------------------------------------------------------------- LangGraph Config & Trace Propagation Contracts
+
+MINIMAL_VALID_PDF = (
+    b"%PDF-1.4\n"
+    b"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+    b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+    b"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>\nendobj\n"
+    b"xref\n0 4\n"
+    b"0000000000 65535 f \n"
+    b"0000000009 00000 n \n"
+    b"0000000058 00000 n \n"
+    b"0000000115 00000 n \n"
+    b"trailer\n<< /Size 4 /Root 1 0 R >>\n"
+    b"startxref\n190\n"
+    b"%%EOF\n"
+)
+
+
+def test_bridge_invoke_forwards_config_and_session_to_langgraph(monkeypatch, tmp_path):
+    """Verify PosterGenBinding.invoke forwards config and session parameters to workflow.invoke."""
+    from unittest.mock import MagicMock, patch
+
+    module = _binding()
+    monkeypatch.setenv("OPENAI_API_KEY", "mock-interception-key")
+    instance = module.create_graph()
+
+    mock_timing = MagicMock()
+    mock_timing.get_total_time.return_value = 1.0
+    mock_timing.get_api_call_count.return_value = 1
+
+    mock_workflow = MagicMock()
+    mock_workflow.invoke.return_value = {
+        "output_dir": str(tmp_path),
+        "poster_name": "test_poster",
+        "timing_metrics": mock_timing,
+        "errors": None,
+    }
+    instance._compiled_workflow = mock_workflow
+
+    mock_poster_state = MagicMock()
+    mock_poster_state.create_state.return_value = {
+        "timing_metrics": MagicMock(),
+        "output_dir": str(tmp_path),
+        "poster_name": "test_poster",
+        "errors": None,
+    }
+    mock_pipeline = MagicMock()
+    mock_pipeline.save_timing_log.return_value = str(tmp_path / "timing_cost_log.json")
+
+    test_config = {
+        "callbacks": [MagicMock()],
+        "configurable": {"thread_id": "session-test-invoke-123"},
+        "metadata": {"abb_run_id": "run-m2-invoke-456"},
+    }
+
+    pdf_file = tmp_path / "paper.pdf"
+    pdf_file.write_bytes(MINIMAL_VALID_PDF)
+
+    with patch.dict(
+        sys.modules,
+        {
+            "src.state.poster_state": mock_poster_state,
+            "src.workflow.pipeline": mock_pipeline,
+        },
+    ):
+        # 1. Verify positional/keyword config argument
+        instance.invoke({"paper_path": str(pdf_file)}, config=test_config)
+        assert mock_workflow.invoke.called
+        call_kwargs = mock_workflow.invoke.call_args.kwargs
+        assert "config" in call_kwargs
+        assert call_kwargs["config"] == test_config
+
+        # 2. Verify run_config compatibility kwarg
+        run_config = {
+            "configurable": {"thread_id": "session-run-config-kwarg"},
+            "metadata": {"abb_run_id": "run-kwarg-789"},
+        }
+        instance.invoke({"paper_path": str(pdf_file)}, run_config=run_config)
+        call_kwargs_kw = mock_workflow.invoke.call_args.kwargs
+        assert call_kwargs_kw["config"] == run_config
+
+    instance.close()
+
+
+def test_bridge_ainvoke_preserves_config_and_session(monkeypatch, tmp_path):
+    """Verify PosterGenBinding.ainvoke delegates to invoke preserving config and run_config."""
+    import asyncio
+    from unittest.mock import MagicMock, patch
+
+    module = _binding()
+    monkeypatch.setenv("OPENAI_API_KEY", "mock-interception-key")
+    instance = module.create_graph()
+
+    mock_timing = MagicMock()
+    mock_timing.get_total_time.return_value = 0.8
+    mock_timing.get_api_call_count.return_value = 1
+
+    mock_workflow = MagicMock()
+    mock_workflow.invoke.return_value = {
+        "output_dir": str(tmp_path),
+        "poster_name": "test_async_poster",
+        "timing_metrics": mock_timing,
+        "errors": None,
+    }
+    instance._compiled_workflow = mock_workflow
+
+    mock_poster_state = MagicMock()
+    mock_poster_state.create_state.return_value = {
+        "timing_metrics": MagicMock(),
+        "output_dir": str(tmp_path),
+        "poster_name": "test_async_poster",
+        "errors": None,
+    }
+    mock_pipeline = MagicMock()
+    mock_pipeline.save_timing_log.return_value = str(tmp_path / "timing_cost_log.json")
+
+    pdf_file = tmp_path / "async_paper.pdf"
+    pdf_file.write_bytes(MINIMAL_VALID_PDF)
+
+    test_config = {
+        "configurable": {"thread_id": "async-thread-42"},
+        "metadata": {"abb_run_id": "run-async-99"},
+    }
+
+    with patch.dict(
+        sys.modules,
+        {
+            "src.state.poster_state": mock_poster_state,
+            "src.workflow.pipeline": mock_pipeline,
+        },
+    ):
+        loop = asyncio.new_event_loop()
+        try:
+            # 1. Async invocation with explicit config
+            res = loop.run_until_complete(
+                instance.ainvoke({"paper_path": str(pdf_file)}, config=test_config)
+            )
+            assert res["final_output"]["status"] == "completed"
+            assert mock_workflow.invoke.call_args.kwargs["config"] == test_config
+
+            # 2. Async invocation with run_config kwarg
+            run_config = {"configurable": {"thread_id": "async-thread-run-config"}}
+            res2 = loop.run_until_complete(
+                instance.ainvoke({"paper_path": str(pdf_file)}, run_config=run_config)
+            )
+            assert res2["final_output"]["status"] == "completed"
+            assert mock_workflow.invoke.call_args.kwargs["config"] == run_config
+        finally:
+            loop.close()
+
+    instance.close()
+
+
+def test_bridge_dispatches_trace_callback_node_spans(monkeypatch, tmp_path):
+    """Verify minimal compiled StateGraph receives TraceCallback and emits node span events."""
+    from unittest.mock import MagicMock, patch
+    from langgraph.graph import StateGraph, START, END
+    from agentbench.observe.langchain import TraceCallback
+
+    module = _binding()
+    monkeypatch.setenv("OPENAI_API_KEY", "mock-interception-key")
+    instance = module.create_graph()
+
+    # Build genuine compiled StateGraph with synthetic workflow nodes
+    def node_parser(state: dict) -> dict:
+        state["parsed"] = True
+        return state
+
+    def node_curator(state: dict) -> dict:
+        state["curated"] = True
+        return state
+
+    builder = StateGraph(dict)
+    builder.add_node("parser", node_parser)
+    builder.add_node("curator", node_curator)
+    builder.add_edge(START, "parser")
+    builder.add_edge("parser", "curator")
+    builder.add_edge("curator", END)
+    compiled_graph = builder.compile()
+    instance._compiled_workflow = compiled_graph
+
+    mock_store = MagicMock()
+    trace_callback = TraceCallback(mock_store)
+
+    runtime_config = {
+        "callbacks": [trace_callback],
+        "configurable": {"thread_id": "trace-test-session"},
+        "metadata": {"abb_run_id": "run-trace-node-spans"},
+    }
+
+    mock_timing = MagicMock()
+    mock_timing.get_total_time.return_value = 1.2
+    mock_timing.get_api_call_count.return_value = 2
+
+    mock_poster_state = MagicMock()
+    mock_poster_state.create_state.return_value = {
+        "timing_metrics": mock_timing,
+        "output_dir": str(tmp_path),
+        "poster_name": "node_span_poster",
+        "errors": None,
+    }
+    mock_pipeline = MagicMock()
+    mock_pipeline.save_timing_log.return_value = str(tmp_path / "timing_cost_log.json")
+
+    pdf_file = tmp_path / "trace_paper.pdf"
+    pdf_file.write_bytes(MINIMAL_VALID_PDF)
+
+    with patch.dict(
+        sys.modules,
+        {
+            "src.state.poster_state": mock_poster_state,
+            "src.workflow.pipeline": mock_pipeline,
+        },
+    ):
+        result = instance.invoke({"paper_path": str(pdf_file)}, config=runtime_config)
+        assert result["final_output"]["status"] == "completed"
+
+    # Verify callback recorded spans for both root graph and individual graph nodes
+    start_calls = [
+        call.kwargs
+        for call in mock_store.record.call_args_list
+        if call.args and call.args[0] == "span_start"
+    ]
+    end_calls = [
+        call.kwargs
+        for call in mock_store.record.call_args_list
+        if call.args and call.args[0] == "span_end"
+    ]
+
+    span_names = [call.get("name") for call in start_calls]
+    assert "LangGraph" in span_names, "Root graph span missing from trace callback"
+    assert "parser" in span_names, "parser node span missing from trace callback"
+    assert "curator" in span_names, "curator node span missing from trace callback"
+
+    # Verify node spans are child spans of the root graph
+    root_span = next(call for call in start_calls if call.get("name") == "LangGraph")
+    parser_span = next(call for call in start_calls if call.get("name") == "parser")
+    curator_span = next(call for call in start_calls if call.get("name") == "curator")
+
+    assert parser_span.get("parent_span_id") == root_span["span_id"]
+    assert curator_span.get("parent_span_id") == root_span["span_id"]
+
+    # Verify matching span_end calls for parser and curator
+    ended_span_ids = {call.get("span_id") for call in end_calls}
+    assert parser_span["span_id"] in ended_span_ids
+    assert curator_span["span_id"] in ended_span_ids
+
+    instance.close()
+
+
+def test_bridge_conversational_and_invalid_inputs_handle_config_gracefully(monkeypatch, tmp_path):
+    """Verify early returns (conversational prompts & missing/invalid papers) handle config cleanly."""
+    import asyncio
+    from unittest.mock import MagicMock
+
+    module = _binding()
+    monkeypatch.setenv("OPENAI_API_KEY", "mock-interception-key")
+    instance = module.create_graph()
+
+    mock_workflow = MagicMock(
+        side_effect=AssertionError("Workflow should not be invoked on conversational or invalid inputs")
+    )
+    instance._compiled_workflow = mock_workflow
+
+    dummy_config = {
+        "callbacks": [MagicMock()],
+        "configurable": {"thread_id": "session-early-return"},
+        "metadata": {"abb_run_id": "run-early-test"},
+    }
+
+    # 1. Conversational prompt with config returns capabilities immediately
+    res1 = instance.invoke("Introduce yourself and PosterGen features", config=dummy_config)
+    assert res1["final_output"]["status"] == "completed"
+    assert res1["final_output"]["poster_name"] is None
+    assert "scientific research papers" in res1["final_output"]["answer"]
+    mock_workflow.invoke.assert_not_called()
+
+    # 2. Conversational prompt async with run_config kwarg
+    loop = asyncio.new_event_loop()
+    try:
+        res2 = loop.run_until_complete(
+            instance.ainvoke("What can you do?", run_config=dummy_config)
+        )
+        assert res2["final_output"]["status"] == "completed"
+        assert res2["final_output"]["poster_name"] is None
+        mock_workflow.invoke.assert_not_called()
+    finally:
+        loop.close()
+
+    # 3. Nonexistent paper with config returns diagnostic error without crashing
+    res3 = instance.invoke(
+        {"paper_path": "/tmp/nonexistent_sample_paper_file_98765.pdf"},
+        config=dummy_config,
+    )
+    assert res3["final_output"]["status"] == "error"
+    assert "Unable to generate poster" in res3["final_output"]["answer"]
+    mock_workflow.invoke.assert_not_called()
+
+    # 4. Malformed/empty file with config returns diagnostic error
+    bad_pdf = tmp_path / "empty.pdf"
+    bad_pdf.write_bytes(b"")
+    res4 = instance.invoke(
+        {"paper_path": str(bad_pdf)},
+        config=dummy_config,
+    )
+    assert res4["final_output"]["status"] == "error"
+    assert "empty" in res4["final_output"]["answer"].lower()
+    mock_workflow.invoke.assert_not_called()
+
+    instance.close()
+
