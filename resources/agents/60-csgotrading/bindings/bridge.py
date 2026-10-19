@@ -37,8 +37,10 @@ around the native call, because the native lifecycle accepts no run config; it i
 never passed as an unsupported keyword.
 Output: a mapping whose ``summary`` field is the human-readable run report;
 ``portfolio`` and ``decisions`` carry the structured result.
-Errors: input and native failures propagate; nothing is turned into a fake
-success.
+Errors: a request for a trading day or item set this deployment cannot serve is
+answered as a refusal (``status = "refused"``, no pipeline run), as the unit's
+requirement asks; malformed input and native failures propagate; nothing is
+turned into a fake success.
 Ownership: the instance owns the SQLite file it creates under ``CS2_DB_PATH``.
 """
 
@@ -75,6 +77,10 @@ _DECISION_SQL = ("SELECT item_name, action, quantity, price, justification "
 
 def _market_csv() -> Path:
     return AGENT_ROOT / "apis" / "cs2market" / "cs2_data.csv"
+
+
+class InputRefused(ValueError):
+    """The input asks for market data or items this deployment cannot serve."""
 
 
 def _load_yaml_config(name: str) -> dict:
@@ -156,11 +162,11 @@ class CsgoTradingDay:
         available = _snapshot_dates()
         found = DATE_PATTERN.findall(value)
         if len(found) > 1:
-            raise ValueError(f"Supply at most one trading day; got {sorted(set(found))}")
+            raise InputRefused(f"Supply at most one trading day; got {sorted(set(found))}")
         if found:
             trading_date = found[0]
             if trading_date not in available:
-                raise ValueError(
+                raise InputRefused(
                     f"No market data for {trading_date}; this deployment has "
                     f"{', '.join(available)} (snapshot-captured market data)")
         else:
@@ -169,7 +175,7 @@ class CsgoTradingDay:
         lowered = value.lower()
         selected = [item for item in self._configured_items if item.lower() in lowered]
         if len(selected) > MAX_ITEMS_PER_RUN:
-            raise ValueError(
+            raise InputRefused(
                 f"Name at most {MAX_ITEMS_PER_RUN} items; got {len(selected)} "
                 f"({', '.join(selected)})")
         if not selected:
@@ -247,7 +253,19 @@ class CsgoTradingDay:
     def invoke(self, value, config=None) -> dict:
         if self._closed or not self._prepared:
             raise RuntimeError("Binding is closed")
-        trading_date, items = self._parse(value)
+        try:
+            trading_date, items = self._parse(value)
+        except InputRefused as exc:
+            return {
+                "summary": f"Refused: {exc}. No trading run was executed and the portfolio is unchanged.",
+                "status": "refused",
+                "trading_date": None,
+                "config": None,
+                "items": [],
+                "portfolio": None,
+                "decisions": [],
+                "elapsed_sec": 0.0,
+            }
         config_path, exp_name = self._config_path(items)
         # ``AgentWorkflow.run`` takes no run configuration, so the adapter's
         # configuration (callbacks, tags, metadata, limits) is attached as ambient
