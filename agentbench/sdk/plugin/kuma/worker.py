@@ -18,6 +18,9 @@ from .error_artifacts import exception_record
 from .configuration import SDK_REPOSITORY, request_options, api_key
 from .compatibility import run_case
 from agentbench.runtime.agentcontainer.session import AgentSession
+from agentbench.sdk.integration.agent import (
+    InProcessAgentSession, ManagedAgentSession, capture_workspace_replay,
+)
 
 
 async def execute(root, output, settings=None, sdk_repo=None, *, providers=None):
@@ -79,15 +82,12 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
         # Create the reusable Agent session before the SDK Run exists.
         run = None
         exporter = None
-        replay = None
         settings = dict(settings or {})
-        if settings.get('isolated_agent'):
-            from agentbench.sdk.integration.channel import DirectoryAgentSession
-            from agentbench.sdk.integration.context import ResponseLimits
-            agent_session = DirectoryAgentSession(timeout=settings.get('agent_timeout', 2400),
-                response_limits=ResponseLimits(**settings.get('agent_response_limits', {})))
-        else:
-            agent_session = AgentSession()
+        # The production entrypoint requires the isolated channel. Direct
+        # in-process callers explicitly retain the native worker test path.
+        local_session = None if settings.get('isolated_agent') else InProcessAgentSession(
+            root, provider=provider, session=AgentSession(), invoke=invoke_agent)
+        agent_session = ManagedAgentSession(output=output, settings=settings, session=local_session)
     try:
         # Pass each current input directly to the adapter. The Agent owns history
         # and memory, so no per-Agent input contract is required.
@@ -195,37 +195,22 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
         
         # An independent host mount keeps versions outside the workspace, SDK
         # ledger, Submission, and trace provider. Only ABB's viewer reads it.
-        from agentbench.runtime.workspace_replay import REPLAY_MOUNT
-        from agentbench.runtime.replay_lifecycle import ReplayCapture
-        if Path(REPLAY_MOUNT).is_dir():
-            replay = ReplayCapture(workspace.path or manifest.get('adapter', {}).get('cwd') or Path.cwd(),
-                                   REPLAY_MOUNT, secrets=files.secrets)
+        agent_session.replay = capture_workspace_replay(
+            workspace.path or manifest.get('adapter', {}).get('cwd') or Path.cwd(), secrets=files.secrets)
+        from .integration import KumaEvidenceSink
+        evidence = KumaEvidenceSink(capture)
 
-        async def invoke(payload, folder, shared_provider):
+        async def invoke(payload, folder, _shared_provider):
             # Reuse one Agent session for every turn and pass only the current input.
-            # shared_provider is the common trace provider for the Case.
-            request = folder / 'request.json'
+            # The local test adapter already owns the shared Case trace provider.
             invocation_id = uuid4().hex
             observed_input = json.loads((folder / 'input.json').read_text())
             # Persist the invocation request with Case, input, and session identity.
-            files.save(str(request.relative_to(output)), {
+            return await agent_session.invoke({
                 'schema': 'abb.invocation.v1', 'run_id': invocation_id, 'session_id': run.run_id,
                 'observation_context': {key: observed_input[key] for key in ('case_id', 'input_id') if isinstance(observed_input.get(key), str)},
-                'agent_id': manifest['agent_id'], 'framework': manifest['framework'], 'input': payload})
-            # Invoke the Agent and wait for this turn to complete.
-            if replay is not None:
-                replay.checkpoint('input_start', observed_input.get('input_id'))
-            try:
-                if settings.get('isolated_agent'):
-                    from .integration import KumaEvidenceSink
-                    await agent_session.invoke(json.loads(request.read_text()), folder, KumaEvidenceSink(capture))
-                else:
-                    await invoke_agent(root, request, folder, provider=shared_provider, session=agent_session)
-            finally:
-                if replay is not None:
-                    replay.checkpoint('input_end', observed_input.get('input_id'))
-            # Return the Agent result to the SDK dialogue driver.
-            return json.loads((folder / 'result.json').read_text())
+                'agent_id': manifest['agent_id'], 'framework': manifest['framework'], 'input': payload},
+                folder, evidence)
         # Drive the Case by receiving inputs, invoking the Agent, submitting
         # outputs, and collecting the Judge report.
         summary = await drive_run(run, invoke, output, provider=provider,
@@ -253,9 +238,6 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
             try:
                 await agent_session.aclose()
             finally:
-                files.save('session.json', agent_session.snapshot())
-                if replay is not None:
-                    replay.finish()
                 if exporter is not None:
                     try:
                         exporter.finish()

@@ -1,33 +1,11 @@
-"""Isolated evaluation build overlay; original Agent/network files stay untouched."""
-from agentbench.observe.timing import span
+"""KUMA configuration for the shared evaluation image overlay."""
+
 from contextlib import contextmanager
 from pathlib import Path
-import re
-import json
-import shutil
-import tempfile
-from types import SimpleNamespace
-from agentbench.runtime.docker.worker_build import agent_build_ignore
-from agentbench.runtime.docker.source_links import materialize_file_links
+
+from agentbench.runtime.docker.evaluation_image import SDK_INSTALL, evaluation_image
 from agentbench.sdk.common.whitelist import append_whitelist
 from .configuration import DEFAULT_BASE_URL
-from .manifest import extend_runtime_environment
-
-# The SDK has to land in the interpreter the worker runs: whatever `python` the Agent
-# image's PATH resolves to. That interpreter need not have pip -- a uv-created venv
-# first on PATH has none. ensurepip installs pip from the standard library's bundled
-# wheel, so bootstrapping needs no network. If neither exists, name the interpreter.
-SDK_INSTALL = (
-    'RUN interpreter="$(command -v python)" '
-    '|| { echo "ABB evaluation overlay: no python on the image PATH" >&2; exit 1; }; '
-    'python -m pip --version >/dev/null 2>&1 '
-    '|| python -m ensurepip --default-pip >/dev/null '
-    '|| { echo "ABB evaluation overlay: $interpreter has no pip module and no ensurepip;'
-    ' install pip into that interpreter in the Agent Dockerfile" >&2; exit 1; }; '
-    'python -m pip --isolated install --upgrade --no-cache-dir '
-    '--index-url https://pypi.org/simple '
-    '-r /opt/abb-sdk/requirements.txt\n'
-)
 
 
 SDK_ENVIRONMENT = ('KUMA_API_KEY', 'DEFUZEX_API_KEY', 'KUMA_BASE_URL')
@@ -37,77 +15,28 @@ SDK_ENVIRONMENT = ('KUMA_API_KEY', 'DEFUZEX_API_KEY', 'KUMA_BASE_URL')
 def evaluation_agent(agent, *, control=None, deadline=None, backend=DEFAULT_BASE_URL,
                      worker_package=__package__, sdk_environment=SDK_ENVIRONMENT,
                      require_profile=True):
-    """Stage an Agent and install the adapter's latest stable PyPI SDK in its image.
+    """Install KUMA and declare its controller, credentials, routes and Profile.
 
-    The host does not need an SDK checkout or installation. Dependencies belong
-    to this adapter and are installed only while building the evaluation image.
-    The Agent source and its original Dockerfile remain unchanged. ``backend`` is
-    the normalized KUMA Backend URL; the container receives KUMA_BASE_URL and its
-    egress admits exactly that Backend.
-
-    A plugin running the same SDK with local providers reuses this overlay:
-    ``backend`` None admits no Backend egress, ``worker_package`` names the
-    package whose ``worker`` module the container runs, ``sdk_environment``
-    lists the host variables forwarded to it, and ``require_profile`` False
-    copies ``requirement.md`` only when the Agent has one.
+    Local providers reuse the same SDK with ``backend=None`` and their own worker
+    package. ``require_profile=False`` copies requirement.md only when supplied.
     """
-    requirements = Path(__file__).with_name('requirements.txt')
-    def check():
-        if control is not None:
-            control.check()
-        if deadline is not None:
-            deadline.check()
-    def checked_copy(source, target):
-        check()
-        with open(source, 'rb') as incoming, open(target, 'wb') as outgoing:
-            while chunk := incoming.read(1024 * 1024):
-                check()
-                outgoing.write(chunk)
-        shutil.copystat(source, target)
-        return target
-    check()
-    if not requirements.is_file() or requirements.is_symlink():
-        raise ValueError('KUMA adapter requirements.txt is missing or linked')
-    with tempfile.TemporaryDirectory(prefix='abb-evaluation-') as temporary:
-        with span('Prepare evaluation overlay', kind='preparation'):
-            root = Path(temporary) / 'agent-unit'
-            shutil.copytree(agent.path, root, ignore=agent_build_ignore(agent.path), symlinks=True,
-                            copy_function=checked_copy)
-            materialize_file_links(root, check)
-            if any(p.is_symlink() for p in root.rglob('*')):
-                raise ValueError('Agent source must not contain symlinks')
-            staged_sdk = root / '.abb-sdk'
-            staged_sdk.mkdir()
-            shutil.copy2(requirements, staged_sdk / 'requirements.txt')
-            if any(p.is_symlink() for p in root.rglob('*')):
-                raise ValueError('Evaluation build must not contain symlinks')
-            source = (root / 'agent.toml').read_text(encoding='utf-8')
-            controller = ("import runpy,sys; sys.path.insert(0, '/opt/abb-sdk-runtime'); "
-                          + f"runpy.run_module({worker_package + '.worker'!r}, run_name='__main__')")
-            source, count = re.subn(r'(?m)^argv = .*$',
-                                   lambda _: 'argv = ' + json.dumps(['python', '-I', '-c', controller]), source)
-            if count != 1:
-                raise ValueError('Expected one explicit launch.argv')
-            if sdk_environment:
-                source = extend_runtime_environment(source, tuple(sdk_environment), field='worker_env_keys')
-            backend_routes = () if backend is None else (
-                {'url': backend, 'methods': ['GET', 'POST']},
-                {'url': backend + '/sdk/*', 'methods': ['GET', 'POST']})
-            source = append_whitelist(source, Path(__file__).with_name('whitelist.json'), backend_routes)
-            (root / 'agent.toml').write_text(source, encoding='utf-8')
-            dockerfile = root / 'Dockerfile'
-            original = dockerfile.read_text(encoding='utf-8')
-            users = re.findall(r'(?im)^USER\s+(.+)$', original)
-            if not users or users[-1].strip() in ('root', '0'):
-                raise ValueError('Evaluation requires an explicit non-root image USER')
-            # Optional profile schemas or fixtures may live here; text-input Agents
-            # do not need to create an otherwise empty directory for Docker COPY.
-            evaluation_copy = ('COPY evaluation/ /opt/agent/evaluation/\n'
-                               if (root / 'evaluation').is_dir() else '')
-            profile_copy = ('COPY requirement.md /opt/agent/requirement.md\n'
-                            if require_profile or (root / 'requirement.md').is_file() else '')
-            dockerfile.write_text(original + '\nENV KUMA_DISABLE_UPDATE_CHECK=1\nUSER root\nCOPY .abb-sdk/ /opt/abb-sdk/\n'
-                                 + SDK_INSTALL + 'COPY .abb-runtime/ /opt/abb-sdk-runtime/\n' + profile_copy
-                                 + evaluation_copy + 'USER ' + users[-1] + '\n', encoding='utf-8')
-            check()
-        yield SimpleNamespace(path=root, agent_id=agent.agent_id, framework=agent.framework)
+    backend_routes = () if backend is None else (
+        {'url': backend, 'methods': ['GET', 'POST']},
+        {'url': backend + '/sdk/*', 'methods': ['GET', 'POST']})
+
+    def configure_manifest(source):
+        return append_whitelist(source, Path(__file__).with_name('whitelist.json'), backend_routes)
+
+    optional_files = tuple(name for name, present in (
+        ('requirement.md', (agent.path / 'requirement.md').is_file()),
+        ('evaluation', (agent.path / 'evaluation').is_dir()),
+    ) if present)
+    with evaluation_image(
+        agent, requirements=Path(__file__).with_name('requirements.txt'),
+        worker_module=worker_package + '.worker', control=control, deadline=deadline,
+        worker_environment=sdk_environment, manifest_transform=configure_manifest,
+        image_environment=('KUMA_DISABLE_UPDATE_CHECK=1',),
+        required_files=('requirement.md',) if require_profile else (),
+        optional_files=optional_files, install_command=SDK_INSTALL,
+    ) as staged:
+        yield staged

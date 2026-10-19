@@ -1,51 +1,34 @@
-"""Host orchestration using the existing Docker runtime and network isolation."""
-import json
-from agentbench.observe.timing import span, timing_session
-import shutil
-import tempfile
-from collections.abc import Mapping
+"""KUMA settings and diagnostics for ABB's shared container execution."""
+from functools import partial
 from pathlib import Path
-from uuid import uuid4
-from agentbench.runtime.docker import DockerRuntime
-from agentbench.runtime.docker.policy import DockerPolicy
-from agentbench.runtime.contracts.execution import (
-    Deadline, DockerCleanupError, RunCancelled, RunControl, RuntimeLimits,
-)
-from agentbench.runtime.interception import TraceEvent
-from agentbench.observe.store import TraceStore, json_value, redact
-from agentbench.sdk.common.artifacts import Artifacts
-from agentbench.sdk.common.output_permissions import prepare_output
+
+from agentbench.runtime.docker.execution_policy import ControllerExecutionPolicy
+from agentbench.sdk.contracts import SDKRunnerContext
+from agentbench.sdk.integration.execution import run_evaluation
 from .configuration import SDK_REPOSITORY, backend_url
-from agentbench.sdk.common.workspace import workspace_policy, prepare_workspace, workspace_digest
-from agentbench.runtime.agentcontainer.config import tomllib
 from .image import evaluation_agent
-from agentbench.runtime.docker.worker_build import _ignore
 
 
-class EvaluationPolicy:
-    def __init__(self, state, *, repository=None, target=SDK_REPOSITORY, writable=False, replay=None, channel=None, publications=()):
-        self.state = state.resolve()
-        self.repository = (repository or state.parent).resolve()
-        self.target, self.writable = target, writable
-        self.replay = replay
-        self.channel = channel
-        self.publications = publications
+class EvaluationPolicy(ControllerExecutionPolicy):
+    """Compatibility for callers supplying KUMA's ledger directory."""
 
-    def owned_directories(self):
-        return (self.state.parent, self.state)
+    def __init__(self, state, *, repository=None, target=SDK_REPOSITORY,
+                 writable=False, replay=None, channel=None, publications=()):
+        state = state.resolve()
+        super().__init__(state.parent, repository=repository or state.parent,
+                         target=target, writable=writable, replay=replay,
+                         channel=channel, publications=publications)
 
-    def shared_directories(self):
-        return tuple(path for _, path in self.publications)
 
-    def run_arguments(self):
-        from agentbench.runtime.workspace_replay import REPLAY_MOUNT
-        recording = ('--mount', f'type=bind,source={self.replay},target={REPLAY_MOUNT}') if self.replay else ()
-        return (*DockerPolicy().run_arguments(), '--mount',
-                f'type=bind,source={self.repository},target={self.target}' + ('' if self.writable else ',readonly'), '--mount',
-                f'type=bind,source={self.state.parent},target=/run/abb-sdk-storage', *recording,
-                *(self.channel.mounts(controller=True) if self.channel else ()),
-                *(arg for index, path in self.publications for arg in (
-                    '--mount', f'type=bind,source={path},target=/run/abb-published/{index}')))
+def _completed_execution(directory):
+    """A failed Judge can still leave a committed, evidence-complete execution."""
+    from .diagnostics import read_diagnostic
+    summary = read_diagnostic(directory, 'evaluation/manifest.json')
+    return (summary.get('phase') == 'judge'
+            and summary.get('execution') in ('succeeded', 'failed')
+            and summary.get('otel') == 'complete'
+            and summary.get('submission') == 'committed'
+            and summary.get('evidence') == 'captured')
 
 
 def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max_bytes=262144,
@@ -57,355 +40,41 @@ def evaluate(agent, *, output, environ, timeout=2400, trace_sink=None, trace_max
              expected_environment_sha256=None,
              safe_case_replay=False, require_credentials=True, overlay=None, defer_judge=False,
              artifact_store=None):
+    """Translate KUMA settings, then execute through the shared runtime.
+
+    Case generation/save/reuse, Judge recovery and result interpretation remain
+    owned by this plugin. The returned directory must be validated by its runner.
     """
-    
-    Run the Kuma worker in Docker and return its host artifact directory.
-
-    This host-side function stages the Agent repository, writes worker settings,
-    starts the container, waits for it, and closes its Docker session. It has two
-    modes: generation_count selects Case generation; otherwise the worker
-    executes a saved Case. It returns a directory, not a Case or Judge report.
-
-    Args:
-        agent: Agent registration supplying agent_id, source path, and runtime
-            configuration used to stage the evaluation container.
-        output: pathlib.Path for the parent output directory. A new UUID-named
-            subdirectory is created for this invocation; output must support
-            resolve(), so a plain string must be converted by the caller.
-        environ: Environment-variable mapping used for Docker configuration and
-            artifact redaction. Must contain a nonempty KUMA_API_KEY or
-            DEFUZEX_API_KEY unless require_credentials is False. This function
-            does not load a .env file itself.
-        timeout: Seconds to wait for the started Agent container (default 2400).
-            This is not an overall deadline: preparation and cleanup have
-            separate runtime limits.
-        trace_sink: Optional object with emit(TraceEvent). Receives redacted,
-            bounded event previews after full events are written to the local
-            network trace. None disables this forwarding, not local tracing.
-        trace_max_bytes: Interceptor memory-spooling threshold (default 262144).
-            Larger responses spill to disk; this never truncates trace content.
-        sdk_request_options: Explicit public SDK HTTP/retry/wait options. Omitted
-            values retain the pinned SDK defaults, separately from timeout.
-        on_artifacts_ready: Optional callback(directory: Path), invoked after
-            initial request/status files exist and before container preparation.
-            Used to advertise the live artifact location to the caller.
-        max_steps: Optional SDK dialogue-step limit, forwarded in worker
-            settings. None leaves the choice to the SDK; it is not a Case count.
-        generation_count: Positive integer selecting generation mode and the
-            number of Cases to prepare. The worker creates/saves Cases without
-            invoking the Agent. None selects execution mode. The generation
-            worker validates the count; callers should omit case_artifact here.
-        generation_indices: Optional original zero-based slots to generate from
-            the full generation_count selection. Other slots are not requested.
-        partial_generation: Record individual generation failures and continue
-            independent slots. Shared authentication/quota blocks stop the batch.
-        safe_case_replay: Explicit Agent promise that whole-Case replay has no
-            unsafe external side effects. Does not override SDK retry policy.
-        case_artifact: Host path to a previously saved SDK Case artifact for
-            execution mode. Copied into the staged repository's .kuma directory
-            and passed to the worker as a repository-relative path. The worker
-            requires a saved Case in execution mode rather than generating one.
-        control: Optional shared RunControl for cooperative cancellation.
-            None creates a fresh control for this invocation.
-        build_coordinator: Optional shared Docker build coordinator, forwarded
-            when constructing DockerRuntime directly. When runtime_services is
-            supplied, runtime creation and shared resources are owned by it.
-        job_context: Optional mapping of inherited Suite/job identity fields,
-            such as suite_id, job_id, and case_index, for events and artifacts.
-        identity: Optional task-specific identity mapping overriding job_context.
-            This function sets agent_id, artifact_run_id, and phase itself;
-            generation mode also clears case_index and case_id.
-        runtime_services: Optional Suite-owned runtime services. Supplies runtime
-            limits and creates the Docker runtime with shared resources. None
-            uses default RuntimeLimits and constructs DockerRuntime directly.
-        expected_case_id: Expected SDK Case ID for execution mode, forwarded to
-            the worker to check that the loaded Case is the selected Case.
-        expected_content_sha256: Expected digest of normalized Case content for
-            execution mode. Forwarded to the worker alongside expected_case_id;
-            this is a content digest, not the saved artifact file's byte digest.
-        require_credentials: False for a plugin whose SDK providers never call
-            the KUMA Backend; no API key is then required.
-        overlay: Optional keyword arguments for ``evaluation_agent``, replacing
-            the default overlay that admits the configured KUMA Backend.
-
-    Returns:
-        pathlib.Path: Absolute directory for this invocation, containing
-        run.json, request/evaluation.json, and available evaluation artifacts
-        and diagnostics. A nonzero container exit is recorded as failed but
-        can still return this path. The caller must validate status and artifacts;
-        returning a directory does not mean the Agent passed its Judge evaluation.
-
-    Raises:
-        ValueError: No supported SDK API key is supplied. Lower layers may also
-            reject invalid configuration.
-        RunCancelled: Cooperative cancellation is observed.
-        Other preparation, Docker, timeout, trace-validation, callback, I/O, or
-        cleanup exceptions propagate. Once the orchestration try block begins,
-        failure status is recorded and session cleanup is attempted; this does
-        not guarantee artifacts exist if initial setup or disk writes fail.
-
-    Notes:
-        Successful execution-mode container exits undergo host trace validation
-        before returning. Generation mode skips that Agent trace requirement.
-        A trace rejection raises even when the worker already saved a report.
-    """
-    control = control or RunControl()
-    control.check()
-    limits = runtime_services.limits if runtime_services is not None else RuntimeLimits()
-    preparation = Deadline.after(limits.preparation_seconds)
+    from .diagnostics import collect_artifacts
+    if control is not None:
+        control.check()
     if require_credentials and not (environ.get('KUMA_API_KEY') or environ.get('DEFUZEX_API_KEY')):
         raise ValueError('KUMA_API_KEY or DEFUZEX_API_KEY is required')
-
-    # Create the artifact directory for this task.
-    from agentbench.sdk.integration.lifecycle import allocate_run
-    directory = allocate_run(output, artifact_store, agent.agent_id, {**dict(job_context or {}), **dict(identity or {})},
-                             generation_indices if generation_indices is not None else
-                             (tuple(range(generation_count)) if generation_count is not None else None))
-    directory.mkdir(parents=True, mode=0o700, exist_ok=True)
-    from agentbench.sdk.integration.context import ResponseLimits
-    response_limits = ResponseLimits.from_environ(environ)
-    files = Artifacts(directory, environ=environ)
-    with timing_session(directory / 'timing.jsonl', source='host', name='Evaluation',
-                        identity={**dict(job_context or {}), **dict(identity or {}), 'agent_id': agent.agent_id}) as timing_root:
-        inputs = directory / 'request'; inputs.mkdir()
-        # The Case is addressed inside private SDK storage; the host copies it
-        # before starting the controller, never into an Agent mount.
-        reused = f'.kuma/{Path(case_artifact).name}' if case_artifact is not None else None
-        files.save('request/evaluation.json', {
-            'defer_judge': defer_judge,
-            'sdk_request_options': sdk_request_options or {},
-            'max_steps': max_steps,
-            'mode': 'generate' if generation_count is not None else 'execute',
-            'count': generation_count, 'case_artifact': reused,
-            'case_indices': generation_indices, 'allow_partial': partial_generation,
-            'expected_case': {'case_id': expected_case_id, 'content_sha256': expected_content_sha256}})
-        destination = prepare_output(directory / 'evaluation')
-        identity = {**dict(job_context or {}), **dict(identity or {}),
-                    'agent_id': agent.agent_id, 'artifact_run_id': directory.name,
-                    'phase': 'generate' if generation_count is not None else 'execute'}
-        identity.setdefault('case_index', None)
-        identity.setdefault('case_id', None)
-        identity.setdefault('sdk_run_id', None)
-        if generation_count is not None:
-            identity.update(case_index=None, case_id=None)
-        status = {**identity, 'schema': 'abb.evaluate.run.v1', 'run_id': directory.name,
-                  'status': 'running', 'cleanup_status': 'pending', 'host_trace_validation': 'not_performed',
-                  'safe_case_replay': safe_case_replay is True}
-        files.save('run.json', status)
-        session = None
-        agent_process = None
-        agent_checkpoint = None
-        workspace_temp = None
-        primary_error = None
-        try:
-            if on_artifacts_ready is not None:
-                on_artifacts_ready(directory)
-            control.check()
-
-            # The container worker calls create_run/save_case for Case preparation.
-            overlay_options = dict(backend=backend_url(environ)) if overlay is None else dict(overlay)
-            with evaluation_agent(agent, control=control, deadline=preparation,
-                                  **overlay_options) as descriptor:
-                # Keep the tracked source/workspace separate from private SDK storage.
-                # Only the trusted controller mounts the ledger.
-                repository = directory / 'sdk-source'
-                def checked_copy(source, target):
-                    control.check()
-                    preparation.check()
-                    with open(source, 'rb') as incoming, open(target, 'wb') as outgoing:
-                        while chunk := incoming.read(1024 * 1024):
-                            control.check()
-                            preparation.check()
-                            outgoing.write(chunk)
-                    shutil.copystat(source, target)
-                    return target
-                with span('Prepare Case workspace', kind='preparation'):
-                    policy = workspace_policy(tomllib.loads((descriptor.path / 'agent.toml').read_text()))
-                    target = policy.path or SDK_REPOSITORY
-                    ledger_root = directory / 'sdk-repo'
-                    ledger_root.mkdir()
-                    if policy.path:
-                        workspace_temp = tempfile.TemporaryDirectory(prefix='.abb-workspace-', dir=directory.parent)
-                        repository = Path(workspace_temp.name)
-                        contract = prepare_workspace(descriptor.path, repository, policy)
-                        repository.chmod(0o777)
-                        for item in repository.rglob('*'):
-                            item.chmod(0o777 if item.is_dir() else (item.stat().st_mode & 0o111) | 0o666)
-                        files.save('evaluation/workspace.json', contract)
-                        settings_path = directory / 'request/evaluation.json'
-                        settings = json.loads(settings_path.read_text())
-                        settings['workspace'] = contract
-                        files.save('request/evaluation.json', settings)
-                        if case_artifact is not None:
-                            if expected_environment_sha256 is None:
-                                raise ValueError('Saved Case has no workspace contract; generate new Cases for this workspace')
-                            if expected_environment_sha256 != workspace_digest(contract):
-                                raise ValueError('Saved Case workspace differs; no Agent steps were executed')
-                    else:
-                        shutil.copytree(descriptor.path / 'agent', repository, ignore=_ignore,
-                                        copy_function=checked_copy)
-                    state = ledger_root / '.kuma'; state.mkdir(mode=0o700); state.chmod(0o700)
-                    if case_artifact is not None:
-                        shutil.copyfile(case_artifact, state / Path(case_artifact).name)
-                store = TraceStore(directory / 'network.jsonl', directory.name,
-                                   source='interceptor', context=identity, environ=environ)
-                class Sink:
-                    def emit(self, event):
-                        # Preserve full evidence before handing a bounded summary to UI.
-                        store.emit(event)
-                        if trace_sink is not None:
-                            data = _trace_preview(redact(json_value(event.data), files.secrets))
-                            data.update(redact({**identity, 'artifact_directory': str(directory)}, files.secrets))
-                            trace_sink.emit(TraceEvent(event.event, data))
-                replay_directory = None
-                if generation_count is None:
-                    replay_directory = directory / 'replay'
-                    replay_directory.mkdir(mode=0o777)
-                    replay_directory.chmod(0o777)
-                from agentbench.sdk.integration.context import ExecutionChannel
-                channel = ExecutionChannel.create(directory / 'channel') if generation_count is None else None
-                settings = json.loads((directory / 'request/evaluation.json').read_text())
-                publications = ()
-                if artifact_store is not None and generation_count is not None:
-                    indices = generation_indices if generation_indices is not None else range(generation_count)
-                    publications = tuple((index, artifact_store.case(agent.agent_id, index).directory)
-                                         for index in indices)
-                    settings['case_publications'] = {str(index): f'/run/abb-published/{index}'
-                                                     for index, _ in publications}
-                settings.update(private_storage='/run/abb-sdk-storage',
-                                isolated_agent=channel is not None, agent_timeout=timeout)
-                settings['agent_response_limits'] = {
-                    'max_bytes': response_limits.max_bytes, 'max_files': response_limits.max_files}
-                files.save('request/evaluation.json', settings)
-                runtime_options = dict(
-                    environ=environ, policy=EvaluationPolicy(state, repository=repository, target=target, writable=bool(policy.path), replay=replay_directory, channel=channel, publications=publications), trace_sink=Sink(),
-                    trace_max_bytes=trace_max_bytes, control=control, identity=identity,
-                    timeout_sec=timeout,
-                    run_id=directory.name, artifact_root=directory,
-                )
-                if runtime_services is not None:
-                    runtime = runtime_services.create_docker_runtime(**runtime_options)
-                else:
-                    runtime = DockerRuntime(build_coordinator=build_coordinator, **runtime_options)
-                control.check()
-                if channel is not None:
-                    from agentbench.runtime.docker.execution_policy import AgentExecutionPolicy
-                    public_inputs = directory / 'agent-request'
-                    public_inputs.mkdir()
-                    agent_outputs = directory / 'agent-output'
-                    agent_outputs.mkdir(mode=0o700)
-                    options = dict(runtime_options)
-                    options['policy'] = AgentExecutionPolicy(repository, target, bool(policy.path), channel, agent_outputs)
-                    options['artifact_root'] = directory / 'agent-runtime'
-                    options['artifact_root'].mkdir()
-                    options['run_id'] = directory.name + '-agent'
-                    agent_runtime = (runtime_services.create_docker_runtime(**options)
-                                     if runtime_services is not None else
-                                     DockerRuntime(build_coordinator=build_coordinator, **options))
-                    agent_process = agent_runtime.start(
-                        descriptor, invocation=(public_inputs, agent_outputs),
-                        argv=('python', '-m', 'agentbench.runtime.agentcontainer.channel'),
-                        exclude_environment=tuple(tomllib.loads((descriptor.path / 'agent.toml').read_text())
-                                                  .get('runtime', {}).get('worker_env_keys', ())) +
-                                            ('KUMA_API_KEY', 'DEFUZEX_API_KEY', 'KUMA_BASE_URL'),
-                        preparation_deadline=preparation)
-                    agent_checkpoint = agent_process.trace_checkpoint()
-
-                # Start the container process, then wait for its generation/execution mode.
-                session = runtime.start(descriptor,
-                                        invocation=(inputs, destination),
-                                        preparation_deadline=preparation)
-                checkpoint = session.trace_checkpoint()
-                with span('Container execution', kind='container') as container_timing:
-                    code = session.wait(timeout=timeout)
-                    container_timing.status = 'succeeded' if code == 0 else 'failed'
-                status['exit_code'] = code
-                # Preparation calls the SDK only; no Agent/LLM invocation exists.
-                if generation_count is None:
-                    from .diagnostics import read_diagnostic
-                    summary = read_diagnostic(directory, 'evaluation/manifest.json')
-                    judge_only_failure = (
-                        summary.get('phase') == 'judge' and summary.get('execution') in ('succeeded', 'failed')
-                        and summary.get('otel') == 'complete' and summary.get('submission') == 'committed'
-                        and summary.get('evidence') == 'captured')
-                    if code == 0 or judge_only_failure:
-                        status['host_trace_validation'] = 'failed'
-                        with span('Validate network evidence', kind='evidence'):
-                            session.validate_trace(checkpoint)
-                            if agent_process is not None:
-                                agent_process.validate_trace(agent_checkpoint)
-                        status['host_trace_validation'] = 'succeeded'
-                status['status'] = 'succeeded' if code == 0 else 'failed'
-        except BaseException as exc:
-            primary_error = exc
-            status.update(status='cancelled' if isinstance(exc, RunCancelled) else 'failed',
-                          error_type=type(exc).__name__, error=str(exc))
-            if isinstance(exc, DockerCleanupError):
-                status.update(cleanup_status='failed', cleanup_error_type=type(exc).__name__,
-                              cleanup_error=str(exc))
-            raise
-        finally:
-            try:
-                errors = []
-                for active, label in ((session, 'controller'), (agent_process, 'agent')):
-                    if active is None:
-                        continue
-                    try:
-                        with span('Cleanup ' + label + ' container', kind='cleanup'):
-                            active.close()
-                    except BaseException as exc:
-                        errors.append(exc)
-                    finally:
-                        files.save('diagnostics.json' if label == 'controller' else 'agent-diagnostics.json',
-                                   {'stdout': active.stdout, 'stderr': active.stderr, **identity})
-                if errors:
-                    exc = errors[0]
-                    status.update(status='failed', cleanup_status='failed',
-                                  cleanup_error_type=type(exc).__name__, cleanup_error=str(exc))
-                    raise exc
-                if status['cleanup_status'] != 'failed':
-                    status['cleanup_status'] = 'succeeded' if session or agent_process else 'not_started'
-            finally:
-                from .diagnostics import collect_artifacts
-                status['artifacts'] = collect_artifacts(directory, status, environ=environ)
-                if primary_error is not None:
-                    primary_error.artifacts = status['artifacts']
-                manifest = destination / 'manifest.json'
-                if manifest.is_file() and not manifest.is_symlink():
-                    try:
-                        status['sdk_run_id'] = json.loads(manifest.read_text()).get('run_id')
-                    except (OSError, ValueError, AttributeError):
-                        pass  # Preserve the original container/validation outcome.
-                files.save('run.json', status)
-                if workspace_temp is not None:
-                    workspace_temp.cleanup()
-        timing_root.status = status['status']
-        return directory
-
-
-def _trace_preview(value, *, depth=0, budget=None):
-    """Bound queued UI values while keeping common payload preview shapes."""
-    budget = [4096] if budget is None else budget
-    if budget[0] <= 0:
-        return None
-    if isinstance(value, str):
-        limit = min(512, budget[0])
-        result = value[:limit] + ('…' if len(value) > limit else '')
-        budget[0] -= len(result)
-        return result
-    if depth >= 5:
-        return _trace_preview(str(value), budget=budget)
-    if isinstance(value, Mapping):
-        result = {}
-        for key, item in list(value.items())[:24]:
-            if budget[0] <= 0:
-                break
-            key = str(key)[:64]
-            budget[0] -= len(key) + 8
-            result[key] = _trace_preview(item, depth=depth + 1, budget=budget)
-        return result
-    if isinstance(value, list):
-        return [_trace_preview(item, depth=depth + 1, budget=budget)
-                for item in value[-4:] if budget[0] > 0]
-    budget[0] -= 24
-    return value
+    context = SDKRunnerContext(
+        environ=environ, model=None, trace_sink=trace_sink, trace_max_bytes=trace_max_bytes,
+        control=control, build_coordinator=build_coordinator,
+        job_context={**dict(job_context or {}), **dict(identity or {})},
+        runtime_services=runtime_services, artifacts=artifact_store)
+    reused = f'.kuma/{Path(case_artifact).name}' if case_artifact is not None else None
+    settings = {
+        'defer_judge': defer_judge, 'sdk_request_options': sdk_request_options or {},
+        'max_steps': max_steps,
+        'mode': 'generate' if generation_count is not None else 'execute',
+        'count': generation_count, 'case_artifact': reused,
+        'case_indices': generation_indices, 'allow_partial': partial_generation,
+        'expected_case': {'case_id': expected_case_id, 'content_sha256': expected_content_sha256}}
+    overlay_options = dict(backend=backend_url(environ)) if overlay is None else dict(overlay)
+    return run_evaluation(
+        agent, context=context, output=output,
+        stage_agent=partial(evaluation_agent, **overlay_options), settings=settings,
+        execute_agent=generation_count is None, timeout=timeout,
+        on_artifacts_ready=on_artifacts_ready, private_directories=('.kuma',),
+        private_files={reused: case_artifact} if reused is not None else None,
+        generation_indices=(generation_indices if generation_indices is not None else
+                            tuple(range(generation_count)) if generation_count is not None else None),
+        expected_environment_sha256=expected_environment_sha256,
+        require_workspace_identity=case_artifact is not None,
+        safe_case_replay=safe_case_replay, validate_failed_execution=_completed_execution,
+        collect_artifacts=collect_artifacts,
+        excluded_agent_environment=('KUMA_API_KEY', 'DEFUZEX_API_KEY', 'KUMA_BASE_URL'),
+        repository_target=SDK_REPOSITORY)

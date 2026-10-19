@@ -52,12 +52,17 @@ class SDKRun(Protocol):
 
     History entries belong to the adapter; the host runner only counts them.
     No KUMA state objects, submission extensions, or private fields are required.
+    The default container worker uses ``case`` as a JSON-serializable, immutable
+    generation snapshot (including case_id), and calls ``judge`` only when no
+    report has already been returned. Existing custom runners may keep consuming
+    the original get_input/submit/report subset.
     """
 
     run_id: str
     state: str
     report: SDKReport | None
     history: tuple[object, ...]
+    case: Mapping[str, object]
 
     def get_input(self, *, full: bool = False) -> SDKTestInput | None: ...
 
@@ -66,13 +71,22 @@ class SDKRun(Protocol):
         error: str | None = None,
     ) -> SDKReport | None: ...
 
+    def judge(self) -> SDKReport: ...
+
 
 class SDKRunFactory(Protocol):
     def __call__(self, **kwargs: object) -> SDKRun: ...
 
 
 class SDK(Protocol):
-    """A module or configured object receiving repo_path plus its own options."""
+    """A module or configured object receiving repo_path plus its own options.
+
+    With the default container worker, create_run(case=None, ...) generates a
+    Case; create_run(case=saved_snapshot, ...) loads it without generation.
+    The worker also supplies agent_root, storage_path, case_index and evidence.
+    SDK options remain SDK-owned. The same factory and SDKRun contracts serve
+    both phases.
+    """
 
     def create_run(self, **kwargs: object) -> SDKRun: ...
 
