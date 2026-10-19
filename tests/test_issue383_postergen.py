@@ -517,6 +517,7 @@ def test_conversational_input_returns_natural_language_without_synthesis(monkeyp
         "Greetings!",
         # Additional capability, feature, and identity inquiries
         "What features do you have?",
+        "What features does postergen have?",
         "What is this agent?",
         "What are your capabilities?",
         "Can you describe what you can do?",
@@ -532,6 +533,7 @@ def test_conversational_input_returns_natural_language_without_synthesis(monkeyp
         "   Tell me what you are capable of doing...   ",
         # Structured envelopes (OpenAI messages, JSON strings, query/prompt dicts)
         {"messages": [{"role": "user", "content": "Tell me what you are capable of doing"}]},
+        {"messages": [{"role": "user", "content": "What features does postergen have?"}]},
         '{"text": "What can this agent do?"}',
         {"query": "What are the features?"},
         {"prompt": "Can you describe what you can do?"},
@@ -559,6 +561,37 @@ def test_conversational_input_returns_natural_language_without_synthesis(monkeyp
         # Strictly assert workflow was never invoked
         mock_workflow.assert_not_called()
 
+    instance.close()
+
+
+def test_third_person_feature_queries_return_capabilities_text(monkeypatch):
+    """Verify third-person feature queries return POSTERGEN_CAPABILITIES_TEXT with status completed."""
+    from unittest.mock import MagicMock
+
+    module = _binding()
+    monkeypatch.setenv("OPENAI_API_KEY", "mock-interception-key")
+    instance = module.create_graph()
+
+    mock_workflow = MagicMock(
+        side_effect=AssertionError("PosterGen workflow should NOT be invoked for conversational queries")
+    )
+    monkeypatch.setattr(instance, "_get_workflow", mock_workflow)
+
+    res = instance.invoke("What features does postergen have?")
+    assert isinstance(res, dict)
+    assert "final_output" in res
+    output = res["final_output"]
+    assert output.get("status") == "completed"
+    assert output.get("answer") == module.POSTERGEN_CAPABILITIES_TEXT
+    assert res.get("status") == "completed"
+    assert res.get("answer") == module.POSTERGEN_CAPABILITIES_TEXT
+
+    # Also test message envelope
+    res_msg = instance.invoke({"messages": [{"role": "user", "content": "What features does postergen have?"}]})
+    assert res_msg["final_output"]["status"] == "completed"
+    assert res_msg["final_output"]["answer"] == module.POSTERGEN_CAPABILITIES_TEXT
+
+    mock_workflow.assert_not_called()
     instance.close()
 
 

@@ -56,7 +56,7 @@ CONVERSATIONAL_PATTERNS = [
     r"\bcapability\b",
     r"\bfunctionality\b",
     r"\b(?:what\s+are\s+the\s+)?features\s+of\s+(?:postergen|this\s+agent|this\s+tool|the\s+system)\b",
-    r"\bwhat\s+(?:features|capabilities)\s+do\s+you\s+have\b",
+    r"\bwhat\s+(?:features|capabilities|functions)\s+(?:do|does)\s+(?:you|postergen|(?:this|the)\s+(?:agent|tool|system))\s+have\b",
     r"\bwhat\s+are\s+(?:the|your)\s+(?:features|functions)\b",
     r"\bfunctions\s+of\s+(?:postergen|this\s+agent|this\s+tool|the\s+system)\b",
     r"\bwhat\s+(?:can|does|do)\s+(?:[\w\-]+\s+){0,2}do\b",
