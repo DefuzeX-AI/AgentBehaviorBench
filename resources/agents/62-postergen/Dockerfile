@@ -43,7 +43,8 @@ RUN cp -r /root/.cache/datalab /home/agent/.cache/datalab \
     && ln -s /opt/agent/agent/data /opt/agent/data \
     && chown -R agent:agent /home/agent/.cache /opt/agent
 # Pre-install kuma-defuzex SDK to guarantee fast, offline-resilient evaluation builds
-RUN python -m pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple 'kuma-defuzex[otel]>=0.3.3'
+ARG ABB_PIP_INDEX_URL=https://pypi.org/simple
+RUN python -m pip install --no-cache-dir --index-url "$ABB_PIP_INDEX_URL" 'kuma-defuzex[otel]>=0.3.3'
 
 COPY .abb-runtime/ /opt/abb-runtime/
 COPY bindings/ ./bindings/

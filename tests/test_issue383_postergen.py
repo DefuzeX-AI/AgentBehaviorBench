@@ -226,6 +226,19 @@ def test_binding_normalizes_text_input():
     instance.close()
 
 
+def test_binding_normalizes_message_objects_with_content_attribute():
+    class DummyMessage:
+        def __init__(self, content):
+            self.content = content
+
+    module = _binding()
+    instance = module.create_graph()
+    norm = instance._normalize_input({"messages": [DummyMessage("A research paper on quantum.")]})
+    text, candidate = instance._extract_text_and_candidate(norm)
+    assert text == "A research paper on quantum."
+    instance.close()
+
+
 def test_binding_rejects_malformed_input():
     module = _binding()
     instance = module.create_graph()
@@ -341,6 +354,8 @@ def test_dockerfile_static_configuration():
     assert "fonts" in dockerfile
     assert "COPY bindings/ ./bindings/" in dockerfile
     assert "COPY agent.toml ./agent.toml" in dockerfile
+    assert "ARG ABB_PIP_INDEX_URL" in dockerfile
+    assert "--index-url" in dockerfile
 
 
 def test_dockerfile_security_no_chmod_777():

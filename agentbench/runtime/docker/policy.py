@@ -153,15 +153,15 @@ class DockerPolicy:
 
     Attributes:
         cpus: Maximum CPU quota allocated to the container (--cpus). Must satisfy
-            0.0 < float(cpus) <= 1024.0. Defaults to 1.0; dynamically overridden
-            via the ``ABB_DOCKER_CPUS`` environment variable when default (1.0).
-            For CPU-intensive neural models (e.g. Marker/Surya layout and OCR predictors),
-            configure via ABB_DOCKER_CPUS (e.g. 4.0).
+            0.0 < float(cpus) <= 1024.0. Defaults to 1.0. When instantiated via
+            :meth:`from_environment`, dynamically resolves the ``ABB_DOCKER_CPUS``
+            environment variable (e.g. 4.0) for CPU-intensive neural models (e.g. Marker/Surya layout
+            and OCR predictors).
         memory: Maximum memory limit for the container (--memory). Must match
             a positive integer followed by a unit suffix [kmgKMG] (e.g. '8g', '512m', '2G').
-            Defaults to '1g'; dynamically overridden via the ``ABB_DOCKER_MEMORY``
-            environment variable when default ('1g'). For heavy vision and multimodal agents,
-            configure via ABB_DOCKER_MEMORY (e.g. '8g') to prevent kernel OOM cgroup termination (exit code 137).
+            Defaults to '1g'. When instantiated via :meth:`from_environment`, dynamically resolves
+            the ``ABB_DOCKER_MEMORY`` environment variable (e.g. '8g') for heavy vision and
+            multimodal agents to prevent kernel OOM cgroup termination (exit code 137).
         pids_limit: Maximum number of simultaneous processes (--pids-limit).
         tmpfs_size: Capacity limit for in-memory tmpfs mounts (/tmp, /run/agentbench-tools).
         egress: Network egress filtering policy.

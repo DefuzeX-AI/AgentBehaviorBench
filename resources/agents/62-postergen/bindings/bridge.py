@@ -274,6 +274,8 @@ class PosterGenBinding:
             last = messages[-1]
             if isinstance(last, dict) and "content" in last:
                 msg_text = str(last["content"]).strip()
+            elif hasattr(last, "content"):
+                msg_text = str(getattr(last, "content")).strip()
 
         raw_text = str(
             msg_text
