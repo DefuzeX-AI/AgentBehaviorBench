@@ -198,3 +198,53 @@ def test_docker_runtime_resource_resolution(monkeypatch):
     rt_ambient = DockerRuntime()
     assert rt_ambient.policy.memory == "16g"
     assert rt_ambient.policy.cpus == 8.0
+
+
+def test_execution_policies_resource_resolution(tmp_path, monkeypatch):
+    """Verify AgentExecutionPolicy and ControllerExecutionPolicy resolve resources via policy/runtime."""
+    from agentbench.runtime.docker.execution_policy import AgentExecutionPolicy, ControllerExecutionPolicy
+    from agentbench.sdk.integration.context import ExecutionChannel
+
+    monkeypatch.setenv(MEMORY_ENV, "16g")
+    monkeypatch.setenv(CPUS_ENV, "8")
+
+    channel = ExecutionChannel.create(tmp_path / "channel")
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    out = tmp_path / "out"
+    out.mkdir()
+    storage = tmp_path / "storage"
+    storage.mkdir()
+
+    # 1. Default constructor defaults to 1g / 1.0 CPU without ambient bleed
+    agent_default = AgentExecutionPolicy(repo, "/workspace", True, channel, out)
+    assert "--memory=1g" in agent_default.run_arguments()
+    assert "--cpus=1.0" in agent_default.run_arguments() or "--cpus=1" in agent_default.run_arguments()
+
+    ctrl_default = ControllerExecutionPolicy(storage, repository=repo, channel=channel)
+    assert "--memory=1g" in ctrl_default.run_arguments()
+    assert "--cpus=1.0" in ctrl_default.run_arguments() or "--cpus=1" in ctrl_default.run_arguments()
+
+    # 2. Explicit base policy constructor preserves limits
+    custom_policy = DockerPolicy(memory="4g", cpus=2.0)
+    agent_custom = AgentExecutionPolicy(repo, "/workspace", True, channel, out, policy=custom_policy)
+    assert "--memory=4g" in agent_custom.run_arguments()
+    assert "--cpus=2.0" in agent_custom.run_arguments()
+
+    # 3. DockerRuntime initializes execution policy from runtime selected environment
+    agent_for_rt = AgentExecutionPolicy(repo, "/workspace", True, channel, out)
+    rt = DockerRuntime(
+        environ={"ABB_DOCKER_MEMORY": "8g", "ABB_DOCKER_CPUS": "4"},
+        policy=agent_for_rt,
+    )
+    args = rt.policy.run_arguments()
+    assert "--memory=8g" in args
+    assert "--cpus=4.0" in args
+
+    # 4. DockerRuntime isolates empty environ against ambient bleed
+    agent_for_empty_rt = AgentExecutionPolicy(repo, "/workspace", True, channel, out)
+    rt_empty = DockerRuntime(environ={}, policy=agent_for_empty_rt)
+    args_empty = rt_empty.policy.run_arguments()
+    assert "--memory=1g" in args_empty
+    assert "--cpus=1.0" in args_empty or "--cpus=1" in args_empty
+

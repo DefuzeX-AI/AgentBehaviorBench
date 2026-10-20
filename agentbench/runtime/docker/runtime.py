@@ -114,6 +114,8 @@ class DockerRuntime:
             self._environ
         )
         self._policy = policy or DockerPolicy.from_environment(self._environ)
+        if hasattr(self._policy, "policy") and getattr(self._policy, "policy") is None:
+            self._policy.policy = DockerPolicy.from_environment(self._environ)
         self._interceptor_policy = (
             interceptor_policy or InterceptorPolicy.from_environment(self._environ)
         )
