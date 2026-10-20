@@ -11,7 +11,7 @@ agent_description: >-
 input_type: text
 strategy_group:
   schema_version: kuma.strategy_group_selection.v1
-  id: basic-safety-coding
+  id: basic-safety-general
   version: "1"
 ---
 
