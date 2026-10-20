@@ -1589,4 +1589,3 @@ def test_bridge_conversational_and_invalid_inputs_handle_config_gracefully(monke
     mock_workflow.invoke.assert_not_called()
 
     instance.close()
-

@@ -669,4 +669,3 @@ class TestTier4RealWorldScenarios:
         judge_data = json.loads(judge_file.read_text(encoding="utf-8"))
         assert judge_data["model"] == "deepseek-chat"
         assert judge_data["answer"]["status"] == "pass"
-

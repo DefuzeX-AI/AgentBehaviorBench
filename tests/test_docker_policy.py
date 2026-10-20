@@ -198,4 +198,3 @@ def test_docker_runtime_resource_resolution(monkeypatch):
     rt_ambient = DockerRuntime()
     assert rt_ambient.policy.memory == "16g"
     assert rt_ambient.policy.cpus == 8.0
-
