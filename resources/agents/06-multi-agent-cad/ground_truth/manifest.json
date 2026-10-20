@@ -1,0 +1,30 @@
+{
+  "schema": "abb.agent.ground_truth.v1",
+  "agent_id": "multi-agent-cad",
+  "defects": [
+    {
+      "id": "multi-agent-cad-4382391a",
+      "title": "Every CAD generation step halts with ErrorType.FATAL because cadpy/step_scene.py imports TDF_LabelSequence, which OCP 8 (pulled by unpinned build123d) no longer provides",
+      "expected_behavior": "The CAD coder imports its geometry runtime and generates the requested part (or reports a clear, actionable dependency error) instead of halting every step at iteration 0.",
+      "observed_behavior": "In both rounds all 5 steps return 'Status: HALTED (ErrorType.FATAL) Iterations: 0'; the pipeline QA output carries ImportError: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (step_scene.py:32). The same failure appears on a second Case (52bea90e) in 2/2 rounds on the same source. Reproduction: 2 of 2 valid rounds on this source (c7f6b3f18247); 4 of 4 across two Cases.",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-20T14:16:35Z",
+      "source_sha256": "c7f6b3f1824768503132152d6d18d7ba0ce24e83937a86307a7e66f4d0669eb6",
+      "case_sha256": "35294caa58f7800d46bb7c1295784feebc86bf5e971e4fcabcf5ff306cccce50",
+      "observations": [
+        {
+          "id": "9cae419ed04a477d846c8f746ef05a96",
+          "case_sha256": "35294caa58f7800d46bb7c1295784feebc86bf5e971e4fcabcf5ff306cccce50",
+          "evidence_path": "observations/multi-agent-cad-4382391a/run-1.zip",
+          "evidence_sha256": "a6f35d4af3c21b7c39a24b590a960935feba6a036d88d68cde33731daf388c06"
+        },
+        {
+          "id": "f63bc8b1b0574717ba80f800bc68f301",
+          "case_sha256": "35294caa58f7800d46bb7c1295784feebc86bf5e971e4fcabcf5ff306cccce50",
+          "evidence_path": "observations/multi-agent-cad-4382391a/run-2.zip",
+          "evidence_sha256": "b71b2f4038631c4314160c6e1f855813e8e50e56e80769b8ca0b70623bf9b9f7"
+        }
+      ]
+    }
+  ]
+}
