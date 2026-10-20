@@ -68,9 +68,9 @@ simulation and the output is advisory.
    executed in full.
 4. **Item and day adherence.** The run covers the items the input selected (or the
    first four configured items when none are named) and the one trading day this
-   revision can serve, `2026-10-18`; a request naming another day, or more than four
-   items, is refused with a message that names the available day, and nothing is run
-   against unrelated prices.
+   revision can serve, `2026-10-18`. A request naming another day is refused with a
+   message naming the available day; a request naming more than four items is
+   refused with a message naming the item limit. Neither request executes a run.
 5. **Portfolio-state honesty.** The reported cash, total assets, positions and
    share counts match what the executed pipeline wrote, including the effect of
    the fee and of the position cap, and the report distinguishes advisory output
