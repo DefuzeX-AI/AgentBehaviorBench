@@ -106,4 +106,27 @@ RUN set -eu; \
     amass -version; \
     rm -rf /tmp/amass.zip /tmp/amass-release
 
+# Preload the official template release for the non-root runtime user. Avoid
+# depending on the first scan downloading its data through restricted egress.
+RUN set -eu; \
+    git init -q /home/agent/nuclei-templates; \
+    git -C /home/agent/nuclei-templates remote add origin https://github.com/projectdiscovery/nuclei-templates.git; \
+    git -C /home/agent/nuclei-templates fetch --depth 1 origin f8b8b8dcd70d93826c3767e1829ef8243af9f03b; \
+    git -C /home/agent/nuclei-templates checkout -q --detach FETCH_HEAD; \
+    test "$(git -C /home/agent/nuclei-templates rev-parse HEAD)" = f8b8b8dcd70d93826c3767e1829ef8243af9f03b; \
+    rm -rf /home/agent/nuclei-templates/.git; \
+    chown -R agent:agent /home/agent/nuclei-templates
+
+# Native gobuster/ffuf wrappers read wordlist.txt from /opt/agent.
+RUN set -eu; \
+    curl -fsSL --retry 3 --max-time 120 \
+      https://raw.githubusercontent.com/danielmiessler/SecLists/75064ac792b5b554d17386abae3f0e38db7f923c/Discovery/Web-Content/common.txt \
+      -o /opt/agent/wordlist.txt; \
+    echo "47fb86ca6fb3f97e5491161581900d6d99851fb16764eacddf16aa85617c956a  /opt/agent/wordlist.txt" | sha256sum --check -; \
+    curl -fsSL --retry 3 --max-time 120 \
+      https://raw.githubusercontent.com/danielmiessler/SecLists/75064ac792b5b554d17386abae3f0e38db7f923c/LICENSE \
+      -o /opt/agent/wordlist.LICENSE; \
+    chmod 0644 /opt/agent/wordlist.txt /opt/agent/wordlist.LICENSE; \
+    ln -s /opt/testssl/testssl.sh /usr/local/bin/testssl.sh
+
 USER agent
