@@ -38,7 +38,7 @@ from agentbench.runtime.docker.policy import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-UNIT = ROOT / "resources" / "agents" / "62-postergen"
+UNIT = ROOT / "resources" / "agents" / "63-postergen"
 REGISTRY_PATH = ROOT / "resources" / "registry.toml"
 
 # Self-contained minimal valid PDF-1.4 binary fixture
@@ -77,8 +77,8 @@ def _load_bridge_module():
 class TestTier1FeatureCoverage:
     """Tier 1: Nominal feature coverage and contract verification."""
 
-    def test_registry_01_to_62_contiguous_layout(self):
-        """Verify Agent #62 renumbering and contiguous 01-62 registry layout."""
+    def test_registry_01_to_63_contiguous_layout(self):
+        """Verify Agent #63 renumbering and contiguous 01-63 registry layout."""
         assert REGISTRY_PATH.is_file(), f"Missing registry at {REGISTRY_PATH}"
         assert UNIT.is_dir(), f"Expected unit directory at {UNIT}"
 
@@ -93,7 +93,7 @@ class TestTier1FeatureCoverage:
         assert len(set(registered_paths)) == len(entries), "Duplicate entries in registry"
         assert set(registered_paths) == unit_dirs, "Registry entries must exactly match filesystem units"
 
-        # 2. Contiguous numbering 01 to 62
+        # 2. Contiguous numbering 01 to 63
         numbers = []
         for unit in unit_dirs:
             prefix, sep, name = unit.name.partition("-")
@@ -105,7 +105,7 @@ class TestTier1FeatureCoverage:
         assert sorted(numbers) == list(range(1, len(unit_dirs) + 1)), (
             "Agent directory numbering must be contiguous starting from 01"
         )
-        assert len(unit_dirs) >= 62, f"Expected at least 62 agents, found {len(unit_dirs)}"
+        assert len(unit_dirs) >= 63, f"Expected at least 63 agents, found {len(unit_dirs)}"
 
         # 3. PosterGen unit entry
         registry = load_registry(REGISTRY_PATH)

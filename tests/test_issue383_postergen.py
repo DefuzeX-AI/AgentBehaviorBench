@@ -26,7 +26,7 @@ from agentbench.sdk.plugin.kuma.onboarding import validate as validate_kuma_prof
 from kuma.repository.agent_profiles import parse_agent_profile
 
 ROOT = Path(__file__).resolve().parents[1]
-UNIT = ROOT / "resources" / "agents" / "62-postergen"
+UNIT = ROOT / "resources" / "agents" / "63-postergen"
 SNAPSHOT = UNIT / "agent"
 REPOSITORY = "https://github.com/Y-Research-SBU/PosterGen"
 REVISION = "8a54325f871ee10fa6545de3b3a9b771aa12620c"

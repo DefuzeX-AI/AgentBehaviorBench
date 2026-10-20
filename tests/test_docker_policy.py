@@ -247,4 +247,3 @@ def test_execution_policies_resource_resolution(tmp_path, monkeypatch):
     args_empty = rt_empty.policy.run_arguments()
     assert "--memory=1g" in args_empty
     assert "--cpus=1.0" in args_empty or "--cpus=1" in args_empty
-
