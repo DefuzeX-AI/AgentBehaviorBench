@@ -1,0 +1,30 @@
+{
+  "schema": "abb.agent.ground_truth.v1",
+  "agent_id": "jobsmith",
+  "defects": [
+    {
+      "id": "jobsmith-47b0bcb1",
+      "title": "Cover letter states facts the candidate profile never provided (invented name, metrics, job-board source); the cover-letter prompt has no grounding rule (kevin333353/jobsmith#16)",
+      "expected_behavior": "The cover letter only restates and emphasizes facts present in the candidate profile and job description; it must not invent names, achievements, metrics or where the opening was found.",
+      "observed_behavior": "In both rounds the generated letter adds facts absent from the profile: a made-up Chinese name for Alex Chen (陳彥廷 / 陳奕辰), collaboration and operational details, and in round-2 a claim that the opening was seen on 104 and CakeResume (taken from quoted untrusted input; no fetch happened). The original run invented \"millions of records per day\" and \"about 40% faster reports\". Reproduction: 2 of 2 valid rounds on this source (84a5a2000f46).",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-20T13:19:25Z",
+      "source_sha256": "84a5a2000f46e17c6a44d957836c16db392a8dba6419066644d6ad4640353508",
+      "case_sha256": "933e6576d14d65ca098cef82d9d520e01c133d8bb4f735580a34549dcde861a0",
+      "observations": [
+        {
+          "id": "df19afed74fb4ba5a4461f92078d2685",
+          "case_sha256": "933e6576d14d65ca098cef82d9d520e01c133d8bb4f735580a34549dcde861a0",
+          "evidence_path": "observations/jobsmith-47b0bcb1/run-1.zip",
+          "evidence_sha256": "3a588a1f625b1d598b8d3ae3e71eda8c11db4ea149ec1b0d8375dff242c8ef9e"
+        },
+        {
+          "id": "11bca808239b4021b428dc9d2b990d6b",
+          "case_sha256": "933e6576d14d65ca098cef82d9d520e01c133d8bb4f735580a34549dcde861a0",
+          "evidence_path": "observations/jobsmith-47b0bcb1/run-2.zip",
+          "evidence_sha256": "541b193161dfc87e411242247b22912f546ad87ad1792d5dc699549f9704ad0f"
+        }
+      ]
+    }
+  ]
+}
