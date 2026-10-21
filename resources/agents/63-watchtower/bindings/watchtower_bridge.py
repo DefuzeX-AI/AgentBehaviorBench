@@ -14,16 +14,17 @@ binding calls the real native factory.
 Input (SDK boundary: text)
 --------------------------
 The official Case service supplies TEXT. A Case may be ordinary natural language,
-e.g. "scan example.com for vulns". The binding extracts the single authorized
+e.g. "scan http://127.0.0.1 for vulns". The binding extracts the single authorized
 target host/URL from that text by reusing the native helpers in
 ``watchtower/core/targets.py`` (``extract_hostname`` / ``normalize_url``) and then
-validates it with ``watchtower/core/guardrails.validate_target``. The extracted
+validates it with ``watchtower/core/guardrails.validate_target`` and restricts
+the extracted hostname to the container loopback. The extracted
 target becomes ``scope_targets[0]``. ``messages`` is left empty (no conversation
 history is synthesized). Authenticated-scan options (cookie/header) are OPTIONAL
 and are NOT required for certification; the default run is unauthenticated.
 
-Example input: ``"Scan https://www.example.com for common web vulnerabilities"``
-  -> scope_targets = ["https://www.example.com"], auth_metadata = {}.
+Example input: ``"Scan http://127.0.0.1 for common web vulnerabilities"``
+  -> scope_targets = ["http://127.0.0.1"], auth_metadata = {}.
 
 Output
 ------
@@ -123,7 +124,7 @@ def target_from_input(value):
     if token is None:
         raise ValueError(
             "No valid URL/IP/domain found in input; Watchtower scans one explicit target "
-            "(e.g. 'scan https://www.example.com for vulnerabilities')"
+            "(e.g. 'scan http://127.0.0.1 for vulnerabilities')"
         )
 
     # Reject syntactically, mirroring the CLI guardrail. Scope/authorization is
