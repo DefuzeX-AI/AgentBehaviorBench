@@ -142,6 +142,24 @@ class TestTier2BoundaryValueAnalysis:
         norm = np.linalg.norm(v_code)
         assert abs(norm - 1.0) < 1e-5
 
+    def test_long_input_and_safe_candidate_handling(self):
+        bridge = _load_bridge_module()
+
+        # Input > 255 chars containing slashes must not raise OSError 36
+        long_query = "Please scan this function: " + ("a" * 300) + "/test.py"
+        assert bridge._is_safe_file_candidate(long_query) is False
+        assert bridge._is_conversational_query(long_query) is False
+
+        # Input with code fence
+        fenced_input = (
+            "Analyze the following Python snippet:\n\n"
+            "```python\n"
+            "import sqlite3\ndef get_user(u):\n    pass\n"
+            "```\n"
+        )
+        assert bridge._is_safe_file_candidate(fenced_input) is False
+        assert bridge._is_conversational_query(fenced_input) is False
+
 
 # ==============================================================================
 # Tier 3: Pairwise Combinatorial & Cross-Feature Interactions
