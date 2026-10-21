@@ -91,6 +91,16 @@ def _install_runtime_patches() -> None:
 _install_runtime_patches()
 
 
+def _is_safe_file_candidate(text: str) -> bool:
+    """Safely check if text could be a filesystem path without raising Errno 36."""
+    if not text or "\n" in text or len(text) > 255:
+        return False
+    try:
+        return Path(text).exists()
+    except OSError:
+        return False
+
+
 def _is_conversational_query(text: str) -> bool:
     """Check if input is a conversational question rather than code to scan."""
     stripped = text.strip()
@@ -100,7 +110,8 @@ def _is_conversational_query(text: str) -> bool:
     # If explicit code syntax or language markers are present, route to scanning
     code_indicators = (
         "def ", "class ", "import ", "select ", "from ", "function ",
-        "<?php", "eval(", "exec(", "<script", "system(", "popen(", "curl "
+        "<?php", "eval(", "exec(", "<script", "system(", "popen(", "curl ",
+        "```", "sqlite3", "cursor."
     )
     lower = stripped.lower()
     if any(ind in lower for ind in code_indicators):
@@ -108,7 +119,7 @@ def _is_conversational_query(text: str) -> bool:
 
     if "/" in stripped or "\\" in stripped:
         # Might be a file path
-        if Path(stripped).exists() or stripped.endswith((".py", ".js", ".php", ".go", ".c", ".cpp")):
+        if _is_safe_file_candidate(stripped) or stripped.endswith((".py", ".js", ".php", ".go", ".c", ".cpp")):
             return False
 
     if len(stripped.splitlines()) > 3:
@@ -187,18 +198,43 @@ class OasisAgentGraph:
         # Materialize input code or resolve file path
         workspace_dir: tempfile.TemporaryDirectory | None = None
         target_path: Path
-        candidate = Path(text_input)
-        if candidate.exists():
-            target_path = candidate.resolve()
+        candidate_path: Path | None = None
+        if _is_safe_file_candidate(text_input):
+            try:
+                candidate_path = Path(text_input).resolve()
+            except OSError:
+                candidate_path = None
+
+        if candidate_path is not None:
+            target_path = candidate_path
         else:
             workspace_dir = tempfile.TemporaryDirectory(prefix="oasis_abb_")
+            code_to_write = text_input
             ext = ".py"
-            if "<?php" in text_input:
-                ext = ".php"
-            elif "function" in text_input and "var " in text_input:
-                ext = ".js"
+            code_block_match = re.search(r"```([a-zA-Z0-9_\-+]*)\n([\s\S]*?)```", text_input)
+            if code_block_match:
+                lang = code_block_match.group(1).lower().strip()
+                code_to_write = code_block_match.group(2).strip()
+                if "php" in lang:
+                    ext = ".php"
+                elif "js" in lang or "javascript" in lang:
+                    ext = ".js"
+                elif "c" in lang or "cpp" in lang:
+                    ext = ".c"
+                elif "java" in lang:
+                    ext = ".java"
+                elif "go" in lang:
+                    ext = ".go"
+                else:
+                    ext = ".py"
+            else:
+                if "<?php" in text_input:
+                    ext = ".php"
+                elif "function" in text_input and ("var " in text_input or "const " in text_input or "let " in text_input):
+                    ext = ".js"
+
             target_file = Path(workspace_dir.name) / f"submission{ext}"
-            target_file.write_text(text_input, encoding="utf-8")
+            target_file.write_text(code_to_write, encoding="utf-8")
             target_path = Path(workspace_dir.name)
 
         try:
@@ -235,8 +271,10 @@ class OasisAgentGraph:
 
         # Hook invoke_oasis_langgraph to forward ABB config to graph.invoke
         original_invoke_langgraph = invoke_mod.invoke_oasis_langgraph
+        captured_results: dict[str, Any] = {}
 
         def _forwarding_invoke(analyzer: Any, vulnerabilities: list[dict[str, Any]], scan_args: Any, report: Any) -> dict[str, Any]:
+            nonlocal captured_results
             graph = invoke_mod.build_oasis_analysis_graph()
             initial = {
                 "analyzer": analyzer,
@@ -255,7 +293,9 @@ class OasisAgentGraph:
             }
             with set_config_context(dict(config or {})):
                 final_state = graph.invoke(initial, config=dict(config or {}))
-            return final_state.get("all_results") or {}
+            res = final_state.get("all_results") or {}
+            captured_results = res
+            return res
 
         invoke_mod.invoke_oasis_langgraph = _forwarding_invoke
         try:
@@ -266,6 +306,8 @@ class OasisAgentGraph:
 
         # Extract markdown report
         report_text = self._collect_report_text(scanner)
+        if not report_text.strip() and captured_results:
+            report_text = self._format_results_fallback(captured_results)
         if not report_text.strip():
             report_text = "# Security Analysis Complete\n\nNo critical vulnerabilities detected."
         return {"answer": report_text}
@@ -295,7 +337,36 @@ class OasisAgentGraph:
                     except Exception:
                         pass
 
+        if not collected:
+            for file_path in Path(output_dir).rglob("*.md"):
+                try:
+                    collected.append(file_path.read_text(encoding="utf-8"))
+                except Exception:
+                    pass
+
         return "\n\n---\n\n".join(collected)
+
+    def _format_results_fallback(self, results: Mapping[str, Any]) -> str:
+        sections: list[str] = ["# Vulnerability Analysis Report\n"]
+        for vuln_type, findings in results.items():
+            if not isinstance(findings, list) or not findings:
+                continue
+            sections.append(f"## {vuln_type}\n")
+            for f in findings:
+                if not isinstance(f, Mapping):
+                    continue
+                file_p = f.get("file_path", "target")
+                line_no = f.get("line_number", "")
+                loc = f"{file_p}:{line_no}" if line_no else str(file_p)
+                sections.append(f"- **Location**: `{loc}`")
+                if "severity" in f:
+                    sections.append(f"  - **Severity**: {f['severity']}")
+                if "description" in f:
+                    sections.append(f"  - **Description**: {f['description']}")
+                if "mitigation" in f:
+                    sections.append(f"  - **Remediation**: {f['mitigation']}")
+                sections.append("")
+        return "\n".join(sections).strip()
 
 
 def create_graph() -> OasisAgentGraph:
