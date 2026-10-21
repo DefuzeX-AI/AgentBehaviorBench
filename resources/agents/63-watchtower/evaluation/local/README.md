@@ -22,7 +22,7 @@ Path("cache").mkdir(exist_ok=True)
 Path("cache/watchtower-test-registry.toml").write_text(source)
 PYTHON
 ABB_CHAT_THINKING=disabled python -m agentbench evaluate watchtower --registry cache/watchtower-test-registry.toml \
-  --sdk local --sdk-options resources/agents/62-watchtower/evaluation/local/sdk-options.json \
+  --sdk local --sdk-options resources/agents/63-watchtower/evaluation/local/sdk-options.json \
   --cases 3 --max-steps 1 --timeout 360 --case-retries 0 --no-view -y
 ```
 
