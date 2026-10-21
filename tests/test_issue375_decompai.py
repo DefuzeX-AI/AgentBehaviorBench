@@ -138,3 +138,25 @@ def test_native_output_and_sticky_budget(monkeypatch,tmp_path,mode):
   assert recorded['state']['messages'][0].content=='native literal prompt'
  else:
   with pytest.raises(RuntimeError):bridge.create_graph().invoke('request')
+
+
+def test_native_import_bounds_existing_sdk_clients(monkeypatch,tmp_path):
+ import sys
+ import types
+ monkeypatch.setattr(bridge.sys,'platform','linux')
+ original=bridge.Path.is_dir
+ monkeypatch.setattr(bridge.Path,'is_dir',lambda p:True if str(p)=='/opt/abb-runtime/agentbench' else original(p))
+ monkeypatch.setenv('OPENAI_API_KEY','fixture-placeholder')
+ monkeypatch.setenv('LLM_MODEL','glm-5.3-flash')
+ monkeypatch.delenv('ABB_AGENT_MODEL',raising=False)
+ monkeypatch.setitem(sys.modules,'container_transport',types.SimpleNamespace(install=lambda *args:None))
+ client=SimpleNamespace(max_retries=10);async_client=SimpleNamespace(max_retries=10)
+ class FakeModel(SimpleNamespace):model_fields={}
+ model=FakeModel(max_retries=10,root_client=client,root_async_client=async_client,model_kwargs={})
+ native=SimpleNamespace(model=SimpleNamespace(bound=model))
+ utils=SimpleNamespace(run_command_in_docker=lambda x:None)
+ modules={'src.utils.utils':utils,'src.tools.sandboxed_shell.dockerized_bash':SimpleNamespace(),'src.utils':SimpleNamespace(),'src.main':native}
+ monkeypatch.setattr(bridge.importlib,'import_module',lambda n:modules[n])
+ assert bridge._native() is native
+ assert model.max_retries==client.max_retries==async_client.max_retries==0
+ assert model.max_tokens==3072

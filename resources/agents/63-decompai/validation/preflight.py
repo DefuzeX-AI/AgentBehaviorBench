@@ -5,6 +5,9 @@ os.environ['OPENAI_API_KEY']='offline-placeholder'
 os.environ['LLM_MODEL']='glm-5.3-flash'
 from bridge import _native
 native=_native()
+assert native.model.bound.root_client.max_retries==0
+assert native.model.bound.root_async_client.max_retries==0
+print("NATIVE_CLIENTS_OK; sync_retries=0; async_retries=0",flush=True)
 print('NATIVE_IMPORT_OK; graph='+type(native.graph).__name__+'; tools='+str(len(native.all_tools)),flush=True)
 fixture=Path('/opt/agent/fixtures/branch');assert fixture.read_bytes()[:4]==b'\x7fELF'
 session=native.utils.create_session_for_binary(str(fixture));binary=Path(session)/'branch'

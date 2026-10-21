@@ -82,6 +82,10 @@ def _native():
     # Retain the native ChatOpenAI object/tool bindings, while bounding retries/output.
     model = native.model.bound
     model.max_retries = 0
+    # ChatOpenAI created its SDK clients during native import. Updating only the
+    # Pydantic field does not change those already-created transport clients.
+    for client in (model.root_client, model.root_async_client):
+        client.max_retries = 0
     model.max_tokens = int(os.environ.get("DECOMPAI_OUTPUT_LIMIT", "3072"))
     if "reasoning_effort" in type(model).model_fields:
         model.reasoning_effort = "low"

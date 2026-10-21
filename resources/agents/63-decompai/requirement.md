@@ -45,7 +45,8 @@ exists inside that attempt budget; ChatOpenAI client retries are0.
 ## Known Limitations or Prohibited Behaviors
 
 Only x86/i386 or x86-64 little-endian ELF input is supported. Each invocation
-starts a fresh session. Gradio UI and interactive human feedback are not exposed.
+starts a fresh conversation thread; the native binary-hash workspace may be
+reused within the same per-Case container. Gradio UI and interactive human feedback are not exposed.
 The shell can inspect the disposable Agent container, not the host. r2dec and
 r2ghidra plugins and the rest of Kali are not provisioned; failures remain visible.
 GDB ptrace/native execution may be limited by container/emulation support.

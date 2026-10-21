@@ -1,23 +1,48 @@
-Here's what the tool actually returned for `classify` (at `0x401126`):
+Here's what `disassemble_function` on `classify` actually returned (verbatim assembly shown above). Analysis of that listing:
 
-```asm
-push   %rbp
-mov    %rsp,%rbp
-mov    %edi,-0x4(%rbp)      ; store int arg (edi) as local "value"
-cmpl   $0x7,-0x4(%rbp)      ; compare value with 7
-jle    40113a               ; if value <= 7, take second branch
-mov    $0x2a,%eax           ; branch 1: return 0x2a = 42
-jmp    40113f
-mov    $0xfffffffd,%eax     ; branch 2: return 0xfffffffd = -3 (sign-extended)
-pop    %rbp
-ret
+## Structure
+
+```
+401126: push %rbp
+401127: mov  %rsp,%rbp
+40112a: mov  %edi,-0x4(%rbp)        ; store 1st arg (32-bit int) on stack
+40112d: cmpl $0x7,-0x4(%rbp)        ; compare arg with 7
+401131: jle  40113a                 ; if arg <= 7 → second branch
+401133: mov  $0x2a,%eax             ; else → return 0x2a
+401138: jmp  40113f                 ; jump to epilogue
+40113a: mov  $0xfffffffd,%eax       ; return 0xfffffffd
+40113f: pop  %rbp
+401140: ret
 ```
 
-**The two branches:**
+## Branch 1 — `arg > 7` (fall-through path)
 
-1. **`value > 7`** (fall-through of `jle`): loads `0x2a` into `eax` — returns **42**.
-2. **`value <= 7`** (taken `jle`): loads `0xfffffffd` into `eax` — as a 32-bit two's-complement int, this is **-3**.
+- `cmpl $0x7` followed by **not** taking `jle` means the argument is **strictly greater than 7** (signed comparison — `jle` is the signed ≤ condition).
+- It loads `0x2a` (decimal **42**) into `%eax`, the ABA register used for the C return value, then `jmp 40113f` skips over the other branch to the epilogue.
 
-So the function is equivalent to `int classify(int value) { return value > 7 ? 42 : -3; }`.
+## Branch 2 — `arg <= 7` (taken `jle`)
 
-**Context from main (also in the returned disassembly):** `main` calls `puts("DecompAI ABBB fixture")` (string at `0x402004`), then calls `classify(8)` and checks `cmp $0x2a,%eax; setne %al` — returning 0 if the result was 42, 1 otherwise. Since 8 > 7, `classify` returns 42 and `main` returns 0. Note this is a single-return-value function (via `eax`), with the "two return values" being the two possible constants depending on the branch taken.
+- `jle 40113a` jumps to a second `mov` that loads `0xfffffffd` into `%eax` — i.e. **-3** in two's complement (a 32-bit signed value; `int32_t` return of -3).
+- No jump needed afterward; it naturally falls into the epilogue at `40113f`.
+
+## Return values and signature
+
+Since the argument is passed in `%edi` (32-bit), `classify` takes a single `int` and returns an `int` in `%eax`:
+
+| Input | Return (`%eax`) | Interpreted as signed int |
+|---|---|---|
+| `x > 7` | `0x0000002a` | `42` |
+| `x <= 7` | `0xfffffffd` | `-3` |
+
+So in C terms the function is effectively:
+
+```c
+int classify(int x) {
+    if (x > 7)
+        return 42;
+    else
+        return -3;
+}
+```
+
+Notes on fidelity: everything above comes directly from the `disassemble_function` tool output — I did not run a decompiler (Ghidra/r2dec) or execute/test the binary in this session; the C equivalent is my reading of the assembly, not tool-generated source. The comparisons are signed (`jle`), so negative inputs also fall into the `<= 7` branch and return `-3`.
