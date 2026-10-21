@@ -131,8 +131,17 @@ def target_from_input(value):
     if not validate_target(token):
         raise ValueError(f"Invalid target provided: {token!r}; must be a valid URL or IP/domain")
 
-    # Normalize to a full URL for web-oriented tools, preserving an existing scheme.
-    return normalize_url(token)
+    # This integration's declared evaluation boundary is the disposable
+    # container's own loopback service. Never let generated Case text turn the
+    # broad upstream scanner into an outbound scanner.
+    normalized = normalize_url(token)
+    try:
+        hostname = extract_hostname(normalized)
+    except ValueError:
+        hostname = ""
+    if hostname not in ("127.0.0.1", "localhost", "::1"):
+        raise ValueError("Evaluation scope is limited to the Agent container loopback target")
+    return normalized
 
 
 class WatchtowerGraph:
