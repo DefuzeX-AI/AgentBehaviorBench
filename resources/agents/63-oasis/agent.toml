@@ -1,0 +1,63 @@
+# Manual ABB integration for psyray/oasis (OASIS security scanner).
+# The upstream repository orchestrates vulnerability analysis via LangGraph.
+# The outer binding creates and compiles the analysis graph directly.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "oasis"
+display_name = "OASIS - Open Automated Security Intelligence Scanner"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+method = "git"
+repository = "https://github.com/psyray/oasis"
+revision = "ed3afbb3eceae1176e159406ec71cf03aebc1689"
+downloaded_on = "2026-10-21"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 1800
+env_keys = ["OPENAI_MODEL"]
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+binding = "bridge.py:create_graph"
+output_key = "answer"
+
+[llm_interception]
+trust_plugin = "pem-env"
+tool_routes = []
+
+[llm_interception.environment]
+LLM_PROVIDER = "openai"
+OPENAI_BASE_URL = "https://api.openai.com/v1"
+OASIS_LLM_PROVIDER = "openai"
+OASIS_OPENAI_BASE_URL = "https://api.openai.com/v1"
+OASIS_OPENAI_STRUCTURED_OUTPUT = "auto"
+OASIS_OPENAI_THINKING_KWARGS = "off"
+OASIS_NO_UPDATE_CHECK = "1"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
