@@ -120,7 +120,7 @@ def test_native_output_and_sticky_budget(monkeypatch,tmp_path,mode):
  recorded={}
  class Graph:
   async def ainvoke(self,state,config,**kw):
-   recorded['state']=state;recorded['config']=config;budget=config['callbacks'][-1]
+   recorded['state']=state;recorded['config']=config;budget=next(callback for callback in config['callbacks'] if hasattr(callback,'exceeded'))
    count=3 if mode=='over_budget' else 1
    for _ in range(count):
     try:budget.on_chat_model_start(None,None)
@@ -160,3 +160,14 @@ def test_native_import_bounds_existing_sdk_clients(monkeypatch,tmp_path):
  assert bridge._native() is native
  assert model.max_retries==client.max_retries==async_client.max_retries==0
  assert model.max_tokens==3072
+
+
+def test_generation_rejects_cached_or_changed_profile(tmp_path):
+ spec=importlib.util.spec_from_file_location('issue375_generate',UNIT/'validation/generate_official.py')
+ generator=importlib.util.module_from_spec(spec);spec.loader.exec_module(generator)
+ profile=tmp_path/'requirement.md';profile.write_text('current committed profile\n')
+ expected=hashlib.sha256(profile.read_bytes()).hexdigest()
+ assert generator.checked_profile(profile,expected)==profile
+ profile.write_text('stale cached image profile\n')
+ with pytest.raises(ValueError,match='SHA256'):
+  generator.checked_profile(profile,expected)

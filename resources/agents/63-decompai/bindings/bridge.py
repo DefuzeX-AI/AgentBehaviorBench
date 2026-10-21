@@ -104,6 +104,9 @@ class Workflow:
 
         class Budget(BaseCallbackHandler):
             raise_error = True
+            # Reject before observers start a model span. Async LangChain runs
+            # inline callbacks first; order alone is insufficient without this.
+            run_inline = True
             def __init__(self):
                 self.calls = 0
                 self.exceeded = False
@@ -125,7 +128,7 @@ class Workflow:
         cfg = dict(config or {})
         cfg["configurable"] = {**cfg.get("configurable", {}), "thread_id": uuid.uuid4().hex}
         cfg["recursion_limit"] = min(int(cfg.get("recursion_limit", 24)), 24)
-        cfg["callbacks"] = [*(cfg.get("callbacks") or []), budget]
+        cfg["callbacks"] = [budget, *(cfg.get("callbacks") or [])]
         session = native.utils.create_session_for_binary(str(binary))
         state = {"messages": [SystemMessage(content=upstream_system_prompt()), HumanMessage(content=request)],
                  "binary_path": str(Path(session) / binary.name), "session_path": session,

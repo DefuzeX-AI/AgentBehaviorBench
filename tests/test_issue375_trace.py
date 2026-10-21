@@ -42,3 +42,44 @@ def test_unsupported_tool_value_is_still_omitted():
  exporter=Exporter();span=SimpleNamespace(set_attribute=lambda *args:pytest.fail('Opaque input must remain omitted'))
  OtelSession._tool_content(SimpleNamespace(exporter=exporter),span,'arguments',{'opaque':object()})
  assert exporter.omissions==[{'abb.tool_arguments_omission':'not_json_serializable'}]
+
+
+@pytest.mark.parametrize('synchronous', [False, True])
+def test_real_callback_budget_rejection_leaves_no_unfinished_span(monkeypatch, tmp_path, synchronous):
+ """Real LangChain dispatch and real OTel; deterministic model, no HTTP calls."""
+ import json
+ from langchain_core.language_models.fake_chat_models import FakeListChatModel
+ from tests.test_issue375_decompai import bridge, UNIT
+ from tests.sdk_fixtures.issue_run import sdk_run
+ from agentbench.observe.invocation import InvocationObservation
+ monkeypatch.syspath_prepend(str(UNIT/'bindings'))
+ monkeypatch.setattr(bridge, 'parse_input', lambda value: ('inspect', tmp_path/'binary'))
+ monkeypatch.setattr(bridge, 'upstream_system_prompt', lambda: 'Native prompt fixture')
+ monkeypatch.setenv('DECOMPAI_MAX_CALLS', '2')
+ model = FakeListChatModel(responses=['Observed offline response'])
+ class Graph:
+  async def ainvoke(self, state, config, **kwargs):
+   for _ in range(3):
+    if synchronous:
+     model.invoke(state['messages'], config=config)
+    else:
+     await model.ainvoke(state['messages'], config=config)
+   pytest.fail('Third model dispatch must be rejected')
+ native = SimpleNamespace(utils=SimpleNamespace(create_session_for_binary=lambda path: str(tmp_path)),
+                          graph=Graph(), model_context_length=128000)
+ monkeypatch.setattr(bridge, '_native', lambda: native)
+ with sdk_run(tmp_path/'repo', ['inspect']) as (run, provider):
+  run.get_input(full=True)
+  observed = InvocationObservation(tmp_path/'observe', 'invoke', run.run_id, 'langgraph', provider=provider)
+  observed.store.record('execution_start', input='inspect')
+  try:
+   with pytest.raises(RuntimeError, match='Deployment model-call budget exhausted'):
+    bridge.create_graph().invoke('inspect', config=observed.config())
+  finally:
+   observed.store.record('execution_error', error='Deployment model-call budget exhausted')
+   observed.close()
+  status = json.loads((tmp_path/'observe/otel-status.json').read_text())
+  assert status == {'status': 'complete', 'unfinished_spans': 0, 'error': None}
+  events = [json.loads(line) for line in (tmp_path/'observe/framework.jsonl').read_text().splitlines()]
+  starts = [event for event in events if event.get('event') == 'span_start' and event.get('data', {}).get('kind') == 'llm']
+  assert len(starts) == 2, 'Rejected third attempt must not open a phantom model span'
