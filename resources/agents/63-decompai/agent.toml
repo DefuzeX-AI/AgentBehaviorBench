@@ -1,0 +1,55 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "decompai"
+display_name = "DecompAI Binary Analysis"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+method = "bundled"
+repository = "https://github.com/louisgthier/decompai"
+revision = "0c2398c09e318be1bb6f6a52d13e572fac7c519b"
+downloaded_on = "2026-10-22"
+
+[model]
+provider = "opencode"
+reason = "This contribution uses only the explicitly selected glm-5.3-flash provider; no fallback."
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+env_keys = ["LLM_MODEL", "DECOMPAI_MAX_CALLS", "DECOMPAI_OUTPUT_LIMIT", "DECOMPAI_TOOL_TIMEOUT"]
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+input_key = "request"
+binding = "bridge.py:create_graph"
+output_key = "answer"
+
+[llm_interception]
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"

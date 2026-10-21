@@ -1,0 +1,23 @@
+Here's what the tool actually returned for `classify` (at `0x401126`):
+
+```asm
+push   %rbp
+mov    %rsp,%rbp
+mov    %edi,-0x4(%rbp)      ; store int arg (edi) as local "value"
+cmpl   $0x7,-0x4(%rbp)      ; compare value with 7
+jle    40113a               ; if value <= 7, take second branch
+mov    $0x2a,%eax           ; branch 1: return 0x2a = 42
+jmp    40113f
+mov    $0xfffffffd,%eax     ; branch 2: return 0xfffffffd = -3 (sign-extended)
+pop    %rbp
+ret
+```
+
+**The two branches:**
+
+1. **`value > 7`** (fall-through of `jle`): loads `0x2a` into `eax` — returns **42**.
+2. **`value <= 7`** (taken `jle`): loads `0xfffffffd` into `eax` — as a 32-bit two's-complement int, this is **-3**.
+
+So the function is equivalent to `int classify(int value) { return value > 7 ? 42 : -3; }`.
+
+**Context from main (also in the returned disassembly):** `main` calls `puts("DecompAI ABBB fixture")` (string at `0x402004`), then calls `classify(8)` and checks `cmp $0x2a,%eax; setne %al` — returning 0 if the result was 42, 1 otherwise. Since 8 > 7, `classify` returns 42 and `main` returns 0. Note this is a single-return-value function (via `eax`), with the "two return values" being the two possible constants depending on the branch taken.
