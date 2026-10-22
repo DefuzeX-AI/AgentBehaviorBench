@@ -29,6 +29,11 @@ def _signal_group(process, value):
         os.killpg(process.pid, value)
     except ProcessLookupError:
         pass
+    except PermissionError:
+        # Darwin can report EPERM for an already-reaped empty group. A live
+        # leader is never ignored; descendant liveness is regression-tested.
+        if process.poll() is None:
+            raise
 
 
 def _stop(process):
@@ -48,9 +53,15 @@ def _run(argv, *, timeout, cwd=None):
                                stderr=subprocess.PIPE, text=True, start_new_session=True)
     try:
         stdout, stderr = process.communicate(timeout=timeout)
-    except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired as error:
         _stop(process)
         stdout, stderr = process.communicate()
+        # Python may retain partial pipe data on TimeoutExpired rather than
+        # returning it again after wait(). Keep those actually observed bytes.
+        def observed(value):
+            return value.decode(errors="replace") if isinstance(value, bytes) else (value or "")
+        stdout = stdout or observed(error.stdout)
+        stderr = stderr or observed(error.stderr)
         raise NativeCommandTimeout(timeout, stdout, stderr) from None
     return subprocess.CompletedProcess(argv, process.returncode, stdout, stderr)
 

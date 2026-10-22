@@ -57,3 +57,7 @@ No external accounts or service keys are supplied to the tools. The original
 runtime alias symlink is normalized to an empty directory in a documented bundled
 copy; all31 regular upstream files are byte-identical. Source preparation and
 actual container/model evaluation remain separate acceptance checks.
+
+The image pre-indexes Ghidra/Jython framework caches on an unrelated throwaway
+return-zero program at build time. The warm-up binary, source, analysis project
+and output log are removed; no evaluation-binary analysis or answer is cached.

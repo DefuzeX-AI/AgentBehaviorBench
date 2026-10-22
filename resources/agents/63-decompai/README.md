@@ -98,3 +98,7 @@ The disabled registry entry reserves two official Case slots for a bounded batch
 The explicit generation helper accepts only count=1 or count=2, with one
 generation attempt per slot. Both passes and failures are retained; no candidate
 filtering or automatic paid retries are used.
+
+The image pre-indexes Ghidra/Jython framework caches on an unrelated throwaway
+return-zero program at build time. The warm-up binary, source, analysis project
+and output log are removed; no evaluation-binary analysis or answer is cached.

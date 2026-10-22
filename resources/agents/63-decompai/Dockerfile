@@ -40,3 +40,15 @@ ENV TIKTOKEN_CACHE_DIR=/opt/tiktoken-cache
 RUN python -c "import tiktoken; tiktoken.get_encoding('o200k_base'); tiktoken.get_encoding('cl100k_base')" \
     && chmod -R a+rX /opt/tiktoken-cache
 USER agent
+# Pre-index the tool framework/Jython cache on an unrelated throwaway program.
+# No evaluation binary/project, generated answer, or warm-up log is retained.
+RUN mkdir -p /tmp/abb-ghidra-warm \
+    && printf 'int main(void) { return 0; }\n' > /tmp/abb-ghidra-warm/probe.c \
+    && gcc -g -O0 /tmp/abb-ghidra-warm/probe.c -o /tmp/abb-ghidra-warm/probe \
+    && JAVA_TOOL_OPTIONS="-XX:ActiveProcessorCount=4" analyzeHeadless /tmp/abb-ghidra-warm project \
+       -import /tmp/abb-ghidra-warm/probe \
+       -scriptPath /opt/agent/agent/src/utils/ghidra_scripts \
+       -postScript decompile_function.py main -deleteProject > /tmp/abb-ghidra-warm/warm.log 2>&1 \
+    && grep -q "Decompiled 'main'" /tmp/abb-ghidra-warm/warm.log \
+    && rm -rf /tmp/abb-ghidra-warm \
+    && find /home/agent/.ghidra -name '*.log*' -type f -delete
