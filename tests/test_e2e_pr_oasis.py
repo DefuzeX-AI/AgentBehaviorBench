@@ -15,7 +15,7 @@ import json
 import os
 from pathlib import Path
 from typing import Any, Mapping
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -127,20 +127,39 @@ class TestTier2BoundaryValueAnalysis:
         r4 = graph.invoke({"input": "What can you do?"})
         assert isinstance(r4, dict) and "answer" in r4
 
-    def test_embedding_vector_dimensions_and_normalization(self):
+    def test_scanner_nonzero_exit_and_missing_report_raise_failure(self):
         bridge = _load_bridge_module()
-        import numpy as np
+        graph = bridge.create_graph()
 
-        # Empty string
-        v_empty = bridge._compute_deterministic_embedding("")
-        assert len(v_empty) == 256
-        assert all(x == 0.0 for x in v_empty)
+        # Non-zero exit code must raise RuntimeError, preserving native scanner failure
+        mock_scanner = MagicMock()
+        mock_scanner.setup_argument_parser.return_value.parse_args.return_value = MagicMock()
+        mock_scanner.run.return_value = 1
+        mock_scanner.report = None
 
-        # Non-empty strings
-        v_code = bridge._compute_deterministic_embedding("function checkPassword(pass) { return pass == 'admin'; }")
-        assert len(v_code) == 256
-        norm = np.linalg.norm(v_code)
-        assert abs(norm - 1.0) < 1e-5
+        with pytest.raises(RuntimeError, match="OASIS scanner execution failed with exit code 1"):
+            with patch("oasis.oasis.OasisScanner", return_value=mock_scanner):
+                graph._run_scan(Path("/unused"), None)
+
+        # Exit code 0 but no report or findings must raise RuntimeError (not fabricate success)
+        mock_scanner.run.return_value = 0
+        with pytest.raises(RuntimeError, match="OASIS scan completed without producing report or findings"):
+            with patch("oasis.oasis.OasisScanner", return_value=mock_scanner):
+                graph._run_scan(Path("/unused"), None)
+
+    def test_native_client_embedding_method_preserved(self):
+        # Native OpenAICompatClient must retain its original embedding method without monkey patching
+        bridge = _load_bridge_module()
+        assert not hasattr(bridge, "_compute_deterministic_embedding")
+        assert not hasattr(bridge, "_install_runtime_patches")
+
+        # Directly verify upstream class methods are not monkey-patched
+        try:
+            from oasis.backends.openai_compat import OpenAICompatClient, OpenAICompatManager
+            assert OpenAICompatClient.embeddings.__qualname__ == "OpenAICompatClient.embeddings"
+            assert OpenAICompatManager.ensure_model_available.__qualname__ == "OpenAICompatManager.ensure_model_available"
+        except ImportError:
+            pass
 
     def test_long_input_and_safe_candidate_handling(self):
         bridge = _load_bridge_module()
@@ -194,6 +213,8 @@ class TestTier3CombinatorialInteractions:
         env = manifest["llm_interception"]["environment"]
         assert env["LLM_PROVIDER"] == "openai"
         assert env["OASIS_LLM_PROVIDER"] == "openai"
+        assert env["OASIS_EMBED_PROVIDER"] == "openai"
+        assert env["OASIS_EMBED_OPENAI_BASE_URL"] == "https://api.openai.com/v1"
         assert env["OASIS_OPENAI_STRUCTURED_OUTPUT"] == "auto"
         assert env["OASIS_OPENAI_THINKING_KWARGS"] == "off"
         assert env["OASIS_NO_UPDATE_CHECK"] == "1"

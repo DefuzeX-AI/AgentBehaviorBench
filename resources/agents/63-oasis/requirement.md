@@ -27,7 +27,7 @@ The response summarizes identified vulnerabilities, severity levels, affected fi
 reasoning details, and remediation guidance.
 
 The model requests are strictly routed to the benchmark's configured LLM provider via OpenAI-compatible
-chat completions endpoint (`/v1/chat/completions`).
+chat completions (`/v1/chat/completions`) and embeddings (`/v1/embeddings`) endpoints.
 
 ## Behaviors to Test
 

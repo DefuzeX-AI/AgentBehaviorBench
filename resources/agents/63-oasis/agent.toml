@@ -19,7 +19,7 @@ downloaded_on = "2026-10-21"
 type = "docker"
 execution = "oneshot"
 timeout_sec = 1800
-env_keys = ["OPENAI_MODEL"]
+env_keys = ["OPENAI_MODEL", "OPENAI_EMBEDDING_MODEL", "EMBED_MODEL"]
 
 [build]
 context = "."
@@ -44,6 +44,8 @@ LLM_PROVIDER = "openai"
 OPENAI_BASE_URL = "https://api.openai.com/v1"
 OASIS_LLM_PROVIDER = "openai"
 OASIS_OPENAI_BASE_URL = "https://api.openai.com/v1"
+OASIS_EMBED_PROVIDER = "openai"
+OASIS_EMBED_OPENAI_BASE_URL = "https://api.openai.com/v1"
 OASIS_OPENAI_STRUCTURED_OUTPUT = "auto"
 OASIS_OPENAI_THINKING_KWARGS = "off"
 OASIS_NO_UPDATE_CHECK = "1"
@@ -60,4 +62,13 @@ ports = [443]
 methods = ["POST"]
 path_patterns = ["/v1/chat/completions"]
 protocol_plugin = "openai-chat"
+credential = "openai"
+
+[[llm_interception.routes]]
+id = "openai-embeddings"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/embeddings"]
+protocol_plugin = "openai-embeddings"
 credential = "openai"

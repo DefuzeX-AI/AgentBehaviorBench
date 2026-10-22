@@ -10,8 +10,8 @@ The binding:
 - Materializes code submissions into isolated temporary workspaces.
 - Connects OASIS to ABB's OpenAI-compatible model interceptor (`/v1/chat/completions`)
   using DeepSeek (`deepseek-flash`).
-- Employs deterministic local feature-hash embeddings to eliminate external
-  embedding service dependencies and prevent egress violations.
+- Routes embedding requests natively through ABB's OpenAI-compatible
+  embedding interceptor (`/v1/embeddings`) with legitimate route declaration.
 - Forwards LangGraph execution configuration (`config=config`) and applies
   `set_config_context` so OpenTelemetry callbacks and framework node spans
   are captured accurately.
@@ -21,7 +21,6 @@ The binding:
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import json
 import logging
 import os
@@ -47,48 +46,6 @@ def _ensure_import_path() -> None:
 
 
 _ensure_import_path()
-
-
-def _compute_deterministic_embedding(text: str, dim: int = 256) -> list[float]:
-    """Compute normalized deterministic n-gram / token feature hash vector.
-
-    Requires only Python stdlib and numpy (bundled with OASIS).
-    Runs offline in container with 0 network calls and reproducible cosine similarities.
-    """
-    import numpy as np
-
-    vec = np.zeros(dim, dtype=np.float32)
-    tokens = re.findall(r"[a-zA-Z_0-9]{2,}", text.lower())
-    if not tokens:
-        return [0.0] * dim
-    for token in tokens:
-        h = int(hashlib.md5(token.encode("utf-8")).hexdigest(), 16)
-        idx = h % dim
-        vec[idx] += 1.0
-    norm = float(np.linalg.norm(vec))
-    if norm > 0.0:
-        vec = vec / norm
-    return vec.tolist()
-
-
-def _install_runtime_patches() -> None:
-    """Patch OpenAICompatManager and OpenAICompatClient for container runtime."""
-    try:
-        from oasis.backends.openai_compat import OpenAICompatClient, OpenAICompatManager
-
-        # Patch embeddings method to return deterministic offline vector
-        OpenAICompatClient.embeddings = lambda self, model, prompt: {  # type: ignore[assignment]
-            "embedding": _compute_deterministic_embedding(prompt)
-        }
-
-        # Model availability is owned by the ABB interceptor
-        OpenAICompatManager.ensure_model_available = lambda self, model: True  # type: ignore[assignment]
-        OpenAICompatManager.check_connection = lambda self: True  # type: ignore[assignment]
-    except Exception as exc:
-        logging.getLogger("oasis.bridge").warning("Failed to install runtime patches: %s", exc)
-
-
-_install_runtime_patches()
 
 
 def _is_safe_file_candidate(text: str) -> bool:
@@ -163,7 +120,6 @@ class OasisAgentGraph:
 
     def __init__(self) -> None:
         _ensure_import_path()
-        _install_runtime_patches()
 
     def invoke(self, input_data: Any, config: Mapping[str, Any] | None = None, **kwargs: Any) -> dict[str, str]:
         """Synchronously execute OASIS security analysis."""
@@ -174,7 +130,6 @@ class OasisAgentGraph:
     ) -> dict[str, str]:
         """Asynchronously execute OASIS security analysis."""
         _ensure_import_path()
-        _install_runtime_patches()
 
         # Extract text from input envelope
         text_input = ""
@@ -254,6 +209,7 @@ class OasisAgentGraph:
         model_name = os.environ.get("OPENAI_MODEL") or os.environ.get("DEEPSEEK_MODEL") or "deepseek-flash"
         api_base = os.environ.get("OPENAI_BASE_URL") or os.environ.get("DEEPSEEK_BASE_URL") or "https://api.openai.com/v1"
         api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("DEEPSEEK_API_KEY") or "local"
+        embed_model = os.environ.get("OPENAI_EMBEDDING_MODEL") or os.environ.get("EMBED_MODEL") or "text-embedding-3-small"
 
         scanner = OasisScanner()
         parser = scanner.setup_argument_parser()
@@ -261,6 +217,7 @@ class OasisAgentGraph:
             "-i", str(target_path),
             "-m", model_name,
             "-sm", model_name,
+            "-em", embed_model,
             "--provider", "openai",
             "--api-base", api_base,
             "--api-key", api_key,
@@ -304,12 +261,19 @@ class OasisAgentGraph:
         finally:
             invoke_mod.invoke_oasis_langgraph = original_invoke_langgraph
 
+        # Preserve native failure: OasisScanner.run returns non-zero on initialization, verification, or scan failure
+        if exit_code != 0:
+            raise RuntimeError(f"OASIS scanner execution failed with exit code {exit_code}")
+
         # Extract markdown report
         report_text = self._collect_report_text(scanner)
         if not report_text.strip() and captured_results:
             report_text = self._format_results_fallback(captured_results)
+
+        # Do not claim successful scan if no report or evidence was produced
         if not report_text.strip():
-            report_text = "# Security Analysis Complete\n\nNo critical vulnerabilities detected."
+            raise RuntimeError("OASIS scan completed without producing report or findings")
+
         return {"answer": report_text}
 
     def _collect_report_text(self, scanner: Any) -> str:

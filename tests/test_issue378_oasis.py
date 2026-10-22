@@ -3,8 +3,8 @@
 Verifies:
 1. Unit directory layout and numbered registry ordering (contiguous layout as Agent #63).
 2. Manifest configuration (agent.toml, source-manifest.json, requirement.md, Dockerfile).
-3. Interception declaration (OpenAI-compatible chat completion routing without tool egress).
-4. Bridge binding contract (create_graph, conversational routing, deterministic local embeddings).
+3. Interception declaration (OpenAI-compatible chat and embedding routing without tool egress).
+4. Bridge binding contract (create_graph, conversational routing, native embeddings and failure propagation).
 """
 
 from __future__ import annotations
@@ -44,7 +44,10 @@ def test_unit_source_and_registry_pinned_to_issue378_revision():
     assert registration.framework == "langgraph"
 
 
-def test_interception_routes_to_openai_chat_with_no_external_egress():
+from unittest.mock import MagicMock, patch
+
+
+def test_interception_routes_to_openai_chat_and_embeddings():
     manifest = _read_manifest()
     interception = manifest["llm_interception"]
 
@@ -57,12 +60,18 @@ def test_interception_routes_to_openai_chat_with_no_external_egress():
     assert credentials[0]["agent_env"] == "OPENAI_API_KEY"
 
     routes = interception["routes"]
-    assert len(routes) == 1
-    route = routes[0]
-    assert route["id"] == "openai-chat"
-    assert route["protocol_plugin"] == "openai-chat"
-    assert route["host_patterns"] == ["api.openai.com"]
-    assert route["path_patterns"] == ["/v1/chat/completions"]
+    assert len(routes) == 2
+    route_map = {r["id"]: r for r in routes}
+
+    chat_route = route_map["openai-chat"]
+    assert chat_route["protocol_plugin"] == "openai-chat"
+    assert chat_route["host_patterns"] == ["api.openai.com"]
+    assert chat_route["path_patterns"] == ["/v1/chat/completions"]
+
+    embed_route = route_map["openai-embeddings"]
+    assert embed_route["protocol_plugin"] == "openai-embeddings"
+    assert embed_route["host_patterns"] == ["api.openai.com"]
+    assert embed_route["path_patterns"] == ["/v1/embeddings"]
 
 
 def test_unit_ships_all_required_integration_files():
@@ -116,22 +125,22 @@ def test_bridge_creates_graph_and_routes_conversational_queries():
     assert "SQL Injection" in res2["answer"]
 
 
-def test_bridge_deterministic_embeddings_are_normalized_and_semantic():
+def test_bridge_preserves_native_embeddings_and_propagates_scanner_failure():
     import sys
     sys.path.insert(0, str(UNIT / "bindings"))
     import bridge
-    import numpy as np
 
-    v1 = bridge._compute_deterministic_embedding("SELECT * FROM users WHERE id = ' + x")
-    v2 = bridge._compute_deterministic_embedding("database sql query select users injection")
-    v3 = bridge._compute_deterministic_embedding("css styling background image color")
+    # Verify no artificial monkey-patching functions exist in bridge
+    assert not hasattr(bridge, "_compute_deterministic_embedding")
+    assert not hasattr(bridge, "_install_runtime_patches")
 
-    assert len(v1) == 256
-    assert abs(np.linalg.norm(v1) - 1.0) < 1e-5
-    assert abs(np.linalg.norm(v2) - 1.0) < 1e-5
+    # Verify _run_scan raises RuntimeError on non-zero scanner exit code
+    graph = bridge.create_graph()
+    mock_scanner = MagicMock()
+    mock_scanner.setup_argument_parser.return_value.parse_args.return_value = MagicMock()
+    mock_scanner.run.return_value = 1
+    mock_scanner.report = None
 
-    sim_sql = float(np.dot(v1, v2))
-    sim_css = float(np.dot(v1, v3))
-
-    assert sim_sql > sim_css
-    assert sim_sql > 0.0
+    with pytest.raises(RuntimeError, match="OASIS scanner execution failed with exit code 1"):
+        with patch("oasis.oasis.OasisScanner", return_value=mock_scanner):
+            graph._run_scan(Path("/unused"), None)
