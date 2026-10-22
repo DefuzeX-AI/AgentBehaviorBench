@@ -102,16 +102,44 @@ class TraceBoundaryTests(unittest.TestCase):
         self.assertIn("actual question", json.dumps(model["model_content"]["input"]))
         self.assertIn("actual answer", json.dumps(model["model_content"]["output"]))
 
-    def test_unfinished_span_remains_incomplete_not_relabelled(self):
+    def test_unfinished_span_is_outcome_not_observed_not_lost_evidence(self):
         self.observation.store.record("execution_start", input="input")
         self.observation.store.record("span_start", span_id="unfinished", name="pending")
         self.observation.close()
         status = json.loads((self.folder / "otel-status.json").read_text())
-        self.assertEqual(status["status"], "incomplete")
+        self.assertEqual(status["status"], "complete")
         self.assertEqual(status["unfinished_spans"], 1)
+        self.assertTrue(status["outcome_not_observed"])
         unfinished = next(s for s in self.local_spans() if s["name"] == "pending")
         self.assertTrue(unfinished["attributes"]["abb.incomplete"])
+        self.assertEqual(unfinished["attributes"]["abb.control_flow"], "outcome_not_observed")
         self.assertEqual(unfinished["status"]["status_code"], "ERROR")
+        self.assertIn("Outcome not observed", unfinished["status"]["description"])
+
+    def test_cancelled_langchain_model_call_keeps_case_judgeable(self):
+        from langchain_core.messages import HumanMessage
+        store = self.observation.store
+        store.record("execution_start", input="input")
+        callback = self.observation.callbacks[0]
+        # asyncio.timeout cancels llm.ainvoke: LangChain sends neither
+        # on_llm_end nor on_llm_error, then the Agent finishes normally.
+        callback.on_chat_model_start({}, [[HumanMessage(content="slow question")]],
+                                     run_id="cancelled", name="ChatOpenAI")
+        store.record("execution_end", output="fallback report")
+        evidence = self.evidence()
+        status = json.loads((self.folder / "otel-status.json").read_text())
+        self.assertEqual(status["status"], "complete")
+        self.assertEqual(status["unfinished_spans"], 1)
+        model = next(s for s in evidence.evidence["spans"] if s["name"] == "ChatOpenAI")
+        self.assertEqual(model["status"], "error")
+
+    def test_missing_parent_still_marks_trace_incomplete(self):
+        self.observation.store.record("execution_start", input="input")
+        self.observation.store.record("span_start", span_id="child", name="child", parent_span_id="absent")
+        self.observation.store.record("span_end", span_id="child")
+        self.observation.close()
+        status = json.loads((self.folder / "otel-status.json").read_text())
+        self.assertEqual(status["status"], "incomplete")
 
     def test_binding_propagates_real_nested_graph_callbacks_and_keeps_native_config(self):
         module = binding()
