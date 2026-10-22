@@ -91,9 +91,9 @@ def test_transport_timeout_is_explicit(monkeypatch,tmp_path):
  assert p.process is None;transport.close_all()
 
 def test_transport_does_not_spawn_docker(tmp_path,monkeypatch):
- original=transport.subprocess.run;args=[]
+ original=transport.subprocess.Popen;args=[]
  def run(argv,**kw):args.append(argv);return original(argv,**kw)
- monkeypatch.setattr(transport.subprocess,'run',run)
+ monkeypatch.setattr(transport.subprocess,'Popen',run)
  p=transport.ContainerBashProcess(workdir=str(tmp_path));assert 'actual' in p.run('printf actual')
  assert args==[['/bin/bash','-c','printf actual']];transport.close_all()
 

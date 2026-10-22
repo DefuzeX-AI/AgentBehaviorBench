@@ -86,6 +86,8 @@ def _native():
     # Pydantic field does not change those already-created transport clients.
     for client in (model.root_client, model.root_async_client):
         client.max_retries = 0
+        client.timeout = 120
+    model.request_timeout = 120
     model.max_tokens = int(os.environ.get("DECOMPAI_OUTPUT_LIMIT", "3072"))
     if "reasoning_effort" in type(model).model_fields:
         model.reasoning_effort = "low"
@@ -98,6 +100,9 @@ def _native():
 class Workflow:
     async def ainvoke(self, value, config=None, **kwargs):
         request, binary = parse_input(value)
+        max_calls = int(os.environ.get("DECOMPAI_MAX_CALLS", "16"))
+        if not 1 <= max_calls <= 16:
+            raise ValueError("Deployment model-call cap must be between 1 and 16")
         native = _native()
         from langchain_core.messages import HumanMessage, SystemMessage
         from langchain_core.callbacks import BaseCallbackHandler
@@ -112,10 +117,10 @@ class Workflow:
                 self.exceeded = False
                 self.truncated = False
             def on_chat_model_start(self, *args, **kwargs):
-                self.calls += 1
-                if self.calls > int(os.environ.get("DECOMPAI_MAX_CALLS", "8")):
+                if self.calls >= max_calls:
                     self.exceeded = True
                     raise RuntimeError("Deployment model-call budget exhausted")
+                self.calls += 1
             def on_llm_end(self, response, **kwargs):
                 for group in response.generations:
                     for generation in group:
@@ -127,7 +132,7 @@ class Workflow:
         budget = Budget()
         cfg = dict(config or {})
         cfg["configurable"] = {**cfg.get("configurable", {}), "thread_id": uuid.uuid4().hex}
-        cfg["recursion_limit"] = min(int(cfg.get("recursion_limit", 24)), 24)
+        cfg["recursion_limit"] = min(int(cfg.get("recursion_limit", 2 * max_calls + 8)), 2 * max_calls + 8)
         cfg["callbacks"] = [budget, *(cfg.get("callbacks") or [])]
         session = native.utils.create_session_for_binary(str(binary))
         state = {"messages": [SystemMessage(content=upstream_system_prompt()), HumanMessage(content=request)],

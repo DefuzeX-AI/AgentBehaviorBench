@@ -23,7 +23,10 @@ RUN python -m pip install --no-cache-dir -r /tmp/native-requirements.txt \
     "pyelftools==0.32" "python-dotenv>=1,<2" "opentelemetry-sdk>=1.30,<2"
 RUN apt-get update && apt-get install -y --no-install-recommends openjdk-21-jdk-headless \
     && rm -rf /var/lib/apt/lists/*
-ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 JAVA_TOOL_OPTIONS="-XX:ActiveProcessorCount=1"
+# Fit the real headless JVM inside ABB's 1GiB Agent container, leaving room for Python.
+RUN sed -i 's/^MAXMEM=2G$/MAXMEM=512M/' /opt/ghidra/support/analyzeHeadless \
+    && grep -q '^MAXMEM=512M$' /opt/ghidra/support/analyzeHeadless
 COPY .abb-runtime/ /opt/abb-runtime/
 COPY agent/ ./agent/
 COPY bindings/ ./bindings/

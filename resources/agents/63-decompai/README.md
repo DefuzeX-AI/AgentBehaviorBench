@@ -52,8 +52,12 @@ upload endpoint. Native tools still inspect the disposable container; the input
 path check is not advertised as confinement of every native tool.
 
 The deployment uses opencode/glm-5.3-flash without model fallback. Defaults are
-8 model attempts, 3072 output tokens per response, 24 graph steps and 60 seconds per
-shell command. The native rate-limit loop remains inside that attempt limit;
+16 model starts, 3072 output tokens per response, 40 graph steps, 120 seconds per
+model request, 60 seconds per shell command and 180 seconds per native utility
+analysis (including Ghidra cold startup). The Agent wall-clock limit is 1800 seconds.
+The Ghidra launcher uses a 512MiB heap and one JVM active processor to fit ABB's
+1GiB/one-CPU runtime. Timeouts retain the actual partial output and terminate the
+managed process group rather than leaving shell children running. The native rate-limit loop remains inside that attempt limit;
 ChatOpenAI transport retries are set to zero. Budget/truncation failures do not
 produce a completed-answer claim. Required credentials stay in the runtime and
 are absent from committed files.
