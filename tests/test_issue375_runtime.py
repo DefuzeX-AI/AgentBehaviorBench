@@ -97,3 +97,14 @@ def test_generation_batch_size_rejected_before_profile_or_sdk(count):
         '--output','/missing-output','--count',count],capture_output=True,text=True)
     assert result.returncode==2
     assert 'invalid choice' in result.stderr
+
+
+def test_generation_prepares_existing_external_sdk_storage(tmp_path):
+    import runpy
+    helper = runpy.run_path(str(UNIT/'validation/generate_official.py'))
+    repo = tmp_path/'repo'
+    repo.mkdir()
+    storage = helper['prepared_storage'](tmp_path/'evidence')
+    assert storage.is_dir()
+    assert not storage.is_relative_to(repo)
+    assert not repo.is_relative_to(storage)

@@ -1,4 +1,4 @@
-"""Explicit one-Case generation with a read-only, hash-checked current Profile.
+"""Explicit bounded Case generation with a read-only, hash-checked current Profile.
 
 Run inside the Agent SDK image, mounting the current Profile at --profile,
 not the image's cached /opt/agent/requirement.md. No credentials go in argv.
@@ -15,6 +15,12 @@ def checked_profile(path, expected_sha256):
     if actual != expected_sha256:
         raise ValueError('Mounted Agent Profile SHA256 does not match the requested source')
     return path
+
+
+def prepared_storage(output):
+    storage = Path(output)/'sdk-storage'
+    storage.mkdir(parents=True, exist_ok=True)
+    return storage
 
 
 def main():
@@ -48,7 +54,7 @@ def main():
     with generation_profile(profile, environment, files) as effective:
         generate_collection(create_run, count=args.count, files=files, repo=Path(args.repo), max_attempts=1,
                             options=dict(repo_path=Path(args.repo), agent_profile_path=effective,
-                                         storage_path=output/'sdk-storage', allow_local=False,
+                                         storage_path=prepared_storage(output), allow_local=False,
                                          track_files=False, upload_diff=False, save_local=True,
                                          max_steps=1, timeout=180, operation_wait_timeout=600, max_retries=0))
 
