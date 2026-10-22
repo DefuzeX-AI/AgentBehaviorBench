@@ -55,8 +55,8 @@ The deployment uses opencode/glm-5.3-flash without model fallback. Defaults are
 16 model starts, 3072 output tokens per response, 40 graph steps, 120 seconds per
 model request, 60 seconds per shell command and 600 seconds per native utility
 analysis (including Ghidra cold startup). The Agent wall-clock limit is 1800 seconds.
-The Ghidra launcher uses a 512MiB heap and one JVM active processor to fit ABB's
-1GiB/one-CPU runtime. Timeouts retain the actual partial output and terminate the
+The Ghidra launcher uses a 512MiB heap and two JVM active processors to fit ABB's
+1GiB/two-CPU runtime. Timeouts retain the actual partial output and terminate the
 managed process group rather than leaving shell children running. The native rate-limit loop remains inside that attempt limit;
 ChatOpenAI transport retries are set to zero. Budget/truncation failures do not
 produce a completed-answer claim. Required credentials stay in the runtime and
@@ -102,3 +102,8 @@ filtering or automatic paid retries are used.
 The image pre-indexes Ghidra/Jython framework caches on an unrelated throwaway
 return-zero program at build time. The warm-up binary, source, analysis project
 and output log are removed; no evaluation-binary analysis or answer is cached.
+
+This deployment explicitly requests runtime.cpus=2. The optional per-unit CPU
+request changes only the Docker CPU quota; memory, process, privilege, network
+and mount policies remain unchanged. The effective quota is captured by ABB
+before Case generation.

@@ -90,3 +90,15 @@ class DockerPolicy:
             f"--tmpfs=/tmp:rw,exec,nosuid,nodev,size={self.tmpfs_size},mode=1777",
             f"--tmpfs=/run/agentbench-tools:rw,exec,nosuid,nodev,size={self.tmpfs_size},mode=1777",
         )
+
+
+def resource_arguments(arguments, *, cpus=None):
+    """Apply an explicit validated unit CPU request, preserving all other policy flags."""
+    arguments = tuple(arguments)
+    if cpus is None:
+        return arguments
+    # Config validates the range; keep the standalone helper contract explicit too.
+    import math
+    if isinstance(cpus, bool) or not isinstance(cpus, (int, float)) or not math.isfinite(cpus) or not 0 < cpus <= 4:
+        raise ValueError("CPU limit must be a finite number in (0, 4]")
+    return tuple(item for item in arguments if not item.startswith('--cpus=')) + (f'--cpus={float(cpus)}',)

@@ -36,7 +36,7 @@ session prompt are retained. An outer transport adapter executes native utility
 commands in ABB's existing non-root Linux container, rather than launching the
 upstream privileged Docker runner. The Agent has no host Docker socket/mount.
 Persistent shell calls keep their state. The image provides file/objdump/GDB,
-radare2 core and Ghidra11.3.1 (512MiB Java heap,one active JVM processor); it is Debian, not the upstream full Kali toolset.
+radare2 core and Ghidra11.3.1 (512MiB Java heap,two active JVM processors); it is Debian, not the upstream full Kali toolset.
 The binding only adds input/session handling, final-answer extraction, cleanup
 and bounded execution: at most16 model starts,3072 output tokens per response,
 40 graph steps,120seconds per model request,60seconds per shell command and
@@ -61,3 +61,8 @@ actual container/model evaluation remain separate acceptance checks.
 The image pre-indexes Ghidra/Jython framework caches on an unrelated throwaway
 return-zero program at build time. The warm-up binary, source, analysis project
 and output log are removed; no evaluation-binary analysis or answer is cached.
+
+This deployment explicitly requests runtime.cpus=2. The optional per-unit CPU
+request changes only the Docker CPU quota; memory, process, privilege, network
+and mount policies remain unchanged. The effective quota is captured by ABB
+before Case generation.

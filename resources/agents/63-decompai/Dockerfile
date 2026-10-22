@@ -23,15 +23,12 @@ RUN python -m pip install --no-cache-dir -r /tmp/native-requirements.txt \
     "pyelftools==0.32" "python-dotenv>=1,<2" "opentelemetry-sdk>=1.30,<2"
 RUN apt-get update && apt-get install -y --no-install-recommends openjdk-21-jdk-headless \
     && rm -rf /var/lib/apt/lists/*
-ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 JAVA_TOOL_OPTIONS="-XX:ActiveProcessorCount=1"
+ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 JAVA_TOOL_OPTIONS="-XX:ActiveProcessorCount=2"
 # Fit the real headless JVM inside ABB's 1GiB Agent container, leaving room for Python.
 RUN sed -i 's/^MAXMEM=2G$/MAXMEM=512M/' /opt/ghidra/support/analyzeHeadless \
     && grep -q '^MAXMEM=512M$' /opt/ghidra/support/analyzeHeadless
-COPY .abb-runtime/ /opt/abb-runtime/
 COPY agent/ ./agent/
-COPY bindings/ ./bindings/
 COPY fixtures/ ./fixtures/
-COPY agent.toml ./agent.toml
 ENV PATH=/opt/ghidra/support:/opt/ghidra:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 RUN grep -q "7019eedc0e0e87d1f53d6b8f5fc62b898567679c5efdce7fbfc557c9e7655e90" /opt/radare2.download.sha256
 RUN gcc -O0 -g -fno-pie -no-pie fixtures/branch.c -o fixtures/branch \
@@ -52,3 +49,8 @@ RUN mkdir -p /tmp/abb-ghidra-warm \
     && grep -q "Decompiled 'main'" /tmp/abb-ghidra-warm/warm.log \
     && rm -rf /tmp/abb-ghidra-warm /var/tmp/agent-ghidra/fscache* /var/tmp/agent-ghidra/packed-db-cache
 RUN find /home/agent -name '*.log*' -type f -delete
+
+# Keep executable bindings/runtime changes after expensive native tool cache preparation.
+COPY .abb-runtime/ /opt/abb-runtime/
+COPY --chown=agent:agent bindings/ ./bindings/
+COPY --chown=agent:agent agent.toml ./agent.toml
