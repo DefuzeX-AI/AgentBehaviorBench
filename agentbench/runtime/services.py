@@ -8,6 +8,7 @@ from types import MappingProxyType
 
 from .contracts.execution import DockerCleanupError, RuntimeLimits
 from .docker.build_coordinator import BuildCoordinator
+from .docker.network_pool import NetworkPool
 from .docker.resources import ResourceRegistry
 
 
@@ -23,6 +24,8 @@ class RuntimeServices:
         self.limits = limits or RuntimeLimits.from_environment(self.command_environ)
         self.build_coordinator = BuildCoordinator()
         self.resource_registry = ResourceRegistry()
+        # Case networks are reused within the Suite and removed in close().
+        self.network_pool = NetworkPool()
 
     def create_docker_runtime(self, **kwargs):
         from .docker.runtime import DockerRuntime
@@ -31,9 +34,13 @@ class RuntimeServices:
         kwargs.setdefault("limits", self.limits)
         kwargs.setdefault("build_coordinator", self.build_coordinator)
         kwargs.setdefault("resource_registry", self.resource_registry)
+        kwargs.setdefault("network_pool", self.network_pool)
         return DockerRuntime(**kwargs)
 
     def close(self) -> None:
+        errors = self.network_pool.close()
+        if errors:
+            raise DockerCleanupError("; ".join(errors))
         remaining = [item for item in self.resource_registry.snapshot() if item["status"] != "removed"]
         if remaining:
             names = ", ".join(str(item["name"]) for item in remaining)
