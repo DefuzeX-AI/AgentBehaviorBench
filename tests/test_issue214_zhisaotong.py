@@ -19,7 +19,7 @@ import sqlite3
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage
@@ -289,6 +289,8 @@ def test_knowledge_index_is_rebuilt_into_the_binding_workspace(monkeypatch):
     utils.config_handler = config_handler
 
     class VectorStoreService:
+        vector_store = SimpleNamespace(get=lambda **kwargs: {"ids": ["indexed-document"]})
+
         def load_document(self):
             calls.append(dict(config_handler.chroma_conf))
 

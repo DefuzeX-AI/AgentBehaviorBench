@@ -30,6 +30,11 @@ corpus -- six documents restored under `data/` at evaluation time: one PDF and
 five text files -- and then answer from those passages plus the user's own
 message.
 
+This deployment rebuilds the originally empty index using the packaged CPU-only
+`BAAI/bge-small-zh-v1.5` embedder, not upstream's hosted DashScope embedding model.
+Retrieval rankings may therefore differ from the upstream hosted deployment.
+Index initialization fails when no documents were successfully loaded.
+
 Two further capabilities exist but are deliberately inert in this deployment.
 `get_weather(city)` and `get_user_location()` need an Amap web-service credential
 and egress to `restapi.amap.com`; neither is provided, and the upstream

@@ -174,7 +174,12 @@ def _build_knowledge_index(workspace: Path) -> None:
 
     from rag.vector_store import VectorStoreService
 
-    VectorStoreService().load_document()
+    service = VectorStoreService()
+    service.load_document()
+    # The native loader logs per-document failures and continues. Do not report
+    # successful initialization if all files failed and RAG has no usable data.
+    if not service.vector_store.get(limit=1)["ids"]:
+        raise RuntimeError("Knowledge index is empty; inspect the upstream document-loading logs")
 
 
 def _final_answer_text(state: object) -> str:
