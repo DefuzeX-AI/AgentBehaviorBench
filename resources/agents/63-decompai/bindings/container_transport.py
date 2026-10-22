@@ -132,7 +132,7 @@ class ContainerBashProcess:
 def install(native_utils, shell_module):
     """Adapt transport only; utility analysis gets a separately declared cold-start limit."""
     def run_command(command):
-        output = _run(['/bin/sh', '-c', command], timeout=int(os.environ.get('DECOMPAI_ANALYSIS_TIMEOUT', '180')))
+        output = _run(['/bin/sh', '-c', command], timeout=int(os.environ.get('DECOMPAI_ANALYSIS_TIMEOUT', '600')))
         combined = output.stdout
         if output.stderr:
             combined += '\n=== STDERR ===\n' + output.stderr

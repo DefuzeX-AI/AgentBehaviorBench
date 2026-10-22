@@ -53,7 +53,7 @@ path check is not advertised as confinement of every native tool.
 
 The deployment uses opencode/glm-5.3-flash without model fallback. Defaults are
 16 model starts, 3072 output tokens per response, 40 graph steps, 120 seconds per
-model request, 60 seconds per shell command and 180 seconds per native utility
+model request, 60 seconds per shell command and 600 seconds per native utility
 analysis (including Ghidra cold startup). The Agent wall-clock limit is 1800 seconds.
 The Ghidra launcher uses a 512MiB heap and one JVM active processor to fit ABB's
 1GiB/one-CPU runtime. Timeouts retain the actual partial output and terminate the
@@ -93,3 +93,8 @@ before JSON encoding and credential redaction. Unsupported values remain omitted
 It does not change tool inputs/results or fabricate observations. Run the typed
 argument regression in tests/test_issue375_trace.py to verify that the real SDK
 receives both arguments and results.
+
+The disabled registry entry reserves two official Case slots for a bounded batch.
+The explicit generation helper accepts only count=1 or count=2, with one
+generation attempt per slot. Both passes and failures are retained; no candidate
+filtering or automatic paid retries are used.

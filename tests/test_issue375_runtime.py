@@ -86,3 +86,14 @@ def test_new_default_budget_allows_sixteen_native_steps(monkeypatch, tmp_path):
     assert result['model_calls']==16
     assert result['answer']=='native terminal response fixture'
     assert recorded['recursion_limit']==40
+
+
+@pytest.mark.parametrize('count', ['0', '3', '100'])
+def test_generation_batch_size_rejected_before_profile_or_sdk(count):
+    import sys
+    result=subprocess.run([sys.executable,str(UNIT/'validation/generate_official.py'),
+        '--profile','/missing-profile','--profile-sha256','0'*64,
+        '--environment','/missing-environment','--repo','/missing-repo',
+        '--output','/missing-output','--count',count],capture_output=True,text=True)
+    assert result.returncode==2
+    assert 'invalid choice' in result.stderr

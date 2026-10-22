@@ -40,7 +40,7 @@ radare2 core and Ghidra11.3.1 (512MiB Java heap,one active JVM processor); it is
 The binding only adds input/session handling, final-answer extraction, cleanup
 and bounded execution: at most16 model starts,3072 output tokens per response,
 40 graph steps,120seconds per model request,60seconds per shell command and
-180seconds per native utility analysis command (including Ghidra cold startup).
+600seconds per native utility analysis command (including Ghidra cold startup).
 The per-invocation wall-clock limit is1800seconds. Timeout errors retain actual
 partial output, and managed shell process groups are terminated on timeout/cleanup. Native rate-limit handling still
 exists inside that attempt budget; ChatOpenAI client retries are0.

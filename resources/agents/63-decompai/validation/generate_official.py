@@ -24,6 +24,8 @@ def main():
     parser.add_argument('--environment', required=True)
     parser.add_argument('--repo', required=True)
     parser.add_argument('--output', required=True)
+    parser.add_argument('--count', type=int, choices=(1, 2), default=1,
+                        help='Explicit bounded official batch size; no candidate filtering')
     args = parser.parse_args()
     profile = checked_profile(args.profile, args.profile_sha256)
     if not Path('/.dockerenv').is_file():
@@ -38,13 +40,13 @@ def main():
     output.mkdir(parents=True, exist_ok=True)
     marker = output/'generation.started'
     with marker.open('x') as handle:
-        handle.write('One explicitly requested official Case; no automatic retry.\n')
+        handle.write('Explicit bounded official batch; each slot generated once; no automatic retry or candidate filtering.\n')
     environment = ExecutionEnvironment.from_dict(json.loads(Path(args.environment).read_text()))
     files = Artifacts(output)
     files.save('source-profile.json', {'path': str(profile), 'sha256': args.profile_sha256,
                                      'cached_image_profile_used': False})
     with generation_profile(profile, environment, files) as effective:
-        generate_collection(create_run, count=1, files=files, repo=Path(args.repo), max_attempts=1,
+        generate_collection(create_run, count=args.count, files=files, repo=Path(args.repo), max_attempts=1,
                             options=dict(repo_path=Path(args.repo), agent_profile_path=effective,
                                          storage_path=output/'sdk-storage', allow_local=False,
                                          track_files=False, upload_diff=False, save_local=True,
