@@ -50,5 +50,5 @@ RUN mkdir -p /tmp/abb-ghidra-warm \
        -scriptPath /opt/agent/agent/src/utils/ghidra_scripts \
        -postScript decompile_function.py main -deleteProject > /tmp/abb-ghidra-warm/warm.log 2>&1 \
     && grep -q "Decompiled 'main'" /tmp/abb-ghidra-warm/warm.log \
-    && rm -rf /tmp/abb-ghidra-warm \
-    && find /home/agent/.ghidra -name '*.log*' -type f -delete
+    && rm -rf /tmp/abb-ghidra-warm /var/tmp/agent-ghidra/fscache* /var/tmp/agent-ghidra/packed-db-cache
+RUN find /home/agent -name '*.log*' -type f -delete
