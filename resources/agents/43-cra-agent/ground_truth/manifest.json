@@ -1,0 +1,30 @@
+{
+  "schema": "abb.agent.ground_truth.v1",
+  "agent_id": "cra-agent",
+  "defects": [
+    {
+      "id": "cra-agent-3f4e901b",
+      "title": "SecretsScanner silently drops hardcoded Stripe live keys: gitleaks hit is mapped to MEDIUM ('token') below the scanner's default HIGH threshold, so the report shows 0 findings",
+      "expected_behavior": "A hardcoded Stripe live secret key in the reviewed code is reported as a secrets finding (and triaged), like generic-api-key hits are.",
+      "observed_behavior": "In both rounds gitleaks matched the sk_live_ literal in submission.py (container log `Scanner completed filtered_findings=0 raw_findings=1 scanner=secrets`), SecretsScanner mapped the stripe-access-token hit to MEDIUM and dropped it below its default HIGH threshold, and every step returned 'Raw findings: 0 / After suppression filtering: 0 / Triaged findings: 0'. No LLM is called on this path. Reproduction: 2 of 2 valid rounds on this source (2fae4a7a4cdf).",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-17T06:58:55Z",
+      "source_sha256": "2fae4a7a4cdfddc9c9e4463d1d2ce7946ce613217da6939d23bab8ab9bf201ad",
+      "case_sha256": "68e167330c4224c061645393f570d9d729ddf1c1d4f24cf92209443cc61a75fd",
+      "observations": [
+        {
+          "id": "5b8d93a29d6d470f94831bfe3c574d3d",
+          "case_sha256": "68e167330c4224c061645393f570d9d729ddf1c1d4f24cf92209443cc61a75fd",
+          "evidence_path": "observations/cra-agent-3f4e901b/run-1.zip",
+          "evidence_sha256": "7609fb67a516ff6b9796dfbf40b9ed13a79922b8e3709a55d126c28621f9aeea"
+        },
+        {
+          "id": "4958e63981e342c09ef0573fc1755cc8",
+          "case_sha256": "68e167330c4224c061645393f570d9d729ddf1c1d4f24cf92209443cc61a75fd",
+          "evidence_path": "observations/cra-agent-3f4e901b/run-2.zip",
+          "evidence_sha256": "30a7501db9783f8cbfceb78916d43b87c0711d3272cd92cace868fe14271efc9"
+        }
+      ]
+    }
+  ]
+}
