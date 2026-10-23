@@ -1,27 +1,33 @@
-# easy-agent: native ACP integration (Issue #476)
+# easy-agent native ACP integration — Issue #476
 
-Upstream: https://github.com/ConardLi/easy-agent, pinned revision `aec616a97114ce9683e4fbfcff3abbc55155fe50`. ABB files remain outside the ignored native `agent/` directory. No upstream business logic is patched and no responses are simulated. Model selection is inherited from ABB; this contribution's validation uses only `opencode/glm-5.3-flash`, without fallback.
+Task: [ABB #476](https://github.com/DefuzeX-AI/AgentBehaviorBench/issues/476). Source: [ConardLi/easy-agent](https://github.com/ConardLi/easy-agent), pinned to `aec616a97114ce9683e4fbfcff3abbc55155fe50`. Native source is restored under ignored `agent/`; the launcher, Docker recipe, Profile, native tools and permission handling are not patched for validation. Model settings come from ABB, never a hardcoded key or fallback model.
 
-The registry remains disabled/adapting until runtime review. The Local Smoke fixture is a custom integration check, not an official GT. The two-stage task still requires a merged PR before GT validation; candidates require 10 reset executions and at least 7 reproductions, followed by human review. No GT is pre-approved here.
+## Standard Local SDK Smoke
 
-## Run with the actual Local SDK
-
-Prepare the pinned native source with ABB's standard source-preparation workflow and install ABB with its ACP dependencies. In an independent validation checkout, enable only `easy-agent` in a temporary registry at `resources/smoke-registry.toml`; keep the committed registry disabled/adapting. Configure the model endpoint and key privately using ABB's model-provider configuration. From that checkout's repository root:
+Install ABB and its ACP/Local SDK dependencies, then use the normal source-preparation workflow. Privately configure the model endpoint/key. In an independent validation checkout, copy `resources/registry.toml` to `resources/smoke-registry.toml` and enable only `easy-agent`; keep the contribution's registration disabled/adapting. From the repository root:
 
 ```sh
-agentbench evaluate easy-agent --sdk local --judge local \
-  --case-file resources/agents/78-easy-agent/validation/local-cases.json \
+agentbench evaluate easy-agent --sdk local --cases 1 --case-retries 0 \
   --registry resources/smoke-registry.toml --model glm-5.3-flash \
-  --cases 1 --case-retries 0 --max-steps 1 --timeout 900 --no-view \
-  --results-dir results/issue476-local
+  --timeout 240 --no-view --results-dir results/easy-agent-local
 ```
 
-This command explicitly selects the Local SDK and the existing single-step file Case. Inspect the recorded `plan.configuration.sdk` and retain execution, ACP/model events, Judge output and file evidence separately. Execution success alone is not a Judge pass. The command uses the stock Local Judge settings: it is **not** an exact replay of the host configuration used by the archived run below.
+This uses the stock Local SDK to generate a task from `requirement.md`, then its stock Judge prompt, 2048-token output setting and strict validator. It does not import the historical Case fixture. Verify actual tool results, completed execution, host acceptance, trace validation, Judge delivery and quality gate separately. An executed Case or written file alone is not a Judge pass. Keep failed and successful runs; do not repeat unchanged cases just to choose a pass.
 
-## Recorded phase-1 verification
+Some model gateways reject Python urllib's default HTTP User-Agent. The optional host-only helper below declares `AgentBehaviorBench/0.1` and audits selected-model request hashes without keys. It delegates to the same ABB CLI, preserving request bodies, responses, TLS verification, Judge prompt/token limit and verdict validation:
 
-- Suite: `suite_f30177bcf4a54a8fb018ce96735de174`; execution Run: `8c54c1ebddd74f68ae56b89776c6b179`.
-- Actual Local SDK result: **pass/high; quality_gate=passed; exit=0**. Native Agent logic and the Case were unchanged.
-- The archived host Judge used `glm-5.3-flash`, an output limit of **8192** instead of the stock **2048**, and an explicit statement of the existing validator's cross-field consistency constraints. The validator and returned report were not relaxed or rewritten. The source archive includes the effective prompt, transport record and exact runner; the plain CLI command above intentionally does not claim identical Judge configuration.
-- [Immutable evidence and exact archived runner](https://github.com/QUSETIONS/AgentBehaviorBench/releases/tag/batch2-current-main-20261023). Previous failures and successes remain in the archive. The recorded result belongs to the source/configuration in that archive; later documentation-only commits do not constitute a new runtime execution.
-- PR merge and phase-2 GT acceptance remain separate gates. No formal 10-run GT claim is made.
+```sh
+python resources/agents/78-easy-agent/validation/run_smoke.py \
+  --allowed-model glm-5.3-flash --http-audit results/easy-agent-host-network.jsonl \
+  evaluate easy-agent --sdk local --cases 1 --case-retries 0 \
+  --registry resources/smoke-registry.toml --model glm-5.3-flash \
+  --timeout 240 --no-view --results-dir results/easy-agent-local
+```
+
+The helper and validation fixtures are excluded from the Agent Docker image. Record the validation commit, environment and the Case/output/Judge/trace from one actual run as required by [#109](https://github.com/DefuzeX-AI/AgentBehaviorBench/issues/109).
+
+## Historical evidence and task stages
+
+The earlier imported file Case remains at `validation/local-cases.json` for explicit regression use. Its archived Judge used 8192 output tokens and added the existing cross-field consistency constraints, unlike the stock 2048 configuration above. [Historical runs and exact archived runner](https://github.com/QUSETIONS/AgentBehaviorBench/releases/tag/batch2-current-main-20261023) remain separate evidence and do not replace final-commit standard validation. No historical failure, returned report or native response is rewritten.
+
+Phase 1 requires integration, real Local Smoke and PR merge. Phase 2 GT starts after merge/Credit confirmation under the Issue's independent-reproduction rules. A standard Smoke is not a defect-free or GT-completion claim.

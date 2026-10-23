@@ -76,8 +76,55 @@ def test_build_cache_and_resource_controls():
 
 def test_readme_explicitly_selects_actual_local_sdk():
     text = (UNIT / "README.md").read_text()
-    assert "agentbench evaluate easy-agent --sdk local --judge local" in text
-    assert "--case-file resources/agents/78-easy-agent/validation/local-cases.json" in text
-    assert "EvaluationService.execute" not in text
+    assert "agentbench evaluate easy-agent --sdk local --cases 1" in text
+    assert "resources/agents/78-easy-agent/validation/run_smoke.py" in text
     assert "8192" in text and "2048" in text
-    assert "not** an exact replay" in text
+    assert "stock Judge" in text and "does not import" in text
+    assert "--case-file" not in text
+
+def smoke_driver():
+    spec = importlib.util.spec_from_file_location("smoke_526", UNIT / "validation/run_smoke.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_host_transport_changes_headers_only(tmp_path):
+    import io
+    import urllib.request
+    from urllib.response import addinfourl
+    from email.message import Message
+    seen = []
+    class LocalCapture(urllib.request.BaseHandler):
+        handler_order = 1
+        def https_open(self, request):
+            seen.append((request.data, request.get_header("Authorization"), request.get_header("User-agent")))
+            headers = Message(); headers["Content-Type"] = "application/json"
+            response = addinfourl(io.BytesIO(b'{"unchanged":true}'), headers, request.full_url, code=200)
+            response.msg = "OK"
+            return response
+    payload = b'{"model":"glm-5.3-flash","max_tokens":2048,"messages":[]}'
+    driver = smoke_driver()
+    opener = driver.http_opener("AgentBehaviorBench/0.1", tmp_path / "network.jsonl", "glm-5.3-flash", LocalCapture())
+    request = urllib.request.Request("https://fixture.example/v1/chat/completions", payload, {"Authorization":"Bearer synthetic-fixture-key"})
+    with opener.open(request) as response:
+        assert response.read() == b'{"unchanged":true}'
+    assert seen == [(payload, "Bearer synthetic-fixture-key", "AgentBehaviorBench/0.1")]
+    audit = (tmp_path / "network.jsonl").read_text()
+    assert "synthetic-fixture-key" not in audit and '"max_tokens":2048' in audit
+
+
+def test_host_transport_rejects_other_models_before_network(tmp_path):
+    import urllib.request
+    driver = smoke_driver()
+    opener = driver.http_opener("AgentBehaviorBench/0.1", tmp_path / "network.jsonl", "glm-5.3-flash")
+    request = urllib.request.Request("https://fixture.example/v1/chat/completions", b'{"model":"another-model"}')
+    with pytest.raises(ValueError, match="approved"):
+        opener.open(request)
+
+
+def test_standard_command_uses_the_real_cli_parser():
+    from agentbench.cli.main import build_parser
+    args = build_parser().parse_args(["evaluate", "easy-agent", "--sdk", "local", "--cases", "1", "--case-retries", "0", "--model", "glm-5.3-flash", "--no-view"])
+    assert args.sdk == "local" and args.cases == 1
+    assert args.case_file is None and args.judge is None
