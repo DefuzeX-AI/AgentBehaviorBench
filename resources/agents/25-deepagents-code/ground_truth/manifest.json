@@ -1,0 +1,36 @@
+{
+  "schema": "abb.agent.ground_truth.v1",
+  "agent_id": "deepagents-code",
+  "defects": [
+    {
+      "id": "deepagents-code-65f346ab",
+      "title": "deepagents-code's ACP server never sends a terminal tool_call_update for edit_file tool calls; they stay 'pending' while every other tool call gets 'completed'.",
+      "expected_behavior": "Every edit_file tool_call should get a terminal tool_call_update (completed or failed), as the other tools do.",
+      "observed_behavior": "Reproduced in 7 of 7 valid rounds on source 479ad2c954f0 (185401Z). In every round step-5 ('Fix the syntax error') calls edit_file ('Edit /home/agent/workspace/broken.c', kind=edit); the ACP stream carries only the initial tool_call with status 'pending' and no tool_call_update, while read and execute calls in the same rounds get tool_call_update status 'completed'. The edit itself is applied (the following gcc compile exits 0). The host did not reject these runs, so only the protocol half of the original report reproduced. Reproduction: 7 of 7 valid rounds on this source (479ad2c954f0).",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-14T14:24:35Z",
+      "source_sha256": "479ad2c954f0ab687ad1970a483e152763da60c6839bb3d764c5bf18195a4689",
+      "case_sha256": "56635f7bdcf04fc332a9f80694c075c87a86c7da209b85f4776b3184a91a30bb",
+      "observations": [
+        {
+          "id": "207fd1b06cdf46c4b27a53d7b471b1d0",
+          "case_sha256": "56635f7bdcf04fc332a9f80694c075c87a86c7da209b85f4776b3184a91a30bb",
+          "evidence_path": "observations/deepagents-code-65f346ab/run-1.zip",
+          "evidence_sha256": "8a539a4a2c7ea837d637a3751453558a1d82495f30fd0bac17e8a091e814c27a"
+        },
+        {
+          "id": "8298eba622da40e5ae6ef8582d479d6f",
+          "case_sha256": "56635f7bdcf04fc332a9f80694c075c87a86c7da209b85f4776b3184a91a30bb",
+          "evidence_path": "observations/deepagents-code-65f346ab/run-2.zip",
+          "evidence_sha256": "452ac73ae854d18bb0d64802cc18812a680680cd7886cffc0fd03fd1a6914c03"
+        },
+        {
+          "id": "7b761f9bac9e4eb2b055878961f1f0c1",
+          "case_sha256": "56635f7bdcf04fc332a9f80694c075c87a86c7da209b85f4776b3184a91a30bb",
+          "evidence_path": "observations/deepagents-code-65f346ab/run-3.zip",
+          "evidence_sha256": "f602fede54c1d6c2d0fd7067cede3f28256a83019da8fbe570da68bc3cf0bb2b"
+        }
+      ]
+    }
+  ]
+}
