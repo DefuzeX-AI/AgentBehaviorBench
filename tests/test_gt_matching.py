@@ -1,206 +1,189 @@
 import json
-from pathlib import Path
 from types import SimpleNamespace
 import pytest
-
-from agentbench.harness.ground_truth.matching import reproduction, detection, summarize, load_rules
-from agentbench.harness.ground_truth import evaluator
-from agentbench.harness.session.plan import digest_json
+from agentbench.harness.ground_truth import evaluator, benchmark_ground_truth
+from agentbench.harness.ground_truth.matching import validate_match, summarize
 from tests.test_ground_truth import ground_truth_fixture, write_json
 
 
-def test_condition_matching_requires_every_condition_and_real_refs():
-    rule = {'conditions': [{'id': 'C1'}, {'id': 'C2'}]}
-    evidence = {'exec:input': 'x'}
-    rows = [{'id': k, 'status': 'satisfied', 'evidence_refs': ['exec:input'], 'reason': 'supported'}
-            for k in ('C1', 'C2')]
-    assert reproduction({'conditions': rows}, rule, evidence) is True
-    rows[1]['status'] = 'unknown'
-    assert reproduction({'conditions': rows}, rule, evidence) is None
-    rows[1]['status'] = 'contradicted'
-    assert reproduction({'conditions': rows}, rule, evidence) is False
-    rows[0]['evidence_refs'] = ['reference:original-trace']
-    with pytest.raises(ValueError):
-        reproduction({'conditions': rows}, rule, evidence)
-
-
-def test_detection_cannot_be_generic_or_cite_only_report():
-    with pytest.raises(ValueError):
-        detection({'detected': True, 'reason': 'issue', 'evidence_refs': ['report']}, {'report': {}})
-
-
-def test_scores_deduplicate_and_preserve_unknown():
-    def row(gt, r, d):
-        return dict(agent_id='a', ground_truth_id=gt, case_reproduced=r, judge_detected=d)
-    scores = summarize([row('1', True, True), row('1', True, True), row('2', True, False), row('3', False, False)])
-    assert scores['trigger_coverage'] == 2/3
-    assert scores['conditional_recognition'] == 1/2
-    assert scores['discovery_coverage'] == 1/3
-    scores = summarize([row('1', True, None), row('2', None, None)])
-    assert scores['discovery_coverage'] is None
-    assert scores['trigger_bounds'] == [0.5, 1]
-    assert summarize([])['discovery_coverage'] is None
-
-
-def setup_evaluation(tmp_path, monkeypatch):
-    fixture = ground_truth_fixture(tmp_path)
-    rule = {'ground_truth_id': 'known-defect', 'ground_truth_sha256': digest_json(fixture.defect),
-            'review_status': 'pending', 'conditions': [{'id': 'C1', 'text': 'Required constraint lost'}]}
-    write_json(fixture.directory / 'matching.json', {'schema': 'abb.gt.matching.v1', 'rules': [rule]})
-    snapshot = fixture.record['snapshot']
-    snapshot.update(state='completed', events=[])
-    monkeypatch.setattr(evaluator, 'read_suite', lambda _: (fixture.record['plan'], []))
-    monkeypatch.setattr(evaluator, '_model', lambda _: SimpleNamespace(model='test', base_url='https://example.test'))
-    evidence = {'exec:input': 'Required constraint', 'exec:result': 'Lost constraint'}
-    monkeypatch.setattr(evaluator, 'evidence_for', lambda *a, **k: (evidence, {'result': 'hash'}))
+def setup(tmp_path, monkeypatch):
+    f = ground_truth_fixture(tmp_path)
+    monkeypatch.setattr(evaluator, 'read_suite', lambda _: (f.plan, []))
+    monkeypatch.setattr('agentbench.harness.session.read_suite', lambda _: (f.plan, []))
+    monkeypatch.setattr(evaluator, 'model_config', lambda _: SimpleNamespace(model='test', base_url='https://test'))
+    class API:
+        def read(self, name): return None
     class Catalog:
         def __init__(self, _): pass
-        def entries(self, **_):
-            return {'run': (object(), dict(agent='alpha', case_index=0, attempt_id='attempt-1'))}
-    return fixture, snapshot, Catalog
+        def entries(self, **kwargs):
+            return {'run': (API(), {'agent': 'alpha', 'case_index': 0, 'attempt_id': 'attempt-1'})}
+    def run(ask):
+        return evaluator._evaluate(f.directory, tmp_path, {}, lambda _: None, ask, lambda _: f.snapshot, Catalog)
+    return f, run
 
 
-def test_end_to_end_saved_results_separate_two_stages(tmp_path, monkeypatch):
-    fixture, snapshot, Catalog = setup_evaluation(tmp_path, monkeypatch)
+def test_summary_mismatch_never_reads_trace_or_calls_sdk(tmp_path, monkeypatch):
+    f, run = setup(tmp_path, monkeypatch)
+    def forbidden(*args, **kwargs): raise AssertionError('Must not inspect trace')
+    monkeypatch.setattr(evaluator, 'read_trace', forbidden)
+    monkeypatch.setattr(evaluator, 'read_reference_traces', forbidden)
+    before = (f.directory / 'events.json').read_bytes()
     requests = []
-    def ask(model, steps, **kwargs):
-        requests.append(kwargs['payload'])
-        if len(requests) == 1:
-            assert 'report' not in kwargs['payload']['evidence']
-            reply = {'conditions': [{'id': 'C1', 'status': 'satisfied', 'reason': 'lost',
-                                     'evidence_refs': ['exec:result']}]}
-        else:
-            assert 'report' in kwargs['payload']['evidence']
-            reply = {'detected': False, 'reason': 'different issue', 'evidence_refs': ['report']}
-        kwargs['on_response']({'choices': [{'message': {'content': json.dumps(reply)}}]})
-        return reply, json.dumps(reply)
-    result = evaluator._evaluate(fixture.record['directory'], tmp_path, {}, lambda _: None,
-                                 ask, lambda _: snapshot, Catalog)
-    assert result['scores']['trigger_coverage'] == 1
-    assert result['scores']['discovery_coverage'] == 0
-    assert result['provisional'] is True
-    assert not fixture.assessment_path.exists()
-    assert fixture.manifest_path.read_text() == json.dumps(fixture.manifest)
-    assert evaluator.read_evaluation(fixture.record['directory'], fixture.record['plan'], [])['status'] == 'completed'
-    assert evaluator.read_evaluation(fixture.record['directory'], fixture.record['plan'], [{}])['status'] == 'stale'
+    def ask(model, **kwargs):
+        requests.append(kwargs)
+        assert 'traces' not in json.dumps(kwargs['payload'])
+        return {'match': False, 'reason': 'Different concrete defect'}
+    result = run(ask)
+    assert result['scores']['discovery_rate'] == 0
+    assert len(requests) == 1
+    cached = run(forbidden)
+    assert cached['cache_reused'] and cached['new_calls'] == 0
+    assert (f.directory / 'events.json').read_bytes() == before
+    overview = benchmark_ground_truth(tmp_path, [f.record], ['alpha'])
+    assert overview['totals']['discovery_rate'] == result['scores']['discovery_rate']
 
 
-def test_no_gt_never_resolves_provider_or_calls_model(tmp_path, monkeypatch):
-    fixture, snapshot, Catalog = setup_evaluation(tmp_path, monkeypatch)
-    fixture.manifest_path.unlink()
-    def fail(*a, **k): raise AssertionError('No model calls expected')
-    monkeypatch.setattr(evaluator, '_model', fail)
-    result = evaluator._evaluate(fixture.record['directory'], tmp_path, {}, lambda _: None,
-                                 fail, lambda _: snapshot, Catalog)
-    assert result['skipped_agents'] == [{'agent_id': 'alpha', 'reason': 'no_gt'}]
-    assert result['scores']['defect_count'] == 0
+@pytest.mark.parametrize('trace_match,score', [(True, 1), (False, 0), (None, None)])
+def test_summary_then_both_traces_even_when_agent_failed(tmp_path, monkeypatch, trace_match, score):
+    f, run = setup(tmp_path, monkeypatch)
+    order = []
+    def trace(*a, **k):
+        order.append('read-trace')
+        return {'events': [{'id': 'candidate-1', 'kind': 'tool', 'output': 'a'}]}
+    monkeypatch.setattr(evaluator, 'read_trace', trace)
+    def ask(model, **kwargs):
+        payload = kwargs['payload']
+        if 'reference_traces' not in payload:
+            order.append('summary')
+            return {'match': True, 'reason': 'Same path truncation'}
+        order.append('trace')
+        assert payload['reference_traces'][0]['events'][-1]['output'] == 'a'
+        assert payload['candidate_trace']['events'][0]['output'] == 'a'
+        return {'match': trace_match, 'reason': 'Compared actual tool output',
+                'reference_event_ids': ['reference/evaluation/inputs/0001/ref-1'], 'candidate_event_ids': ['candidate-1']}
+    result = run(ask)
+    assert order == ['summary', 'read-trace', 'trace']
+    assert result['decisions'][0]['score'] == score
+    assert result['scores']['pending'] == (score is None)
+    assert result['status'] == ('partial' if score is None else 'completed')
+    if score == 1:
+        assert result['decisions'][0]['trace_evidence']['candidate'][0]['id'] == 'candidate-1'
 
 
-def test_human_exclusion_skips_calls_preserves_evidence_and_invalidates_scores(tmp_path, monkeypatch):
-    from agentbench.harness.ground_truth import benchmark_ground_truth
-    fixture, snapshot, Catalog = setup_evaluation(tmp_path, monkeypatch)
-    def unknown(*args, **kwargs):
-        return {'conditions': [{'id': 'C1', 'status': 'unknown', 'reason': 'insufficient',
-                                'evidence_refs': []}]}, ''
-    evaluator._evaluate(fixture.record['directory'], tmp_path, {}, lambda _: None,
-                        unknown, lambda _: snapshot, Catalog)
-    before = fixture.manifest_path.read_bytes()
-    write_json(fixture.directory / 'reviews.json', {'schema': 'abb.gt.reviews.v1', 'reviews': [{
-        'ground_truth_id': 'known-defect', 'ground_truth_sha256': digest_json(fixture.defect),
-        'decision': 'excluded', 'reason': 'Native design requires this behavior',
-        'reviewed_by': 'human', 'reviewed_at': '2026-10-21T00:00:00Z'}]})
-    assert evaluator.read_evaluation(fixture.record['directory'], fixture.record['plan'], [])['status'] == 'stale'
-    def fail(*args, **kwargs): raise AssertionError('Excluded GT must not invoke a model')
-    result = evaluator._evaluate(fixture.record['directory'], tmp_path, {}, lambda _: None,
-                                 fail, lambda _: snapshot, Catalog)
-    assert result['scores']['defect_count'] == 0
+def test_missing_report_is_pending_not_zero(tmp_path, monkeypatch):
+    f, run = setup(tmp_path, monkeypatch)
+    f.attempt['result']['benchmark'] = {}
+    def fail(*a, **k): raise AssertionError('Must not call model')
+    result = run(fail)
+    assert result['scores']['pending'] == 1
+    assert result['scores']['discovery_rate'] is None
     assert result['calls'] == 0
-    assert result['skipped_agents'][0]['reason'] == 'human_excluded'
-    assert fixture.manifest_path.read_bytes() == before
-    overview = benchmark_ground_truth(tmp_path, [fixture.record], ['alpha'])
-    assert overview['totals']['defect_count'] == 0
 
 
-def test_exclusion_cannot_silently_apply_to_changed_gt(tmp_path):
-    from agentbench.harness.ground_truth.reviews import eligible_defects
-    fixture = ground_truth_fixture(tmp_path)
-    write_json(fixture.directory / 'reviews.json', {'schema': 'abb.gt.reviews.v1', 'reviews': [{
-        'ground_truth_id': 'known-defect', 'ground_truth_sha256': 'wrong',
-        'decision': 'excluded', 'reason': 'wrong revision', 'reviewed_by': 'human',
-        'reviewed_at': '2026-10-21T00:00:00Z'}]})
-    with pytest.raises(ValueError, match='changed evidence'):
-        eligible_defects(fixture.directory.parent, [{**fixture.defect,
-            'ground_truth_sha256': digest_json(fixture.defect)}])
+def test_complete_pass_is_zero_without_model(tmp_path, monkeypatch):
+    f, run = setup(tmp_path, monkeypatch)
+    f.report.update(status='pass', issues=[])
+    result = run(lambda *a, **k: pytest.fail('No finding to compare'))
+    assert result['scores']['discovery_rate'] == 0
 
 
-def test_pending_review_is_not_a_negative_and_approval_restores_eligibility(tmp_path):
-    from agentbench.harness.ground_truth.reviews import eligible_defects
-    fixture = ground_truth_fixture(tmp_path)
-    defects = [{**fixture.defect, 'ground_truth_sha256': digest_json(fixture.defect)}]
-    review = {'ground_truth_id': 'known-defect', 'ground_truth_sha256': digest_json(fixture.defect),
-              'decision': 'needs_review', 'reason': 'Native contract audit pending human decision',
-              'reviewed_by': 'automated audit', 'reviewed_at': '2026-10-21T00:00:00Z'}
-    write_json(fixture.directory / 'reviews.json', {'schema': 'abb.gt.reviews.v1', 'reviews': [review]})
-    assert eligible_defects(fixture.directory.parent, defects) == ([], [review])
-    review.update(decision='approved', reviewed_by='human')
-    write_json(fixture.directory / 'reviews.json', {'schema': 'abb.gt.reviews.v1', 'reviews': [review]})
-    assert eligible_defects(fixture.directory.parent, defects) == (defects, [])
+def test_evidence_gaps_leave_pending_even_with_unmatched_finding(tmp_path, monkeypatch):
+    f, run = setup(tmp_path, monkeypatch)
+    f.report['evidence_gaps'] = ['Missing later execution']
+    result = run(lambda *a, **k: {'match': False, 'reason': 'Unrelated'})
+    assert result['scores']['pending'] == 1
 
 
-def test_bad_model_response_preserves_unknown(tmp_path, monkeypatch):
-    fixture, snapshot, Catalog = setup_evaluation(tmp_path, monkeypatch)
-    result = evaluator._evaluate(fixture.record['directory'], tmp_path, {}, lambda _: None,
-                                 lambda *a, **k: ({'conditions': []}, ''), lambda _: snapshot, Catalog)
-    assert result['scores']['trigger_unknown'] == 1
-    assert result['scores']['trigger_coverage'] is None
+def test_failed_request_not_resent_even_after_result_cache_invalidated(tmp_path, monkeypatch):
+    f, run = setup(tmp_path, monkeypatch)
+    requests = []
+    def ask(*a, **k):
+        requests.append(1)
+        raise RuntimeError('Network disconnected')
+    result = run(ask)
+    assert result['scores']['pending'] == 1
+    # New unrelated saved metadata invalidates whole-evaluation cache, not the request journal.
+    write_json(f.directory / 'cases/new-metadata.json', {})
+    second = run(ask)
+    assert second['calls'] == 0 and second['cache_hits'] == 1
+    assert len(requests) == 1
 
 
-def test_rule_change_requires_gt_rebinding(tmp_path):
-    fixture = ground_truth_fixture(tmp_path)
-    write_json(fixture.directory / 'matching.json', {'schema': 'abb.gt.matching.v1', 'rules': [
-        {'ground_truth_id': 'known-defect', 'ground_truth_sha256': 'wrong'}]})
-    with pytest.raises(ValueError, match='changed GT'):
-        load_rules(fixture.unit, [{**fixture.defect, 'ground_truth_sha256': digest_json(fixture.defect)}])
+def test_unknown_or_bad_model_reply_never_counts_as_zero(tmp_path, monkeypatch):
+    f, run = setup(tmp_path, monkeypatch)
+    result = run(lambda *a, **k: {'match': 'yes', 'reason': 'Bad type'})
+    assert result['scores']['pending'] == 1
 
 
-def test_suite_hook_runs_after_persistence_before_return(tmp_path, monkeypatch):
-    from agentbench.cli import execution
-    from agentbench.cli.sessions import configuration, fresh
-    from agentbench.harness import SuiteRunner
-    from agentbench.harness.session import read_snapshot
-    from tests.test_suite_concurrency import Factory
-    from tests.test_suite_resume import make_agent
-    monkeypatch.setattr(fresh, 'PROJECT_ROOT', tmp_path)
-    monkeypatch.setattr(configuration, 'runner_configuration', lambda *a: {'sdk': 'fixture'})
-    seen = []
-    def after(directory):
-        snapshot = read_snapshot(directory)
-        seen.append(snapshot['suite_id'])
-        assert all(c['execution_status'] == 'completed' for j in snapshot['jobs'] for c in j['cases'])
-    outcome = execution.run_benchmark_session((make_agent(tmp_path, 1),), runner=SuiteRunner(runner_factory=Factory()),
-        output_path=None, results_dir=tmp_path/'results', output_fn=lambda _: None,
-        viewer_starter=None, after_suite=after)
-    assert seen == [outcome.result.suite_id]
-
-
-def test_source_mismatch_does_not_call_provider(tmp_path, monkeypatch):
-    fixture, snapshot, Catalog = setup_evaluation(tmp_path, monkeypatch)
-    fixture.record['plan']['agents'][0]['source_sha256'] = 'b'*64
-    def fail(*a, **k): raise AssertionError('must not call')
-    result = evaluator._evaluate(fixture.record['directory'], tmp_path, {}, lambda _: None,
-                                 fail, lambda _: snapshot, Catalog)
-    assert result['skipped_agents'][0]['reason'] == 'source_not_applicable'
-    assert result['scores']['defect_count'] == 0
-
-
-def test_read_evidence_rejects_oversize_and_never_reads_judge(tmp_path):
-    from agentbench.observe.view_api import RunViewAPI
-    step = tmp_path/'evaluation/inputs/0001'
-    step.mkdir(parents=True)
-    (step/'input.json').write_text('{"payload":"hello"}')
-    (step/'result.json').write_text('{"output":"world"}')
-    write_json(tmp_path/'evaluation/judge/report.json', {'secret_verdict': 'issue'})
-    value, _ = evaluator.evidence_for(RunViewAPI(tmp_path), limit=1000)
-    assert 'secret_verdict' not in json.dumps(value)
+def test_citations_must_reference_both_actual_traces():
     with pytest.raises(ValueError):
-        evaluator.evidence_for(RunViewAPI(tmp_path), limit=10)
+        validate_match({'match': True, 'reason': 'Same', 'reference_event_ids': ['r'],
+                        'candidate_event_ids': ['invented']}, {'r'}, {'c'})
+
+
+def test_duplicate_hits_and_pending_aggregation():
+    rows = [{'agent_id': 'a', 'ground_truth_id': gt, 'score': score}
+            for gt, score in [('1', 1), ('1', None), ('1', 1), ('2', 0), ('3', None)]]
+    result = summarize(rows)
+    assert (result['defect_count'], result['matched'], result['unmatched'], result['pending']) == (3, 1, 1, 1)
+    assert result['discovery_rate'] is None
+    assert result['discovery_bounds'] == [1/3, 2/3]
+
+
+def test_gt_change_marks_previous_score_stale(tmp_path, monkeypatch):
+    f, run = setup(tmp_path, monkeypatch)
+    run(lambda *a, **k: {'match': False, 'reason': 'Different'})
+    f.defect['summary'] = 'A changed defect'
+    write_json(f.manifest_path, f.manifest)
+    assert evaluator.read_evaluation(f.directory, f.plan, [])['status'] == 'stale'
+
+
+def test_trace_reader_resolves_real_tool_payloads(tmp_path):
+    from agentbench.observe.view_api import RunViewAPI
+    from agentbench.harness.ground_truth.traces import read_trace
+    folder = tmp_path / 'evaluation/inputs/0001'
+    write_json(folder / 'input.json', {'prompt': 'test'})
+    write_json(folder / 'result.json', {'error_type': 'GraphRecursionError'})
+    write_json(folder / 'otel-payloads/input.json', {'path': 'a b.txt'})
+    write_json(folder / 'otel-payloads/output.json', 'a')
+    span = {'source': 'otel', 'event': 'span', 'data': {'span_id': 'abc', 'trace_id': 't', 'name': 'tool',
+            'attributes': {'abb.kind': 'tool', 'abb.input_ref': 'otel-payloads/input.json',
+                           'abb.output_ref': 'otel-payloads/output.json'}}}
+    (folder / 'otel.jsonl').write_text(json.dumps(span) + '\n', encoding='utf-8')
+    trace = read_trace(RunViewAPI(tmp_path))
+    assert trace['events'][-1]['input'] == {'path': 'a b.txt'}
+    assert trace['events'][-1]['output'] == 'a'
+    with pytest.raises(ValueError):
+        read_trace(RunViewAPI(tmp_path), limit=2)
+
+
+
+def test_case_without_attempt_keeps_defect_pending(tmp_path, monkeypatch):
+    f, run = setup(tmp_path, monkeypatch)
+    f.snapshot['jobs'][0]['cases'].append({'case_index': 1, 'attempts': []})
+    result = run(lambda *a, **k: {'match': False, 'reason': 'Different'})
+    assert result['scores']['pending'] == 1
+    assert len(result['decisions']) == 2
+
+
+def test_reference_payload_change_marks_result_stale(tmp_path, monkeypatch):
+    f, run = setup(tmp_path, monkeypatch)
+    run(lambda *a, **k: {'match': False, 'reason': 'Different'})
+    write_json(f.manifest_path.parent / 'attempts/reference/evaluation/inputs/0001/otel-payloads/tool-output.json', 'changed')
+    assert evaluator.read_evaluation(f.directory, f.plan, [])['status'] == 'stale'
+
+
+def test_missing_reference_payload_is_pending_after_summary_match(tmp_path, monkeypatch):
+    f, run = setup(tmp_path, monkeypatch)
+    folder = f.manifest_path.parent / 'attempts/reference/evaluation/inputs/0001'
+    (folder / 'otel-payloads/tool-output.json').unlink()
+    monkeypatch.setattr(evaluator, 'read_trace', lambda *a, **k: {'events': [{'id': 'c', 'output': 'a'}]})
+    calls = []
+    def ask(*a, **k):
+        calls.append(k['payload'])
+        if 'reference_traces' not in k['payload']:
+            return {'match': True, 'reason': 'Same summary'}
+        assert k['payload']['reference_traces'][0]['warnings']
+        return {'match': None, 'reason': 'Missing actual tool output', 'reference_event_ids': [], 'candidate_event_ids': []}
+    assert run(ask)['scores']['pending'] == 1
+    assert len(calls) == 2

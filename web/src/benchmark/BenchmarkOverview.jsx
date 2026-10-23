@@ -12,9 +12,9 @@ const { Text } = Typography;
 
 function CountingRules() {
   return <dl className="benchmark-definitions">
-    <dt>Benchmark score (proposed)</dt><dd>GT Discovery@B: 100 × the mean discovery fraction across a fixed set of Agents, averaged over independent trials at the same budget B. Agent/SDK versions, GT revisions and retry rules must be frozen before testing. No formal score is computed from unconstrained historical runs.</dd>
-    <dt>Ground truth</dt><dd>Recorded Agent defects and reproduction evidence, stored in each Agent’s ground_truth/manifest.json. Review provenance varies; automatic matching is shown separately in each Suite.</dd>
-    <dt>Discovered</dt><dd>An explicit assessment confirms that a Case reproduced the defect and its Judge correctly identified it. Repeated discoveries count once per defect.</dd>
+    <dt>GT discovery score</dt><dd>Each known GT scores 1 for a summary match confirmed by both traces, 0 for a resolved non-discovery, or pending for insufficient evidence. Repeated hits count once. A final rate is available only when every GT is resolved.</dd>
+    <dt>Ground truth</dt><dd>Recorded Agent defects and reproduction evidence, stored as complete Case result directories under each Agent’s ground_truth/, with a README and short per-Case descriptions. Judge summaries are compared first, then both traces are checked. Suite and overview use the same saved scores.</dd>
+    <dt>Discovered</dt><dd>A Judge finding matches the GT summary and is confirmed by reference and execution trace events. Repeated discoveries count once per defect.</dd>
     <dt>Observed GT coverage</dt><dd>100 × discovered defects / known defects for Agents represented in the selected SDK’s Suites. Only that SDK’s assessments count. This is historical coverage; comparable benchmark scores require a shared, frozen Agent/GT set and equal budgets.</dd>
     <dt>Not assessed</dt><dd>No complete assessment for the current ground truth revision. A Judge’s “issue” verdict alone does not count as discovery.</dd>
     <dt>Cases</dt><dd>Includes planned and queued Cases. Each reuse adds a Case; retries stay within the same Case. Execution completion is separate from discovery.</dd>
@@ -24,8 +24,8 @@ function CountingRules() {
 function BenchmarkTotals({ totals, groundTruth }) {
   const progress = groundTruthProgress(groundTruth);
   return <section className="benchmark-summary" aria-label="Ground truth results">
-    <div className="benchmark-total"><span>Benchmark score</span><strong aria-label="Benchmark score unavailable">—</strong>
-      <small>Protocol not configured</small></div>
+    <div className="benchmark-total"><span>GT discovery score</span><strong>{groundTruth?.discovery_rate == null ? 'Pending' : `${(groundTruth.discovery_rate * 100).toFixed(1)}%`}</strong>
+      <small>{groundTruth?.discovered_defect_count ?? 0}/{groundTruth?.defect_count ?? 0} matched · {groundTruth?.pending_defect_count ?? 0} pending</small></div>
     <div className={`benchmark-discovery${progress.percent === null ? ' unassessed' : ''}`}>
       <div className="benchmark-discovery-heading"><strong>{progress.found} <span>Discovered</span></strong><b>{progress.label}</b></div>
       <div className="benchmark-discovery-track" role="img" aria-label={progress.description}>
@@ -65,7 +65,7 @@ function AgentDetails({ agent }) {
     {!!defects.length && <><h3>Ground truth</h3><Table className="benchmark-breakdown" rowKey="id" size="small" pagination={false}
       dataSource={defects} scroll={{ x: 620 }} columns={[
         { title: 'Known defect', dataIndex: 'title', render: (title, defect) => <div className="benchmark-agent"><strong>{title}</strong><Text type="secondary">{defect.id}</Text></div> },
-        { title: 'Case reproduced', dataIndex: 'case_reproduced', width: 145, render: value => <AssessmentValue value={value} /> },
+        { title: 'GT score', dataIndex: 'score', width: 145, render: value => value == null ? 'Pending' : value },
         { title: 'Judge detected', dataIndex: 'judge_detected', width: 145, render: value => <AssessmentValue value={value} /> },
       ]} /></>}
     <h3>Suites</h3><Table className="benchmark-breakdown" rowKey="suite_id" size="small" pagination={false}
