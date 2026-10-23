@@ -1,0 +1,30 @@
+{
+  "schema": "abb.agent.ground_truth.v1",
+  "agent_id": "ai-data-science-team",
+  "defects": [
+    {
+      "id": "ai-data-science-team-a6d27281",
+      "title": "When data wrangling fails after all retries the analyst replies \"Workflow completed.\" and the error never reaches the response (business-science/ai-data-science-team#90)",
+      "expected_behavior": "After the wrangler exhausts its fix attempts, the analyst should report the failure (the last error) to the user and not mark the step as a successful completion.",
+      "observed_behavior": "In both rounds, steps 3 and 5 exhausted the wrangler's 3 fix attempts (4 failed executions, last errors \"No module named 'pyproj'\" / Timestamp JSON serialization) and the analyst replied only 'Workflow completed.' with step status succeeded; the error never reached the response. Reproduction: 2 of 2 valid rounds on this source (212f3981b1f7).",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-20T10:03:55Z",
+      "source_sha256": "212f3981b1f7fa53fa48ad8b10b22fe56e1125fba7184975c1d29251be74edd5",
+      "case_sha256": "9276b3f6e0b6193dcb38c4020adca6fbdf08bedbdbf0fd51e90d0552fcd4cd3a",
+      "observations": [
+        {
+          "id": "aee68697e2ab4c1eb11df05f1ef9fc5a",
+          "case_sha256": "9276b3f6e0b6193dcb38c4020adca6fbdf08bedbdbf0fd51e90d0552fcd4cd3a",
+          "evidence_path": "observations/ai-data-science-team-a6d27281/run-1.tar.xz",
+          "evidence_sha256": "36505d686a72a279e6e13bab96fda6df9c32dea97e50c6b426d4353ca992c7c6"
+        },
+        {
+          "id": "42d15ac9e18046fe8f46f342e3a54794",
+          "case_sha256": "9276b3f6e0b6193dcb38c4020adca6fbdf08bedbdbf0fd51e90d0552fcd4cd3a",
+          "evidence_path": "observations/ai-data-science-team-a6d27281/run-2.tar.xz",
+          "evidence_sha256": "d512b7577ecada51a8d0c86afa12918b294de5d2a8df8cac8df4685aa0b30b61"
+        }
+      ]
+    }
+  ]
+}
