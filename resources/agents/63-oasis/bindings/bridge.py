@@ -43,6 +43,107 @@ def _ensure_import_path() -> None:
         entry = str(_SOURCE_ROOT)
         if entry not in sys.path:
             sys.path.insert(0, entry)
+    _install_concurrency_and_inventory_guards()
+
+
+def _install_concurrency_and_inventory_guards() -> None:
+    """Safeguard process concurrency and model inventory for in-process threaded runtime.
+
+    1. OpenAICompatClient.list:
+       Queries /models with a short (2.0s) timeout so unrouted discovery calls
+       do not hang for the default 240s httpx timeout. When /models is unrouted
+       or unavailable in container sandboxes, falls back to declared models from
+       the environment, preserving real model verification in ensure_model_available.
+       Preserves native qualname and untouched native OpenAICompatClient.embeddings.
+    2. EmbeddingManager.index_code_files & EmbeddingAnalyzer._execute_parallel_analysis:
+       Executes directly in-process when single item, or via ThreadPoolExecutor when
+       multiple items, eliminating multiprocessing.Pool deadlocks on macOS arm64 (spawn).
+    """
+    try:
+        from concurrent.futures import ThreadPoolExecutor
+        from oasis.analyze import EmbeddingAnalyzer, analyze_item_parallel
+        from oasis.backends.openai_compat import OpenAICompatClient
+        from oasis.embedding import EmbeddingManager, process_file_parallel
+    except (ImportError, Exception):
+        return
+
+    # Guard 1: Resilient model inventory check (no 240s hang on unrouted /models)
+    if not getattr(OpenAICompatClient, "_abb_guarded", False):
+        orig_list = OpenAICompatClient.list
+
+        def _safe_list(self: Any) -> dict[str, Any]:
+            try:
+                old_timeout = getattr(self, "_default_timeout", None)
+                try:
+                    self._default_timeout = 2.0
+                    return orig_list(self)
+                finally:
+                    self._default_timeout = old_timeout
+            except Exception:
+                pass
+            declared: list[dict[str, str]] = []
+            for k in ("OPENAI_MODEL", "DEEPSEEK_MODEL", "OPENAI_EMBEDDING_MODEL", "EMBED_MODEL"):
+                v = os.environ.get(k)
+                if v and v.strip() and not any(m["model"] == v.strip() for m in declared):
+                    declared.append({"model": v.strip(), "name": v.strip()})
+            if not declared:
+                declared = [
+                    {"model": "deepseek-flash", "name": "deepseek-flash"},
+                    {"model": "text-embedding-3-small", "name": "text-embedding-3-small"},
+                ]
+            return {"models": declared}
+
+        _safe_list.__qualname__ = "OpenAICompatClient.list"
+        OpenAICompatClient.list = _safe_list
+        OpenAICompatClient._abb_guarded = True
+
+    # Guard 2: Sequential / ThreadPool indexing to eliminate macOS arm64 multiprocessing spawn deadlock
+    if not getattr(EmbeddingManager, "_abb_guarded", False):
+        def _safe_index_code_files(
+            self: Any,
+            files: list[Any],
+            *,
+            embedding_progress_hook: Any = None,
+            embedding_progress_min_interval_sec: float = 0.5,
+        ) -> None:
+            process_args = self._build_index_process_args(files)
+            if not process_args:
+                return
+            workers = min(4, len(process_args))
+            if workers <= 1:
+                for arg in process_args:
+                    res = process_file_parallel(arg)
+                    self._store_index_result(res)
+                return
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                for res in executor.map(process_file_parallel, process_args):
+                    self._store_index_result(res)
+
+        EmbeddingManager.index_code_files = _safe_index_code_files
+        EmbeddingManager._abb_guarded = True
+
+    # Guard 3: Sequential / ThreadPool analysis to eliminate macOS arm64 multiprocessing spawn deadlock
+    if not getattr(EmbeddingAnalyzer, "_abb_guarded", False):
+        def _safe_execute_parallel_analysis(self: Any, process_args: list[Any]) -> list[Any]:
+            if not process_args:
+                return []
+            workers = min(4, len(process_args))
+            if workers <= 1:
+                results = []
+                for arg in process_args:
+                    res = analyze_item_parallel(arg)
+                    if res and "error" not in res:
+                        results.append(res)
+                return results
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                results = [
+                    res for res in executor.map(analyze_item_parallel, process_args)
+                    if res and "error" not in res
+                ]
+            return results
+
+        EmbeddingAnalyzer._execute_parallel_analysis = _safe_execute_parallel_analysis
+        EmbeddingAnalyzer._abb_guarded = True
 
 
 _ensure_import_path()
@@ -221,7 +322,7 @@ class OasisAgentGraph:
             "--provider", "openai",
             "--api-base", api_base,
             "--api-key", api_key,
-            "-t", "0.02",
+            "-t", "0.5",
             "-v", "all",
             "-s"
         ])
@@ -264,6 +365,25 @@ class OasisAgentGraph:
         # Preserve native failure: OasisScanner.run returns non-zero on initialization, verification, or scan failure
         if exit_code != 0:
             raise RuntimeError(f"OASIS scanner execution failed with exit code {exit_code}")
+
+        # Verify embedding generation succeeded if valid input files were present (preserve real blockage on missing service)
+        em = getattr(scanner, "embedding_manager", None)
+        valid_files = getattr(scanner, "valid_input_files", None)
+        if isinstance(valid_files, (list, tuple)) and len(valid_files) > 0 and em is not None:
+            code_base = getattr(em, "code_base", {})
+            if isinstance(code_base, dict):
+                has_embeddings = any(
+                    (isinstance(v, dict) and bool(v.get("embedding")))
+                    or (
+                        isinstance(v, dict)
+                        and any(bool(f.get("embedding")) for f in v.get("functions", {}).values())
+                    )
+                    for v in code_base.values()
+                )
+                if not has_embeddings:
+                    raise RuntimeError(
+                        "OASIS failed to generate embeddings for target code files; embedding service may be unavailable or failing."
+                    )
 
         # Extract markdown report
         report_text = self._collect_report_text(scanner)

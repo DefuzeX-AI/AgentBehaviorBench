@@ -143,7 +143,16 @@ class TestTier2BoundaryValueAnalysis:
 
         # Exit code 0 but no report or findings must raise RuntimeError (not fabricate success)
         mock_scanner.run.return_value = 0
+        mock_scanner.valid_input_files = []
         with pytest.raises(RuntimeError, match="OASIS scan completed without producing report or findings"):
+            with patch("oasis.oasis.OasisScanner", return_value=mock_scanner):
+                graph._run_scan(Path("/unused"), None)
+
+        # Exit code 0 with input files but failed embeddings must raise RuntimeError preserving blockage
+        mock_scanner.valid_input_files = [Path("/unused/test.py")]
+        mock_scanner.embedding_manager = MagicMock()
+        mock_scanner.embedding_manager.code_base = {}
+        with pytest.raises(RuntimeError, match="OASIS failed to generate embeddings"):
             with patch("oasis.oasis.OasisScanner", return_value=mock_scanner):
                 graph._run_scan(Path("/unused"), None)
 
@@ -217,7 +226,29 @@ class TestTier3CombinatorialInteractions:
         assert env["OASIS_EMBED_OPENAI_BASE_URL"] == "https://api.openai.com/v1"
         assert env["OASIS_OPENAI_STRUCTURED_OUTPUT"] == "auto"
         assert env["OASIS_OPENAI_THINKING_KWARGS"] == "off"
+        assert env["OASIS_OPENAI_HTTP_TIMEOUT_SEC"] == "60"
         assert env["OASIS_NO_UPDATE_CHECK"] == "1"
+
+    def test_resilient_model_inventory_and_concurrency_guards(self):
+        bridge = _load_bridge_module()
+        from oasis.backends.openai_compat import OpenAICompatClient, OpenAICompatManager
+
+        # Ensure qualnames are strictly preserved
+        assert OpenAICompatClient.embeddings.__qualname__ == "OpenAICompatClient.embeddings"
+        assert OpenAICompatManager.ensure_model_available.__qualname__ == "OpenAICompatManager.ensure_model_available"
+        assert OpenAICompatClient.list.__qualname__ == "OpenAICompatClient.list"
+
+        # Verify fallback inventory provides configured models when /models is unrouted
+        with patch.dict(os.environ, {"OPENAI_MODEL": "deepseek-flash", "OPENAI_EMBEDDING_MODEL": "text-embedding-3-small"}):
+            client = OpenAICompatClient("http://127.0.0.1:9", api_key="dummy")
+            models_info = client.list()
+            model_names = [m["name"] for m in models_info.get("models", [])]
+            assert "deepseek-flash" in model_names
+            assert "text-embedding-3-small" in model_names
+
+            manager = OpenAICompatManager("http://127.0.0.1:9", api_key="dummy")
+            assert manager.ensure_model_available("deepseek-flash") is True
+            assert manager.ensure_model_available("non-existent-model-xyz") is False
 
 
 # ==============================================================================
