@@ -14,6 +14,7 @@ from agentbench.observe.timing import span, timing_session
 from agentbench.observe.store import TraceStore, json_value, redact
 from agentbench.runtime.contracts.execution import Deadline, DockerCleanupError, RunCancelled, RunControl, RuntimeLimits
 from agentbench.runtime.docker import DockerRuntime
+from agentbench.runtime.docker.policy import DockerPolicy
 from agentbench.runtime.docker.execution_policy import ControllerExecutionPolicy
 from agentbench.runtime.docker.worker_build import _ignore
 from agentbench.runtime.interception import TraceEvent
@@ -188,8 +189,9 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                 settings['agent_response_limits'] = {
                     'max_bytes': response_limits.max_bytes, 'max_files': response_limits.max_files}
                 files.save('request/evaluation.json', settings)
+                base_policy = DockerPolicy.from_environment(environ)
                 runtime_options = dict(
-                    environ=environ, policy=ControllerExecutionPolicy(ledger_root, repository=repository, target=target, writable=bool(policy.path), replay=replay_directory, channel=channel, publications=publications), trace_sink=Sink(),
+                    environ=environ, policy=ControllerExecutionPolicy(ledger_root, repository=repository, target=target, writable=bool(policy.path), replay=replay_directory, channel=channel, publications=publications, policy=base_policy), trace_sink=Sink(),
                     trace_max_bytes=trace_max_bytes, control=control, identity=identity,
                     timeout_sec=timeout,
                     run_id=directory.name, artifact_root=directory,
@@ -206,7 +208,7 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                     agent_outputs = directory / 'agent-output'
                     Path(agent_outputs).mkdir(mode=0o700)
                     options = dict(runtime_options)
-                    options['policy'] = AgentExecutionPolicy(repository, target, bool(policy.path), channel, agent_outputs)
+                    options['policy'] = AgentExecutionPolicy(repository, target, bool(policy.path), channel, agent_outputs, policy=base_policy)
                     options['artifact_root'] = directory / 'agent-runtime'
                     Path(options['artifact_root']).mkdir()
                     options['run_id'] = directory.name + '-agent'

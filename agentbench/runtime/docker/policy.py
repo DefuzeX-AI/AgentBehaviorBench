@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import math
+import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -71,14 +74,153 @@ class EgressSettings:
         return self.mode in ("observe", "open")
 
 
+MEMORY_ENV = "ABB_DOCKER_MEMORY"
+CPUS_ENV = "ABB_DOCKER_CPUS"
+
+# Positive integer followed by unit [k, m, g, K, M, G]
+_MEMORY_REGEX = re.compile(r"^[1-9][0-9]*[kmgKMG]$")
+
+# Minimum and maximum CPU bounds for Docker container
+MIN_CPUS = 0.0
+MAX_CPUS = 1024.0
+
+
+def _validate_docker_memory(memory: str) -> str:
+    """Validate Docker container memory limit format.
+
+    Constraints:
+        Must be a non-empty string consisting of a positive integer followed by
+        a standard memory unit suffix [k, m, g, K, M, G] (e.g. '8g', '512m', '2G').
+        Values such as '0g', '-8g', floats ('8.5g'), non-numeric characters, or
+        missing units ('8') are invalid and raise ValueError.
+
+    Args:
+        memory: The memory string to validate.
+
+    Returns:
+        The validated and stripped memory string.
+
+    Raises:
+        ValueError: If memory does not match the required format.
+    """
+    if not isinstance(memory, str):
+        raise ValueError(f"Memory limit must be a string, got {type(memory).__name__}")
+    stripped = memory.strip()
+    if not _MEMORY_REGEX.fullmatch(stripped):
+        raise ValueError(
+            f"Invalid memory limit format: {memory!r}. "
+            f"Must match positive integer with unit [kmgKMG] (e.g. '8g', '512m', '2G')."
+        )
+    return stripped
+
+
+def _validate_docker_cpus(cpus: float | int | str) -> float | int:
+    """Validate Docker container CPU allocation limit.
+
+    Constraints:
+        Must be a positive numeric value strictly greater than 0.0 and less than or
+        equal to 1024.0. Non-numeric strings, negative numbers, zero, NaN, infinities,
+        and boolean values are invalid and raise ValueError.
+
+    Args:
+        cpus: The CPU limit to validate (numeric value or numeric string).
+
+    Returns:
+        The validated CPU value. When passed as an integer (and not a string),
+        the integer value is returned to preserve argument formatting in downstream consumers.
+
+    Raises:
+        ValueError: If cpus cannot be parsed as a positive float within (0.0, 1024.0].
+    """
+    if isinstance(cpus, bool):
+        raise ValueError(f"Invalid cpus value {cpus!r}: boolean is not allowed.")
+    try:
+        val = float(cpus)
+    except (TypeError, ValueError):
+        raise ValueError(f"Invalid cpus format: {cpus!r}. Must parse as a positive float.")
+    if math.isnan(val) or math.isinf(val) or val <= MIN_CPUS or val > MAX_CPUS:
+        raise ValueError(
+            f"Invalid cpus value: {val}. Must be a positive float within 0.0 < float(cpus) <= 1024.0."
+        )
+    if isinstance(cpus, int) and not isinstance(cpus, str):
+        return cpus
+    return val
+
+
 @dataclass(frozen=True, slots=True)
 class DockerPolicy:
+    """Security and resource limits applied to every agent container.
+
+    Attributes:
+        cpus: Maximum CPU quota allocated to the container (--cpus). Must satisfy
+            0.0 < float(cpus) <= 1024.0. Defaults to 1.0. When instantiated via
+            :meth:`from_environment`, dynamically resolves the ``ABB_DOCKER_CPUS``
+            environment variable (e.g. 4.0) for CPU-intensive neural models (e.g. Marker/Surya layout
+            and OCR predictors).
+        memory: Maximum memory limit for the container (--memory). Must match
+            a positive integer followed by a unit suffix [kmgKMG] (e.g. '8g', '512m', '2G').
+            Defaults to '1g'. When instantiated via :meth:`from_environment`, dynamically resolves
+            the ``ABB_DOCKER_MEMORY`` environment variable (e.g. '8g') for heavy vision and
+            multimodal agents to prevent kernel OOM cgroup termination (exit code 137).
+        pids_limit: Maximum number of simultaneous processes (--pids-limit).
+        tmpfs_size: Capacity limit for in-memory tmpfs mounts (/tmp, /run/agentbench-tools).
+        egress: Network egress filtering policy.
+    """
+
     cpus: float = 1.0
     memory: str = "1g"
     pids_limit: int = 128
     # Capacity limit, not a reservation; tmpfs usage also counts toward memory.
     tmpfs_size: str = "1g"
     egress: EgressSettings = EgressSettings()
+
+    def __post_init__(self) -> None:
+        validated_mem = _validate_docker_memory(self.memory)
+        object.__setattr__(self, "memory", validated_mem)
+
+        validated_cpus = _validate_docker_cpus(self.cpus)
+        object.__setattr__(self, "cpus", validated_cpus)
+
+    @classmethod
+    def from_environment(
+        cls,
+        environ: Mapping[str, str] | None = None,
+        base: DockerPolicy | None = None,
+    ) -> DockerPolicy:
+        """Construct DockerPolicy from an explicit environment mapping or ambient process environment.
+
+        Args:
+            environ: Environment mapping to resolve limits from. If None, falls back to os.environ.
+                If an empty mapping ({}) is passed, default limits (1g memory, 1.0 CPU) are used
+                without ambient environment bleed.
+            base: Optional base DockerPolicy providing default values for unconfigured settings.
+
+        Returns:
+            Validated DockerPolicy instance.
+        """
+        env = os.environ if environ is None else environ
+        base_policy = base or cls()
+
+        mem = base_policy.memory
+        if MEMORY_ENV in env:
+            mem = env[MEMORY_ENV]
+
+        cpus = base_policy.cpus
+        if CPUS_ENV in env:
+            raw_cpus = env[CPUS_ENV]
+            if isinstance(raw_cpus, str):
+                raw_cpus = raw_cpus.strip()
+            cpus = _validate_docker_cpus(raw_cpus)
+
+        egress = EgressSettings.from_environment(env, base=base_policy.egress)
+
+        return cls(
+            cpus=cpus,
+            memory=mem,
+            pids_limit=base_policy.pids_limit,
+            tmpfs_size=base_policy.tmpfs_size,
+            egress=egress,
+        )
 
     def run_arguments(self) -> tuple[str, ...]:
         return (
