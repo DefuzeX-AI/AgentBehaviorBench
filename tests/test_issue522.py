@@ -10,7 +10,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 @pytest.fixture
 def bridge():
     path = (Path(__file__).resolve().parents[1] / "resources/agents/"
-            "63-mini-opencode/bindings/bridge.py")
+            "69-mini-opencode/bindings/bridge.py")
     spec = importlib.util.spec_from_file_location("issue522_bridge", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
