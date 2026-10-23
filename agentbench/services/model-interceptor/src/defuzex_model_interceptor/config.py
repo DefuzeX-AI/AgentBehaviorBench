@@ -57,6 +57,7 @@ class Target:
     endpoint_paths: Mapping[str, str] | None = None
     input_modalities: tuple[str, ...] = ('text',)
     secret: str = field(default='', repr=False)
+    chat_thinking: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -168,6 +169,9 @@ def _target(value: object) -> Target:
         for key, item in headers.items()
     ):
         raise ServiceConfigurationError("target headers must be a string object")
+    chat_thinking = data.get("chat_thinking")
+    if chat_thinking is not None and chat_thinking not in ("enabled", "disabled", "auto"):
+        raise ServiceConfigurationError("target chat_thinking must be enabled, disabled, or auto")
     endpoints = data.get("endpoint_paths")
     if endpoints is not None and (not isinstance(endpoints, dict) or not endpoints or any(
         not isinstance(key, str) or not key.startswith("/")
@@ -177,6 +181,7 @@ def _target(value: object) -> Target:
     )):
         raise ServiceConfigurationError("target endpoint_paths must map endpoints to relative API paths")
     return Target(
+        chat_thinking=chat_thinking,
         input_modalities=_strings(data, 'input_modalities') if 'input_modalities' in data else ('text',),
         secret=_read_secret(_string(data, 'secret_file')) if 'secret_file' in data else '',
         endpoint_paths=MappingProxyType(endpoints) if endpoints is not None else None,
