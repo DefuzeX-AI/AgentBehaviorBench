@@ -37,7 +37,7 @@ def prepare(environ):
     base, model = selected(environ)
     child = dict(environ)
     child.update(OPENAI_API_KEY=environ[KEY], OPENAI_BASE_URL=base,
-                 PYDANTIC_DEEP_MODEL="openai:" + model)
+                 PYDANTIC_DEEP_MODEL="openai-chat:" + model)
     return ["/opt/agent-venv/bin/python", "/opt/agent/bootstrap/server.py"], child, {}
 
 def main():

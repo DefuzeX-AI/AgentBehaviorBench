@@ -65,3 +65,15 @@ def test_outer_recipe_keeps_native_agent_and_unprivileged_user():
     assert "USER agent" in recipe and "COPY .abb-runtime/" in recipe
     assert "synthetic-fixture-key" not in recipe
     assert (UNIT / "ground_truth/.gitkeep").is_file()
+
+
+def test_build_cache_and_resource_controls():
+    recipe = (UNIT / "Dockerfile").read_text()
+    assert "--mount=type=cache,target=/root/.cache/pip" in recipe
+    assert "pip install --no-cache-dir" not in recipe
+
+
+def test_selected_model_uses_explicit_chat_completions_protocol():
+    _, child, _ = launcher().prepare(environment())
+    assert child["PYDANTIC_DEEP_MODEL"] == "openai-chat:fixture-model"
+    assert child["OPENAI_BASE_URL"] == environment()["ABB_AGENT_MODEL_BASE_URL"]
