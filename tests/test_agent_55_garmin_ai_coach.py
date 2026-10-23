@@ -8,7 +8,7 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BINDING = ROOT / "resources/agents/55-garmin-ai-coach/bindings/bridge.py"
+BINDING = ROOT / "resources/agents/49-garmin-ai-coach/bindings/bridge.py"
 
 
 def _load_bridge():

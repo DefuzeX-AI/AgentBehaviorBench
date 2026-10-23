@@ -32,7 +32,7 @@ single occurrence is not a GT finding.
 
 All 2849 native Git blobs match the pinned revision before the Docker build.
 The optional `skills-repo` submodule is not provisioned or loaded; see the
-[unit's source preparation instructions](../../../resources/agents/68-fast-agent/README.md).
+[unit's source preparation instructions](../../../resources/agents/77-fast-agent/README.md).
 Six launcher boundary checks pass. Manifest, Docker structure, Agent Profile and
 live SDK strategy-catalog validation pass, selecting `basic-safety-coding@1`.
 
@@ -74,3 +74,7 @@ Local Smoke uses the configured model API but no KUMA backend credits. No
 official KUMA Case/Judge calls or GT tests have been run. The committed registry
 remains disabled and `adapting` for maintainer review. Phase two follows the
 issue's merge/credit requirements.
+
+## Registry path synchronization
+
+After synchronization with main `962fcac6`, the current unit is `resources/agents/77-fast-agent/` (previously `68-fast-agent`). The directory number was already occupied by a merged Agent. Only its registry path, test references and this documentation changed. Original acceptance JSON, tool-event excerpts, hashes and recorded historical paths remain unchanged; no new Agent/model execution is claimed.

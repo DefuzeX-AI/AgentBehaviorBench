@@ -10,6 +10,10 @@ def timeline(api):
     names = ['timing.jsonl', 'evaluation/timing.jsonl']
     names.extend(sorted(path.name for path in api.directory.glob('timing-recovery-*.jsonl')))
     names.extend(sorted(path.name for path in api.directory.glob('timing-judge-*.jsonl')))
+    from .archive import archive_manifest
+    archived = archive_manifest(api.directory)
+    if archived:
+        names = [name for name in archived['files'] if name.endswith('.jsonl') and 'timing' in name]
     for name in names:
         try:
             path = api.file(name)

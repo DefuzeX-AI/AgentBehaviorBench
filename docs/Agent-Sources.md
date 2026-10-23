@@ -39,8 +39,8 @@ Git acquisition implementation cannot reproduce their source:
 | Unit | Required local material |
 | --- | --- |
 | `01-folder-mover-agent` | The original local source snapshot matching the recorded SHA-256 content digest; the recorded Windows path is provenance, not a portable download URL. |
-| `13-claude-agent-acp` | The selected upstream checkout, including its documentation link handling. The pinned source contains a symbolic link; automatic Git extraction rejects symbolic links. |
-| `41-biomedical-aiq-research-agent` | The selected upstream checkout and required data assets. Its dataset ZIP files are Git LFS objects; automatic Git extraction does not materialize LFS. |
+| `10-claude-agent-acp` | The selected upstream checkout, including its documentation link handling. The pinned source contains a symbolic link; automatic Git extraction rejects symbolic links. |
+| `37-biomedical-aiq-research-agent` | The selected upstream checkout and required data assets. Its dataset ZIP files are Git LFS objects; automatic Git extraction does not materialize LFS. |
 
 For GitHub sources, the repository and exact commit are recorded in each unit's
 `agent.toml` and `source-manifest.json`. Supply the matching source tree under that

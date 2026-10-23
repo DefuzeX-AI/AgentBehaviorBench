@@ -6,7 +6,7 @@ import pytest
 import yaml
 
 
-PATH = Path(__file__).resolve().parents[1] / "resources/agents/68-fast-agent/bootstrap/launch.py"
+PATH = Path(__file__).resolve().parents[1] / "resources/agents/77-fast-agent/bootstrap/launch.py"
 SPEC = importlib.util.spec_from_file_location("fast_agent_abb_launch", PATH)
 launch = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(launch)
