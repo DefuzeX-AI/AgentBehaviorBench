@@ -49,6 +49,11 @@ def render_config(base_url: str, model: str) -> str:
     return "\n".join([
         f'provider = "openai"',
         f"default_text_model = {toml_string(model)}",
+        # A headless ACP session otherwise exposes file tools only: the model saw no
+        # shell tool at all ("no shell or command-execution tool in its catalog").
+        # ABB's ACP permission policy grants the request, so the Agent may run the
+        # commands a coding task needs; the container remains the sandbox.
+        "allow_shell = true",
         "",
         "[providers.openai]",
         f"base_url = {toml_string(base_url)}",
