@@ -1,0 +1,106 @@
+{
+  "status": "candidate_pending_human_review",
+  "repository": "bytedance/deer-flow",
+  "source_revision": "a1eb3971412ee269f1f89bfb5cc9e158b682f86e",
+  "model": "openrouter/deepseek/deepseek-v4.1-flash-1017",
+  "method": "Issue-derived directed reproduction; upstream reports were consulted before hypotheses.",
+  "formal_issue_447_protocol_satisfied": false,
+  "limitations": [
+    "No blind source-first discovery",
+    "No ten independent ABB repetitions per frozen case",
+    "Three offline component repetitions are not three ABB agent repetitions",
+    "Podcast credential absence is an explicit fixture; eligibility needs reviewer assessment",
+    "No Judge run; no official GT manifest registration"
+  ],
+  "component_repetitions": 3,
+  "live_case_inputs": 4,
+  "live_case_inputs_succeeded": 2,
+  "live_suite_status": "failed",
+  "candidates": [
+    {
+      "id": "deer-flow-issue-7303",
+      "issue": 7303,
+      "issue_url": "https://github.com/bytedance/deer-flow/issues/7303",
+      "title": "Quoted artifact paths truncate at spaces",
+      "expected_behavior": "Preserve the full quoted sandbox path in the persistent artifact reference.",
+      "observed_behavior": "The production extractor stores /mnt/user-data/outputs/quarterly instead of the full quarterly report.txt path.",
+      "reproduced": 3,
+      "attempted": 3,
+      "case_ids": [
+        "issue-7303-trigger",
+        "issue-7303-control"
+      ],
+      "agent_recovery": "Literal full-path fallback read returned CHECKPOINT-7303. Agent then retried newly emitted truncated handles; no final response before GraphRecursionError at limit 100.",
+      "task_outcome": "failed_recursion_limit",
+      "control": "No-space handle resolved correctly; readback and final response succeeded.",
+      "live_agent_defect_reproduced": true,
+      "status": "candidate_pending_human_review"
+    },
+    {
+      "id": "deer-flow-issue-7302",
+      "issue": 7302,
+      "issue_url": "https://github.com/bytedance/deer-flow/issues/7302",
+      "title": "Duplicate SQL columns silently lose data in JSON export",
+      "expected_behavior": "Reject ambiguous duplicate JSON keys or preserve both source values explicitly; never silently discard a value.",
+      "observed_behavior": "The native exporter reports success but turns two id columns with values 1 and 2 into a single id value 2.",
+      "reproduced": 3,
+      "attempted": 3,
+      "case_ids": [
+        "issue-7302-trigger-and-control"
+      ],
+      "agent_recovery": "Agent diagnosed native JSON value loss and additionally demonstrated CSV/Markdown preserve both values. No final response before GraphRecursionError at limit 100.",
+      "task_outcome": "failed_recursion_limit",
+      "control": "Distinct SQL aliases preserved both values in JSON.",
+      "live_agent_defect_reproduced": true,
+      "status": "candidate_pending_human_review"
+    },
+    {
+      "id": "deer-flow-issue-7235",
+      "issue": 7235,
+      "issue_url": "https://github.com/bytedance/deer-flow/issues/7235",
+      "title": "Podcast CLI returns success after generation failure",
+      "expected_behavior": "Return a nonzero process status when podcast generation fails.",
+      "observed_behavior": "The native CLI reports missing credentials and produces no MP3, but exits 0; argparse control exits 2.",
+      "reproduced": 3,
+      "attempted": 3,
+      "case_ids": [
+        "issue-7235-trigger-and-control"
+      ],
+      "agent_recovery": "Agent checked stderr and MP3 absence, correctly reported generation failure despite exit code 0. Diagnostic task completed; no audio generation recovery attempted.",
+      "task_outcome": "succeeded_diagnostic_task",
+      "control": "No-argument native CLI returned argparse exit code 2.",
+      "live_agent_defect_reproduced": true,
+      "status": "candidate_pending_human_review"
+    }
+  ],
+  "source_file_hashes": {
+    "backend/packages/harness/deerflow/tools/artifact_registry.py": "314da00943318638b5a5ed21c88b90259b384f3c6ad9d200af0d86e1ab57bf74",
+    "skills/public/data-analysis/scripts/analyze.py": "4197721f53307a2b0a927dccf129de943e00cd409d8be95ed84c42be05e1eefd",
+    "skills/public/podcast-generation/scripts/generate.py": "a896764aa6165185a24c0465561e19f36b5f437ad4f8f0e098cbc796e460b605"
+  },
+  "component_observations": [
+    {
+      "id": "component-44de539ed28c2f16",
+      "evidence_path": "components-container-probe.json",
+      "sha256": "44de539ed28c2f1681a742786e56191e2d58ff6aed8f48b25a8e29576f756106",
+      "all_triggers_reproduced": true,
+      "all_controls_passed": true
+    },
+    {
+      "id": "component-049c4c3ae4a3b15b",
+      "evidence_path": "components-repeat-2.json",
+      "sha256": "049c4c3ae4a3b15ba2290d21f9b70a95b3cc238f6a532fc5a6be6774d0f85446",
+      "all_triggers_reproduced": true,
+      "all_controls_passed": true
+    },
+    {
+      "id": "component-aee8027bfaa7c83e",
+      "evidence_path": "components-repeat-3.json",
+      "sha256": "aee8027bfaa7c83e8278f63d163116726d0c2bbfb7d16ba805d266b30650a362",
+      "all_triggers_reproduced": true,
+      "all_controls_passed": true
+    }
+  ],
+  "agent_evidence": "agent-evidence.json",
+  "note": "Local component-GT classification follows the requester rule; it is not official issue-447 acceptance."
+}
