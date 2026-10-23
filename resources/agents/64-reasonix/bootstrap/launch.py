@@ -39,10 +39,19 @@ def config_toml(base_url: str, model: str) -> str:
     """Return Reasonix's global config.toml for one static OpenAI-compatible provider.
 
     `models` is a static one-entry list. Reasonix otherwise discovers models over
-    `GET <base>/models`, which is outside the admitted model route. Nothing else is
-    declared: every other upstream default (tool set, telemetry policy, sandbox
-    posture) is left exactly as the pinned release ships it, and no tool is
-    disabled to fit one provider.
+    `GET <base>/models`, which is outside the admitted model route. Nothing else
+    about the provider is declared.
+
+    `[sandbox] bash = "off"` is required, not a preference. Upstream's Linux
+    default is `enforce`, and bubblewrap cannot create the namespaces it needs
+    inside a default container, so with `enforce` every shell command is refused
+    with "bash sandbox requested but unavailable on this host; refusing to run
+    unconfined" — a coding Agent that cannot run a command cannot be evaluated.
+    Upstream documents this exact configuration for containers and names the
+    consequence: shell commands then run unconfined and the container is the only
+    boundary, which is what ABB already provides. `--sandbox-bash auto` does not
+    fix it: upstream derives the override from the flag only when it is
+    `enforce`, so the config file is the only place this can be set.
     """
     return "\n".join([
         "config_version = 1",
@@ -59,6 +68,9 @@ def config_toml(base_url: str, model: str) -> str:
         f"default        = {toml_string(model)}",
         f"api_key_env    = {toml_string(KEY_ENV)}",
         f"context_window = {DEFAULT_CONTEXT_LIMIT}",
+        "",
+        "[sandbox]",
+        'bash = "off"',
         "",
     ])
 
