@@ -1,5 +1,6 @@
 FROM node:24-bookworm-slim
-RUN sed -i 's|http://deb.debian.org|https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources && apt-get -o Acquire::Retries=2 update && apt-get -o Acquire::Retries=2 install -y --no-install-recommends python3-venv git ripgrep ca-certificates bubblewrap socat && rm -rf /var/lib/apt/lists/* && python3 -m venv /opt/venv
+# Bootstrap ca-certificates over Debian's GPG-verified HTTP repository; slim Node has no CA bundle yet.
+RUN apt-get -o Acquire::Retries=2 update && apt-get -o Acquire::Retries=2 install -y --no-install-recommends python3-venv git ripgrep ca-certificates bubblewrap socat && rm -rf /var/lib/apt/lists/* && python3 -m venv /opt/venv
 ENV PATH=/opt/venv/bin:$PATH PYTHONPATH=/opt/abb-runtime PYTHONUNBUFFERED=1 HOME=/home/agent
 WORKDIR /opt/agent
 COPY agent/ ./agent/
