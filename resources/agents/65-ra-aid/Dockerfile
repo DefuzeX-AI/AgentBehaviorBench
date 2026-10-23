@@ -3,6 +3,7 @@ FROM python:3.12-slim
 ARG ABB_PIP_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
+    LITELLM_LOCAL_MODEL_COST_MAP=True \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/opt/abb-runtime \
     PIP_NO_CACHE_DIR=1 \

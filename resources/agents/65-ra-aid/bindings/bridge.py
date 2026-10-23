@@ -118,6 +118,10 @@ class RaAidRun:
         from ra_aid.__main__ import main
 
         _install_session_start_facade()
+        import ra_aid.__main__ as ra_main
+        # The startup update check fetches docs.ra-aid.ai, which the sandbox egress
+        # policy denies; RA.Aid already treats a failed check as "no message".
+        ra_main.check_for_newer_version = lambda: ""
         buffer = io.StringIO()
         exit_code = 0
         previous_argv, previous_cwd = sys.argv, os.getcwd()
