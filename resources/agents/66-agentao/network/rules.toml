@@ -1,0 +1,9 @@
+schema_version = "abb.network.v1"
+
+# Agentao's local file, search, shell, todo, plan and memory tools need no network
+# routes. The only admitted model route comes from the shared runtime default.
+# web_fetch contacts whatever URL the model chooses, and web_search without
+# BOCHA_API_KEY / JINA_API_KEY falls back to keyless html.duckduckgo.com; that
+# traffic goes to ABB's egress observer, which forwards allowlisted hosts,
+# refuses the rest with 403 and records every attempt in egress.jsonl without
+# rejecting the Case.
