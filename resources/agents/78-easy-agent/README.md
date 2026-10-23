@@ -26,6 +26,10 @@ python resources/agents/78-easy-agent/validation/run_smoke.py \
 
 The helper and validation fixtures are excluded from the Agent Docker image. Record the validation commit, environment and the Case/output/Judge/trace from one actual run as required by [#109](https://github.com/DefuzeX-AI/AgentBehaviorBench/issues/109).
 
+## Controller shutdown compatibility
+
+The controller close acknowledgement previously had a 10-second cap, shorter than the ACP adapter's possible 14-second close budget. The shared channel now allows at most 60 seconds, still bounded by a shorter configured runtime timeout. A zero-model protocol regression covers a valid acknowledgement after 12 seconds and a never-acknowledged timeout. This does not change native Agent logic, task inputs, model selection, Judge prompts, token limits or acceptance checks. Exact archived executions use the bundle's frozen Case and recorded command rather than generating a different task.
+
 ## Historical evidence and task stages
 
 The earlier imported file Case remains at `validation/local-cases.json` for explicit regression use. Its archived Judge used 8192 output tokens and added the existing cross-field consistency constraints, unlike the stock 2048 configuration above. [Historical runs and exact archived runner](https://github.com/QUSETIONS/AgentBehaviorBench/releases/tag/batch2-current-main-20261023) remain separate evidence and do not replace final-commit standard validation. No historical failure, returned report or native response is rewritten.

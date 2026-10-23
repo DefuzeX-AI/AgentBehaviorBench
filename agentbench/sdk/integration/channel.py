@@ -142,7 +142,9 @@ class DirectoryAgentSession:
     async def aclose(self):
         if not self.closed:
             self.closed = True
-            await self._exchange({'operation': 'close'}, min(10, self.timeout))
+            # A valid adapter shutdown may outlast the former ten-second channel cap.
+            # Keep the wait finite and respect a shorter declared runtime timeout.
+            await self._exchange({'operation': 'close'}, min(60, self.timeout))
 
     def snapshot(self):
         return dict(self.state)
