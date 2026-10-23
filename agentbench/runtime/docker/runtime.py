@@ -50,7 +50,7 @@ from .egress_observer import (
 )
 from .interceptor_image import LocalInterceptorImageProvider, default_interceptor_image_provider
 from .interceptor_policy import InterceptorPolicy
-from .policy import DockerPolicy, EgressSettings
+from .policy import DockerPolicy, EgressSettings, resource_arguments
 from .session import DockerSession
 from .resources import ResourceRegistry
 from .worker_build import worker_build_context
@@ -323,7 +323,7 @@ class DockerRuntime:
                 *network_arguments,
                 "--workdir",
                 config.workdir,
-                *self._policy.run_arguments(),
+                *resource_arguments(self._policy.run_arguments(), cpus=getattr(config, "cpus", None)),
             ]
             if interceptor is not None:
                 # Mount the interceptor certificate into the Agent container.

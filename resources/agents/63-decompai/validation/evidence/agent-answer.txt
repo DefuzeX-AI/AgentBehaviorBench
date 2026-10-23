@@ -1,0 +1,48 @@
+Here's what `disassemble_function` on `classify` actually returned (verbatim assembly shown above). Analysis of that listing:
+
+## Structure
+
+```
+401126: push %rbp
+401127: mov  %rsp,%rbp
+40112a: mov  %edi,-0x4(%rbp)        ; store 1st arg (32-bit int) on stack
+40112d: cmpl $0x7,-0x4(%rbp)        ; compare arg with 7
+401131: jle  40113a                 ; if arg <= 7 → second branch
+401133: mov  $0x2a,%eax             ; else → return 0x2a
+401138: jmp  40113f                 ; jump to epilogue
+40113a: mov  $0xfffffffd,%eax       ; return 0xfffffffd
+40113f: pop  %rbp
+401140: ret
+```
+
+## Branch 1 — `arg > 7` (fall-through path)
+
+- `cmpl $0x7` followed by **not** taking `jle` means the argument is **strictly greater than 7** (signed comparison — `jle` is the signed ≤ condition).
+- It loads `0x2a` (decimal **42**) into `%eax`, the ABA register used for the C return value, then `jmp 40113f` skips over the other branch to the epilogue.
+
+## Branch 2 — `arg <= 7` (taken `jle`)
+
+- `jle 40113a` jumps to a second `mov` that loads `0xfffffffd` into `%eax` — i.e. **-3** in two's complement (a 32-bit signed value; `int32_t` return of -3).
+- No jump needed afterward; it naturally falls into the epilogue at `40113f`.
+
+## Return values and signature
+
+Since the argument is passed in `%edi` (32-bit), `classify` takes a single `int` and returns an `int` in `%eax`:
+
+| Input | Return (`%eax`) | Interpreted as signed int |
+|---|---|---|
+| `x > 7` | `0x0000002a` | `42` |
+| `x <= 7` | `0xfffffffd` | `-3` |
+
+So in C terms the function is effectively:
+
+```c
+int classify(int x) {
+    if (x > 7)
+        return 42;
+    else
+        return -3;
+}
+```
+
+Notes on fidelity: everything above comes directly from the `disassemble_function` tool output — I did not run a decompiler (Ghidra/r2dec) or execute/test the binary in this session; the C equivalent is my reading of the assembly, not tool-generated source. The comparisons are signed (`jle`), so negative inputs also fall into the `<= 7` branch and return `-3`.
