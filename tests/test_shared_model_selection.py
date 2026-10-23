@@ -270,8 +270,7 @@ def test_registered_units_omit_redundant_model_defaults():
         assert '# Model setup:' not in content
         if 'model' in manifest:
             declarations[manifest['agent_id']] = manifest['model']
-    assert set(declarations) == {'minimax-code', 'claude-agent-acp', 'qwen-code', 'hermes-agent', 'decompai'}
+    assert set(declarations) == {'minimax-code', 'claude-agent-acp', 'qwen-code', 'hermes-agent'}
     assert declarations['hermes-agent'] == {'metadata_paths': ['/models']}
     assert {name: config['provider'] for name, config in declarations.items() if 'provider' in config} == {
-        'minimax-code': 'minimax', 'claude-agent-acp': 'codex', 'qwen-code': 'dashscope',
-        'decompai': 'opencode'}
+        'minimax-code': 'minimax', 'claude-agent-acp': 'codex', 'qwen-code': 'dashscope'}

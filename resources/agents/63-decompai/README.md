@@ -51,7 +51,7 @@ Only x86/i386 or x86-64 little-endian ELF is accepted. There is no URL download 
 upload endpoint. Native tools still inspect the disposable container; the input
 path check is not advertised as confinement of every native tool.
 
-The deployment uses opencode/glm-5.3-flash without model fallback. Defaults are
+The model is the one ABB serves on the declared route (glm-5.3-flash by default). Defaults are
 16 model starts, 3072 output tokens per response, 40 graph steps, 120 seconds per
 model request, 60 seconds per shell command and 600 seconds per native utility
 analysis (including Ghidra cold startup). The Agent wall-clock limit is 1800 seconds.

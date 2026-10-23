@@ -65,9 +65,8 @@ def _native():
     key = os.environ.get("OPENAI_API_KEY")
     if not key:
         raise RuntimeError("Runtime model interception credential is required")
+    # ABB replaces the model behind the declared route, so the name is only a label here.
     model_name = os.environ.get("ABB_AGENT_MODEL") or os.environ.get("LLM_MODEL") or "glm-5.3-flash"
-    if model_name != "glm-5.3-flash":
-        raise ValueError("This deployment is pinned to glm-5.3-flash")
     os.environ["LLM_MODEL"] = model_name
     os.environ["DECOMPAI_RUNNER_BUILD"] = "false"
     sys.path.insert(0, str(SOURCE))

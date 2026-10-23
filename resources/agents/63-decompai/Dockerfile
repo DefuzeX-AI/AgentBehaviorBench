@@ -1,5 +1,5 @@
 FROM --platform=linux/amd64 python:3.11-slim
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 GRADIO_ANALYTICS_ENABLED=False \
     PYTHONPATH=/opt/abb-runtime:/opt/agent/agent \
     GHIDRA_HOME=/opt/ghidra \
     PATH=/opt/ghidra/support:/opt/ghidra:/usr/local/bin:/usr/bin:/bin \
