@@ -89,8 +89,8 @@ not an ABB acceptance. The script uses the exact same adapter as the interceptor
 With the RAG bridge running, use the routing files for this command only:
 
 ```bash
-ABB_MODEL_PROVIDERS_CONFIG="$PWD/resources/biomedical-model-providers.toml" \
-ABB_MODEL_ROUTING_CONFIG="$PWD/resources/biomedical-model-routing-nvidia.toml" \
+ABB_MODEL_PROVIDERS_CONFIG="$PWD/resources/agents/41-biomedical-aiq-research-agent/biomedical-model-providers.toml" \
+ABB_MODEL_ROUTING_CONFIG="$PWD/resources/agents/41-biomedical-aiq-research-agent/biomedical-model-routing-nvidia.toml" \
 agentbench evaluate biomedical-aiq-research-agent --cases 1 --sdk local --no-view
 ```
 

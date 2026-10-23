@@ -169,9 +169,9 @@ def run(configuration: RunConfiguration | None = None) -> int:
             suite_runner.retry_policy = config.retry_policy
 
     def match_ground_truth(directory):
-        from agentbench.harness.ground_truth.evaluator import evaluate_suite
-        evaluate_suite(directory, DEFAULT_REGISTRY_PATH.parent.parent,
-                       environ=config.environ, output=config.output_fn)
+        from agentbench.evaluation import EvaluationService
+        EvaluationService(DEFAULT_REGISTRY_PATH.parent.parent,
+                          environ=config.environ).evaluate_gt(directory, output=config.output_fn)
 
     execution = run_benchmark_session(
         agents,
