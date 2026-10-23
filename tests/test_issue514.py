@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-PATH = Path(__file__).resolve().parents[1] / "resources/agents/70-coddy/bootstrap/launch.py"
+PATH = Path(__file__).resolve().parents[1] / "resources/agents/77-coddy/bootstrap/launch.py"
 SPEC = importlib.util.spec_from_file_location("coddy_abb_launcher", PATH)
 launch = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(launch)

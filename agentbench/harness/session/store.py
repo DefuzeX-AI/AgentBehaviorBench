@@ -33,6 +33,8 @@ def read_suite(directory):
     events = json.loads((directory / 'events.json').read_text(encoding='utf-8'))
     if not isinstance(events, list):
         raise ValueError('Suite events must be an array')
+    from .event_refs import expand_event
+    events = [expand_event(directory, event) for event in events]
     for index, event in enumerate(events, 1):
         if (not isinstance(event, dict) or event.get('schema') != EVENT_SCHEMA
                 or event.get('sequence') != index or event.get('suite_id') != plan['suite_id']):
@@ -61,6 +63,7 @@ class SuiteStore:
         self._lock = SuiteLock(self.directory)
         self._owner = threading.get_ident()
         self._plan, self._events = None, []
+        self._stored_events = []
 
     @classmethod
     def begin(cls, root, suite_id, registrations, *, configuration=None, environ=None,
@@ -75,6 +78,7 @@ class SuiteStore:
             store._plan = build_plan(suite_id, registrations, configuration=configuration,
                                      secrets=store._secrets, result_log_path=store.path,
                                      origin_suite_id=origin_suite_id)
+            store._plan['artifact_layout'] = 'agent-trajectories-v1'
             if result_log_path is not None:
                 store._plan['requested_output_path'] = str(Path(result_log_path).resolve())
             atomic_json(store.path, [])
@@ -98,6 +102,7 @@ class SuiteStore:
         store._lock.acquire()
         try:
             store._plan, store._events = read_suite(directory)
+            store._stored_events = json.loads(store.path.read_text(encoding='utf-8'))
             return store
         except BaseException:
             store.close()
@@ -148,7 +153,12 @@ class SuiteStore:
                         'suite_id': self.suite_id, 'sequence': len(self._events) + 1}, self._secrets)
         updated_plan = extend_plan(self._plan, value)
         pending = [*self._events, value]
-        atomic_json(self.path, pending)
+        from .event_refs import retain_event
+        stored = retain_event(self.directory, value,
+            managed=self._plan.get('artifact_layout') == 'agent-trajectories-v1')
+        stored_pending = [*self._stored_events, stored]
+        atomic_json(self.path, stored_pending)
+        self._stored_events = stored_pending
         self._events, self._plan = pending, updated_plan
         return deepcopy(value)
 

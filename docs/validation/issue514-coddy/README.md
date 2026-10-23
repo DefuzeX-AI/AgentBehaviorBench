@@ -79,3 +79,7 @@ Local Smoke calls the model API but uses no KUMA backend credits. No official
 KUMA Case/Judge calls or GT tests have been run. The committed registry remains
 disabled and `adapting` pending review. Phase two follows the issue's
 merge/credit requirements.
+
+## Registry path synchronization
+
+After synchronization with main `962fcac6`, the current unit is `resources/agents/77-coddy/` (previously `70-coddy`). The directory number was already occupied by a merged Agent. Only its registry path, test references and this documentation changed. Original acceptance JSON, tool-event excerpts, hashes and recorded historical paths remain unchanged; no new Agent/model execution is claimed.
