@@ -99,29 +99,20 @@ def test_cli_reads_same_result_and_report(project, capsys):
 
 def install_test_gt(service, agent_id):
     """Synthetic GT for protocol tests, never a benchmark finding."""
-    from agentbench.harness.session.plan import source_digest, digest_json
-    from agentbench.harness.ground_truth.files import file_digest
-    unit = service.root / 'unit'
-    directory = unit / 'ground_truth'
-    directory.mkdir(exist_ok=True)
-    observations = []
-    for index in range(2):
-        path = directory / f'observation-{index}.txt'
-        path.write_text('Synthetic fixture: expected exact echo, observed modified output.')
-        observations.append({'id': str(index), 'case_sha256': 'a' * 64,
-            'evidence_path': path.name, 'evidence_sha256': file_digest(path)})
-    defect = {'id': 'echo-changed', 'title': 'Echo changed', 'expected_behavior': 'Echo input exactly',
-        'observed_behavior': 'Output contains an added turn counter', 'source_sha256': source_digest(unit),
-        'case_sha256': 'a' * 64, 'confirmed_by': 'synthetic-test-fixture',
-        'confirmed_at': '2026-10-21T00:00:00+00:00', 'observations': observations}
-    (directory / 'manifest.json').write_text(json.dumps({'schema': 'abb.agent.ground_truth.v1',
-        'agent_id': agent_id, 'defects': [defect]}))
-    (directory / 'matching.json').write_text(json.dumps({'schema': 'abb.gt.matching.v1', 'rules': [{
-        'ground_truth_id': defect['id'], 'ground_truth_sha256': digest_json(defect),
-        'review_status': 'approved', 'conditions': [{'id': 'C1', 'text': 'Output appends a counter to the requested exact echo.'}]}]}))
+    from agentbench.harness.ground_truth.manifests import MANIFEST_SCHEMA
+    directory = service.root / 'unit/ground_truth/echo-changed'
+    folder = directory / 'attempts/reference/evaluation/inputs/0001'
+    folder.mkdir(parents=True)
+    (directory / 'gt.json').write_text(json.dumps({
+        'schema': MANIFEST_SCHEMA, 'agent_id': agent_id, 'id': 'echo-changed',
+        'summary': 'Echo changed', 'explanation': 'Output appends a counter to the requested exact echo.',
+        'reference_attempts': ['reference']}))
+    (directory / 'case.json').write_text(json.dumps({'case_id': 'reference'}))
+    (folder / 'input.json').write_text(json.dumps({'payload': 'hello'}))
+    (folder / 'result.json').write_text(json.dumps({'output': 'hello 1'}))
 
 
-def test_gt_reads_submitted_report_in_second_stage_only(project, monkeypatch):
+def test_gt_matches_submitted_summary_before_loading_saved_traces(project, monkeypatch):
     service, _, _ = project
     install_test_gt(service, 'example')
     result = run_one(service)
@@ -130,21 +121,21 @@ def test_gt_reads_submitted_report_in_second_stage_only(project, monkeypatch):
     response = {**report(request, 'issue'), 'issues': [{'input_id': 'a', 'message': 'Fixture finding'}]}
     service.submit_judge(suite, run, response)
     from agentbench.harness.ground_truth import evaluator
-    monkeypatch.setattr(evaluator, '_model', lambda _: SimpleNamespace(model='fixture', base_url='https://example.test'))
+    monkeypatch.setattr(evaluator, 'model_config', lambda _: SimpleNamespace(model='fixture', base_url='https://example.test'))
     calls = []
-    def ask(model, steps, **kwargs):
-        evidence = kwargs['payload']['evidence']
-        calls.append(evidence)
-        ref = next(k for k in evidence if k.endswith('result.json'))
+    def ask(model, **kwargs):
+        payload = kwargs['payload']
+        calls.append(payload)
+        assert payload['finding_summary'] == 'Fixture finding'
         if len(calls) == 1:
-            assert 'report' not in evidence
-            value = {'conditions': [{'id': 'C1', 'status': 'satisfied', 'reason': 'Fixture', 'evidence_refs': [ref]}]}
-        else:
-            assert evidence['report'] == response
-            value = {'detected': True, 'reason': 'Fixture', 'evidence_refs': ['report', ref]}
-        return value, json.dumps(value)
+            assert set(payload) == {'reference', 'finding_summary'}
+            return {'match': True, 'reason': 'Matching problem summaries'}
+        assert payload['reference_traces'] and payload['candidate_trace']['events']
+        return {'match': True, 'reason': 'Compared saved execution evidence',
+                'reference_event_ids': [payload['reference_traces'][0]['events'][0]['id']],
+                'candidate_event_ids': [payload['candidate_trace']['events'][0]['id']]}
     gt = service.evaluate_gt(suite, ask=ask)
-    assert len(calls) == 2 and gt['scores']['discovery_coverage'] == 1
+    assert len(calls) == 2 and gt['scores']['discovery_rate'] == 1
     assert gt['status'] == 'completed' and gt['provisional']
 
 

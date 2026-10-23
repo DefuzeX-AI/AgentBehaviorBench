@@ -35,3 +35,7 @@ without model calls. SQLite and PTY native modules were loaded in Docker.
 The Agent Profile was validated with the authenticated KUMA catalog context.
 No official KUMA Case/Judge call or phase-two GT test was performed. Merge and
 maintainer acceptance remain separate from this successful Local Smoke.
+
+## Registry path synchronization
+
+After synchronization with main `962fcac6`, the current unit is `resources/agents/77-blade-code/` (previously `73-blade-code`). The directory number was already occupied by a merged Agent. Only its registry path, test references and this documentation changed. Original acceptance JSON, tool-event excerpts, hashes and recorded historical paths remain unchanged; no new Agent/model execution is claimed.

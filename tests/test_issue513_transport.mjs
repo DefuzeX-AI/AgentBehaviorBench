@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
-import { createCompatibility } from '../resources/agents/73-blade-code/bootstrap/acp-compat.mjs';
+import { createCompatibility } from '../resources/agents/77-blade-code/bootstrap/acp-compat.mjs';
 
 function fixture(t) {
   const temporary = mkdtempSync(path.join(os.tmpdir(), 'abb-blade-acp-'));
