@@ -58,7 +58,7 @@ whichever unprivileged uid the runtime selects.
 
 ```bash
 # static checks
-python scripts/validate_unit_generic.py resources/agents/63-codewhale codewhale
+python scripts/validate_unit_generic.py resources/agents/65-codewhale codewhale
 
 # one local Case (Docker, no KUMA spend)
 ABB_RUNTIME_BUILD_TIMEOUT_SEC=3600 .venv/bin/python -m agentbench evaluate \
