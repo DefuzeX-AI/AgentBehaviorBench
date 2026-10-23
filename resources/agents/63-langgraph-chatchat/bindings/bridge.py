@@ -218,9 +218,12 @@ class _ChatchatBaseAgent:
     def _config(self, config: dict | None) -> dict:
         self._thread += 1
         thread_id = f"abb-chatchat-{self._thread}"
-        if config and isinstance(config.get("configurable"), dict):
-            thread_id = str(config["configurable"].get("thread_id") or thread_id)
-        return {"configurable": {"thread_id": thread_id}}
+        merged = dict(config or {})
+        configurable = dict(merged.get("configurable") or {})
+        configurable["thread_id"] = str(configurable.get("thread_id") or thread_id)
+        # Keep ABB's callbacks / run metadata so framework node spans are recorded.
+        merged["configurable"] = configurable
+        return merged
 
     @staticmethod
     def _text(result: dict[str, Any]) -> str:
