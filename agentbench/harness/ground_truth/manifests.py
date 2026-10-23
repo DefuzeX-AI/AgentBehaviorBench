@@ -3,12 +3,10 @@
 from pathlib import Path
 
 from agentbench.harness.registry import tomllib
-from agentbench.harness.session.plan import digest_json
 
-from .files import (GroundTruthError, file_digest, hash_field, label, read_bytes,
-                    read_json, records_field, text_field, timestamp_field, within)
+from .files import (GroundTruthError, label, read_bytes, read_json, records_field, text_field, within)
 
-MANIFEST_SCHEMA = 'abb.agent.ground_truth.v1'
+MANIFEST_SCHEMA = 'abb.agent.ground_truth.case.v1'
 
 
 def registered_units(root):
@@ -46,53 +44,45 @@ def registered_units(root):
 
 
 def load_manifest(unit, agent_id):
-    """Validate all defects and retained observation hashes, or reject this manifest."""
+    """Read small GT descriptions; open saved traces only after summary matching."""
     unit = Path(unit).resolve()
-    directory = within(unit, unit / 'ground_truth')
-    path = within(directory, directory / 'manifest.json')
-    if not path.exists():
+    root = within(unit, unit / 'ground_truth')
+    if not root.exists():
         return None
-    try:
-        identity = tomllib.loads(read_bytes(within(unit, unit / 'agent.toml')).decode('utf-8'))
-    except (ValueError, UnicodeError) as error:
-        raise GroundTruthError('Agent manifest is invalid') from error
+    paths = sorted(root.glob('*/gt.json'))
+    if not paths:
+        if any((root / name).exists() for name in ('manifest.json', 'ground_truth.json')):
+            raise GroundTruthError('Legacy GT: migrate to complete case directories with gt.json')
+        return None
+    identity = tomllib.loads(read_bytes(within(unit, unit / 'agent.toml')).decode('utf-8'))
     if identity.get('agent_id') != agent_id:
-        raise GroundTruthError('registered Agent identity does not match agent.toml')
-    document = read_json(path)
-    if document.get('schema') != MANIFEST_SCHEMA:
-        raise GroundTruthError('unsupported manifest schema')
-    if document.get('agent_id') != agent_id:
-        raise GroundTruthError('manifest Agent identity does not match its registration')
-    defects, seen = [], set()
-    for record in records_field(document, 'defects'):
-        identifier = text_field(record, 'id')
+        raise GroundTruthError('Agent identity differs from registry')
+    seen, defects = set(), []
+    for path in paths:
+        path = within(root, path)
+        defect = read_json(path)
+        if defect.get('schema') != MANIFEST_SCHEMA or defect.get('agent_id') != agent_id:
+            raise GroundTruthError('Invalid gt.json schema or Agent identity')
+        identifier = text_field(defect, 'id')
         if identifier in seen:
-            raise GroundTruthError('duplicate defect identity')
+            raise GroundTruthError('Duplicate GT identity')
         seen.add(identifier)
-        for key in ('title', 'expected_behavior', 'observed_behavior', 'confirmed_by'):
-            text_field(record, key)
-        timestamp_field(record, 'confirmed_at')
-        hash_field(record, 'source_sha256')
-        case_hash = hash_field(record, 'case_sha256')
-        observations = records_field(record, 'observations')
-        observation_ids, evidence_paths = set(), set()
-        for observation in observations:
-            observation_id = text_field(observation, 'id')
-            if observation_id in observation_ids:
-                raise GroundTruthError('observation identities must be distinct')
-            observation_ids.add(observation_id)
-            if hash_field(observation, 'case_sha256') != case_hash:
-                raise GroundTruthError('observations must repeat the same retained Case')
-            evidence_path = Path(text_field(observation, 'evidence_path'))
-            if evidence_path.is_absolute() or '..' in evidence_path.parts:
-                raise GroundTruthError('evidence_path must be relative to ground_truth')
-            evidence = within(directory, directory / evidence_path)
-            if evidence in evidence_paths:
-                raise GroundTruthError('observations must retain distinct evidence files')
-            evidence_paths.add(evidence)
-            if file_digest(evidence) != hash_field(observation, 'evidence_sha256'):
-                raise GroundTruthError('observation evidence digest does not match')
-        if len(observation_ids) < 2:
-            raise GroundTruthError('confirmed defects require at least two observations')
-        defects.append({**record, 'ground_truth_sha256': digest_json(record)})
+        for field in ('summary', 'explanation'):
+            text_field(defect, field)
+        case_directory = path.parent
+        if not within(case_directory, case_directory / 'case.json').is_file():
+            raise GroundTruthError('GT requires the original case.json')
+        attempts = defect.get('reference_attempts')
+        if (not isinstance(attempts, list) or not attempts or
+                any(not isinstance(a, str) or not a or Path(a).name != a or a in ('.', '..')
+                    or '/' in a or chr(92) in a for a in attempts)):
+            raise GroundTruthError('reference_attempts must name retained attempt directories')
+        if len(set(attempts)) != len(attempts):
+            raise GroundTruthError('Duplicate reference attempt')
+        for attempt in attempts:
+            parent = 'trajectory' if (case_directory / 'trajectory').is_dir() else 'attempts'
+            folder = within(case_directory, case_directory / parent / attempt)
+            if not folder.is_dir():
+                raise GroundTruthError('Reference attempt directory is unavailable')
+        defects.append({**defect, '_case_directory': case_directory})
     return defects

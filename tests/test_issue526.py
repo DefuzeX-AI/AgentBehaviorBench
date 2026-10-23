@@ -6,7 +6,7 @@ import os
 import tomllib
 import pytest
 ROOT = Path(os.environ.get("ABB_UNIT_TEST_ROOT", Path(__file__).resolve().parents[1]))
-UNIT = ROOT / "resources/agents/68-chatcli"
+UNIT = ROOT / "resources/agents/77-chatcli"
 
 def launcher():
     spec = importlib.util.spec_from_file_location("launch_526", UNIT / "bootstrap/launch.py")
@@ -73,10 +73,53 @@ def test_build_cache_and_resource_controls():
     assert "GOMAXPROCS=2" in recipe and "go build -p 2" in recipe
 
 
-def test_readme_explicitly_selects_actual_local_sdk():
+
+def smoke_driver():
+    spec = importlib.util.spec_from_file_location("smoke_526", UNIT / "validation/run_smoke.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_host_transport_changes_headers_only(tmp_path):
+    import io
+    import urllib.request
+    from urllib.response import addinfourl
+    from email.message import Message
+    seen = []
+    class LocalCapture(urllib.request.BaseHandler):
+        handler_order = 1
+        def https_open(self, request):
+            seen.append((request.data, request.get_header("Authorization"), request.get_header("User-agent")))
+            headers = Message(); headers["Content-Type"] = "application/json"
+            response = addinfourl(io.BytesIO(b'{"unchanged":true}'), headers, request.full_url, code=200)
+            response.msg = "OK"
+            return response
+    payload = b'{"model":"glm-5.3-flash","max_tokens":2048,"messages":[]}'
+    driver = smoke_driver()
+    opener = driver.http_opener("AgentBehaviorBench/0.1", tmp_path / "network.jsonl", "glm-5.3-flash", LocalCapture())
+    request = urllib.request.Request("https://fixture.example/v1/chat/completions", payload, {"Authorization":"Bearer synthetic-fixture-key"})
+    with opener.open(request) as response:
+        assert response.read() == b'{"unchanged":true}'
+    assert seen == [(payload, "Bearer synthetic-fixture-key", "AgentBehaviorBench/0.1")]
+    audit = (tmp_path / "network.jsonl").read_text()
+    assert "synthetic-fixture-key" not in audit and '"max_tokens":2048' in audit
+
+
+def test_host_transport_rejects_other_models_before_network(tmp_path):
+    import urllib.request
+    driver = smoke_driver()
+    opener = driver.http_opener("AgentBehaviorBench/0.1", tmp_path / "network.jsonl", "glm-5.3-flash")
+    request = urllib.request.Request("https://fixture.example/v1/chat/completions", b'{"model":"another-model"}')
+    with pytest.raises(ValueError, match="approved"):
+        opener.open(request)
+
+
+def test_readme_uses_stock_local_sdk_and_native_source():
     text = (UNIT / "README.md").read_text()
-    assert "agentbench evaluate chatcli --sdk local --judge local" in text
-    assert "--case-file resources/agents/68-chatcli/validation/local-cases.json" in text
-    assert "EvaluationService.execute" not in text
-    assert "8192" in text and "2048" in text
-    assert "not** an exact replay" in text
+    assert "--sdk local" in text and "agentbench evaluate chatcli" in text
+    assert "77-chatcli" in text and "2048" in text
+    assert "--case-file" not in text
+    assert "No Agent source patch" in text
+    assert "https://github.com/DefuzeX-AI/AgentBehaviorBench/issues/526" in text
+    assert "Apache-2.0" in text
