@@ -215,12 +215,8 @@ def run_benchmark_once(
             _handle_agent_complete(item, terminal_output, None if viewer is None else viewer.url,
                                    concurrent=concurrent)
 
-        recovery_options = {}
-        if result_log is not None and hasattr(result_log, 'store'):
-            recovery_options['retain_case'] = result_log.store.retain_case
-            from agentbench.cli.sessions.recovery import artifact_options
-            recovery_options.update(artifact_options(runner, result_log.store, environ))
-        result = runner.run(
+        from agentbench.evaluation.service import execute_registered
+        result = execute_registered(runner,
             agents,  # Agents under evaluation.
             suite_id=suite_id,
             # Render the start of an Agent run.
@@ -230,7 +226,8 @@ def run_benchmark_once(
             on_progress=progress_printer,
             on_event=on_event,
             on_tick=on_tick if result_log is not None or live_cases is not None else None,
-            **recovery_options,
+            store=getattr(result_log, 'store', None),
+            environ=environ if result_log is not None else None,
         )
 
         close_live_cases()

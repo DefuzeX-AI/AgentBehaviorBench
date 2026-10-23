@@ -10,11 +10,11 @@ def configure(parser):
 
 def execute(args):
     from agentbench.cli.environment import load_project_environment, execution_environment_snapshot
-    from agentbench.harness.ground_truth.evaluator import evaluate_suite
+    from agentbench.evaluation import EvaluationService
     from agentbench.project import project_root
     load_project_environment(args.env_file)
     try:
-        result = evaluate_suite(args.suite, project_root(), environ=execution_environment_snapshot().environ)
+        result = EvaluationService(project_root(), environ=execution_environment_snapshot().environ).evaluate_gt(args.suite, output=print)
         return 0 if result['status'] == 'completed' and not result['warnings'] else 1
     except (OSError, ValueError, RuntimeError) as exc:
         print(f'GT matching unavailable: {type(exc).__name__}')

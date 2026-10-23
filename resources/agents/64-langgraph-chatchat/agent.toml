@@ -1,0 +1,53 @@
+# Manual ABB integration for chatchat-space/LangGraph-Chatchat.
+# DeepSeek direct API cannot drive -b json_schema generation reliably;
+# files follow validated LangGraph unit conventions used by ready Agents.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "langgraph-chatchat"
+display_name = "LangGraph-Chatchat (base_agent)"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+method = "git"
+repository = "https://github.com/chatchat-space/LangGraph-Chatchat"
+revision = "0ae53b7ef7f23b04fe37062a8ad031b39e8f11a3"
+downloaded_on = "2026-10-23"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+env_keys = ["OPENAI_MODEL", "CHATCHAT_ROOT"]
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+binding = "bridge.py:create_graph"
+output_key = "output"
+
+[llm_interception]
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
