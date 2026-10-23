@@ -94,6 +94,7 @@ for installation inputs and manual source prerequisites.
 - [How to add an Agent](docs/How%20To%20Add%20Agent.md)
 - [CLI reference](docs/cli.md)
 - [Native cases and independent Judges (no KUMA required)](docs/Native-Cases.md)
+- [Shared Python and JSON CLI evaluation service](docs/Evaluation-Service.md)
 - [How to start ABB](docs/Guide.md)
 
 ## Evaluation SDK and Judge
