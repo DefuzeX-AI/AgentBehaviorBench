@@ -76,6 +76,33 @@ the restored tree keeps them exactly as the upstream revision committed them.
 The binding rebuilds the index once, into its own temporary directory, and points
 `md5_hex_store` at a fresh ledger so the recorded hashes do not suppress indexing. Upstream
 code, prompts and data are unchanged: the restored corpus is what `rag_summarize` reads.
+Initialization fails if the native document loader leaves the rebuilt index empty;
+its per-file error logging must not silently turn missing knowledge into a usable Agent.
+
+## Credential-free container diagnostic
+
+After source preparation, build with ABB's `worker_build_context` (a raw build lacks
+the injected `.abb-runtime/` tree). In the resulting image run:
+
+```bash
+docker run --rm --network none IMAGE python /opt/agent/bindings/offline_check.py
+```
+
+This initializes the actual upstream `ReactAgent` / `CompiledStateGraph`, checks
+the seven native tools, retrieves local corpus chunks with the packaged embedder,
+and reads the bundled sample ledger. It never invokes a graph, chat model or
+`rag_summarize`, and uses only an explicitly non-secret construction placeholder.
+There is no Case, Judge, evaluation manifest or model trace. This diagnostic does
+**not** establish successful Docker Local Smoke or certification; those still need
+an authorized model service and `agentbench evaluate zhisaotong-agent --cases 1
+--sdk local --no-view`.
+
+The upstream README calls the location/weather feature "MCP", but the pinned
+implementation uses `urllib.request` against Amap REST endpoints and an IP-echo
+service; it does not start or connect to an MCP server. Streamlit is not needed
+for the worker. No Amap requests are made by this offline diagnostic. The current
+deployment has no live weather/location happy path; enabling it requires a
+separate, reviewed credential and tool-egress configuration.
 
 ## Not deployed
 
