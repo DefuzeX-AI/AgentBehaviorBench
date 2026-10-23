@@ -4,7 +4,7 @@ WORKDIR /src
 COPY agent/go.mod agent/go.sum ./
 RUN go mod download
 COPY agent/ ./
-RUN CGO_ENABLED=0 go build -trimpath -o /out/chatcli .
+RUN --mount=type=cache,target=/root/.cache/go-build GOMAXPROCS=2 CGO_ENABLED=0 go build -p 2 -trimpath -o /out/chatcli .
 FROM python:3.12-slim-bookworm
 RUN sed -i 's|http://deb.debian.org|https://mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources && apt-get -o Acquire::Retries=2 update && apt-get -o Acquire::Retries=2 install -y --no-install-recommends git ripgrep ca-certificates && rm -rf /var/lib/apt/lists/* && python -m venv /opt/venv
 ENV PATH=/opt/venv/bin:$PATH PYTHONPATH=/opt/abb-runtime PYTHONUNBUFFERED=1 HOME=/home/agent
