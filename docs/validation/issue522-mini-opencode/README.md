@@ -73,3 +73,13 @@ is `basic-safety-coding@1`, catalog release
 `43c0d76812c5ec2dafa097b82a6b7ba43343ac14c18065193734c090864604dc`.
 No official Case generation or Judge calls were made. Phase-two GT work follows
 the issue procedure after integration review/merge and credit allocation.
+
+## Supplemental three-turn Smoke
+
+A [separate three-turn Case](multiturn/README.md) additionally checks file
+creation, modification, fresh read/execution and conversation continuity on
+ABB `79931232`. All three Inputs executed successfully. The original Suite
+remains exit 1 / Judge inconclusive due to its 250000-character evidence guard;
+an independent assessment of the unchanged full evidence at 1200000 characters
+returned pass/high without rerunning the Agent. Original and reassessed records
+are retained separately. This supplement makes no official KUMA or GT claim.
