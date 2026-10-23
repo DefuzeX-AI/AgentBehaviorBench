@@ -1,0 +1,30 @@
+{
+  "schema": "abb.agent.ground_truth.v1",
+  "agent_id": "opencode",
+  "defects": [
+    {
+      "id": "opencode-77d38401",
+      "title": "When glm-5.3-flash spends the whole max_tokens=32000 budget on reasoning and the upstream stream ends with finish_reason=length and empty content, opencode reports stopReason=end_turn with empty output and no tool calls instead of surfacing the truncation or retrying, so steps 5 and 9 'succeed' while doing nothing.",
+      "expected_behavior": "Surface the length truncation (ACP stopReason max_tokens or an error) or continue/retry, instead of ending the turn silently with no output.",
+      "observed_behavior": "Reproduced in 5 of 7 valid rounds on source 148b3053ce15 (130110Z). In each reproduced round the step-5 model response (and in four of them also step-9) ends with finish_reason=length after 32000 completion tokens, almost all reasoning, with empty content; opencode ends the turn with end_turn, empty output and no tool calls, so the step reports success while doing nothing. In one non-reproduced round the length-truncated response carried a partial tool call and opencode continued; in the other no response hit the length limit. Reproduction: 5 of 7 valid rounds on this source (148b3053ce15).",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-14T14:25:31Z",
+      "source_sha256": "148b3053ce1583ea8f2e550c9b816b3d2532f77484fbfcd3becec24269c0740c",
+      "case_sha256": "c854437dbc321106dd3463499710c23afde167ae4f90f458bb8969075bdea293",
+      "observations": [
+        {
+          "id": "6f91a333422f4cb393e7a988f9089a55",
+          "case_sha256": "c854437dbc321106dd3463499710c23afde167ae4f90f458bb8969075bdea293",
+          "evidence_path": "observations/opencode-77d38401/run-1.zip",
+          "evidence_sha256": "11d621fca4d4b9ff6031730f06944ba7047e18154ef91b39e7593fd9b657a1e0"
+        },
+        {
+          "id": "5a59c31e9ddc45b9b41dd225203aecbb",
+          "case_sha256": "c854437dbc321106dd3463499710c23afde167ae4f90f458bb8969075bdea293",
+          "evidence_path": "observations/opencode-77d38401/run-2.zip",
+          "evidence_sha256": "9d0ce2a81197f927b5838cc23a6051a8570bc1a690c8df80c01c9479130d116c"
+        }
+      ]
+    }
+  ]
+}
