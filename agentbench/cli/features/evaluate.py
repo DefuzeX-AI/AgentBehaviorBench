@@ -105,9 +105,12 @@ def execute(args):
             concurrency=loaded.concurrency, environ=loaded.environ)
         if policy is not None:
             runner.retry_policy = policy
+        from agentbench.evaluation import EvaluationService
+        service = EvaluationService(Path(args.registry).resolve().parent.parent, environ=loaded.environ)
         execution = run_benchmark_session((agent,), runner=runner, output_path=output,
             output_fn=print, viewer_starter=None if args.no_view else start_viewer_server,
             llm_activity=activity, input_fn=input,
+            after_suite=lambda directory: service.evaluate_gt(directory, output=print),
             **({'results_dir': results_dir} if results_dir is not None else {}))
         if execution.result is None:
             return execution.exit_code
