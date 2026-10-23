@@ -3,12 +3,12 @@
 from importlib.metadata import PackageNotFoundError
 from types import SimpleNamespace
 
-from agentbench.cli.sessions.configuration import installed_sdk_distributions
+from agentbench.evaluation.configuration import installed_sdk_distributions
 
 
 def test_distribution_names_come_from_selected_plugin_requirements(tmp_path, monkeypatch):
     from agentbench.sdk import discovery
-    from agentbench.cli.sessions import configuration
+    from agentbench.evaluation import configuration
     plugin = tmp_path / 'evaluation_plugin'
     plugin.mkdir()
     (plugin / 'requirements.txt').write_text(
@@ -31,7 +31,7 @@ def test_distribution_names_come_from_selected_plugin_requirements(tmp_path, mon
 
 def test_host_sdk_distribution_upgrade_changes_provenance(tmp_path, monkeypatch):
     from agentbench.sdk import discovery
-    from agentbench.cli.sessions import configuration
+    from agentbench.evaluation import configuration
     from agentbench.harness.session.plan import digest_json
     plugin = tmp_path / 'plugin'
     plugin.mkdir()

@@ -9,7 +9,7 @@ BINDING = (
     Path(__file__).parents[1]
     / "resources"
     / "agents"
-    / "48-breadfree-simu"
+    / "42-breadfree-simu"
     / "bindings"
     / "bridge.py"
 )

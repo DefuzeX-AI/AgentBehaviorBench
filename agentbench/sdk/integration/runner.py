@@ -17,9 +17,11 @@ from .run import Report
 
 
 def read(path):
-    if Path(path).is_symlink():
+    from agentbench.observe.archive import resolve_artifact_path
+    path = resolve_artifact_path(path)
+    if path.is_symlink():
         raise ValueError('SDK artifacts must not be links')
-    return json.loads(Path(path).read_bytes())
+    return json.loads(path.read_bytes())
 
 
 def accepted(directory, *, execution):
@@ -179,6 +181,7 @@ class ContainerSDKRunner:
         return result
 
     def _read_result(self, directory, registration, case, document):
+        from agentbench.observe.archive import resolve_artifact_path
         host = accepted(directory, execution=True)
         root = directory / 'evaluation'
         manifest = read(root / 'manifest.json')
@@ -211,7 +214,7 @@ class ContainerSDKRunner:
                     or request.get('observation_context') != {'case_id': case.case_id, 'input_id': item['input_id']}
                     or not request.get('run_id') or output.get('run_id') != request['run_id']
                     or read(root / relative / 'otel-status.json').get('status') != 'complete'
-                    or not Path(root / relative / 'spans.jsonl').is_file()):
+                    or not resolve_artifact_path(root / relative / 'spans.jsonl').is_file()):
                 raise ValueError('SDK input, output, submission or evidence mismatch')
             seen.add(item['input_id'])
             if output['status'] == 'succeeded':

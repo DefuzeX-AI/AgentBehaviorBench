@@ -1,0 +1,36 @@
+{
+  "messages": [
+    {
+      "content": "        script = cls(locale=data.get(\"locale\", \"en\"))\n        for line in data.get(\"lines\", []):\n            script.lines.append(\n                ScriptLine(speaker=line.get(\"speaker\", \"male\"),\n                           paragraph=line.get(\"paragraph\", \"\"))\n            )\n        return script\n\n\ndef _resolve_provider(override_env: str, existing_provider: str, has_existing_creds: bool) -> str:\n    override = os.getenv(override_env)\n    if override:\n        return override.strip().lower()\n    if has_existing_creds:\n        return existing_provider\n    if os.getenv(\"MINIMAX_API_KEY\"):\n        return \"minimax\"\n    raise ValueError(\n        f\"No credentials found. Set VOLCENGINE_TTS_APPID + VOLCENGINE_TTS_ACCESS_TOKEN \"\n        f\"for {existing_provider}, or MINIMAX_API_KEY for minimax \"\n        f\"(optionally force with {override_env}).\"\n    )\n\n\ndef _resolve_tts_provider() -> str:\n    has_volc = bool(\n        os.getenv(\"VOLCENGINE_TTS_APPID\") and os.getenv(\"VOLCENGINE_TTS_ACCESS_TOKEN\")\n    )\n    provider = _resolve_provider(\"PODCAST_GENERATION_PROVIDER\", \"volcengine\", has_volc)\n    if provider not in (\"volcengine\", \"minimax\"):\n        raise ValueError(\n            f\"Unknown podcast provider: {provider!r} (use 'volcengine' or 'minimax')\"\n        )\n    return provider\n\n\ndef _default_max_retries() -> int:\n    try:\n        return int(os.getenv(\"MINIMAX_TTS_MAX_RETRIES\", str(DEFAULT_TTS_MAX_RETRIES)))\n    except ValueError:\n        return DEFAULT_TTS_MAX_RETRIES\n\n\ndef _default_max_workers(provider: str) -> int:\n    \"\"\"Each provider owns its own concurrency: MiniMax stays low to avoid rate\n    limits, Volcengine keeps the historical default. Not user-tunable by design.\n    \"\"\"\n    if provider == \"minimax\":\n        return DEFAULT_MINIMAX_MAX_WORKERS\n    return DEFAULT_MAX_WORKERS\n\n\ndef _parse_retry_after(response) -> float | None:\n    \"\"\"Return the server-provided Retry-After (seconds), if any.\"\"\"\n    headers = getattr(response, \"headers\", None) or {}\n    value = headers.get(\"Retry-After\")\n    try:\n        return float(value) if value else None\n    except (TypeError, ValueError):\n        return None\n\n\ndef _backoff_sleep(attempt: int, retry_after: float | None) -> None:\n    \"\"\"Sleep with exponential backoff + jitter, honoring Retry-After when present.\n\n    Jitter de-synchronizes concurrent workers that all got rate-limited at once,\n    avoiding a thundering-herd retry storm.\n    \"\"\"\n    base = retry_after if retry_after else min(2 ** attempt, 30)\n    time.sleep(base + random.uniform(0, 1))\n\n\ndef text_to_speech_volcengine(\n    text: str, voice_type: str, max_retries: int | None = None\n) -> bytes | None:\n    \"\"\"Convert text to speech using Volcengine TTS (returns base64-decoded mp3 bytes).\n\n    Retries with exponential backoff on transient HTTP errors (429 / 5xx).\n    \"\"\"\n    app_id = os.getenv(\"VOLCENGINE_TTS_APPID\")\n    access_token = os.getenv(\"VOLCENGINE_TTS_ACCESS_TOKEN\")",
+      "additional_kwargs": {
+        "deerflow_tool_meta": {
+          "status": "success",
+          "error_type": null,
+          "recoverable_by_model": true,
+          "recommended_next_action": "continue",
+          "source": "content_analysis"
+        },
+        "deerflow_read_mark": {
+          "path": "/mnt/skills/public/podcast-generation/scripts/generate.py",
+          "hash": "a896764aa6165185a24c0465561e19f36b5f437ad4f8f0e098cbc796e460b605"
+        },
+        "deerflow_tool_receipt": {
+          "tool_call_id": "chatcmpl-tool-b4132c0ca4f519b6",
+          "tool_name": "read_file",
+          "status": "success",
+          "args_sha256": "a044a5c019931688",
+          "output_sha256": "003754cd290155c9",
+          "output_bytes": 2913,
+          "created_at": "2026-10-23T01:41:14.277216+00:00"
+        }
+      },
+      "response_metadata": {},
+      "type": "tool",
+      "name": "read_file",
+      "id": "f3a94bb3-1676-4ea8-9dd1-82e2c523f769",
+      "tool_call_id": "chatcmpl-tool-b4132c0ca4f519b6",
+      "artifact": null,
+      "status": "success"
+    }
+  ]
+}

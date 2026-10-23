@@ -11,7 +11,7 @@ from typing import Protocol, Mapping
 
 from agentbench.sdk.common.artifacts import Artifacts
 from agentbench.sdk.integration.cases import case_bytes, digest
-from agentbench.sdk.integration.run import Report
+from agentbench.harness.session.codec import RecoveredReport
 
 
 class Judge(Protocol):
@@ -43,13 +43,13 @@ def build_request(directory, registration, document):
         prefix = f'evaluation/inputs/{index:04d}'
         if step['directory'] != f'inputs/{index:04d}':
             raise ValueError('Unexpected evidence step path')
-        for name in ('input.json', 'request.json', 'result.json', 'otel-status.json',
-                     'spans.jsonl', 'framework.jsonl'):
-            relative = prefix + '/' + name
-            path = root / relative
+        # Retain payloads and file evidence referenced by spans as well as indexes.
+        # These are execution-owned output files, never the Agent unit or GT.
+        for path in sorted((root / prefix).rglob('*')):
+            relative = path.relative_to(root).as_posix()
+            if path.is_symlink() or not path.resolve().is_relative_to(root.resolve()):
+                raise ValueError('Evidence attachment escapes execution directory')
             if path.is_file():
-                if path.is_symlink() or not path.resolve().is_relative_to(root.resolve()):
-                    raise ValueError('Evidence attachment escapes execution directory')
                 files[relative] = {'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
                                    'size_bytes': path.stat().st_size}
         steps.append({'input': read(prefix + '/input.json'),
@@ -73,7 +73,8 @@ def validate_evidence(request, directory):
         path = root / relative
         if path.is_symlink() or not path.resolve().is_relative_to(root):
             raise ValueError('Unsafe Judge attachment')
-        content = path.read_bytes()
+        from agentbench.observe.archive import artifact_file
+        content = artifact_file(root, relative).read_bytes()
         if len(content) != metadata['size_bytes'] or digest(content) != metadata['sha256']:
             raise ValueError('Judge evidence changed')
 
@@ -83,9 +84,21 @@ def execute_judge(judge, request, *, directory, environ):
     lock = SuiteLock(Path(directory) / 'judge-protocol-lock')
     lock.acquire()
     try:
+        from agentbench.observe.archive import restore_archive
+        restore_archive(directory)
         return _execute_judge(judge, request, directory=directory, environ=environ)
     finally:
         lock.close()
+
+
+def validate_response(response, request):
+    """Shared envelope validation for provider and externally submitted reports."""
+    if (not isinstance(response, dict) or response.get('schema') != 'abb.judge.result.v1'
+            or response.get('request_id') != request['request_id']
+            or response.get('status') not in ('pass', 'issue', 'inconclusive')
+            or not isinstance(response.get('issues'), list)
+            or not isinstance(response.get('evidence_gaps'), list)):
+        raise ValueError('Judge returned an invalid or mismatched response')
 
 
 def _execute_judge(judge, request, *, directory, environ):
@@ -105,16 +118,11 @@ def _execute_judge(judge, request, *, directory, environ):
         if request.get('request_id') != identity:
             raise ValueError('Judge changed its request')
         validate_evidence(request, directory)
-        if (not isinstance(response, dict) or response.get('schema') != 'abb.judge.result.v1'
-                or response.get('request_id') != request['request_id']
-                or response.get('status') not in ('pass', 'issue', 'inconclusive')
-                or not isinstance(response.get('issues'), list)
-                or not isinstance(response.get('evidence_gaps'), list)):
-            raise ValueError('Judge returned an invalid or mismatched response')
+        validate_response(response, request)
         files.save('evaluation/judge/report.json', response)
         files.save('evaluation/judge/delivery.json', {'status': 'received', 'request_id': request['request_id']})
         safe = json.loads((Path(directory) / 'evaluation/judge/report.json').read_bytes())
-        return Report(safe['status'], safe.get('confidence'), tuple(safe['issues']), tuple(safe['evidence_gaps']))
+        return RecoveredReport(safe)
     except Exception as exc:
         files.save('evaluation/judge/delivery.json', {'status': 'failed', 'request_id': request['request_id'],
                                                       'error_type': type(exc).__name__})

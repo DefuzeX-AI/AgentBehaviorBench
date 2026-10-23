@@ -76,7 +76,7 @@ rejected explicitly; those richer routing options remain available in replacemen
 Cline selects its native OpenRouter, DeepSeek or ZhipuAI provider and validates model IDs
 against the catalog bundled with CLI 3.0.62 / `@cline/llms` 0.0.83. Unknown IDs fail instead
 of silently becoming the provider default. The catalog snapshot is in
-`resources/agents/18-cline/bootstrap/model-catalog.json`; refresh it when upgrading the
+`resources/agents/15-cline/bootstrap/model-catalog.json`; refresh it when upgrading the
 pinned distribution. Pi's provider-specific thinking options follow the selected service.
 
 For an integration that requires a provider, protocol or provider-owned tool service,

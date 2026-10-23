@@ -12,6 +12,7 @@ from .sdk import FEATURE as SDK_FEATURE
 from .resume import FEATURE as RESUME_FEATURE, RETRY_FEATURE
 from .reuse import FEATURE as REUSE_FEATURE
 from .gt import FEATURE as GT_FEATURE
+from .api import FEATURE as API_FEATURE
 
 FEATURES: tuple[CommandFeature, ...] = (
     RUN_FEATURE,
@@ -26,6 +27,7 @@ FEATURES: tuple[CommandFeature, ...] = (
     RETRY_FEATURE,
     REUSE_FEATURE,
     GT_FEATURE,
+    API_FEATURE,
 )
 
 __all__ = ["FEATURES", "CommandFeature"]

@@ -1,0 +1,55 @@
+# Hand-written from the pinned Codewhale release (npm `codewhale@0.10.1`,
+# release tag v0.10.1) and its native ACP server (`codewhale serve --acp`),
+# configured through the documented `CODEWHALE_*` OpenAI-compatible overrides.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "codewhale"
+display_name = "Codewhale (ACP, shared model provider)"
+framework = "acp"
+
+[evaluation]
+replay_safe = false
+
+[evaluation.workspace]
+path = "/home/agent/workspace"
+initial_state = "empty"
+
+[evaluation.file_evidence]
+track_files = true
+upload_diff = true
+export_changed_files = true
+
+[source]
+method = "install"
+repository = "https://github.com/codewhale-hq/Codewhale"
+revision = "fead51eeea0fb6038ea3e30923751b1a1c765b25"
+downloaded_on = "2026-10-23"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+env_keys = []
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "acp"
+transport = "stdio"
+command = ["python", "/opt/agent/bootstrap/launch.py"]
+handshake_timeout = 120
+cwd = "/home/agent/workspace"
+permission_policy = "allow_once"
+
+[llm_interception]
+trust_plugin = "pem-env"
+network_config = "network/rules.toml"
+tool_routes = []
+
+# Model credentials and exact routes use the shared runtime default.
