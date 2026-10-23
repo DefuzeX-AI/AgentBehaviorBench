@@ -340,6 +340,9 @@ def test_bounded_regular_reads_and_duplicate_json_keys(tmp_path):
     malformed.write_text('{"defects": [], "defects": []}')
     with pytest.raises(GroundTruthError):
         read_json(malformed)
+def test_nonregular_fifo_is_rejected(tmp_path):
+    if not hasattr(os, 'mkfifo'):
+        pytest.skip('Named FIFOs are unavailable on this platform')
     fifo = tmp_path / 'fifo'
     os.mkfifo(fifo)
     with pytest.raises(GroundTruthError, match='regular files'):

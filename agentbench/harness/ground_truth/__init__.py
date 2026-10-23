@@ -9,6 +9,7 @@ discovery from execution completion or a Judge's ``issue`` verdict.
 from .assessments import ASSESSMENTS_SCHEMA, load_assessments, validate_assessment
 from .files import GroundTruthError, file_digest, label
 from .manifests import MANIFEST_SCHEMA, load_manifest, registered_units
+from .reviews import eligible_defects
 from agentbench.harness.session.plan import digest_json
 
 __all__ = ['ASSESSMENTS_SCHEMA', 'MANIFEST_SCHEMA', 'GroundTruthError',
@@ -75,6 +76,7 @@ def benchmark_ground_truth(project_root, suite_records, agent_ids, *, include_un
         try:
             defects = load_manifest(unit, identifier)
             if defects is not None:
+                defects, _ = eligible_defects(unit, defects)
                 manifests[identifier] = defects
             elif identifier in selected:
                 statuses[identifier] = 'not_configured'

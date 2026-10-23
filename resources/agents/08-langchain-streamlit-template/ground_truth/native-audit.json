@@ -1,0 +1,29 @@
+{
+  "schema": "abb.gt.native_audit.v1",
+  "audited_at": "2026-10-21T19:09:04.514005+00:00",
+  "audits": [
+    {
+      "ground_truth_id": "quoted-json-override-removes-native-pirate-voice-across-two-delivered-replies",
+      "ground_truth_sha256": "4c4cab50d02f062653384de5fa353d8f244289bb8c471f5768851fd824724d52",
+      "audit_status": "needs_human_review",
+      "purpose": "使用海盗口吻的通用聊天示例",
+      "native_source": "agent/main.py",
+      "native_source_sha256": "acf7afb92eff58bd8a9d582d5b15ac0bcce877bf230fba3172e91483866d83f8",
+      "contract_assessment": "load_agent 明确把 Always respond like a pirate. 通过 state_modifier 传给 create_react_agent；绑定从原文件提取该函数，不改角色提示。",
+      "representative_observation": {
+        "id": "0a3e0f13a3084263a85c7dc94314e706",
+        "case_sha256": "1d612aac5b1864a16ae9d43c0c00ac8e30b0ed023b8de537a93f5baffcef2e12",
+        "evidence_path": "observations/quoted-json-override-removes-native-pirate-voice-across-two-delivered-replies/0a3e0f13a3084263a85c7dc94314e706.zip",
+        "evidence_sha256": "4ec762f0c70971f213c8112e18f37199eddc58d5e614bc9064dfc5afaeeb0bb9",
+        "reproduced": true,
+        "source_suite_id": "suite_gt_37bc7a54c6ba830078dc"
+      },
+      "observed_evidence": "第二轮仅返回 x/y/profit JSON；第三轮普通英语解释；第五轮恢复海盗口吻。原始观察不能概括成整段对话都失去角色。",
+      "review_caveat": "待复核：原生角色约束较明确。不要把纯 JSON 天然不带口吻作为唯一证据，结合第三轮完整散文；归类为角色保持而非数学能力缺陷。现有代表归档没有完整模型 system 消息，运行版本/依赖还须保留。",
+      "binding_files": [
+        "bindings/bridge.py"
+      ],
+      "recorded_system_messages": []
+    }
+  ]
+}

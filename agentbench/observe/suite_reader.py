@@ -20,6 +20,11 @@ def persisted_snapshot(result_log):
     snapshot.update(events=events, event_count=len(events), path=str(path),
                     total_case_count=sum(agent['case_count'] for agent in plan['agents']),
                     suite_error=snapshot.get('error'), parse_errors=[])
+    from agentbench.harness.ground_truth.evaluator import read_evaluation
+    try:
+        snapshot['gt_evaluation'] = read_evaluation(path.parent, plan, events)
+    except (OSError, ValueError):
+        snapshot['gt_evaluation'] = {'status': 'invalid', 'provisional': True}
     return snapshot
 
 

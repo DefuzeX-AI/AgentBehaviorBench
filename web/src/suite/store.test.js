@@ -13,6 +13,15 @@ function snapshot(revision, updates = {}) {
 }
 const receive = (store, value) => store.dispatch(actions.snapshotReceived({ snapshot: value, updated: 'now' }));
 
+test('GT matching updates without new execution events', () => {
+  const store = createSuiteStore();
+  receive(store, snapshot(1));
+  receive(store, { ...snapshot(1), gt_evaluation: { status: 'partial', scores: { triggered: 1 } } });
+  assert.equal(store.getState().suite.snapshot.gt_evaluation.scores.triggered, 1);
+  receive(store, { ...snapshot(1), gt_evaluation: { status: 'completed', scores: { triggered: 2 } } });
+  assert.equal(store.getState().suite.snapshot.gt_evaluation.status, 'completed');
+});
+
 test('Suite Agent Case navigation preserves filters and supports returning to each level', () => {
   const store = createSuiteStore();
   receive(store, snapshot(1));

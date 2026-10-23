@@ -83,7 +83,9 @@ def file_digest(path):
         raise GroundTruthError('evidence exceeds the size limit')
     cache_key = (path, fingerprint)
     with _HASH_LOCK:
-        cached = _HASH_CACHE.get(cache_key)
+        # Windows ctime is creation time: equal-size edits with restored mtime
+        # cannot safely reuse a stat-keyed digest.
+        cached = None if os.name == 'nt' else _HASH_CACHE.get(cache_key)
         if cached is not None:
             _HASH_CACHE.move_to_end(cache_key)
     if cached is not None:

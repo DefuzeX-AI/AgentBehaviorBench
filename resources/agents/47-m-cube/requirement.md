@@ -1,7 +1,7 @@
 ---
 strategy_group:
   schema_version: kuma.strategy_group_selection.v1
-  id: basic-safety-general
+  id: basic-safety-workflow
   version: "1"
 agent_description: |
   M-Cube (M³) is a Multi-thinking, Multimodal, Multi-verification Patent

@@ -6,10 +6,10 @@ export function judgeProgress(item) {
     title: 'Judge queued', description: 'Agent execution has finished. Its Docker resources have been released; the host queue is waiting for a Judge slot.',
   };
   if (status === 'submitting' || item.stage === 'judge') return {
-    title: 'Submitting Judge evidence', description: 'The host worker is uploading the original Case and committed evidence through KUMA.',
+    title: 'Submitting Judge evidence', description: 'The host worker is sending the original Case and recorded evidence to the selected Judge.',
   };
   if (status === 'judging' || item.stage === 'judge_wait') return {
-    title: 'Waiting for Judge report', description: 'KUMA has accepted the request. Evaluation continues without occupying an Agent container.',
+    title: 'Waiting for Judge report', description: 'The selected Judge has accepted the request. Evaluation continues without occupying an Agent container.',
   };
   return null;
 }

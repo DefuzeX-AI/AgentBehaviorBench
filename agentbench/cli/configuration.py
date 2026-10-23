@@ -20,6 +20,7 @@ class RunConfiguration:
 
     input_fn: Callable[[str], str] = input
     assume_yes: bool = False
+    agent_ids: tuple[str, ...] = ()
     output_fn: Callable[[str], None] = print
     suite_runner: SuiteRunner | None = None
     sdk: SDK | None = None

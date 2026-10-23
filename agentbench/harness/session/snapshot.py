@@ -98,6 +98,8 @@ def suite_snapshot(plan, events):
                   judge_received=sum(case['judge_status'] is not None for case in cases),
                   host_accepted=sum(case['host_acceptance'] == 'accepted' for case in cases))
     return {'schema': 'abb.suite.snapshot.v1', 'suite_id': suite_id, 'revision': revision,
+            **{key: plan['configuration'][key] for key in ('suite_name', 'reference_collection_note')
+               if isinstance(plan.get('configuration', {}).get(key), str)},
             'origin_suite_id': plan.get('origin_suite_id'),
             'state': state, 'jobs': list(jobs.values()), 'counts': counts,
             'judge_counts': dict(Counter(case['judge_status'] for case in cases if case['judge_status'])),

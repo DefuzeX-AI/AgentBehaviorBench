@@ -1,67 +1,22 @@
-"""Container-local KUMA evaluation with fixed Cases and a local Judge; no Backend."""
-
-from __future__ import annotations
-
-from collections.abc import Mapping
-
-from ...contracts import EvaluationRunner, RunnerConcurrencyCapabilities, SDKRunnerContext
+"""Independent local testing method using ABB execution and a host model Judge."""
+from pathlib import Path
+from agentbench.sdk.plugin.native.plugin import NativePlugin
 
 
-class LocalEvaluationSDK:
-    """Run the pinned KUMA SDK with local Case and Judge providers.
-
-    The Agent still runs in its Docker container behind the model interceptor,
-    exactly as with ``kuma``. Only Case generation and judging stay local, so a
-    run needs no KUMA credential and spends no KUMA credit.
-    """
-
-    execution = "container"
-
+class LocalEvaluationSDK(NativePlugin):
     def execution_configuration(self, *, environ, model, options):
         from .relay import judge_model
         environment = dict(environ)
         if model is not None:
             environment['ABB_MODEL'] = model
-        judge = judge_model(environment)
-        return {'judge': {'base_url': judge.base_url, 'model': judge.model}}
+        selected = judge_model(environment)
+        return {'judge': {'base_url': selected.base_url, 'model': selected.model},
+                'implementation': 'abb-local-v2'}
 
-    def version_info(self):
-        return {'name': 'local', 'version': '0.0.1', 'latest_version': None}
-
-    def strategy_selection(self, directory):
-        # Local execution consumes the same KUMA Agent Profile format.
-        from ..kuma.strategy_checks import selection
-        return selection(directory)
-
-    def strategy_checker(self, *, environ, timeout):
-        from .strategy_checks import LocalStrategyChecker
-        return LocalStrategyChecker()
-
-    # Selected only by `--sdk local`; an omitted --sdk keeps meaning `kuma`.
-    implicit_selection = False
-    concurrency_capabilities = RunnerConcurrencyCapabilities(
-        isolated_cases=True, cooperative_cancel=True,
-    )
-
-    def create_benchmark_runner(
-        self, *, context: SDKRunnerContext, options: Mapping[str, object]
-    ) -> EvaluationRunner:
-        from .benchmark import LocalContainerRunner
-
-        environment = dict(context.environ)
-        if context.model is not None:
-            environment["ABB_MODEL"] = context.model
-
-        return LocalContainerRunner(
-            environ=environment,
-            options=options,
-            trace_sink=context.trace_sink,
-            trace_max_bytes=context.trace_max_bytes,
-            control=context.control,
-            build_coordinator=context.build_coordinator,
-            job_context=context.job_context,
-            runtime_services=context.runtime_services, artifacts=context.artifacts,
-        )
+    def create_benchmark_runner(self, *, context, options):
+        from .native_runner import LocalRunner
+        return LocalRunner(self, context=context, options=options)
 
 
-plugin = LocalEvaluationSDK()
+plugin = LocalEvaluationSDK(create_run='agentbench.sdk.plugin.native.backend:create_run',
+                           requirements=Path(__file__).with_name('requirements.txt'))

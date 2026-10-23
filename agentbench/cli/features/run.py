@@ -34,6 +34,8 @@ DEFAULT_REGISTRY_PATH = project_root() / "resources" / "registry.toml"
 def configure_parser(parser: ArgumentParser) -> None:
     configure_sdk_parser(parser)
     configure_retry_parser(parser)
+    parser.add_argument('--agent', action='append', default=[], metavar='ID',
+                        help='Run only this enabled ready Agent; repeat to select several.')
     parser.add_argument('-y', '--yes', action='store_true', help='Confirm this execution without prompting.')
     parser.add_argument(
         "--env-file",
@@ -70,6 +72,8 @@ def execute(args: Namespace) -> int:
                                      "environ": loaded.environ, **sdk_arguments(args)}
         if directory is not None:
             kwargs['results_dir'] = directory
+        if getattr(args, 'agent', None):
+            kwargs['agent_ids'] = tuple(args.agent)
         policy = retry_policy_argument(args)
         if policy is not None:
             kwargs['retry_policy'] = policy
@@ -114,6 +118,12 @@ def run(configuration: RunConfiguration | None = None) -> int:
         time.sleep(LOGO_PAUSE_SECONDS)
         registry = load_registry(DEFAULT_REGISTRY_PATH)
         agents = registry.ready()
+        if config.agent_ids:
+            selected = set(config.agent_ids)
+            unavailable = selected - {agent.agent_id for agent in agents}
+            if unavailable:
+                raise ValueError('Selected Agents are not enabled and ready: ' + ', '.join(sorted(unavailable)))
+            agents = tuple(agent for agent in agents if agent.agent_id in selected)
         from agentbench.sdk.strategy_checks import check_agents
 
         checks = None if not agents or config.suite_runner is not None else check_agents(
@@ -158,6 +168,11 @@ def run(configuration: RunConfiguration | None = None) -> int:
         if config.retry_policy is not None:
             suite_runner.retry_policy = config.retry_policy
 
+    def match_ground_truth(directory):
+        from agentbench.evaluation import EvaluationService
+        EvaluationService(DEFAULT_REGISTRY_PATH.parent.parent,
+                          environ=config.environ).evaluate_gt(directory, output=config.output_fn)
+
     execution = run_benchmark_session(
         agents,
         runner=suite_runner,
@@ -168,6 +183,7 @@ def run(configuration: RunConfiguration | None = None) -> int:
 
         viewer_starter=config.viewer_starter,
         llm_activity=llm_activity,
+        after_suite=match_ground_truth,
         **({'results_dir': config.results_dir} if config.results_dir is not None else {}),
 
     )

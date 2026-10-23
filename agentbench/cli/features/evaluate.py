@@ -36,6 +36,8 @@ def configure_parser(parser):
     parser.add_argument('--timeout', type=float, help='Override the SDK timeout option (seconds)')
     parser.add_argument('--cases', type=int, help='Number of independent Cases (default: Registry case count)')
     parser.add_argument('--max-steps', type=int, help='Override Registry step: SDK upper bound on dialogue steps per Case')
+    parser.add_argument('--case-file', type=Path, help='Import abb.cases.v1 JSON with --sdk native or local')
+    parser.add_argument('--judge', help='With --sdk native/local: local, kuma or a trusted module:object; omit for execution only')
 
 
 def execute(args):
@@ -50,6 +52,13 @@ def execute(args):
                 raise ValueError(f'{name} must be a positive integer')
         selected = sdk_arguments(args)
         options = dict(selected.get('sdk_options', {}))
+        for name in ('case_file', 'judge'):
+            value = getattr(args, name, None)
+            if value is not None:
+                selection = selected.get('sdk_selection')
+                if selection is None or selection.reference.name not in ('native', 'local'):
+                    raise ValueError('--case-file and --judge require --sdk native or local')
+                options[name] = str(value)
         # Only explicit aliases are forwarded. Each SDK owns its defaults.
         for name in ('output', 'timeout', 'max_steps'):
             value = getattr(args, name, None)
@@ -96,9 +105,12 @@ def execute(args):
             concurrency=loaded.concurrency, environ=loaded.environ)
         if policy is not None:
             runner.retry_policy = policy
+        from agentbench.evaluation import EvaluationService
+        service = EvaluationService(Path(args.registry).resolve().parent.parent, environ=loaded.environ)
         execution = run_benchmark_session((agent,), runner=runner, output_path=output,
             output_fn=print, viewer_starter=None if args.no_view else start_viewer_server,
             llm_activity=activity, input_fn=input,
+            after_suite=lambda directory: service.evaluate_gt(directory, output=print),
             **({'results_dir': results_dir} if results_dir is not None else {}))
         if execution.result is None:
             return execution.exit_code
@@ -106,11 +118,12 @@ def execute(args):
         if any(item.error_type or item.completed_case_count != item.requested_case_count for item in items):
             return 1
         reports = [benchmark.report for item in items for benchmark in item.benchmarks]
-        if not reports or any(report is None for report in reports):
+        benchmarks = [benchmark for item in items for benchmark in item.benchmarks]
+        if not reports or any(b.report is None and not b.execution_only for b in benchmarks):
             print('Evaluation failed: SDK completed without a Judge report')
             return 1
         for index, report in enumerate(reports, 1):
-            print(f'Judge Case {index}: {report.status}')
+            print(f'Judge Case {index}: {report.status if report is not None else "not requested (execution only)"}')
         return execution.exit_code or execution.result.exit_code
     except ConcurrencyConfigurationError as exc:
         print(f"Configuration error: {exc}")
