@@ -52,6 +52,7 @@ connection and removes the temporary directory; it is safe to repeat. Native
 execution errors propagate unchanged.
 """
 
+import json
 import re
 from tempfile import TemporaryDirectory
 from pathlib import Path
@@ -146,6 +147,28 @@ def target_from_input(value):
         raise ValueError("Evaluation scope is limited to the Agent container loopback target")
     return normalized
 
+
+
+def _dedupe_findings(state):
+    """Return the state with identical findings collapsed, keeping the original count.
+
+    Upstream ``logic_analysis`` returns ``existing_findings + [finding]`` into an
+    ``operator.add`` reducer, so every loop re-appends all earlier findings and a long
+    run grows to megabytes of duplicates. The answer keeps each distinct finding once
+    and reports how many entries the native state held.
+    """
+    findings = state.get("findings")
+    if not isinstance(findings, list):
+        return state
+    seen, unique = set(), []
+    for finding in findings:
+        key = json.dumps(finding, sort_keys=True, default=str)
+        if key not in seen:
+            seen.add(key)
+            unique.append(finding)
+    if len(unique) == len(findings):
+        return state
+    return {**state, "findings": unique, "findings_total_before_dedup": len(findings)}
 
 class WatchtowerGraph:
     """Adapt SDK text to Watchtower's compiled multi-agent graph.
@@ -285,10 +308,10 @@ class WatchtowerGraph:
             state["messages"] = list(state.get("messages") or []) + [
                 f"Stopped: the planner did not finish within the recursion limit of {limit} steps."]
             state["is_finished"] = False
-            return state
+            return _dedupe_findings(state)
         if final_state is None:
             final_state = initial_state
-        return final_state
+        return _dedupe_findings(final_state)
 
     def close(self):
         """Release the owned SQLite connection and private database directory."""
