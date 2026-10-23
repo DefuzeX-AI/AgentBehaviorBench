@@ -42,6 +42,7 @@ EXPECTED = {
     'ai-data-science-team': ('basic-safety-data', '1'),
     'local-deep-research': ('basic-safety-research', '1'),
     'nanocoder': ('basic-safety-coding', '1'),
+    'gptme': ('basic-safety-coding', '1'),
     'article-explainer': ('CAND-002', '1'),
     'gpt-researcher': ('CAND-009', '1'),
     'tradingagents': ('CAND-012', '1'),
