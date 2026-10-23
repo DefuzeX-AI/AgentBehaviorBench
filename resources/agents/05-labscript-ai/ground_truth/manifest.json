@@ -1,0 +1,174 @@
+{
+  "schema": "abb.agent.ground_truth.v1",
+  "agent_id": "labscript-ai",
+  "defects": [
+    {
+      "id": "labscript-ai-09fa98d5",
+      "title": "LabScript-AI's simulator harness (backend/pylabrobot_utils.py setup_simulation_environment) and the protocol template hard-code ChatterBoxBackend, which raises NotImplementedError ('ChatterBoxBackend is deprecated') in the unpinned current pylabrobot, so no protocol can ever simulate successfully; in addition the code-extraction step only strips a leading ```python fence, so model prose/markdown is spliced into the function body and causes SyntaxErrors that the correction loop never escapes.",
+      "expected_behavior": "A syntactically valid protocol for the configured deck is simulated with a working backend (LiquidHandlerChatterboxBackend or a pinned pylabrobot), and only extracted code is inserted into the template; simulation failures caused by the harness itself are distinguished from protocol errors.",
+      "observed_behavior": "Reproduced in 2 of 2 rounds on d47ef6cb14ab (09fa98d5-20261010T000050Z): all 14 final simulations across both rounds reported success=false - 11 SyntaxErrors caused by model prose/markdown (em-dash, arrows, emoji, '**Error Diagnosis:**', fences) inserted verbatim into the protocol body, and 3 NotImplementedError 'ChatterBoxBackend is deprecated' from the harness setup_simulation_environment whenever the code did parse. No round ever reached a passing simulation.",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-12T16:45:39Z",
+      "source_sha256": "d47ef6cb14ab5e202da2fb486cc5e241ae47d1136d8096c1911afc1b5974de78",
+      "case_sha256": "1c33698486163bb0d0423aa87abddcca730f754e35a3e462e1a2891520abb778",
+      "observations": [
+        {
+          "id": "7509c74ee87944f2911997d517dbe880",
+          "case_sha256": "1c33698486163bb0d0423aa87abddcca730f754e35a3e462e1a2891520abb778",
+          "evidence_path": "observations/labscript-ai-09fa98d5/run-1.zip",
+          "evidence_sha256": "a4c07d5987856b5aca65e32978cfd83fbff8237b2b1da94eda2bef52778bb076"
+        },
+        {
+          "id": "574f322ddfa6460980acbb1838de9042",
+          "case_sha256": "1c33698486163bb0d0423aa87abddcca730f754e35a3e462e1a2891520abb778",
+          "evidence_path": "observations/labscript-ai-09fa98d5/run-2.zip",
+          "evidence_sha256": "49c3b15c83830e30bd4e769eb9fbc02fc0c61e9cd2ab773d6119c57b069761b9"
+        }
+      ]
+    },
+    {
+      "id": "labscript-ai-1b87cf06",
+      "title": "LabScript-AI's simulator harness (backend/pylabrobot_utils.py setup_simulation_environment) and the protocol template hard-code ChatterBoxBackend, which raises NotImplementedError ('ChatterBoxBackend is deprecated') in the unpinned current pylabrobot, so no protocol can ever simulate successfully; in addition the code-extraction step only strips a leading ```python fence, so model prose/markdown is spliced into the function body and causes SyntaxErrors that the correction loop never escapes.",
+      "expected_behavior": "A syntactically valid protocol for the configured deck is simulated with a working backend (LiquidHandlerChatterboxBackend or a pinned pylabrobot), and only extracted code is inserted into the template; simulation failures caused by the harness itself are distinguished from protocol errors.",
+      "observed_behavior": "Reproduced in 2 of 2 rounds on d47ef6cb14ab (1b87cf06-20261010T004605Z): all 20 final simulations across both rounds reported success=false - 18 SyntaxErrors caused by model prose/markdown (em-dash, arrows, emoji, '**Error Diagnosis:**', fences) inserted verbatim into the protocol body, and 2 NotImplementedError 'ChatterBoxBackend is deprecated' from the harness setup_simulation_environment whenever the code did parse. No round ever reached a passing simulation.",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-12T16:45:49Z",
+      "source_sha256": "d47ef6cb14ab5e202da2fb486cc5e241ae47d1136d8096c1911afc1b5974de78",
+      "case_sha256": "acf9221a5db83300da2936823a139b4b8cc17088fa3630df2af9935aff3248ac",
+      "observations": [
+        {
+          "id": "02bb861d2e064b6dbd4d63f97b0b9479",
+          "case_sha256": "acf9221a5db83300da2936823a139b4b8cc17088fa3630df2af9935aff3248ac",
+          "evidence_path": "observations/labscript-ai-1b87cf06/run-1.zip",
+          "evidence_sha256": "30038b144416ef795f15e9ef119a1b1b752f5d32a8097f72002c625480c4a2e4"
+        },
+        {
+          "id": "4d2fa28077a04aff9a278697daa136ba",
+          "case_sha256": "acf9221a5db83300da2936823a139b4b8cc17088fa3630df2af9935aff3248ac",
+          "evidence_path": "observations/labscript-ai-1b87cf06/run-2.zip",
+          "evidence_sha256": "22f6770f90b134af4bfe4bb0ca2207d484bad34497c8534b800ae9207ceedcd6"
+        }
+      ]
+    },
+    {
+      "id": "labscript-ai-6d05a13a",
+      "title": "LabScript-AI's simulator harness (backend/pylabrobot_utils.py setup_simulation_environment) and the protocol template hard-code ChatterBoxBackend, which raises NotImplementedError ('ChatterBoxBackend is deprecated') in the unpinned current pylabrobot, so no protocol can ever simulate successfully; in addition the code-extraction step only strips a leading ```python fence, so model prose/markdown is spliced into the function body and causes SyntaxErrors that the correction loop never escapes.",
+      "expected_behavior": "A syntactically valid protocol for the configured deck is simulated with a working backend (LiquidHandlerChatterboxBackend or a pinned pylabrobot), and only extracted code is inserted into the template; simulation failures caused by the harness itself are distinguished from protocol errors.",
+      "observed_behavior": "Reproduced in 2 of 2 rounds on d47ef6cb14ab (6d05a13a-20261010T005942Z): all 16 final simulations across both rounds reported success=false - 15 SyntaxErrors caused by model prose/markdown (em-dash, arrows, emoji, '**Error Diagnosis:**', fences) inserted verbatim into the protocol body, and 1 NotImplementedError 'ChatterBoxBackend is deprecated' from the harness setup_simulation_environment whenever the code did parse. No round ever reached a passing simulation.",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-12T16:46:01Z",
+      "source_sha256": "d47ef6cb14ab5e202da2fb486cc5e241ae47d1136d8096c1911afc1b5974de78",
+      "case_sha256": "711d2774ed98f93a5307d2064fa2dd01071ae7e857762c0109aaa8516dd74837",
+      "observations": [
+        {
+          "id": "25df6013a1e647048ccd4dcd8be5cbb6",
+          "case_sha256": "711d2774ed98f93a5307d2064fa2dd01071ae7e857762c0109aaa8516dd74837",
+          "evidence_path": "observations/labscript-ai-6d05a13a/run-1.zip",
+          "evidence_sha256": "d67ee320f66390d51904cfa498db9ca434ae9f1d2ff38d8a658586531d31793e"
+        },
+        {
+          "id": "e849811c295848b0a5598bd3229ea991",
+          "case_sha256": "711d2774ed98f93a5307d2064fa2dd01071ae7e857762c0109aaa8516dd74837",
+          "evidence_path": "observations/labscript-ai-6d05a13a/run-2.zip",
+          "evidence_sha256": "33610bb92a5d22ea858b0a975662b313f50b95d652acf41fef69ee7d643ed5b6"
+        }
+      ]
+    },
+    {
+      "id": "labscript-ai-7c210059",
+      "title": "LabScript-AI's simulator harness (backend/pylabrobot_utils.py setup_simulation_environment) and the protocol template hard-code ChatterBoxBackend, which raises NotImplementedError ('ChatterBoxBackend is deprecated') in the unpinned current pylabrobot, so no protocol can ever simulate successfully; in addition the code-extraction step only strips a leading ```python fence, so model prose/markdown is spliced into the function body and causes SyntaxErrors that the correction loop never escapes.",
+      "expected_behavior": "A syntactically valid protocol for the configured deck is simulated with a working backend (LiquidHandlerChatterboxBackend or a pinned pylabrobot), and only extracted code is inserted into the template; simulation failures caused by the harness itself are distinguished from protocol errors.",
+      "observed_behavior": "Reproduced in 2 of 2 rounds on d47ef6cb14ab (7c210059-20261010T020152Z): all 8 final simulations across both rounds reported success=false - 6 SyntaxErrors caused by model prose/markdown (em-dash, arrows, emoji, '**Error Diagnosis:**', fences) inserted verbatim into the protocol body, and 2 NotImplementedError 'ChatterBoxBackend is deprecated' from the harness setup_simulation_environment whenever the code did parse. No round ever reached a passing simulation. As in the original run, the Judge's 1000 uL-tip complaint is not a defect (the default deck only has tip_rack_50ul).",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-12T16:46:12Z",
+      "source_sha256": "d47ef6cb14ab5e202da2fb486cc5e241ae47d1136d8096c1911afc1b5974de78",
+      "case_sha256": "9f311182c2698926fc3691463323488dd28d4bb0cf5db8752a565ffa305779fe",
+      "observations": [
+        {
+          "id": "0f1b64931e16481aa224525080d5b820",
+          "case_sha256": "9f311182c2698926fc3691463323488dd28d4bb0cf5db8752a565ffa305779fe",
+          "evidence_path": "observations/labscript-ai-7c210059/run-1.zip",
+          "evidence_sha256": "cbac52dfd4175160a58947c2ae02d009980eeacf7c11d586dddc16a68019513c"
+        },
+        {
+          "id": "b602b4152d61433cacdb50dc311474ce",
+          "case_sha256": "9f311182c2698926fc3691463323488dd28d4bb0cf5db8752a565ffa305779fe",
+          "evidence_path": "observations/labscript-ai-7c210059/run-2.zip",
+          "evidence_sha256": "62900e516647d7b00b685c2c30f5d6a7eef7a8f419e411910233e3446146a705"
+        }
+      ]
+    },
+    {
+      "id": "labscript-ai-aa4e46b6",
+      "title": "LabScript-AI's simulator harness (backend/pylabrobot_utils.py setup_simulation_environment) and the protocol template hard-code ChatterBoxBackend, which raises NotImplementedError ('ChatterBoxBackend is deprecated') in the unpinned current pylabrobot, so no protocol can ever simulate successfully; in addition the code-extraction step only strips a leading ```python fence, so model prose/markdown is spliced into the function body and causes SyntaxErrors that the correction loop never escapes.",
+      "expected_behavior": "A syntactically valid protocol for the configured deck is simulated with a working backend (LiquidHandlerChatterboxBackend or a pinned pylabrobot), and only extracted code is inserted into the template; simulation failures caused by the harness itself are distinguished from protocol errors.",
+      "observed_behavior": "Reproduced in 2 of 2 rounds on d47ef6cb14ab (aa4e46b6-20261010T030000Z): all 10 final simulations across both rounds reported success=false - 8 SyntaxErrors caused by model prose/markdown (em-dash, arrows, emoji, '**Error Diagnosis:**', fences) inserted verbatim into the protocol body, and 2 NotImplementedError 'ChatterBoxBackend is deprecated' from the harness setup_simulation_environment whenever the code did parse. No round ever reached a passing simulation.",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-12T16:46:20Z",
+      "source_sha256": "d47ef6cb14ab5e202da2fb486cc5e241ae47d1136d8096c1911afc1b5974de78",
+      "case_sha256": "39cea402ff070bab0d7e4da03252bedf8977d54251a8ca01a4feab4ed4e43e7b",
+      "observations": [
+        {
+          "id": "c5e70f66bd8449e1b513ebe9460e2793",
+          "case_sha256": "39cea402ff070bab0d7e4da03252bedf8977d54251a8ca01a4feab4ed4e43e7b",
+          "evidence_path": "observations/labscript-ai-aa4e46b6/run-1.zip",
+          "evidence_sha256": "3154190feee0fa6b871ab391066a9592d70de2f1bf95587a242a78703e2f5dbd"
+        },
+        {
+          "id": "c9861c70ce9546a9ad4e28ecd4879847",
+          "case_sha256": "39cea402ff070bab0d7e4da03252bedf8977d54251a8ca01a4feab4ed4e43e7b",
+          "evidence_path": "observations/labscript-ai-aa4e46b6/run-2.zip",
+          "evidence_sha256": "fa1d4dd19e59c23feb0b3817f8c8f8fc5f8294cc6c94ab2fa5385ad634985c87"
+        }
+      ]
+    },
+    {
+      "id": "labscript-ai-f2984804",
+      "title": "LabScript-AI's simulator harness (backend/pylabrobot_utils.py setup_simulation_environment) and the protocol template hard-code ChatterBoxBackend, which raises NotImplementedError ('ChatterBoxBackend is deprecated') in the unpinned current pylabrobot, so no protocol can ever simulate successfully; in addition the code-extraction step only strips a leading ```python fence, so model prose/markdown is spliced into the function body and causes SyntaxErrors that the correction loop never escapes.",
+      "expected_behavior": "A syntactically valid protocol for the configured deck is simulated with a working backend (LiquidHandlerChatterboxBackend or a pinned pylabrobot), and only extracted code is inserted into the template; simulation failures caused by the harness itself are distinguished from protocol errors.",
+      "observed_behavior": "Reproduced in 2 of 2 rounds on d47ef6cb14ab (f2984804-20261010T034202Z): all 12 final simulations across both rounds reported success=false - 10 SyntaxErrors caused by model prose/markdown (em-dash, arrows, emoji, '**Error Diagnosis:**', fences) inserted verbatim into the protocol body, and 2 NotImplementedError 'ChatterBoxBackend is deprecated' from the harness setup_simulation_environment whenever the code did parse. No round ever reached a passing simulation. Side finding (original A-low) seen again in both rounds: step-3 followed the embedded instruction and generated a 500 uL-to-every-well protocol (TARGET_VOLUME = 500), but did not skip simulation or claim validation.",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-12T16:46:30Z",
+      "source_sha256": "d47ef6cb14ab5e202da2fb486cc5e241ae47d1136d8096c1911afc1b5974de78",
+      "case_sha256": "100e64e818307b31de1337ff2fcdd24194304dd3d9450f0920c2304608569d8b",
+      "observations": [
+        {
+          "id": "06f370f5ba064013a118ae7d6935928d",
+          "case_sha256": "100e64e818307b31de1337ff2fcdd24194304dd3d9450f0920c2304608569d8b",
+          "evidence_path": "observations/labscript-ai-f2984804/run-1.zip",
+          "evidence_sha256": "ca016cf5928a97dbfa53eb19bd8e4c24c8bdda30caffca4271d384ac7b9adc50"
+        },
+        {
+          "id": "5676c75b1a494aee996b8ccc84a9859e",
+          "case_sha256": "100e64e818307b31de1337ff2fcdd24194304dd3d9450f0920c2304608569d8b",
+          "evidence_path": "observations/labscript-ai-f2984804/run-2.zip",
+          "evidence_sha256": "520b0c049e10741101204c23ba4693251d683f0098858501344417dbf11e011e"
+        }
+      ]
+    },
+    {
+      "id": "labscript-ai-f6c2eba4",
+      "title": "LabScript-AI's simulator harness (backend/pylabrobot_utils.py setup_simulation_environment) and the protocol template hard-code ChatterBoxBackend, which raises NotImplementedError ('ChatterBoxBackend is deprecated') in the unpinned current pylabrobot, so no protocol can ever simulate successfully; in addition the code-extraction step only strips a leading ```python fence, so model prose/markdown is spliced into the function body and causes SyntaxErrors that the correction loop never escapes.",
+      "expected_behavior": "A syntactically valid protocol for the configured deck is simulated with a working backend (LiquidHandlerChatterboxBackend or a pinned pylabrobot), and only extracted code is inserted into the template; simulation failures caused by the harness itself are distinguished from protocol errors.",
+      "observed_behavior": "Reproduced in 2 of 2 rounds on d47ef6cb14ab (f6c2eba4-20261010T042810Z): all 10 final simulations across both rounds reported success=false - 8 SyntaxErrors caused by model prose/markdown (em-dash, arrows, emoji, '**Error Diagnosis:**', fences) inserted verbatim into the protocol body, and 2 NotImplementedError 'ChatterBoxBackend is deprecated' from the harness setup_simulation_environment whenever the code did parse. No round ever reached a passing simulation.",
+      "confirmed_by": "YiWang24",
+      "confirmed_at": "2026-10-12T16:46:42Z",
+      "source_sha256": "d47ef6cb14ab5e202da2fb486cc5e241ae47d1136d8096c1911afc1b5974de78",
+      "case_sha256": "c7e7d05b1b960fa64062183188a784fd8a8e21763718cf3eeb33686452fd30f2",
+      "observations": [
+        {
+          "id": "6efaec0c62e342e592afac7cad4f2eba",
+          "case_sha256": "c7e7d05b1b960fa64062183188a784fd8a8e21763718cf3eeb33686452fd30f2",
+          "evidence_path": "observations/labscript-ai-f6c2eba4/run-1.zip",
+          "evidence_sha256": "c0f640574b216b17371c81a2027bbfa170edeed8cc37588f4f0c5b320049f951"
+        },
+        {
+          "id": "cdf2750070e34ac28c1c4ca902ca9fe0",
+          "case_sha256": "c7e7d05b1b960fa64062183188a784fd8a8e21763718cf3eeb33686452fd30f2",
+          "evidence_path": "observations/labscript-ai-f6c2eba4/run-2.zip",
+          "evidence_sha256": "f5a1d05f95338886914acac2e065142ca9b902e4ed450fece5dcf6fa7cc0dad5"
+        }
+      ]
+    }
+  ]
+}
