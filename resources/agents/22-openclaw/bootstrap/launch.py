@@ -84,6 +84,23 @@ def gateway_config(base_url: str, model: str, port: int, workdir: str) -> dict:
         # Update checks and telemetry would be egress outside the model route.
         "update": {"checkOnStart": False, "auto": {"enabled": False}},
         "telemetry": {"enabled": False},
+        # The bundled browser plugin drives the image's Chromium over CDP on a pinned
+        # loopback port (declared in network/rules.toml; the runtime redirects loopback too).
+        "browser": {
+            "enabled": True,
+            "executablePath": "/usr/local/bin/abb-chromium",
+            "headless": True,
+            "noSandbox": True,
+            "defaultProfile": "openclaw",
+            "profiles": {"openclaw": {"cdpPort": 18810}},
+        },
+        # Official Tavily web_search provider (docs/tools/tavily.md), loaded from the
+        # build-time install; the key comes from TAVILY_API_KEY in the Gateway env.
+        "plugins": {
+            "load": {"paths": [str(OPENCLAW.parents[1] / "@openclaw/tavily-plugin")]},
+            "entries": {"tavily": {"enabled": True}},
+        },
+        "tools": {"web": {"search": {"provider": "tavily"}}},
     }
 
 
