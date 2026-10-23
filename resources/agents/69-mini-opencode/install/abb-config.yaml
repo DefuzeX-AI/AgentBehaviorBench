@@ -1,0 +1,29 @@
+# Native configuration shape from config.example.yaml; no credentials are stored.
+models:
+  chat_model:
+    type: deepseek
+    model: deepseek-chat
+    api_key: $DEEPSEEK_API_KEY
+    api_base: https://api.deepseek.com
+    temperature: 0
+    top_p: 1.0
+    max_tokens: 8192
+    timeout: 60
+    max_retries: 3
+
+tools:
+  enabled:
+    - web_fetch
+    - web_search
+    - bocha_web_search
+  configs:
+    web_fetch:
+      api_key: $FIRECRAWL_API_KEY
+    web_search:
+      api_key: $TAVILY_API_KEY
+    bocha_web_search:
+      api_key: $BOCHA_API_KEY
+  mcp_servers:
+    docs-langchain:
+      transport: streamable_http
+      url: https://docs.langchain.com/mcp

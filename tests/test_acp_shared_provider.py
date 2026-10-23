@@ -13,7 +13,7 @@ AGENTS = (
     'opencode', 'kilo-code', 'goose', 'cline', 'kimi-cli', 'pi-coding-agent',
     'copilot-cli', 'openclaw', 'hermes-agent', 'openhands', 'deepagents-code',
     'open-interpreter', 'claurst', 'oh-my-pi', 'kode-cli', 'zeroclaw', 'jcode',
-    'mastracode', 'nanocoder',
+    'mastracode', 'nanocoder', 'mini-agent', 'reasonix',
 )
 from agentbench.adapter.acp.config import ACPConfig
 from agentbench.runtime.agentcontainer.config import AgentContainerConfig
@@ -92,7 +92,7 @@ def test_selected_provider_reaches_native_config_and_exact_observed_route(
     assert base in serialized
     if agent not in ('openclaw', 'zeroclaw'):
         assert KEY not in json.dumps(result[0])
-    if agent not in ('copilot-cli', 'openhands', 'kode-cli', 'mastracode'):
+    if agent not in ('copilot-cli', 'openhands', 'kode-cli', 'mastracode', 'mini-agent'):
         assert KEY not in serialized
     if agent in ('opencode', 'kilo-code'):
         assert native['model'] == 'abb/' + model
