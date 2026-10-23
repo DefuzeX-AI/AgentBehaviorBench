@@ -50,6 +50,12 @@ class BenchmarkResult:
     host_trace_validation: str = "unknown"
     failures: tuple[BenchmarkStepFailure, ...] = ()
     dependency_failure: dict | None = None
+    judge_delivery_status: str = 'unknown'
+
+    @property
+    def execution_only(self) -> bool:
+        return (self.report is None and self.judge_delivery_status == 'not_requested'
+                and self.host_acceptance == 'accepted' and self.host_trace_validation == 'succeeded')
 
     @property
     def execution_status(self) -> str:
@@ -61,7 +67,7 @@ class BenchmarkResult:
 
 
 CaseStatus = Literal["succeeded", "failed", "cancelled", "skipped"]
-QualityGate = Literal["passed", "failed"]
+QualityGate = Literal["passed", "failed", "not_evaluated"]
 
 
 def _aggregate_execution(statuses) -> str:
@@ -103,6 +109,9 @@ class CaseResult:
             return self.status
         if ((self.artifacts or {}).get('completion') or {}).get('execution') == 'failed':
             return 'failed'
+        if (self.artifacts or {}).get('judge_delivery_status') == 'failed' and (
+                (self.artifacts or {}).get('completion') or {}).get('execution') == 'succeeded':
+            return 'completed'
         if self.benchmark is not None and self.benchmark.execution_status == 'failed':
             return 'failed'
         if self.host_acceptance == 'rejected' or self.host_trace_validation == 'failed':
@@ -144,12 +153,16 @@ class CaseResult:
     def judge_delivery_status(self) -> str:
         if self.judge_status is not None:
             return 'received'
+        if self.benchmark is not None and self.benchmark.execution_only:
+            return 'not_requested'
         return (self.artifacts or {}).get('judge_delivery_status') or (
             'missing' if self.benchmark is not None else 'unknown')
 
     @property
     def quality_gate(self) -> QualityGate:
         """Keep the non-pass gate while excluding rejected or unfinished work."""
+        if self.benchmark is not None and self.benchmark.execution_only and self.execution_status == 'completed':
+            return 'not_evaluated'
         return 'passed' if (self.execution_status == 'completed' and self.error_type is None
                             and self.benchmark is not None and self.benchmark.passed
                             and self.host_acceptance != 'rejected'
@@ -188,7 +201,8 @@ class CaseResult:
             raise ValueError("Case result requires a terminal status")
         if self.benchmark is not None and self.benchmark.agent_id != self.agent_id:
             raise ValueError("Case benchmark belongs to another Agent")
-        if self.status == "succeeded" and (self.benchmark is None or not self.benchmark.passed):
+        if self.status == "succeeded" and (self.benchmark is None or not (
+                self.benchmark.passed or (self.benchmark.execution_only and not self.benchmark.failures))):
             raise ValueError("A succeeded Case requires a passing benchmark")
         if self.status in {"cancelled", "skipped"} and self.benchmark is not None:
             raise ValueError("Unfinished Cases cannot carry a completed benchmark")
@@ -268,6 +282,10 @@ class SuiteAgentResult:
 
     @property
     def quality_gate(self) -> QualityGate:
+        if (self.preparation_error is None and len(self.case_results) == self.requested_case_count
+                and self.case_results and all(c.quality_gate in {'passed', 'not_evaluated'} for c in self.case_results)
+                and any(c.quality_gate == 'not_evaluated' for c in self.case_results)):
+            return 'not_evaluated'
         return 'passed' if (self.preparation_error is None
                             and len(self.case_results) == self.requested_case_count
                             and all(case.quality_gate == 'passed' for case in self.case_results)) else 'failed'
@@ -353,9 +371,13 @@ class BenchmarkSuiteResult:
 
     @property
     def quality_gate(self) -> QualityGate:
+        if (self.skipped_count == 0 and self.items
+                and all(i.quality_gate in {'passed', 'not_evaluated'} for i in self.items)
+                and any(i.quality_gate == 'not_evaluated' for i in self.items)):
+            return 'not_evaluated'
         return 'passed' if (self.skipped_count == 0
                             and all(item.quality_gate == 'passed' for item in self.items)) else 'failed'
 
     @property
     def exit_code(self) -> int:
-        return 0 if self.quality_gate == 'passed' else 1
+        return 0 if self.quality_gate in {'passed', 'not_evaluated'} else 1

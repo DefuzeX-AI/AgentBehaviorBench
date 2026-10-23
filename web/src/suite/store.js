@@ -33,6 +33,7 @@ const suiteSlice = createSlice({
         if (old.can_resume !== snapshot.can_resume) state.snapshot.can_resume = snapshot.can_resume;
         if (JSON.stringify(old.commands) !== JSON.stringify(snapshot.commands)) state.snapshot.commands = snapshot.commands;
         if (JSON.stringify(old.evaluation_source) !== JSON.stringify(snapshot.evaluation_source)) state.snapshot.evaluation_source = snapshot.evaluation_source;
+        if (JSON.stringify(old.gt_evaluation) !== JSON.stringify(snapshot.gt_evaluation)) state.snapshot.gt_evaluation = snapshot.gt_evaluation;
       }
       // Keep an explicitly selected historical attempt across live updates.
       for (const item of normalizeCases(snapshot)) {

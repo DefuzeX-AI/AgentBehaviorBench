@@ -82,3 +82,18 @@ def test_tool_declaration_survives_profile_relocation(tmp_path):
         actual = parse_agent_profile(path)
         assert actual.tool_capabilities.to_dict() == parse_agent_profile(source).tool_capabilities.to_dict()
         assert actual.tool_capabilities_path.is_relative_to(path.parent)
+
+def test_kuma_and_local_share_the_public_snapshot(tmp_path):
+    from types import SimpleNamespace
+    from agentbench.sdk.common.agent_context import with_environment
+    from agentbench.sdk.plugin.local.generation import agent_context
+    source = tmp_path / 'requirement.md'
+    source.write_text(REQUIREMENT, encoding='utf-8')
+    environment = ExecutionEnvironment(runtime='docker', network={'mode':'internal'})
+    expected = with_environment(agent_context(SimpleNamespace(path=tmp_path, agent_id='echo')), environment)
+    files = Artifacts(tmp_path/'out')
+    with generation_profile(source, environment, files, agent_id='echo'):
+        actual = json.loads((files.directory/'agent-context.json').read_text(encoding='utf-8'))
+    assert actual == expected
+    assert actual['environment_scope'] == 'sdk_controller'
+    assert source.read_text(encoding='utf-8') == REQUIREMENT

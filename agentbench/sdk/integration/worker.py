@@ -118,7 +118,7 @@ async def execute_case(factory, root, repository, settings, files, summary, *, s
     if digest(content) != settings['expected_artifact_sha256']:
         raise ValueError('Prepared Case artifact changed before execution')
     document = json.loads(content)
-    case = unpack_case(document, factory=settings['sdk_factory'], index=settings['case_index'])
+    case = unpack_case(document, factory=settings['sdk_factory'], index=settings.get('source_case_index', settings['case_index']))
     if (case['case_id'] != settings['expected_case_id']
             or digest(case_bytes(case)) != settings['expected_content_sha256']
             or document['workspace'] != settings.get('workspace')):
@@ -183,10 +183,13 @@ async def execute_case(factory, root, repository, settings, files, summary, *, s
             if snapshot(run.case) != document['case']:
                 raise ValueError('SDK mutated the generation snapshot during execution')
             from .dialogue import judge_run
-            if report is None:
-                report = judge_run(run)
-            files.save('judge/report.json', {key: plain(getattr(report, key)) for key in (
-                'status', 'confidence', 'issues', 'evidence_gaps')})
+            if settings.get('execution_only'):
+                summary['judge_delivery_status'] = 'not_requested'
+            else:
+                if report is None:
+                    report = judge_run(run)
+                files.save('judge/report.json', {key: plain(getattr(report, key)) for key in (
+                    'status', 'confidence', 'issues', 'evidence_gaps')})
             summary.update(phase='finished', status='succeeded', run_state=run.state,
                            history_count=len(run.history), evidence='complete', span_count=evidence.span_count)
     except BaseException as exc:
@@ -201,10 +204,22 @@ async def execute(root, output, settings, *, session=None):
     summary = {'schema': 'abb.sdk.execution.v1', 'status': 'running', 'steps': [], 'phase': 'startup'}
     try:
         mode = settings['mode']
-        if mode not in ('generate', 'execute'):
+        if mode not in ('generate', 'execute', 'context'):
             raise ValueError('Unknown SDK worker mode')
         if mode == 'execute' and not settings.get('isolated_agent'):
             raise ValueError('Execution requires the isolated Agent channel')
+        if mode == 'context':
+            from agentbench.runtime.agentcontainer.environment import observe_environment
+            from agentbench.sdk.common.agent_context import with_environment
+            from agentbench.sdk.common.workspace import workspace_policy
+            from agentbench.runtime.agentcontainer.config import tomllib
+            policy = workspace_policy(tomllib.loads((Path(root) / 'agent.toml').read_text()))
+            workspace = ({'path': policy.path, 'initial_state': policy.initial_state,
+                          'fixture': policy.fixture} if policy.path else None)
+            environment = observe_environment(settings.get('execution_environment'), workspace=workspace)
+            files.save('agent-context.json', with_environment(settings['agent_context'], environment))
+            summary.update(status='succeeded', phase='context')
+            return 0
         factory = load_factory(settings['sdk_factory'])
         repository = Path((settings.get('workspace') or {}).get('path') or '/opt/abb-sdk-repo')
         if mode == 'generate':
@@ -239,6 +254,10 @@ def main():
     args = parser.parse_args()
     try:
         settings = json.loads(args.settings.read_bytes())
+        from agentbench.runtime.contracts.environment import ENVIRONMENT_FILE
+        environment_path = args.settings.parent / ENVIRONMENT_FILE
+        if environment_path.exists() and isinstance(settings, dict):
+            settings['execution_environment'] = json.loads(environment_path.read_bytes())
         if not isinstance(settings, dict):
             raise ValueError('SDK settings must be an object')
     except (OSError, ValueError) as exc:

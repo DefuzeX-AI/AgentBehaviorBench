@@ -13,7 +13,7 @@ const { Text } = Typography;
 function CountingRules() {
   return <dl className="benchmark-definitions">
     <dt>Benchmark score (proposed)</dt><dd>GT Discovery@B: 100 × the mean discovery fraction across a fixed set of Agents, averaged over independent trials at the same budget B. Agent/SDK versions, GT revisions and retry rules must be frozen before testing. No formal score is computed from unconstrained historical runs.</dd>
-    <dt>Ground truth</dt><dd>Human-confirmed Agent defects, reproduced with the same Case across multiple rounds. Stored in each Agent’s ground_truth/manifest.json.</dd>
+    <dt>Ground truth</dt><dd>Recorded Agent defects and reproduction evidence, stored in each Agent’s ground_truth/manifest.json. Review provenance varies; automatic matching is shown separately in each Suite.</dd>
     <dt>Discovered</dt><dd>An explicit assessment confirms that a Case reproduced the defect and its Judge correctly identified it. Repeated discoveries count once per defect.</dd>
     <dt>Observed GT coverage</dt><dd>100 × discovered defects / known defects for Agents represented in the selected SDK’s Suites. Only that SDK’s assessments count. This is historical coverage; comparable benchmark scores require a shared, frozen Agent/GT set and equal budgets.</dd>
     <dt>Not assessed</dt><dd>No complete assessment for the current ground truth revision. A Judge’s “issue” verdict alone does not count as discovery.</dd>

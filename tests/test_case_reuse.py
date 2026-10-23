@@ -1,6 +1,7 @@
 """Single saved Case selection, fresh execution/judging, and durable request identity."""
 
 import threading
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -159,7 +160,7 @@ def test_viewer_completed_case_reuse_is_queued_once_and_links_to_same_viewer(tmp
         command = controller.submit(payload, controller.token)
         assert command['status'] == 'completed', command
         assert command['result_url'] == f'/suite/{command["suite_id"]}/'
-        assert command['result_path'].endswith('/events.json')
+        assert Path(command['result_path']).name == 'events.json'
         assert len(factory.executed) == 1
     finally:
         controller.close()

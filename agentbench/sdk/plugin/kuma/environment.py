@@ -66,16 +66,19 @@ def environment_text(environment):
 
 
 @contextmanager
-def generation_profile(source, environment, files):
+def generation_profile(source, environment, files, *, agent_id=None):
     """Keep the original untouched and preserve referenced files in a temporary Profile."""
     from kuma.repository.agent_profiles import parse_agent_profile
     import yaml
 
     profile = parse_agent_profile(source)
-    content = source.read_text(encoding='utf-8-sig')
+    from agentbench.sdk.common.agent_context import load_agent_context, with_environment
+    context = with_environment(load_agent_context(source, agent_id=agent_id), environment)
+    files.save('agent-context.json', context)
+    content = context['profile']
     headings = list(re.finditer(r'^##\s+(.+?)\s*$', content, re.MULTILINE))
     # Match the SDK's alias precedence and duplicate-heading behavior.
-    heading = next((match for title in ('生产使用场景', 'Production Use Scenario')
+    heading = next((match for title in ('\u751f\u4ea7\u4f7f\u7528\u573a\u666f', 'Production Use Scenario')
                     for match in reversed(headings) if match.group(1).strip() == title), None)
     if heading is None:
         raise ValueError('KUMA Profile has no Production Use Scenario')
@@ -92,7 +95,7 @@ def generation_profile(source, environment, files):
                 relative = f'references/{key}.json'
                 target = root / relative
                 target.parent.mkdir(exist_ok=True)
-                target.write_bytes(path.read_bytes())
+                target.write_text(json.dumps(context['references'][key], ensure_ascii=False), encoding='utf-8')
                 metadata[key] = relative
                 references[relative] = json.loads(target.read_text(encoding='utf-8-sig'))
         if references:

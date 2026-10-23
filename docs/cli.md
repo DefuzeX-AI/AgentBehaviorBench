@@ -99,6 +99,7 @@ agentbench evaluate [AGENT] [OPTIONS]
 ```bash
 agentbench evaluate react-agent --sdk kuma --cases 1
 agentbench evaluate react-agent --sdk local --cases 1 --yes --no-view --results-dir results/smoke
+agentbench evaluate react-agent --sdk native --case-file cases.json --cases 1 --max-steps 2 --no-view
 agentbench evaluate react-agent --sdk kuma --cases 2 --max-steps 3 --output results/sdk-artifacts --results-dir results/my-run --no-view
 ```
 

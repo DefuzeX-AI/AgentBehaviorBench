@@ -41,6 +41,7 @@ def run_benchmark_session(
     llm_activity: LLMActivity | None = None,
     input_fn: Callable[[str], str] = input,
     results_dir: str | Path | None = None,
+    after_suite: Callable | None = None,
 ) -> BenchmarkExecution:
     """
 
@@ -54,7 +55,8 @@ def run_benchmark_session(
         # Run a single benchmark session and return the result if no rerun is requested.
         execution = run_benchmark_once(agents, runner=runner, output_path=output_path,
             output_fn=output_fn, viewer_starter=viewer_starter, llm_activity=llm_activity,
-            **({'results_dir': results_dir} if results_dir is not None else {}))
+            **({'results_dir': results_dir} if results_dir is not None else {}),
+            **({'after_suite': after_suite} if after_suite is not None else {}))
 
 
         
@@ -99,6 +101,7 @@ def run_benchmark_once(
     viewer_starter: ViewerStarter | None,
     llm_activity: LLMActivity | None = None,
     results_dir: str | Path | None = None,
+    after_suite: Callable | None = None,
 ) -> BenchmarkExecution:
 
     directory = validate_results_dir(output_path, results_dir)
@@ -212,12 +215,8 @@ def run_benchmark_once(
             _handle_agent_complete(item, terminal_output, None if viewer is None else viewer.url,
                                    concurrent=concurrent)
 
-        recovery_options = {}
-        if result_log is not None and hasattr(result_log, 'store'):
-            recovery_options['retain_case'] = result_log.store.retain_case
-            from agentbench.cli.sessions.recovery import artifact_options
-            recovery_options.update(artifact_options(runner, result_log.store, environ))
-        result = runner.run(
+        from agentbench.evaluation.service import execute_registered
+        result = execute_registered(runner,
             agents,  # Agents under evaluation.
             suite_id=suite_id,
             # Render the start of an Agent run.
@@ -227,13 +226,20 @@ def run_benchmark_once(
             on_progress=progress_printer,
             on_event=on_event,
             on_tick=on_tick if result_log is not None or live_cases is not None else None,
-            **recovery_options,
+            store=getattr(result_log, 'store', None),
+            environ=environ if result_log is not None else None,
         )
 
         close_live_cases()
         if result_log is not None:
             result_log.append_suite_complete(result)
         print_suite_summary(result, output_fn)
+        if after_suite is not None and result_log is not None and hasattr(result_log, 'store'):
+            try:
+                after_suite(result_log.path.parent)
+            except Exception as exc:
+                # GT evaluation is independent of Agent execution and SDK judging.
+                output_fn(f'GT matching unavailable ({type(exc).__name__}); execution results retained.')
         if result_log is not None:
             print_viewer_footer(
                 result_log.path, None if viewer is None else viewer.url, output_fn

@@ -76,12 +76,13 @@ class ContainerSDKRunner:
 
     def _settings(self, registration, **values):
         return dict(sdk_factory=self.plugin.create_run, sdk_options=self.sdk_options,
+                    execution_only=getattr(self.plugin, 'execution_only', False),
                     agent_id=registration.agent_id, framework=registration.framework, **values)
 
     def _run(self, registration, *, settings, context, on_progress, **kwargs):
         def ready(directory):
             self.directory = directory
-            emit_progress(on_progress, stage='case_generation' if settings['mode'] == 'generate'
+            emit_progress(on_progress, stage='case_generation' if settings['mode'] in ('generate', 'context')
                           else 'benchmark_execution', status='started',
                           agent_id=registration.agent_id, artifact_directory=str(directory),
                           detail='SDK artifacts available')
@@ -134,7 +135,8 @@ class ContainerSDKRunner:
                 or case.case_index >= registration.case_count):
             raise ValueError('Default SDK execution requires a prepared Case')
         document = read(case.artifact_path)
-        snapshot = unpack_case(document, factory=self.plugin.create_run, index=case.case_index)
+        source_index = document.get('case_index') if getattr(self.plugin, 'execution_only', False) else case.case_index
+        snapshot = unpack_case(document, factory=self.plugin.create_run, index=source_index)
         workspace = document.get('workspace')
         if (digest(Path(case.artifact_path).read_bytes()) != case.artifact_sha256
                 or digest(case_bytes(snapshot)) != case.content_sha256
@@ -145,6 +147,7 @@ class ContainerSDKRunner:
                           'case_index': case.case_index, 'case_id': case.case_id})
         directory = self._run(registration, context=context, on_progress=on_progress,
             settings=self._settings(registration, mode='execute', case_index=case.case_index,
+                source_case_index=source_index,
                 expected_case_id=case.case_id, expected_content_sha256=case.content_sha256,
                 expected_artifact_sha256=case.artifact_sha256),
             private_files={'case.json': case.artifact_path},
@@ -152,6 +155,9 @@ class ContainerSDKRunner:
         try:
             result = self._read_result(directory, registration, case, document)
         except Exception as exc:
+            if (getattr(exc, 'artifacts', None) or {}).get('phase') == 'judge':
+                # Judge delivery must never rewrite accepted Agent execution.
+                raise
             host = read(directory / 'run.json')
             host.update(status='failed', validation='failed', validation_error=str(exc))
             Artifacts(directory, environ=self.context.environ).save('run.json', host)
@@ -175,7 +181,10 @@ class ContainerSDKRunner:
     def _read_result(self, directory, registration, case, document):
         host = accepted(directory, execution=True)
         root = directory / 'evaluation'
-        manifest, report = read(root / 'manifest.json'), read(root / 'judge/report.json')
+        manifest = read(root / 'manifest.json')
+        unjudged = (getattr(self.plugin, 'execution_only', False)
+                    and manifest.get('judge_delivery_status') == 'not_requested')
+        report = None if unjudged else read(root / 'judge/report.json')
         if (host.get('agent_id') != registration.agent_id or host.get('case_id') != case.case_id
                 or host.get('case_index') != case.case_index
                 or manifest.get('schema') != 'abb.sdk.execution.v1'
@@ -183,7 +192,7 @@ class ContainerSDKRunner:
                 or manifest.get('case_id') != case.case_id or read(root / 'case.json') != document
                 or not isinstance(manifest.get('run_id'), str) or not manifest['run_id']
                 or type(manifest.get('history_count')) is not int or manifest['history_count'] < 0
-                or not isinstance(report.get('status'), str) or not report['status']):
+                or (not unjudged and (not isinstance(report.get('status'), str) or not report['status']))):
             raise ValueError('SDK result identity or completion mismatch')
         steps, failures, seen = [], [], set()
         for index, entry in enumerate(manifest['steps'], 1):
@@ -216,9 +225,10 @@ class ContainerSDKRunner:
                 raise ValueError('Unknown Agent result status')
         if not seen:
             raise ValueError('SDK result has no executed inputs')
-        normalized = Report(report['status'], report.get('confidence'),
+        normalized = None if unjudged else Report(report['status'], report.get('confidence'),
                             tuple(report['issues']), tuple(report['evidence_gaps']))
         return BenchmarkResult(registration.agent_id, registration.framework, manifest['run_id'],
             manifest['run_state'], normalized, tuple(steps), manifest['history_count'], provider_mode='sdk-container',
             evidence_status='captured', host_acceptance='accepted',
-            host_trace_validation='succeeded', failures=tuple(failures))
+            host_trace_validation='succeeded', failures=tuple(failures),
+            judge_delivery_status='not_requested' if unjudged else 'received')

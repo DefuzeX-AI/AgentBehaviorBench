@@ -128,7 +128,7 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
             # without invoking the Agent.
             from .generation import generate_collection
             from .environment import generation_profile
-            profile_context = (generation_profile(root / 'requirement.md', environment, files)
+            profile_context = (generation_profile(root / 'requirement.md', environment, files, agent_id=manifest['agent_id'])
                                if providers is None else nullcontext())
             with profile_context as profile_path:
                 if providers is None:

@@ -62,7 +62,7 @@ export default function SuiteNavEntry({ row, snapshot, selected, selectedCaseKey
       <RootContent type={selected ? 'button' : undefined} className="suite-nav-root-content"
         href={selected ? undefined : row.url} onClick={selected ? onSuiteSelect : undefined}
         aria-label={`Open Suite ${row.suite_id}`} aria-current={selected ? 'page' : undefined}>
-        <span className="suite-nav-root-heading"><strong>Suite</strong><code title={row.suite_id}>{compactIdentity(row.suite_id, 7, 4)}</code>
+        <span className="suite-nav-root-heading"><strong>{row.suite_name || 'Suite'}</strong><code title={row.suite_id}>{compactIdentity(row.suite_id, 7, 4)}</code>
           <Tooltip title={`Execution complete: ${summary.complete}/${summary.total} Cases`}>
             <b aria-label={`Execution complete: ${summary.percentage}%`} className={summary.percentage === 100 ? 'completion-full' : summary.percentage > 0 ? 'completion-active' : 'completion-pending'}>{summary.percentage}%</b>
           </Tooltip></span>

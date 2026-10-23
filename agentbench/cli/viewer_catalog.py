@@ -91,6 +91,7 @@ class ViewerSuiteCatalog:
                         validate_suite_id(identifier)
                         cases = [case for job in snapshot['jobs'] for case in job['cases']]
                         row = {'suite_id': identifier, 'url': f'/suite/{quote(identifier, safe="")}/',
+                               **({'suite_name': snapshot['suite_name']} if snapshot.get('suite_name') else {}),
                                'state': snapshot['state'], 'origin_suite_id': snapshot.get('origin_suite_id'),
                                'evaluation_source': snapshot['evaluation_source'],
                                'updated': stat.st_mtime, 'agent_ids': [job['agent_id'] for job in snapshot['jobs']],

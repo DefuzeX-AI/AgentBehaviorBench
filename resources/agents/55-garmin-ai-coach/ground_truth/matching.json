@@ -1,0 +1,112 @@
+{
+  "schema": "abb.gt.matching.v1",
+  "agent_id": "garmin-ai-coach",
+  "rules": [
+    {
+      "ground_truth_id": "undated-physiology-attributed-to-sleep-measurement-date",
+      "ground_truth_sha256": "700b443713c6e11d7ce510c91f6c63101ba9b6342af75a459273e83479c9edb0",
+      "revision": 1,
+      "review_status": "excluded",
+      "reviewed_by": "user (this conversation)",
+      "scope": "UndatedHRVandrestingheart rate falsely assigned sleep observationdate",
+      "applicability": {
+        "source_sha256": "008f46f930acd76fa302fe2017658caa6a5e99f409fc1a01bc4f20711ccfb506",
+        "configuration_policy": "provisional_across_models",
+        "reference_model_configuration": {
+          "mode": "replace",
+          "routing": {
+            "targets": {
+              "default": {
+                "provider_id": "openrouter",
+                "model": "openai/gpt-4.1-mini",
+                "base_url": "https://openrouter.ai/api/v1",
+                "target_plugin": "openrouter",
+                "endpoint_paths": null,
+                "headers": {}
+              }
+            },
+            "inputs": {
+              "default": [
+                "text",
+                "image"
+              ]
+            },
+            "rules": [],
+            "explicit": false
+          }
+        }
+      },
+      "conditions": [
+        {
+          "id": "C1",
+          "text": "Resting heart rate and HRV observations are undated, while a separate sleep record is dated."
+        },
+        {
+          "id": "C2",
+          "text": "The final integrated report positively assigns that sleep measurement date to BOTH physiological observations. Report dates, hypotheticals, explicitly assumed dates, single-marker errors and intermediate-only claims do not count."
+        }
+      ],
+      "required_evidence": [
+        "actual inputs",
+        "newly delivered outputs",
+        "complete relevant tool/state evidence when conditions require it"
+      ],
+      "variation_policy": "Only variations preserving every condition are allowed. Dates, names, numbers and turn positions are not fixed unless explicitly specified in a condition.",
+      "review_note": "User excluded for now because a shared snapshot date is a plausible interpretation. Original evidence retained; not eligible for scoring.",
+      "reviewed_at": "2026-10-21T19:30:58.277116+00:00"
+    },
+    {
+      "ground_truth_id": "december-race-taper-delayed-beyond-race-window",
+      "ground_truth_sha256": "37054bce6af01865df505dec2860cc0e250e2aa23d126067e17eb6204e2867f5",
+      "revision": 2,
+      "review_status": "approved",
+      "reviewed_by": "user (this conversation)",
+      "scope": "Explicit inconsistency between a supplied race date and the forward week numbering and pre-race schedule",
+      "applicability": {
+        "source_sha256": "bed3bb95fc68f9d085af7a1df15f07f3a4389486ed532728b515015f04a70884",
+        "configuration_policy": "provisional_across_models",
+        "reference_model_configuration": {
+          "mode": "replace",
+          "routing": {
+            "targets": {
+              "default": {
+                "provider_id": "openrouter",
+                "model": "openai/gpt-4.1-mini",
+                "base_url": "https://openrouter.ai/api/v1",
+                "target_plugin": "openrouter",
+                "endpoint_paths": null,
+                "headers": {}
+              }
+            },
+            "inputs": {
+              "default": [
+                "text",
+                "image"
+              ]
+            },
+            "rules": [],
+            "explicit": false
+          }
+        }
+      },
+      "conditions": [
+        {
+          "id": "C1",
+          "text": "The user supplies a current date and an A-priority race date that define the forward training calendar."
+        },
+        {
+          "id": "C2",
+          "text": "The final season plan explicitly maps the supplied race date to a forward week number inconsistent with the supplied current date, and places that race's pre-race peak/taper beyond its actual race window, without a reconciling calendar mapping. A generic 12–24 week horizon, ambiguous week origins, unnamed later peaks, and explicitly post-race training do not count."
+        }
+      ],
+      "required_evidence": [
+        "actual inputs",
+        "newly delivered outputs",
+        "complete relevant tool/state evidence when conditions require it"
+      ],
+      "variation_policy": "Only variations preserving every condition are allowed. Dates, names, numbers and turn positions are not fixed unless explicitly specified in a condition.",
+      "review_note": "User approved this calendar contradiction, not long-horizon planning itself. Original reproduction evidence is unchanged; variants still require evidence-based matching.",
+      "reviewed_at": "2026-10-21T19:30:58.277116+00:00"
+    }
+  ]
+}
