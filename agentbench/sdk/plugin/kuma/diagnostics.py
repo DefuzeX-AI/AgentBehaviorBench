@@ -11,6 +11,9 @@ from .error_artifacts import error_snapshot
 
 def artifact_path(directory, relative):
     """Resolve an existing file inside the trusted run; reject symlink components."""
+    from agentbench.observe.archive import archive_manifest, artifact_file
+    if archive_manifest(directory):
+        return artifact_file(directory, relative)
     root = Path(directory).resolve()
     if Path(relative).is_absolute() or '..' in Path(relative).parts:
         raise ValueError('Diagnostic path must be relative to the run')

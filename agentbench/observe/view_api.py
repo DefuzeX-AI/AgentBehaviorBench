@@ -163,10 +163,8 @@ class RunViewAPI:
         self.run_id = directory.name
 
     def file(self, relative):
-        path = (self.directory / relative).resolve(strict=True)
-        if not path.is_relative_to(self.directory) or path == self.directory:
-            raise ValueError('Path outside run')
-        return path
+        from .archive import artifact_file
+        return artifact_file(self.directory, relative)
 
     def read(self, relative):
         try:
@@ -289,11 +287,10 @@ class RunViewAPI:
         match = re.fullmatch(r'otel/([0-9a-f]{16})/payload/(input|output|error|metadata|events)', route)
         if match:
             span = next(s for s in self.spans()['spans'] if s['span_id'] == match[1])
-            output = self.file(span['output_directory'])
             ref = span['attributes'][f'abb.{match[2]}_ref']
-            target = (output / ref).resolve(strict=True)
-            if not target.is_relative_to(output):
+            if Path(ref).is_absolute() or '..' in Path(ref).parts:
                 raise ValueError('Payload outside output')
+            target = self.file(span['output_directory'] + '/' + ref)
             with target.open(encoding='utf-8') as stream:
                 payload = [json.loads(line) for line in stream if line.strip()] if match[2] == 'events' else json.load(stream)
             return {'payload': payload}
