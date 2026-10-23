@@ -1,5 +1,5 @@
 FROM python:3.13-slim-bookworm@sha256:e32be0e55814a08977501ca863271d9bd02443710db8f2afaf8372e2c4508530
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/opt/abb-runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git ripgrep fd-find tree bubblewrap ca-certificates \
     && ln -s /usr/bin/fdfind /usr/local/bin/fd \
@@ -14,8 +14,11 @@ COPY agent/ ./
 RUN --mount=type=cache,target=/root/.cache/uv uv pip install --system --no-deps .
 RUN python -m pip check
 
+WORKDIR /opt/agent
+COPY .abb-runtime/ /opt/abb-runtime/
+COPY bindings/ ./bindings/
+COPY agent.toml ./agent.toml
 RUN useradd --create-home --uid 10001 agent \
     && mkdir -p /workspace/langrepl \
     && chown -R agent:agent /workspace/langrepl
 USER agent
-WORKDIR /workspace/langrepl
