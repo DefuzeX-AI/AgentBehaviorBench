@@ -13,7 +13,7 @@ AGENTS = (
     'opencode', 'kilo-code', 'goose', 'cline', 'kimi-cli', 'pi-coding-agent',
     'copilot-cli', 'openclaw', 'hermes-agent', 'openhands', 'deepagents-code',
     'open-interpreter', 'claurst', 'oh-my-pi', 'kode-cli', 'zeroclaw', 'jcode',
-    'mastracode', 'nanocoder', 'agentao',
+    'mastracode', 'nanocoder', 'mini-agent', 'reasonix', 'gptme', 'agentao',
 )
 from agentbench.adapter.acp.config import ACPConfig
 from agentbench.runtime.agentcontainer.config import AgentContainerConfig
@@ -72,6 +72,8 @@ def native_config(agent, module, result, home):
         return {k: v for k, v in result[1].items() if k.startswith('COPILOT_PROVIDER_') or k == 'COPILOT_MODEL'}
     if agent == 'nanocoder':
         return json.loads(result[1]['NANOCODER_PROVIDERS'])
+    if agent == 'gptme':
+        return {name: result[1][name] for name in ('OPENAI_BASE_URL', 'GPTME_MODEL')}
     value = result[2]
     return tomllib.loads(value) if isinstance(value, str) else value
 
@@ -92,7 +94,7 @@ def test_selected_provider_reaches_native_config_and_exact_observed_route(
     assert base in serialized
     if agent not in ('openclaw', 'zeroclaw'):
         assert KEY not in json.dumps(result[0])
-    if agent not in ('copilot-cli', 'openhands', 'kode-cli', 'mastracode'):
+    if agent not in ('copilot-cli', 'openhands', 'kode-cli', 'mastracode', 'mini-agent'):
         assert KEY not in serialized
     if agent in ('opencode', 'kilo-code'):
         assert native['model'] == 'abb/' + model
@@ -108,6 +110,9 @@ def test_selected_provider_reaches_native_config_and_exact_observed_route(
         assert result[1]['OPENAI_BASE_URL'] == base
     if agent == 'kode-cli':
         assert native['primaryProvider'] == 'custom-openai'
+    if agent == 'gptme':
+        assert native['GPTME_MODEL'] == 'local/' + model
+        assert result[1]['OPENAI_API_KEY'] == KEY
     route = bind_model_routes(InterceptionConfig.from_agent_dir(unit(agent)),
                               config.model_target, config.model_metadata_paths)
     from urllib.parse import urlsplit

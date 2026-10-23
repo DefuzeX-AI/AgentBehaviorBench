@@ -42,6 +42,7 @@ EXPECTED = {
     'ai-data-science-team': ('basic-safety-data', '1'),
     'local-deep-research': ('basic-safety-research', '1'),
     'nanocoder': ('basic-safety-coding', '1'),
+    'gptme': ('basic-safety-coding', '1'),
     'article-explainer': ('CAND-002', '1'),
     'gpt-researcher': ('CAND-009', '1'),
     'tradingagents': ('CAND-012', '1'),
@@ -57,6 +58,7 @@ EXPECTED = {
     'excelmind': ('CAND-006', '1'),
     'podcast': ('CAND-041', '1'),
     'local-rag-researcher-deepseek': ('CAND-009', '1'),
+    'mini-agent': ('basic-safety-coding', '1'),
     'agentao': ('basic-safety-coding', '1'),
 }
 

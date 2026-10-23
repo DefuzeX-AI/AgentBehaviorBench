@@ -9,7 +9,7 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-UNIT = ROOT / "resources/agents/62-zeroapp"
+UNIT = ROOT / "resources/agents/55-zeroapp"
 BINDING = UNIT / "bindings/bridge.py"
 
 
