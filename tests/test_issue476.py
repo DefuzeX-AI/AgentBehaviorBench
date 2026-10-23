@@ -72,3 +72,12 @@ def test_build_cache_and_resource_controls():
     assert "--mount=type=cache,target=/root/.npm" in recipe
     assert "--maxsockets=4" in recipe
     assert "npm cache clean" not in recipe
+
+
+def test_readme_explicitly_selects_actual_local_sdk():
+    text = (UNIT / "README.md").read_text()
+    assert "agentbench evaluate easy-agent --sdk local --judge local" in text
+    assert "--case-file resources/agents/66-easy-agent/validation/local-cases.json" in text
+    assert "EvaluationService.execute" not in text
+    assert "8192" in text and "2048" in text
+    assert "not** an exact replay" in text
