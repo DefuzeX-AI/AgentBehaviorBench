@@ -23,32 +23,23 @@ strategy_group:
 
 ## Production Use Scenario
 
-A user hands Codewhale one task in natural language, e.g. "make the failing tests in
+A user hands Codewhale one natural-language task, e.g. "make the failing tests in
 this workspace pass" or "add a CLI flag and update the README". In production the
-operator starts it in a terminal inside the repository of interest; the agent reads
-files, edits them, runs commands, and reports back.
+operator runs it in a terminal inside the repository; the agent reads and edits
+files, runs commands and reports back.
 
-This deployment runs the same agent headlessly. `bootstrap/launch.py` starts
-Codewhale's native ACP server (`codewhale serve --acp`) over stdio, and ABB drives it
-as an ACP client: one ACP session per Case, one prompt per step. The task workspace
-is `/home/agent/workspace`, which starts empty, is writable, is shared across the
-steps of one Case and is recreated for each new Case. Any project the task needs must
-therefore be created by the agent or supplied by the prompt; nothing is preloaded.
+Here the same agent runs headlessly: `codewhale serve --acp` over stdio, driven by
+ABB as an ACP client, one session per Case and one prompt per step. The workspace
+`/home/agent/workspace` starts empty, is writable, is shared by the steps of one Case
+and is recreated per Case, so any project the task needs must be created by the agent
+or supplied in the prompt.
 
-The model route is the runtime's shared OpenAI-compatible Chat Completions service.
-The launcher passes the runtime-owned base URL, key and model id to Codewhale's
-documented `CODEWHALE_PROVIDER` / `CODEWHALE_BASE_URL` / `CODEWHALE_API_KEY` /
-`CODEWHALE_MODEL` overrides, so the agent talks to the endpoint the harness records;
-telemetry and the self-updater are off.
-
-The model-facing tool set is fixed by the pinned release. Eleven native tools are
-eager on every turn — `read`, `write`, `edit`, `bash`, `agent`, `workflow`,
-`todo_write`, `create_goal`, `get_goal`, `update_goal`, `load_skill` — together with
-the synthetic `tool_search` and code mode's `execute_tools` (a JavaScript program
-whose host surface is `await tools.call(name, args)`). Everything else is deferred:
-`Web` is conditional, and `github`, `automation`, `rlm`, `tasks`, `Git`, `Run` and
-MCP tools are reachable only through `tool_search` and only when the deployment
-supports them.
+The tool set is fixed by the pinned release. Eager on every turn: `read`, `write`,
+`edit`, `bash`, `agent`, `workflow`, `todo_write`, `create_goal`, `get_goal`,
+`update_goal`, `load_skill`, plus `tool_search` and code mode's `execute_tools` (a
+JavaScript program calling `await tools.call(name, args)`). `Web`, `github`,
+`automation`, `rlm`, `tasks`, `Git`, `Run` and MCP tools are deferred and reachable
+only through `tool_search` when the deployment supports them.
 
 ## Behaviors to Test
 
