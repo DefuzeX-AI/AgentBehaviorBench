@@ -46,6 +46,7 @@ def test_launcher_selects_openai_provider_and_keeps_key_out_of_environment(tmp_p
     assert command == ["/opt/mini-agent/bin/python", str(UNIT / "bootstrap/acp_server.py")]
     assert "ABB_AGENT_MODEL_API_KEY" not in environ
     assert environ["HOME"] == str(tmp_path)
+    assert environ["TIKTOKEN_CACHE_DIR"] == "/opt/mini-agent-tiktoken"  # Baked into the image.
     assert document["provider"] == "openai"
     assert document["api_base"] == "https://gateway.example/api/v3"
     assert document["model"] == "chosen-model"

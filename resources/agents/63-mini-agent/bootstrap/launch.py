@@ -14,6 +14,9 @@ KEY_ENV = "ABB_AGENT_MODEL_API_KEY"
 BASE_URL_ENV = "ABB_AGENT_MODEL_BASE_URL"
 MODEL_ENV = "ABB_AGENT_MODEL"
 MINI_AGENT_PYTHON = "/opt/mini-agent/bin/python"
+# read_file counts tokens with tiktoken's cl100k_base, which tiktoken otherwise downloads
+# from openaipublic.blob.core.windows.net on first use; the Dockerfile caches it here.
+TIKTOKEN_CACHE = "/opt/mini-agent-tiktoken"
 ACP_SERVER = Path(__file__).resolve().with_name("acp_server.py")
 # Pinned upstream templates that scripts/setup-config.sh copies; the wheel omits them.
 SOURCE_CONFIG = Path(__file__).resolve().parents[1] / "agent/mini_agent/config"
@@ -65,6 +68,7 @@ def prepare(environ: dict[str, str], home: Path) -> tuple[list[str], dict[str, s
     # need it in their environment.
     child = {k: v for k, v in environ.items() if k != KEY_ENV}
     child["HOME"] = str(home)
+    child["TIKTOKEN_CACHE_DIR"] = TIKTOKEN_CACHE
     return [MINI_AGENT_PYTHON, str(ACP_SERVER)], child, config_document(key, base_url, model)
 
 

@@ -22,6 +22,10 @@ The lock records a PyPI mirror's wheel URLs; exporting keeps the locked versions
 hashes while downloading from PyPI. ABB's worker uses the separate `/opt/venv`, so the
 locked `agent-client-protocol==0.6.3` of the Agent and the adapter's 0.12.1 do not mix.
 `uv` stays on PATH because Mini-Agent's system prompt directs Python work through `uv`.
+`read_file` counts tokens with tiktoken's `cl100k_base`, which tiktoken downloads from
+`openaipublic.blob.core.windows.net` on first use; that host is not admitted, so the build
+caches the (hash-verified) encoding in `/opt/mini-agent-tiktoken` and the launcher sets
+`TIKTOKEN_CACHE_DIR`. Without it every `read_file` call fails with the refused download.
 
 ## Model provider
 

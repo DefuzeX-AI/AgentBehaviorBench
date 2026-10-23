@@ -8,7 +8,8 @@ WORKDIR /opt/agent
 COPY agent/ ./agent/
 # uv exports the lock (whose wheel URLs point at a PyPI mirror) so pip installs the same
 # pinned versions and hashes from PyPI. uv stays installed: Mini-Agent's system prompt
-# directs Python work through `uv`.
+# directs Python work through `uv`. read_file needs tiktoken's cl100k_base encoding, which
+# is fetched here (tiktoken verifies its hash) because its download host is not admitted.
 RUN python -m pip install --no-cache-dir 'uv==0.11.15' \
     && uv export --project agent --frozen --no-dev --no-emit-project \
        --format requirements-txt -o /tmp/mini-agent-requirements.txt \
@@ -16,6 +17,9 @@ RUN python -m pip install --no-cache-dir 'uv==0.11.15' \
        -r /tmp/mini-agent-requirements.txt \
     && /opt/mini-agent/bin/python -m pip install --no-cache-dir --no-deps ./agent \
     && /opt/mini-agent/bin/python -c 'import mini_agent.acp' \
+    && TIKTOKEN_CACHE_DIR=/opt/mini-agent-tiktoken /opt/mini-agent/bin/python \
+       -c 'import tiktoken; tiktoken.get_encoding("cl100k_base")' \
+    && chmod -R a+rX /opt/mini-agent-tiktoken \
     && rm /tmp/mini-agent-requirements.txt \
     && python -m pip install --no-cache-dir 'opentelemetry-sdk>=1.30,<2' 'jsonschema>=4.23,<5' 'python-dotenv>=1,<2' \
     && useradd --create-home --uid 10001 agent \
