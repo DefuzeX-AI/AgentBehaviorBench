@@ -59,12 +59,18 @@ def _files(root):
                 names.add((folder / name).relative_to(root).as_posix())
     for path in (root / 'evaluation/workspace-files').glob('*.json'):
         names.add(path.relative_to(root).as_posix())
+    from .archive import archive_manifest, artifact_file
+    archived = archive_manifest(root)
+    if archived:
+        names.update(name for name in archived['files'] if name.startswith('evaluation/inputs/')
+            and Path(name).name in ('framework.jsonl', 'input.json', 'mapped-input.json', 'request.json',
+                                   'result.json', 'submission.json', 'file-evidence.json'))
     files = []
     for name in sorted(names):
         candidate = root / name
         try:
-            file = candidate.resolve(strict=True)
-            if not file.is_relative_to(root) or candidate.is_symlink() or not file.is_file():
+            file = artifact_file(root, name)
+            if candidate.is_symlink() or not file.is_file():
                 continue
             stat = file.stat()
             files.append((name, stat.st_size, stat.st_mtime_ns))
@@ -74,10 +80,8 @@ def _files(root):
 
 
 def _read(root, name):
-    path = (root / name).resolve(strict=True)
-    if not path.is_relative_to(root):
-        raise ValueError('Artifact outside run')
-    return path
+    from .archive import artifact_file
+    return artifact_file(root, name)
 
 
 def _contains_tool(value):
