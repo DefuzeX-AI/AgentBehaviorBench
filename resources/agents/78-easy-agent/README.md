@@ -10,7 +10,7 @@ Prepare the pinned native source with ABB's standard source-preparation workflow
 
 ```sh
 agentbench evaluate easy-agent --sdk local --judge local \
-  --case-file resources/agents/66-easy-agent/validation/local-cases.json \
+  --case-file resources/agents/78-easy-agent/validation/local-cases.json \
   --registry resources/smoke-registry.toml --model glm-5.3-flash \
   --cases 1 --case-retries 0 --max-steps 1 --timeout 900 --no-view \
   --results-dir results/issue476-local

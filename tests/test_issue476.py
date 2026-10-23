@@ -6,7 +6,7 @@ import os
 import tomllib
 import pytest
 ROOT = Path(os.environ.get("ABB_UNIT_TEST_ROOT", Path(__file__).resolve().parents[1]))
-UNIT = ROOT / "resources/agents/66-easy-agent"
+UNIT = ROOT / "resources/agents/78-easy-agent"
 
 def launcher():
     spec = importlib.util.spec_from_file_location("launch_476", UNIT / "bootstrap/launch.py")
@@ -77,7 +77,7 @@ def test_build_cache_and_resource_controls():
 def test_readme_explicitly_selects_actual_local_sdk():
     text = (UNIT / "README.md").read_text()
     assert "agentbench evaluate easy-agent --sdk local --judge local" in text
-    assert "--case-file resources/agents/66-easy-agent/validation/local-cases.json" in text
+    assert "--case-file resources/agents/78-easy-agent/validation/local-cases.json" in text
     assert "EvaluationService.execute" not in text
     assert "8192" in text and "2048" in text
     assert "not** an exact replay" in text
