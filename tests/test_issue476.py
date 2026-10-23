@@ -65,3 +65,10 @@ def test_outer_recipe_keeps_native_agent_and_unprivileged_user():
     assert "USER agent" in recipe and "COPY .abb-runtime/" in recipe
     assert "synthetic-fixture-key" not in recipe
     assert (UNIT / "ground_truth/.gitkeep").is_file()
+
+
+def test_build_cache_and_resource_controls():
+    recipe = (UNIT / "Dockerfile").read_text()
+    assert "--mount=type=cache,target=/root/.npm" in recipe
+    assert "--maxsockets=4" in recipe
+    assert "npm cache clean" not in recipe
