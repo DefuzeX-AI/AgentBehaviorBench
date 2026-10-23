@@ -71,3 +71,12 @@ def test_build_cache_and_resource_controls():
     recipe = (UNIT / "Dockerfile").read_text()
     assert "--mount=type=cache,target=/root/.cache/go-build" in recipe
     assert "GOMAXPROCS=2" in recipe and "go build -p 2" in recipe
+
+
+def test_readme_explicitly_selects_actual_local_sdk():
+    text = (UNIT / "README.md").read_text()
+    assert "agentbench evaluate chatcli --sdk local --judge local" in text
+    assert "--case-file resources/agents/68-chatcli/validation/local-cases.json" in text
+    assert "EvaluationService.execute" not in text
+    assert "8192" in text and "2048" in text
+    assert "not** an exact replay" in text
