@@ -6,7 +6,7 @@ import os
 import tomllib
 import pytest
 ROOT = Path(os.environ.get("ABB_UNIT_TEST_ROOT", Path(__file__).resolve().parents[1]))
-UNIT = ROOT / "resources/agents/66-chatcli"
+UNIT = ROOT / "resources/agents/68-chatcli"
 
 def launcher():
     spec = importlib.util.spec_from_file_location("launch_526", UNIT / "bootstrap/launch.py")
