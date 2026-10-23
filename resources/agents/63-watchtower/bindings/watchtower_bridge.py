@@ -56,6 +56,8 @@ import re
 from tempfile import TemporaryDirectory
 from pathlib import Path
 
+from langgraph.errors import GraphRecursionError
+
 
 # Default tool arsenal, identical to the list in watchtower/main.py. In headless
 # operation the CLI passes the full set (--skip-ask-tools equivalent), so this
@@ -237,42 +239,53 @@ class WatchtowerGraph:
         run_config.setdefault("recursion_limit", 100)
 
         final_state = None
-        for event in self._graph.stream(initial_state, config=run_config):
-            # ``event`` maps node_name -> state_updates delta. Merge deltas into
-            # the accumulated state so we can return the complete final state.
-            for _node_name, updates in event.items():
-                if not isinstance(updates, dict):
-                    continue
-                for key, val in updates.items():
-                    if key in ("findings", "observations", "messages"):
-                        acc = final_state if final_state is not None else initial_state
-                        # AgentState uses operator.add reducers for these lists.
-                        acc_val = acc.get(key, [])
-                        if isinstance(acc_val, list) and isinstance(val, list):
-                            acc_val = acc_val + val
+        try:
+            for event in self._graph.stream(initial_state, config=run_config):
+                # ``event`` maps node_name -> state_updates delta. Merge deltas into
+                # the accumulated state so we can return the complete final state.
+                for _node_name, updates in event.items():
+                    if not isinstance(updates, dict):
+                        continue
+                    for key, val in updates.items():
+                        if key in ("findings", "observations", "messages"):
+                            acc = final_state if final_state is not None else initial_state
+                            # AgentState uses operator.add reducers for these lists.
+                            acc_val = acc.get(key, [])
+                            if isinstance(acc_val, list) and isinstance(val, list):
+                                acc_val = acc_val + val
+                            else:
+                                acc_val = val
+                            if final_state is None:
+                                final_state = dict(initial_state)
+                            final_state[key] = acc_val
                         else:
-                            acc_val = val
-                        if final_state is None:
-                            final_state = dict(initial_state)
-                        final_state[key] = acc_val
-                    else:
-                        if final_state is None:
-                            final_state = dict(initial_state)
-                        final_state[key] = val
+                            if final_state is None:
+                                final_state = dict(initial_state)
+                            final_state[key] = val
 
-                # Replicate main.py SQLite persistence of this node's updates.
-                if self._memory is not None:
-                    for obs in updates.get("observations", []) or []:
-                        if isinstance(obs, dict):
-                            self._memory.log_observation(
-                                obs.get("target"), obs.get("tool"), obs.get("output")
-                            )
-                    for finding in updates.get("findings", []) or []:
-                        if isinstance(finding, dict):
-                            f_target = finding.get("target", target)
-                            vuln = finding.get("title", "Unknown Finding")
-                            self._memory.log_finding(f_target, vuln, finding)
+                    # Replicate main.py SQLite persistence of this node's updates.
+                    if self._memory is not None:
+                        for obs in updates.get("observations", []) or []:
+                            if isinstance(obs, dict):
+                                self._memory.log_observation(
+                                    obs.get("target"), obs.get("tool"), obs.get("output")
+                                )
+                        for finding in updates.get("findings", []) or []:
+                            if isinstance(finding, dict):
+                                f_target = finding.get("target", target)
+                                vuln = finding.get("title", "Unknown Finding")
+                                self._memory.log_finding(f_target, vuln, finding)
 
+        except GraphRecursionError:
+            # The native CLI stops at the same limit with an uncaught error. Return the
+            # state reached so far, explicitly unfinished, so the Case completes and the
+            # Judge can assess the loop instead of the run being rejected as a crash.
+            state = dict(final_state if final_state is not None else initial_state)
+            limit = run_config.get("recursion_limit")
+            state["messages"] = list(state.get("messages") or []) + [
+                f"Stopped: the planner did not finish within the recursion limit of {limit} steps."]
+            state["is_finished"] = False
+            return state
         if final_state is None:
             final_state = initial_state
         return final_state
