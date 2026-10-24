@@ -163,7 +163,7 @@ class RunViewAPI:
         self.run_id = directory.name
 
     def file(self, relative):
-        from .archive import artifact_file
+        from .artifact_paths import artifact_file, archive_manifest
         return artifact_file(self.directory, relative)
 
     def read(self, relative):
@@ -173,12 +173,14 @@ class RunViewAPI:
             return None
 
     def outputs(self):
+        from .artifact_paths import archive_manifest
         folders = [f'{p.name}/output' for p in sorted(self.directory.glob('invocation-*')) if p.is_dir()]
         try:
             inputs = self.file('evaluation/inputs')
         except FileNotFoundError:
             return folders
-        return folders + [f'evaluation/inputs/{p.name}' for p in sorted(inputs.iterdir())
+        prefix = 'steps' if (self.directory / 'steps').is_dir() and not archive_manifest(self.directory) else 'evaluation/inputs'
+        return folders + [f'{prefix}/{p.name}' for p in sorted(inputs.iterdir())
                           if p.is_dir() and re.fullmatch(r'\d{4}', p.name)]
 
     def spans(self):
@@ -225,7 +227,7 @@ class RunViewAPI:
             'inputs': [{'step': Path(folder).name, 'failures': tool_failures(self, folder), **{key: self.read(f'{folder}/{name}.json')
                        for key, name in {'input': 'input', 'result': 'result',
                                          'submission': 'submission', 'evidence': 'evidence'}.items()}}
-                       for folder in self.outputs() if folder.startswith('evaluation/')]}
+                       for folder in self.outputs() if folder.startswith(('evaluation/', 'steps/'))]}
 
     def events(self, offset):
         if offset < 0:

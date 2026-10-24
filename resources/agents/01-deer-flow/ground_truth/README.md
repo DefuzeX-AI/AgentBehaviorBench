@@ -1,31 +1,46 @@
 # DeerFlow Ground Truth
 
-这里保存 3 个完整的 ABB Case 结果目录。目录内容直接复制自已有运行，
-保留 `case.json`、`generation.json`、`publication.json` 和整个 `attempts/`。
-没有重跑 Agent，也没有向 KUMA 重新提交。每个目录里的 `gt.json` 只是简短的
-问题说明与参考 attempt 索引，不展开或复制 trace。
+This directory contains three complete ABB Case result directories copied from
+existing runs. Each copy retains `case.json`, `generation.json`,
+`publication.json`, and the entire historical `attempts/` directory. The Agent
+was not rerun, and nothing was resubmitted to KUMA. Each Case's `gt.json` contains
+a concise defect description and reference attempt IDs; it does not embed or
+duplicate the traces.
 
-| Case 目录 | 对应问题 | 参考流程中的实际证据 | Agent 补救与任务结果 |
+| Case directory | Defect | Evidence in the reference execution | Agent recovery and task outcome |
 | --- | --- | --- | --- |
-| [issue-7303-artifact-path](issue-7303-artifact-path/) | [#7303](https://github.com/bytedance/deer-flow/issues/7303)：带空格的产物路径被截断 | 创建带空格的路径 → ArtifactCapture 登记截断路径 → 读取失败 → 使用完整路径读回 CHECKPOINT-7303 | 完整路径补救成功，但后续再次尝试截断引用，最终递归超限 |
-| [issue-7302-sql-columns](issue-7302-sql-columns/) | [#7302](https://github.com/bytedance/deer-flow/issues/7302)：SQL 重复列名导出 JSON 丢值 | 两列同名 id，值为 1 和 2 → JSON 仅剩 id=2；不同列名对照保留两值 | Agent 识别丢值并比较其他格式，最终递归超限 |
-| [issue-7235-podcast-exit](issue-7235-podcast-exit/) | [#7235](https://github.com/bytedance/deer-flow/issues/7235)：播客生成失败仍返回退出码 0 | 生成报错、无 MP3，但进程返回 0；参数错误对照返回 2 | Agent 正确指出失败，诊断任务完成；没有恢复音频生成 |
+| [issue-7303-artifact-path](issue-7303-artifact-path/) | [#7303](https://github.com/bytedance/deer-flow/issues/7303): artifact paths containing spaces are truncated | A path containing spaces is created; ArtifactCapture registers a truncated path; reading it fails; reading the full path returns CHECKPOINT-7303. | The full-path fallback succeeds, but the Agent subsequently retries truncated references and eventually reaches the recursion limit. |
+| [issue-7302-sql-columns](issue-7302-sql-columns/) | [#7302](https://github.com/bytedance/deer-flow/issues/7302): JSON export loses values for duplicate SQL column names | Two columns named id contain 1 and 2; JSON retains only id=2. A control with distinct column names preserves both values. | The Agent identifies the lost value and compares other formats, then eventually reaches the recursion limit. |
+| [issue-7235-podcast-exit](issue-7235-podcast-exit/) | [#7235](https://github.com/bytedance/deer-flow/issues/7235): failed podcast generation returns exit code 0 | Generation reports an error and produces no MP3, but the process returns 0. An invalid-argument control returns 2. | The Agent correctly identifies the failure and completes the diagnostic task; audio generation is not recovered. |
 
-## 怎样查看
+## Inspecting the evidence
 
-每个 Case 的 `case.json` 保存任务输入；`attempts/<id>/run.json` 保存执行状态。
-`attempts/<id>/evaluation/inputs/` 中保存原始输入、输出、OTel trace 及其 payload，
-其余 `channel/`、`replay/`、`agent-output/` 等内容按原目录结构保留。
-`evidence/` 保留已有的 3 次组件探针结果，不能当作 3 次 Agent 运行。
+Each Case's `case.json` contains the task inputs.
+`attempts/<id>/run.json` records execution status.
+`attempts/<id>/evaluation/inputs/` retains the original inputs, outputs, OTel
+traces, and payloads. Other directories, including `channel/`, `replay/`, and
+`agent-output/`, retain their original structure. The `evidence/` directory
+contains three existing component-probe results; these are not three Agent runs.
 
-三个 Case 来自 `suite_4a9ae480fe9348eca2f14d832176637c` 的 case 0、2、3。
-#7303 的无空格对照是原 Suite 中单独的 case 1，仍保留在原结果目录；
-它不另算一个 GT。本目录只放三个缺陷对应的 Case。
-原始结果中的历史路径只用于溯源；ABB 读取本地复制后的相对路径，不依赖旧结果目录。
+The Cases originate from slots 0, 2, and 3 of
+`suite_4a9ae480fe9348eca2f14d832176637c`. The no-space control for #7303 is a
+separate Case in slot 1 of that original Suite and remains in the original
+results directory. It is not a separate ground-truth defect. This directory
+contains only the Cases corresponding to the three defects.
 
-## ABB 如何评判
+Historical absolute paths are retained for provenance only. ABB reads the copied
+artifacts through local relative paths and does not depend on the original
+results directory. These retained reference Cases use the historical layout;
+new runs use the layout described in [Result storage](../../../../docs/Result-Storage.md).
 
-先用已有 Judge 问题总结比较 `gt.json` 的 `summary` 和 `explanation`。
-总结匹配后，才从 `reference_attempts` 指定的本地原始目录读取 trace，与本轮
-trace 对照。缺陷命中计 1、明确不符计 0、证据不足待定；补救结果单独记录。
-不根据执行成功/失败直接判断 GT，不使用 ZIP 或文件哈希。
+## How ABB evaluates matches
+
+ABB first compares existing Judge issue summaries against the `summary` and
+`explanation` in `gt.json`. Only after a summary match does it load the original
+local traces identified by `reference_attempts` and compare them with the current
+execution's traces. A confirmed defect match scores 1, a clear mismatch scores 0,
+and insufficient evidence remains unresolved. Recovery outcomes are recorded
+separately.
+
+Execution success or failure alone does not determine a ground-truth match.
+Matching does not rely on ZIP archives or file hashes.

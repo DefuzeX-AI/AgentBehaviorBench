@@ -154,10 +154,10 @@ def test_real_containers_keep_future_case_private(tmp_path, monkeypatch, framewo
                    overlay={'backend': None, 'worker_package': 'acceptance',
                             'sdk_environment': (), 'require_profile': False})
     generation = evaluate(descriptor, generation_count=1, **options)
-    collection = json.loads((generation / 'evaluation/case-collection.json').read_text())
+    collection = json.loads((generation / 'case-collection.json').read_text())
     entry = collection['cases'][0]
     case_file = store.case(descriptor.agent_id, 0).directory / 'case.json'
-    assert case_file.read_bytes() == (generation / 'evaluation/cases' / Path(entry['artifact']).name).read_bytes()
+    assert case_file.read_bytes() == (generation / 'cases' / Path(entry['artifact']).name).read_bytes()
     contract = None
     if workspace:
         import tomllib
@@ -170,13 +170,13 @@ def test_real_containers_keep_future_case_private(tmp_path, monkeypatch, framewo
     status = json.loads((result / 'run.json').read_text())
     assert status['status'] == 'succeeded', (result, (result / 'diagnostics.json').read_text())
     assert status['cleanup_status'] == 'succeeded'
-    assert json.loads((result / 'evaluation/judge/report.json').read_text())['status'] == 'pass'
-    steps = result / 'evaluation/inputs'
+    assert json.loads((result / 'judge/report.json').read_text())['status'] == 'pass'
+    steps = result / 'inputs'
     assert json.loads((steps / '0001/result.json').read_text())['output'] == 'first step isolated'
     second = json.loads((steps / '0002/result.json').read_text())['output']
     assert second.startswith('future-')
     assert second not in (steps / '0001/result.json').read_text()
-    assert json.loads((result / 'evaluation/session.json').read_text())['invocations'] == 2
+    assert json.loads((result / 'session.json').read_text())['invocations'] == 2
     print('Private storage acceptance:', result)
 
 def test_missing_external_storage_support_fails_before_sdk_call(tmp_path):

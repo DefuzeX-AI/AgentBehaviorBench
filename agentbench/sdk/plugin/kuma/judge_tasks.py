@@ -14,15 +14,15 @@ from .diagnostics import artifact_path, read_diagnostic, collect_artifacts
 from .configuration import api_key, request_options
 
 TASK = 'judge-task.json'
-CONTEXT = 'evaluation/judge/context.json'
+CONTEXT = 'judge/context.json'
 
 
 def load_context(directory):
     path = artifact_path(directory, CONTEXT)
     if path.stat().st_size > 32 * 1024 * 1024:
         raise ValueError('Judge context exceeds the persisted evidence limit')
-    from .judge_bundle import restore_context
-    return restore_context(json.loads(path.read_text(encoding='utf-8')))
+    from .judge_bundle import restore_context, read_context
+    return restore_context(read_context(directory, json.loads(path.read_text(encoding='utf-8'))))
 
 
 def digest(directory, relative):
@@ -36,7 +36,7 @@ def digest(directory, relative):
 def validate_execution(directory, case, *, task=None):
     """Require cleanup, trace acceptance and unchanged, correlated submissions."""
     host = read_diagnostic(directory, 'run.json')
-    summary = read_diagnostic(directory, 'evaluation/manifest.json')
+    summary = read_diagnostic(directory, 'manifest.json')
     if (host.get('cleanup_status') != 'succeeded'
             or host.get('host_trace_validation') != 'succeeded'
             or host.get('case_id') != case.case_id
@@ -51,7 +51,7 @@ def validate_execution(directory, case, *, task=None):
     context = load_context(directory)
     from kuma import to_json
     if (context.case.case_id != case.case_id
-            or to_json(context.case) != read_diagnostic(directory, 'evaluation/case.json')
+            or to_json(context.case) != read_diagnostic(directory, 'case.json')
             or case_content_sha256(to_json(context.case)) != case.content_sha256
             or context.history[0].submission.run_id != summary.get('run_id')):
         raise ValueError('Judge context does not match the prepared Case and Run')
@@ -60,14 +60,14 @@ def validate_execution(directory, case, *, task=None):
     from .completion import validate_input_prefix
     last = summary['steps'][-1]
     validate_input_prefix(to_json(context.case), summary,
-                          read_diagnostic(directory, 'evaluation/' + last['directory'] + '/result.json'))
-    relatives = [CONTEXT, 'evaluation/case.json', 'evaluation/process.json']
+                          read_diagnostic(directory, last['directory'] + '/result.json'))
+    relatives = [CONTEXT, 'case.json', 'process.json']
     if summary.get('termination'):
-        if read_diagnostic(directory, 'evaluation/termination.json') != summary['termination']:
+        if read_diagnostic(directory, 'termination.json') != summary['termination']:
             raise ValueError('Termination evidence does not match history')
-        relatives.append('evaluation/termination.json')
+        relatives.append('termination.json')
     for step, item in zip(summary['steps'], context.history):
-        prefix = 'evaluation/' + step['directory']
+        prefix = step['directory']
         submission = read_diagnostic(directory, prefix + '/submission.json')
         result = read_diagnostic(directory, prefix + '/result.json')
         request = read_diagnostic(directory, prefix + '/request.json')
@@ -173,7 +173,7 @@ def _judge_task(runner, registration, case, ticket, *, on_progress=None):
         raise ValueError('Original Judge operation is terminally failed; automatic replacement is disabled')
     if task['state'] == 'completed':
         return read_result(directory, registration.agent_id, provider_mode=runner.provider_mode)
-    backend = read_diagnostic(directory, 'evaluation/process.json').get('sdk_base_url')
+    backend = read_diagnostic(directory, 'process.json').get('sdk_base_url')
     if not isinstance(backend, str) or not backend:
         raise ValueError('Original KUMA Backend identity is missing')
     credential, _ = api_key(runner.environ)
@@ -217,8 +217,8 @@ def _judge_task(runner, registration, case, ticket, *, on_progress=None):
             report = to_json(report)
             if report.get('extensions', {}).get('case_id') != case.case_id:
                 raise ValueError('Judge report belongs to another Case')
-            files.save('evaluation/judge/report.json', report)
-            files.save('evaluation/manifest.json', {**summary, 'phase': 'finished', 'judge': 'received'})
+            files.save('judge/report.json', report)
+            files.save('manifest.json', {**summary, 'phase': 'finished', 'judge': 'received'})
             files.save(TASK, {**task, 'state': 'completed', 'finished_at': time.time()})
             emit_progress(on_progress, stage='judge', status='succeeded', detail='Judge report received',
                           artifact_directory=str(directory), **identity)
@@ -233,9 +233,9 @@ def _judge_task(runner, registration, case, ticket, *, on_progress=None):
             except Exception:
                 latest, ledger_readable = [], False
             request = max(latest, key=lambda r: r.updated_at or 0).to_dict() if latest else None
-            current = read_diagnostic(directory, 'evaluation/manifest.json') or summary
+            current = read_diagnostic(directory, 'manifest.json') or summary
             if current.get('judge') != 'received':
-                files.save('evaluation/manifest.json', {**current, 'phase': 'judge', 'judge': 'failed',
+                files.save('manifest.json', {**current, 'phase': 'judge', 'judge': 'failed',
                     'request': request, 'error': exception_record(exc, phase='judge')})
             from agentbench.runtime.contracts.execution import RunCancelled
             resumable_request = (request.get('status') in {'prepared', 'queued', 'running', 'succeeded'}

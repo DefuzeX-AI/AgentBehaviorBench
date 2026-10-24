@@ -11,22 +11,8 @@ from .error_artifacts import error_snapshot
 
 def artifact_path(directory, relative):
     """Resolve an existing file inside the trusted run; reject symlink components."""
-    from agentbench.observe.archive import archive_manifest, artifact_file
-    if archive_manifest(directory):
-        return artifact_file(directory, relative)
-    root = Path(directory).resolve()
-    if Path(relative).is_absolute() or '..' in Path(relative).parts:
-        raise ValueError('Diagnostic path must be relative to the run')
-    candidate = root / relative
-    resolved = candidate.resolve(strict=True)
-    if not resolved.is_relative_to(root) or not candidate.is_file():
-        raise ValueError('Diagnostic path outside run')
-    current = candidate
-    while current != root:
-        if current.is_symlink():
-            raise ValueError('Linked diagnostic file')
-        current = current.parent
-    return resolved
+    from agentbench.observe.artifact_paths import artifact_file
+    return artifact_file(directory, relative)
 
 
 def read_diagnostic(directory, relative):
@@ -49,9 +35,9 @@ def read_diagnostic(directory, relative):
 
 # Artifacts whose absence changes what a failure means. An unreadable one is
 # reported as such instead of being folded into "no diagnostics".
-REQUIRED_ARTIFACTS = ('evaluation/manifest.json', 'evaluation/error.json',
-                      'evaluation/case-collection.json', 'evaluation/case.json',
-                      'evaluation/judge/report.json')
+REQUIRED_ARTIFACTS = ('manifest.json', 'error.json',
+                      'case-collection.json', 'case.json',
+                      'judge/report.json')
 
 
 def unreadable_reason(directory, relative):
@@ -109,8 +95,8 @@ def collect_artifacts(directory, host, *, environ=None):
         Reads local files only. Missing or malformed diagnostics are tolerated.
     """
     files = Artifacts(Path(directory), environ=environ)
-    summary = read_diagnostic(directory, 'evaluation/manifest.json')
-    early = read_diagnostic(directory, 'evaluation/error.json')
+    summary = read_diagnostic(directory, 'manifest.json')
+    early = read_diagnostic(directory, 'error.json')
     error = summary.get('error')
     if not isinstance(error, dict):
         error = early
@@ -135,14 +121,14 @@ def collect_artifacts(directory, host, *, environ=None):
     for step in steps if isinstance(steps, list) else ():
         if not isinstance(step, dict) or not isinstance(step.get('directory'), str):
             continue
-        native = read_diagnostic(directory, f"evaluation/{step['directory']}/result.json")
+        native = read_diagnostic(directory, f"{step['directory']}/result.json")
         if native.get('status') in ('failed', 'timeout', 'cancelled', 'aborted'):
             result['native_failure'] = {key: _text(native.get(key)) for key in ('status', 'error_type', 'error', 'error_code', 'dependency_host', 'http_status', 'retry_after')}
             result['native_failure']['input_id'] = _text(step.get('input_id'))
             break
-    report = read_diagnostic(directory, 'evaluation/judge/report.json')
-    case = read_diagnostic(directory, 'evaluation/case.json')
-    backend = read_diagnostic(directory, 'evaluation/process.json').get('sdk_base_url')
+    report = read_diagnostic(directory, 'judge/report.json')
+    case = read_diagnostic(directory, 'case.json')
+    backend = read_diagnostic(directory, 'process.json').get('sdk_base_url')
     if isinstance(backend, str) and backend:
         result['sdk_base_url'] = _text(backend)
     case_id, run_id = summary.get('case_id'), summary.get('run_id')
@@ -163,7 +149,7 @@ def collect_artifacts(directory, host, *, environ=None):
         result['received_report'] = {
             'status': report['status'], 'report_id': _text(report['report_id']),
             'run_id': _text(run_id), 'case_id': _text(case_id),
-            'path': 'evaluation/judge/report.json', 'host_accepted': result['host_acceptance'] == 'accepted',
+            'path': 'judge/report.json', 'host_accepted': result['host_acceptance'] == 'accepted',
         }
         result['judge_delivery_status'] = 'received'
     related = []
