@@ -1,0 +1,576 @@
+{
+  "coverage": "protocol_events",
+  "internal_model_spans": "not_observed",
+  "tool_calls": 4,
+  "incomplete_tools": [],
+  "initialize": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "fork": {},
+          "resume": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [
+        {
+          "id": "autohand-setup",
+          "name": "Set up Autohand Code",
+          "description": "Configure authentication and a model in an interactive terminal.",
+          "args": [
+            "--setup"
+          ],
+          "type": "terminal"
+        }
+      ],
+      "agentInfo": {
+        "name": "autohand-cli",
+        "title": "Autohand Code",
+        "version": "0.9.8"
+      }
+    },
+    "pid": 10,
+    "session": {
+      "sessionId": "1e232a5f-78d1-45f6-9328-563219ff748d-1792774005650",
+      "modes": {
+        "currentModeId": "default",
+        "availableModes": [
+          {
+            "id": "default",
+            "name": "Ask",
+            "description": "Ask before actions that need approval"
+          },
+          {
+            "id": "plan",
+            "name": "Plan",
+            "description": "Inspect and plan without making changes"
+          },
+          {
+            "id": "yolo",
+            "name": "YOLO",
+            "description": "Auto-approve actions without interruption"
+          },
+          {
+            "id": "automode",
+            "name": "Auto",
+            "description": "Run an interactive autonomous workflow"
+          }
+        ]
+      },
+      "configOptions": [
+        {
+          "currentValue": "deepseek-flash",
+          "options": [
+            {
+              "value": "deepseek-flash",
+              "name": "deepseek-flash"
+            },
+            {
+              "value": "deepseek-v4-flash",
+              "name": "deepseek-v4-flash"
+            },
+            {
+              "value": "deepseek-v4-pro",
+              "name": "deepseek-v4-pro"
+            },
+            {
+              "value": "deepseek-chat",
+              "name": "deepseek-chat"
+            },
+            {
+              "value": "deepseek-reasoner",
+              "name": "deepseek-reasoner"
+            }
+          ],
+          "id": "model",
+          "name": "Model",
+          "description": "Select the model used for this session",
+          "category": "model",
+          "type": "select"
+        },
+        {
+          "currentValue": "normal",
+          "options": [
+            {
+              "value": "none",
+              "name": "None"
+            },
+            {
+              "value": "normal",
+              "name": "Normal"
+            },
+            {
+              "value": "extended",
+              "name": "Extended"
+            }
+          ],
+          "id": "thinking_level",
+          "name": "Thinking Level",
+          "description": "Control the depth of LLM reasoning",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            }
+          ],
+          "id": "auto_commit",
+          "name": "Auto Commit",
+          "description": "Automatically commit changes with LLM-generated messages",
+          "type": "select"
+        },
+        {
+          "currentValue": "on",
+          "options": [
+            {
+              "value": "on",
+              "name": "On"
+            },
+            {
+              "value": "off",
+              "name": "Off"
+            }
+          ],
+          "id": "context_compact",
+          "name": "Context Compaction",
+          "description": "Automatically compact context when sessions grow long",
+          "type": "select"
+        }
+      ],
+      "_meta": {
+        "commands": [
+          {
+            "name": "help",
+            "description": "Show available commands"
+          },
+          {
+            "name": "new",
+            "description": "Start a new conversation"
+          },
+          {
+            "name": "model",
+            "description": "Select or change the model"
+          },
+          {
+            "name": "resume",
+            "description": "Resume a previous session"
+          },
+          {
+            "name": "sessions",
+            "description": "List recent sessions"
+          },
+          {
+            "name": "session",
+            "description": "Show current session info"
+          },
+          {
+            "name": "status",
+            "description": "Show Autohand status"
+          },
+          {
+            "name": "undo",
+            "description": "Undo the last file change"
+          },
+          {
+            "name": "init",
+            "description": "Create AGENTS.md file"
+          },
+          {
+            "name": "memory",
+            "description": "Manage conversation memory"
+          },
+          {
+            "name": "skills",
+            "description": "List available skills"
+          },
+          {
+            "name": "export",
+            "description": "Export conversation"
+          },
+          {
+            "name": "permissions",
+            "description": "Manage tool permissions"
+          },
+          {
+            "name": "feedback",
+            "description": "Send feedback to Autohand"
+          },
+          {
+            "name": "agents",
+            "description": "List available agents"
+          },
+          {
+            "name": "hooks",
+            "description": "Manage lifecycle hooks"
+          },
+          {
+            "name": "automode",
+            "description": "Toggle autonomous agent loop"
+          },
+          {
+            "name": "autoresearch",
+            "description": "Manage autonomous experiment loops"
+          },
+          {
+            "name": "add-dir",
+            "description": "Add additional working directory"
+          },
+          {
+            "name": "share",
+            "description": "Share session transcript"
+          },
+          {
+            "name": "formatters",
+            "description": "Manage code formatters"
+          },
+          {
+            "name": "lint",
+            "description": "Run code linting"
+          },
+          {
+            "name": "mcp",
+            "description": "Manage MCP servers"
+          },
+          {
+            "name": "mcp install",
+            "description": "Browse and install community MCP servers"
+          },
+          {
+            "name": "sync",
+            "description": "Sync settings with cloud"
+          },
+          {
+            "name": "history",
+            "description": "Show conversation history"
+          },
+          {
+            "name": "about",
+            "description": "Show Autohand version and links"
+          },
+          {
+            "name": "plan",
+            "description": "Toggle plan mode"
+          },
+          {
+            "name": "ide",
+            "description": "IDE integration settings"
+          },
+          {
+            "name": "search",
+            "description": "Configure web search"
+          },
+          {
+            "name": "login",
+            "description": "Sign in to Autohand account"
+          },
+          {
+            "name": "logout",
+            "description": "Sign out of Autohand account"
+          },
+          {
+            "name": "learn",
+            "description": "Analyze project and recommend skills"
+          },
+          {
+            "name": "skills search",
+            "description": "Search community skills"
+          },
+          {
+            "name": "skills trending",
+            "description": "Show trending community skills"
+          },
+          {
+            "name": "skills remove",
+            "description": "Remove an installed skill"
+          }
+        ]
+      }
+    }
+  },
+  "session": {
+    "sessionId": "1e232a5f-78d1-45f6-9328-563219ff748d-1792774005650",
+    "modes": {
+      "currentModeId": "default",
+      "availableModes": [
+        {
+          "id": "default",
+          "name": "Ask",
+          "description": "Ask before actions that need approval"
+        },
+        {
+          "id": "plan",
+          "name": "Plan",
+          "description": "Inspect and plan without making changes"
+        },
+        {
+          "id": "yolo",
+          "name": "YOLO",
+          "description": "Auto-approve actions without interruption"
+        },
+        {
+          "id": "automode",
+          "name": "Auto",
+          "description": "Run an interactive autonomous workflow"
+        }
+      ]
+    },
+    "configOptions": [
+      {
+        "currentValue": "deepseek-flash",
+        "options": [
+          {
+            "value": "deepseek-flash",
+            "name": "deepseek-flash"
+          },
+          {
+            "value": "deepseek-v4-flash",
+            "name": "deepseek-v4-flash"
+          },
+          {
+            "value": "deepseek-v4-pro",
+            "name": "deepseek-v4-pro"
+          },
+          {
+            "value": "deepseek-chat",
+            "name": "deepseek-chat"
+          },
+          {
+            "value": "deepseek-reasoner",
+            "name": "deepseek-reasoner"
+          }
+        ],
+        "id": "model",
+        "name": "Model",
+        "description": "Select the model used for this session",
+        "category": "model",
+        "type": "select"
+      },
+      {
+        "currentValue": "normal",
+        "options": [
+          {
+            "value": "none",
+            "name": "None"
+          },
+          {
+            "value": "normal",
+            "name": "Normal"
+          },
+          {
+            "value": "extended",
+            "name": "Extended"
+          }
+        ],
+        "id": "thinking_level",
+        "name": "Thinking Level",
+        "description": "Control the depth of LLM reasoning",
+        "type": "select"
+      },
+      {
+        "currentValue": "off",
+        "options": [
+          {
+            "value": "off",
+            "name": "Off"
+          },
+          {
+            "value": "on",
+            "name": "On"
+          }
+        ],
+        "id": "auto_commit",
+        "name": "Auto Commit",
+        "description": "Automatically commit changes with LLM-generated messages",
+        "type": "select"
+      },
+      {
+        "currentValue": "on",
+        "options": [
+          {
+            "value": "on",
+            "name": "On"
+          },
+          {
+            "value": "off",
+            "name": "Off"
+          }
+        ],
+        "id": "context_compact",
+        "name": "Context Compaction",
+        "description": "Automatically compact context when sessions grow long",
+        "type": "select"
+      }
+    ],
+    "_meta": {
+      "commands": [
+        {
+          "name": "help",
+          "description": "Show available commands"
+        },
+        {
+          "name": "new",
+          "description": "Start a new conversation"
+        },
+        {
+          "name": "model",
+          "description": "Select or change the model"
+        },
+        {
+          "name": "resume",
+          "description": "Resume a previous session"
+        },
+        {
+          "name": "sessions",
+          "description": "List recent sessions"
+        },
+        {
+          "name": "session",
+          "description": "Show current session info"
+        },
+        {
+          "name": "status",
+          "description": "Show Autohand status"
+        },
+        {
+          "name": "undo",
+          "description": "Undo the last file change"
+        },
+        {
+          "name": "init",
+          "description": "Create AGENTS.md file"
+        },
+        {
+          "name": "memory",
+          "description": "Manage conversation memory"
+        },
+        {
+          "name": "skills",
+          "description": "List available skills"
+        },
+        {
+          "name": "export",
+          "description": "Export conversation"
+        },
+        {
+          "name": "permissions",
+          "description": "Manage tool permissions"
+        },
+        {
+          "name": "feedback",
+          "description": "Send feedback to Autohand"
+        },
+        {
+          "name": "agents",
+          "description": "List available agents"
+        },
+        {
+          "name": "hooks",
+          "description": "Manage lifecycle hooks"
+        },
+        {
+          "name": "automode",
+          "description": "Toggle autonomous agent loop"
+        },
+        {
+          "name": "autoresearch",
+          "description": "Manage autonomous experiment loops"
+        },
+        {
+          "name": "add-dir",
+          "description": "Add additional working directory"
+        },
+        {
+          "name": "share",
+          "description": "Share session transcript"
+        },
+        {
+          "name": "formatters",
+          "description": "Manage code formatters"
+        },
+        {
+          "name": "lint",
+          "description": "Run code linting"
+        },
+        {
+          "name": "mcp",
+          "description": "Manage MCP servers"
+        },
+        {
+          "name": "mcp install",
+          "description": "Browse and install community MCP servers"
+        },
+        {
+          "name": "sync",
+          "description": "Sync settings with cloud"
+        },
+        {
+          "name": "history",
+          "description": "Show conversation history"
+        },
+        {
+          "name": "about",
+          "description": "Show Autohand version and links"
+        },
+        {
+          "name": "plan",
+          "description": "Toggle plan mode"
+        },
+        {
+          "name": "ide",
+          "description": "IDE integration settings"
+        },
+        {
+          "name": "search",
+          "description": "Configure web search"
+        },
+        {
+          "name": "login",
+          "description": "Sign in to Autohand account"
+        },
+        {
+          "name": "logout",
+          "description": "Sign out of Autohand account"
+        },
+        {
+          "name": "learn",
+          "description": "Analyze project and recommend skills"
+        },
+        {
+          "name": "skills search",
+          "description": "Search community skills"
+        },
+        {
+          "name": "skills trending",
+          "description": "Show trending community skills"
+        },
+        {
+          "name": "skills remove",
+          "description": "Remove an installed skill"
+        }
+      ]
+    }
+  },
+  "prompt_completed": {
+    "stopReason": "end_turn"
+  }
+}
