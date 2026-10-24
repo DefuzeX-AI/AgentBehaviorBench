@@ -93,7 +93,9 @@ class FileArtifactStore:
         from uuid import uuid4
         root = self.agent_directory(agent_id) if self.managed else self.directory
         path = child(root, ('preparations/' if self.managed else 'preparation/') + uuid4().hex)
-        path.mkdir(parents=True)
+        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        path.parent.chmod(0o700)
+        path.mkdir()
         return path
 
     def case(self, agent_id, case_index):

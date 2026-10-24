@@ -10,7 +10,7 @@ def read_trace(api, *, limit=8 * 1024 * 1024):
     def read(relative):
         nonlocal size
         path = api.file(relative)
-        from agentbench.observe.archive import ArtifactFile
+        from agentbench.observe.artifact_paths import ArtifactFile
         raw = path.read_bytes() if isinstance(path, ArtifactFile) else read_bytes(path, limit=limit)
         size += len(raw)
         if size > limit:
