@@ -1,0 +1,12 @@
+schema_version = "abb.network.v1"
+
+# OpenSoul's ACP-exposed tools (file read/write, terminal) are local and need no
+# network routes. The only admitted model route is the one declared in agent.toml
+# via the shared runtime default (POST <selected-base>/chat/completions).
+#
+# The messaging channels OpenSoul would otherwise start (Discord, Telegram,
+# Matrix, ...) are switched off in bootstrap/launch.py (OPENSOUL_SKIP_CHANNELS=1),
+# so the Gateway never dials them. Any other request the Agent attempts (a web
+# fetch, an MCP server, a package install) goes to ABB's egress observer, which
+# forwards allowlisted hosts, refuses the rest with 403 and records every attempt
+# in egress.jsonl without rejecting the Case.
