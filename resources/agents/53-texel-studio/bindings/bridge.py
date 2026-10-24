@@ -201,7 +201,7 @@ def _render(canvas, params: dict[str, Any], steps: list[str], edit: bool,
             char = str(idx) if idx < 10 else chr(ord("A") + idx - 10)
             legend.append(f"{char} = {idx} ({canvas.palette[idx]}): {count}px")
     filled = sum(c for i, c in counts.items() if i >= 0)
-    log =steps if len(steps) <= STEP_LOG_LIMIT else steps[:STEP_LOG_LIMIT] + [f"... {len(steps) - STEP_LOG_LIMIT} more steps"]
+    log = steps if len(steps) <= STEP_LOG_LIMIT else steps[:STEP_LOG_LIMIT] + [f"... {len(steps) - STEP_LOG_LIMIT} more steps"]
     return "\n".join([
         f"Texel Studio {'edit' if edit else 'generation'}: {params['prompt']}",
         f"Canvas: {canvas.size}x{canvas.size}, sprite_type={params['sprite_type']}, "
