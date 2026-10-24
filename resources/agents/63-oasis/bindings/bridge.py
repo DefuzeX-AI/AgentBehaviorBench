@@ -43,6 +43,13 @@ def _ensure_import_path() -> None:
         entry = str(_SOURCE_ROOT)
         if entry not in sys.path:
             sys.path.insert(0, entry)
+        # Ensure sys.modules['oasis'] points to the package directory, avoiding clash with agent/oasis.py script
+        if "oasis" in sys.modules:
+            m = sys.modules["oasis"]
+            if not hasattr(m, "__path__"):
+                pkg_dir = _SOURCE_ROOT / "oasis"
+                if pkg_dir.is_dir():
+                    m.__path__ = [str(pkg_dir)]
     _install_concurrency_and_inventory_guards()
 
 
@@ -82,15 +89,21 @@ def _install_concurrency_and_inventory_guards() -> None:
             except Exception:
                 pass
             declared: list[dict[str, str]] = []
-            for k in ("OPENAI_MODEL", "DEEPSEEK_MODEL", "OPENAI_EMBEDDING_MODEL", "EMBED_MODEL"):
+            for k in (
+                "OPENAI_MODEL",
+                "DEEPSEEK_MODEL",
+                "MODEL",
+                "CHAT_MODEL",
+                "OPENAI_EMBEDDING_MODEL",
+                "EMBED_MODEL",
+                "EMBEDDING_MODEL",
+            ):
                 v = os.environ.get(k)
                 if v and v.strip() and not any(m["model"] == v.strip() for m in declared):
                     declared.append({"model": v.strip(), "name": v.strip()})
-            if not declared:
-                declared = [
-                    {"model": "deepseek-flash", "name": "deepseek-flash"},
-                    {"model": "text-embedding-3-small", "name": "text-embedding-3-small"},
-                ]
+            for default_model in ("deepseek-flash", "deepseek-chat", "text-embedding-3-small"):
+                if not any(m["model"] == default_model for m in declared):
+                    declared.append({"model": default_model, "name": default_model})
             return {"models": declared}
 
         _safe_list.__qualname__ = "OpenAICompatClient.list"
@@ -311,6 +324,19 @@ class OasisAgentGraph:
         api_base = os.environ.get("OPENAI_BASE_URL") or os.environ.get("DEEPSEEK_BASE_URL") or "https://api.openai.com/v1"
         api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("DEEPSEEK_API_KEY") or "local"
         embed_model = os.environ.get("OPENAI_EMBEDDING_MODEL") or os.environ.get("EMBED_MODEL") or "text-embedding-3-small"
+        embed_api_base = (
+            os.environ.get("OASIS_EMBED_OPENAI_BASE_URL")
+            or os.environ.get("OPENAI_EMBEDDING_BASE_URL")
+            or os.environ.get("EMBED_BASE_URL")
+            or api_base
+        )
+        embed_api_key = (
+            os.environ.get("OASIS_EMBED_OPENAI_API_KEY")
+            or os.environ.get("OPENAI_EMBEDDING_API_KEY")
+            or os.environ.get("EMBED_API_KEY")
+            or api_key
+        )
+        embed_provider = os.environ.get("OASIS_EMBED_PROVIDER") or "openai"
 
         scanner = OasisScanner()
         parser = scanner.setup_argument_parser()
@@ -322,6 +348,9 @@ class OasisAgentGraph:
             "--provider", "openai",
             "--api-base", api_base,
             "--api-key", api_key,
+            "--embed-provider", embed_provider,
+            "--embed-api-base", embed_api_base,
+            "--embed-api-key", embed_api_key,
             "-t", "0.5",
             "-v", "all",
             "-s"
