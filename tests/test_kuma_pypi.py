@@ -229,7 +229,7 @@ def test_kuma_generation_prepares_entire_selection_in_one_session(echo_agent, tm
     def evaluate(agent, **kwargs):
         generation_calls.append(kwargs['generation_count'])
         assert kwargs['identity']['case_index'] is None
-        case_collection(generated / 'evaluation', count=kwargs['generation_count'])
+        case_collection(generated, count=kwargs['generation_count'])
         (generated / 'run.json').write_text(json.dumps({'status': 'succeeded'}))
         return generated
     monkeypatch.setattr('agentbench.sdk.plugin.kuma.benchmark.evaluate', evaluate)
@@ -275,15 +275,15 @@ def write_completed_case(directory, agent_id, case):
     files = Artifacts(directory, environ={})
     run_id = f"sdk-{case['case_id']}"
     files.save('run.json', {'run_id': directory.name, 'agent_id': agent_id, 'status': 'succeeded'})
-    files.save('evaluation/case.json', case)
-    files.save('evaluation/manifest.json', {
+    files.save('case.json', case)
+    files.save('manifest.json', {
         'run_id': run_id, 'case_id': case['case_id'], 'execution': 'succeeded', 'otel': 'complete',
         'submission': 'committed', 'evidence': 'captured', 'judge': 'received', 'phase': 'finished',
-        'steps': [{'input_id': 'input-1', 'directory': 'inputs/0001', 'committed': True}]})
-    files.save('evaluation/judge/report.json', {'run_id': run_id, 'report_id': 'report',
+        'steps': [{'input_id': 'input-1', 'directory': 'steps/0001', 'committed': True}]})
+    files.save('judge/report.json', {'run_id': run_id, 'report_id': 'report',
         'status': 'pass', 'extensions': {'case_id': case['case_id']}})
     item = case['inputs'][0]
-    prefix = 'evaluation/inputs/0001/'
+    prefix = 'steps/0001/'
     files.save(prefix + 'input.json', item)
     files.save(prefix + 'result.json', {'schema': 'abb.result.v1', 'status': 'succeeded',
         'agent_id': agent_id, 'run_id': 'invocation', 'output': item['payload']})
@@ -407,7 +407,7 @@ def test_service_retains_identity_trace_and_diagnostics_on_cleanup_failure(
     assert diagnostics['stdout'] == 'stdout evidence'
     assert runtime_options[0]['control'] is control
     assert len(closed) == 2
-    traces = [json.loads(line) for line in (directory / 'network.jsonl').read_text().splitlines()]
+    traces = [json.loads(line) for line in (directory / 'logs/network.jsonl').read_text().splitlines()]
     assert len(traces) == 2
     trace = traces[0]
     assert trace['data']['agent_id'] == echo_agent.agent_id
@@ -440,7 +440,7 @@ def test_real_pypi_overlay_and_offline_case_judge(echo_agent):
     output = Path(__file__).resolve().parents[1] / 'results/verification' / f'kuma-pypi-{uuid4().hex}'
     output.mkdir(parents=True)
     with evaluation_agent(echo_agent) as staged:
-        assert not (staged.path / 'evaluation').exists()
+        assert not (staged.path).exists()
         assert 'COPY evaluation/' not in (staged.path / 'Dockerfile').read_text()
         config = AgentContainerConfig.from_agent_dir(
             staged.path, secret_resolver=EnvironmentSecretResolver({}),
