@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-AGENT_DIR = ROOT / "resources" / "agents" / "95-deepagentforce"
+AGENT_DIR = ROOT / "resources" / "agents" / "99-deepagentforce"
 
 
 def test_registry_registration():
@@ -22,7 +22,7 @@ def test_registry_registration():
     assert entry.get("enabled") is False, "enabled must be false for adapting status"
     assert entry.get("status") == "adapting", "status must be 'adapting'"
     assert entry.get("framework") == "langgraph", "framework must be 'langgraph'"
-    assert entry.get("path") == "resources/agents/95-deepagentforce"
+    assert entry.get("path") == "resources/agents/99-deepagentforce"
 
 
 def test_agent_descriptor_schema():
