@@ -79,6 +79,57 @@ def test_sync_calls_and_cleanup_share_loop_and_forward_config(bridge, tmp_path):
     agent.close()
 
 
+def test_sync_cleanup_failure_closes_owned_loop_and_preserves_error(bridge, tmp_path):
+    agent, calls, _ = prepared(bridge, tmp_path)
+    agent.invoke("hello")
+    loop = calls[0][3]
+    failure = ValueError("native cleanup failure")
+    finalized = []
+
+    async def failed_cleanup():
+        raise failure
+
+    async def release_resource():
+        finalized.append(asyncio.get_running_loop())
+
+    agent._cleanup = failed_cleanup
+    agent._resources.push_async_callback(release_resource)
+    try:
+        with pytest.raises(ValueError) as caught:
+            agent.close()
+        assert caught.value is failure
+        assert finalized == [loop]
+        assert loop.is_closed()
+        assert agent._runner is None
+        agent.close()
+    finally:
+        # Dispose the leaked runner when checking the unfixed implementation.
+        if agent._runner is not None:
+            agent._runner.close()
+
+
+def test_sync_close_from_active_loop_preserves_owned_runner(bridge, tmp_path):
+    agent, calls, cleanups = prepared(bridge, tmp_path)
+    agent.invoke("hello")
+    runner = agent._runner
+    loop = calls[0][3]
+
+    async def run():
+        with pytest.raises(RuntimeError, match="Use ainvoke/aclose"):
+            agent.close()
+        assert agent._runner is runner
+        assert not loop.is_closed()
+        assert not agent._closed
+        assert not cleanups
+
+    try:
+        asyncio.run(run())
+    finally:
+        agent.close()
+    assert loop.is_closed()
+    assert cleanups == [loop]
+
+
 def test_interrupt_retained_without_automatic_approval_and_explicit_resume(bridge, tmp_path):
     from langgraph.types import Command
 

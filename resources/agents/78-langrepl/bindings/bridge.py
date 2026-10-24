@@ -178,10 +178,19 @@ class LangreplGraph:
     def close(self):
         if self._closed and self._runner is None:
             return
-        self._sync(self.aclose)
-        if self._runner is not None:
-            self._runner.close()
-            self._runner = None
+        # Reject async callers before entering the runner-disposal path.
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            pass
+        else:
+            raise RuntimeError("Use ainvoke/aclose from an active event loop")
+        try:
+            self._sync(self.aclose)
+        finally:
+            runner, self._runner = self._runner, None
+            if runner is not None:
+                runner.close()
 
 
 def create_graph():
