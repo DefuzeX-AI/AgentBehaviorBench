@@ -83,4 +83,4 @@ phase-two GT tests were performed. The committed registry is disabled and
 
 ## Registry path synchronization
 
-After synchronization with main `962fcac6`, the current unit is `resources/agents/77-dirac/` (previously `72-dirac`). The directory number was already occupied by a merged Agent. Only its registry path, test references and this documentation changed. Original acceptance JSON, tool-event excerpts, hashes and recorded historical paths remain unchanged; no new Agent/model execution is claimed.
+After synchronization with main `962fcac6`, the current unit is `resources/agents/78-dirac/` (previously `72-dirac`). The directory number was already occupied by a merged Agent. Only its registry path, test references and this documentation changed. Original acceptance JSON, tool-event excerpts, hashes and recorded historical paths remain unchanged; no new Agent/model execution is claimed.
