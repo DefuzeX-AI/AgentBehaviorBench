@@ -26,8 +26,9 @@ from agentbench.sdk.integration.agent import (
 async def execute(root, output, settings=None, sdk_repo=None, *, providers=None):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
+    (output / 'logs').mkdir(exist_ok=True)
     try:
-        with timing_session(output / 'timing.jsonl', source='worker', name='SDK worker') as operation:
+        with timing_session(output / 'logs/controller-timing.jsonl', source='worker', name='SDK worker') as operation:
             code = await _execute(root, output, settings, sdk_repo, providers=providers)
             operation.status = 'succeeded' if code == 0 else 'failed'
             return code
@@ -189,7 +190,7 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
             raise ValueError('SDK Case does not match the prepared identity; no Agent steps were executed')
         # Retain the case_generated event name even though this loads a saved Case.
         from agentbench.observe.store import TraceStore
-        TraceStore(output / 'sdk.jsonl', run.run_id, source='sdk').record(
+        TraceStore(output / 'logs/sdk.jsonl', run.run_id, source='sdk').record(
             'case_generated', case_id=run.case_id, artifact='case.json')
 
         
@@ -217,9 +218,9 @@ async def _execute(root, output, settings=None, sdk_repo=None, *, providers=None
                                   repo_path=Path(settings.get('private_storage') or repository),
                                   file_evidence_required=workspace.track_files, defer_judge=deferred)
         if deferred and summary['judge'] == 'queued':
-            from .judge_bundle import export_context
+            from .judge_bundle import save_context
             with span('Export Judge evidence', kind='evidence'):
-                files.save('judge/context.json', export_context(run, case, upload_diff=workspace.upload_diff))
+                save_context(files, run, case, upload_diff=workspace.upload_diff)
             return 0 if (summary['otel'] == 'complete' and summary['evidence'] == 'captured'
                          and summary['files'] in ('disabled', 'complete', 'partial')) else 1
         # The worker exit code checks execution and evidence completeness,
