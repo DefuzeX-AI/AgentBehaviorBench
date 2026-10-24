@@ -125,6 +125,26 @@ def test_bridge_creates_graph_and_routes_conversational_queries():
     assert "SQL Injection" in res2["answer"]
 
 
+def _can_import_oasis() -> bool:
+    try:
+        import numpy  # noqa: F401
+        import sys
+        sys.path.insert(0, str(UNIT / "bindings"))
+        import bridge
+        bridge._ensure_import_path()
+        import oasis.oasis  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+requires_oasis = pytest.mark.skipif(
+    not _can_import_oasis(),
+    reason="Native 'oasis' package or 'numpy' dependency not installed in host environment",
+)
+
+
+@requires_oasis
 def test_bridge_preserves_native_embeddings_and_propagates_scanner_failure():
     import sys
     sys.path.insert(0, str(UNIT / "bindings"))

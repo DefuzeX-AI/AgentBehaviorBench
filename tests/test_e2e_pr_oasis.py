@@ -37,6 +37,24 @@ def _load_bridge_module():
     return module
 
 
+def _can_import_oasis() -> bool:
+    try:
+        import numpy  # noqa: F401
+        bridge = _load_bridge_module()
+        bridge._ensure_import_path()
+        import oasis.oasis  # noqa: F401
+        from oasis.backends.openai_compat import OpenAICompatClient, OpenAICompatManager  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+requires_oasis = pytest.mark.skipif(
+    not _can_import_oasis(),
+    reason="Native 'oasis' package or 'numpy' dependency not installed in host environment",
+)
+
+
 # ==============================================================================
 # Tier 1: Feature Coverage (Category-Partition Method)
 # ==============================================================================
@@ -127,6 +145,7 @@ class TestTier2BoundaryValueAnalysis:
         r4 = graph.invoke({"input": "What can you do?"})
         assert isinstance(r4, dict) and "answer" in r4
 
+    @requires_oasis
     def test_scanner_nonzero_exit_and_missing_report_raise_failure(self):
         bridge = _load_bridge_module()
         graph = bridge.create_graph()
@@ -156,6 +175,7 @@ class TestTier2BoundaryValueAnalysis:
             with patch("oasis.oasis.OasisScanner", return_value=mock_scanner):
                 graph._run_scan(Path("/unused"), None)
 
+    @requires_oasis
     def test_native_client_embedding_method_preserved(self):
         # Native OpenAICompatClient must retain its original embedding method without monkey patching
         bridge = _load_bridge_module()
@@ -229,6 +249,13 @@ class TestTier3CombinatorialInteractions:
         assert env["OASIS_OPENAI_HTTP_TIMEOUT_SEC"] == "60"
         assert env["OASIS_NO_UPDATE_CHECK"] == "1"
 
+        runtime = manifest["runtime"]
+        for k in ("OPENAI_EMBEDDING_BASE_URL", "OASIS_EMBED_OPENAI_BASE_URL", "EMBED_BASE_URL"):
+            assert k in runtime["env_keys"]
+        for k in ("OPENAI_EMBEDDING_API_KEY", "OASIS_EMBED_OPENAI_API_KEY", "EMBED_API_KEY"):
+            assert k in runtime["optional_secret_env_keys"]
+
+    @requires_oasis
     def test_resilient_model_inventory_and_concurrency_guards(self):
         bridge = _load_bridge_module()
         from oasis.backends.openai_compat import OpenAICompatClient, OpenAICompatManager
@@ -249,6 +276,76 @@ class TestTier3CombinatorialInteractions:
             manager = OpenAICompatManager("http://127.0.0.1:9", api_key="dummy")
             assert manager.ensure_model_available("deepseek-flash") is True
             assert manager.ensure_model_available("non-existent-model-xyz") is False
+
+    @requires_oasis
+    def test_scanner_receives_independent_embedding_configuration(self):
+        bridge = _load_bridge_module()
+        graph = bridge.create_graph()
+
+        mock_scanner = MagicMock()
+        mock_scanner.run.return_value = 0
+        mock_scanner.report = MagicMock()
+        mock_scanner.report.output_dir = None
+        mock_scanner.findings = []
+        mock_scanner.valid_input_files = []
+
+        parsed_args = {}
+
+        def fake_parse_args(args_list):
+            for i in range(0, len(args_list) - 1, 2):
+                flag = args_list[i]
+                val = args_list[i + 1]
+                parsed_args[flag] = val
+            mock_obj = MagicMock()
+            mock_obj.target = parsed_args.get("--target")
+            mock_obj.models = [parsed_args.get("--models")]
+            mock_obj.embed_models = [parsed_args.get("-em")]
+            mock_obj.provider = parsed_args.get("--provider")
+            mock_obj.api_base = parsed_args.get("--api-base")
+            mock_obj.api_key = parsed_args.get("--api-key")
+            mock_obj.embed_provider = parsed_args.get("--embed-provider")
+            mock_obj.embed_api_base = parsed_args.get("--embed-api-base")
+            mock_obj.embed_api_key = parsed_args.get("--embed-api-key")
+            return mock_obj
+
+        mock_scanner.setup_argument_parser.return_value.parse_args.side_effect = fake_parse_args
+
+        # Case A: Separate embedding base url and key
+        env_split = {
+            "OPENAI_BASE_URL": "http://chat.example.com/v1",
+            "OPENAI_API_KEY": "chat-secret-key",
+            "OASIS_EMBED_OPENAI_BASE_URL": "http://embed.example.com/v1",
+            "OASIS_EMBED_OPENAI_API_KEY": "embed-secret-key",
+            "OASIS_EMBED_PROVIDER": "openai",
+        }
+        with patch.dict(os.environ, env_split, clear=False):
+            with patch("oasis.oasis.OasisScanner", return_value=mock_scanner):
+                try:
+                    graph._run_scan(Path("/unused"), None)
+                except Exception:
+                    pass
+                assert parsed_args.get("--api-base") == "http://chat.example.com/v1"
+                assert parsed_args.get("--api-key") == "chat-secret-key"
+                assert parsed_args.get("--embed-api-base") == "http://embed.example.com/v1"
+                assert parsed_args.get("--embed-api-key") == "embed-secret-key"
+                assert parsed_args.get("--embed-provider") == "openai"
+
+        # Case B: Fallback to chat base url and key when embedding endpoints not specified
+        parsed_args.clear()
+        env_fallback = {
+            "OPENAI_BASE_URL": "http://unified.example.com/v1",
+            "OPENAI_API_KEY": "unified-secret-key",
+        }
+        with patch.dict(os.environ, env_fallback, clear=True):
+            with patch("oasis.oasis.OasisScanner", return_value=mock_scanner):
+                try:
+                    graph._run_scan(Path("/unused"), None)
+                except Exception:
+                    pass
+                assert parsed_args.get("--api-base") == "http://unified.example.com/v1"
+                assert parsed_args.get("--api-key") == "unified-secret-key"
+                assert parsed_args.get("--embed-api-base") == "http://unified.example.com/v1"
+                assert parsed_args.get("--embed-api-key") == "unified-secret-key"
 
 
 # ==============================================================================
