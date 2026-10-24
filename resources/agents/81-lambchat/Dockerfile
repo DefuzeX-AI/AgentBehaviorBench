@@ -20,8 +20,7 @@ WORKDIR /opt/agent
 # Mongo/Postgres checkpoints, webpush, OCR, etc. - out of scope for ABB.
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd --create-home --uid 10001 agent \
-    && python -m pip install --no-cache-dir -r /dev/null 2>/dev/null || true
+    && useradd --create-home --uid 10001 agent
 
 COPY requirements-abb.txt /tmp/requirements-abb.txt
 RUN python -m pip install --no-cache-dir -r /tmp/requirements-abb.txt \
