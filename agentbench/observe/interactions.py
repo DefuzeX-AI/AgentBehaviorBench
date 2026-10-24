@@ -52,14 +52,14 @@ def _files(root):
     names = {'network.jsonl', 'evaluation/sdk.jsonl', 'evaluation/case.json',
              'evaluation/judge/report.json', 'evaluation/manifest.json',
              'evaluation/workspace-artifacts.json', 'evaluation/workspace.json'}
-    for pattern in ('evaluation/inputs/[0-9][0-9][0-9][0-9]', 'invocation-*/output'):
+    for pattern in ('steps/[0-9][0-9][0-9][0-9]', 'evaluation/inputs/[0-9][0-9][0-9][0-9]', 'invocation-*/output'):
         for folder in root.glob(pattern):
             for name in ('framework.jsonl', 'input.json', 'mapped-input.json', 'request.json',
                          'result.json', 'submission.json', 'file-evidence.json'):
                 names.add((folder / name).relative_to(root).as_posix())
-    for path in (root / 'evaluation/workspace-files').glob('*.json'):
-        names.add(path.relative_to(root).as_posix())
-    from .archive import archive_manifest, artifact_file
+    for path in list((root / 'workspace-files').glob('*.json')) + list((root / 'evaluation/workspace-files').glob('*.json')):
+        names.add('evaluation/workspace-files/' + path.name)
+    from .artifact_paths import archive_manifest, artifact_file
     archived = archive_manifest(root)
     if archived:
         names.update(name for name in archived['files'] if name.startswith('evaluation/inputs/')
@@ -80,7 +80,7 @@ def _files(root):
 
 
 def _read(root, name):
-    from .archive import artifact_file
+    from .artifact_paths import artifact_file
     return artifact_file(root, name)
 
 
