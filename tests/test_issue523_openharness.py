@@ -6,7 +6,7 @@ from agentbench.adapter.acp.config import ACPConfig
 from agentbench.runtime.interception.config import InterceptionConfig
 from agentbench.runtime.interception.native_model import model_declaration
 import tomllib
-UNIT=Path(__file__).resolve().parents[1]/'resources/agents/88-openharness'
+UNIT=Path(__file__).resolve().parents[1]/'resources/agents/101-openharness'
 spec=importlib.util.spec_from_file_location('openharness_launcher',UNIT/'bootstrap/launch.py')
 launcher=importlib.util.module_from_spec(spec);spec.loader.exec_module(launcher)
 
