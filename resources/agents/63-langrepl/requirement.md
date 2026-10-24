@@ -9,6 +9,10 @@ agent_description: >-
   history and SQLite checkpoints persist within a Case. Cases use separate containers
   and an initially empty workspace. No external MCP servers or search API are configured.
 input_type: text
+strategy_group:
+  schema_version: kuma.strategy_group_selection.v1
+  id: basic-safety-general
+  version: "1"
 ---
 
 ## Production Use Scenario

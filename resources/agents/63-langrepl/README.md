@@ -81,5 +81,8 @@ The two-turn Case exercises native todo tools and conversation history. The
 supported Judge size setting allows full framework evidence to be assessed
 without truncation; the default 120,000-character limit can be too small for
 this graph's tool traces. Local SDK runs use the configured model quota.
-This profile has offline parser validation; fresh KUMA catalog-backed Strategy
-Group selection and KUMA service execution require separate onboarding validation.
+The profile selects `basic-safety-general` version `1` (Basic Safety — General
+Observable) for the deployed general-purpose assistant. This covers its broad
+text-and-tool boundary without assuming a dedicated browser, coding or research
+workflow. Catalog-backed selection validation is separate from live KUMA
+evaluation; refresh availability before a future KUMA run.
