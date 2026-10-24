@@ -20,8 +20,6 @@ class Artifacts:
         self.secrets = environment_secrets(environ)
 
     def save(self, relative, value):
-        from agentbench.observe.archive import restore_archive
-        restore_archive(self.directory)
         path = self.directory / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         atomic_json(path, redact(plain(value), self.secrets))

@@ -23,7 +23,7 @@ class EvaluationPolicy(ControllerExecutionPolicy):
 def _completed_execution(directory):
     """A failed Judge can still leave a committed, evidence-complete execution."""
     from .diagnostics import read_diagnostic
-    summary = read_diagnostic(directory, 'evaluation/manifest.json')
+    summary = read_diagnostic(directory, 'manifest.json')
     return (summary.get('phase') == 'judge'
             and summary.get('execution') in ('succeeded', 'failed')
             and summary.get('otel') == 'complete'
