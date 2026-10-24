@@ -39,3 +39,5 @@ maintainer acceptance remain separate from this successful Local Smoke.
 ## Registry path synchronization
 
 The unit moved from `73-blade-code` to `77-blade-code` when synchronizing with main `962fcac6`. The revision for the maintainer's verification-failure feedback uses `resources/agents/88-blade-code/`; main `0ef4257b` already contains fast-agent at 86 and pi-go at 87. Original acceptance JSON, tool-event excerpts, hashes and recorded historical paths remain unchanged. The relocation itself does not establish a new Agent/model execution.
+
+The subsequent verification-failure compatibility change, focused regression checks and new Docker acceptance records are documented separately in [verification-revision/](verification-revision/README.md). They do not rewrite the historical records above.

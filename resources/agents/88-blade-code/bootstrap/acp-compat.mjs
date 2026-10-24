@@ -62,7 +62,7 @@ export function createCompatibility(workspace) {
         if (message.jsonrpc === '2.0' && !Object.hasOwn(message, 'result')
             && message.error?.code === -32603
             && message.error?.data?.failureType === 'verification_failed'
-            && message.error.message === 'Agent turn failed (verification_failed)') {
+            && message.error.message === 'Internal error: Agent turn failed (verification_failed)') {
           const diagnostic = { jsonrpc: '2.0', method: 'session/update', params: {
             sessionId, update: { sessionUpdate: 'agent_message_chunk', content: {
               type: 'text', text: '\n[ABB adapter diagnostic: verification_failed] '

@@ -83,7 +83,7 @@ def test_failed_verification_reaches_real_acp_host_as_explicit_refusal(tmp_path)
     assert failure["status"] == "failed"
     assert failure["nativeVerificationEnabled"] is True
     assert failure["nativeError"] == {
-        "code": -32603, "message": "Agent turn failed (verification_failed)",
+        "code": -32603, "message": "Internal error: Agent turn failed (verification_failed)",
         "data": {"failureType": "verification_failed", "modelId": "offline-model",
                  "outputStarted": True, "toolExecutionStarted": True,
                  "toolCallsCount": 18,

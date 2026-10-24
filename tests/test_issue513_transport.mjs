@@ -108,7 +108,7 @@ function prompt(bridge, id = 81, sessionId = 'native-session') {
 
 function verificationError(id = 81, overrides = {}) {
   return { jsonrpc: '2.0', id, error: { code: -32603,
-    message: 'Agent turn failed (verification_failed)',
+    message: 'Internal error: Agent turn failed (verification_failed)',
     data: { failureType: 'verification_failed', modelId: 'abb-model',
       outputStarted: true, toolExecutionStarted: true, toolCallsCount: 18,
       taskFailure: { message: 'Independent verification did not produce a fresh PASS before the retry limit.' } },
@@ -141,6 +141,7 @@ test('successful prompts and unrelated RPC failures retain their original envelo
   for (const overrides of [
     { code: -32000 },
     { message: 'Different failure' },
+    { message: 'Agent turn failed (verification_failed)' },
     { data: { failureType: 'provider_error' } },
     { data: { failureType: 'goal_verification_failed' } },
     { data: { failureType: 'loop_detected' } },

@@ -51,7 +51,7 @@ adapts the following ACP transport boundaries:
   confirmed in the same workspace. Existing files, other errors and paths
   outside the workspace (including symlink escapes) are not normalized.
 - A native `session/prompt` RPC error with code `-32603`, exact message
-  `Agent turn failed (verification_failed)` and matching
+  `Internal error: Agent turn failed (verification_failed)` and matching
   `data.failureType="verification_failed"` otherwise prevents ABB from judging
   the completed tool/stream evidence. For a tracked prompt only, the relay
   appends a clearly labeled ABB adapter diagnostic and returns ACP

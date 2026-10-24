@@ -18,7 +18,7 @@ for await (const frame of createInterface({ input: process.stdin })) {
         content: { type: 'text', text: 'Native streamed text remains unchanged.' } },
     } });
     send({ jsonrpc: '2.0', id: message.id, error: {
-      code: -32603, message: 'Agent turn failed (verification_failed)', data: {
+      code: -32603, message: 'Internal error: Agent turn failed (verification_failed)', data: {
         failureType: 'verification_failed', modelId: 'offline-model',
         outputStarted: true, toolExecutionStarted: true, toolCallsCount: 18,
         taskFailure: { reason: 'No fresh verification PASS' },
