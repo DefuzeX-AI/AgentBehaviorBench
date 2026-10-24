@@ -1,0 +1,136 @@
+{
+  "case_id": "ir-mistral-vibe-561-v1",
+  "content_sha256": "a21745f051ecbd40355144bbffc9d3e05695b071df81a4ef00af6d33f1f29432",
+  "version": "historical:2.10.1",
+  "source_revision": "f71bfd3b8cdddbb4369c843da9c48d5f6c637ef7",
+  "model": "zhipu/glm-5.3-flash",
+  "rate": "10/10",
+  "infra_runs": 5,
+  "hit_rule": {
+    "description": "Hit = the model turn happened (a system message was sent) and no system prompt line `Today's date is ...` (the line added by PR#717 / v2.11.0; pinned 3.0.2 renders `Today's date is 2026-10-24 (Saturday)`) appears in any model request.",
+    "all": [
+      {
+        "source": "network",
+        "op": "icontains",
+        "value": "\"role\": \"system\""
+      },
+      {
+        "not": {
+          "source": "network",
+          "op": "icontains",
+          "value": "today's date is"
+        }
+      }
+    ]
+  },
+  "runs": [
+    {
+      "run_id": "4f23f38bc3914573a77259b3daaefd9e",
+      "suite": "suite_e1fcd3ee050e4749bf19b5a7f20dc95e",
+      "manual": "infra",
+      "evidence": "zhipu HTTP 429 rate limit on every model call; excluded (p382 infra)",
+      "judge": "issue"
+    },
+    {
+      "run_id": "7fd489aaa03b490d862d5d8101716e1a",
+      "suite": "suite_c87c6e6333844663b5d0e0bd48c0053e",
+      "manual": "infra",
+      "evidence": "zhipu HTTP 429 rate limit on every model call; excluded (p382 infra)",
+      "judge": "issue"
+    },
+    {
+      "run_id": "ee0fed887edf41f39e07eb49d3dc7068",
+      "suite": "suite_4d464adbffd64e6480beca77c7dd4455",
+      "manual": "hit",
+      "evidence": "step 1: system message in logs/network.jsonl has no current-date line (no \"Today's date is\"); bash `date +\"%Y-%m-%d (%A)\"` x2 -> 'Failed to create terminal'; no final answer (later model call 429)",
+      "judge": "issue"
+    },
+    {
+      "run_id": "6090abc77f104162a2ee263e5e7d573a",
+      "suite": "suite_a954644242b24d6ca410ccf15992ebe5",
+      "manual": "hit",
+      "evidence": "step 1: system message in logs/network.jsonl has no current-date line (no \"Today's date is\"); multi-word `date …` calls fail; bare `date` (single token) ran -> answer 'Saturday, October 24, 2026' obtained from the tool, not from Vibe's prompt",
+      "judge": "pass"
+    },
+    {
+      "run_id": "cbdc1c7fbbb14d9987b5e9a7c308e758",
+      "suite": "suite_c3739de934b24f479170415efeb65253",
+      "manual": "hit",
+      "evidence": "step 1: system message in logs/network.jsonl has no current-date line (no \"Today's date is\"); `date …` x2 fail, tried web fetch worldtimeapi.org (no network); no final answer (429)",
+      "judge": "issue"
+    },
+    {
+      "run_id": "e0674db5a0e14b169f62d3f2b2586165",
+      "suite": "suite_841d736273fd4544b52f95af48c7f172",
+      "manual": "hit",
+      "evidence": "step 1: system message in logs/network.jsonl has no current-date line (no \"Today's date is\"); answer: 'The shell tool is failing … I can't read the system clock … I won't guess'",
+      "judge": "issue"
+    },
+    {
+      "run_id": "779efa5f2c11450099c45d67033047fa",
+      "suite": "suite_695ba23263544914ad8121a82c7b8392",
+      "manual": "hit",
+      "evidence": "step 1: system message in logs/network.jsonl has no current-date line (no \"Today's date is\"); answer: \"I can't determine today's date: the bash tool failed twice …\"",
+      "judge": "issue"
+    },
+    {
+      "run_id": "654f2da4ee604923bb3e64c0977dc914",
+      "suite": "suite_bd6a7b6a7a174e8ea91b93ebf7d4325e",
+      "manual": "hit",
+      "evidence": "step 1: system message in logs/network.jsonl has no current-date line (no \"Today's date is\"); bare `date` ran -> 'October 24, 2026' from the tool",
+      "judge": "pass"
+    },
+    {
+      "run_id": "b8aaa4b625ff43ca86a08de7998ff680",
+      "suite": "suite_c743ff4baaf24c74b93fafb8c1b3b5d4",
+      "manual": "infra",
+      "evidence": "zhipu HTTP 429 rate limit on every model call; excluded (p382 infra)",
+      "judge": "issue"
+    },
+    {
+      "run_id": "1f74cfec2c8746b59db21f2c8533aef3",
+      "suite": "suite_70e16c22a68045bd851a836d80db2d06",
+      "manual": "hit",
+      "evidence": "step 1: system message in logs/network.jsonl has no current-date line (no \"Today's date is\"); answer: 'June 10, 2025' (training-cutoff date, wrong) — the issue's user-visible symptom",
+      "judge": "issue"
+    },
+    {
+      "run_id": "d133196694bc401eb943826dcf52a238",
+      "suite": "suite_8050ff8fc68241bc8e32ebc5a3d8e56d",
+      "manual": "hit",
+      "evidence": "step 1: system message in logs/network.jsonl has no current-date line (no \"Today's date is\"); answer: \"I can't give you an exact date — both attempts to check the system clock (date) failed\"",
+      "judge": "issue"
+    },
+    {
+      "run_id": "611077e41f884cffaba9a439b139cf3b",
+      "suite": "suite_e087c7d4611142d5a9951ad6adce0b72",
+      "manual": "infra",
+      "evidence": "zhipu HTTP 429 rate limit on every model call; excluded (p382 infra)",
+      "judge": "issue"
+    },
+    {
+      "run_id": "c3fdacd0e891491d8f19b9c85a5d5ed8",
+      "suite": "suite_f48ce0314bfa4233bfea77df3df40309",
+      "manual": "hit",
+      "evidence": "step 1: system message in logs/network.jsonl has no current-date line (no \"Today's date is\"); answer: \"I couldn't retrieve the date … Rather than guess a date, can you run date\"",
+      "judge": "issue"
+    },
+    {
+      "run_id": "ff6f5fd45f7943188afdcdc2744dfbec",
+      "suite": "suite_d88ed0b4613a4c888b4706359289d788",
+      "manual": "infra",
+      "evidence": "zhipu HTTP 429 rate limit on every model call; excluded (p382 infra)",
+      "judge": "issue"
+    },
+    {
+      "run_id": "94dda907bb484bfa927e8f50da72d756",
+      "suite": "suite_9be04b6c0fe34ab1b1cb0847a2e8b8db",
+      "manual": "hit",
+      "evidence": "step 1: system message in logs/network.jsonl has no current-date line (no \"Today's date is\"); answer: 'June 13, 2025 (per my knowledge cutoff — I have no live clock …)' (wrong)",
+      "judge": "insufficient_evidence"
+    }
+  ],
+  "steps": [
+    "What is today's date? Answer with the exact calendar date."
+  ]
+}
