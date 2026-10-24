@@ -97,8 +97,6 @@ class EvaluationService:
                 result = execute_registered(runner, (registration,), suite_id=suite_id,
                     on_event=event, store=store, environ=self.environ)
                 store.append({'event': 'suite_completed', 'summary': suite_summary(result)})
-                from agentbench.observe.archive import compact_suite
-                compact_suite(store.directory)
             except BaseException as exc:
                 store.append({'event': 'suite_failed', 'error': {'type': type(exc).__name__,
                     'message': str(exc)}})

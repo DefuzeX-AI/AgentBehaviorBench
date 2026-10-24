@@ -13,7 +13,7 @@ AGENTS = (
     'opencode', 'kilo-code', 'goose', 'cline', 'kimi-cli', 'pi-coding-agent',
     'copilot-cli', 'openclaw', 'hermes-agent', 'openhands', 'deepagents-code',
     'open-interpreter', 'claurst', 'oh-my-pi', 'kode-cli', 'zeroclaw', 'jcode',
-    'mastracode', 'nanocoder', 'mini-agent', 'reasonix', 'gptme',
+    'mastracode', 'nanocoder', 'mini-agent', 'reasonix', 'gptme', 'agentao',
 )
 from agentbench.adapter.acp.config import ACPConfig
 from agentbench.runtime.agentcontainer.config import AgentContainerConfig
