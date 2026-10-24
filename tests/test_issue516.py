@@ -9,7 +9,7 @@ import pytest
 
 @pytest.fixture
 def bridge(monkeypatch):
-    path = Path(__file__).resolve().parents[1] / "resources/agents/81-langrepl/bindings/bridge.py"
+    path = Path(__file__).resolve().parents[1] / "resources/agents/100-langrepl/bindings/bridge.py"
     spec = importlib.util.spec_from_file_location("issue516_bridge", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -251,7 +251,7 @@ def test_all_model_roles_match_the_registered_chat_protocol(bridge, tmp_path, mo
         assert model.output_cost_per_mtok is None
     assert original.model == "native-model"
     assert original.provider == "anthropic"
-    unit = Path(__file__).resolve().parents[1] / "resources/agents/81-langrepl"
+    unit = Path(__file__).resolve().parents[1] / "resources/agents/100-langrepl"
     interception = InterceptionConfig.from_agent_dir(unit)
     assert [route.protocol_plugin for route in interception.routes] == ["openai-chat"]
     assert [item.agent_env for item in interception.credentials] == ["LLM__OPENAI_API_KEY"]
