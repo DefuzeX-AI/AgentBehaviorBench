@@ -151,6 +151,14 @@ Distinguish a Judge's behavioral finding from an execution or evidence failure.
 Report skipped, blocked and failed checks accurately; do not hide them to claim
 the suite passes.
 
+## Internal writing language
+
+Write project-authored internal documentation, code comments, commit messages,
+PR titles and descriptions, and ground-truth explanatory text in English. Do not
+introduce Chinese prose into these materials. Preserve verbatim external evidence
+and recorded execution artifacts; do not translate them in place. Explicitly
+localized public documentation remains under `docs/otherLanguages/`.
+
 ## Maintain the user documentation
 
 Keep README's setup and onboarding links usable. Order the Agent addition guide
