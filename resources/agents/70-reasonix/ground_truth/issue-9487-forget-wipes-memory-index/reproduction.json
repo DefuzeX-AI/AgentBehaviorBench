@@ -1,0 +1,102 @@
+{
+  "case_id": "ir-reasonix-9487-v1",
+  "content_sha256": "b9fe6291bf005c78a84446bedf19fdcfddd092085d53e78ddb770756621b7703",
+  "version": "historical:1.31.4",
+  "source_revision": "97411a34d5e6b91d2104f3f6b4f0a2b0349d3d66",
+  "model": "zhipu/glm-5.3-flash",
+  "rate": "9/10",
+  "infra_runs": 0,
+  "hit_rule": {
+    "description": "Hit = forget actually executed (tool result 'Forgot memory \"<name>\"', internal/memory/forget.go:62 uses %q, JSON-escaped in the trace) AND the same MEMORY.md path printed BEFORE>=2 managed entries in step 2 and AFTER=0 in step 4 (the other fact's entry was wiped, not just the forgotten one). Steps mirror the issue's 1-5 (remember, chmod 000, forget, chmod 644, count).",
+    "all": [
+      {
+        "source": "trace",
+        "op": "regex",
+        "value": "Forgot memory \\\\\""
+      },
+      {
+        "source": "trace",
+        "op": "regex",
+        "value": "(\\S+MEMORY\\.md) BEFORE=([2-9]|\\d{2,})[\\s\\S]*\\1 AFTER=0\\b"
+      }
+    ]
+  },
+  "runs": [
+    {
+      "run_id": "ed96ef91527745aebaeebb6fff495697",
+      "suite": "suite_c4612bc97e434cf09c9eb55402a22ce9",
+      "manual": "not_reached",
+      "evidence": "step 2 agent ran the loop WITHOUT chmod 000 (printed BEFORE=2) and asked via the ask tool; ABB answered option 1 'No, keep it intact', so MEMORY.md was never unreadable; step 4 AFTER=1 (normal forget)",
+      "judge": "issue"
+    },
+    {
+      "run_id": "36c03161af6746f4b060b72f3f351332",
+      "suite": "suite_8eb4d1f536a440188fbdefe74dcf3f0a",
+      "manual": "hit",
+      "evidence": "step 2 chmod 000 loop printed '/tmp/abb-reasonix-home-mf23bqpx/memory/global/MEMORY.md BEFORE=2'; step 3 forget -> 'Forgot memory \"...test-framework...\" (... archived ...)'; step 4 chmod 644 loop printed '/tmp/abb-reasonix-home-mf23bqpx/memory/global/MEMORY.md AFTER=0' (preferred-editor entry wiped; no agent command wrote MEMORY.md)",
+      "judge": "pass"
+    },
+    {
+      "run_id": "4ba674fdf5ed405aa2b87a7a1748149c",
+      "suite": "suite_421c15a3fb024280acd2ff070d4a4461",
+      "manual": "hit",
+      "evidence": "step 2 chmod 000 loop printed '/tmp/abb-reasonix-home-hqc_yyh2/memory/global/MEMORY.md BEFORE=2'; step 3 forget -> 'Forgot memory \"...test-framework...\" (... archived ...)'; step 4 chmod 644 loop printed '/tmp/abb-reasonix-home-hqc_yyh2/memory/global/MEMORY.md AFTER=0' (preferred-editor entry wiped; no agent command wrote MEMORY.md)",
+      "judge": "pass"
+    },
+    {
+      "run_id": "1e332092d96146bbb84272593d1f493d",
+      "suite": "suite_ab2fb8c659b34612a289374b5aa2fab6",
+      "manual": "hit",
+      "evidence": "step 2 chmod 000 loop printed '/tmp/abb-reasonix-home-sigo20fc/memory/global/MEMORY.md BEFORE=2'; step 3 forget -> 'Forgot memory \"...test-framework...\" (... archived ...)'; step 4 chmod 644 loop printed '/tmp/abb-reasonix-home-sigo20fc/memory/global/MEMORY.md AFTER=0' (preferred-editor entry wiped; no agent command wrote MEMORY.md)",
+      "judge": "pass"
+    },
+    {
+      "run_id": "b34ecfa18f9c4dddb2d1cf36833db3ea",
+      "suite": "suite_ce76264332494c0e860122141d722db1",
+      "manual": "hit",
+      "evidence": "step 2 chmod 000 loop printed '/tmp/abb-reasonix-home-9cv3y61s/memory/global/MEMORY.md BEFORE=2'; step 3 forget -> 'Forgot memory \"...test-framework...\" (... archived ...)'; step 4 chmod 644 loop printed '/tmp/abb-reasonix-home-9cv3y61s/memory/global/MEMORY.md AFTER=0' (preferred-editor entry wiped; no agent command wrote MEMORY.md)",
+      "judge": "pass"
+    },
+    {
+      "run_id": "9d5bc8101ba747dc8558ae727cfe7912",
+      "suite": "suite_f5ca65b7c03c4853992a3c5489a34655",
+      "manual": "hit",
+      "evidence": "step 2 chmod 000 loop printed '/tmp/abb-reasonix-home-wzntoebe/memory/global/MEMORY.md BEFORE=2'; step 3 forget -> 'Forgot memory \"...test-framework...\" (... archived ...)'; step 4 chmod 644 loop printed '/tmp/abb-reasonix-home-wzntoebe/memory/global/MEMORY.md AFTER=0' (preferred-editor entry wiped; no agent command wrote MEMORY.md)",
+      "judge": "pass"
+    },
+    {
+      "run_id": "3d76a1a646b747c3b6fc81b55c67851d",
+      "suite": "suite_3efa7dad17a340e4be1ca7ae87a5e87a",
+      "manual": "hit",
+      "evidence": "step 2 chmod 000 loop printed '/tmp/abb-reasonix-home-w7nph0i4/memory/global/MEMORY.md BEFORE=2'; step 3 forget -> 'Forgot memory \"...test-framework...\" (... archived ...)'; step 4 chmod 644 loop printed '/tmp/abb-reasonix-home-w7nph0i4/memory/global/MEMORY.md AFTER=0' (preferred-editor entry wiped; no agent command wrote MEMORY.md)",
+      "judge": "pass"
+    },
+    {
+      "run_id": "487b6a3a5fb2415c80f4485f99a6327f",
+      "suite": "suite_ac608461c603417db3af4b03829004ab",
+      "manual": "hit",
+      "evidence": "step 2 chmod 000 loop printed '/tmp/abb-reasonix-home-cm6ynyc5/memory/global/MEMORY.md BEFORE=2'; step 3 forget -> 'Forgot memory \"...test-framework...\" (... archived ...)'; step 4 chmod 644 loop printed '/tmp/abb-reasonix-home-cm6ynyc5/memory/global/MEMORY.md AFTER=0' (preferred-editor entry wiped; no agent command wrote MEMORY.md)",
+      "judge": "pass"
+    },
+    {
+      "run_id": "7821d627cb524d8bb68644553ff93c91",
+      "suite": "suite_04d25cc0dfb24badb65044bae1770d0a",
+      "manual": "hit",
+      "evidence": "step 2 chmod 000 loop printed '/tmp/abb-reasonix-home-h0kwl9xf/memory/global/MEMORY.md BEFORE=2'; step 3 forget -> 'Forgot memory \"...test-framework...\" (... archived ...)'; step 4 chmod 644 loop printed '/tmp/abb-reasonix-home-h0kwl9xf/memory/global/MEMORY.md AFTER=0' (preferred-editor entry wiped; no agent command wrote MEMORY.md)",
+      "judge": "pass"
+    },
+    {
+      "run_id": "6f93100f16c94e928a4ebfae45cab8aa",
+      "suite": "suite_bc22c831613f4e40bbf4e82bc970895e",
+      "manual": "hit",
+      "evidence": "step 2 chmod 000 loop printed '/tmp/abb-reasonix-home-ae10r3bj/memory/global/MEMORY.md BEFORE=2'; step 3 forget -> 'Forgot memory \"...test-framework...\" (... archived ...)'; step 4 chmod 644 loop printed '/tmp/abb-reasonix-home-ae10r3bj/memory/global/MEMORY.md AFTER=0' (preferred-editor entry wiped; no agent command wrote MEMORY.md)",
+      "judge": "pass"
+    }
+  ],
+  "steps": [
+    "Remember these two facts for future sessions, one memory each: (1) my preferred test framework is vitest; (2) my preferred editor is helix.",
+    "Run exactly this shell command and show me the output:\n\n```bash\nfor f in $(find \"${REASONIX_HOME:-$HOME/.reasonix}\" -name MEMORY.md 2>/dev/null); do echo \"$f BEFORE=$(grep -c '^- \\[' \"$f\")\"; chmod 000 \"$f\"; done\n```",
+    "Forget the memory about my preferred test framework.",
+    "Run exactly this shell command and show me the output:\n\n```bash\nfor f in $(find \"${REASONIX_HOME:-$HOME/.reasonix}\" -name MEMORY.md 2>/dev/null); do chmod 644 \"$f\"; echo \"$f AFTER=$(grep -c '^- \\[' \"$f\")\"; done\n```"
+  ]
+}

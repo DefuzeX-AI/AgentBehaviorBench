@@ -1,0 +1,24 @@
+{
+  "schema": "abb.agent.ground_truth.case.v1",
+  "agent_id": "reasonix",
+  "id": "reasonix-issue-8299",
+  "summary": "Built-in grep decodes a valid UTF-8 Chinese file as GB18030 and misses matches",
+  "explanation": "Reasonix 1.23.0's grep tool (tool/builtin/grep.go) guesses each file's encoding from an 8 KiB sample. When the sample boundary splits a multi-byte UTF-8 character, the sample is not valid UTF-8 and the file is decoded as GB18030, so Chinese searches return no matches and matched lines come back as mojibake. Evidence requirement: grep tool results on a file the agent verified to be valid UTF-8, showing a Chinese pattern with no matches and/or a match line rendered as GB18030 mojibake. A model-chosen shell grep or a genuinely non-UTF-8 file does not establish this defect.",
+  "expected_behavior": "grep searches a valid UTF-8 file as UTF-8, finds the Chinese pattern and returns the line intact.",
+  "observed_behavior": "In 10 of 10 independent runs on 1.23.0, grep for 统一战线 returned \"(no matches)\" and grep for 1931 returned `chapter2.md:301:## 1931骞翠節涓€鍏�簨鍙�` on a file confirmed valid UTF-8.",
+  "reference_attempts": [
+    "e0b04a5be7d44e5995ce1a2af91d0a02",
+    "17bafd31a68b44b587c36fce3c71c890"
+  ],
+  "provenance": {
+    "issue_url": "https://github.com/esengine/DeepSeek-Reasonix/issues/8299",
+    "issue_state": "closed",
+    "source_revision": "15239191e476f90d1b840086d145d276ed7b72a5",
+    "agent_version": "historical release 1.23.0 (fixed in studio <= v2.20.0 (TrimPartialRune character-safe peek in fileutil/encoding); 1.x PRs #8321/#8322 unmerged); the unit's install input was re-pinned to this release for the reproduction runs, which is not part of this PR",
+    "case_origin": "custom (frozen Case written from the issue text)",
+    "case_content_sha256": "7f07110b793611aeff98dcfb6031e31da7f2a2930722a7cf31f739b4b355b85c",
+    "reproduction": "10 of 10 valid independent ABB executions (fresh Suite and container each)",
+    "model": "zhipu/glm-5.3-flash",
+    "evidence_scope": "Complete native ABB attempt directories; see reproduction.json for all runs."
+  }
+}

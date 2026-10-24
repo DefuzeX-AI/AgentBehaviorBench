@@ -1,0 +1,118 @@
+{
+  "case_id": "ir-reasonix-8811-v1",
+  "content_sha256": "74931851527305c606cfa2876cea5044eed4d821d7c9e39dcd7fc9882863f04d",
+  "version": "historical:1.25.1",
+  "source_revision": "c4fbdd1d07400180fe9b4746f2c6326e53116e28",
+  "model": "zhipu/glm-5.3-flash",
+  "rate": "10/10",
+  "infra_runs": 0,
+  "hit_rule": {
+    "description": "Hit = probe.txt was created (task succeeded) AND step 1 failed because the agent returned stopReason \"error\" (ABB cannot record the raw stopReason in the trace: its PromptResponse model rejects 'error', so the value only appears in the failure event as input_value='error'; the raw-JSON form is kept as an alternative) AND the turn failed on the final-answer readiness gate (Reasonix status_update turnOutcome reason 'final-answer readiness failed ...'), not on a real model/tool error (e.g. a provider 401 also maps to stopReason error in internal/acp/service.go).",
+    "all": [
+      {
+        "source": "file:probe.txt",
+        "op": "exists",
+        "value": ""
+      },
+      {
+        "source": "step_status:1",
+        "op": "equals",
+        "value": "failed"
+      },
+      {
+        "any": [
+          {
+            "source": "trace",
+            "op": "regex",
+            "value": "\"stopReason\"\\s*:\\s*\"error\""
+          },
+          {
+            "source": "trace",
+            "op": "contains",
+            "value": "input_value='error'"
+          }
+        ]
+      },
+      {
+        "source": "trace",
+        "op": "contains",
+        "value": "final-answer readiness failed"
+      }
+    ]
+  },
+  "runs": [
+    {
+      "run_id": "27ab42de5da342dd8bb345af1feefbf3",
+      "suite": "suite_918d284d1f1a4cf6ad6d90cbaf9f77a4",
+      "manual": "hit",
+      "evidence": "step 1 write_file probe.txt -> 'wrote N bytes to /home/agent/workspace/probe.txt' (file exported, content 'ok'); status_update turnOutcome {kind: paused, reason: 'final-answer readiness failed 1 times: run a relevant verification command after the latest write for the current role setting'}; then ABB failure 'validation error for PromptResponse ... input_value='error'' (stopReason error), step failed; no model/tool error preceded it",
+      "judge": "pass"
+    },
+    {
+      "run_id": "6877bcfd67c84b22a2f7d6d7101ba776",
+      "suite": "suite_079cb63fb0704c51b593b7f255657a25",
+      "manual": "hit",
+      "evidence": "step 1 write_file probe.txt -> 'wrote N bytes to /home/agent/workspace/probe.txt' (file exported, content 'ok'); status_update turnOutcome {kind: paused, reason: 'final-answer readiness failed 1 times: run a relevant verification command after the latest write for the current role setting'}; then ABB failure 'validation error for PromptResponse ... input_value='error'' (stopReason error), step failed; no model/tool error preceded it",
+      "judge": "pass"
+    },
+    {
+      "run_id": "2e6874add98d4aa2886710e0a61df2ff",
+      "suite": "suite_e452fe410b4e4bbca97a037487857c8c",
+      "manual": "hit",
+      "evidence": "step 1 write_file probe.txt -> 'wrote N bytes to /home/agent/workspace/probe.txt' (file exported, content 'ok'); status_update turnOutcome {kind: paused, reason: 'final-answer readiness failed 1 times: run a relevant verification command after the latest write for the current role setting'}; then ABB failure 'validation error for PromptResponse ... input_value='error'' (stopReason error), step failed; no model/tool error preceded it",
+      "judge": "pass"
+    },
+    {
+      "run_id": "13eb36481aef42d694b44bc14316b81f",
+      "suite": "suite_32b23c40c0b1483c9bef714dfd5f8556",
+      "manual": "hit",
+      "evidence": "step 1 write_file probe.txt -> 'wrote N bytes to /home/agent/workspace/probe.txt' (file exported, content 'ok'); status_update turnOutcome {kind: paused, reason: 'final-answer readiness failed 1 times: run a relevant verification command after the latest write for the current role setting'}; then ABB failure 'validation error for PromptResponse ... input_value='error'' (stopReason error), step failed; no model/tool error preceded it",
+      "judge": "pass"
+    },
+    {
+      "run_id": "afc5c33bbc7840fbab91d74590fa1189",
+      "suite": "suite_67bd3348b27d4d69893a802e0082e3cc",
+      "manual": "hit",
+      "evidence": "step 1 write_file probe.txt -> 'wrote N bytes to /home/agent/workspace/probe.txt' (file exported, content 'ok'); status_update turnOutcome {kind: paused, reason: 'final-answer readiness failed 1 times: run a relevant verification command after the latest write for the current role setting'}; then ABB failure 'validation error for PromptResponse ... input_value='error'' (stopReason error), step failed; no model/tool error preceded it",
+      "judge": "pass"
+    },
+    {
+      "run_id": "b5deccff92044c08871942596e2b883e",
+      "suite": "suite_057044ff3c534a99b98c73c0c5eacbfb",
+      "manual": "hit",
+      "evidence": "step 1 write_file probe.txt -> 'wrote N bytes to /home/agent/workspace/probe.txt' (file exported, content 'ok'); status_update turnOutcome {kind: paused, reason: 'final-answer readiness failed 1 times: run a relevant verification command after the latest write for the current role setting'}; then ABB failure 'validation error for PromptResponse ... input_value='error'' (stopReason error), step failed; no model/tool error preceded it",
+      "judge": "pass"
+    },
+    {
+      "run_id": "4e5c724dacb84d92bf490b374f24c976",
+      "suite": "suite_1e1955f568c042e58a2b2c03fe422360",
+      "manual": "hit",
+      "evidence": "step 1 write_file probe.txt -> 'wrote N bytes to /home/agent/workspace/probe.txt' (file exported, content 'ok'); status_update turnOutcome {kind: paused, reason: 'final-answer readiness failed 1 times: run a relevant verification command after the latest write for the current role setting'}; then ABB failure 'validation error for PromptResponse ... input_value='error'' (stopReason error), step failed; no model/tool error preceded it",
+      "judge": "pass"
+    },
+    {
+      "run_id": "a9f7fb0b697443de88bc31e42cb7b245",
+      "suite": "suite_1a31432c6b56418a9620ffe43624af15",
+      "manual": "hit",
+      "evidence": "step 1 write_file probe.txt -> 'wrote N bytes to /home/agent/workspace/probe.txt' (file exported, content 'ok'); status_update turnOutcome {kind: paused, reason: 'final-answer readiness failed 1 times: run a relevant verification command after the latest write for the current role setting'}; then ABB failure 'validation error for PromptResponse ... input_value='error'' (stopReason error), step failed; no model/tool error preceded it",
+      "judge": "pass"
+    },
+    {
+      "run_id": "5fd3ff63e50d4577b41cf97fdd74164d",
+      "suite": "suite_af105063d0594c3393a3dce3646e453e",
+      "manual": "hit",
+      "evidence": "step 1 write_file probe.txt -> 'wrote N bytes to /home/agent/workspace/probe.txt' (file exported, content 'ok'); status_update turnOutcome {kind: paused, reason: 'final-answer readiness failed 1 times: run a relevant verification command after the latest write for the current role setting'}; then ABB failure 'validation error for PromptResponse ... input_value='error'' (stopReason error), step failed; no model/tool error preceded it",
+      "judge": "pass"
+    },
+    {
+      "run_id": "eeca99325b2149d9b9e7bdd89165b4d0",
+      "suite": "suite_d7febdedad71481b9ac6b1a9a2adfe7e",
+      "manual": "hit",
+      "evidence": "step 1 write_file probe.txt -> 'wrote N bytes to /home/agent/workspace/probe.txt' (file exported, content 'ok'); status_update turnOutcome {kind: paused, reason: 'final-answer readiness failed 1 times: run a relevant verification command after the latest write for the current role setting'}; then ABB failure 'validation error for PromptResponse ... input_value='error'' (stopReason error), step failed; no model/tool error preceded it",
+      "judge": "pass"
+    }
+  ],
+  "steps": [
+    "write a file named probe.txt containing ok in the workspace"
+  ]
+}

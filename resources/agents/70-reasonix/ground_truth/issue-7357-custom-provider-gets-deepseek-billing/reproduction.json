@@ -1,0 +1,99 @@
+{
+  "case_id": "ir-reasonix-7357-v1",
+  "content_sha256": "e9563efaa686c56aa24c224856eef31b940e4f3c29ca0124a7b16f6011581c1a",
+  "version": "historical:1.19.4",
+  "source_revision": "b36a7e3d54a6cb88bbef8467fb5ba937f1337f34",
+  "model": "zhipu/glm-5.3-flash",
+  "rate": "10/10",
+  "infra_runs": 0,
+  "hit_rule": {
+    "description": "Hit = the cat output in the trace shows the launcher's custom provider (name = \"abb\") followed within the same block by balance_url = \"https://api.deepseek.com/user/balance\". The launcher writes neither key, so they can only come from Reasonix's own rewrite (cli migrateLegacyConfigForCLI -> ApplyUserConfigUpgradesOnStartup runs for `acp`).",
+    "all": [
+      {
+        "source": "trace",
+        "op": "contains",
+        "value": "config.toml"
+      },
+      {
+        "source": "trace",
+        "op": "regex",
+        "value": "name\\s*=\\s*\\\\?\"abb\\\\?\"[\\s\\S]{0,1500}?balance_url\\s*=\\s*\\\\?\"https://api\\.deepseek\\.com/user/balance"
+      }
+    ]
+  },
+  "runs": [
+    {
+      "run_id": "1672193e05e847b0bc8b671caeb44114",
+      "suite": "suite_5d67442a096b47068289776d15e961fe",
+      "manual": "hit",
+      "evidence": "step 1 bash `cat $REASONIX_HOME/config.toml` tool_call_update content: config_version = 5 (launcher wrote 1), single [[providers]] block name = \"abb\", base_url = \"https://open.bigmodel.cn/api/coding/paas/v4\", balance_url = \"https://api.deepseek.com/user/balance\", price = { cache_hit = 0.0028, input = 0.14, output = 0.28, currency = \"$\" }",
+      "judge": null
+    },
+    {
+      "run_id": "e89ccc7035344f1688acd9265492a225",
+      "suite": "suite_9f687547995945b09889fa5a504dc328",
+      "manual": "hit",
+      "evidence": "step 1 bash `cat $REASONIX_HOME/config.toml` tool_call_update content: config_version = 5 (launcher wrote 1), single [[providers]] block name = \"abb\", base_url = \"https://open.bigmodel.cn/api/coding/paas/v4\", balance_url = \"https://api.deepseek.com/user/balance\", price = { cache_hit = 0.0028, input = 0.14, output = 0.28, currency = \"$\" }",
+      "judge": null
+    },
+    {
+      "run_id": "6d0df8bdd61d453d864b9d494b5c0c54",
+      "suite": "suite_1f3068d4b73d41b68831414dcbf3733e",
+      "manual": "hit",
+      "evidence": "step 1 bash `cat $REASONIX_HOME/config.toml` tool_call_update content: config_version = 5 (launcher wrote 1), single [[providers]] block name = \"abb\", base_url = \"https://open.bigmodel.cn/api/coding/paas/v4\", balance_url = \"https://api.deepseek.com/user/balance\", price = { cache_hit = 0.0028, input = 0.14, output = 0.28, currency = \"$\" }",
+      "judge": null
+    },
+    {
+      "run_id": "0a7c32c4009e4fad892494860a6a43c6",
+      "suite": "suite_16c07ab4a58e4a45bfa45acc7c0c3a14",
+      "manual": "hit",
+      "evidence": "step 1 bash `cat $REASONIX_HOME/config.toml` tool_call_update content: config_version = 5 (launcher wrote 1), single [[providers]] block name = \"abb\", base_url = \"https://open.bigmodel.cn/api/coding/paas/v4\", balance_url = \"https://api.deepseek.com/user/balance\", price = { cache_hit = 0.0028, input = 0.14, output = 0.28, currency = \"$\" }",
+      "judge": null
+    },
+    {
+      "run_id": "eddddf65acf04dd8b555469ab4514f8d",
+      "suite": "suite_c43e5ca34cf44adbb0c8510e81720cb3",
+      "manual": "hit",
+      "evidence": "step 1 bash `cat $REASONIX_HOME/config.toml` tool_call_update content: config_version = 5 (launcher wrote 1), single [[providers]] block name = \"abb\", base_url = \"https://open.bigmodel.cn/api/coding/paas/v4\", balance_url = \"https://api.deepseek.com/user/balance\", price = { cache_hit = 0.0028, input = 0.14, output = 0.28, currency = \"$\" }",
+      "judge": null
+    },
+    {
+      "run_id": "7056e4396f7f41c69f98bfc9e8b8f73a",
+      "suite": "suite_8061f39aca2445ccb75622ecb5371d8c",
+      "manual": "hit",
+      "evidence": "step 1 bash `cat $REASONIX_HOME/config.toml` tool_call_update content: config_version = 5 (launcher wrote 1), single [[providers]] block name = \"abb\", base_url = \"https://open.bigmodel.cn/api/coding/paas/v4\", balance_url = \"https://api.deepseek.com/user/balance\", price = { cache_hit = 0.0028, input = 0.14, output = 0.28, currency = \"$\" }",
+      "judge": null
+    },
+    {
+      "run_id": "a729cdb4d6f04d3b811c3270da06e8d3",
+      "suite": "suite_3f06924dafe348b294f2c75cd410b407",
+      "manual": "hit",
+      "evidence": "step 1 bash `cat $REASONIX_HOME/config.toml` tool_call_update content: config_version = 5 (launcher wrote 1), single [[providers]] block name = \"abb\", base_url = \"https://open.bigmodel.cn/api/coding/paas/v4\", balance_url = \"https://api.deepseek.com/user/balance\", price = { cache_hit = 0.0028, input = 0.14, output = 0.28, currency = \"$\" }",
+      "judge": null
+    },
+    {
+      "run_id": "12ae0e70fddb484e9359fbc172b63dae",
+      "suite": "suite_9e200294c283471a96b7c76d369de25c",
+      "manual": "hit",
+      "evidence": "step 1 bash `cat $REASONIX_HOME/config.toml` tool_call_update content: config_version = 5 (launcher wrote 1), single [[providers]] block name = \"abb\", base_url = \"https://open.bigmodel.cn/api/coding/paas/v4\", balance_url = \"https://api.deepseek.com/user/balance\", price = { cache_hit = 0.0028, input = 0.14, output = 0.28, currency = \"$\" }",
+      "judge": null
+    },
+    {
+      "run_id": "ef34cef76ca04ac691d5cac0334af00f",
+      "suite": "suite_e8c8899abe0f4a52866455a62eef71c4",
+      "manual": "hit",
+      "evidence": "step 1 bash `cat $REASONIX_HOME/config.toml` tool_call_update content: config_version = 5 (launcher wrote 1), single [[providers]] block name = \"abb\", base_url = \"https://open.bigmodel.cn/api/coding/paas/v4\", balance_url = \"https://api.deepseek.com/user/balance\", price = { cache_hit = 0.0028, input = 0.14, output = 0.28, currency = \"$\" }",
+      "judge": null
+    },
+    {
+      "run_id": "c76c40c9535048d599b0375ba975a2af",
+      "suite": "suite_a291843f3bb4417e87a44070ad6fd425",
+      "manual": "hit",
+      "evidence": "step 1 bash `cat $REASONIX_HOME/config.toml` tool_call_update content: config_version = 5 (launcher wrote 1), single [[providers]] block name = \"abb\", base_url = \"https://open.bigmodel.cn/api/coding/paas/v4\", balance_url = \"https://api.deepseek.com/user/balance\", price = { cache_hit = 0.0028, input = 0.14, output = 0.28, currency = \"$\" }",
+      "judge": null
+    }
+  ],
+  "steps": [
+    "Show me the Reasonix configuration file this session is using: run `cat \"${REASONIX_HOME:-$HOME/.reasonix}/config.toml\"` and paste the [[providers]] section exactly as printed."
+  ]
+}

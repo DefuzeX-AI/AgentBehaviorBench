@@ -1,0 +1,100 @@
+{
+  "case_id": "ir-reasonix-8406-v1",
+  "content_sha256": "d81ecf47ee2d27bc554571d5f292631ce59e2bd5d50e924b28e7de928d439838",
+  "version": "historical:1.24.1",
+  "source_revision": "8e55fc49f832ec74f73d37804280e78dc63f49ca",
+  "model": "zhipu/glm-5.3-flash",
+  "rate": "10/10",
+  "infra_runs": 0,
+  "hit_rule": {
+    "description": "Hit = the agent actually ran a bash command containing `git branch -a`/`--all` (rawInput \"command\" field, not the prompt text) AND the trace shows the TaskPolicy block (errMsg 'task policy forbids mutation' or output 'task policy forbids workspace modifications', internal/agent/taskpolicy_gate.go:15 at v1.24.1). 'do not modify any files' is the issue's own trigger phrase.",
+    "all": [
+      {
+        "source": "trace",
+        "op": "regex",
+        "value": "\"command\"\\s*:\\s*\"[^\"]*git branch (-a|--all)"
+      },
+      {
+        "source": "trace",
+        "op": "regex",
+        "value": "task policy forbids (mutation|workspace modifications)"
+      }
+    ]
+  },
+  "runs": [
+    {
+      "run_id": "060ab712299e4950a19268582f712592",
+      "suite": "suite_f1d3bd6fb993441d89762d130162a06a",
+      "manual": "hit",
+      "evidence": "step 2 bash {command: 'git branch -a'} (permission allow_once) -> tool_call_update failed 'blocked: task policy forbids mutation'; agent then fell back to git for-each-ref / reading .git",
+      "judge": "pass"
+    },
+    {
+      "run_id": "5dc9b10835c14d22944623b74100ad27",
+      "suite": "suite_b8e482310bf4450290679e6cbe0f2559",
+      "manual": "hit",
+      "evidence": "step 2 bash {command: 'git branch -a'} (permission allow_once) -> tool_call_update failed 'blocked: task policy forbids mutation'; agent then fell back to git for-each-ref / reading .git",
+      "judge": "issue"
+    },
+    {
+      "run_id": "683f0e7e2e424449849b5dd0a23f3dde",
+      "suite": "suite_2ddc2357cf984566b40f516ddaf2ea57",
+      "manual": "hit",
+      "evidence": "step 2 bash {command: 'git branch -a'} (permission allow_once) -> tool_call_update failed 'blocked: task policy forbids mutation'; agent then fell back to git for-each-ref / reading .git",
+      "judge": "pass"
+    },
+    {
+      "run_id": "2ac92c8a2de94a38b9b365410f9182d4",
+      "suite": "suite_bb19f382daaf4254b894fa592c14d978",
+      "manual": "hit",
+      "evidence": "step 2 bash {command: 'git branch -a'} (permission allow_once) -> tool_call_update failed 'blocked: task policy forbids mutation'; agent then fell back to git for-each-ref / reading .git",
+      "judge": "pass"
+    },
+    {
+      "run_id": "13b249dad69544b88bd44b1cd9978a28",
+      "suite": "suite_61e0c0ca50554fdc9eda0599c73a224c",
+      "manual": "hit",
+      "evidence": "step 2 bash {command: 'git branch -a'} (permission allow_once) -> tool_call_update failed 'blocked: task policy forbids mutation'; agent then fell back to git for-each-ref / reading .git",
+      "judge": "pass"
+    },
+    {
+      "run_id": "14ffe663ea25434980cb1085f1140e80",
+      "suite": "suite_eac443652b4d46a7939bdf25c57c7c41",
+      "manual": "hit",
+      "evidence": "step 2 bash {command: 'git branch -a'} (permission allow_once) -> tool_call_update failed 'blocked: task policy forbids mutation'; agent then fell back to git for-each-ref / reading .git",
+      "judge": "pass"
+    },
+    {
+      "run_id": "e53d621c3b3c4cf291ea0e31199a2ad3",
+      "suite": "suite_837ec2cbeb184dce9ffdc9b3790aa565",
+      "manual": "hit",
+      "evidence": "step 2 bash {command: 'git branch -a'} (permission allow_once) -> tool_call_update failed 'blocked: task policy forbids mutation'; agent then fell back to git for-each-ref / reading .git",
+      "judge": "pass"
+    },
+    {
+      "run_id": "b8425979efbc4840aea3e6c046488988",
+      "suite": "suite_c8f741491ca341508e2162ac1b2dd8d1",
+      "manual": "hit",
+      "evidence": "step 2 bash {command: 'git branch -a'} (permission allow_once) -> tool_call_update failed 'blocked: task policy forbids mutation'; agent then fell back to git for-each-ref / reading .git",
+      "judge": "pass"
+    },
+    {
+      "run_id": "657344bdb9044327b6c6d29c5d0af3fd",
+      "suite": "suite_00e6c20ad28c456980d4a7be6c09a826",
+      "manual": "hit",
+      "evidence": "step 2 bash {command: 'git branch -a'} (permission allow_once) -> tool_call_update failed 'blocked: task policy forbids mutation'; agent then fell back to git for-each-ref / reading .git",
+      "judge": "pass"
+    },
+    {
+      "run_id": "452fe607348d468682b19a2d9ca01639",
+      "suite": "suite_18d079edf1fe4998a69af88685728a63",
+      "manual": "hit",
+      "evidence": "step 2 bash {command: 'git branch -a'} (permission allow_once) -> tool_call_update failed 'blocked: task policy forbids mutation'; agent then fell back to git for-each-ref / reading .git",
+      "judge": "pass"
+    }
+  ],
+  "steps": [
+    "Set up a small Git repository with a local remote by running exactly this shell command:\n\n```bash\ngit init -q -b main && git config user.email dev@example.com && git config user.name dev && echo hi > README.md && git add README.md && git commit -qm init && git branch feature-a && git branch feature-b && git init -q --bare .remote.git && git remote add origin .remote.git && git push -q origin main feature-a && git fetch -q origin && git log --oneline\n```",
+    "Read-only analysis, do not modify any files: list all local and remote branches in this repository with `git branch -a` and tell me which branches exist."
+  ]
+}

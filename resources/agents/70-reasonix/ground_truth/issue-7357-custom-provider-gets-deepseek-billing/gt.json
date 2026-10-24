@@ -1,0 +1,24 @@
+{
+  "schema": "abb.agent.ground_truth.case.v1",
+  "agent_id": "reasonix",
+  "id": "reasonix-issue-7357",
+  "summary": "Startup config rewrite adds DeepSeek's balance URL and prices to a custom provider",
+  "explanation": "Reasonix 1.19.4 upgrades the user config on every start (cli/cli.go -> config/pricing.go ApplyUserConfigUpgradesOnStartup). Loading starts from built-in defaults whose first provider is DeepSeek, and the merged result is written back, so a user-defined OpenAI-compatible provider (here name \"abb\", base_url pointing at another vendor) gains `balance_url = \"https://api.deepseek.com/user/balance\"` and DeepSeek's `price` table, and config_version is bumped. Evidence requirement: the config file read back by the agent after start, showing the custom provider block with DeepSeek's balance_url/price that the written config did not contain. The model's own edits to the config, or the version bump alone, do not establish this defect.",
+  "expected_behavior": "Upgrading the config preserves a custom provider as written; DeepSeek-specific billing endpoints and prices are not attached to other vendors' providers.",
+  "observed_behavior": "In 10 of 10 independent runs on 1.19.4 the config written with config_version = 1 and no billing keys read back as config_version = 5 with balance_url = https://api.deepseek.com/user/balance and price = {cache_hit 0.0028, input 0.14, output 0.28} on the custom \"abb\" provider.",
+  "reference_attempts": [
+    "0a7c32c4009e4fad892494860a6a43c6",
+    "eddddf65acf04dd8b555469ab4514f8d"
+  ],
+  "provenance": {
+    "issue_url": "https://github.com/esengine/DeepSeek-Reasonix/issues/7357",
+    "issue_state": "closed",
+    "source_revision": "b36a7e3d54a6cb88bbef8467fb5ba937f1337f34",
+    "agent_version": "historical release 1.19.4 (fixed in 1.19.7 (PR #7386)); the unit's install input was re-pinned to this release for the reproduction runs, which is not part of this PR",
+    "case_origin": "custom (frozen Case written from the issue text)",
+    "case_content_sha256": "e9563efaa686c56aa24c224856eef31b940e4f3c29ca0124a7b16f6011581c1a",
+    "reproduction": "10 of 10 valid independent ABB executions (fresh Suite and container each)",
+    "model": "zhipu/glm-5.3-flash",
+    "evidence_scope": "Complete native ABB attempt directories; see reproduction.json for all runs."
+  }
+}
