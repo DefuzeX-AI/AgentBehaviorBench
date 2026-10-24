@@ -64,7 +64,7 @@ class IndependentRunner:
         assert all(status.get(field) == 'succeeded' for field in (
             'status', 'cleanup_status', 'host_trace_validation')), (
                 status, (self.directory / 'diagnostics.json').read_text())
-        report = json.loads((self.directory / 'evaluation/judge/report.json').read_text())
+        report = json.loads((self.directory / 'judge/report.json').read_text())
         return BenchmarkResult(registration.agent_id, registration.framework, case.case_id,
                                'completed', SimpleNamespace(**report), (), len(report['outputs']),
                                provider_mode='independent', host_acceptance='accepted',
@@ -147,7 +147,7 @@ def test_shared_host_cleans_both_sessions_when_agent_evidence_is_rejected(tmp_pa
     status = json.loads((directory / 'run.json').read_text())
     assert status['status'] == 'failed' and status['cleanup_status'] == 'succeeded'
     assert status['host_trace_validation'] == 'failed'
-    assert (directory / 'evaluation/judge/report.json').is_file()
+    assert (directory / 'judge/report.json').is_file()
 
 
 def test_shared_host_imports_without_vendor_sdk():
@@ -218,7 +218,7 @@ def test_independent_sdk_real_container_retains_case_output_and_judge(tmp_path, 
         case, = runner.prepare_cases(agent)
         result = runner.run_case(agent, case)
         assert result.passed
-        evaluation = runner.directory / 'evaluation'
+        evaluation = runner.directory
         report = json.loads((evaluation / 'judge/report.json').read_text())
         assert report['outputs'] == ['first:1', 'second:2']
         assert json.loads((evaluation / 'case.json').read_text()) == json.loads(case.artifact_path.read_text())

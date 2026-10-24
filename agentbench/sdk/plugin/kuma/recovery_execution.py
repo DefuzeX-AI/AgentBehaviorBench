@@ -40,15 +40,17 @@ def recover_case(runner, registration, case, *, previous_result, validator, on_p
     directory = Path(original)
     if directory.is_symlink() or not directory.is_dir():
         raise ValueError('Recovery artifact directory is missing or linked')
-    from agentbench.observe.archive import restore_archive
-    restore_archive(directory)
+    from agentbench.observe.legacy_archive import restore_archive
+    from agentbench.observe.legacy_archive import archive_manifest
+    if archive_manifest(directory):
+        restore_archive(directory)
     timing_id = uuid4().hex
     timing_identity = runner._identity(registration, phase='recover', case_index=case.case_index, case_id=case.case_id)
     with timing_session(directory / f'timing-recovery-{timing_id}.jsonl', source='host',
                         name='Judge recovery', identity=timing_identity):
         host = read_diagnostic(directory, 'run.json')
-        summary = read_diagnostic(directory, 'evaluation/manifest.json')
-        current_case = read_diagnostic(directory, 'evaluation/case.json')
+        summary = read_diagnostic(directory, 'manifest.json')
+        current_case = read_diagnostic(directory, 'case.json')
         if (host.get('agent_id') != registration.agent_id or host.get('run_id') != directory.name
                 or host.get('case_id') != case.case_id or summary.get('case_id') != case.case_id
                 or current_case.get('case_id') != case.case_id
@@ -56,17 +58,17 @@ def recover_case(runner, registration, case, *, previous_result, validator, on_p
             raise ValueError('Recovery artifacts do not match the selected original Case')
         if host.get('attempt_id') not in (None, previous_result.attempt_id):
             raise ValueError('Recovery artifacts belong to another Attempt')
-        received = read_diagnostic(directory, 'evaluation/judge/report.json')
+        received = read_diagnostic(directory, 'judge/report.json')
         if received and summary.get('judge') == 'received':
             # The SDK and host already finished; a coordinator crash may have lost
             # only case_completed. Reconcile the saved result without any SDK call.
             result = validator(directory, registration.agent_id, recovered_report=received)
             files = Artifacts(directory, environ=runner.environ)
             recovery_id = uuid4().hex
-            files.save(f'evaluation/recovery/{recovery_id}/before.json', {'host': host, 'manifest': summary})
+            files.save(f'recovery/{recovery_id}/before.json', {'host': host, 'manifest': summary})
             files.save('run.json', {**host, 'status': 'succeeded', 'validation': 'succeeded',
                                    'recovery_id': recovery_id})
-            files.save(f'evaluation/recovery/{recovery_id}/acceptance.json', {
+            files.save(f'recovery/{recovery_id}/acceptance.json', {
                 'host_accepted': True, 'run_id': result.run_id, 'source': 'existing_report'})
             return result
         diagnostics = collect_artifacts(directory, host, environ=runner.environ)
@@ -83,13 +85,13 @@ def recover_case(runner, registration, case, *, previous_result, validator, on_p
         # still recorded them as pending before the earlier process exited.
         if request.get('status') == 'failed':
             raise _failed_request(directory, runner, host, summary, request)
-        process = read_diagnostic(directory, 'evaluation/process.json')
+        process = read_diagnostic(directory, 'process.json')
         base_url = process.get('sdk_base_url')
         if not isinstance(base_url, str) or not base_url:
             raise ValueError('Original SDK Backend identity was not recorded; recovery is unavailable')
         files = Artifacts(directory, environ=runner.environ)
         recovery_id = uuid4().hex
-        prefix = f'evaluation/recovery/{recovery_id}'
+        prefix = f'recovery/{recovery_id}'
         files.save(f'{prefix}/before.json', {'host': host, 'manifest': summary, 'request': request})
         identity = runner._identity(registration, phase='judge', case_index=case.case_index, case_id=case.case_id)
         emit_progress(on_progress, stage='benchmark_execution', status='started',
@@ -113,8 +115,8 @@ def recover_case(runner, registration, case, *, previous_result, validator, on_p
             validating = True
             result = validator(directory, registration.agent_id, recovered_report=report)
             # All checks passed before changing the visible report or terminal state.
-            files.save('evaluation/judge/report.json', report)
-            files.save('evaluation/manifest.json', {**summary, 'phase': 'finished', 'judge': 'received',
+            files.save('judge/report.json', report)
+            files.save('manifest.json', {**summary, 'phase': 'finished', 'judge': 'received',
                                                   'request': recovered['request'], 'recovery_id': recovery_id})
             files.save('run.json', {**host, 'status': 'succeeded', 'validation': 'succeeded',
                                    'recovery_id': recovery_id})
@@ -127,7 +129,7 @@ def recover_case(runner, registration, case, *, previous_result, validator, on_p
                 latest = inspect_requests(repository, client_id)
                 _check_request(latest, summary, client_id)
                 current_error = exception_record(exc, phase='judge')
-                files.save('evaluation/manifest.json', {**summary, 'request': latest, 'error': current_error})
+                files.save('manifest.json', {**summary, 'request': latest, 'error': current_error})
             except Exception:
                 pass
             recovery_error = exception_record(exc, phase='judge')
@@ -148,7 +150,7 @@ def _check_request(request, summary, client_id):
 
 
 def _failed_request(directory, runner, host, summary, request):
-    Artifacts(directory, environ=runner.environ).save('evaluation/manifest.json', {**summary, 'request': request})
+    Artifacts(directory, environ=runner.environ).save('manifest.json', {**summary, 'request': request})
     error = RuntimeError('The original Judge request is terminally failed and cannot be resumed')
     error.artifacts = collect_artifacts(directory, host, environ=runner.environ)
     return error

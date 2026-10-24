@@ -42,7 +42,7 @@ async def execute():
                         'session_id': case['case_id'], 'agent_id': settings['agent_id'],
                         'framework': 'langgraph', 'input': value,
                         'observation_context': {'case_id': case['case_id'], 'input_id': str(index)}}
-            result = await agent.invoke(envelope, output / 'inputs' / f'{index:04d}', evidence)
+            result = await agent.invoke(envelope, output / 'steps' / f'{index:04d}', evidence)
             results.append(result['output'])
     assert evidence.spans, 'Original Agent spans must reach the independent SDK'
     files.save('evidence.json', evidence.spans)
