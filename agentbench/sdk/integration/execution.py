@@ -6,6 +6,7 @@ isolated processes, evidence validation and cleanup.
 """
 from collections.abc import Mapping
 import json
+import os
 from pathlib import Path, PurePosixPath
 import shutil
 import tempfile
@@ -84,11 +85,12 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
     from agentbench.sdk.integration.context import ResponseLimits
     response_limits = ResponseLimits.from_environ(environ)
     files = Artifacts(directory, environ=environ)
-    with timing_session(directory / 'timing.jsonl', source='host', name='Evaluation',
+    (directory / 'logs').mkdir(exist_ok=True)
+    with timing_session(directory / 'logs/host-timing.jsonl', source='host', name='Evaluation',
                         identity={**identity, 'agent_id': agent.agent_id}) as timing_root:
         inputs = directory / 'request'; Path(inputs).mkdir()
         files.save('request/evaluation.json', settings)
-        destination = prepare_output(directory / 'evaluation')
+        destination = prepare_output(directory)
         identity = {**identity,
                     'agent_id': agent.agent_id, 'artifact_run_id': directory.name,
                     'phase': 'execute' if execute_agent else 'generate'}
@@ -137,7 +139,7 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                         Path(repository).chmod(0o777)
                         for item in Path(repository).rglob('*'):
                             item.chmod(0o777 if item.is_dir() else (item.stat().st_mode & 0o111) | 0o666)
-                        files.save('evaluation/workspace.json', contract)
+                        files.save('workspace.json', contract)
                         settings_path = directory / 'request/evaluation.json'
                         settings = json.loads(Path(settings_path).read_text())
                         settings['workspace'] = contract
@@ -158,7 +160,7 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                         path = _private_path(ledger_root, relative)
                         Path(path.parent).mkdir(parents=True, mode=0o700, exist_ok=True)
                         checked_copy(source, path)
-                store = TraceStore(directory / 'network.jsonl', directory.name,
+                store = TraceStore(directory / 'logs/network.jsonl', directory.name,
                                    source='interceptor', context=identity, environ=environ)
                 class Sink:
                     def emit(self, event):
@@ -284,10 +286,28 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                     except (OSError, ValueError, AttributeError):
                         pass  # Preserve the original container/validation outcome.
                 files.save('run.json', status)
+                if (status['cleanup_status'] == 'succeeded'
+                        and status['host_trace_validation'] == 'succeeded'):
+                    cleanup_transport(directory)
                 if workspace_temp is not None:
                     workspace_temp.cleanup()
         timing_root.status = status['status']
         return directory
+
+
+def cleanup_transport(directory):
+    """Retire only temporary communication after both containers are stopped."""
+    root = Path(directory).resolve()
+    for name in ('channel', 'agent-request', 'agent-output'):
+        path = root / name
+        if path.is_symlink() or (hasattr(path, 'is_junction') and path.is_junction()) or not path.resolve().is_relative_to(root):
+            raise ValueError('Transport path leaves execution root')
+        if path.is_dir():
+            target = str(path)
+            if os.name == 'nt' and not target.startswith('\\\\?\\'):
+                target = ('\\\\?\\UNC\\' + target[2:] if target.startswith('\\\\')
+                          else '\\\\?\\' + target)
+            shutil.rmtree(target)
 
 
 def _trace_preview(value, *, depth=0, budget=None):

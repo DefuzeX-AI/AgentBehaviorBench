@@ -21,8 +21,6 @@ class SuiteResultLog:
 
     def append_suite_complete(self, result):
         self.store.append({'event': 'suite_completed', 'summary': _summary_to_json(result)})
-        from agentbench.observe.archive import compact_suite
-        compact_suite(self.store.directory)
 
     def append_suite_error(self, exc):
         self.store.append({'event': 'suite_failed', 'error': {'type': type(exc).__name__, 'message': str(exc)}})
