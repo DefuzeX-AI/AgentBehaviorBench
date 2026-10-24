@@ -20,6 +20,10 @@ def result_path(directory, relative=''):
             or path.is_absolute() or '..' in path.parts
             or (relative and path.as_posix() != relative)):
         raise ValueError('Invalid result path')
+    from .artifact_paths import archive_manifest, artifact_file
+    archived = archive_manifest(root)
+    if archived and relative in archived['files']:
+        return artifact_file(root, relative)
     target = root
     for part in path.parts:
         target = target / part
@@ -59,7 +63,7 @@ def preview_file(directory, relative):
     if not target.is_file():
         raise ValueError('Not a result file')
     with target.open('rb') as stream:
-        size = os.fstat(stream.fileno()).st_size
+        size = target.stat().st_size
         content = stream.read(PREVIEW_BYTES + 1)
     truncated = len(content) > PREVIEW_BYTES
     content = content[:PREVIEW_BYTES]

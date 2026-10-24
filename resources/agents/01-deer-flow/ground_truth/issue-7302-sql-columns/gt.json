@@ -1,0 +1,22 @@
+{
+  "id": "deer-flow-issue-7302",
+  "summary": "Duplicate SQL columns silently lose data in JSON export",
+  "explanation": "The native data-analysis action_query silently overwrites identically named keys when exporting duplicate SQL columns to JSON. In the reference query, both columns are named id and have values 1 and 2, but the exported output retains only id=2. A control query with distinct aliases preserves both values. Verify the original query result against the actual exported content. An unrelated CSV schema migration or a missing final report does not establish this defect.",
+  "expected_behavior": "Reject ambiguous duplicate JSON keys or preserve both source values explicitly; never silently discard a value.",
+  "observed_behavior": "The native exporter reports success but turns two id columns with values 1 and 2 into a single id value 2.",
+  "agent_recovery": "Agent diagnosed native JSON value loss and additionally demonstrated CSV/Markdown preserve both values. No final response before GraphRecursionError at limit 100.",
+  "task_outcome": "failed_recursion_limit",
+  "provenance": {
+    "issue_url": "https://github.com/bytedance/deer-flow/issues/7302",
+    "source_revision": "a1eb3971412ee269f1f89bfb5cc9e158b682f86e",
+    "evidence_scope": "Complete original native Agent Case; supplemental component probes are separate evidence, not Agent runs.",
+    "suite_id": "suite_4a9ae480fe9348eca2f14d832176637c",
+    "case_index": 2,
+    "source_case_directory": "C:\\Song_startup\\benchmark\\r\\suites\\suite_4a9ae480fe9348eca2f14d832176637c\\cases\\40cb2d49661b548c7ac5841e\\2"
+  },
+  "schema": "abb.agent.ground_truth.case.v1",
+  "agent_id": "deer-flow",
+  "reference_attempts": [
+    "ba73560887b44165861c83c7fd79fe44"
+  ]
+}

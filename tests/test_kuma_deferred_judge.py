@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 from kuma import to_json
 
-from agentbench.sdk.plugin.kuma.judge_bundle import export_context, restore_context
+from agentbench.sdk.plugin.kuma.judge_bundle import export_context, restore_context, save_context, read_context
 from agentbench.sdk.plugin.kuma.judge_tasks import prepare_task, judge_task
 from agentbench.sdk.plugin.kuma.compatibility import run_case
 from agentbench.sdk.plugin.kuma.benchmark import KumaContainerRunner
@@ -62,7 +62,7 @@ def stage_task(root, *, native_failure=False, stop_early=False):
         judge=False, max_steps=2, track_files=True, upload_diff=True, trace_evidence=capture,
         on_failure='stop' if stop_early else 'continue')
     directory = root / 'attempt'
-    evaluation = directory / 'evaluation'
+    evaluation = directory
     case_json = run_case(run)
     Artifacts(evaluation).save('case.json', case_json)
     agent_id = 'fixture-agent'
@@ -84,7 +84,7 @@ def stage_task(root, *, native_failure=False, stop_early=False):
         summary = asyncio.run(drive_run(run, invoke, evaluation, provider=provider,
             repo_path=repo, file_evidence_required=True, defer_judge=True))
         assert summary['judge'] == 'queued' and run.report is None
-        Artifacts(evaluation).save('judge/context.json', export_context(run, case_json, upload_diff=True))
+        save_context(Artifacts(evaluation), run, case_json, upload_diff=True)
     finally:
         provider.shutdown()
     Artifacts(evaluation).save('process.json', {'sdk_base_url': OfflineBackend.base_url})
@@ -101,7 +101,8 @@ def stage_task(root, *, native_failure=False, stop_early=False):
 
 def test_real_sdk_defers_and_restores_all_committed_evidence(tmp_path):
     runner, agent, case, ticket, verification = stage_task(tmp_path)
-    context_json = json.loads((ticket.directory / 'evaluation/judge/context.json').read_text(encoding='utf-8'))
+    context_json = json.loads((ticket.directory / 'judge/context.json').read_text(encoding='utf-8'))
+    context_json = read_context(ticket.directory, context_json)
     restored = restore_context(context_json)
     assert to_json(restored.history) == context_json['history']
     assert to_json(restored.case) == context_json['case']
@@ -118,7 +119,7 @@ def test_host_sdk_judges_once_and_reuses_report_after_restart(tmp_path, monkeypa
     again = judge_task(runner, agent, case, ticket)
     assert first.passed and again.run_id == first.run_id
     assert len(backend.posts) == 1
-    assert (ticket.directory / 'evaluation/judge/report.json').is_file()
+    assert (ticket.directory / 'judge/report.json').is_file()
     assert json.loads((ticket.directory / 'judge-task.json').read_text())['state'] == 'completed'
 
 
@@ -141,11 +142,11 @@ def test_report_write_failure_recovers_original_judge_without_resubmission(tmp_p
     save = Artifacts.save
 
     def fail_report(self, relative, value):
-        if relative == 'evaluation/judge/report.json':
+        if relative == 'judge/report.json':
             raise PermissionError('container-owned Judge directory')
         return save(self, relative, value)
 
-    context = (ticket.directory / 'evaluation/judge/context.json').read_bytes()
+    context = (ticket.directory / 'judge/context.json').read_bytes()
     with monkeypatch.context() as scoped:
         scoped.setattr(Artifacts, 'save', fail_report)
         with pytest.raises(PermissionError):
@@ -156,17 +157,17 @@ def test_report_write_failure_recovers_original_judge_without_resubmission(tmp_p
     assert result.report.status == 'issue'
     # The pinned SDK polls the original completed operation again; no new POST.
     assert len(backend.posts) == 1 and backend.polls == polls + 1
-    assert (ticket.directory / 'evaluation/judge/context.json').read_bytes() == context
-    assert json.loads((ticket.directory / 'evaluation/manifest.json').read_text())['judge'] == 'received'
+    assert (ticket.directory / 'judge/context.json').read_bytes() == context
+    assert json.loads((ticket.directory / 'manifest.json').read_text())['judge'] == 'received'
 
 
 def test_modified_queued_evidence_is_rejected_before_any_sdk_upload(tmp_path, monkeypatch):
     runner, agent, case, ticket, _ = stage_task(tmp_path)
     backend = OfflineBackend(case.case_id)
     monkeypatch.setattr('kuma.transport.backend.BackendClient', lambda **kwargs: backend)
-    submission = ticket.directory / 'evaluation/inputs/0001/submission.json'
+    submission = ticket.directory / 'steps/0001/submission.json'
     submission.write_text('{}')
-    with pytest.raises(ValueError, match='identity mismatch'):
+    with pytest.raises(ValueError, match='reference was modified'):
         judge_task(runner, agent, case, ticket)
     assert backend.posts == []
 
@@ -176,10 +177,10 @@ def test_saved_report_validation_failure_is_rejected_without_resubmission(tmp_pa
     backend = OfflineBackend(case.case_id)
     monkeypatch.setattr('kuma.transport.backend.BackendClient', lambda **kwargs: backend)
     judge_task(runner, agent, case, ticket)
-    report_path = ticket.directory / 'evaluation/judge/report.json'
+    report_path = ticket.directory / 'judge/report.json'
     report = json.loads(report_path.read_text())
     report['extensions']['case_id'] = 'foreign-case'
-    Artifacts(ticket.directory).save('evaluation/judge/report.json', report)
+    Artifacts(ticket.directory).save('judge/report.json', report)
     with pytest.raises(RuntimeError, match='Case / Judge identity mismatch') as caught:
         runner.judge_case(agent, case, ticket)
     assert caught.value.artifacts['host_acceptance'] == 'rejected'
@@ -251,7 +252,7 @@ def test_failed_submission_keeps_sdk_and_native_causes_instead_of_enqueue_error(
     host = json.loads((directory / 'run.json').read_text())
     files.save('run.json', {**host, 'status': 'failed', 'exit_code': 1,
                            'host_trace_validation': 'not_performed'})
-    files.save('evaluation/manifest.json', {**summary, 'phase': 'submission',
+    files.save('manifest.json', {**summary, 'phase': 'submission',
         'submission': 'failed', 'evidence': 'pending', 'judge': 'pending',
         'error': {'type': 'SensitiveDataError', 'code': 'sensitive_data_blocked',
                   'message': 'Sensitive data blocked the original submission', 'retryable': False}})
@@ -430,7 +431,7 @@ def test_viewer_revalidates_old_failed_reports_without_changing_logs_or_artifact
     artifacts['received_report']['host_accepted'] = False
     artifacts['recovery'] = {'action': 'blocked', 'allow_replay': False,
                             'reason': 'Resume the durable host Judge task without Agent replay'}
-    source = ticket.directory / 'evaluation/case.json'
+    source = ticket.directory / 'case.json'
     prepared = replace(case, artifact_path=source, artifact_sha256=hashlib.sha256(source.read_bytes()).hexdigest())
     identity = {'agent_id': agent.agent_id, 'case_index': 0, 'case_id': case.case_id,
                 'attempt_id': 'original-attempt', 'job_id': 'job'}
@@ -456,7 +457,7 @@ def test_viewer_revalidates_old_failed_reports_without_changing_logs_or_artifact
     files.save('run.json', {**host, 'attempt_id': 'foreign-attempt'})
     assert reconcile_reports(plan, rows, suite_snapshot(plan, rows)) is rows
     files.save('run.json', host)
-    files.save('evaluation/inputs/0001/result.json', {})
+    files.save('steps/0001/result.json', {})
     assert reconcile_reports(plan, rows, suite_snapshot(plan, rows)) is rows
 
 
@@ -476,14 +477,14 @@ def test_terminated_prefix_survives_host_judge_and_preserves_unexecuted_inputs(t
 def test_early_termination_cannot_hide_missing_evidence(tmp_path, damage):
     from agentbench.sdk.plugin.kuma.judge_tasks import validate_execution
     _, _, case, ticket, _ = stage_task(tmp_path, native_failure=True, stop_early=True)
-    manifest = ticket.directory / 'evaluation/manifest.json'
+    manifest = ticket.directory / 'manifest.json'
     data = json.loads(manifest.read_text())
     if damage == 'missing_termination':
         data.pop('termination')
     elif damage == 'wrong_tail':
         data['unexecuted_inputs'] = []
     else:
-        result = ticket.directory / 'evaluation/inputs/0001/result.json'
+        result = ticket.directory / 'steps/0001/result.json'
         native = json.loads(result.read_text())
         native['session_usable'] = True
         result.write_text(json.dumps(native))
