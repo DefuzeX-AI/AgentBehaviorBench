@@ -30,6 +30,26 @@ The helper and validation fixtures are excluded from the Agent Docker image. Rec
 
 The controller close acknowledgement previously had a 10-second cap, shorter than the ACP adapter's possible 14-second close budget. The shared channel now allows at most 60 seconds, still bounded by a shorter configured runtime timeout. A zero-model protocol regression covers a valid acknowledgement after 12 seconds and a never-acknowledged timeout. This does not change native Agent logic, task inputs, model selection, Judge prompts, token limits or acceptance checks. Exact archived executions use the bundle's frozen Case and recorded command rather than generating a different task.
 
+## Full-evidence Local Judge presentation
+
+The shared Local Judge now offers a lossless JSONL view: adjacent events inherit
+identical nested `common_fields`, while every distinct field, timestamp, event
+order, text chunk and tool result stays present. The view is used only when smaller
+than the original text and when every JSON record round-trips exactly. Original
+attachment bytes and hashes remain unchanged. The exact model-facing view is
+retained at `evaluation/judge/local-evidence-view.json`. This is a shared SDK input
+presentation change, not an upstream Agent patch or a changed judging criterion;
+it requires review along with the integration.
+
+The existing 120000-character guard, Judge system prompt, 2048-token reply budget,
+strict verdict validation and full-evidence hash validation remain unchanged.
+Unique oversized evidence still returns `inconclusive` before any model call.
+The prior frozen run's 225714-character evidence presents as 98703 characters with
+all 313 framework events and four spans independently restored. That offline
+round-trip audit is not itself a Smoke/Judge pass; retain a fresh final-head
+container run and its real Judge response separately. Earlier `inconclusive`
+reports are not replaced or edited.
+
 ## Historical evidence and task stages
 
 The earlier imported file Case remains at `validation/local-cases.json` for explicit regression use. Its archived Judge used 8192 output tokens and added the existing cross-field consistency constraints, unlike the stock 2048 configuration above. [Historical runs and exact archived runner](https://github.com/QUSETIONS/AgentBehaviorBench/releases/tag/batch2-current-main-20261023) remain separate evidence and do not replace final-commit standard validation. No historical failure, returned report or native response is rewritten.
