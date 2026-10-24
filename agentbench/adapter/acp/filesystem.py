@@ -29,10 +29,25 @@ def read_file(config, path, line=None, limit=None):
     return ReadTextFileResponse(content=content)
 
 
+def _make_parents(directory):
+    """Create missing parents as open as the runtime-prepared workspace.
+
+    The host removes the Case workspace after the run; a 0755 directory owned
+    by the container user would block that removal.
+    """
+    missing = []
+    while not directory.exists():
+        missing.append(directory)
+        directory = directory.parent
+    for created in reversed(missing):
+        created.mkdir(exist_ok=True)
+        created.chmod(0o777)
+
+
 def write_file(config, path, content):
     target = workspace_path(config, path)
     if len(content.encode('utf-8')) > config.max_output_bytes:
         raise RequestError.invalid_params({'message': 'File exceeds configured output limit'})
-    target.parent.mkdir(parents=True, exist_ok=True)
+    _make_parents(target.parent)
     target.write_text(content, encoding='utf-8')
     return WriteTextFileResponse()
