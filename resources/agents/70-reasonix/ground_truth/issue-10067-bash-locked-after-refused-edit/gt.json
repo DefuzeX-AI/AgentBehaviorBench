@@ -1,0 +1,24 @@
+{
+  "schema": "abb.agent.ground_truth.case.v1",
+  "agent_id": "reasonix",
+  "id": "reasonix-issue-10067",
+  "summary": "After a refused edit is retried successfully, every bash command stays blocked by the read-evidence gate",
+  "explanation": "In Reasonix 1.38.3 the read-evidence gate refuses an edit_file whose target the model has not read and stores that refused call for the turn. After the model reads the file and the retried edit succeeds, the stored entry is never cleared: outstandingReadEvidence re-checks the stored call, whose old_string no longer exists after the edit, so the requirement stays target_invalid and outstanding. For the rest of the turn every bash command is refused with 'bash cannot declare which files it changes while a read-evidence requirement is outstanding (<file>)', while read_file reports the requirement as already satisfied. Evidence requirement: a refused edit_file, a successful read and retried edit of the same file, then a bash call refused naming that file, followed by a full read_file and the identical bash refused again. A bash failure from the command itself, or a refusal before any edit, does not establish this defect. Removed upstream in 1.38.8 (#10223).",
+  "expected_behavior": "Once the model has read the current file and the edit has succeeded, the read-evidence requirement is cleared and bash commands run normally.",
+  "observed_behavior": "In 10 of 10 independent runs on 1.38.3, bash `echo x > tmp.txt` was refused naming tools/foo.py after the retried edit had succeeded; a full read_file returned the current content and the identical bash was refused again (3 to 15 refusals per run).",
+  "reference_attempts": [
+    "fcb5e3d764124cf0aa7949f0429cfd27",
+    "6db04986a01546aca465ff7aca53394f"
+  ],
+  "provenance": {
+    "issue_url": "https://github.com/esengine/DeepSeek-Reasonix/issues/10067",
+    "issue_state": "closed",
+    "source_revision": "fa018e4109268c912063c8cc619302fccdb57d74",
+    "agent_version": "historical release 1.38.3 (fixed in 1.x v1.38.8 (#10223); read-evidence gate absent in v2.49.0); the unit's install input was re-pinned to this release for the reproduction runs, which is not part of this PR",
+    "case_origin": "custom (frozen Case written from the issue text)",
+    "case_content_sha256": "ee0ab4fb959c2d5f2400d338c830f64d0afe00bd6adf59d75c890d1842177b94",
+    "reproduction": "10 of 10 valid independent ABB executions (fresh Suite and container each)",
+    "model": "zhipu/glm-5.3-flash",
+    "evidence_scope": "Complete native ABB attempt directories; see reproduction.json for all runs."
+  }
+}
