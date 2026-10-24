@@ -222,8 +222,8 @@ def test_all_model_roles_match_the_registered_chat_protocol(bridge, tmp_path, mo
         model: str = "native-model"
         max_tokens: int = 10000
         temperature: float = 0.1
-        extended_reasoning: object = None
-        provider_options: object = None
+        extended_reasoning: object = "native-reasoning"
+        provider_options: object = "native-options"
         input_cost_per_mtok: object = 1
         output_cost_per_mtok: object = 5
 
@@ -242,10 +242,14 @@ def test_all_model_roles_match_the_registered_chat_protocol(bridge, tmp_path, mo
     config = agent._agent_config
     for model in [config.llm, *(s.llm for s in config.subagents), config.compression.llm]:
         assert model.provider == "openai"
-        assert model.model == "deepseek-v4-pro"
+        assert model.model == "abb-runtime-selected"
         assert model.max_tokens == original.max_tokens
         assert model.temperature == original.temperature
+        assert model.extended_reasoning is None
+        assert model.provider_options is None
         assert model.input_cost_per_mtok is None
+        assert model.output_cost_per_mtok is None
+    assert original.model == "native-model"
     assert original.provider == "anthropic"
     unit = Path(__file__).resolve().parents[1] / "resources/agents/81-langrepl"
     interception = InterceptionConfig.from_agent_dir(unit)

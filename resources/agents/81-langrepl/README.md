@@ -14,13 +14,13 @@ dependencies; no Python 3.13 packages are installed into the host environment.
 Upstream defaults select Anthropic. The binding's deployment configuration changes
 the selected main agent, both subagents and configured compression model to the
 native OpenAI-compatible client, retaining their generation limits. Native model
-labels are set to `deepseek-v4-pro`; provider-specific reasoning/options and native
-Anthropic cost estimates are cleared. Graph logic and tools are unchanged.
+labels use the neutral `abb-runtime-selected` placeholder; provider-specific
+reasoning/options and native Anthropic cost estimates are cleared. Graph logic
+and tools are unchanged.
 The manifest registers Chat Completions with ABB replacement interception,
 including its nested `LLM__OPENAI_API_KEY` environment variable. The host-selected
-model applies to all matching calls. This integration was prepared for Bailian's
-OpenAI-compatible endpoint with `deepseek-v4-pro`; host model configuration
-supplies the actual credentials, endpoint and effective model.
+model replaces that placeholder on all matching calls. Host model configuration
+supplies the credentials, endpoint and effective model through ABB's shared selection.
 No provider credentials or fixed provider restriction belong in this unit.
 The unit has no fixed non-model API endpoints. For web-fetch tasks, configure the
 needed destinations using host `ABB_EGRESS_ALLOW`; the default observer permits

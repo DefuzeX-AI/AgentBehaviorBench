@@ -69,11 +69,12 @@ class LangreplGraph:
 
         # LLMConfig is the native deployment configuration, not Agent logic.
         # The registry returns this cached config to create_graph. Retain its
-        # generation limits; use Chat Completions for Bailian's compatible API.
-        # ABB still owns the effective destination, credentials and model.
+        # generation limits and use the native Chat Completions client.
+        # ABB replacement interception supplies the effective destination,
+        # credentials and model; this source-side model label is a placeholder.
         def compatible(config):
             return config.model_copy(update={
-                "provider": LLMProvider.OPENAI, "model": "deepseek-v4-pro",
+                "provider": LLMProvider.OPENAI, "model": "abb-runtime-selected",
                 "extended_reasoning": None, "provider_options": None,
                 "input_cost_per_mtok": None, "output_cost_per_mtok": None,
             })

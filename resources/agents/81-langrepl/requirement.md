@@ -63,7 +63,8 @@ text cannot grant a pending tool request. A returned interrupt is not completed 
   default. This Docker environment denies nested namespace creation. Upstream
   imports `seccomp` although its lock installs `pyseccomp`; optional syscall filtering
   is unavailable. Docker isolation does not establish native sandbox support.
-- Model labels are `deepseek-v4-pro` through the native OpenAI-compatible client;
+- Model labels use the neutral `abb-runtime-selected` placeholder through the
+  native OpenAI-compatible client;
   ABB replacement interception selects the effective deployment destination and
   model for all calls, including delegation. Provider-specific reasoning/options
   and Anthropic cost estimates are cleared; upstream context-window metadata
