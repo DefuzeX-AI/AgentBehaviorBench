@@ -63,7 +63,13 @@ unprivileged uid the runtime chooses and isolates Cases. It writes:
 - `harness/models.json`: one provider `abb` (`api = "openai-completions"`,
   `baseUrl` = `ABB_AGENT_MODEL_BASE_URL`) with one model `ABB_AGENT_MODEL`, and
   `apiKey = "$ABB_AGENT_MODEL_API_KEY"`, which Pi resolves from the environment at
-  request time, so the key never appears in argv or on disk;
+  request time, so the key never appears in argv or on disk. The model entry also sets
+  `name`: kimchi copies it into its model registries as `display_name` and calls
+  `.trim()` on it (`src/models.ts` `modelToMetadata`, `model-registry.ts`). Without a
+  name the prompt-construction extension fails to load (`kimchi -p` reports
+  `Failed to load extension ... m.display_name.trim`; ACP mode drops the error
+  silently), and every request falls back to Pi's base system prompt instead of
+  kimchi's own;
 - `harness/settings.json`: `defaultProvider`/`defaultModel` selecting that model (ACP
   `session/new` does not choose one), every kimchi multi-model role (`orchestrator`,
   `planner`, `builder`, `reviewer`, `explorer`, `researcher`) pinned to it so delegation
@@ -99,10 +105,10 @@ terminals or client file-system methods in the acceptance run.
 
 kimchi streams fine-grained ACP updates (one `agent_message_chunk` or `tool_call_update` per
 model delta) plus `_kimchi.dev/pi_notify` status notifications. A one-step Case therefore
-produces several hundred kilobytes of `framework.jsonl`, which exceeds the local Judge's
-default `ABB_LOCAL_JUDGE_MAX_CHARS` (120000) and makes it report `inconclusive` for evidence
-size alone. Raise that limit for `--sdk local` runs; it does not affect execution or evidence
-capture.
+produces roughly 0.3 to 0.8 MB of `framework.jsonl`, which exceeds the local Judge's default
+`ABB_LOCAL_JUDGE_MAX_CHARS` (120000), and often any limit a single Judge request can carry,
+so the local Judge reports `inconclusive` for evidence size alone. This does not affect
+execution or evidence capture; the KUMA Judge accepts the same evidence.
 
 ## Installation inputs
 

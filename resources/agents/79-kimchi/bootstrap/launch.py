@@ -49,7 +49,11 @@ def prepare(environ: dict[str, str]) -> tuple[list[str], dict[str, str], dict[st
                 "api": "openai-completions",
                 "apiKey": f"${KEY_ENV}",
                 "compat": {"supportsDeveloperRole": False, **({"thinkingFormat": thinking} if thinking else {})},
-                "models": [{"id": model, "reasoning": True, "contextWindow": 200000, "maxTokens": 32000}],
+                # kimchi copies `name` into its model registries and calls .trim() on
+                # it; without a name its prompt-construction extension fails to load
+                # (silently in ACP mode) and sessions fall back to Pi's base prompt.
+                "models": [{"id": model, "name": model, "reasoning": True,
+                            "contextWindow": 200000, "maxTokens": 32000}],
             }
         }
     }
