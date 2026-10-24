@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 from acp import text_block
 
-UNIT = Path(__file__).resolve().parents[1] / 'resources/agents/79-pydantic-deepagents'
+UNIT = Path(__file__).resolve().parents[1] / 'resources/agents/91-pydantic-deepagents'
 
 
 def load_bridge():
