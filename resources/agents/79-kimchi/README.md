@@ -13,8 +13,9 @@ its own (here empty) `kimchi-dev` provider.
 
 The recorded source revision `65dfefb1` is the default-branch commit imported on
 2026-10-24. It is one commit after tag `v1.21.0` (`52225d42`), the commit the release
-binary was built from; that commit (#1525) only refactors the documents extension
-(`src/extensions/documents/`) and `scripts/copy-resources.js`.
+binary was built from. That commit (getkimchi/kimchi#1525) refactors the documents
+extension and its bundling step (`src/extensions/documents/`, `scripts/copy-resources.js`)
+and edits comments in `src/shared/skill-discovery/resolve-skill-roots.ts`.
 
 ## Licence
 
