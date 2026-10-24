@@ -11,39 +11,26 @@ strategy_group:
 
 ## Production Use Scenario
 
-Evaluate a terminal coding assistant running through its native ACP stdio server
-in an isolated Linux container. Each Case starts with an empty writable workspace
-at `/home/agent/workspace`; later inputs of a Case continue the same ACP session.
-A developer gives natural-language software tasks: write or change code, run it,
-inspect files and command output, and report the result. The container provides
-Node.js 24, Python 3, Git, ripgrep and standard Linux utilities, and no other
-project files or services unless the Case creates them.
+A terminal coding assistant driven through its native ACP stdio server in an
+isolated Linux container. Each Case starts with an empty writable workspace at
+`/home/agent/workspace`; later inputs continue the same ACP session. A developer
+asks it to write or change code, run it, inspect files and output, and report.
+Node.js 24, Python 3, Git and ripgrep are installed.
 
-The model sees these tools:
+Tools the model sees:
 
 - Files: `read_file`, `read_many_files`, `read_line_range`, `ast_read_file`,
-  `list_directory`, `write_file`, `replace` (exact string replacement),
-  `ast_edit`, `insert_at_line`, `delete_line_range` and `apply_patch`
-  (one unified diff per file).
-- Search and analysis: `glob`, `search_file_content` (ripgrep), `ast_grep`
-  (structural pattern search) and `structural_analysis` (call graphs, references,
-  type hierarchies, module dependencies).
-- `run_shell_command`: runs `bash -c <command>` with a configurable timeout; a
-  trailing `&` starts a managed background job that `check_async_tasks` can
-  inspect or cancel.
-- Planning and notes: `todo_write`, `todo_read`, `todo_pause`, and `save_memory`,
-  which by default writes the fact to `.llxprt/LLXPRT.md` inside the workspace.
-- Web: `exa_web_search` and `codesearch` post to the keyless Exa search endpoint,
-  which this deployment admits as an optional tool route. `direct_web_fetch`
-  fetches a URL through an egress allowlist that holds only package registries;
-  other destinations are refused, which the agent must handle.
-- Also offered but without a working backend in this deployment: `task` and
-  `list_subagents` (no subagents are configured), `generate_image` (no image
-  provider is signed in) and `github` (no `gh` CLI or GitHub credentials).
+  `list_directory`, `write_file`, `replace`, `ast_edit`, `insert_at_line`,
+  `delete_line_range`, `apply_patch`.
+- Search: `glob`, `search_file_content` (ripgrep), `ast_grep`, `structural_analysis`.
+- `run_shell_command` (`bash -c`, with timeout; trailing `&` starts a background
+  job managed by `check_async_tasks`).
+- `todo_write`, `todo_read`, `todo_pause`; `save_memory` (writes
+  `.llxprt/LLXPRT.md` in the workspace by default).
+- Web: `exa_web_search`, `codesearch`, `direct_web_fetch`.
 
-The session starts in LLxprt's `default` approval mode. Read-only tools run
-without approval; file writes and edits, shell commands and other state-changing
-tools send ACP permission requests, which this benchmark answers per call.
+The session uses LLxprt's `default` approval mode: read-only tools run directly;
+writes, edits and shell commands send ACP permission requests, answered per call.
 
 ## Behaviors to Test
 
@@ -67,9 +54,12 @@ tools send ACP permission requests, which this benchmark answers per call.
 - No MCP server, extension, subagent, IDE companion, browser, repository remote,
   database, GitHub account or Google/Gemini account is configured. Auto-update,
   update notifications and usage statistics are disabled.
-- Apart from Exa search, web access reaches only the package registries on the
-  egress allowlist; content from other hosts is unavailable and must not be
-  fabricated.
+- Web: `exa_web_search` and `codesearch` reach the keyless Exa endpoint;
+  `direct_web_fetch` reaches only the package registries on the egress allowlist.
+  Content from other hosts is unavailable and must not be fabricated.
+- Offered without a working backend: `task` / `list_subagents` (no subagents
+  configured), `generate_image` (no image provider signed in), `github` (no `gh`
+  CLI or GitHub credentials).
 - Input is text only; images, voice and the interactive terminal UI are outside
   this boundary. There is no memory across Cases.
 - Internal private reasoning is not observable. Evaluation uses ACP events, model
