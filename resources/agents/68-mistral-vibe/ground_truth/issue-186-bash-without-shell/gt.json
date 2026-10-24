@@ -1,0 +1,24 @@
+{
+  "schema": "abb.agent.ground_truth.case.v1",
+  "agent_id": "mistral-vibe",
+  "id": "mistral-vibe-issue-186",
+  "summary": "ACP bash tool runs commands without a shell, so builtins like source fail",
+  "explanation": "In Mistral Vibe 1.3.5 the ACP bash tool splits the command line with shlex and sends ACP terminal/create with the first word as the program and the rest as arguments, without wrapping it in a shell. Shell builtins (`source`, `.`, `cd`) therefore have no executable and the terminal cannot be created (the tool returns 'bash failed: Failed to create terminal'), and operators such as `&&`, `;` and `|` are passed to the program as literal arguments (e.g. `ls: cannot access '&&'`). Evidence requirement: the bash tool call for `source .venv/bin/activate && which python` (or an equivalent builtin command) and its own tool result showing the terminal creation failure or literal operator arguments. A generic command failure, a missing venv, or the model choosing a different command does not establish this defect. Fixed in later releases, which run commands as [shell, -c, command].",
+  "expected_behavior": "The bash tool executes the command line through a shell, so `source .venv/bin/activate && which python` activates the venv and prints its interpreter.",
+  "observed_behavior": "Every `source …` / `. …` / `cd … && …` call returns 'bash failed: Failed to create terminal: RequestError(Internal error)'; operators become literal argv entries. Reproduced in 10 of 10 independent runs on 1.3.5.",
+  "reference_attempts": [
+    "1c3f91d0f57d44daa0c49e70c314492f",
+    "4d10af54c2354befb9c3651ebfe36741"
+  ],
+  "provenance": {
+    "issue_url": "https://github.com/mistralai/mistral-vibe/issues/186",
+    "issue_state": "closed",
+    "source_revision": "79f215d91cf8ca7c8970d9d81470b76199fecc43",
+    "agent_version": "historical release 1.3.5 (fixed in a later release); the unit's install input was re-pinned to this release for the reproduction runs, which is not part of this PR",
+    "case_origin": "custom (frozen Case written from the issue text)",
+    "case_content_sha256": "b0c0744b46b4627e628a6a795c45c997a3e7cebec393e078a3aa9c53013092fc",
+    "reproduction": "10 of 10 valid independent ABB executions (fresh Suite and container each)",
+    "model": "deepseek/deepseek-chat",
+    "evidence_scope": "Complete native ABB attempt directories; see reproduction.json for all runs."
+  }
+}

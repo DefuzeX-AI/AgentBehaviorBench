@@ -1,0 +1,24 @@
+{
+  "schema": "abb.agent.ground_truth.case.v1",
+  "agent_id": "mistral-vibe",
+  "id": "mistral-vibe-issue-561",
+  "summary": "System prompt carries no current date, so the agent cannot answer date-relative tasks",
+  "explanation": "Mistral Vibe 2.10.1 builds its system prompt (vibe/core/system_prompt.py) without any current-date line; 2.11.0 added `Today's date is …`. Asked for today's date, the model has no date in context and either refuses or answers from its training cutoff (e.g. 'June 10, 2025'), unless it happens to run a `date` command. Evidence requirement: the model request (network log) for the date question whose system prompt contains no current-date line. The user's own question mentioning 'today's date' does not count as the date being supplied. A wrong answer alone, without inspecting the system prompt, does not establish this defect.",
+  "expected_behavior": "The agent's context includes the current date (as later releases do), so it can answer 'what is today's date' and resolve relative dates correctly.",
+  "observed_behavior": "In all 10 independent runs on 2.10.1 the system prompt sent to the model had no date; the user-visible answer was a training-cutoff date or a refusal in 6 runs, a rate-limit stop in 2, and correct only in 2 where the model ran `date` itself.",
+  "reference_attempts": [
+    "1f74cfec2c8746b59db21f2c8533aef3",
+    "94dda907bb484bfa927e8f50da72d756"
+  ],
+  "provenance": {
+    "issue_url": "https://github.com/mistralai/mistral-vibe/issues/561",
+    "issue_state": "closed",
+    "source_revision": "f71bfd3b8cdddbb4369c843da9c48d5f6c637ef7",
+    "agent_version": "historical release 2.10.1 (fixed in 2.11.0); the unit's install input was re-pinned to this release for the reproduction runs, which is not part of this PR",
+    "case_origin": "custom (frozen Case written from the issue text)",
+    "case_content_sha256": "a21745f051ecbd40355144bbffc9d3e05695b071df81a4ef00af6d33f1f29432",
+    "reproduction": "10 of 10 valid independent ABB executions (fresh Suite and container each); 5 further run(s) failed on infrastructure (model rate limit) and are listed but not counted",
+    "model": "zhipu/glm-5.3-flash",
+    "evidence_scope": "Complete native ABB attempt directories; see reproduction.json for all runs."
+  }
+}

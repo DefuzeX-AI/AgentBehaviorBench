@@ -1,0 +1,107 @@
+{
+  "case_id": "ir-mistral-vibe-259-v1",
+  "content_sha256": "76dda74919d797ba1b2d77ee536cc42d9e325631315005e2866a1b0aa8e628e3",
+  "version": "historical:1.3.5",
+  "source_revision": "79f215d91cf8ca7c8970d9d81470b76199fecc43",
+  "model": "zhipu/glm-5.3-flash",
+  "rate": "9/10",
+  "infra_runs": 1,
+  "hit_rule": {
+    "description": "Hit = the agent attempted a piped command (walked the path) and the tool result sent back to the model shows the pipe passed as a literal argument (e.g. `ls: cannot access '|'`, `find: paths must precede expression: `|'`, `'|': No such file`).",
+    "all": [
+      {
+        "source": "trace",
+        "op": "regex",
+        "value": "\\|\\s*grep"
+      },
+      {
+        "source": "network",
+        "op": "regex",
+        "value": "(cannot access '\\||'\\|': No such file|precede expression: .\\|'|unknown predicate .\\|'|ls: invalid option -- )"
+      }
+    ]
+  },
+  "runs": [
+    {
+      "run_id": "5ebc629636344370a260d351f30bb6e7",
+      "suite": "suite_6accb0f33a384403abce26af574deb5a",
+      "manual": "hit",
+      "evidence": "step 2 tool result (logs/network.jsonl / acp tool_call_update): 'ls projects/wiki | grep -E \"i18n|locale|translation\"' -> \"ls: invalid option -- 'E'\" (grep's -E handed to ls); then sh -c '…' wrapper succeeded",
+      "judge": "pass"
+    },
+    {
+      "run_id": "f593809b9aad49cbbda2ed57332f9775",
+      "suite": "suite_13276bfd7b7c4ccb8812747ddff470aa",
+      "manual": "hit",
+      "evidence": "step 2 tool result (logs/network.jsonl / acp tool_call_update): 'ls projects/wiki | grep -E …' -> \"ls: invalid option -- 'E'\"; 'ls projects/wiki | grep locale' -> \"ls: cannot access '|': No such file or directory\\nls: cannot access 'grep'\"",
+      "judge": "pass"
+    },
+    {
+      "run_id": "5ce6c022fb554cb0b6a062cb1d367e64",
+      "suite": "suite_1591732d79884088b6e762f463ae98ec",
+      "manual": "hit",
+      "evidence": "step 2 tool result (logs/network.jsonl / acp tool_call_update): 'ls … | grep -E …' -> \"ls: invalid option -- 'E'\"; 'echo hello | tr a-z A-Z' -> stdout 'hello | tr a-z A-Z'; 'ls projects/wiki | wc -l' -> \"ls: cannot access '|'\"",
+      "judge": "pass"
+    },
+    {
+      "run_id": "671fcfeb942d426da32834b538136906",
+      "suite": "suite_8c5efb3bcb0e4f4eb85c980bbd8c2aa7",
+      "manual": "not_reached",
+      "evidence": "step 2 never ran a tool: prompt_completed stopReason=refusal, agent text 'API error from abb (model: glm-5.3-flash): Rate limit exceeded' (HTTP 429). Step 1 does show the same no-shell mechanism (dirs named '&&' and 'touch' created; \"printf: warning: ignoring excess arguments, starting with '>'\") but the pipe path was not reached",
+      "judge": "insufficient_evidence"
+    },
+    {
+      "run_id": "f2f997fcdf314064b08bbfafec31ea68",
+      "suite": "suite_e88ccc3a16994e9888cd8aeac3baf232",
+      "manual": "hit",
+      "evidence": "step 2 tool result (logs/network.jsonl / acp tool_call_update): 'ls -A projects/wiki | grep -E …' -> \"ls: invalid option -- 'E'\"; 'ls -A projects/wiki | grep translation' -> \"ls: cannot access '|': No such file or directory\"",
+      "judge": "pass"
+    },
+    {
+      "run_id": "d8a93734d7ac4f7d8b2b0ad8d2d10655",
+      "suite": "suite_1fbe9021dc6a45c99d6574e9e640126d",
+      "manual": "hit",
+      "evidence": "step 2 tool result (logs/network.jsonl / acp tool_call_update): \"ls projects/wiki | grep -E 'i18n|locale|translation'\" -> \"ls: invalid option -- 'E'\"",
+      "judge": "issue"
+    },
+    {
+      "run_id": "ffa1422a881f4044b608bcbeabbeaaee",
+      "suite": "suite_f5ce07eca27c4f66ac22bf397b7fd866",
+      "manual": "infra",
+      "evidence": "zhipu HTTP 429 rate limit on every model call; excluded (p382 infra)",
+      "judge": "issue"
+    },
+    {
+      "run_id": "f6f127724605476fafa101fff10646fe",
+      "suite": "suite_f2c6b699a9d34099b58373945af2d018",
+      "manual": "hit",
+      "evidence": "step 2 tool result (logs/network.jsonl / acp tool_call_update): 'ls -1 projects/wiki | grep -E …' -> \"ls: invalid option -- 'E'\"; 'echo hello | grep hello' -> stdout 'hello | grep hello'",
+      "judge": "pass"
+    },
+    {
+      "run_id": "92c10450e5c340b18c817e6abdc7b945",
+      "suite": "suite_be67511e81af470f89d8bb0a13074ba1",
+      "manual": "hit",
+      "evidence": "step 2 tool result (logs/network.jsonl / acp tool_call_update): 'ls -1 projects/wiki | grep -Ei …' -> \"ls: invalid option -- 'E'\"; 'echo hello | tr a-z A-Z' -> 'hello | tr a-z A-Z'",
+      "judge": "issue"
+    },
+    {
+      "run_id": "61a02f42ed244a10852c9d522a485f9d",
+      "suite": "suite_4fe7368869dd4ffba52a674e411bcb34",
+      "manual": "hit",
+      "evidence": "step 2 tool result (logs/network.jsonl / acp tool_call_update): 'ls -1 projects/wiki | grep -E …' -> \"ls: invalid option -- 'E'\"; 'echo pipe-test | cat' -> stdout 'pipe-test | cat'",
+      "judge": "issue"
+    },
+    {
+      "run_id": "9d1449a9e08f4789a70f01056f1dfd21",
+      "suite": "suite_9d98e2e18aa247228f7d262270d384f0",
+      "manual": "hit",
+      "evidence": "step 2 tool result (logs/network.jsonl / acp tool_call_update): 'ls projects/wiki | grep -E …' -> \"ls: invalid option -- 'E'\"; 'ls projects/wiki | head -n 2' -> \"ls: cannot access '|': No such file or directory\\nls: cannot access 'head'\"",
+      "judge": "pass"
+    }
+  ],
+  "steps": [
+    "Create a fixture directory with a few files: `mkdir -p projects/wiki && touch projects/wiki/i18n.json projects/wiki/locale.md projects/wiki/readme.txt projects/wiki/translation.yml`.",
+    "List the files under projects/wiki and keep only the ones whose names contain i18n, locale or translation, using a single piped shell command."
+  ]
+}
