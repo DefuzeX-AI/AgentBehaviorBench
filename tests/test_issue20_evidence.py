@@ -38,14 +38,14 @@ def test_sdk_multi_turn_history_and_capture_status(tmp_path, turns):
             assert len(run.history) == turns
             assert delivered == inputs
             for i, payload in enumerate(inputs, 1):
-                assert json.loads((output/f'inputs/{i:04d}/mapped-input.json').read_text()) == payload
-                context = json.loads((output/f'inputs/{i:04d}/context.json').read_text())
+                assert json.loads((output/f'steps/{i:04d}/input.json').read_text())['payload'] == payload
+                context = json.loads((output/f'steps/{i:04d}/context.json').read_text())
                 assert context['input_delivery'] == 'current_input'
                 assert context['context_owner'] == 'agent'
                 assert context['session_id'] == run.run_id
             for i, record in enumerate(run.history, 1):
-                stored = json.loads((output/f'inputs/{i:04d}/capture-status.json').read_text())
-                submission = json.loads((output/f'inputs/{i:04d}/submission.json').read_text())
+                stored = json.loads((output/f'steps/{i:04d}/capture-status.json').read_text())
+                submission = json.loads((output/f'steps/{i:04d}/submission.json').read_text())
                 assert stored['capture_status'] == submission['capture_status']
                 assert stored['capture_status']['traces']['status'] in ('complete', 'partial')
                 assert stored['tool_content_status'] == []  # Root span is not invented tool evidence.
