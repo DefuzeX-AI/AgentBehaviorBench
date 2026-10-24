@@ -11,10 +11,10 @@ def test_registry_contains_docsentinel():
     assert docsentinel["status"] == "adapting"
     assert docsentinel["enabled"] is False
     assert docsentinel["framework"] == "langgraph"
-    assert docsentinel["path"] == "resources/agents/95-docsentinel"
+    assert docsentinel["path"] == "resources/agents/103-docsentinel"
 
 def test_agent_toml_structure():
-    agent_toml_path = Path("resources/agents/95-docsentinel/agent.toml")
+    agent_toml_path = Path("resources/agents/103-docsentinel/agent.toml")
     assert agent_toml_path.exists()
     data = tomllib.loads(agent_toml_path.read_text())
     assert data["schema_version"] == "defuzex-bench.agent.v2"
@@ -28,7 +28,7 @@ def test_agent_toml_structure():
     assert len(data["llm_interception"]["routes"]) > 0
 
 def test_source_manifest():
-    manifest_path = Path("resources/agents/95-docsentinel/source-manifest.json")
+    manifest_path = Path("resources/agents/103-docsentinel/source-manifest.json")
     assert manifest_path.exists()
     import json
     data = json.loads(manifest_path.read_text())
