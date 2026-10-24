@@ -1,0 +1,54 @@
+# Manual completion of the BBA-generated configuration facts.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "alphastream"
+display_name = "AlphaStream — Multi-Agent Stock Analysis"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+method = "git"
+repository = "https://github.com/lc2panda/alphastream"
+revision = "abc3398c49ac2ad0ff3be34ca787b03c67004ead"
+downloaded_on = "2026-10-24"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+# Technical + fundamental + capital flow (parallel) + sentiment analysts,
+# then a decision node; multi-agent LLM calls, 1800s is required.
+timeout_sec = 1800
+env_keys = ["LLM_MODEL"]
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "langgraph"
+mode = "in_process"
+input_key = "input"
+binding = "alphastream_bridge.py:create_graph"
+
+[llm_interception]
+trust_plugin = "pem-env"
+tool_routes = []
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
