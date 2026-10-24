@@ -76,5 +76,5 @@ lines only. `acceptance-summary.json` is a contributor index with file hashes,
 counts, prerequisites and limitations. Full ACP/model traces and private native
 state are deliberately absent from Git.
 
-See the [unit README](../../../resources/agents/77-autohand/README.md) for the
+See the [unit README](../../../resources/agents/80-autohand/README.md) for the
 execution command, credential setup and deployment boundaries.

@@ -7,7 +7,7 @@ import stat
 
 import pytest
 
-LAUNCHER = Path(__file__).resolve().parents[1] / "resources/agents/77-autohand/bootstrap/launch.py"
+LAUNCHER = Path(__file__).resolve().parents[1] / "resources/agents/80-autohand/bootstrap/launch.py"
 spec = importlib.util.spec_from_file_location("autohand_launch", LAUNCHER)
 launch = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(launch)
