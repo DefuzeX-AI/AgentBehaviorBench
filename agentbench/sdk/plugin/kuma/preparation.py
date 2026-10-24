@@ -17,7 +17,7 @@ from .generation_failures import SHARED_GENERATION_BLOCKS
 def _case_files(directory):
     """Name saved Case files even when their content cannot be read."""
     try:
-        names = sorted(path.name for path in (directory / 'evaluation/cases').glob('*.json'))
+        names = sorted(path.name for path in (directory / 'cases').glob('*.json'))
     except OSError:
         return 'unknown'
     return ', '.join(names) or 'none'
@@ -75,21 +75,21 @@ def prepare_batch(runner, registration, *, evaluator, case_indices=None,
             collection = json.loads(runner.case_collection.read_text())
             validate_collection(collection, count=count)
             source_cases = runner.case_collection.resolve().parent / 'cases'
-            target_cases = directory / 'evaluation/cases'
+            target_cases = directory / 'cases'
             target_cases.mkdir(parents=True)
             for entry in collection['cases']:
                 runner.control.check()
                 source = collection_artifact(source_cases, entry['artifact'])
                 shutil.copyfile(source, target_cases / source.name)
-            files.save('evaluation/case-collection.json', collection)
+            files.save('case-collection.json', collection)
         else:
-            collection = read_diagnostic(directory, 'evaluation/case-collection.json')
+            collection = read_diagnostic(directory, 'case-collection.json')
             if not collection:
                 # An unreadable collection is not a failed generation: the Cases may
                 # already be generated and billed. Say so instead of discarding them.
                 # The artifact detail appended by evaluation_failure names the file,
                 # its owner and its mode.
-                if unreadable_reason(directory, 'evaluation/case-collection.json') is not None:
+                if unreadable_reason(directory, 'case-collection.json') is not None:
                     raise evaluation_failure(
                         directory, 'Case batch was written but the host cannot read it; '
                         f'generated Case files on disk: {_case_files(directory)}',
@@ -103,7 +103,7 @@ def prepare_batch(runner, registration, *, evaluator, case_indices=None,
                                    primary_error=primary_error)
         accepted = len(batch.cases)
         complete = accepted == len(indices)
-        files.save('evaluation/batch-selection.json', {
+        files.save('batch-selection.json', {
             'requested_count': count, 'selected_case_indices': indices,
             'accepted_count': accepted, 'status': 'accepted' if complete else 'partial',
             'failures': batch.failures, 'unattempted_indices': batch.unattempted_indices})
@@ -114,7 +114,7 @@ def prepare_batch(runner, registration, *, evaluator, case_indices=None,
                                'validation': 'succeeded' if complete else 'partial'})
         return batch
     except Exception as exc:
-        files.save('evaluation/batch-selection.json', {
+        files.save('batch-selection.json', {
             'requested_count': count, 'accepted_count': 0, 'status': 'rejected', 'error': str(exc)})
         status = read_diagnostic(directory, 'run.json')
         files.save('run.json', {**status, 'status': 'cancelled' if runner.control.cancelled else 'failed',

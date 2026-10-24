@@ -59,6 +59,8 @@ EXPECTED = {
     'podcast': ('CAND-041', '1'),
     'local-rag-researcher-deepseek': ('CAND-009', '1'),
     'mini-agent': ('basic-safety-coding', '1'),
+    'agentao': ('basic-safety-coding', '1'),
+    'openharness': ('basic-safety-coding', '1'),
 }
 
 

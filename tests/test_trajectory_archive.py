@@ -1,74 +1,30 @@
+"""Historical archives remain readable; new runs have no archive writer."""
+import hashlib
 import json
-from pathlib import Path
-
 import pytest
-
-from agentbench.observe.archive import artifact_file, compact_trajectory, restore_archive
-from agentbench.observe.view_api import RunViewAPI
+from agentbench.observe.artifact_paths import artifact_file
 from agentbench.sdk.common.artifacts import Artifacts
 
 
-def saved_run(tmp_path):
-    root = tmp_path / 'cases/case-one/trajectory/one'
-    files = Artifacts(root)
-    files.save('run.json', {'agent_id': 'alpha', 'run_id': 'one', 'case_id': 'c',
-        'status': 'succeeded', 'cleanup_status': 'succeeded', 'host_trace_validation': 'succeeded'})
-    files.save('evaluation/manifest.json', {'judge': 'received', 'steps': [{'directory': 'inputs/0001'}]})
-    files.save('evaluation/judge/report.json', {'status': 'issue'})
-    case = {'case_id': 'c', 'inputs': [{'input_id': 'i', 'payload': 'hello'}]}
-    Artifacts(root.parent.parent).save('case.json', {'case': case})
-    files.save('evaluation/case.json', case)
-    submission = {'output': 'answer', 'extensions': {'trace_evidence': {'spans': ['test']}}}
-    files.save('evaluation/inputs/0001/input.json', case['inputs'][0])
-    files.save('evaluation/inputs/0001/mapped-input.json', 'hello')
-    files.save('evaluation/inputs/0001/submission.json', submission)
-    files.save('evaluation/inputs/0001/result.json', {'output': 'answer'})
-    files.save('evaluation/inputs/0001/evidence.json', submission['extensions']['trace_evidence'])
-    files.save('evaluation/inputs/0001/otel-status.json', {'status': 'complete'})
-    files.save('evaluation/inputs/0001/otel-payloads/a.json', {'text': 'hello'})
-    files.save('evaluation/inputs/0001/otel-payloads/b.json', {'text': 'hello'})
-    files.save('evaluation/judge/context.json', {'case': case, 'history': [
-        {'test_input': case['inputs'][0], 'submission': submission}], 'run_status': 'completed'})
-    files.save('channel/response/00000000/result.json', {'output': 'answer'})
-    return root
-
-
-def test_archive_roundtrip_preserves_every_evidence_byte_and_reader(tmp_path):
-    root = saved_run(tmp_path)
-    originals = {p.relative_to(root).as_posix(): p.read_bytes() for p in root.rglob('*')
-                 if p.is_file() and 'channel' not in p.parts}
-    compact_trajectory(root)
-    assert not (root / 'channel').exists()
-    assert not (root / 'evaluation').exists()
-    assert (root / 'steps/0001/result.json').is_file()
-    assert len(list((root / 'blobs').iterdir())) == 1
-    api = RunViewAPI(root)
-    assert api.outputs() == ['evaluation/inputs/0001']
-    assert api.evaluation()['judge']['status'] == 'issue'
-    for name, raw in originals.items():
-        assert artifact_file(root, name).read_bytes() == raw, name
-    assert json.loads((root / 'judge/context.json').read_bytes())['references']
-    restore_archive(root)
-    for name, raw in originals.items():
-        assert (root / name).read_bytes() == raw
-
-
-def test_archive_detects_tampered_payload_and_reference_escape(tmp_path):
-    root = saved_run(tmp_path)
-    compact_trajectory(root)
-    next((root / 'blobs').iterdir()).write_bytes(b'changed')
+def test_historical_archive_reads_exact_bytes_without_recreating_files(tmp_path):
+    root = tmp_path / 'trajectory/old'
+    raw = b'{"output": "retained"}'
+    blob = root / 'blobs/payload'
+    blob.parent.mkdir(parents=True)
+    blob.write_bytes(raw)
+    (root / 'manifest.json').write_text(json.dumps({
+        'schema': 'abb.trajectory.v1', 'documents': {}, 'files': {
+            'evaluation/inputs/0001/result.json': {
+                'path': 'blobs/payload', 'size': len(raw),
+                'sha256': hashlib.sha256(raw).hexdigest()}}}))
+    before = {p.relative_to(root): p.read_bytes() for p in root.rglob('*') if p.is_file()}
+    assert artifact_file(root, 'steps/0001/result.json').read_bytes() == raw
+    assert {p.relative_to(root): p.read_bytes() for p in root.rglob('*') if p.is_file()} == before
+    blob.write_bytes(b'corrupt')
     with pytest.raises(ValueError, match='digest mismatch'):
-        artifact_file(root, 'evaluation/inputs/0001/otel-payloads/a.json').read_bytes()
+        artifact_file(root, 'steps/0001/result.json').read_bytes()
     with pytest.raises(ValueError, match='leaves'):
-        artifact_file(root, '../../outside')
-
-
-def test_incomplete_execution_keeps_transport_for_recovery(tmp_path):
-    root = saved_run(tmp_path)
-    (root / 'evaluation/judge/report.json').unlink()
-    compact_trajectory(root)
-    assert (root / 'channel/response/00000000/result.json').exists()
-    assert not (root / 'manifest.json').exists()
+        artifact_file(root, '../outside')
 
 
 def test_suite_records_are_references_and_case_slots_do_not_alias(tmp_path):
@@ -107,28 +63,3 @@ def test_managed_gt_results_live_with_agent_and_suite_only_references(tmp_path, 
     def forbidden(*args, **kwargs):
         raise AssertionError('Saved evaluation must be reused')
     assert run(forbidden)['cache_reused']
-
-
-def test_sdk_ledgers_are_flattened_and_failed_archive_can_retry(tmp_path, monkeypatch):
-    from agentbench.observe import archive
-    root = saved_run(tmp_path)
-    ledger = 'sdk-repo/.kuma/runs/run_0123456789abcdef/submissions/step-0000.json'
-    Artifacts(root).save(ledger, {'submission_id': 'original-remote-request'})
-    original = (root / ledger).read_bytes()
-    write = archive.atomic_bytes
-    failed = False
-    def fail_once(path, data):
-        nonlocal failed
-        if 'sdk-state' in path.parts and not failed:
-            failed = True
-            raise OSError('Simulated archive write failure')
-        return write(path, data)
-    monkeypatch.setattr(archive, 'atomic_bytes', fail_once)
-    with pytest.raises(OSError, match='archive write failure'):
-        compact_trajectory(root)
-    assert (root / ledger).read_bytes() == original
-    assert not (root / 'manifest.json').exists()
-    compact_trajectory(root)
-    assert artifact_file(root, ledger).read_bytes() == original
-    assert len(list((root / 'sdk-state').glob('*.json'))) == 1
-    assert not (root / '.archive-pending.json').exists()

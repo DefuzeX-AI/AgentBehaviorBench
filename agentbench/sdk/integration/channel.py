@@ -53,7 +53,11 @@ def collect_response(source, destination, *, limits=None):
                                 if total > limits.max_bytes:
                                     raise byte_limit()
                                 stream.write(block)
-                        temporary.replace(target)
+                        if current.parts[0] == 'otel-payloads':
+                            from agentbench.observe.payloads import publish_payload
+                            publish_payload(temporary, target, destination)
+                        else:
+                            temporary.replace(target)
                     finally:
                         temporary.unlink(missing_ok=True)
                 else:
@@ -142,9 +146,7 @@ class DirectoryAgentSession:
     async def aclose(self):
         if not self.closed:
             self.closed = True
-            # A valid adapter shutdown may outlast the former ten-second channel cap.
-            # Keep the wait finite and respect a shorter declared runtime timeout.
-            await self._exchange({'operation': 'close'}, min(60, self.timeout))
+            await self._exchange({'operation': 'close'}, min(10, self.timeout))
 
     def snapshot(self):
         return dict(self.state)

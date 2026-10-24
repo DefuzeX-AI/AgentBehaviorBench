@@ -20,7 +20,7 @@ def result_path(directory, relative=''):
             or path.is_absolute() or '..' in path.parts
             or (relative and path.as_posix() != relative)):
         raise ValueError('Invalid result path')
-    from .archive import archive_manifest, artifact_file
+    from .artifact_paths import archive_manifest, artifact_file
     archived = archive_manifest(root)
     if archived and relative in archived['files']:
         return artifact_file(root, relative)
