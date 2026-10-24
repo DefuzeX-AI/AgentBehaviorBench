@@ -38,4 +38,4 @@ maintainer acceptance remain separate from this successful Local Smoke.
 
 ## Registry path synchronization
 
-After synchronization with main `962fcac6`, the current unit is `resources/agents/77-blade-code/` (previously `73-blade-code`). The directory number was already occupied by a merged Agent. Only its registry path, test references and this documentation changed. Original acceptance JSON, tool-event excerpts, hashes and recorded historical paths remain unchanged; no new Agent/model execution is claimed.
+The unit moved from `73-blade-code` to `77-blade-code` when synchronizing with main `962fcac6`. The revision for the maintainer's verification-failure feedback uses `resources/agents/88-blade-code/`; main `0ef4257b` already contains fast-agent at 86 and pi-go at 87. Original acceptance JSON, tool-event excerpts, hashes and recorded historical paths remain unchanged. The relocation itself does not establish a new Agent/model execution.

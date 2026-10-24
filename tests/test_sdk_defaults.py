@@ -180,7 +180,7 @@ def test_sdk_cleanup_failure_is_retained_without_hiding_judge_error(tmp_path, mo
     monkeypatch.setattr(worker, 'load_factory', lambda ref: failing_close)
     with pytest.raises(RuntimeError, match='original Judge error' if judge_fails else 'SDK close failed'):
         runner.run_case(unit, case)
-    error = json.loads((runner.directory / 'evaluation/error.json').read_bytes())
+    error = json.loads((runner.directory / 'error.json').read_bytes())
     if judge_fails:
         assert error['sdk_cleanup_error'] == 'SDK close failed'
     assert all(process.closed for process in processes)
@@ -227,7 +227,7 @@ def test_partial_generation_keeps_published_case_and_does_not_retry_failed_reque
         runner.prepare_cases(unit)
     assert published.read_bytes() == original
     assert factory.generated == [0]
-    error = json.loads((runner.directory / 'evaluation/error.json').read_bytes())
+    error = json.loads((runner.directory / 'error.json').read_bytes())
     assert 'reconcile' in error['error']
 
 
@@ -261,7 +261,7 @@ def test_judge_error_preserves_steps_and_closes_sdk_and_agent(tmp_path, monkeypa
     monkeypatch.setattr(worker, 'load_factory', lambda ref: unavailable)
     with pytest.raises(RuntimeError, match='failed'):
         runner.run_case(unit, case)
-    error = json.loads((runner.directory / 'evaluation/error.json').read_bytes())
+    error = json.loads((runner.directory / 'error.json').read_bytes())
     assert error['phase'] == 'judge' and all(step['submitted'] for step in error['steps'])
     assert factory.runs[-1].judged == 1 and factory.runs[-1].closed
     assert agent.closed and all(p.closed for p in processes)
@@ -327,9 +327,9 @@ def test_loading_case_cannot_regenerate_a_different_case(tmp_path, monkeypatch, 
 
 
 @pytest.mark.parametrize('artifact,change', [
-    ('inputs/0001/submission.json', lambda d: d.update(input_id='another')),
-    ('inputs/0001/request.json', lambda d: d.update(input='different input')),
-    ('inputs/0001/result.json', lambda d: d.update(run_id='wrong invocation')),
+    ('steps/0001/submission.json', lambda d: d.update(input_id='another')),
+    ('steps/0001/request.json', lambda d: d.update(input='different input')),
+    ('steps/0001/result.json', lambda d: d.update(run_id='wrong invocation')),
     ('case.json', lambda d: d['case'].update(case_id='different Case')),
     ('manifest.json', lambda d: d.update(case_id='different Case')),
 ])
@@ -337,7 +337,7 @@ def test_host_rejects_mismatched_saved_evidence(tmp_path, monkeypatch, factory, 
     runner, _ = make_runner(tmp_path, unit, monkeypatch)
     case = runner.prepare_cases(unit)[0]
     runner.run_case(unit, case)
-    path = runner.directory / 'evaluation' / artifact
+    path = runner.directory / artifact
     value = json.loads(path.read_bytes())
     change(value)
     path.write_text(json.dumps(value))
@@ -402,8 +402,8 @@ def test_default_sdk_real_containers(tmp_path, monkeypatch):
         assert [step.payload for step in result.steps] == ['first', 'first:1']
         assert [step.invocation.output for step in result.steps] == ['first:1', 'first:1:2']
         assert cases[0].artifact_path.is_file()
-        assert json.loads((runner.directory / 'evaluation/session.json').read_bytes())['invocations'] == 2
-        assert json.loads((runner.directory / 'evaluation/session.json').read_bytes())['closed'] is True
+        assert json.loads((runner.directory / 'session.json').read_bytes())['invocations'] == 2
+        assert json.loads((runner.directory / 'session.json').read_bytes())['closed'] is True
         assert json.loads((runner.directory / 'run.json').read_bytes())['cleanup_status'] == 'succeeded'
         print('Default SDK acceptance:', runner.directory)
     finally:

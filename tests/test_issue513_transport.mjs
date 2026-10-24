@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
-import { createCompatibility } from '../resources/agents/77-blade-code/bootstrap/acp-compat.mjs';
+import { createCompatibility } from '../resources/agents/88-blade-code/bootstrap/acp-compat.mjs';
 
 function fixture(t) {
   const temporary = mkdtempSync(path.join(os.tmpdir(), 'abb-blade-acp-'));
@@ -98,4 +98,73 @@ test('symlink escape cannot authorize missing-file error normalization', (t) => 
   symlinkSync(path.join(workspace, 'inside'), path.join(workspace, 'safe'), 'dir');
   const safe = fileError(bridge, path.join(workspace, 'safe', 'missing.txt'));
   assert.equal(JSON.parse(safe.normalized).error.code, -32002);
+});
+
+function prompt(bridge, id = 81, sessionId = 'native-session') {
+  const frame = JSON.stringify({ jsonrpc: '2.0', id, method: 'session/prompt',
+    params: { sessionId, prompt: [{ type: 'text', text: 'Implement and verify the task.' }] } });
+  assert.equal(bridge.fromClient(frame), frame);
+}
+
+function verificationError(id = 81, overrides = {}) {
+  return { jsonrpc: '2.0', id, error: { code: -32603,
+    message: 'Agent turn failed (verification_failed)',
+    data: { failureType: 'verification_failed', modelId: 'abb-model',
+      outputStarted: true, toolExecutionStarted: true, toolCallsCount: 18,
+      taskFailure: { message: 'Independent verification did not produce a fresh PASS before the retry limit.' } },
+    ...overrides } };
+}
+
+test('typed native verification failure becomes an explicit refusal with original error', (t) => {
+  const { bridge } = fixture(t);
+  prompt(bridge);
+  const streamed = '{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"native-session","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Native answer already streamed."}}}}';
+  assert.equal(bridge.fromAgent(streamed), streamed);
+  const original = verificationError();
+  const frames = bridge.fromAgent(JSON.stringify(original)).split('\n').map(JSON.parse);
+  assert.equal(frames.length, 2);
+  assert.equal(frames[0].method, 'session/update');
+  assert.equal(frames[0].params.sessionId, 'native-session');
+  assert.match(frames[0].params.update.content.text, /ABB adapter diagnostic: verification_failed/);
+  assert.match(frames[0].params.update.content.text, /not a verification PASS/);
+  assert.equal(frames[1].id, original.id);
+  assert.equal(frames[1].result.stopReason, 'refusal');
+  assert.deepEqual(frames[1].result._meta['abb/verificationFailure'], {
+    status: 'failed', nativeVerificationEnabled: true, nativeError: original.error,
+  });
+  const repeated = JSON.stringify(original);
+  assert.equal(bridge.fromAgent(repeated), repeated);
+});
+
+test('successful prompts and unrelated RPC failures retain their original envelopes', (t) => {
+  const { bridge } = fixture(t);
+  for (const overrides of [
+    { code: -32000 },
+    { message: 'Different failure' },
+    { data: { failureType: 'provider_error' } },
+    { data: { failureType: 'goal_verification_failed' } },
+    { data: { failureType: 'loop_detected' } },
+  ]) {
+    prompt(bridge);
+    const frame = JSON.stringify(verificationError(81, overrides));
+    assert.equal(bridge.fromAgent(frame), frame);
+  }
+  prompt(bridge);
+  const success = '{"jsonrpc":"2.0","id":81,"result":{"stopReason":"end_turn","_meta":{"native":"kept"}}}';
+  assert.equal(bridge.fromAgent(success), success);
+  const late = JSON.stringify(verificationError());
+  assert.equal(bridge.fromAgent(late), late);
+});
+
+test('verification diagnostics require a known prompt and stay with its session', (t) => {
+  const { bridge } = fixture(t);
+  const unknown = JSON.stringify(verificationError(999));
+  assert.equal(bridge.fromAgent(unknown), unknown);
+  prompt(bridge, 'first', 'session-a');
+  prompt(bridge, 'second', 'session-b');
+  for (const [id, sessionId] of [['second', 'session-b'], ['first', 'session-a']]) {
+    const frames = bridge.fromAgent(JSON.stringify(verificationError(id))).split('\n').map(JSON.parse);
+    assert.equal(frames[0].params.sessionId, sessionId);
+    assert.equal(frames[1].id, id);
+  }
 });
