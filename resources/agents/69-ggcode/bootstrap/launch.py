@@ -134,8 +134,24 @@ class PromptCompletion:
         return line
 
 
+# Stop reasons ACP allows in a session/prompt result.
+ACP_STOP_REASONS = frozenset({"end_turn", "max_tokens", "max_turn_requests", "refusal", "cancelled"})
+
+
 def _stop_reply(request_id: object, stop: str) -> bytes:
-    reply = {"jsonrpc": "2.0", "id": request_id, "result": {"stopReason": stop}}
+    """Answer session/prompt with `stop`, or with a JSON-RPC error for a non-ACP value.
+
+    ggcode reports `"error"` when its agent loop returns an error (handler.go
+    handleSessionPrompt); that is not an ACP stop reason, so the turn fails as a
+    request error instead of an invalid result.
+    """
+    if stop in ACP_STOP_REASONS:
+        reply = {"jsonrpc": "2.0", "id": request_id, "result": {"stopReason": stop}}
+    else:
+        reply = {"jsonrpc": "2.0", "id": request_id, "error": {
+            "code": -32603,
+            "message": f"ggcode ended the turn with stopReason {stop!r} (agent loop error)",
+        }}
     return json.dumps(reply, separators=(",", ":")).encode() + b"\n"
 
 

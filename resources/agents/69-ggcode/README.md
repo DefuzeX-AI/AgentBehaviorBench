@@ -34,7 +34,9 @@ The launcher runs ggcode as a child and relays ACP stdio, adapting two things:
   notification (`internal/acp/handler.go`, `handleSessionPrompt`). An ACP client treats
   the first reply as the end of the turn, so the relay holds it and answers the request
   with the stop reason from the matching `prompt_complete` (empty becomes `end_turn`).
-  Error replies pass through unchanged.
+  When ggcode's agent loop fails it reports `stopReason: "error"`, which is not an ACP
+  stop reason; the relay answers that request with a JSON-RPC internal error (`-32603`)
+  instead of an invalid result. Error replies pass through unchanged.
 - **Workspace cleanup.** ggcode keeps project state in `<workspace>/.ggcode/` (memory,
   trajectory learnings, perf baseline) and creates those directories with an explicit
   `0755`, which `umask 0` cannot widen. ABB removes the Case workspace from the host after
