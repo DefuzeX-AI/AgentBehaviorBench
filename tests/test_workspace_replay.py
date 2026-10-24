@@ -216,7 +216,7 @@ def test_replay_is_outside_kuma_mount_and_submission(tmp_path):
         return {'schema': 'abb.result.v1', 'agent_id': 'fixture-agent', 'run_id': folder.name,
                 'status': 'succeeded', 'output': 'blue'}
     try:
-        summary = asyncio.run(drive_run(run, invoke, archive.parent / 'evaluation', provider=provider,
+        summary = asyncio.run(drive_run(run, invoke, archive.parent, provider=provider,
             repo_path=repo, file_evidence_required=True))
         assert summary['judge'] == 'received'
     finally:
