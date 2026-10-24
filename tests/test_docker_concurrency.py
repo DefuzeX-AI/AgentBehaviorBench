@@ -324,14 +324,17 @@ def test_creation_cancel_race_cleans_planned_names_and_retains_cleanup_failure(f
         if "rm" in args:
             assert kwargs["cleanup"] is True
             assert kwargs["deadline"].remaining() >= 0
-    assert any(args[:2] == ["network", "rm"] for args, _ in calls)
     if cleanup_fails:
+        assert any(args[:2] == ["network", "rm"] for args, _ in calls)
         assert any(item["status"] == "cleanup_failed" for item in resources)
         with pytest.raises(DockerCleanupError):
             services.close()
     else:
-        assert all(item["status"] == "removed" for item in resources)
+        # A cleanly released network returns to the Suite pool until close().
+        assert not any(args[:2] == ["network", "rm"] for args, _ in calls)
         services.close()
+        assert any(args[:2] == ["network", "rm"] for args, _ in calls)
+        assert all(item["status"] == "removed" for item in services.resource_registry.snapshot())
 
 
 def test_runtime_services_share_builds_but_not_sessions_or_environment():
