@@ -26,7 +26,7 @@ def test_profile_is_private_and_cleanup_preserves_native_callbacks(tmp_path, mon
     monkeypatch.setitem(sys.modules, 'tablegpt', SimpleNamespace(DEFAULT_TABLEGPT_IPYKERNEL_PROFILE_DIR=source))
     monkeypatch.setitem(sys.modules, 'tablegpt.agent', SimpleNamespace(create_tablegpt_graph=lambda **_: Graph()))
     monkeypatch.setitem(sys.modules, 'langchain_core.messages', SimpleNamespace(HumanMessage=lambda **_: object()))
-    path = Path(__file__).resolve().parents[1] / 'resources/agents/11-tablegpt-agent/bindings/bridge.py'
+    path = Path(__file__).resolve().parents[1] / 'resources/agents/08-tablegpt-agent/bindings/bridge.py'
     spec = importlib.util.spec_from_file_location('tablegpt_binding_fixture', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

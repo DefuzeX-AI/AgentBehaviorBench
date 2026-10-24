@@ -73,7 +73,8 @@ def validate_evidence(request, directory):
         path = root / relative
         if path.is_symlink() or not path.resolve().is_relative_to(root):
             raise ValueError('Unsafe Judge attachment')
-        content = path.read_bytes()
+        from agentbench.observe.archive import artifact_file
+        content = artifact_file(root, relative).read_bytes()
         if len(content) != metadata['size_bytes'] or digest(content) != metadata['sha256']:
             raise ValueError('Judge evidence changed')
 
@@ -83,6 +84,8 @@ def execute_judge(judge, request, *, directory, environ):
     lock = SuiteLock(Path(directory) / 'judge-protocol-lock')
     lock.acquire()
     try:
+        from agentbench.observe.archive import restore_archive
+        restore_archive(directory)
         return _execute_judge(judge, request, directory=directory, environ=environ)
     finally:
         lock.close()

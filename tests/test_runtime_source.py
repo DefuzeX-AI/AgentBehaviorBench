@@ -352,11 +352,11 @@ def test_git_install_inputs_are_applied_when_added_after_source_restore(unit, tm
 
 
 @pytest.mark.parametrize('unit_name', [
-    '04-ai-hedge-fund-crypto', '05-labscript-ai', '06-multi-agent-cad',
-    '07-autoresearch-agents', '08-langchain-streamlit-template', '09-curiosity',
-    '10-readwren', '11-tablegpt-agent', '33-open-notebook',
-    '34-ai-data-science-team', '35-local-deep-research', '37-article-explainer',
-    '39-tradingagents',
+    '02-ai-hedge-fund-crypto', '03-labscript-ai', '04-multi-agent-cad',
+    '05-autoresearch-agents', '06-langchain-streamlit-template', '58-curiosity',
+    '07-readwren', '08-tablegpt-agent', '30-open-notebook',
+    '31-ai-data-science-team', '32-local-deep-research', '34-article-explainer',
+    '35-tradingagents',
 ])
 def test_registered_abb_descriptor_loads_after_clean_source_preparation(unit_name, tmp_path, monkeypatch):
     import shutil
@@ -373,7 +373,7 @@ def test_registered_abb_descriptor_loads_after_clean_source_preparation(unit_nam
     monkeypatch.setattr(preparation, 'source_archive', lambda *args: archive)
     prepare(root, tmp_path)
     config = LangGraphAdapterConfig.from_agent_dir(root)
-    expected_graph = 'article_explainer' if unit_name == '37-article-explainer' else 'agent'
+    expected_graph = 'article_explainer' if unit_name == '34-article-explainer' else 'agent'
     assert config.graph_id == expected_graph
     assert config.binding
     assert (root/'agent/abb-langgraph.json').read_bytes() == (root/'install/abb-langgraph.json').read_bytes()
