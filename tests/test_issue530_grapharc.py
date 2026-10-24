@@ -8,7 +8,7 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-AGENT_DIR = ROOT / "resources/agents/95-grapharc"
+AGENT_DIR = ROOT / "resources/agents/96-grapharc"
 REGISTRY_PATH = ROOT / "resources/registry.toml"
 
 
@@ -19,7 +19,7 @@ def test_registry_registration() -> None:
     agents = [a for a in data.get("agents", []) if a.get("agent_id") == "grapharc"]
     assert len(agents) == 1, "grapharc must be registered exactly once in registry.toml"
     entry = agents[0]
-    assert entry.get("path") == "resources/agents/95-grapharc"
+    assert entry.get("path") == "resources/agents/96-grapharc"
     assert entry.get("framework") == "langgraph"
     assert entry.get("status") == "adapting"
     assert entry.get("enabled") is False
