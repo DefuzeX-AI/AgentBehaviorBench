@@ -44,3 +44,21 @@ acceptance with the pinned ACP/KUMA dependencies installed, run
 networking disabled. It runs a real ACP stdio peer and command, and retains Case,
 Agent output, SDK evidence and a custom Judge report that checks both terminal
 paths. No production model or Backend is called.
+
+## Permission requests
+
+ABB is the ACP client, so it answers `session/request_permission` itself under the
+unit's `permission_policy`; no person reviews the request. The `permission` event
+records the request, the offered options, the outcome, `policy` and
+`decided_by = "abb_permission_policy"`. Evaluation SDK trace evidence keeps span
+names and tool arguments/results but drops span event attributes, so a bare
+`acp.permission` event cannot tell a Judge what was asked or who approved it.
+`permissions.py` therefore also emits one completed `acp.session/request_permission`
+tool span. It is a child of the requested tool's open span, or of the root span
+when the Agent announced no tool. Its arguments carry the tool call ID, title,
+kind, status, locations, a `rawInput` of at most 4 KiB and the offered options.
+Its result carries the outcome, selected option, policy, `automatic: true` and a
+note that no user reviewed the request. Values are redacted first; text is capped
+at 1024 characters, lists at 16 items, and diff/terminal content is only counted.
+The span has no `gen_ai.tool.call.id`, so the native ID still identifies exactly
+one tool span. Regression coverage lives in `tests/test_issue416.py`.
