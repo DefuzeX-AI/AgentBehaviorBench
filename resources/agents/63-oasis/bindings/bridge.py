@@ -68,9 +68,10 @@ def _install_concurrency_and_inventory_guards() -> None:
     """
     try:
         from concurrent.futures import ThreadPoolExecutor
-        from oasis.analyze import EmbeddingAnalyzer, analyze_item_parallel
+        from oasis.analyze import EmbeddingAnalyzer, analyze_item_parallel, SecurityAnalyzer
         from oasis.backends.openai_compat import OpenAICompatClient
         from oasis.embedding import EmbeddingManager, process_file_parallel
+        from oasis.oasis import OasisScanner
     except (ImportError, Exception):
         return
 
@@ -157,6 +158,118 @@ def _install_concurrency_and_inventory_guards() -> None:
 
         EmbeddingAnalyzer._execute_parallel_analysis = _safe_execute_parallel_analysis
         EmbeddingAnalyzer._abb_guarded = True
+
+    # Guard 4: Resilient vulnerability embedding with retry & error surfacing
+    if not getattr(EmbeddingManager, "_abb_vuln_embed_guarded", False):
+        def _safe_get_vulnerability_embedding(self: Any, vulnerability: Any) -> list[float]:
+            from oasis.embedding import build_vulnerability_embedding_prompt
+            vuln_name = (
+                vulnerability.get("name") or vulnerability.get("tag") or str(vulnerability)
+                if isinstance(vulnerability, dict)
+                else str(vulnerability)
+            )
+            resp = None
+            try:
+                prompt = build_vulnerability_embedding_prompt(vulnerability)
+                resp = self.ollama_client.embeddings(model=self.embedding_model, prompt=prompt)
+            except Exception:
+                resp = None
+
+            if resp and "embedding" in resp and isinstance(resp["embedding"], list):
+                return resp["embedding"]
+
+            # Retry with concise single vulnerability name as prompt
+            try:
+                resp = self.ollama_client.embeddings(
+                    model=self.embedding_model, prompt=f"Vulnerability: {vuln_name}"
+                )
+                if resp and "embedding" in resp and isinstance(resp["embedding"], list):
+                    return resp["embedding"]
+            except Exception as retry_err:
+                raise RuntimeError(
+                    f"Failed to generate embedding for vulnerability type '{vuln_name}': {retry_err}"
+                ) from retry_err
+
+            raise RuntimeError(
+                f"Failed to generate embedding for vulnerability type '{vuln_name}': empty or invalid response from embedding model."
+            )
+
+        _safe_get_vulnerability_embedding.__qualname__ = "EmbeddingManager.get_vulnerability_embedding"
+        EmbeddingManager.get_vulnerability_embedding = _safe_get_vulnerability_embedding
+        EmbeddingManager._abb_vuln_embed_guarded = True
+
+    # Guard 5: OpenAICompatClient.embeddings array/string payload resilience
+    if not getattr(OpenAICompatClient, "_abb_embed_guarded", False):
+        orig_embeddings = OpenAICompatClient.embeddings
+
+        def _safe_embeddings(self: Any, model: str, prompt: Any) -> dict[str, Any]:
+            input_payload = [prompt] if isinstance(prompt, str) else prompt
+            payload = {"model": model, "input": input_payload}
+            try:
+                data = self._post_json("/embeddings", payload)
+            except Exception as err:
+                if isinstance(prompt, str):
+                    try:
+                        data = self._post_json("/embeddings", {"model": model, "input": prompt})
+                    except Exception:
+                        raise err
+                else:
+                    raise err
+            rows = data.get("data") if isinstance(data, dict) else None
+            if not rows or not isinstance(rows[0], dict):
+                raise RuntimeError("OpenAI-compatible embeddings response missing data[0]")
+            embedding = rows[0].get("embedding")
+            if not isinstance(embedding, list):
+                raise RuntimeError("OpenAI-compatible embeddings response missing 'embedding' vector")
+            return {"embedding": embedding}
+
+        _safe_embeddings.__qualname__ = "OpenAICompatClient.embeddings"
+        OpenAICompatClient.embeddings = _safe_embeddings
+        OpenAICompatClient._abb_embed_guarded = True
+
+    # Guard 6: SecurityAnalyzer.search_vulnerabilities error surfacing (no silent empty results on embedding failure)
+    if not getattr(SecurityAnalyzer, "_abb_search_guarded", False):
+        def _safe_search_vulnerabilities(self: Any, vulnerability: Any, threshold: float = 0.5) -> list[Any]:
+            vuln_name = (
+                vulnerability.get("name") or vulnerability.get("tag") or str(vulnerability)
+                if isinstance(vulnerability, dict)
+                else str(vulnerability)
+            )
+            vuln_vector = self.embedding_manager.get_vulnerability_embedding(vulnerability)
+            if not vuln_vector:
+                raise RuntimeError(
+                    f"Failed to get embedding for vulnerability type '{vuln_name}'. No embedding returned."
+                )
+            results = []
+            for file_path, data in self.code_base.items():
+                if self.analyze_by_function:
+                    self._process_functions(file_path, data, vuln_vector, threshold, results)
+                else:
+                    self._process_file(file_path, data, vuln_vector, threshold, results)
+            return sorted(results, key=lambda x: x[1], reverse=True)
+
+        _safe_search_vulnerabilities.__qualname__ = "SecurityAnalyzer.search_vulnerabilities"
+        SecurityAnalyzer.search_vulnerabilities = _safe_search_vulnerabilities
+        SecurityAnalyzer._abb_search_guarded = True
+
+    # Guard 7: OasisScanner.run_analysis_mode non-zero exit on hollow zero-vulnerability scan
+    if not getattr(OasisScanner, "_abb_analysis_mode_guarded", False):
+        orig_run_analysis_mode = OasisScanner.run_analysis_mode
+
+        def _safe_run_analysis_mode(self: Any, main_models: list[str], scan_model: list[str], vuln_mapping: Any) -> bool:
+            res = orig_run_analysis_mode(self, main_models, scan_model, vuln_mapping)
+            if not res:
+                return False
+            rep = getattr(self, "report", None)
+            if rep:
+                last_results = getattr(rep, "_last_summary_results", None)
+                if isinstance(last_results, dict) and len(last_results) == 0:
+                    return False
+            return True
+
+        _safe_run_analysis_mode.__qualname__ = "OasisScanner.run_analysis_mode"
+        OasisScanner.run_analysis_mode = _safe_run_analysis_mode
+        OasisScanner._abb_analysis_mode_guarded = True
 
 
 _ensure_import_path()
@@ -418,6 +531,18 @@ class OasisAgentGraph:
         report_text = self._collect_report_text(scanner)
         if not report_text.strip() and captured_results:
             report_text = self._format_results_fallback(captured_results)
+
+        # Do not claim successful scan if 0 vulnerability types were analyzed or report indicates zero analysis
+        if isinstance(valid_files, (list, tuple)) and len(valid_files) > 0:
+            if "Analyzed 0 vulnerability types across the codebase" in report_text:
+                raise RuntimeError(
+                    "OASIS scan failed: analyzed 0 vulnerability types across the codebase. "
+                    "Vulnerability embeddings or analysis pipeline failed."
+                )
+            if not captured_results:
+                raise RuntimeError(
+                    "OASIS scan completed without analyzing any vulnerability types or producing findings."
+                )
 
         # Do not claim successful scan if no report or evidence was produced
         if not report_text.strip():

@@ -17,11 +17,12 @@ to the AgentBehaviorBench benchmark harness.
 
 OASIS requires two independently configured model backends:
 1. **Chat Model (Scan & Deep Analysis)**:
-   - Validated models: `deepseek-chat`, `deepseek-flash`
+   - **Validated models**: `deepseek-chat`, `deepseek-flash`
    - Provider: `openai` (`--provider openai`)
    - Endpoints: Configured via `OPENAI_BASE_URL` / `DEEPSEEK_BASE_URL` and `OPENAI_API_KEY` / `DEEPSEEK_API_KEY`.
 2. **Embedding Model (Vulnerability & Source Vectorization)**:
-   - Validated model: `text-embedding-3-small`
+   - **Validated model**: `text-embedding-3-small` (OpenAI 1536-dimensional embedding model)
+   - Compatible alternatives: Any OpenAI-compatible embedding model supporting standard `POST /v1/embeddings` (e.g. `nomic-embed-text`, `bge-large-zh-v1.5`, Zhipu `embedding-3`).
    - Provider: `openai` (`--embed-provider openai`)
    - Endpoints: Configured via `OASIS_EMBED_OPENAI_BASE_URL` / `OPENAI_EMBEDDING_BASE_URL` and `OASIS_EMBED_OPENAI_API_KEY` / `OPENAI_EMBEDDING_API_KEY` (falling back to `OPENAI_BASE_URL` / `OPENAI_API_KEY` if not set).
 
@@ -29,6 +30,11 @@ OASIS requires two independently configured model backends:
 Because DeepSeek and many specialized OpenAI-compatible LLM endpoints do not serve an `/embeddings` route, chat and embedding traffic are routed independently:
 - Chat requests (`POST /v1/chat/completions`) go to `OPENAI_BASE_URL`.
 - Embedding requests (`POST /v1/embeddings`) go to `OASIS_EMBED_OPENAI_BASE_URL`.
+
+### Vulnerability-Type Embedding Resilience & Failure Surfacing
+OASIS embeds both target source files and vulnerability-type descriptions (for semantic similarity ranking):
+- If an embedding provider rejects structured multi-line descriptions (e.g. HTTP 405 / 400), OASIS automatically retries with concise single-item prompts (`Vulnerability: <name>`).
+- If vulnerability-type embedding fails permanently or yields 0 analyzed types, the scan halts and surfaces a `RuntimeError` rather than silently reporting a hollow analysis of zero vulnerability types.
 
 ## KUMA / Benchmark Configuration
 
@@ -41,3 +47,4 @@ Environment variables forwarded by `agent.toml`:
 - `OPENAI_EMBEDDING_MODEL` / `EMBED_MODEL`: Embedding model name (`text-embedding-3-small`)
 - `OPENAI_BASE_URL`: Chat API base URL
 - `OASIS_EMBED_OPENAI_BASE_URL`: Embedding API base URL
+- `OPENAI_EMBEDDING_API_KEY`: Embedding API key (optional secret)

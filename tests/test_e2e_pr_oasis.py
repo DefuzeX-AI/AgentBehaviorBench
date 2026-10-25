@@ -347,6 +347,101 @@ class TestTier3CombinatorialInteractions:
                 assert parsed_args.get("--embed-api-base") == "http://unified.example.com/v1"
                 assert parsed_args.get("--embed-api-key") == "unified-secret-key"
 
+    @requires_oasis
+    def test_vulnerability_embedding_retry_and_failure_surfacing(self):
+        bridge = _load_bridge_module()
+        bridge._ensure_import_path()
+        from oasis.embedding import EmbeddingManager
+
+        mock_client = MagicMock()
+        mock_args = MagicMock()
+        mock_args.embed_model = "text-embedding-3-small"
+        mock_args.chunk_size = 500
+        mock_args.embeddings_analyze_type = "file"
+        mock_args.cache_dir = None
+        mock_backend = MagicMock()
+        mock_backend.get_client.return_value = mock_client
+        em = EmbeddingManager(mock_args, mock_backend)
+        em.ollama_client = mock_client
+        em.embedding_model = "test-model"
+
+        # Case 1: Rich prompt fails with 405, concise prompt retry succeeds
+        calls = []
+        def side_effect_recover(model, prompt):
+            calls.append(prompt)
+            if "Common patterns" in prompt:
+                raise RuntimeError("OpenAI-compatible server returned 405 Method Not Allowed")
+            return {"embedding": [0.1, 0.2, 0.3]}
+
+        mock_client.embeddings.side_effect = side_effect_recover
+        vec = em.get_vulnerability_embedding({"name": "SQL Injection", "description": "desc", "patterns": ["pat"], "impact": "imp", "mitigation": "mit"})
+        assert vec == [0.1, 0.2, 0.3]
+        assert len(calls) == 2
+        assert "Vulnerability: SQL Injection" in calls[1]
+
+        # Case 2: Both rich prompt and retry fail -> must raise RuntimeError, never return None
+        mock_client.embeddings.side_effect = RuntimeError("OpenAI-compatible server returned 405 Method Not Allowed")
+        with pytest.raises(RuntimeError, match="Failed to generate embedding for vulnerability type 'SQL Injection'"):
+            em.get_vulnerability_embedding({"name": "SQL Injection", "description": "desc", "patterns": ["pat"], "impact": "imp", "mitigation": "mit"})
+
+    @requires_oasis
+    def test_zero_vulnerability_types_report_raises_runtime_error(self):
+        bridge = _load_bridge_module()
+        graph = bridge.create_graph()
+
+        mock_scanner = MagicMock()
+        mock_scanner.run.return_value = 0
+        mock_scanner.valid_input_files = [Path("/target/vuln.py")]
+        mock_scanner.embedding_manager = MagicMock()
+        mock_scanner.embedding_manager.code_base = {"/target/vuln.py": {"embedding": [0.1, 0.2]}}
+        mock_scanner.setup_argument_parser.return_value.parse_args.return_value = MagicMock()
+
+        # Mock report output containing the hollow 0-type summary
+        with patch.object(graph, "_collect_report_text", return_value="## Overview\nAnalyzed 0 vulnerability types across the codebase."):
+            with patch("oasis.oasis.OasisScanner", return_value=mock_scanner):
+                with pytest.raises(RuntimeError, match="analyzed 0 vulnerability types across the codebase"):
+                    graph._run_scan(Path("/unused"), None)
+
+    @requires_oasis
+    def test_openai_compat_embeddings_fallback_on_array_rejection(self):
+        bridge = _load_bridge_module()
+        bridge._ensure_import_path()
+        from oasis.backends.openai_compat import OpenAICompatClient
+
+        client = OpenAICompatClient("http://127.0.0.1:9999", api_key="dummy")
+        posted_payloads = []
+
+        def fake_post_json(path, payload, timeout=None):
+            posted_payloads.append(payload)
+            if isinstance(payload.get("input"), list):
+                raise RuntimeError("OpenAI-compatible server returned 405 for /embeddings")
+            return {"data": [{"embedding": [0.42, 0.84]}]}
+
+        with patch.object(client, "_post_json", side_effect=fake_post_json):
+            res = client.embeddings(model="test-embed", prompt="single text prompt")
+            assert res == {"embedding": [0.42, 0.84]}
+            assert len(posted_payloads) == 2
+            assert posted_payloads[0]["input"] == ["single text prompt"]
+            assert posted_payloads[1]["input"] == "single text prompt"
+
+    @requires_oasis
+    def test_search_vulnerabilities_propagates_embedding_failure(self):
+        bridge = _load_bridge_module()
+        bridge._ensure_import_path()
+        from oasis.analyze import SecurityAnalyzer
+
+        analyzer = SecurityAnalyzer.__new__(SecurityAnalyzer)
+        analyzer.embedding_manager = MagicMock()
+        analyzer.embedding_manager.get_vulnerability_embedding.side_effect = RuntimeError(
+            "Failed to generate embedding for vulnerability type 'SQL Injection'"
+        )
+        analyzer.code_base = {"/target/app.py": {"embedding": [0.1, 0.2]}}
+        analyzer.analyze_by_function = False
+
+        # Guard 6 must propagate the RuntimeError rather than returning []
+        with pytest.raises(RuntimeError, match="Failed to generate embedding for vulnerability type 'SQL Injection'"):
+            analyzer.search_vulnerabilities({"name": "SQL Injection"}, threshold=0.5)
+
 
 # ==============================================================================
 # Tier 4: Real-World Scenarios & Workload Integrity
