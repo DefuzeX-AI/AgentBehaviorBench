@@ -779,7 +779,7 @@ class DockerRuntime:
                 "Transparent interception requires an Agent image with a non-root USER"
             )
 
-    @timed('Check Docker availability', kind='preparation')
+    @timed('Lease Case network', kind='preparation')
     def _lease_network(self, *, internal: bool, deadline: Deadline | None) -> str:
         """Take an empty Suite pool network for this Case, creating one only when none is free."""
         pool = self._network_pool
@@ -814,6 +814,7 @@ class DockerRuntime:
         pool.adopt(name, lambda value: self._remove_resource("network", value))
         return name
 
+    @timed('Check Docker availability', kind='preparation')
     def _check_available(self, *, deadline: Deadline | None = None) -> None:
         try:
             result = self._run_quiet("info", "--format", "{{.ServerVersion}}", capture=True, deadline=deadline)

@@ -110,3 +110,19 @@ def test_pool_leases_are_exclusive_and_kind_specific():
     assert pool.take(False) == egress
     assert pool.close() == []
     assert sorted(removed) == sorted([egress, internal])
+
+
+def test_network_lease_and_daemon_check_have_distinct_timing_stages(suite, tmp_path):
+    from agentbench.observe.timing import timing_session
+    from agentbench.observe.timeline import timeline
+    from agentbench.observe.view_api import RunViewAPI
+
+    try:
+        with timing_session(tmp_path / 'timing.jsonl', source='host', name='Case'):
+            with pytest.raises(DockerRuntimeError, match='agent create refused'):
+                suite.run_case()
+        names = [operation['name'] for operation in timeline(RunViewAPI(tmp_path))['operations']]
+        assert names.count('Check Docker availability') == 1
+        assert names.count('Lease Case network') == 1
+    finally:
+        suite.services.close()
