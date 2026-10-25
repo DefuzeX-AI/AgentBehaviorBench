@@ -107,3 +107,9 @@ This deployment explicitly requests runtime.cpus=2. The optional per-unit CPU
 request changes only the Docker CPU quota; memory, process, privilege, network
 and mount policies remain unchanged. The effective quota is captured by ABB
 before Case generation.
+
+### Bounded public dependency downloads
+
+The build-only `bootstrap/download_release.sh` resumes partial official GitHub release downloads for radare2 and Ghidra. It permits at most three attempts, with20-second connect and600-second per-request limits, retains partial bytes between failed requests, and verifies a fixed SHA256 before any installation/extraction. A checksum mismatch fails immediately rather than accepting a different artifact. The radare2 digest is the existing deployment pin; the Ghidra digest is `bcda0a9de8993444766cc255964c65c042b291ddaf6c50d654e316e442b441fa`, recorded from the previously verified official11.3.1 download. The historical GitHub asset has no API digest, so this is not described as a newly publisher-signed checksum. These build controls do not change native Agent source, tools, model selection, prompts, runtime quotas or Judge behavior.
+
+A locked BuildKit cache mount retains only these public release archives between interrupted builds. Every complete cached file is rechecked against its fixed digest before reuse; invalid or partial cache contents never skip verification. Cache contents are not Agent source, model answers or evaluation workspaces.

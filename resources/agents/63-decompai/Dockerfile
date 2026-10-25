@@ -9,14 +9,17 @@ WORKDIR /opt/agent
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl unzip gcc libc6-dev binutils file gdb openjdk-21-jre-headless \
     && rm -rf /var/lib/apt/lists/*
-RUN curl -fL --retry 1 --connect-timeout 20 \
-    https://github.com/radareorg/radare2/releases/download/6.2.4/radare2_6.2.4_amd64.deb -o /tmp/r2.deb \
-    && sha256sum /tmp/r2.deb > /opt/radare2.download.sha256 \
-    && PATH="$PATH:/usr/sbin:/sbin" dpkg -i /tmp/r2.deb && rm /tmp/r2.deb
-RUN curl -fL --retry 1 --connect-timeout 20 \
-    https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_11.3.1_build/ghidra_11.3.1_PUBLIC_20250219.zip -o /tmp/ghidra.zip \
-    && sha256sum /tmp/ghidra.zip > /opt/ghidra.download.sha256 \
-    && unzip -q /tmp/ghidra.zip -d /opt && rm /tmp/ghidra.zip \
+COPY bootstrap/download_release.sh /tmp/abb-download-release.sh
+RUN --mount=type=cache,id=abb-decompai-releases,target=/opt/abb-release-cache,sharing=locked sh /tmp/abb-download-release.sh \
+    https://github.com/radareorg/radare2/releases/download/6.2.4/radare2_6.2.4_amd64.deb /opt/abb-release-cache/radare2_6.2.4_amd64.deb \
+    7019eedc0e0e87d1f53d6b8f5fc62b898567679c5efdce7fbfc557c9e7655e90 \
+    && sha256sum /opt/abb-release-cache/radare2_6.2.4_amd64.deb > /opt/radare2.download.sha256 \
+    && PATH="$PATH:/usr/sbin:/sbin" dpkg -i /opt/abb-release-cache/radare2_6.2.4_amd64.deb
+RUN --mount=type=cache,id=abb-decompai-releases,target=/opt/abb-release-cache,sharing=locked sh /tmp/abb-download-release.sh \
+    https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_11.3.1_build/ghidra_11.3.1_PUBLIC_20250219.zip /opt/abb-release-cache/ghidra_11.3.1_PUBLIC_20250219.zip \
+    bcda0a9de8993444766cc255964c65c042b291ddaf6c50d654e316e442b441fa \
+    && sha256sum /opt/abb-release-cache/ghidra_11.3.1_PUBLIC_20250219.zip > /opt/ghidra.download.sha256 \
+    && unzip -q /opt/abb-release-cache/ghidra_11.3.1_PUBLIC_20250219.zip -d /opt \
     && mv /opt/ghidra_11.3.1_PUBLIC /opt/ghidra
 COPY agent/requirements.txt /tmp/native-requirements.txt
 RUN python -m pip install --no-cache-dir -r /tmp/native-requirements.txt \
