@@ -1,7 +1,7 @@
 # easy-agent native ACP integration — Issue #476
 
 Task: [ABB Issue476](https://github.com/DefuzeX-AI/AgentBehaviorBench/issues/476).
-This unit is `104-easy-agent`. It uses pinned original `ConardLi/easy-agent@aec616a97114ce9683e4fbfcff3abbc55155fe50` with `[source] method="git"`; all610 source files remain unmodified. The outer launcher maps ABB-selected model settings and isolates HOME/XDG state. Native ACP, prompts, tools and reasoning remain upstream.
+This unit is `108-easy-agent`. It uses pinned original `ConardLi/easy-agent@aec616a97114ce9683e4fbfcff3abbc55155fe50` with `[source] method="git"`; all610 source files remain unmodified. The outer launcher maps ABB-selected model settings and isolates HOME/XDG state. Native ACP, prompts, tools and reasoning remain upstream.
 
 ## Local Smoke
 
@@ -18,7 +18,7 @@ This command uses the stock Judge and generates its own Case; it does not import
 The optional header-only host helper avoids gateways rejecting the default Python User-Agent:
 
 ```sh
-python resources/agents/104-easy-agent/validation/run_smoke.py \
+python resources/agents/108-easy-agent/validation/run_smoke.py \
   --allowed-model glm-5.3-flash --http-audit results/easy-agent-host-network.jsonl \
   evaluate easy-agent --sdk local --cases 1 --case-retries 0 --no-view \
   --registry resources/smoke-registry.toml --model glm-5.3-flash \
