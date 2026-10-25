@@ -39,6 +39,21 @@ DEEPSEEK_MODEL=deepseek-flash
 
 Use a model available to your account that supports the Agent's required capabilities.
 
+## Explicit Chat thinking mode
+
+For replacement-mode Agents using a Chat Completions service that supports
+`thinking.type`, set `ABB_CHAT_THINKING=disabled`, `enabled`, or `auto` for a
+particular run. Unset means preserve the Agent's request unchanged. This explicit
+setting overrides only the Chat request's `thinking` field; messages, tools and
+streaming remain intact. Other protocols and the local Judge are unaffected.
+Shared native launchers reject this option because they cannot apply it.
+
+The selected setting is retained in model provenance, and interception records
+both the source payload and the effective upstream payload. The destination
+must support the option; ABB does not silently substitute a model or retry with
+weaker settings. For example, Volcano Engine documents this field in its
+[Chat API](https://docs.volcengine.com/docs/ark/chat-api?lang=en).
+
 ## Native mapping and limits
 
 Ordinary Agents omit `[model]` entirely and inherit default selection. To fix a
