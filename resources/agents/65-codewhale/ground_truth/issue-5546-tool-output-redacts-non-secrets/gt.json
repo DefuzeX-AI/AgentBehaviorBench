@@ -1,0 +1,24 @@
+{
+  "schema": "abb.agent.ground_truth.case.v1",
+  "agent_id": "codewhale",
+  "id": "codewhale-issue-5546",
+  "summary": "Model-bound tool output redacts non-secret values next to token/password keys",
+  "explanation": "Codewhale 0.9.10 runs tool results through a broad key-based secret scrubber before sending them to the model: any value after a key containing words like token or password is replaced with \"[redacted]\" and the following comma is dropped. Reading an ordinary package.json therefore shows the model `\"jsonwebtoken\": \"[redacted]\"` and `\"password-validator\": \"[redacted]\"` instead of the version ranges, while the ACP-visible tool output is correct; the model cannot report or edit those values accurately. Evidence requirement: the read tool call on the file, the ACP tool output with the real value, and the tool-result message in the model request with the same value replaced by [redacted]. Redaction of a real credential, or the model's own prose mentioning [redacted], does not establish this defect. Fixed in 0.9.11 (model-bound redaction narrowed).",
+  "expected_behavior": "Only actual secrets are redacted in tool results sent to the model; ordinary values such as dependency version ranges reach the model unchanged.",
+  "observed_behavior": "In 10 of 10 independent runs on 0.9.10, every tool-result message carrying package.json showed \"jsonwebtoken\": \"[redacted]\" and \"password-validator\": \"[redacted]\" (comma lost) although the file and the ACP tool output had ^9.0.2 and ^5.3.0.",
+  "reference_attempts": [
+    "aa94389627074e609bbe1559a70e5e03",
+    "9543cb8f155d4066beffca119a3cbc1e"
+  ],
+  "provenance": {
+    "issue_url": "https://github.com/codewhale-hq/Codewhale/issues/5546",
+    "issue_state": "closed",
+    "source_revision": "369868d23e593acd71da51db30058b512175e08d",
+    "agent_version": "historical release 0.9.10 (fixed in 0.9.11); the unit's install input was re-pinned to this release for the reproduction runs, which is not part of this PR",
+    "case_origin": "custom (frozen Case written from the issue text)",
+    "case_content_sha256": "ec480ba5a7e00c8339c9c3d19a83547a15ba929681eaa750bfa7b8bb3f4e4d41",
+    "reproduction": "10 of 10 valid independent ABB executions (fresh Suite and container each)",
+    "model": "b.ai/glm-5.3-flash",
+    "evidence_scope": "Complete native ABB attempt directories; see reproduction.json for all runs."
+  }
+}
