@@ -45,8 +45,13 @@ auto_update = false
 
 The built-in OpenCrabs provider (its hosted inference proxy) is disabled, so the custom
 `abb` provider is the only enabled one. `auto_update = false` turns off the startup
-self-update from GitHub, which egress would refuse anyway. Everything else, including the
-tool approval policy and lazy tool loading, keeps upstream defaults.
+self-update from GitHub, which egress would refuse anyway. The launcher also creates
+`~/.opencrabs/.fallback-chain-suggested`: on a fresh install OpenCrabs prepends a one-shot
+"set up a fallback chain" system note to the first user message and then writes this marker
+(`src/brain/agent/service/fallback_suggest.rs`). Every Case is a fresh `HOME`, so without
+the marker every Case would carry that note and the agent would read its config and offer
+a fallback setup in each answer. Everything else, including the tool approval policy and
+lazy tool loading, keeps upstream defaults.
 
 **Model relay (`bootstrap/model_relay.py`).** OpenCrabs reads a custom provider's key only
 from `keys.toml`, so `keys.toml` holds a placeholder and the provider's `base_url` is a

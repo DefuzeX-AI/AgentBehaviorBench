@@ -20,6 +20,7 @@ PROVIDER = "abb"
 # OpenCrabs reads a custom provider's key only from keys.toml; the relay replaces
 # this placeholder with the selected key.
 PLACEHOLDER_KEY = "abb-model-relay"
+FALLBACK_SUGGESTED_MARKER = ".fallback-chain-suggested"
 
 
 def config_toml(relay_url: str, model: str) -> str:
@@ -70,6 +71,11 @@ def prepare(environ: dict[str, str], home: Path, start_relay=model_relay.start) 
     keys = config_dir / "keys.toml"
     keys.write_text(keys_toml())
     keys.chmod(0o600)
+    # OpenCrabs prepends a one-shot "set up a fallback chain" system note to the
+    # first user turn of a fresh install and records it with this marker
+    # (brain/agent/service/fallback_suggest.rs). Every Case is a fresh HOME, so
+    # without the marker every Case would carry that note.
+    (config_dir / FALLBACK_SUGGESTED_MARKER).write_text("suggested\n")
 
     no_proxy = ",".join(filter(None, [environ.get("NO_PROXY", ""), "127.0.0.1", "localhost"]))
     child = {k: v for k, v in environ.items() if k != KEY_ENV}
