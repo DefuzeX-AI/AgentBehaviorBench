@@ -55,3 +55,13 @@ A run using8192 must be labelled as an explicitly configured run, not a default
 2048-token or unmodified-main pass. Agent onboarding and shared SDK changes belong
 in separate PRs; tests of their composition must name both revisions. Keep the
 original failed runs and use unchanged frozen inputs for dependency validation.
+
+## Lossless streamed-trace presentation
+
+The existing separately reviewed SDK fix in PR612 factors repeated JSONL context
+fields into ordered blocks. Every original record, value type and order must
+round-trip; malformed/unrepresentable streams stay raw. No tool output, text
+chunk or event is removed, and original attachment bytes/hashes stay unchanged.
+The exact model-facing view is retained at `judge/local-evidence-view.json`.
+This allows repetitive streams to fit the unchanged120000-character guard;
+large unique content still produces an explicit inconclusive result.
