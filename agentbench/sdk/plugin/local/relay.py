@@ -41,6 +41,11 @@ class JudgeModel:
     # Three attempts plus backoff must end before the container stops waiting
     # (LocalJudge.timeout), so a slow model is reported as such, not as silence.
     timeout: float = 90.0
+    max_tokens: int = 2048
+
+    def __post_init__(self):
+        if type(self.max_tokens) is not int or not 1 <= self.max_tokens <= 32768:
+            raise ValueError('ABB_LOCAL_JUDGE_MAX_TOKENS must be an integer from1 to32768')
 
 
 def judge_model(environ):
@@ -68,7 +73,12 @@ def judge_model(environ):
         raise ValueError('The local Judge needs a model: set ABB_LOCAL_JUDGE_MODEL or OPENROUTER_MODEL')
     if not key:
         raise ValueError(f'The local Judge needs an API key: set {credential}')
-    return JudgeModel(base, model, key)
+    raw_tokens = (environ.get('ABB_LOCAL_JUDGE_MAX_TOKENS') or '2048').strip()
+    try:
+        tokens = int(raw_tokens)
+    except (TypeError, ValueError):
+        raise ValueError('ABB_LOCAL_JUDGE_MAX_TOKENS must be an integer from1 to32768') from None
+    return JudgeModel(base, model, key, max_tokens=tokens)
 
 
 def read_request(path):
@@ -95,7 +105,7 @@ def json_object(text):
 def ask_model(model, steps, *, system=SYSTEM, normalize=verdict_fields, payload=None, on_response=None):
     """Return the normalized verdict and raw reply for one request."""
     url = model.base_url + '/chat/completions'
-    body = json.dumps({'model': model.model, 'temperature': 0, 'max_tokens': 2048, 'messages': [
+    body = json.dumps({'model': model.model, 'temperature': 0, 'max_tokens': model.max_tokens, 'messages': [
         {'role': 'system', 'content': system},
         {'role': 'user', 'content': json.dumps({'steps': steps} if payload is None else payload, ensure_ascii=False)}]}).encode()
     headers = {'content-type': 'application/json', 'authorization': f'Bearer {model.api_key}'}
@@ -121,6 +131,8 @@ def ask_model(model, steps, *, system=SYSTEM, normalize=verdict_fields, payload=
     if on_response is not None:
         on_response(data)
     try:
+        if data['choices'][0].get('finish_reason') == 'length':
+            raise RuntimeError('The Judge model reply was truncated at its configured token budget')
         content = data['choices'][0]['message'].get('content') or ''
     except (KeyError, IndexError, TypeError, AttributeError):
         raise RuntimeError('The Judge model returned no chat completion') from None

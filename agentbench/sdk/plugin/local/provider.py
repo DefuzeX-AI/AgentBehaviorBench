@@ -1,5 +1,7 @@
 """ABB Judge protocol implementation; calls the configured model directly."""
 import json
+import hashlib
+from pathlib import PurePosixPath
 
 from agentbench.sdk.common.artifacts import Artifacts
 from agentbench.sdk.judges import validate_evidence
@@ -63,9 +65,36 @@ class LocalProvider:
                 relative = prefix + '/' + name
                 if relative in request['attachments']:
                     traces[name] = (directory / relative).read_text(encoding='utf-8')
+            observed_files = None
+            if request.get('file_evidence', {}).get('track_files'):
+                relative = prefix + '/file-evidence.json'
+                if relative not in request['attachments']:
+                    gaps.append('Required workspace file evidence is missing.')
+                else:
+                    observed_files = json.loads((directory / relative).read_text(encoding='utf-8'))
+                    if (observed_files.get('schema') != 'abb.file-evidence.v1'
+                            or observed_files.get('status') != 'complete'):
+                        gaps.append('Workspace file evidence is partial or invalid.')
+                    # Every content blob is already bound by the request attachment
+                    # digest. Still require each manifest reference to be in this step.
+                    for change in observed_files.get('changes', []):
+                        for side in ('before', 'after'):
+                            entry = change.get(side)
+                            if entry and entry.get('artifact'):
+                                blob = entry['artifact']
+                                if (not isinstance(blob, str) or not blob.startswith(prefix + '/file-content/')
+                                        or '..' in PurePosixPath(blob).parts
+                                        or PurePosixPath(blob).as_posix() != blob
+                                        or blob not in request['attachments']):
+                                    raise ValueError('Unbound workspace content artifact')
+                                value = json.loads((directory / blob).read_text(encoding='utf-8'))
+                                if (value.get('encoding') != 'utf-8' or not isinstance(value.get('content'), str)
+                                        or hashlib.sha256(value['content'].encode()).hexdigest() != entry.get('sha256')):
+                                    raise ValueError('Workspace content digest mismatch')
+                                entry['content'] = value['content']
             steps.append({'input_id': step['input']['input_id'],
                           'input': step['input']['payload'], 'output': step['result'],
-                          'traces': traces})
+                          'traces': traces, **({'file_evidence': observed_files} if observed_files is not None else {})})
         # Do not silently truncate evidence and then claim a complete assessment.
         if len(json.dumps({'steps': steps, 'agent_context': request['case'].get('abb_agent_context')}, ensure_ascii=False)) > limit:
             gaps.append(f'Evidence exceeds this local provider limit ({limit} characters).')
@@ -82,7 +111,7 @@ class LocalProvider:
             payload={'agent_context': request['case'].get('abb_agent_context'), 'steps': steps})
         Artifacts(directory, environ=environ).save('judge/local-provider.json',
             {'provider': 'abb-local-v2', 'model': model.model, 'base_url': model.base_url,
-             'system_prompt': SYSTEM, 'max_chars': limit, 'reply': raw})
+             'system_prompt': SYSTEM, 'max_chars': limit, 'max_tokens': getattr(model, 'max_tokens', 2048), 'reply': raw})
         return {**answer, **base}
 
 
