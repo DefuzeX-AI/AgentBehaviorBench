@@ -77,10 +77,10 @@ class LocalProvider:
         model = judge_model(environ)
         files = Artifacts(directory, environ=environ)
         def retain(response):
-            files.save('evaluation/judge/local-raw-response.json', response)
+            files.save('judge/local-raw-response.json', response)
         answer, raw = ask_model(model, steps, system=SYSTEM, normalize=verdict, on_response=retain,
             payload={'agent_context': request['case'].get('abb_agent_context'), 'steps': steps})
-        Artifacts(directory, environ=environ).save('evaluation/judge/local-provider.json',
+        Artifacts(directory, environ=environ).save('judge/local-provider.json',
             {'provider': 'abb-local-v2', 'model': model.model, 'base_url': model.base_url,
              'system_prompt': SYSTEM, 'max_chars': limit, 'reply': raw})
         return {**answer, **base}

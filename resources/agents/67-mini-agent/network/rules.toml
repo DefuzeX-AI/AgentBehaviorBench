@@ -1,0 +1,10 @@
+schema_version = "abb.network.v1"
+
+# Mini-Agent's built-in tools (read_file, write_file, edit_file, bash, bash_output,
+# bash_kill, record_note/recall_notes, get_skill) run locally inside its process
+# and need no network routes. bootstrap/launch.py copies the pinned mcp-example.json,
+# in which every MCP server is disabled, so no MCP server is started. read_file's
+# tiktoken encoding is cached in the image (TIKTOKEN_CACHE_DIR), so it is not fetched
+# from openaipublic.blob.core.windows.net. The only
+# admitted route is the shared model route derived from the selected base URL;
+# package installs or other hosts requested by a task go through the egress policy.

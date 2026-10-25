@@ -1,5 +1,6 @@
 """Write ended spans immediately; complete payloads are stored separately."""
 import json
+import hashlib
 import threading
 from datetime import datetime, timezone
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
@@ -58,10 +59,16 @@ class FileExporter(SpanExporter):
             return SpanExportResult.FAILURE
 
     def payload(self, span, label, value):
-        name = f'{span.context.span_id:016x}-{label}.json'
+        value = redact(json_value(value), self.secrets)
+        # Immutable payloads are shared by all spans with the same content.
+        # References are published only after the complete file is visible.
+        encoded = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode('utf-8')
+        name = hashlib.sha256(encoded).hexdigest() + '.json'
         directory = self.directory / 'otel-payloads'
         directory.mkdir(exist_ok=True)
-        atomic_json(directory / name, redact(json_value(value), self.secrets))
+        path = directory / name
+        if not path.exists():
+            atomic_json(path, value)
         self.annotate(span, {f'abb.{label}_ref': f'otel-payloads/{name}'})
         # Publish a real in-progress span snapshot; the ended export replaces it by ID.
         self.export([span], live=True)

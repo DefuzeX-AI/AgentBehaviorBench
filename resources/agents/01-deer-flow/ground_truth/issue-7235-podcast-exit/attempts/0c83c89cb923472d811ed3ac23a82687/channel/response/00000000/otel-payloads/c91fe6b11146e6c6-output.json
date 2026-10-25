@@ -1,0 +1,48 @@
+[
+  {
+    "graph": null,
+    "update": {
+      "messages": [
+        {
+          "content": "The CLI prints failures but returns exit code 0 — let's verify that empirically without touching the network.\n\n",
+          "additional_kwargs": {},
+          "response_metadata": {
+            "finish_reason": "tool_callstool_calls",
+            "model_name": "deepseek/deepseek-v4.1-flash-1017deepseek/deepseek-v4.1-flash-1017",
+            "system_fingerprint": "vllm-0.31.1rc1.dev273+g2eb491e18-tp2-2fe22025vllm-0.31.1rc1.dev273+g2eb491e18-tp2-2fe22025",
+            "model_provider": "openai"
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a1666b-5cb8-7782-aef2-067ac1456b29",
+          "tool_calls": [
+            {
+              "name": "bash",
+              "args": {
+                "command": "cd /mnt/user-data/workspace && cat > probe_cli_errors.py <<'EOF'\nimport json, os, subprocess, sys, tempfile, shutil\n\nCLI = \"/mnt/skills/public/podcast-generation/scripts/generate.py\"\nSTRIP = [\"VOLCENGINE_TTS_APPID\", \"VOLCENGINE_TTS_ACCESS_TOKEN\",\n         \"MINIMAX_API_KEY\", \"PODCAST_GENERATION_PROVIDER\"]\n\ntmpdir = tempfile.mkdtemp(prefix=\"podcast-cli-probe-\", dir=\"/mnt/user-data/outputs\")\nscript_path = os.path.join(tmpdir, \"script.json\")\nout_mp3 = os.path.join(tmpdir, \"fresh-missing.mp3\")\n\nwith open(script_path, \"w\", encoding=\"utf-8\") as f:\n    json.dump({\"lines\": [{\"speaker\": \"male\", \"paragraph\": \"Hello\"}]}, f)\n\nassert not os.path.exists(out_mp3), \"output must start missing\"\n\nenv = os.environ.copy()\nstripped_present = [k for k in STRIP if k in env]\nfor k in STRIP:\n    env.pop(k, None)\n\nprint(\"CLI:\", CLI, \"exists:\", os.path.exists(CLI))\nprint(\"tmpdir:\", tmpdir)\nprint(\"credential vars present in parent env (names only):\", stripped_present or \"none\")\nprint(\"credential vars still set in child env:\", [k for k in STRIP if k in env] or \"none\")\nprint(\"=\" * 70)\n\ndef run(label, argv):\n    print(f\"--- {label} ---\")\n    cp = subprocess.run(argv, capture_output=True, text=True,\n                        env=env, timeout=120)\n    print(\"argv:\", argv)\n    print(\"returncode:\", cp.returncode)\n    print(\"stdout:\\n\" + (cp.stdout or \"<empty>\"))\n    print(\"stderr:\\n\" + (cp.stderr or \"<empty>\"))\n    print(\"=\" * 70)\n    return cp\n\ncp1 = run(\"case A: real invocation\", [sys.executable, CLI,\n        \"--script-file\", script_path, \"--output-file\", out_mp3])\ncp2 = run(\"case B: control, no args\", [sys.executable, CLI])\n\nprint(\"--- outcome ---\")\nexists = os.path.exists(out_mp3)\nprint(\"mp3 exists:\", exists)\nprint(\"mp3 size (bytes):\", os.path.getsize(out_mp3) if exists else \"n/a\")\nprint(\"files in tmpdir:\", sorted(os.listdir(tmpdir)))\nEOF\npython probe_cli_errors.py"
+              },
+              "id": "chatcmpl-tool-b99cebda0424b253",
+              "type": "tool_call"
+            }
+          ],
+          "invalid_tool_calls": [],
+          "usage_metadata": {
+            "input_tokens": 17671,
+            "output_tokens": 708,
+            "total_tokens": 18379,
+            "input_token_details": {
+              "audio": 0,
+              "cache_read": 15360
+            },
+            "output_token_details": {
+              "audio": 0,
+              "reasoning": 80
+            }
+          }
+        }
+      ]
+    },
+    "resume": null,
+    "goto": []
+  }
+]

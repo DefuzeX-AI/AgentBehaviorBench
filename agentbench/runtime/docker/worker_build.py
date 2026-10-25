@@ -29,6 +29,23 @@ def agent_build_ignore(agent_root):
     return ignore
 
 
+def runtime_build_ignore(package):
+    """Do not ship host command-line and onboarding tools to worker images.
+
+    Keep shared SDK/harness/observe modules: workers import them too. Excluding
+    them only from the fingerprint would silently reuse stale executable code.
+    """
+    root = Path(package).resolve()
+
+    def ignore(directory, names):
+        excluded = _ignore(directory, names)
+        if Path(directory).resolve() == root:
+            excluded.extend(name for name in names if name in {'cli', 'onboarding', '__main__.py'})
+        return excluded
+
+    return ignore
+
+
 @contextmanager
 def worker_build_context(config, *, control: RunControl | None = None,
                          deadline: Deadline | None = None):
@@ -59,7 +76,8 @@ def worker_build_context(config, *, control: RunControl | None = None,
             shutil.copytree(config.build_context, context, ignore=agent_build_ignore(config.agent_root),
                             symlinks=True, copy_function=copy)
             package = Path(__file__).resolve().parents[2]
-            shutil.copytree(package, context / ".abb-runtime" / "agentbench", ignore=_ignore, symlinks=True, copy_function=copy)
+            shutil.copytree(package, context / ".abb-runtime" / "agentbench",
+                            ignore=runtime_build_ignore(package), symlinks=True, copy_function=copy)
             materialize_file_links(context, check)
             for path in context.rglob("*"):
                 check()

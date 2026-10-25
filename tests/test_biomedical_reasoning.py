@@ -67,15 +67,15 @@ class BiomedicalReasoningTests(unittest.TestCase):
     def test_catalog_preserves_existing_providers(self):
         before = load_provider_catalog({})
         after = load_provider_catalog({
-            "ABB_MODEL_PROVIDERS_CONFIG": str(ROOT / "resources/biomedical-model-providers.toml")})
+            "ABB_MODEL_PROVIDERS_CONFIG": str(ROOT / "resources/agents/37-biomedical-aiq-research-agent/biomedical-model-providers.toml")})
         self.assertEqual(before["priority"], after["priority"])
         for name, value in before["providers"].items():
             self.assertEqual(value, after["providers"][name])
 
     def test_nvidia_agent_target_does_not_change_deepseek_judge(self):
         env = {
-            "ABB_MODEL_PROVIDERS_CONFIG": str(ROOT / "resources/biomedical-model-providers.toml"),
-            "ABB_MODEL_ROUTING_CONFIG": str(ROOT / "resources/biomedical-model-routing-nvidia.toml"),
+            "ABB_MODEL_PROVIDERS_CONFIG": str(ROOT / "resources/agents/37-biomedical-aiq-research-agent/biomedical-model-providers.toml"),
+            "ABB_MODEL_ROUTING_CONFIG": str(ROOT / "resources/agents/37-biomedical-aiq-research-agent/biomedical-model-routing-nvidia.toml"),
             "OPENROUTER_API_KEY": "synthetic-deepseek-key",
             "OPENROUTER_MODEL": "deepseek-v4-flash",
             "OPENROUTER_BASE_URL": "https://api.deepseek.com",
