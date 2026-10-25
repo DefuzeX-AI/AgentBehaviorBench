@@ -7,13 +7,12 @@
 FROM alpine:3.24 AS builder
 RUN apk add --no-cache bash curl git musl-dev python3
 WORKDIR /app
-COPY agent/.github/scripts/install-zig.sh .github/scripts/install-zig.sh
+# Copy the whole restored source (ABB validates COPY sources before the source is restored, so
+# individual agent/ paths would fail on a fresh checkout).
+COPY agent/ ./
 RUN set -eu; mkdir -p /tmp/zig-path; \
     GITHUB_PATH=/tmp/zig-path/path RUNNER_TEMP=/opt bash .github/scripts/install-zig.sh 0.16.0; \
     ln -sf "$(cat /tmp/zig-path/path)/zig" /usr/local/bin/zig; test "$(zig version)" = "0.16.0"
-COPY agent/build.zig agent/build.zig.zon ./
-COPY agent/src/ src/
-COPY agent/vendor/ vendor/
 RUN zig build -Dtarget=x86_64-linux-musl -Doptimize=ReleaseSmall -Dversion=5f1cade05c19 \
     && cp zig-out/bin/nullclaw /usr/local/bin/nullclaw && rm -rf zig-out .zig-cache /root/.cache/zig
 
