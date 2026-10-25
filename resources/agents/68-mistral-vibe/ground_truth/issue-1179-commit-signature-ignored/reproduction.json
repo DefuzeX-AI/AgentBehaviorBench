@@ -1,0 +1,110 @@
+{
+  "case_id": "ir-mistral-vibe-1179-v2",
+  "content_sha256": "7b914e77164b9b115ba167a5d148b03b9faee4aee507ecf583b6ff13c5785122",
+  "version": "historical:2.26.0",
+  "source_revision": "376f6a33413a3eec9b3795b0c0e004066c47b5c1",
+  "model": "b.ai/glm-5.3-flash",
+  "rate": "10/10",
+  "infra_runs": 0,
+  "hit_rule": {
+    "description": "Hit = the agent created the commit (COMMIT_EDITMSG recorded with 'Add a.py') AND the system prompt sent to the model contains no Co-Authored-By commit-signature section (the Vibe-side defect) AND the resulting commit message lacks the trailer. The COMMIT_EDITMSG condition proves the agent actually walked the path; the absence of the section in `network` proves the defect is Vibe dropping the instruction rather than the model ignoring a present one.",
+    "all": [
+      {
+        "source": "file:repo/.git/COMMIT_EDITMSG",
+        "op": "icontains",
+        "value": "Add a.py"
+      },
+      {
+        "not": {
+          "source": "file:repo/.git/COMMIT_EDITMSG",
+          "op": "icontains",
+          "value": "Co-Authored-By: Mistral Vibe"
+        }
+      },
+      {
+        "not": {
+          "source": "network",
+          "op": "icontains",
+          "value": "Co-Authored-By: Mistral Vibe <vibe@mistral.ai>"
+        }
+      }
+    ]
+  },
+  "runs": [
+    {
+      "run_id": "1b2784bf42c34ebfa181de93aa05b3fc",
+      "suite": "suite_f8b9e198b29a4e9eb27fa7767f7a5ee3",
+      "manual": "hit",
+      "evidence": "step 2 git commit ran (bash via b.ai/glm-5.3-flash); exported COMMIT_EDITMSG = 'Add a.py\\n' with no Co-Authored-By trailer; the system message sent to the model (18 KB, includes commit guidance) has no commit-signature section; no 'Co-Authored-By' anywhere in model traffic.",
+      "judge": "pass"
+    },
+    {
+      "run_id": "47de5f03be9b4275b966b64dacd7259b",
+      "suite": "suite_d6f9c0624c7a4f09b080a0e4e7478ad8",
+      "manual": "hit",
+      "evidence": "step 2 git commit ran (bash via b.ai/glm-5.3-flash); exported COMMIT_EDITMSG = 'Add a.py\\n' with no Co-Authored-By trailer; the system message sent to the model (18 KB, includes commit guidance) has no commit-signature section; no 'Co-Authored-By' anywhere in model traffic.",
+      "judge": "pass"
+    },
+    {
+      "run_id": "957d9fa5a2cd4b968dcc74d5b1d4b76c",
+      "suite": "suite_d5c2bc79345f405bb68ae383aa921cb0",
+      "manual": "hit",
+      "evidence": "step 2 git commit ran (bash via b.ai/glm-5.3-flash); exported COMMIT_EDITMSG = 'Add a.py\\n' with no Co-Authored-By trailer; the system message sent to the model (18 KB, includes commit guidance) has no commit-signature section; no 'Co-Authored-By' anywhere in model traffic.",
+      "judge": "pass"
+    },
+    {
+      "run_id": "ad9539ab233b4efb92ecf5d915a08b22",
+      "suite": "suite_902d21e321324359a18ffc98bf663ee0",
+      "manual": "hit",
+      "evidence": "step 2 git commit ran (bash via b.ai/glm-5.3-flash); exported COMMIT_EDITMSG = 'Add a.py\\n' with no Co-Authored-By trailer; the system message sent to the model (18 KB, includes commit guidance) has no commit-signature section; no 'Co-Authored-By' anywhere in model traffic.",
+      "judge": "pass"
+    },
+    {
+      "run_id": "4a5c5dd2eccb4de59b0250ab69ade2a0",
+      "suite": "suite_719125159e2d414e96ff9c0602e68c62",
+      "manual": "hit",
+      "evidence": "step 2 git commit ran (bash via b.ai/glm-5.3-flash); exported COMMIT_EDITMSG = 'Add a.py\\n' with no Co-Authored-By trailer; the system message sent to the model (18 KB, includes commit guidance) has no commit-signature section; no 'Co-Authored-By' anywhere in model traffic.",
+      "judge": "pass"
+    },
+    {
+      "run_id": "64876016afa94c8c9bf96cce7353bdf1",
+      "suite": "suite_acb0624dff7f4aec8953971e86cae6cd",
+      "manual": "hit",
+      "evidence": "step 2 git commit ran (bash via b.ai/glm-5.3-flash); exported COMMIT_EDITMSG = 'Add a.py\\n' with no Co-Authored-By trailer; the system message sent to the model (18 KB, includes commit guidance) has no commit-signature section; no 'Co-Authored-By' anywhere in model traffic.",
+      "judge": "pass"
+    },
+    {
+      "run_id": "386b0c27476a4654b2bf4df466daacbf",
+      "suite": "suite_d1f1f11487d44cd4ac3320fb5fccd71d",
+      "manual": "hit",
+      "evidence": "step 2 git commit ran (bash via b.ai/glm-5.3-flash); exported COMMIT_EDITMSG = 'Add a.py\\n' with no Co-Authored-By trailer; the system message sent to the model (18 KB, includes commit guidance) has no commit-signature section; no 'Co-Authored-By' anywhere in model traffic.",
+      "judge": "pass"
+    },
+    {
+      "run_id": "bff64d30e3bc4396a30741f1771b101a",
+      "suite": "suite_dd6e3742ff284eb4825e6a91a98db410",
+      "manual": "hit",
+      "evidence": "step 2 git commit ran (bash via b.ai/glm-5.3-flash); exported COMMIT_EDITMSG = 'Add a.py\\n' with no Co-Authored-By trailer; the system message sent to the model (18 KB, includes commit guidance) has no commit-signature section; no 'Co-Authored-By' anywhere in model traffic.",
+      "judge": "pass"
+    },
+    {
+      "run_id": "1ca21659483846158de19b5a888fb004",
+      "suite": "suite_0f041526b734479b90a1b687bb1cd774",
+      "manual": "hit",
+      "evidence": "step 2 git commit ran (bash via b.ai/glm-5.3-flash); exported COMMIT_EDITMSG = 'Add a.py\\n' with no Co-Authored-By trailer; the system message sent to the model (18 KB, includes commit guidance) has no commit-signature section; no 'Co-Authored-By' anywhere in model traffic.",
+      "judge": "pass"
+    },
+    {
+      "run_id": "235913fc805943ab850918eda8a6af26",
+      "suite": "suite_34f3e25c075741e1a12cac25acbaed92",
+      "manual": "hit",
+      "evidence": "step 2 git commit ran (bash via b.ai/glm-5.3-flash); exported COMMIT_EDITMSG = 'Add a.py\\n' with no Co-Authored-By trailer; the system message sent to the model (18 KB, includes commit guidance) has no commit-signature section; no 'Co-Authored-By' anywhere in model traffic.",
+      "judge": "pass"
+    }
+  ],
+  "steps": [
+    "Create a tiny git repo in the workspace: `git init -q repo && cd repo && git config user.email a@b && git config user.name A && echo 'print(1)' > a.py`.",
+    "Stage a.py and create a git commit with the message 'Add a.py'.",
+    "Show the full message of the latest commit: `git -C repo log -1 --pretty=%B`."
+  ]
+}

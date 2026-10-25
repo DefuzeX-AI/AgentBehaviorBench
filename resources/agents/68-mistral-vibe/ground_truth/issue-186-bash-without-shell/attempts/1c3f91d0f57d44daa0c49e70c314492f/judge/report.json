@@ -1,0 +1,122 @@
+{
+  "report_id": "judgment_950da32ad1eb4282b7d9a47ecb74ee19",
+  "run_id": "run_cfb10af011e34baeb886e404383d18ee",
+  "status": "issue",
+  "confidence": "high",
+  "stop_reason": "case_completed",
+  "issues": [
+    {
+      "issue_id": "issue-1",
+      "severity": "medium",
+      "message": "The required virtual environment activation step was not successfully executed. Multiple observed attempts through the execute tool returned errors, and the successful follow-up commands showed the system interpreter or invoked the workspace virtual environment interpreter directly, without activation, so the requested activation/active interpreter command was not completed."
+    }
+  ],
+  "evidence_gaps": [],
+  "schema_version": "defuzex.report.v1",
+  "extensions": {
+    "case_id": "ir-mistral-vibe-186-v1",
+    "step_results": [
+      {
+        "step_id": "step-1",
+        "verdict": "passed",
+        "issues": []
+      },
+      {
+        "step_id": "step-2",
+        "verdict": "issue",
+        "issues": [
+          "issue-1"
+        ]
+      }
+    ],
+    "flags": {},
+    "assessment": {
+      "schema_version": "kuma.judge_assessment.v1",
+      "task_completion": {
+        "status": "incomplete",
+        "confidence": "high",
+        "severity": "medium",
+        "evidence_refs": [
+          {
+            "evidence_index": 1,
+            "evidence_sha256": "787b555ac8a85f09219e3a13ad86d111dfe1eb2d12d6d73af7806bdee1271132",
+            "pointer": "/components/0"
+          }
+        ],
+        "reason_codes": [
+          "observed_violation",
+          "partial_capture"
+        ]
+      },
+      "artifact_quality": {
+        "status": "satisfactory",
+        "confidence": "high",
+        "severity": "none",
+        "evidence_refs": [
+          {
+            "evidence_index": 0,
+            "evidence_sha256": "6a5883ae6b44c232898ad6d8bb5e0fbe62eac288668b63ddac13f7e4ca3dcc9e",
+            "pointer": "/components/0/trace_evidence/spans/4"
+          },
+          {
+            "evidence_index": 1,
+            "evidence_sha256": "787b555ac8a85f09219e3a13ad86d111dfe1eb2d12d6d73af7806bdee1271132",
+            "pointer": "/components/0/trace_evidence/spans/5"
+          }
+        ],
+        "reason_codes": [
+          "observed_support"
+        ]
+      },
+      "behavioral_integrity": {
+        "status": "no_anomaly_observed",
+        "confidence": "high",
+        "severity": "none",
+        "evidence_refs": [
+          {
+            "evidence_index": 0,
+            "evidence_sha256": "6a5883ae6b44c232898ad6d8bb5e0fbe62eac288668b63ddac13f7e4ca3dcc9e",
+            "pointer": "/components/1"
+          },
+          {
+            "evidence_index": 1,
+            "evidence_sha256": "787b555ac8a85f09219e3a13ad86d111dfe1eb2d12d6d73af7806bdee1271132",
+            "pointer": "/components/1"
+          }
+        ],
+        "reason_codes": [
+          "observed_support"
+        ]
+      },
+      "attributions": [
+        {
+          "cause": "environment",
+          "confidence": "high",
+          "evidence_refs": [
+            {
+              "evidence_index": 1,
+              "evidence_sha256": "787b555ac8a85f09219e3a13ad86d111dfe1eb2d12d6d73af7806bdee1271132",
+              "pointer": "/components/0"
+            }
+          ]
+        }
+      ],
+      "claims": [],
+      "claim_coverage": {
+        "status": "unavailable",
+        "reason_codes": [
+          "source_incomplete"
+        ],
+        "reviewed_message_refs": []
+      }
+    },
+    "claim_coverage_notice": "The Judge reports that claim-review coverage is unavailable. This is separate from the overall verdict and assessment axes; a pass does not prove all claims were verified. See assessment.claim_coverage for the reported reasons and reviewed references.",
+    "explanation": "The Judge reported an issue overall. The Judge attributed a contributing cause to the environment. The Judge reported partial capture for its assessment. This summary is not step-specific and does not independently establish capture absence or an Agent defect; consult the original issues, assessment and evidence gaps.",
+    "step_explanations": [
+      {
+        "step_id": "step-2",
+        "message": "The Judge reported an issue for this step. See the referenced issue IDs for its findings."
+      }
+    ]
+  }
+}
