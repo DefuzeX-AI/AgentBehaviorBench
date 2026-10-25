@@ -1,0 +1,11 @@
+schema_version = "abb.network.v1"
+
+# Sudo Code's file, search and shell tools run locally and need no network routes.
+# The admitted model routes are the shared runtime default derived from the
+# selected provider (POST <base>/chat/completions) plus the GET <base>/models
+# catalog request declared in agent.toml. scode reaches both through the loopback
+# relay in bootstrap/model_relay.py, which forwards them through the runtime proxy.
+# Release update checks are disabled (SCODE_CHECK_UPDATES=0) and telemetry is
+# opt-in and not enabled. No web search provider, MCP server or connector is
+# configured; WebFetch and WebSearch have no admitted route. ripgrep is
+# preinstalled for local search.
