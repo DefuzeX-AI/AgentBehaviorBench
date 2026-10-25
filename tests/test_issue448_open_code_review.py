@@ -7,7 +7,7 @@ from agentbench.harness.registry import load_registry, tomllib
 from kuma.repository.agent_profiles import parse_agent_profile
 
 ROOT = Path(__file__).resolve().parents[1]
-UNIT_DIR = ROOT / "resources" / "agents" / "110-open-code-review"
+UNIT_DIR = ROOT / "resources" / "agents" / "122-open-code-review"
 
 
 def test_registry_contract():
@@ -19,7 +19,7 @@ def test_registry_contract():
     assert entry["enabled"] is False, "status='adapting' must have enabled=false"
     assert entry["status"] == "adapting"
     assert entry["framework"] == "acp"
-    assert entry["path"] == "resources/agents/110-open-code-review"
+    assert entry["path"] == "resources/agents/122-open-code-review"
 
 
 def test_agent_toml_contract():
@@ -41,8 +41,15 @@ def test_network_rules_contract():
     with rules_path.open("rb") as f:
         data = tomllib.load(f)
     assert data["schema_version"] == "abb.network.v1"
-    routes = data.get("tool_routes", [])
-    assert any("api.deepseek.com" in r.get("host_patterns", []) for r in routes)
+    # Default model selection: no provider-specific routes.
+    assert data.get("tool_routes", []) == []
+
+
+def test_launcher_passes_acp_through():
+    launch_text = (UNIT_DIR / "bootstrap" / "launch.py").read_text(encoding="utf-8")
+    assert "os.execvpe" in launch_text
+    assert "session/prompt" not in launch_text
+    assert not (UNIT_DIR / "bootstrap" / "sitecustomize.py").exists()
 
 
 def test_kuma_requirement_profile():

@@ -1,14 +1,16 @@
 schema_version = "defuzex-bench.agent.v2"
 agent_id = "open-code-review"
-display_name = "open-code-review (Native Dual-Binary ACP bridge, DeepSeek provider)"
+display_name = "open-code-review (native ACP adapter ocr-acp)"
 framework = "acp"
 
 [evaluation]
 replay_safe = false
 
+# Fixture project; the launcher commits it as the repository baseline (fixtures cannot contain .git).
 [evaluation.workspace]
 path = "/home/agent/workspace"
-initial_state = "empty"
+initial_state = "fixture"
+fixture = "evaluation/fixture"
 
 [evaluation.file_evidence]
 track_files = true
