@@ -5,7 +5,7 @@ import json
 import copy
 import pytest
 
-PATH=Path(__file__).resolve().parents[1]/'resources/agents/105-chatcli/bootstrap/compat.py'
+PATH=Path(__file__).resolve().parents[1]/'resources/agents/107-chatcli/bootstrap/compat.py'
 def module():
     spec=importlib.util.spec_from_file_location('chatcli_transport',PATH)
     m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m

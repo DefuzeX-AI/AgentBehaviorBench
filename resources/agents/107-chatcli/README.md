@@ -2,7 +2,7 @@
 
 Task: [ABB Issue #526](https://github.com/DefuzeX-AI/AgentBehaviorBench/issues/526). Upstream license: [Apache-2.0 at the pinned revision](https://github.com/diillson/chatcli/blob/45db39a5174bde637a203408462155b2a9047829/LICENSE).
 
-This unit is `105-chatcli`. It acquires the unchanged native source from `https://github.com/diillson/chatcli` at `45db39a5174bde637a203408462155b2a9047829` using `[source] method="git"`. No Agent source patch, local repair fork, fabricated tool response or replacement agent is used. The launcher maps ABB-selected model settings, isolates HOME/XDG state, and runs the ABB-only reversible OpenAI tool-name transport described below. The ACP server keeps its upstream coder mode and tool/permission handling.
+This unit is `107-chatcli`. It acquires the unchanged native source from `https://github.com/diillson/chatcli` at `45db39a5174bde637a203408462155b2a9047829` using `[source] method="git"`. No Agent source patch, local repair fork, fabricated tool response or replacement agent is used. The launcher maps ABB-selected model settings, isolates HOME/XDG state, and runs the ABB-only reversible OpenAI tool-name transport described below. The ACP server keeps its upstream coder mode and tool/permission handling.
 
 ## Local Smoke
 
@@ -21,7 +21,7 @@ The stock Local SDK generates a self-contained task from `requirement.md`, then 
 Some model gateways reject Python urllib's default HTTP User-Agent. The optional host-only helper below sets an explicit `AgentBehaviorBench/0.1` User-Agent and records request hashes without keys. It delegates to the same normal ABB CLI and changes neither request JSON nor responses, TLS verification, SDK prompts, token budgets or verdict validation:
 
 ```sh
-python resources/agents/105-chatcli/validation/run_smoke.py \
+python resources/agents/107-chatcli/validation/run_smoke.py \
   --allowed-model glm-5.3-flash --http-audit results/chatcli-host-network.jsonl \
   evaluate chatcli --sdk local --cases 1 --case-retries 0 --no-view \
   --registry resources/smoke-registry.toml --model glm-5.3-flash \

@@ -6,7 +6,7 @@ import os
 import tomllib
 import pytest
 ROOT = Path(os.environ.get("ABB_UNIT_TEST_ROOT", Path(__file__).resolve().parents[1]))
-UNIT = ROOT / "resources/agents/105-chatcli"
+UNIT = ROOT / "resources/agents/107-chatcli"
 
 def launcher():
     spec = importlib.util.spec_from_file_location("launch_526", UNIT / "bootstrap/launch.py")
@@ -118,7 +118,7 @@ def test_host_transport_rejects_other_models_before_network(tmp_path):
 def test_readme_uses_stock_local_sdk_and_native_source():
     text = (UNIT / "README.md").read_text()
     assert "--sdk local" in text and "agentbench evaluate chatcli" in text
-    assert "105-chatcli" in text and "2048" in text
+    assert "107-chatcli" in text and "2048" in text
     assert "--case-file" not in text
     assert "No Agent source patch" in text
     assert "https://github.com/DefuzeX-AI/AgentBehaviorBench/issues/526" in text
