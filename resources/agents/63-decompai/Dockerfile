@@ -22,7 +22,8 @@ RUN --mount=type=cache,id=abb-decompai-releases,target=/opt/abb-release-cache,sh
     && unzip -q /opt/abb-release-cache/ghidra_11.3.1_PUBLIC_20250219.zip -d /opt \
     && mv /opt/ghidra_11.3.1_PUBLIC /opt/ghidra
 COPY agent/requirements.txt /tmp/native-requirements.txt
-RUN python -m pip install --no-cache-dir -r /tmp/native-requirements.txt \
+ARG PIP_INDEX_URL=https://pypi.org/simple
+RUN python -m pip install --index-url "$PIP_INDEX_URL" --no-cache-dir -r /tmp/native-requirements.txt \
     "pyelftools==0.32" "python-dotenv>=1,<2" "opentelemetry-sdk>=1.30,<2"
 RUN apt-get update && apt-get install -y --no-install-recommends openjdk-21-jdk-headless \
     && rm -rf /var/lib/apt/lists/*

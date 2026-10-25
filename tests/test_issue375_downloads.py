@@ -65,3 +65,9 @@ def test_dockerfile_checks_both_release_digests_before_installation():
 def test_verified_complete_cache_avoids_network(fixture):
  _,state,out=fixture;out.write_bytes(PAYLOAD)
  r,c,result=run(fixture);assert r.returncode==0 and c==[] and result.read_bytes()==PAYLOAD and 'CACHED_SHA256_VERIFIED' in r.stderr
+
+
+def test_pip_mirror_is_explicit_build_only_with_official_tls_default():
+ s=(UNIT/'Dockerfile').read_text();assert 'ARG PIP_INDEX_URL=https://pypi.org/simple' in s
+ assert 'pip install --index-url "$PIP_INDEX_URL"' in s
+ assert 'ENV PIP_INDEX_URL' not in s and '--trusted-host' not in s
