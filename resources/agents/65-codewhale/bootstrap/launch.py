@@ -44,6 +44,17 @@ def codewhale_binary() -> str:
     )
 
 
+def chat_path_suffix(base_url: str) -> str:
+    """Codewhale strips a trailing version segment (vN or beta) from base_url before
+    appending path_suffix (upstream_url/unversioned_base_url in
+    crates/app-server/src/chat_completions.rs), so keep that segment in the suffix;
+    otherwise `https://api.b.ai/v1` becomes `https://api.b.ai/chat/completions`
+    and misses the admitted `<base_url>/chat/completions` route."""
+    last = urlsplit(base_url).path.rstrip("/").rsplit("/", 1)[-1]
+    version = last.lower() == "beta" or (last[:1] in "vV" and last[1:].isdigit() and len(last) > 1)
+    return f"/{last}/chat/completions" if version else "/chat/completions"
+
+
 def render_config(base_url: str, model: str) -> str:
     """Return the config.toml that binds the shared model route explicitly."""
     return "\n".join([
@@ -60,7 +71,7 @@ def render_config(base_url: str, model: str) -> str:
         # The runtime admits exactly `<base_url>/chat/completions`; Codewhale's
         # OpenAI route would otherwise append its own `/v1/chat/completions` and
         # miss that route, so the suffix is pinned to the admitted path.
-        'path_suffix = "/chat/completions"',
+        f"path_suffix = {toml_string(chat_path_suffix(base_url))}",
         # The key itself is never written here; Codewhale reads this variable from
         # the environment, which the runtime fills for this process only.
         f"api_key_env = {toml_string(KEY_VARIABLE)}",
