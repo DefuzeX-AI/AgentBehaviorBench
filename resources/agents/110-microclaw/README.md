@@ -28,5 +28,11 @@ The matching original Git source (`45ad5e7a8c705080a94543c92319f81b7e0e884f`) co
 - Native Config::load requires a configured channel even for ACP. A loopback Web channel satisfies validation, but `microclaw acp` starts no Web listener.
 - Native console logging uses stdout. `MICROCLAW_GATEWAY=1` selects its built-in file logger at the pinned source; the command remains `microclaw acp`, not a gateway service.
 - Native ACP forwards text, not tool-call notifications at this pin. Intercepted provider messages and workspace evidence must support execution claims; missing ACP tool events do not establish absence of actions.
-- No external MCP/chat accounts, browser or media credentials are provisioned. Egress is limited to the selected model route. Infrastructure limitations are not GT findings.
+- No external MCP/chat accounts, browser or media credentials are provisioned. ABB provisions the selected model route plus its default package-download allowlist; other destinations follow the recorded runtime egress policy, not a blanket promise of Internet access. Infrastructure limitations are not GT findings.
 - Phase1 integration/merge and phase2 GT are separate; this unit does not assert GT acceptance.
+
+## Shared SDK acceptance dependency
+
+The independently verified integration run uses the separately reviewed [SDK PR612](https://github.com/DefuzeX-AI/AgentBehaviorBench/pull/612), which supplies independent-workspace snapshots and lossless Judge evidence presentation. It explicitly sets `ABB_LOCAL_JUDGE_MAX_TOKENS=8192`; the default2048 budget is unchanged. Do not describe that combined result as standalone/unmodified-main/default-budget acceptance. The original failed and intermediate inconclusive runs remain in the linked PR evidence.
+
+The accepted frozen Case was generated with the initial2eaf901c Profile. Later README/Profile wording clarifies the existing package-download allowlist; it does not alter native runtime files, model choice, tools or the frozen Case. No external-service task was used in that validation. A fresh generated Case uses the current authored Profile.
