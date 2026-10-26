@@ -54,6 +54,8 @@ index serving remain original defaults, not integration-added disabling.
 `bootstrap/local-models.json` pins 16 original public tensor/tokenizer/config
 assets (211,110,711 bytes) by immutable Hub revision, byte size and SHA256.
 Build-time downloads resume within bounded retries and fail closed on mismatch.
+Public Hub requests refresh expiring signed redirects with a per-fetch query; the
+repository revision, asset path, byte length and SHA256 remain immutable.
 `prefetch_models.py` packages the native Hub cache layout; cold session startup
 therefore needs no embedding download. Each Case has its own writable refs and
 metadata, while immutable model weights stay in the image. Session/memory state

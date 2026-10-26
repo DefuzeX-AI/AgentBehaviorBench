@@ -4,6 +4,7 @@ import json
 from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
+import time
 
 ROOT = Path(__file__).resolve().parent
 
@@ -36,7 +37,8 @@ def install(manifest, cache, destination):
         if not blob.exists() or blob.stat().st_size != asset['bytes'] or digest(blob) != asset['sha256']:
             subprocess.run(['curl', '--fail', '--location', '--connect-timeout', '20',
                             '--max-time', '600', '--retry', '2', '--continue-at', '-',
-                            f'https://huggingface.co/{repo}/resolve/{revision}/{name}',
+                            f'https://huggingface.co/{repo}/resolve/{revision}/{name}'
+                            f'?download=true&abb_sha256={asset["sha256"]}&abb_fetch={time.time_ns()}',
                             '-o', str(blob)], check=True, timeout=1850)
         if blob.stat().st_size != asset['bytes'] or digest(blob) != asset['sha256']:
             raise ValueError('Pinned public model asset checksum mismatch')

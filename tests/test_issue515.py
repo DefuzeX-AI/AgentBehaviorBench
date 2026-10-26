@@ -356,3 +356,51 @@ def test_transport_rejects_untrusted_https_certificate(tls_upstream):
         assert seen == []
     finally:
         server.shutdown();server.server_close()
+
+
+def prefetch_module():
+    spec = importlib.util.spec_from_file_location('issue515_prefetch', UNIT / 'bootstrap/prefetch_models.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_public_download_refreshes_redirect_without_changing_asset_identity(tmp_path, monkeypatch):
+    from urllib.parse import urlsplit, parse_qs
+    module = prefetch_module()
+    data = b'original-public-tensor-fixture'
+    digest = hashlib.sha256(data).hexdigest()
+    asset = {'repository': 'Example/public', 'revision': 'a' * 40,
+             'path': 'onnx/model.onnx', 'bytes': len(data), 'sha256': digest}
+    calls = []
+    clock = iter([1001, 1002])
+    monkeypatch.setattr(module.time, 'time_ns', lambda: next(clock))
+    def download(argv, **kwargs):
+        calls.append(argv)
+        Path(argv[argv.index('-o') + 1]).write_bytes(data)
+    monkeypatch.setattr(module.subprocess, 'run', download)
+    for n in [1, 2]:
+        module.install({'assets': [asset]}, tmp_path / str(n), tmp_path / ('dest' + str(n)))
+    urls = [next(s for s in a if s.startswith('https://')) for a in calls]
+    assert urls[0] != urls[1]
+    for url in urls:
+        parsed = urlsplit(url)
+        assert parsed.netloc == 'huggingface.co'
+        assert parsed.path == '/Example/public/resolve/' + 'a' * 40 + '/onnx/model.onnx'
+        assert parse_qs(parsed.query)['abb_sha256'] == [digest]
+        assert parse_qs(parsed.query)['download'] == ['true']
+    assert all('--fail' in a and '--continue-at' in a and '-k' not in a for a in calls)
+    module.install({'assets': [asset]}, tmp_path / '1', tmp_path / 'cached-dest')
+    assert len(calls) == 2
+
+
+def test_public_download_hash_mismatch_still_fails_closed(tmp_path, monkeypatch):
+    module = prefetch_module()
+    asset = {'repository': 'Example/public', 'revision': 'b' * 40,
+             'path': 'onnx/model.onnx', 'bytes': 4, 'sha256': hashlib.sha256(b'good').hexdigest()}
+    def wrong_bytes(argv, **kwargs):
+        Path(argv[argv.index('-o') + 1]).write_bytes(b'evil')
+    monkeypatch.setattr(module.subprocess, 'run', wrong_bytes)
+    with pytest.raises(ValueError, match='checksum mismatch'):
+        module.install({'assets': [asset]}, tmp_path / 'cache', tmp_path / 'destination')
+    assert not (tmp_path / 'destination/models--Example--public').exists()
