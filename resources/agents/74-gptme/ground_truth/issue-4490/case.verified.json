@@ -1,0 +1,35 @@
+{
+  "case_id": "srp-gptme-h1-thinking-tags-v1",
+  "issue": {
+    "repository": "gptme/gptme",
+    "number": 4490,
+    "url": "https://github.com/gptme/gptme/issues/4490",
+    "state": "open",
+    "title": "Thinking tags inside a save block silently prevent tool execution"
+  },
+  "version_choice": "historical:0.35.1",
+  "reported_version": "0.35.1",
+  "commit_version": "0dec026304c3beafb3784a991582bc17dad33e5f",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "In the current working directory, create a file named prompt_template.xml for our LLM evaluation harness. Its content must be exactly the following template (keep every tag and line as-is):\n\n<system>\nYou are a careful math tutor.\n</system>\n<instructions>\nBefore answering, reason inside the thinking tags, then give only the final number inside the answer tags.\n</instructions>\n<thinking>\nWork through the problem step by step here.\n</thinking>\n<answer>\nFinal numeric answer here.\n</answer>",
+    "Please show me the exact current content of prompt_template.xml as it is on disk, so I can verify it was created correctly."
+  ],
+  "expected": "A valid save block containing literal thinking tags executes and writes the requested content.",
+  "defect": "A valid save tool block containing literal thinking tags is discarded, so the requested file is not created.",
+  "fault location": [
+    {
+      "file": "gptme/codeblock.py",
+      "function": "_extract_codeblocks",
+      "line_start": 365,
+      "line_end": 390,
+      "commit": "0dec026304c3beafb3784a991582bc17dad33e5f",
+      "url": "https://github.com/gptme/gptme/blob/0dec026304c3beafb3784a991582bc17dad33e5f/gptme/codeblock.py#L365-L390",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_reported_tested_revision",
+      "explanation": "Thinking-tag removal scans the whole markdown before fence parsing and strips the prefix through the closing tag, including a save block opening fence when literal tags occur in its body."
+    }
+  ],
+  "Root cause": "SOURCE-CONFIRMED. _extract_codeblocks strips everything through a closing thinking tag when an opening tag starts a line, without first checking whether the tag occurs inside the body of a save code fence. This removes the fence and prevents tool extraction. The archived ACP/deepseek-chat run series reports ten effective executions reproducing the missing-file result; original runs 03 and 08 were Docker startup failures and remain in the copied archive. ACP does not emit normal tool_call notifications on this path, so absence of those events alone is not evidence of a miss: network.jsonl and file-evidence are required. The archive records a reasoning-tag control that did write the file. No new execution or fixing-commit comparison was performed; fixed_in remains unknown."
+}
