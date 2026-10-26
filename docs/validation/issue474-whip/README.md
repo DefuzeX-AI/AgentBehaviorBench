@@ -84,7 +84,7 @@ an automatic GT summary with zero calls; no GT exploration was started.
 ## Source and checks
 
 The native source revision is `1c5da05987d2869687dfc95fc9128ad2ad68e0f0`.
-See the [unit README](../../../resources/agents/127-whip/README.md) for the exact
+See the [unit README](../../../resources/agents/132-whip/README.md) for the exact
 manual prerequisite: checkout the pinned Git tree, validate it is clean, and
 materialize its internal `.claude/skills` directory link without changing source
 file bytes. ABB does not automatically restore this bundled unit.
@@ -123,7 +123,7 @@ performed as part of this onboarding validation.
 ## Submission synchronization — 2026-10-26
 
 This closeout merges upstream `8349406e` and relocates the current unit from
-`123-whip` to `127-whip`. The earlier integration/evidence commit is
+`123-whip` to `132-whip`. The earlier integration/evidence commit is
 `1ff65d2c`. Native source, launcher, Dockerfile, profile, manifest and runtime
 configuration are byte-identical to that integration; only the current registry,
 unit location, runnable references and this submission record change. Existing
