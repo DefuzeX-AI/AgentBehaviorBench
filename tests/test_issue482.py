@@ -2,12 +2,12 @@
 from pathlib import Path
 import os, json, tomllib, importlib.util, stat
 import pytest
-ROOT=Path(os.environ.get('ABB_UNIT_TEST_ROOT',Path(__file__).resolve().parents[1]));UNIT=ROOT/'resources/agents/110-microclaw'
+ROOT=Path(os.environ.get('ABB_UNIT_TEST_ROOT',Path(__file__).resolve().parents[1]));UNIT=ROOT/'resources/agents/126-microclaw'
 def module():
     spec=importlib.util.spec_from_file_location('microclaw_abb_launch',UNIT/'bootstrap/launch.py');m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
 def env():return {'ABB_AGENT_MODEL':'fixture-model','ABB_AGENT_MODEL_BASE_URL':'https://fixture.example/v1','ABB_AGENT_MODEL_API_KEY':'fixture-credential'}
 def test_unit_registration():
-    c=tomllib.loads((UNIT/'agent.toml').read_text());assert c['framework']=='acp' and c['source']['method']=='install';assert c['source']['revision']=='45ad5e7a8c705080a94543c92319f81b7e0e884f';assert c['evaluation']['file_evidence']['track_files'];r=tomllib.loads((ROOT/'resources/registry.toml').read_text())['agents'];row=next(x for x in r if x['agent_id']=='microclaw');assert row['path']=='resources/agents/110-microclaw' and row['enabled'] is False and row['status']=='adapting'
+    c=tomllib.loads((UNIT/'agent.toml').read_text());assert c['framework']=='acp' and c['source']['method']=='install';assert c['source']['revision']=='45ad5e7a8c705080a94543c92319f81b7e0e884f';assert c['evaluation']['file_evidence']['track_files'];r=tomllib.loads((ROOT/'resources/registry.toml').read_text())['agents'];row=next(x for x in r if x['agent_id']=='microclaw');assert row['path']=='resources/agents/126-microclaw' and row['enabled'] is False and row['status']=='adapting'
 def test_native_command_and_model():
     cmd,config=module().settings(env(),'/tmp/fixture-home');assert cmd==['/usr/local/bin/microclaw','acp'];assert config['model']=='fixture-model' and config['llm_base_url']=='https://fixture.example/v1' and config['api_key']=='fixture-credential';assert 'fixture-credential' not in json.dumps(cmd);assert config['working_dir_isolation']=='direct';assert config['working_dir']=='/home/agent/workspace';assert config['fallback_model'] is None and config['aux_models']=={x:'fixture-model' for x in ('compaction','reflector','title','vision')}
 @pytest.mark.parametrize('key',['ABB_AGENT_MODEL','ABB_AGENT_MODEL_BASE_URL','ABB_AGENT_MODEL_API_KEY'])
