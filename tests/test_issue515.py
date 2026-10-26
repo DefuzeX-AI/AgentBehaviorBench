@@ -11,7 +11,7 @@ import hashlib
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-UNIT = Path(os.environ.get('ABB_ISSUE515_UNIT', ROOT / 'resources/agents/127-octomind'))
+UNIT = Path(os.environ.get('ABB_ISSUE515_UNIT', ROOT / 'resources/agents/129-octomind'))
 
 
 @pytest.fixture
@@ -33,7 +33,7 @@ def setup(tmp_path):
     template = unit / 'agent/config-templates/default.toml'
     template.parent.mkdir(parents=True)
     template.write_text('[model]\nname="octohub:auto"\n[supervisor]\nenabled=true\n[supervisor.model]\nname="octohub:auto"\n[compression.model]\nname="octohub:auto"\n')
-    shutil.copytree(ROOT / 'resources/agents/127-octomind/bootstrap/defaults', unit / 'bootstrap/defaults')
+    shutil.copytree(ROOT / 'resources/agents/129-octomind/bootstrap/defaults', unit / 'bootstrap/defaults')
     tap = tmp_path / 'tap'
     tap.mkdir()
     return unit, tap, template
@@ -133,7 +133,7 @@ def test_every_sidecar_text_model_is_routed_and_other_settings_unchanged(launche
             table = table[part]
         for field in fields:
             table[field] = 'openrouter:glm-5.3-flash'
-    overrides = json.loads((ROOT / 'resources/agents/127-octomind/bootstrap/local-models.json').read_text())['native_config']
+    overrides = json.loads((ROOT / 'resources/agents/129-octomind/bootstrap/local-models.json').read_text())['native_config']
     for section, fields in overrides['octocode'].items():
         table = expected
         for part in section.split('.'):
