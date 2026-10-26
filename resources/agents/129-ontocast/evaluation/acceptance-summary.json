@@ -1,0 +1,79 @@
+{
+  "schema": "abb.contributor.acceptance-summary.v1",
+  "agent_id": "ontocast",
+  "issue": 501,
+  "source_revision": "b111d53f722fa6b3fc17091188c3135c6c54acc2",
+  "abb_base": "8349406ee5bdc4e8b22e220a89236bab10a6bcef",
+  "model": "deepseek/deepseek-flash",
+  "suite_id": "suite_eadb0f44c2ba4050a0a5c247707fa9f9",
+  "sdk_run_id": "68e7e63d88954de08098165d3af6e792",
+  "attempt_id": "427a6d573c104e649c4395854d99ade2",
+  "case_count": 1,
+  "input_count": 1,
+  "cli_exit_code": 1,
+  "duration_seconds": 258.22,
+  "execution": "succeeded",
+  "cleanup": "succeeded",
+  "host_trace_validation": "succeeded",
+  "network_counts": {
+    "interceptor_ready": 2,
+    "llm_request": 4,
+    "llm_response": 4
+  },
+  "binding_tests_passed": 14,
+  "native_source_blobs_verified": 514,
+  "official_case_or_judge_calls": 0,
+  "gt_tested": false,
+  "prior_failed_attempts": [
+    "v1 blocked before Agent/model activity by missing SDK trace dependency opentelemetry.",
+    "v2 reached four real model calls with accepted trace/cleanup, but the input failed because the native entity-consolidation encoder dependency was missing. Both are retained and not GT.",
+    "v4: four real model responses, then the native pure in-memory store rejected an RDF 1.2 provenance triple term. Input failed; not accepted as Smoke or GT. Offline plain-versus-provenance comparison reproduced the serialization incompatibility without model calls.",
+    "v5: zero Agent model requests; ABB file loading did not put the split helper on its import path. The owned service helper is now included in the single outer binding file. Failed input and inconclusive Judge retained.",
+    "v6: first Agent inference request received upstream HTTP 402 insufficient balance. Input failed, Judge inconclusive; infrastructure failure, not GT. User replenished the account before the subsequent attempt.",
+    "v7: Agent execution, trace validation and cleanup succeeded, but local Judge evidence exceeded the configured 1.2M-character limit (CLI 1). Two complete hash-verified Judge-only replays at 4M characters returned pass with evidence_gaps, correctly rejected by the unchanged response validator. Neither replay was accepted. The imported Case lacked Agent context; final Case includes the actual deployed Profile via ABB load_agent_context without changing the document payload.",
+    "v8: complete Agent execution/trace/cleanup, but non-thinking Judge again returned invalid pass with evidence_gaps (CLI 1). Judge-only replay of identical evidence with thinking enabled and max_tokens 8192 returned validated pass/high. The original failed CLI result and invalid raw reply remain unchanged; the later final attempt uses the proven Judge options end-to-end.",
+    "v9: runtime execution/trace/cleanup succeeded. The original Judge consumed all 8192 output tokens in reasoning and returned no JSON (CLI 1). Separate full-evidence assessment with a larger Judge budget and JSON mode is recorded separately; original CLI outcome not overwritten.",
+    "v10: final end-to-end attempt with verified Judge configuration blocked on first Agent request by upstream HTTP 402 insufficient balance. Inconclusive Judge and original CLI 1 retained. No further paid requests made after this blocker."
+  ],
+  "embedding_deployment": "Native aggregation remains enabled, real CPU torch 2.14.1+cpu / sentence-transformers 6.2.0; supported settings share all-MiniLM-L6-v2 across aggregation/chunking/embedding. No fake vectors or removed tools.",
+  "limits": [
+    "One synthetic English text document, not broad quality/security acceptance.",
+    "Case-local native Fuseki; no external database/vector service or OCR stack.",
+    "Checkpoint differs from native multilingual defaults; multilingual merge quality is not accepted.",
+    "Optional hdbscan/umap semantic segmentation absent; native naive chunking fallback disclosed.",
+    "Local Judge pass is separate from official KUMA evaluation and human review."
+  ],
+  "public_records": "Sanitized labeled derivatives, not an importable or byte-identical SDK ledger. Original raw traces retained locally; private model reasoning/credentials excluded.",
+  "interrupted_attempts": [
+    "v3: WSL uptime reset and both controller/worker processes disappeared before a final result. Retained running record has three requests and two responses; outcome unknown, excluded from acceptance."
+  ],
+  "judge_deployment": {
+    "scope": "Judge only; original prompts/responses unchanged",
+    "thinking": "enabled",
+    "max_tokens": 8192,
+    "max_chars": "4000000"
+  },
+  "quality_gate": "failed in original CLI; not overwritten by supplemental Judge",
+  "original_judge_status": "failed delivery; no accepted report",
+  "supplemental_judge_status": "pass",
+  "supplemental_judge_confidence": "high",
+  "supplemental_judge_deployment": {
+    "thinking": "enabled",
+    "max_tokens": 32768,
+    "response_format": {
+      "type": "json_object"
+    },
+    "max_chars": 4000000,
+    "evidence_truncated": false,
+    "original_records_modified": false
+  },
+  "acceptance_status": "Draft: runtime verified and separate validated Judge pass/high; original end-to-end CLI gate remains failed. Final rerun blocked by HTTP 402 balance. Not full Stage 1 acceptance.",
+  "deployment_images": {
+    "fuseki": "conceptkernel/jena-fuseki:6.0@sha256:04c1bd90627c058d0789f32216b6a484b63738661d8f41ea476955ed8d99e6fe",
+    "java": "eclipse-temurin:21-jre-jammy@sha256:affcab5356e1270ac35d2361ee83135af2f03e8d580eca78a6d5d6fdbf048db0"
+  },
+  "integration_commit": "969444ab32bf546e9a4be5ccbfefb8389c353b9f",
+  "pre_submission_main_merge": "0d59f2585c8ef38fbf0bc1d4e45dd8e362e8536d",
+  "storage_deployment": "Native Fuseki manager with Case-local Jena 6.0.0 / Java 21, loopback only, fresh workspace TDB2 datasets, ephemeral local credential, 128 MiB JVM heap. Original in-memory implementation unchanged; native RDF 1.2 provenance retained.",
+  "evidence_zip_sha256": "7f71cb7b1db5969afd10c98adaa76fbd9c63a26352cf80b56452ac2c8734c29f"
+}
