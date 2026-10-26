@@ -17,8 +17,8 @@ ENV_KEYS = (KEY_ENV, BASE_ENV, MODEL_ENV, PROVIDER_ENV)
 def model_declaration(manifest):
     """No provider inherits run defaults; native integrations declare a fixed provider."""
     declaration = manifest.get('model', {})
-    if not isinstance(declaration, dict) or set(declaration) - {'provider', 'source', 'reason', 'metadata_paths'}:
-        raise InterceptionConfigurationError('model accepts provider, source, reason and metadata_paths')
+    if not isinstance(declaration, dict) or set(declaration) - {'provider', 'source', 'reason', 'metadata_paths', 'runtime_configurable'}:
+        raise InterceptionConfigurationError('model accepts provider, source, reason, metadata_paths and runtime_configurable')
     provider = declaration.get('provider')
     if 'provider' in declaration and (not isinstance(provider, str)
             or not re.fullmatch(r'[a-z][a-z0-9_-]*', provider)):
@@ -37,15 +37,21 @@ def model_declaration(manifest):
         raise InterceptionConfigurationError('A model.provider pin requires a model integration')
     if 'reason' in declaration and (not isinstance(declaration['reason'], str) or not declaration['reason'].strip()):
         raise InterceptionConfigurationError('model.reason must be non-empty text')
+    configurable = declaration.get('runtime_configurable', False)
+    if 'runtime_configurable' in declaration:
+        if type(configurable) is not bool:
+            raise InterceptionConfigurationError('model.runtime_configurable must be a boolean')
+        if source != 'native' or not declaration.get('reason') or 'llm_interception' not in manifest:
+            raise InterceptionConfigurationError('model.runtime_configurable requires native ACP, an explicit provider and reason, and interception')
     paths = declaration.get('metadata_paths', [])
     if not isinstance(paths, list) or any(path != '/models' for path in paths) or len(paths) > 1:
         raise InterceptionConfigurationError('model.metadata_paths supports only ["/models"]')
-    if source == 'shared':
+    if source == 'shared' or configurable:
         section = manifest['llm_interception']
         if not isinstance(section, dict):
             raise InterceptionConfigurationError('llm_interception must be a table')
         if section.get('routes') or section.get('credentials') or section.get('environment'):
-            raise InterceptionConfigurationError('Default ACP model routes and credentials are resolved at runtime; remove static overrides or declare a fixed native integration')
+            raise InterceptionConfigurationError('Runtime-configurable ACP model routes and credentials are resolved at runtime; remove static overrides or declare a fixed native integration')
         runtime = manifest.get('runtime', {})
         declared = {key for field in ('env_keys', 'secret_env_keys', 'optional_secret_env_keys', 'worker_env_keys')
                     for key in runtime.get(field, [])}
@@ -56,11 +62,17 @@ def model_declaration(manifest):
     return source, tuple(paths)
 
 
+def uses_runtime_model(manifest):
+    """Keep native provenance while opting a compatible client into runtime selection."""
+    source, _ = model_declaration(manifest)
+    return source == 'shared' or manifest.get('model', {}).get('runtime_configurable', False)
+
+
 def select_model_provider(manifest, environ, fallback=None):
     """Per-Agent pins win over run-level provider choices, without changing shared state."""
     source, _ = model_declaration(manifest)
     provider = manifest.get('model', {}).get('provider')
-    if source in ('native', 'direct') or not provider:
+    if source == 'direct' or (source == 'native' and not uses_runtime_model(manifest)) or not provider:
         return fallback
     if environ.get('ABB_MODEL_ROUTING_CONFIG', '').strip():
         raise InterceptionConfigurationError('A fixed model.provider cannot be combined with multi-target routing')
@@ -69,7 +81,7 @@ def select_model_provider(manifest, environ, fallback=None):
 
 
 def resolve_shared_model(manifest, environ, model_provider=None):
-    if model_declaration(manifest)[0] != 'shared':
+    if not uses_runtime_model(manifest):
         return None
     if environ.get('ABB_MODEL_ROUTING_CONFIG', '').strip():
         raise InterceptionConfigurationError('Shared native Agents use one model; multi-target routing is only supported in replacement mode')

@@ -59,8 +59,8 @@ class ACPConfig:
                 *_strings(runtime.get('env_keys', []), 'runtime.env_keys'),
                 *_strings(runtime.get('secret_env_keys', []), 'runtime.secret_env_keys'),
                 *_strings(runtime.get('optional_secret_env_keys', []), 'runtime.optional_secret_env_keys'))
-        from agentbench.runtime.interception.native_model import model_declaration, ENV_KEYS
-        if model_declaration(manifest)[0] == 'shared':
+        from agentbench.runtime.interception.native_model import uses_runtime_model, ENV_KEYS
+        if uses_runtime_model(manifest):
             keys += ENV_KEYS
         # Observe mode forwards declared native credentials to the ACP process.
         interception = manifest.get('llm_interception', {})

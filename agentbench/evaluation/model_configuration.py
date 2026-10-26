@@ -45,7 +45,7 @@ def agent_model_configuration(registrations, *, environ, model):
             }, secrets)
             result[agent.agent_id] = {'mode': mode, 'routing': routing}
             continue
-        from agentbench.runtime.interception.native_model import resolve_shared_model
+        from agentbench.runtime.interception.native_model import resolve_shared_model, model_declaration
         shared = resolve_shared_model(manifest, environ)
         runtime = manifest.get('runtime', {})
         private = set(runtime.get('secret_env_keys', ())) | set(runtime.get('optional_secret_env_keys', ()))
@@ -63,7 +63,9 @@ def agent_model_configuration(registrations, *, environ, model):
         if manifest.get('model', {}).get('provider'):
             result[agent.agent_id]['provider_pin'] = manifest['model']['provider']
         if shared is not None:
-            result[agent.agent_id]['model_source'] = 'shared'
+            result[agent.agent_id]['model_source'] = model_declaration(manifest)[0]
+            if manifest.get('model', {}).get('runtime_configurable'):
+                result[agent.agent_id]['runtime_configurable'] = True
             result[agent.agent_id]['target'] = public_configuration({
                 'provider_id': shared.provider_id, 'model': shared.model,
                 'base_url': shared.base_url, 'target_plugin': shared.target_plugin,

@@ -111,3 +111,35 @@ linked new Suite; SDK/judge configuration is checked separately as before.
 Configuration and offline regression tests do not certify every Agent/provider/model
 combination. Earlier provider-specific acceptance records remain historical; a fresh live
 Case is required to demonstrate native requests and tool behavior for a new combination.
+
+### Runtime-configurable native clients
+
+A provider-constrained native ACP client that accepts a configurable OpenAI Chat
+Completions endpoint, model ID and credential can explicitly opt into runtime
+selection while retaining its native declaration:
+
+```toml
+[model]
+provider = "deepseek"
+source = "native"
+reason = "The native client supports only this provider's model catalog."
+runtime_configurable = true
+```
+
+This capability requires a native ACP declaration, an explicit provider and a
+nonempty reason. It uses the same provider pin and `--model` precedence as shared
+selection. The runtime supplies `ABB_AGENT_MODEL_*` to the launcher and derives the
+exact observed Chat Completions route. Static model credentials, routes and
+interception environment overrides cannot be combined with this capability;
+runtime-owned variables cannot be declared as inputs. The launcher must preserve
+and validate the selected model and map the credential/base URL into supported
+native configuration. Missing provider credentials fail without fallback.
+
+The capability does not enable Responses, Messages, custom headers, nonstandard
+endpoint suffixes or multi-target routing. Such clients retain their existing
+native configuration contract. Existing native declarations without this opt-in
+continue using dedicated settings and do not consume global model overrides.
+Provenance retains `model_source=native`, records the capability and the actual
+selected target, and excludes credentials. Whale uses this capability with an
+explicit `--model deepseek-v4-pro`; its unsupported Flash alias fails instead of
+silently selecting another model.

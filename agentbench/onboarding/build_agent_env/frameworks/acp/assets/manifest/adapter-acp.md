@@ -41,3 +41,9 @@ generates exact routes and requires an existing outer launcher implementing the
 ABB_AGENT_MODEL_* contract. Fixed native integrations declare provider, source="native"
 and a reason, retaining dedicated protocol, credentials and tools. Do not generate
 source="shared" or boilerplate model comments in every manifest.
+
+A constrained native Chat Completions client may additionally declare
+model.runtime_configurable=true when its launcher maps runtime-owned base URL,
+credential and model settings without altering native restrictions. Keep
+source="native", an explicit provider and reason; omit fixed model routes and
+credentials. This capability does not support Responses or Messages transports.

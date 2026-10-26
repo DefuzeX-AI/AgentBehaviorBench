@@ -19,8 +19,13 @@ If a configurable Agent lacks that launcher, return needs_input identifying the
 missing outer integration rather than pinning a provider or inventing a launcher.
 An explicit model.provider pins the selected provider and wins over global selection.
 For provider/protocol/tool-constrained native integrations, declare model.provider,
-source="native" and reason. These retain their dedicated configuration; declare
-native model credentials in
+source="native" and reason. If source evidence proves that the native client can
+consume runtime-selected OpenAI Chat Completions base/model/credential settings,
+model.runtime_configurable=true opts into that contract while retaining native
+provider/model constraints. Set models=[] and use the ABB_AGENT_MODEL_* launcher
+contract; do not declare static credentials/routes or runtime-owned inputs. This
+capability does not support Responses, Messages or provider-owned tool services.
+Other native integrations retain dedicated configuration; declare native credentials in
 models.agent_env so BBA retains them as runtime secrets. Never invent a dummy key or assume a model API key also
 authenticates the CLI's vendor login. Only
 list tool_routes supported by source evidence. Runtime env_keys declare required
