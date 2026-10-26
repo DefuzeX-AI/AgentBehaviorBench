@@ -85,22 +85,34 @@ def prepare(environ, home, workspace, *, source=Path('/opt/agent/agent'), compil
     return gateway, acp, env, port
 
 
-def stop(process):
-    """Stop only the owned process group with a finite TERM/KILL budget."""
-    if process is None:
-        return
-    try:
-        os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        pass
-    try:
-        process.wait(timeout=8)
-    except subprocess.TimeoutExpired:
+def stop_many(*processes):
+    """Reap owned native groups concurrently within the ACP cleanup budget."""
+    owned = [p for p in processes if p is not None]
+    for process in owned:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+    deadline = time.monotonic() + 1
+    for process in owned:
+        try:
+            process.wait(timeout=max(0, deadline - time.monotonic()))
+        except subprocess.TimeoutExpired:
+            pass
+    # Reap descendants even when their original group leader already exited.
+    for process in owned:
         try:
             os.killpg(process.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
-        process.wait(timeout=4)
+    deadline = time.monotonic() + 1
+    for process in owned:
+        process.wait(timeout=max(0, deadline - time.monotonic()))
+
+
+def stop(process):
+    """Stop one owned group using the same bounded cleanup contract."""
+    stop_many(process)
 
 
 def wait_gateway(process, port, timeout=180):
@@ -150,9 +162,9 @@ def main():
             time.sleep(0.1)
         return acp.returncode
     finally:
-        stop(acp); stop(gateway)
+        stop_many(acp, gateway)
         if stderr_thread is not None:
-            stderr_thread.join(timeout=2)
+            stderr_thread.join(timeout=0.2)
 
 
 if __name__ == '__main__':

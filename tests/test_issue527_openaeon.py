@@ -131,3 +131,22 @@ def test_native_stderr_tee_preserves_exact_bytes(tmp_path,monkeypatch):
     forwarded=io.BytesIO();monkeypatch.setattr(m.sys,'stderr',types.SimpleNamespace(buffer=forwarded))
     with os.fdopen(read_fd,'rb') as stream:m.tee_native_stderr(stream,tmp_path/'native.log')
     assert (tmp_path/'native.log').read_bytes()==payload and forwarded.getvalue()==payload
+
+
+def test_two_stubborn_native_groups_stop_within_default_acp_budget():
+    import os,signal
+    children=[]
+    try:
+        for _ in range(2):
+            child=subprocess.Popen([sys.executable,'-u','-c',
+                'import signal,time;signal.signal(signal.SIGTERM,signal.SIG_IGN);print("ready",flush=True);time.sleep(60)'],
+                stdout=subprocess.PIPE,text=True,start_new_session=True)
+            children.append(child);assert child.stdout.readline().strip()=='ready'
+        started=time.monotonic();m.stop_many(*children)
+        assert time.monotonic()-started<2.8
+        assert all(child.returncode==-signal.SIGKILL for child in children)
+        for child in children:
+            with pytest.raises(ProcessLookupError):os.killpg(child.pid,0)
+    finally:
+        for child in children:
+            if child.poll() is None:os.killpg(child.pid,signal.SIGKILL);child.wait()
