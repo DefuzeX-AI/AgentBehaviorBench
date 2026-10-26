@@ -1,0 +1,46 @@
+{
+  "case_id": "ir-codewhale-5546-v1",
+  "issue": {
+    "repository": "codewhale-hq/Codewhale",
+    "number": 5546,
+    "url": "https://github.com/codewhale-hq/Codewhale/issues/5546",
+    "state": "closed",
+    "title": "[redacted] output from tools impairs editing"
+  },
+  "version_choice": "historical:0.9.10",
+  "reported_version": "source HEAD on 2026-08-23; exact release unspecified by reporter (archived reproduction: 0.9.10)",
+  "commit_version": "369868d23e593acd71da51db30058b512175e08d",
+  "fixed_in": "0.9.11 (archived attribution; release boundary not independently verified)",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Create the file package.json in the workspace by running exactly: printf '{\\n  \"name\": \"demo\",\\n  \"dependencies\": {\\n    \"jsonwebtoken\": \"^9.0.2\",\\n    \"password-validator\": \"^5.3.0\"\\n  }\\n}\\n' > package.json",
+    "Read package.json, tell me the exact version ranges of jsonwebtoken and password-validator as written in the file, then change jsonwebtoken to ^9.0.3 with an edit."
+  ],
+  "expected": "Ordinary code such as `\"jsonwebtoken\": \"^9.0.2\"` reaches the model byte-exact in read/shell tool results; only credential-shaped values are masked (issue #5546; fixed in 0.9.11 by commit 2776c214 'redact_model_bound_secrets').",
+  "defect": "Model-bound tool results are run through the broad key-based scrubber, so values next to keys containing token/password (dependency versions) are replaced with `[redacted]`, which breaks exact-match edits and read-back.",
+  "fault location": [
+    {
+      "file": "crates/tui/src/client.rs",
+      "function": "redact_model_bound_text",
+      "line_start": 628,
+      "line_end": 634,
+      "commit": "369868d23e593acd71da51db30058b512175e08d",
+      "url": "https://github.com/codewhale-hq/Codewhale/blob/369868d23e593acd71da51db30058b512175e08d/crates/tui/src/client.rs#L628-L634",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Routes model-bound text through the broad redact_secrets scrubber after exact-secret replacement."
+    },
+    {
+      "file": "crates/config/src/persistence.rs",
+      "function": "redact_keyed_assignment",
+      "line_start": 382,
+      "line_end": 419,
+      "commit": "369868d23e593acd71da51db30058b512175e08d",
+      "url": "https://github.com/codewhale-hq/Codewhale/blob/369868d23e593acd71da51db30058b512175e08d/crates/config/src/persistence.rs#L382-L419",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Matches sensitive substrings in keys and replaces the value suffix, including non-secret dependency versions."
+    }
+  ],
+  "Root cause": "CONFIRMED IN THE TESTED SOURCE AND SUPPORTED BY ARCHIVED REPRODUCTION. At commit 369868d23e593acd71da51db30058b512175e08d, client.rs redact_model_bound_text calls the broad persistence::redact_secrets after exact-secret replacement. redact_keyed_assignment tests whether a key contains a sensitive hint, including token/password, and replaces the entire value suffix rather than checking whether it is credential-shaped. Ordinary dependency keys jsonwebtoken and password-validator therefore lose their version strings; the trailing comma can also be consumed. This affects tool-result content sent to the model, while ACP-visible tool output can remain intact. The archived review reports 10/10 independent executions with this discrepancy, using b.ai/glm-5.3-flash; these are archived findings, not new runs performed for this file. logs/network.jsonl must be retained alongside ACP events to examine the actual model-bound tool message. The original reporter described source HEAD on 2026-08-23 without an explicit release number; 0.9.10 is the archived reproduction version. Archived materials identify 0.9.11 and fixing commit prefix 2776c214; the first release boundary and full fixing SHA were not independently verified here. The issue is currently closed. pinned_contains_fix is false with respect to this file's tested commit_version; the original case's true value must not be interpreted as that vulnerable historical commit containing the fix."
+}

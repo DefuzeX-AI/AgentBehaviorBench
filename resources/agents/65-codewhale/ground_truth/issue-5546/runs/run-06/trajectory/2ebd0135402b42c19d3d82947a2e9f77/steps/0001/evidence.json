@@ -1,0 +1,243 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_0bcb5b23fab74e9599ade5483347a795",
+  "case_id": "ir-codewhale-5546-v1",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "a43dd869352c1900f2a0642ee12a99e6",
+      "span_id": "2961d28ec5a34d64",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792914648068969499,
+      "end_time_unix_nano": 1792914701524355581,
+      "duration_nano": 53455386082,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.stderr",
+          "time_unix_nano": 1792914648401344689,
+          "attributes": {}
+        },
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1792914648428023512,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1792914648431849363,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792914648437389856,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792914655583187434,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792914672635327228,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792914693128071109,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792914701522842538,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "a43dd869352c1900f2a0642ee12a99e6",
+      "span_id": "3e7c956ccc6b7203",
+      "parent_span_id": "2961d28ec5a34d64",
+      "name": "bash: printf '{\\n  \"name\": \"demo\",\\n  \"dependencies\": {\\n    \"jsonwebtoken\": \"^9.0.2\",\\n    \"password-validator\": \"^5.3.0\"\\n  }\\n}\\n' > package.json",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792914655580422963,
+      "end_time_unix_nano": 1792914655701980598,
+      "duration_nano": 121557635,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash: printf '{\\n  \"name\": \"demo\",\\n  \"dependencies\": {\\n    \"jsonwebtoken\": \"^9.0.2\",\\n    \"password-validator\": \"^5.3.0\"\\n  }\\n}\\n' > package.json",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "printf '{\\n  \"name\": \"demo\",\\n  \"dependencies\": {\\n    \"jsonwebtoken\": \"^9.0.2\",\\n    \"password-validator\": \"^5.3.0\"\\n  }\\n}\\n' > package.json"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "(no output)",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_c6d00b9261a3458285ff68a4"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "a43dd869352c1900f2a0642ee12a99e6",
+      "span_id": "f43c94e273631dab",
+      "parent_span_id": "2961d28ec5a34d64",
+      "name": "read: package.json",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792914663569397290,
+      "end_time_unix_nano": 1792914663580371846,
+      "duration_nano": 10974556,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "read: package.json",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "path": "package.json"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "{\n  \"name\": \"demo\",\n  \"dependencies\": {\n    \"jsonwebtoken\": \"^9.0.2\",\n    \"password-validator\": \"^5.3.0\"\n  }\n}\n",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_8db4bf61a97c4346878ab18b"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "a43dd869352c1900f2a0642ee12a99e6",
+      "span_id": "721ff30ae382e040",
+      "parent_span_id": "2961d28ec5a34d64",
+      "name": "bash: cat package.json && echo '---' && node -e \"console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).dependencies)\" 2>/dev/null || python3 -c \"import json;print(json.load(open('package.json'))['dependencies'])\"",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792914672632086184,
+      "end_time_unix_nano": 1792914672862667870,
+      "duration_nano": 230581686,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash: cat package.json && echo '---' && node -e \"console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).dependencies)\" 2>/dev/null || python3 -c \"import json;print(json.load(open('package.json'))['dependencies'])\"",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cat package.json && echo '---' && node -e \"console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).dependencies)\" 2>/dev/null || python3 -c \"import json;print(json.load(open('package.json'))['dependencies'])\""
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "{\n  \"name\": \"demo\",\n  \"dependencies\": {\n    \"jsonwebtoken\": \"^9.0.2\",\n    \"password-validator\": \"^5.3.0\"\n  }\n}\n---\n{ jsonwebtoken: '^9.0.2', 'password-validator': '^5.3.0' }\n",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_38193699470d403cb49cfeff"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "a43dd869352c1900f2a0642ee12a99e6",
+      "span_id": "e8d3aef583c705d7",
+      "parent_span_id": "2961d28ec5a34d64",
+      "name": "bash: wc -c package.json; echo '---'; od -c package.json | sed -n '1,20p'; echo '---'; grep -n 'redacted' package.json | wc -l",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792914693126175033,
+      "end_time_unix_nano": 1792914693232247679,
+      "duration_nano": 106072646,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash: wc -c package.json; echo '---'; od -c package.json | sed -n '1,20p'; echo '---'; grep -n 'redacted' package.json | wc -l",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "wc -c package.json; echo '---'; od -c package.json | sed -n '1,20p'; echo '---'; grep -n 'redacted' package.json | wc -l"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "111 package.json\n---\n0000000   {  \\n           \"   n   a   m   e   \"   :       \"   d   e   m\n0000020   o   \"   ,  \\n           \"   d   e   p   e   n   d   e   n   c\n0000040   i   e   s   \"   :       {  \\n                   \"   j   s   o\n0000060   n   w   e   b   t   o   k   e   n   \"   :       \"   ^   9   .\n0000100   0   .   2   \"   ,  \\n                   \"   p   a   s   s   w\n0000120   o   r   d   -   v   a   l   i   d   a   t   o   r   \"   :    \n0000140   \"   ^   5   .   3   .   0   \"  \\n           }  \\n   }  \\n\n0000157\n---\n0\n",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_713671572a404e9d83b499d8"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}
