@@ -81,6 +81,9 @@ def gateway_config(base_url: str, model: str, port: int, workdir: str) -> dict:
                 }
             },
         },
+        # ask_user blocks the turn until a human answers (default 900 s), which
+        # never happens in an unattended Case. Global deny wins over tool profiles.
+        "tools": {"deny": ["ask_user"]},
         # Update checks and telemetry would be egress outside the model route.
         "update": {"checkOnStart": False, "auto": {"enabled": False}},
         "telemetry": {"enabled": False},
