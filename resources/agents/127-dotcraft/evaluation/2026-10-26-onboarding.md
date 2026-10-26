@@ -139,3 +139,9 @@ one background title response and cached input; the canceled title call has no
 reported usage. Judge and official Case-generation usage are excluded. Automatic
 GT summaries reported zero calls; no GT experiment was performed. Neither run
 passed its quality gate, and no certification or accepted onboarding is claimed.
+
+## PR preparation verification — 2026-10-26
+
+The branch is based on upstream main `8349406e` and uses standalone slot `127-dotcraft`. Seven focused tests passed again. Current and freshly restored units passed combined configuration validation and the official Profile parser against a freshly fetched SDK catalog; the isolated restore contained 6,553 pinned source files. Native integration behavior files are unchanged from runtime evidence head `d223a36e`; no paid run was repeated.
+
+The PR remains draft because neither historical quality gate passed: the local Judge reply was invalid and official Judge submission was blocked. Earlier raw outcomes, capture gaps and source-placeholder uncertainty remain unchanged. Slot numbering must be reconciled if another onboarding PR merges first.
