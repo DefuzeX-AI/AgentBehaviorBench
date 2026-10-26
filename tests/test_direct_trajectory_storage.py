@@ -1,5 +1,6 @@
 """Final paths are usable before completion and require no archive transition."""
 import hashlib
+import errno
 import json
 import os
 from pathlib import Path
@@ -62,6 +63,142 @@ def test_payload_publication_rejects_corrupt_existing_blob(tmp_path):
     with pytest.raises(ValueError, match='digest mismatch'):
         publish_payload(temporary, step / 'payload.json', step)
     assert temporary.read_bytes() == raw
+
+
+def test_new_payload_does_not_reopen_just_published_blob(tmp_path, monkeypatch):
+    step = tmp_path / 'steps/0001'
+    step.mkdir(parents=True)
+    temporary, target = step / 'incoming', step / 'payload.json'
+    temporary.write_bytes(b'complete payload')
+    link = os.link
+    calls = []
+
+    def transient_link(source, destination):
+        calls.append((source, destination))
+        if len(calls) > 1:
+            raise FileNotFoundError(errno.ENOENT, 'new blob not visible yet')
+        return link(source, destination)
+
+    monkeypatch.setattr(os, 'link', transient_link)
+    publish_payload(temporary, target, step)
+    assert target.read_bytes() == b'complete payload'
+    blob, = (tmp_path / 'blobs').iterdir()
+    assert os.path.samefile(blob, target)
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize('existing', [False, True])
+@pytest.mark.parametrize('error', [errno.EXDEV, errno.EPERM, errno.ENOTSUP, errno.EACCES])
+def test_optional_payload_link_failure_publishes_complete_file(tmp_path, monkeypatch, existing, error):
+    _check_payload_link_failure(tmp_path, monkeypatch, existing, error)
+
+
+def test_existing_payload_disappears_before_link_without_losing_copy(tmp_path, monkeypatch):
+    _check_payload_link_failure(tmp_path, monkeypatch, True, errno.ENOENT)
+
+
+def _check_payload_link_failure(tmp_path, monkeypatch, existing, error):
+    raw = b'complete new payload'
+    step = tmp_path / 'steps/0001'
+    step.mkdir(parents=True)
+    temporary, target = step / 'incoming', step / 'payload.json'
+    temporary.write_bytes(raw)
+    target.write_bytes(b'previous complete payload')
+    blob = tmp_path / 'blobs' / hashlib.sha256(raw).hexdigest()
+    blob.parent.mkdir()
+    if existing:
+        blob.write_bytes(raw)
+    link = os.link
+
+    def failed_link(source, destination):
+        if existing and Path(destination) == blob:
+            return link(source, destination)
+        assert temporary.read_bytes() == raw
+        assert target.read_bytes() == b'previous complete payload'
+        if error == errno.ENOENT:
+            blob.unlink()
+        raise OSError(error, 'injected optional-link failure')
+
+    monkeypatch.setattr(os, 'link', failed_link)
+    publish_payload(temporary, target, step)
+    assert target.read_bytes() == raw
+    assert not temporary.exists()
+    assert sorted(p.name for p in step.iterdir()) == ['payload.json']
+    if blob.exists():
+        assert hashlib.sha256(blob.read_bytes()).hexdigest() == blob.name
+
+
+def test_unexpected_payload_link_failure_keeps_original_and_target(tmp_path, monkeypatch):
+    raw = b'complete payload'
+    step = tmp_path / 'steps/0001'
+    step.mkdir(parents=True)
+    temporary, target = step / 'incoming', step / 'payload.json'
+    temporary.write_bytes(raw)
+    target.write_bytes(b'old payload')
+    blob = tmp_path / 'blobs' / hashlib.sha256(raw).hexdigest()
+    blob.parent.mkdir()
+    blob.write_bytes(raw)
+    link = os.link
+
+    def failed_link(source, destination):
+        if Path(destination) == blob:
+            return link(source, destination)
+        raise OSError(errno.EIO, 'injected I/O failure')
+
+    monkeypatch.setattr(os, 'link', failed_link)
+    with pytest.raises(OSError) as exc:
+        publish_payload(temporary, target, step)
+    assert exc.value.errno == errno.EIO
+    assert temporary.read_bytes() == raw
+    assert target.read_bytes() == b'old payload'
+
+
+@pytest.mark.parametrize('existing', [False, True])
+def test_payload_publish_failure_does_not_replace_previous_target(tmp_path, monkeypatch, existing):
+    raw = b'complete payload'
+    step = tmp_path / 'steps/0001'
+    step.mkdir(parents=True)
+    temporary, target = step / 'incoming', step / 'payload.json'
+    temporary.write_bytes(raw)
+    target.write_bytes(b'old payload')
+    blob = tmp_path / 'blobs' / hashlib.sha256(raw).hexdigest()
+    blob.parent.mkdir()
+    if existing:
+        blob.write_bytes(raw)
+    replace = Path.replace
+
+    def failed_replace(source, destination):
+        if destination == target:
+            assert temporary.read_bytes() == raw
+            assert target.read_bytes() == b'old payload'
+            raise OSError(errno.EIO, 'injected atomic-publication failure')
+        return replace(source, destination)
+
+    monkeypatch.setattr(Path, 'replace', failed_replace)
+    with pytest.raises(OSError, match='atomic-publication'):
+        publish_payload(temporary, target, step)
+    assert temporary.read_bytes() == raw
+    assert target.read_bytes() == b'old payload'
+    assert blob.read_bytes() == raw
+    assert sorted(p.name for p in step.iterdir()) == ['incoming', 'payload.json']
+
+
+def test_payload_publication_rejects_linked_blob_without_losing_copy(tmp_path):
+    raw = b'complete payload'
+    step = tmp_path / 'steps/0001'
+    step.mkdir(parents=True)
+    temporary, target = step / 'incoming', step / 'payload.json'
+    temporary.write_bytes(raw)
+    target.write_bytes(b'old payload')
+    blob = tmp_path / 'blobs' / hashlib.sha256(raw).hexdigest()
+    blob.parent.mkdir()
+    outside = tmp_path / 'outside'
+    outside.write_bytes(raw)
+    blob.symlink_to(outside)
+    with pytest.raises(ValueError, match='Linked'):
+        publish_payload(temporary, target, step)
+    assert temporary.read_bytes() == raw
+    assert target.read_bytes() == b'old payload'
 
 
 def test_judge_context_references_committed_files_and_detects_changes(tmp_path, monkeypatch):
