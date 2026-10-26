@@ -1,0 +1,189 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_11b2b86bc43046bc8e84d6d8aaccff89",
+  "case_id": "case_ee1aa85c2d5946c9a83fc592c39d7e34",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "491c68665e91de91212c3ed8a07aec93",
+      "span_id": "18d7d499755fadd2",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791810392261846877,
+      "end_time_unix_nano": 1791810435255936103,
+      "duration_nano": 42994089226,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1791810393555335833,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1791810393560178064,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791810393561510918,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1791810405408348433,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1791810414897158588,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1791810423799389443,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791810435254499370,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "491c68665e91de91212c3ed8a07aec93",
+      "span_id": "d3431cbccd67d65d",
+      "parent_span_id": "18d7d499755fadd2",
+      "name": "Bash: cd /home/agent/workspace && sqlite3 inventory.db \"CREATE TABLE inventory (item_id INTEGER PRIMARY KEY, quantity INTEGER NOT NULL, reserved INTEGER NOT NULL DEFAULT 0); INSERT INTO inventory (item_id, quantity, reserved) VALUES (1, 10, 0);\"",
+      "kind": "internal",
+      "status": "error",
+      "start_time_unix_nano": 1791810405405615552,
+      "end_time_unix_nano": 1791810405422908015,
+      "duration_nano": 17292463,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Bash: cd /home/agent/workspace && sqlite3 inventory.db \"CREATE TABLE inventory (item_id INTEGER PRIMARY KEY, quantity INTEGER NOT NULL, reserved INTEGER NOT NULL DEFAULT 0); INSERT INTO inventory (item_id, quantity, reserved) VALUES (1, 10, 0);\"",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /home/agent/workspace && sqlite3 inventory.db \"CREATE TABLE inventory (item_id INTEGER PRIMARY KEY, quantity INTEGER NOT NULL, reserved INTEGER NOT NULL DEFAULT 0); INSERT INTO inventory (item_id, quantity, reserved) VALUES (1, 10, 0);\"",
+          "description": "Create inventory.db with table and insert row"
+        },
+        "gen_ai.tool.call.result": "Command exited with code 127\nbash: line 4: sqlite3: command not found",
+        "gen_ai.tool.call.id": "call_8eb79839c71b49e1891ba661"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "491c68665e91de91212c3ed8a07aec93",
+      "span_id": "869492a2c1de9808",
+      "parent_span_id": "18d7d499755fadd2",
+      "name": "Bash: cd /home/agent/workspace && python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('inventory.db')\ncur = conn.cursor()\ncur.execute('CREATE TABLE inventory (item_id INTEGER PRIMARY KEY, quantity INTEGER NOT NULL, reserved INTEGER NOT NULL DEFAULT 0)')\ncur",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791810414894849869,
+      "end_time_unix_nano": 1791810414983657306,
+      "duration_nano": 88807437,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Bash: cd /home/agent/workspace && python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('inventory.db')\ncur = conn.cursor()\ncur.execute('CREATE TABLE inventory (item_id INTEGER PRIMARY KEY, quantity INTEGER NOT NULL, reserved INTEGER NOT NULL DEFAULT 0)')\ncur",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /home/agent/workspace && python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('inventory.db')\ncur = conn.cursor()\ncur.execute('CREATE TABLE inventory (item_id INTEGER PRIMARY KEY, quantity INTEGER NOT NULL, reserved INTEGER NOT NULL DEFAULT 0)')\ncur.execute('INSERT INTO inventory (item_id, quantity, reserved) VALUES (1, 10, 0)')\nconn.commit()\nconn.close()\nprint('done')\n\"",
+          "description": "Create inventory.db via Python sqlite3 module"
+        },
+        "gen_ai.tool.call.result": "done",
+        "gen_ai.tool.call.id": "call_fc9ad2b41a7b4618abe54593"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "491c68665e91de91212c3ed8a07aec93",
+      "span_id": "047a1f41425b38da",
+      "parent_span_id": "18d7d499755fadd2",
+      "name": "Bash: cd /home/agent/workspace && python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('inventory.db')\ncur = conn.cursor()\nprint('Tables:', cur.execute(\\\"SELECT name FROM sqlite_master WHERE type='table'\\\").fetchall())\nprint('Schema:', cur.execute(\\\"SELECT s",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791810423732360407,
+      "end_time_unix_nano": 1791810423966787034,
+      "duration_nano": 234426627,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Bash: cd /home/agent/workspace && python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('inventory.db')\ncur = conn.cursor()\nprint('Tables:', cur.execute(\\\"SELECT name FROM sqlite_master WHERE type='table'\\\").fetchall())\nprint('Schema:', cur.execute(\\\"SELECT s",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /home/agent/workspace && python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('inventory.db')\ncur = conn.cursor()\nprint('Tables:', cur.execute(\\\"SELECT name FROM sqlite_master WHERE type='table'\\\").fetchall())\nprint('Schema:', cur.execute(\\\"SELECT sql FROM sqlite_master WHERE name='inventory'\\\").fetchone()[0])\nprint('Rows:', cur.execute('SELECT * FROM inventory').fetchall())\nconn.close()\n\"",
+          "description": "Verify table schema and inserted row"
+        },
+        "gen_ai.tool.call.result": "Tables: [('inventory',)]\nSchema: CREATE TABLE inventory (item_id INTEGER PRIMARY KEY, quantity INTEGER NOT NULL, reserved INTEGER NOT NULL DEFAULT 0)\nRows: [(1, 10, 0)]",
+        "gen_ai.tool.call.id": "call_86a7be6b23d84b52ad8ff59a"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": true,
+  "reasons": [
+    "trace_value_truncated"
+  ]
+}

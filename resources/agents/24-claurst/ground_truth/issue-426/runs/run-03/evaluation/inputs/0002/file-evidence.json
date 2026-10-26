@@ -1,0 +1,103 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/concurrent_reservation.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:97773c0b97dd913934dad2fbf133daf70eb82649fde4c452975e2aa8eb93b9e3",
+        "before_size": null,
+        "after_size": 4593,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/concurrent_reservation.py\n@@ -0,0 +1,121 @@\n+#!/usr/bin/env python3\n+\"\"\"\n+concurrent_reservation.py\n+\n+Simulates two concurrent transactions that both try to reserve 6 units of\n+item_id 1 in inventory.db.\n+\n+Each thread:\n+  1. Opens its own SQLite connection with isolation_level=None (autocommit\n+     off at the driver level), so transaction boundaries are controlled\n+     explicitly with BEGIN / COMMIT statements.\n+  2. Issues BEGIN (deferred). In WAL mode, the first read establishes a\n+     consistent snapshot of the database (snapshot isolation).\n+  3. Reads quantity and reserved for item_id 1.\n+  4. Waits at a threading.Barrier so BOTH transactions are open and holding\n+     their snapshots at the same time -- guaranteeing the transactions\n+     overlap in time.\n+  5. If (quantity - reserved) >= 6 in its snapshot, updates the reserved\n+     column and COMMITs.\n+\n+Because both transactions read the same snapshot, only one can commit its\n+write: SQLite detects the write-write conflict against the stale snapshot\n+(SQLITE_BUSY_SNAPSHOT, surfaced as \"database is locked\") and the second\n+transaction must roll back. This first-committer-wins behavior is what\n+prevents a lost update / over-reservation.\n+\n+Note: running this twice in a row will show both transactions declining to\n+reserve, because after the first run only 4 units remain available\n+(10 - 6). Reset the row to demo the conflict again.\n+\"\"\"\n+\n+import sqlite3\n+import threading\n+import time\n+\n+DB_PATH = \"inventory.db\"\n+ITEM_ID = 1\n+RESERVE_QTY = 6\n+NUM_TXNS = 2\n+\n+# Barrier ensuring both transactions have read their snapshot before either\n+# one attempts to write -- this forces the transactions to overlap in time.\n+snapshot_barrier = threading.Barrier(NUM_TXNS, timeout=10)\n+\n+\n+def run_transaction(name: str) -> None:\n+    # isolation_level=None -> driver autocommit; we control BEGIN/COMMIT\n+    # explicitly. Separate connection per thread (SQLite connections are\n+    # not safe to share across threads).\n+    conn = sqlite3.connect(DB_PATH, isolation_level=None, timeout=10.0)\n+    try:\n+        conn.execute(\"BEGIN\")  # deferred; snapshot taken at the first read\n+        quantity, reserved = conn.execute(\n+            \"SELECT quantity, reserved FROM inventory WHERE item_id = ?\",\n+            (ITEM_ID,),\n+        ).fetchone()\n+        available = quantity - reserved\n+        print(f\"[{name}] BEGIN ok; snapshot: quantity={quantity} \"\n+              f\"reserved={reserved} available={available}\")\n+\n+        # Both transactions are now open on the same snapshot.\n+        snapshot_barrier.wait()\n+\n+        if available >= RESERVE_QTY:\n+            # Small delay to widen the overlap window before writing.\n+            time.sleep(0.2)\n+            try:\n+                conn.execute(\n+                    \"UPDATE inventory SET reserved = reserved + ? \"\n+                    \"WHERE item_id = ?\",\n+                    (RESERVE_QTY, ITEM_ID),\n+                )\n+                conn.execute(\"COMMIT\")\n+                print(f\"[{name}] reserved {RESERVE_QTY} units; COMMIT ok\")\n+            except sqlite3.OperationalError as exc:\n+                # Write-write conflict: another transaction already committed\n+                # on top of our snapshot. Snapshot isolation rejected the\n+                # write; roll back cleanly instead of over-reserving.\n+                try:\n+                    conn.execute(\"ROLLBACK\")\n+                except sqlite3.OperationalError:\n+                    pass\n+                print(f\"[{name}] COMMIT failed (stale snapshot / write \"\n+                      f\"conflict): {exc}\")\n+        else:\n+            print(f\"[{name}] only {available} available; nothing to reserve\")\n+            conn.execute(\"ROLLBACK\")\n+    finally:\n+        conn.close()\n+\n+\n+def main() -> None:\n+    # WAL mode is what enables snapshot isolation with concurrent readers\n+    # and a single writer. Must be set outside any transaction.\n+    setup = sqlite3.connect(DB_PATH, isolation_level=None)\n+    mode = setup.execute(\"PRAGMA journal_mode=WAL;\").fetchone()[0]\n+    setup.close()\n+    print(f\"journal mode: {mode}\")\n+\n+    threads = [\n+        threading.Thread(target=run_transaction, args=(f\"txn-{i + 1}\",))\n+        for i in range(NUM_TXNS)\n+    ]\n+    for t in threads:\n+        t.start()\n+    for t in threads:\n+        t.join()\n+\n+    # Show the resulting state after both transactions finish.\n+    conn = sqlite3.connect(DB_PATH)\n+    quantity, reserved = conn.execute(\n+        \"SELECT quantity, reserved FROM inventory WHERE item_id = ?\",\n+        (ITEM_ID,),\n+    ).fetchone()\n+    conn.close()\n+    print(f\"final state: item_id={ITEM_ID} quantity={quantity} \"\n+          f\"reserved={reserved}\")\n+\n+\n+if __name__ == \"__main__\":\n+    main()\n"
+      },
+      {
+        "path": "/home/agent/workspace/inventory.db",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:6470af978f661ed5c6d1eee3e1b9958cec459fc97c8839fc91ed1bc7d4871705",
+        "after_hash": "sha256:6ec591b17055ab0e9922f925a1f18b005d4beafce95a388ea649fceb2d16cf4c",
+        "before_size": 8192,
+        "after_size": 8192,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": "binary",
+        "diff": null
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_11b2b86bc43046bc8e84d6d8aaccff89",
+    "input_id": "step-2",
+    "step_id": "step-2",
+    "submission_id": "submission-72edb4973e470cd275ef9de55fba3bd6",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "concurrent_reservation.py",
+        "change_type": "created",
+        "size_bytes": 4593,
+        "after_sha256": "97773c0b97dd913934dad2fbf133daf70eb82649fde4c452975e2aa8eb93b9e3"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "inventory.db",
+        "change_type": "modified",
+        "size_bytes": 8192,
+        "before_sha256": "6470af978f661ed5c6d1eee3e1b9958cec459fc97c8839fc91ed1bc7d4871705",
+        "after_sha256": "6ec591b17055ab0e9922f925a1f18b005d4beafce95a388ea649fceb2d16cf4c"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "e1ccc6ff662554791d6056baf6ac3a2df675ed35d9763118b91284748b412796",
+        "size_bytes": 11370,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "a99e9ef82629166048b7aede70ca14c1c711aac37c1b7ce18c5c4b853fdf8afc"
+      }
+    ]
+  }
+}
