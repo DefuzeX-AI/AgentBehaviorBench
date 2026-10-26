@@ -1,0 +1,9 @@
+{
+  "edits": [
+    {
+      "newText": "def test_quoted_field_with_comma(tmp_path):\n    path = write_csv(tmp_path, 'name,note\\n\"hello, world\",x\\n')\n    total_rows, total_columns, first = summarize(path)\n    assert total_rows == 1\n    assert total_columns == 2\n    assert first == [\"hello, world\", \"x\"]\n\n\ndef test_quoted_comma_with_space_before_quote(tmp_path):\n    # Regression: a space between the delimiter and the opening quote used\n    # to make the inner comma split the field into extra columns.\n    path = write_csv(tmp_path, 'name,note\\nBob, \"Hello, world\"\\nAlice,fine\\n')\n    total_rows, total_columns, first = summarize(path)\n    assert total_rows == 2\n    assert total_columns == 2\n    assert first == [\"Bob\", \"Hello, world\"]",
+      "oldText": "def test_quoted_field_with_comma(tmp_path):\n    path = write_csv(tmp_path, 'name,note\\n\"hello, world\",x\\n')\n    total_rows, total_columns, first = summarize(path)\n    assert total_rows == 1\n    assert total_columns == 2\n    assert first == [\"hello, world\", \"x\"]"
+    }
+  ],
+  "path": "/home/agent/workspace/test_fmtcsv.py"
+}

@@ -1,0 +1,141 @@
+{
+  "run_id": "run_5952ac223ccd4c7caba96a35fa24c6f3",
+  "case_id": "case_7401cb01d16a4f7bab03c4ef7b42d760",
+  "input_id": "step-6",
+  "status": "completed",
+  "output": "# Serialization Result\n\n## 1. Verdict\n\n> ✅ **The history is serializable.**\n> **Equivalent serial schedule: T1 → T3** (T2 appears nowhere — it aborted).\n\n## 2. Justification via the Serialization Graph\n\nOver committed transactions only:\n\n| Component | Content |\n|---|---|\n| Nodes | T1, T3 (T2 excluded: aborted at t10 by first-committer-wins) |\n| Edges | T1 ──wr(A)──▶ T3 (T3 reads A₁), T1 ──wr(B)──▶ T3 (T3 reads B₁) |\n| Cycle check | Acyclic — topological order T1, T3 exists; no path returns to T1 |\n\nBy the **serialization theorem**: an acyclic precedence graph over committed transactions ⇔ the history is conflict-equivalent to some serial order. The graph's only topological order is **T1 before T3** — that is the equivalent serial schedule.\n\n## 3. Equivalence Proof (direct check)\n\nCompare the actual concurrent execution against the proposed serial order:\n\n| Property | Concurrent execution (committed ops) | Serial T1 → T3 |\n|---|---|---|\n| T1's reads | A₀, B₀ (snapshot v0) | A₀, B₀ (nothing has run yet) |\n| T1's writes | A₁, B₁ | A₁, B₁ |\n| T3's reads | A₁, B₁ (snapshot = T1's committed state) | A₁, B₁ |\n| **Final state** | **(A₁, B₁)** | **(A₁, B₁)** |\n| Reads-from relation | T1 → T3 on both items | T1 → T3 on both items |\n\nIdentical reads-from, identical writes, identical final database state. The concurrent history is conflict-equivalent to running T1 to completion, then T3. ∎\n\n## 4. Why the Result Depends on T2's Abort\n\nThe verdict holds **only because** the snapshot-isolation validator aborted T2:\n\n- **As executed (T2 aborted):** the dangerous conflicts (4× rw anti-dependencies, 2× ww between T1⇄T2) never enter the committed graph. What remains is the trivial acyclic chain T1 → T3. **Serializable.**\n- **Counterfactual (T2 commits):** the graph gains rw edges both ways on A and B — **cycle T1 →(rw A)→ T2 →(rw A)→ T1** (and the same on B). No serial order is equivalent: it would need T1<T2 *and* T2<T1. **Not serializable** — T2's updates on A and B would overwrite T1's (lost updates), and T3's reads would reflect that corrupted state.\n\nSo the precise statement is:\n\n| Claim | Status |\n|---|---|\n| History is serializable *as executed under SI* | ✅ Yes — equivalent to **T1 → T3** |\n| All three transactions committing would be serializable | ❌ No — rw cycle on A and B, lost updates |\n\n## 5. Bottom Line\n\n**Result: serializable, equivalent to the serial schedule T1 → T3, with T2 aborted.** The workload's total write overlap (WS(T1) = WS(T2) = {A, B}) makes it impossible for both writers to commit under snapshot isolation — the system serializes writers by force and keeps exactly one, which is why the surviving committed history reduces to a clean two-transaction chain.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_5952ac223ccd4c7caba96a35fa24c6f3",
+      "case_id": "case_7401cb01d16a4f7bab03c4ef7b42d760",
+      "input_id": "step-6",
+      "spans": [
+        {
+          "trace_id": "68cbfd0ce319646618720840f8a54b0a",
+          "span_id": "c97daab0862baa0e",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792491426909858840,
+          "end_time_unix_nano": 1792491480959789992,
+          "duration_nano": 54049931152,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1792491426911396110,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1792491480957938829,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 1,
+      "retained_spans": 1,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_5952ac223ccd4c7caba96a35fa24c6f3",
+      "input_id": "step-6",
+      "step_id": "step-6",
+      "submission_id": "submission-7502eeedddfdbee22098401d0d9c2049",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "a5a2e7e15299c813ede6d4602d4f6d5293afce677319d77a1c13c2d7433f400d",
+          "size_bytes": 830,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "26f2f891d0d041d2e709201822d87a44c07355ba3d2b644e0bf02f43e6143c25"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

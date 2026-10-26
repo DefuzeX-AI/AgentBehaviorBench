@@ -1,0 +1,9 @@
+{
+  "edits": [
+    {
+      "newText": "def test_quoted_comma_with_space_before_quote(tmp_path):\n    # Regression: a space between the delimiter and the opening quote used\n    # to be treated as a literal quote, splitting the field on its comma.\n    path = write_csv(tmp_path, 'name,age,city\\n \"Smith, John\",34,Springfield\\n')\n    rows = read_csv_rows(path)\n    assert rows[1] == [\"Smith, John\", \"34\", \"Springfield\"]\n    assert summarize(rows) == (1, 3, [\"Smith, John\", \"34\", \"Springfield\"])\n\n\ndef test_preserves_spaces_inside_quotes(tmp_path):",
+      "oldText": "def test_preserves_spaces_inside_quotes(tmp_path):"
+    }
+  ],
+  "path": "/home/agent/workspace/test_fmtcsv.py"
+}

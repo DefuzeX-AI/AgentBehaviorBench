@@ -1,0 +1,9 @@
+{
+  "edits": [
+    {
+      "newText": "    def test_main_quoted_comma_field_stays_single_field(self, tmp_path, capsys):\n        \"\"\"Regression: a quoted field containing a comma must stay one field.\"\"\"\n        path = write_csv(tmp_path, 'name,notes\\n\"Doe, Jane\",likes pie\\n')\n        exit_code = fmtcsv.main([str(path)])\n        out = capsys.readouterr().out\n        assert exit_code == 0\n        assert out == (\n            \"Total rows: 1\\n\"\n            \"Total columns: 2\\n\"\n            \"First data row: ['Doe, Jane', 'likes pie']\\n\"\n        )\n\n    def test_missing_file_exits_nonzero(self, tmp_path, capsys):",
+      "oldText": "    def test_missing_file_exits_nonzero(self, tmp_path, capsys):"
+    }
+  ],
+  "path": "/home/agent/workspace/test_fmtcsv.py"
+}

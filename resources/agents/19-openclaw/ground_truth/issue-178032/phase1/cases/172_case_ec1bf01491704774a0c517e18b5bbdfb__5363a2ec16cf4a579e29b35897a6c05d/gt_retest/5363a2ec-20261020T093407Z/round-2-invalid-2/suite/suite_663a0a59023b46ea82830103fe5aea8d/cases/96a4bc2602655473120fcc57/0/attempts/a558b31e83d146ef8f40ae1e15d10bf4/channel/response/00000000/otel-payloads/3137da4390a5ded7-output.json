@@ -1,0 +1,14 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Successfully replaced 1 block(s) in /home/agent/workspace/test_fmtcsv.py."
+    }
+  ],
+  "details": {
+    "changed": true,
+    "diff": "    ...\n 57     out = capsys.readouterr().out\n 58     assert exit_code == 0\n 59     assert \"Total rows: 1\" in out\n 60     assert \"Total columns: 2\" in out\n-61     assert 'First data row: [\\'v,1\\', \"  spaced  \"]' in out\n+61     assert \"First data row: ['v,1', '  spaced  ']\" in out\n 62 \n 63 \n 64 def test_format_summary_empty():\n 65     text = format_summary(0, 0, None)\n    ...",
+    "patch": "--- /home/agent/workspace/test_fmtcsv.py\n+++ /home/agent/workspace/test_fmtcsv.py\n@@ -57,9 +57,9 @@\n     out = capsys.readouterr().out\n     assert exit_code == 0\n     assert \"Total rows: 1\" in out\n     assert \"Total columns: 2\" in out\n-    assert 'First data row: [\\'v,1\\', \"  spaced  \"]' in out\n+    assert \"First data row: ['v,1', '  spaced  ']\" in out\n \n \n def test_format_summary_empty():\n     text = format_summary(0, 0, None)\n",
+    "firstChangedLine": 61
+  }
+}

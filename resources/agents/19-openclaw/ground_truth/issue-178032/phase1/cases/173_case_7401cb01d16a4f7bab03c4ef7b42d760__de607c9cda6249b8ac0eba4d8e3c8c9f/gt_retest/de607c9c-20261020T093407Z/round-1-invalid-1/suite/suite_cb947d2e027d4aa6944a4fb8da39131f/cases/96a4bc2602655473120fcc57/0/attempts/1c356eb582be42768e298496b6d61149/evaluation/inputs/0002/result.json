@@ -1,0 +1,245 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "5d7a326897ab466d9ea7e87ecba6b09d",
+  "case_id": "case_7401cb01d16a4f7bab03c4ef7b42d760",
+  "input_id": "step-2",
+  "invocation_id": "5d7a326897ab466d9ea7e87ecba6b09d",
+  "agent_id": "openclaw",
+  "status": "succeeded",
+  "output": "# Read/Write Sets & Conflict Enumeration\n\n## 1. Read and Write Sets\n\n| Txn | Read Set RS(Ti) | Write Set WS(Ti) | Notes |\n|---|---|---|---|\n| T1 | {A, B} | {A, B} | read-then-write on both items |\n| T2 | {A, B} | {A, B} | identical footprint to T1 |\n| T3 | {A, B} | **∅** | read-only |\n\nPairwise intersections (necessary condition for each conflict type):\n\n| Pair | RS∩WS | WS∩RS | WS∩WS | Conflict types possible |\n|---|---|---|---|---|\n| T1–T2 | {A,B} | {A,B} | {A,B} | rw + wr + ww |\n| T1–T3 | — | {A,B} | — | rw or wr only |\n| T2–T3 | — | {A,B} | — | rw or wr only |\n\n## 2. Name-Based (Operation-Level) Conflicts\n\nDirections below assume canonical order **T1 → T2 → T3**; each entry names the item and operation pair.\n\n### T1 vs T2 — all three types on both items (6 conflicts)\n\n| Type | Edge (first op → second op) | Item |\n|---|---|---|\n| **rw** | T1.R(A) → T2.W(A) | A |\n| **wr** | T1.W(A) → T2.R(A) | A |\n| **ww** | T1.W(A) → T2.W(A) | A |\n| **rw** | T1.R(B) → T2.W(B) | B |\n| **wr** | T1.W(B) → T2.R(B) | B |\n| **ww** | T1.W(B) → T2.W(B) | B |\n\n### T1 vs T3 — 2 conflicts (order-dependent direction)\n\n| Type | Edge | Item |\n|---|---|---|\n| rw | T3.R(A) → T1.W(A) — if T3 reads before T1 writes; **wr** (T1.W(A) → T3.R(A)) if T1 commits first | A |\n| rw | T3.R(B) → T1.W(B) — same condition | B |\n\n### T2 vs T3 — 2 conflicts (same structure)\n\n| Type | Edge | Item |\n|---|---|---|\n| rw / wr | T3.R(A) ↔ T2.W(A) | A |\n| rw / wr | T3.R(B) ↔ T2.W(B) | B |\n\n**Total: 10 pairwise operation-level conflicts** (6 + 2 + 2).\n\n## 3. Snapshot-Aware (MVCC) Conflicts — What the Graph Actually Contains\n\nUnder SI, conflicts are resolved against **versions**, not item names. With version orders `A0(T0) < A1(T1) < A2(T2)` and both concurrent readers taking the T0 snapshot:\n\n| Name-based conflict | SI reality |\n|---|---|\n| T1.W(A) → T2.R(A) **(wr)** | **Does not materialize** — T2's snapshot read fetches **A0** from T0, not T1's uncommitted A1 |\n| T1.W(B) → T2.R(B) **(wr)** | **Does not materialize** — same, reads B0 |\n| T1.W(A) → T2.W(A) **(ww)** | Real edge `T1 →ww T2` (version order), **but erased by FCW abort of T2** |\n| T1.W(B) → T2.W(B) **(ww)** | Same — erased by abort |\n| T1.R(A) → T2.W(A) **(rw)** | **Inverted**: T2 read A0; next version A1 was installed by T1 → edge `T2 →rw T1` |\n| T1.R(B) → T2.W(B) **(rw)** | Inverted → `T2 →rw T1` |\n| T3's two conflicts | Order-dependent: if T3's snapshot = T0 → `T3 →rw T1` on A and B; if T3 reads after T1's commit → `T1 →wr T3` on A and B |\n\n**Edges in the MVCC serialization graph (before FCW):**\n\n```\nT0 →wr(A,B)→ T1,  T0 →wr(A,B)→ T2,  T0 →wr(A,B)→ T3\nT1 →ww(A,B)→ T2\nT2 →rw(A,B)→ T1          ← closes the cycle T1 ⇄ T2\nT3 →rw(A,B)→ T1          (or T1 →wr T3 if T3 snapshots later)\n```\n\n**After FCW aborts T2:** all T2 edges (both ww, both rw, its wr from T0) are removed. Remaining graph is acyclic — consistent with the previous result: **committed history is serializable** (equivalent order T3 → T1 or T1 → T3), while the aborted pair would have formed a `T1 ⇄ T2` cycle (lost update) had both committed.\n\n## 4. Summary Counts\n\n| Pair | rw | wr | ww | Total (name-based) | Surviving in committed SG |\n|---|---|---|---|---|---|\n| T1–T2 | 2 | 2 | 2 | 6 | 0 (ww & rw erased by abort; wr never existed under snapshots) |\n| T1–T3 | 2 | 0 | 0 | 2 | 2 (rw, or wr if T3 follows) |\n| T2–T3 | 2 | 0 | 0 | 2 | 0 (T2 aborted) |\n| **Σ** | **6** | **2** | **2** | **10** | **2** |",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "openclaw-acp",
+        "title": "OpenClaw ACP Gateway",
+        "version": "2026.9.5"
+      }
+    },
+    "pid": 10,
+    "session": {
+      "sessionId": "0b8d919e-55c8-45a9-8f6a-9522ecd6737f",
+      "modes": {
+        "currentModeId": "adaptive",
+        "availableModes": [
+          {
+            "id": "off",
+            "name": "Off"
+          },
+          {
+            "id": "minimal",
+            "name": "Minimal"
+          },
+          {
+            "id": "low",
+            "name": "Low"
+          },
+          {
+            "id": "medium",
+            "name": "Medium"
+          },
+          {
+            "id": "high",
+            "name": "High"
+          },
+          {
+            "id": "adaptive",
+            "name": "Adaptive",
+            "description": "Use the Gateway session default thought level."
+          }
+        ]
+      },
+      "configOptions": [
+        {
+          "currentValue": "adaptive",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "minimal",
+              "name": "Minimal"
+            },
+            {
+              "value": "low",
+              "name": "Low"
+            },
+            {
+              "value": "medium",
+              "name": "Medium"
+            },
+            {
+              "value": "high",
+              "name": "High"
+            },
+            {
+              "value": "adaptive",
+              "name": "Adaptive"
+            }
+          ],
+          "id": "thought_level",
+          "name": "Thought level",
+          "description": "Controls how much deliberate reasoning OpenClaw requests from the Gateway model.",
+          "category": "thought_level",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "auto",
+              "name": "Auto"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            }
+          ],
+          "id": "fast_mode",
+          "name": "Fast mode",
+          "description": "Controls whether OpenAI sessions use the Gateway fast-mode profile.",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            },
+            {
+              "value": "full",
+              "name": "Full"
+            }
+          ],
+          "id": "verbose_level",
+          "name": "Tool verbosity",
+          "description": "Controls how much tool progress and output detail OpenClaw keeps enabled for the session.",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            }
+          ],
+          "id": "trace_level",
+          "name": "Plugin trace",
+          "description": "Controls whether plugin-owned trace lines are shown for the session.",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            },
+            {
+              "value": "stream",
+              "name": "Stream"
+            }
+          ],
+          "id": "reasoning_level",
+          "name": "Reasoning stream",
+          "description": "Controls whether reasoning-capable models emit reasoning text for the session.",
+          "type": "select"
+        },
+        {
+          "currentValue": "inherit",
+          "options": [
+            {
+              "value": "inherit",
+              "name": "Inherit"
+            },
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "tokens",
+              "name": "Tokens"
+            },
+            {
+              "value": "full",
+              "name": "Full"
+            }
+          ],
+          "id": "response_usage",
+          "name": "Usage detail",
+          "description": "Controls how much usage information OpenClaw attaches to responses for the session. 'inherit' follows the configured default; 'off' explicitly disables it for this session.",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            },
+            {
+              "value": "ask",
+              "name": "Ask"
+            },
+            {
+              "value": "full",
+              "name": "Full"
+            }
+          ],
+          "id": "elevated_level",
+          "name": "Elevated actions",
+          "description": "Controls how aggressively the session allows elevated execution behavior.",
+          "type": "select"
+        }
+      ]
+    },
+    "session_id": "0b8d919e-55c8-45a9-8f6a-9522ecd6737f",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

@@ -1,0 +1,141 @@
+{
+  "run_id": "run_2f490252595c4d0293f473282169a26b",
+  "case_id": "case_7401cb01d16a4f7bab03c4ef7b42d760",
+  "input_id": "step-7",
+  "status": "completed",
+  "output": "# Snapshot Isolation Analysis — Summary Report\n\n**Workload:** T1 (RW: A, B), T2 (RW: A, B), T3 (RO: A, B) — T1/T2 concurrent off the same snapshot; MVCC with version store A0→A1→A2, B0→B1→B2.\n\n## Isolation Level\n\n**Snapshot Isolation** (snapshot reads + first-committer-wins). Anomaly profile — no dirty reads, no non-repeatable reads, no read skew — rules out anything below SI; the FCW abort of a concurrent writer is SI's signature. It is *not* a Serializable level: the hypothetical both-commit graph contains cycle `T1 ⇄ T2`, proving the guarantee is weaker — serializability here is earned by abort, not guaranteed by the protocol.\n\n## Anomalies\n\n| Anomaly | Verdict | Explanation |\n|---|---|---|\n| Dirty read | Absent | T2.R(A) reads committed A0, never T1's uncommitted A1 |\n| Non-repeatable read | Absent | Single snapshot per transaction |\n| Phantom read | N/A | No predicate scans or inserts/deletes |\n| Write skew | Absent | Concurrent write sets intersect ({A,B} ∩ {A,B}) — degrades to an ordinary ww conflict |\n| Lost update | **Attempted → prevented** | Both increment A, B from the same base; FCW aborts the second committer (T2), so no increment is lost |\n| Read skew | Absent | T3's R(A), R(B) come from one consistent snapshot |\n\n**The single live event: the T1–T2 write-write conflict on both A and B**, resolved as a lost-update attempt that FCW converts into one abort (T2 aborts and retries).\n\n## Serialization Graph & Result\n\n- **Both-commit graph:** edges `T1 →ww(A,B)→ T2` (version order) and `T2 →rw(A,B)→ T1` form the 2-cycle **T1 ⇄ T2** → non-serializable (lost updates on A and B).\n- **Committed projection (FCW aborts T2):** remaining edges {T0→T1, T0→T3, T3→rw→T1} — **acyclic**.\n\n✅ **Serializable.** Equivalent serial schedule: **T3 → T1** (T3 reads the pre-commit snapshot, T1's writes land last). Under the literal as-written reading the history is already the serial schedule **T1 → T2 → T3**.\n\n## Bottom Line\n\nThe committed outcome is serializable at Snapshot Isolation: one writer aborts (T2) and the survivor's schedule collapses to the serial order T3 → T1. The cost is one retry; the caveat is that this clean result is workload-specific — with disjoint write sets the same structure would allow write skew, which only a true Serializable implementation (e.g., SSI) would catch.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_2f490252595c4d0293f473282169a26b",
+      "case_id": "case_7401cb01d16a4f7bab03c4ef7b42d760",
+      "input_id": "step-7",
+      "spans": [
+        {
+          "trace_id": "3f9409c77b259147be59813f32714d62",
+          "span_id": "64f40dcc6094b2b0",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792489361234438919,
+          "end_time_unix_nano": 1792489382391559048,
+          "duration_nano": 21157120129,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1792489361236173790,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1792489382389776223,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 1,
+      "retained_spans": 1,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_2f490252595c4d0293f473282169a26b",
+      "input_id": "step-7",
+      "step_id": "step-7",
+      "submission_id": "submission-5e3a4670e440127b4bd21601ba95b2a2",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "47e62409a36903e03dc04f831547bee103674be68c1fb94c4f3d29df2e5bf387",
+          "size_bytes": 830,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "961e21fff36fca61fa22b9697801ed61473cee5aaa3dc4325613b9f7e4f1e47d"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}
