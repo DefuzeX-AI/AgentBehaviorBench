@@ -2,7 +2,7 @@ from pathlib import Path
 import importlib.util,json,subprocess,sys,time
 import pytest
 ROOT=Path(__file__).resolve().parents[1]
-P=ROOT/'resources/agents/128-openaeon/bootstrap/launch.py'
+P=ROOT/'resources/agents/135-openaeon/bootstrap/launch.py'
 spec=importlib.util.spec_from_file_location('openaeon_candidate',P);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 ENV={'ABB_AGENT_MODEL':'glm-5.3-flash','ABB_AGENT_MODEL_BASE_URL':'https://model.example.test/v1','ABB_AGENT_MODEL_API_KEY':'synthetic-fixture-only'}
 @pytest.mark.parametrize('key',list(ENV))
@@ -150,3 +150,12 @@ def test_two_stubborn_native_groups_stop_within_default_acp_budget():
     finally:
         for child in children:
             if child.poll() is None:os.killpg(child.pid,signal.SIGKILL);child.wait()
+
+
+def test_registry_keeps_a_unique_numeric_directory_prefix():
+    import tomllib
+    rows=tomllib.loads((ROOT/'resources/registry.toml').read_text())['agents']
+    selected=next(r for r in rows if r['agent_id']=='openaeon')
+    assert (ROOT/selected['path']).resolve()==P.parents[1].resolve()
+    prefix=Path(selected['path']).name.split('-',1)[0]
+    assert [r['agent_id'] for r in rows if Path(r['path']).name.split('-',1)[0]==prefix]==['openaeon']
