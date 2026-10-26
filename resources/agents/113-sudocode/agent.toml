@@ -1,0 +1,57 @@
+# Hand-written from the pinned Sudo Code release binary's native ACP server
+# (`scode acp`) and its sudocode.json OpenAI-compatible provider contract.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "sudocode"
+display_name = "Sudo Code (ACP, shared model provider)"
+framework = "acp"
+
+[evaluation]
+replay_safe = false
+
+[evaluation.workspace]
+path = "/home/agent/workspace"
+initial_state = "empty"
+
+[evaluation.file_evidence]
+track_files = true
+upload_diff = true
+export_changed_files = true
+
+[source]
+method = "install"
+repository = "https://github.com/sudoprivacy/sudocode"
+revision = "e820666797007931dcd4e57605025f0c51586092"
+downloaded_on = "2026-10-25"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+env_keys = []
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "acp"
+transport = "stdio"
+command = ["python", "/opt/agent/bootstrap/launch.py"]
+handshake_timeout = 120
+cwd = "/home/agent/workspace"
+permission_policy = "allow_once"
+
+# scode refreshes its model catalog with GET <base_url>/models (context window,
+# output ceiling, tool support) using the same endpoint and credential.
+[model]
+metadata_paths = ["/models"]
+
+[llm_interception]
+trust_plugin = "pem-env"
+network_config = "network/rules.toml"
+tool_routes = []
