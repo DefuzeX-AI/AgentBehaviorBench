@@ -4,7 +4,7 @@ import tomllib
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-AGENT_DIR = ROOT / "resources" / "agents" / "113-terminai"
+AGENT_DIR = ROOT / "resources" / "agents" / "125-terminai"
 REGISTRY_FILE = ROOT / "resources" / "registry.toml"
 
 
@@ -14,7 +14,7 @@ def test_registry_registration():
     matches = [a for a in data.get("agents", []) if a.get("agent_id") == "terminai"]
     assert len(matches) == 1, "terminai must be registered in registry.toml"
     entry = matches[0]
-    assert entry["path"] == "resources/agents/113-terminai"
+    assert entry["path"] == "resources/agents/125-terminai"
     assert entry["status"] == "adapting"
     assert entry["enabled"] is False, "Maintainer Hard Gate: enabled must be false while adapting"
     assert entry["framework"] == "acp"

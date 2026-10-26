@@ -2,7 +2,7 @@
 
 - **Agent Name**: TerminaI
 - **Agent ID**: terminai
-- **Slot**: #113 (`resources/agents/113-terminai`)
+- **Slot**: #125 (`resources/agents/125-terminai`)
 - **Upstream Repository**: https://github.com/Prof-Harita/terminaI
 - **Pinned Commit**: 4b816c7acc5a89afb692d512c046cdc61bf6186b (Apache-2.0)
 - **Framework**: Native ACP (`bundle/gemini.js --experimental-acp`)
