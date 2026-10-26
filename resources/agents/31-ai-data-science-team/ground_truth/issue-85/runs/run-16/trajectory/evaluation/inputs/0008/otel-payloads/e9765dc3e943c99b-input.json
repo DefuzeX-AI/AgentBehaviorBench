@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_raw):\n    import pandas as pd\n    import numpy as np\n\n    # Ensure data_raw is a list of DataFrames\n    if not isinstance(data_raw, list):\n        data_list = [data_raw]\n    else:\n        data_list = data_raw\n\n    # If empty, return an empty DataFrame\n    if len(data_list) == 0:\n        return pd.DataFrame()\n\n    # Take the first DataFrame\n    df = data_list[0].copy()\n\n    # 1. Standardize column names\n    df.columns = df.columns.str.lower().str.strip().str.replace(' ', '_')\n\n    # 2. Normalize data types\n    date_cols = [col for col in df.columns if 'date' in col]\n    for col in date_cols:\n        df[col] = pd.to_datetime(df[col], errors='coerce')\n\n    numeric_cols = ['price', 'quantity_sold', 'extended_sales']\n    for col in numeric_cols:\n        if col in df.columns:\n            df[col] = pd.to_numeric(df[col], errors='coerce')\n\n    # 3. Handle missing values\n    for col in numeric_cols:\n        if col in df.columns:\n            df[f'{col}_missing'] = df[col].isna()\n            if col == 'extended_sales':\n                df[col] = df[col].fillna(0)\n            else:\n                median_val = df[col].median()\n                if pd.isna(median_val):\n                    median_val = 0\n                df[col] = df[col].fillna(median_val)\n\n    # 4. Detect divergence and missing transactions\n    if 'price' in df.columns and 'quantity_sold' in df.columns and 'extended_sales' in df.columns:\n        df['expected_extended_sales'] = df['price'] * df['quantity_sold']\n        df['divergence'] = ~np.isclose(df['extended_sales'], df['expected_extended_sales'], rtol=1e-9, atol=1e-9)\n        df['missing_transaction'] = (\n            (df['quantity_sold'] <= 0) |\n            (df['extended_sales'] <= 0) |\n            (df['price'] <= 0) |\n            df['price_missing'] |\n            df['quantity_sold_missing'] |\n            df['extended_sales_missing']\n        )\n\n    # 5. Handle categorical encoding\n    cat_cols = [col for col in df.columns if df[col].dtype == 'object']\n    for col in cat_cols:\n        df[col] = df[col].astype('category')\n\n    # 6. Flag duplicates\n    df['is_duplicate'] = df.duplicated(keep=False)\n\n    # 7. Convert datetime columns to JSON-serializable strings\n    for col in df.columns:\n        if pd.api.types.is_datetime64_any_dtype(df[col]):\n            df[col] = df[col].dt.strftime('%Y-%m-%dT%H:%M:%S')\n            df[col] = df[col].where(df[col].notna(), None)\n\n    return df\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 4187,
+      "prompt_tokens": 1293,
+      "total_tokens": 5480,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 3482,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261017235536140072223c955d568S7D5kbf2",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a14c4a-d05c-78d2-aa6a-24aa95c29fe2-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 1293,
+    "output_tokens": 4187,
+    "total_tokens": 5480,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 3482
+    }
+  }
+}

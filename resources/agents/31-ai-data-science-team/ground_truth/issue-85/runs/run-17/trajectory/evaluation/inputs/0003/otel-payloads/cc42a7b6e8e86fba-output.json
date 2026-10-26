@@ -1,0 +1,77 @@
+{
+  "generations": [
+    [
+      {
+        "text": "```python\ndef data_visualization(data_raw):\n    import pandas as pd\n    import json\n    import plotly.express as px\n    import plotly.graph_objects as go\n    import plotly.io as pio\n\n    if not isinstance(data_raw, pd.DataFrame):\n        data_raw = pd.DataFrame(data_raw)\n\n    df = data_raw.copy()\n    df['date'] = pd.to_datetime(df['date'])\n    aggregated = df.groupby('date', as_index=False)['extended_sales'].sum()\n\n    fig = px.line(\n        aggregated,\n        x='date',\n        y='extended_sales',\n        title='Waveform of Total Extended Sales Over Time',\n        labels={\n            'date': 'Date',\n            'extended_sales': 'Extended Sales (USD)'\n        },\n        markers=False\n    )\n\n    fig.update_traces(line=dict(width=2))\n\n    fig_json = pio.to_json(fig)\n    fig_dict = json.loads(fig_json)\n\n    return fig_dict\n```",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "```python\ndef data_visualization(data_raw):\n    import pandas as pd\n    import json\n    import plotly.express as px\n    import plotly.graph_objects as go\n    import plotly.io as pio\n\n    if not isinstance(data_raw, pd.DataFrame):\n        data_raw = pd.DataFrame(data_raw)\n\n    df = data_raw.copy()\n    df['date'] = pd.to_datetime(df['date'])\n    aggregated = df.groupby('date', as_index=False)['extended_sales'].sum()\n\n    fig = px.line(\n        aggregated,\n        x='date',\n        y='extended_sales',\n        title='Waveform of Total Extended Sales Over Time',\n        labels={\n            'date': 'Date',\n            'extended_sales': 'Extended Sales (USD)'\n        },\n        markers=False\n    )\n\n    fig.update_traces(line=dict(width=2))\n\n    fig_json = pio.to_json(fig)\n    fig_dict = json.loads(fig_json)\n\n    return fig_dict\n```",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 786,
+              "prompt_tokens": 771,
+              "total_tokens": 1557,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 569,
+                "rejected_prediction_tokens": null,
+                "text_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 0,
+                "image_tokens": null,
+                "text_tokens": null
+              }
+            },
+            "model_provider": "openai",
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261018184600845356080c955d568CuxpKr1r",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a15055-c5af-7610-8c2f-75b9c85cab75-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 786,
+      "prompt_tokens": 771,
+      "total_tokens": 1557,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 569,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261018184600845356080c955d568CuxpKr1r"
+  },
+  "run": null,
+  "type": "LLMResult"
+}
