@@ -1,0 +1,130 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_101e5e2bb52040aa9da016c6f35c2554",
+  "case_id": "case_deefea2312e942a38bbb76b68fafb84c",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "8a77cb57cccb05c9a7f0d919beeb5cb6",
+      "span_id": "019c1cca430f60c3",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790306971367607571,
+      "end_time_unix_nano": 1790307092957018269,
+      "duration_nano": 121589410698,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1790306975969447227,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1790306982099835065,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1790306982101398249,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1790307092952868211,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "8a77cb57cccb05c9a7f0d919beeb5cb6",
+      "span_id": "46b0b96578a4875e",
+      "parent_span_id": "019c1cca430f60c3",
+      "name": "write_file",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790306992741358997,
+      "end_time_unix_nano": 1790306992757725238,
+      "duration_nano": 16366241,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "write_file",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"content\":\"def sort_list(items):\\n    \\\"\\\"\\\"Sort a list of integers in ascending order using insertion sort.\\\"\\\"\\\"\\n    result = list(items)\\n    for i in range(1, len(result)):\\n        key = result[i]\\n        j = i - 1\\n        while j >= 0 and result[j] > key:\\n            result[j + 1] = result[j]\\n            j -= 1\\n        result[j + 1] = key\\n    return result\\n\",\"path\":\"sorting.py\"}",
+        "gen_ai.tool.call.result": "Wrote 345 bytes to sorting.py",
+        "gen_ai.tool.call.id": "call_d9ed2bf81a3448e19209b30b"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "8a77cb57cccb05c9a7f0d919beeb5cb6",
+      "span_id": "7ecc82b13ff3f0e9",
+      "parent_span_id": "019c1cca430f60c3",
+      "name": "execute_command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790307085986224097,
+      "end_time_unix_nano": 1790307086023642081,
+      "duration_nano": 37417984,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "execute_command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"command\":\"python -c \\\"\\nfrom sorting import sort_list\\nprint(sort_list([5, 2, 9, 1, 5, 6]))\\nprint(sort_list([]))\\nprint(sort_list([1]))\\nprint(sort_list([3, -1, 0, -7, 2]))\\nprint(sort_list([9, 8, 7, 6, 5, 4, 3, 2, 1]))\\n\\\"\"}",
+        "gen_ai.tool.call.result": "[1, 2, 5, 5, 6, 9]\n[]\n[1]\n[-7, -1, 0, 2, 3]\n[1, 2, 3, 4, 5, 6, 7, 8, 9]\n",
+        "gen_ai.tool.call.id": "call_c208c92b40734c2cb3e45489"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 28,
+  "truncated": false,
+  "reasons": [
+    "trace_attribute_not_allowlisted"
+  ]
+}

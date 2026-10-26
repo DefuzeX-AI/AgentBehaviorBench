@@ -1,0 +1,527 @@
+{
+  "run_id": "run_53a5dcfbacbb4e0ab8af6b46a3895a66",
+  "case_id": "case_1d0dca4b7f324afa87f5ef592c3b185d",
+  "input_id": "step-3",
+  "status": "aborted",
+  "output": null,
+  "error": "Agent execution aborted; see local diagnostics",
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "partial",
+      "reasons": [
+        "trace_attribute_not_allowlisted"
+      ]
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/splits.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:1e872f7f3f843ab829bb9d1bb0c748b5ead54fded0b499433964400e0d0dcf95",
+        "before_size": null,
+        "after_size": 5792,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/splits.py\n@@ -0,0 +1,153 @@\n+\"\"\"Rolling-origin, group-aware backtest splits.\n+\n+The dataset is a sequence of row mappings (e.g. rows from csv.DictReader)\n+with a time column and a group column. Time values are treated as discrete,\n+ordered periods: splits operate on the sorted distinct time values (\"the\n+grid\"), and all window sizes -- train_window, horizon, step, gap -- are\n+measured in grid steps, not in rows or wall-clock time. Feed in a column\n+already bucketed to the period size you care about (e.g. an integer day\n+index or an ISO date string) so grid steps match calendar periods.\n+\n+Fold semantics, for an origin at grid position o:\n+\n+    train window : grid positions [o - train_window, o)   (sliding)\n+                   grid positions [0, o)                  (expanding)\n+    gap          : grid positions [o, o + gap) are dropped\n+    test window  : grid positions [o + gap, o + gap + horizon)\n+\n+The first fold uses the smallest origin that satisfies the train window\n+(train_window for sliding, min_train for expanding); each subsequent origin\n+advances by `step` grid positions. Folds stop once the test window would run\n+past the end of the grid.\n+\n+Group awareness: the same grid cutoffs are applied to every group, so within\n+a fold every group's train rows strictly precede its test rows. A group is\n+included in a fold only if it has at least one row in both the train and the\n+test window; groups with too little data are omitted from that fold. A fold\n+where no group qualifies is skipped.\n+\n+Fold rows are sorted by (time, group) and are the same dict objects as the\n+input rows, not copies.\n+\"\"\"\n+\n+from __future__ import annotations\n+\n+from collections import defaultdict\n+from dataclasses import dataclass\n+from typing import Any, Mapping, Sequence\n+\n+\n+@dataclass(frozen=True)\n+class Fold:\n+    \"\"\"One rolling-origin fold.\n+\n+    origin     : last time value used for training (the forecast origin)\n+    test_start : first time value of the test window\n+    test_end   : last time value of the test window\n+    train/test : rows of the participating groups, sorted by (time, group)\n+    \"\"\"\n+\n+    index: int\n+    origin: Any\n+    test_start: Any\n+    test_end: Any\n+    train: tuple[Mapping, ...]\n+    test: tuple[Mapping, ...]\n+\n+\n+def rolling_origin_splits(\n+    rows: Sequence[Mapping],\n+    *,\n+    time_col: str,\n+    group_col: str,\n+    horizon: int,\n+    train_window: int | None = None,\n+    step: int = 1,\n+    gap: int = 0,\n+    min_train: int = 1,\n+) -> list[Fold]:\n+    \"\"\"Split `rows` into rolling-origin folds.\n+\n+    Args:\n+        rows: row mappings, each containing `time_col` and `group_col`.\n+        time_col: column of mutually sortable, discrete time values.\n+        group_col: column identifying the group each row belongs to.\n+        horizon: test window length in grid steps (>= 1).\n+        train_window: training window length in grid steps; None for an\n+            expanding window that uses all history before the origin.\n+        step: origin advance per fold, in grid steps (>= 1).\n+        gap: number of grid steps dropped between train end and test\n+            start (>= 0).\n+        min_train: smallest expanding-window training length in grid steps\n+            (>= 1). Ignored when train_window is given.\n+\n+    Returns:\n+        Folds in chronological order with contiguous 0-based `index`.\n+\n+    Raises:\n+        ValueError: on invalid configuration, empty input, or an input too\n+            short to produce a single fold.\n+    \"\"\"\n+    if horizon < 1:\n+        raise ValueError(f\"horizon must be >= 1, got {horizon}\")\n+    if step < 1:\n+        raise ValueError(f\"step must be >= 1, got {step}\")\n+    if gap < 0:\n+        raise ValueError(f\"gap must be >= 0, got {gap}\")\n+    if train_window is not None and train_window < 1:\n+        raise ValueError(f\"train_window must be >= 1 or None, got {train_window}\")\n+    if min_train < 1:\n+        raise ValueError(f\"min_train must be >= 1, got {min_train}\")\n+    if not rows:\n+        raise ValueError(\"rows must not be empty\")\n+\n+    grid = sorted({row[time_col] for row in rows})\n+    n = len(grid)\n+    pos_of = {t: i for i, t in enumerate(grid)}\n+\n+    rows_at: dict[int, list[Mapping]] = defaultdict(list)\n+    for row in rows:\n+        rows_at[pos_of[row[time_col]]].append(row)\n+\n+    first_origin = train_window if train_window is not None else min_train\n+    if first_origin + gap + horizon > n:\n+        raise ValueError(\n+            f\"dataset too short: grid has {n} time steps but the first fold \"\n+            f\"needs {first_origin} train + {gap} gap + {horizon} horizon\"\n+        )\n+\n+    folds: list[Fold] = []\n+    origin_idx = first_origin\n+    while origin_idx + gap + horizon <= n:\n+        test_lo = origin_idx + gap\n+        train_lo = origin_idx - train_window if train_window is not None else 0\n+\n+        train_by_group: dict[Any, list[Mapping]] = defaultdict(list)\n+        for p in range(train_lo, origin_idx):\n+            for row in rows_at.get(p, ()):\n+                train_by_group[row[group_col]].append(row)\n+        test_by_group: dict[Any, list[Mapping]] = defaultdict(list)\n+        for p in range(test_lo, test_lo + horizon):\n+            for row in rows_at.get(p, ()):\n+                test_by_group[row[group_col]].append(row)\n+\n+        shared = sorted(set(train_by_group) & set(test_by_group))\n+        if not shared:\n+            origin_idx += step\n+            continue\n+\n+        key = lambda r: (r[time_col], r[group_col])\n+        train = sorted((r for g in shared for r in train_by_group[g]), key=key)\n+        test = sorted((r for g in shared for r in test_by_group[g]), key=key)\n+\n+        folds.append(Fold(\n+            index=len(folds),\n+            origin=grid[origin_idx - 1],\n+            test_start=grid[test_lo],\n+            test_end=grid[test_lo + horizon - 1],\n+            train=tuple(train),\n+            test=tuple(test),\n+        ))\n+        origin_idx += step\n+\n+    return folds\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "dropped_count": 108,
+  "missing": [
+    "trace_evidence:trace_attribute_not_allowlisted"
+  ],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_53a5dcfbacbb4e0ab8af6b46a3895a66",
+      "case_id": "case_1d0dca4b7f324afa87f5ef592c3b185d",
+      "input_id": "step-3",
+      "spans": [
+        {
+          "trace_id": "9cc4ac0db8974391edca468a996ed130",
+          "span_id": "b3e1f5aa8b3ab76d",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "error",
+          "start_time_unix_nano": 1790306889274193925,
+          "end_time_unix_nano": 1790307288213570150,
+          "duration_nano": 398939376225,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1790306889276954564,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1790307287926777623,
+              "attributes": {}
+            },
+            {
+              "name": "acp.failure",
+              "time_unix_nano": 1790307287927982791,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1790307288197923082,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "9cc4ac0db8974391edca468a996ed130",
+          "span_id": "ee516b7f4c0bb15b",
+          "parent_span_id": "b3e1f5aa8b3ab76d",
+          "name": "task_update",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790307206441635317,
+          "end_time_unix_nano": 1790307206487698803,
+          "duration_nano": 46063486,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "task_update",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"activeForm\":\"Implementing rolling-origin fold generator\",\"id\":\"task_fold_generator\",\"status\":\"in_progress\"}",
+            "gen_ai.tool.call.result": "{\"content\":\"Tasks updated: [0/9 completed]\\nCurrently: Implementing rolling-origin fold generator (task_fold_generator)\\nTask IDs:\\n- task_scaffold: Scaffold project structure and dev tooling (Python + pytest, package layout, lint/format config) (pending)\\n- task_contracts: Define data and config contracts (group/time-indexed dataset schema; backtest config: horizon, step size, expanding vs sliding window, gap, group policy) (pending)\\n- task_fold_generator: Implement rolling-origin, group-aware fold generator (monotonically advancing origins, per-group train/test windows) (in_progress)\\n- task_invariant_checks: Implement invariant/leakage checks (no train-test overlap per group, strictly increasing origins, group integrity across folds, exact horizon lengths, deterministic reproducibility) (pending)\\n- task_fixtures: Build deterministic synthetic fixtures with known edge cases (uneven group lengths, groups missing at some timestamps, minimum-data boundaries) (pending)\\n- task_eval_harness: Implement evaluation harness that runs a naive reference model across all folds and aggregates per-fold/per-group metrics (pending)\\n- task_tests: Write pytest suites verifying every invariant and edge case (sliding vs expanding, gap handling, empty/short groups, config validation errors) (pending)\\n- task_docs: Document fold semantics, invariant list, and how to run the verification suite in a README (pending)\\n- task_verify: Run full verification (pytest, coverage, lint), fix failures, and confirm all checks pass (pending)\",\"tasks\":[{\"id\":\"task_scaffold\",\"content\":\"Scaffold project structure and dev tooling (Python + pytest, package layout, lint/format config)\",\"status\":\"pending\",\"activeForm\":\"Scaffolding project structure\"},{\"id\":\"task_contracts\",\"content\":\"Define data and config contracts (group/time-indexed dataset schema; backtest config: horizon, step size, expanding vs sliding window, gap, group policy)\",\"status\":\"pending\",\"activeForm\":\"Defining data and config contracts\"},{\"id\":\"task_fold_generator\",\"content\":\"Implement rolling-origin, group-aware fold generator (monotonically advancing origins, per-group train/test windows)\",\"status\":\"in_progress\",\"activeForm\":\"Implementing rolling-origin fold generator\"},{\"id\":\"task_invariant_checks\",\"content\":\"Implement invariant/leakage checks (no train-test overlap per group, strictly increasing origins, group integrity across folds, exact horizon lengths, deterministic reproducibility)\",\"status\":\"pending\",\"activeForm\":\"Implementing invariant checks\"},{\"id\":\"task_fixtures\",\"content\":\"Build deterministic synthetic fixtures with known edge cases (uneven group lengths, groups missing at some timestamps, minimum-data boundaries)\",\"status\":\"pending\",\"activeForm\":\"Building synthetic event dataset generator\"},{\"id\":\"task_eval_harness\",\"content\":\"Implement evaluation harness that runs a naive reference model across all folds and aggregates per-fold/per-group metrics\",\"status\":\"pending\",\"activeForm\":\"Implementing evaluation harness\"},{\"id\":\"task_tests\",\"content\":\"Write pytest suites verifying every invariant and edge case (sliding vs expanding, gap handling, empty/short groups, config validation errors)\",\"status\":\"pending\",\"activeForm\":\"Writing pytest suites\"},{\"id\":\"task_docs\",\"content\":\"Document fold semantics, invariant list, and how to run the verification suite in a README\",\"status\":\"pending\",\"activeForm\":\"Writing README\"},{\"id\":\"task_verify\",\"content\":\"Run full verification (pytest, coverage, lint), fix failures, and confirm all checks pass\",\"status\":\"pending\",\"activeForm\":\"Running full verification\"}],\"isError\":false}",
+            "gen_ai.tool.call.id": "call_0527f3312766481a8b521721"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "9cc4ac0db8974391edca468a996ed130",
+          "span_id": "06b24e18f59c8e79",
+          "parent_span_id": "b3e1f5aa8b3ab76d",
+          "name": "write_file",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790307206446461407,
+          "end_time_unix_nano": 1790307206535010331,
+          "duration_nano": 88548924,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "write_file",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"content\":\"\\\"\\\"\\\"Rolling-origin, group-aware backtest splits.\\n\\nThe dataset is a sequence of row mappings (e.g. rows from csv.DictReader)\\nwith a time column and a group column. Time values are treated as discrete,\\nordered periods: splits operate on the sorted distinct time values (\\\"the\\ngrid\\\"), and all window sizes -- train_window, horizon, step, gap -- are\\nmeasured in grid steps, not in rows or wall-clock time. Feed in a column\\nalready bucketed to the period size you care about (e.g. an integer day\\nindex or an ISO date string) so grid steps match calendar periods.\\n\\nFold semantics, for an origin at grid position o:\\n\\n    train window : grid positions [o - train_window, o)   (sliding)\\n                   grid positions [0, o)                  (expanding)\\n    gap          : grid positions [o, o + gap) are dropped\\n    test window  : grid positions [o + gap, o + gap + horizon)\\n\\nThe first fold uses the smallest origin that satisfies the train window\\n(train_window for sliding, min_train for expanding); each subsequent origin\\nadvances by `step` grid positions. Folds stop once the test window would run\\npast the end of the grid.\\n\\nGroup awareness: the same grid cutoffs are applied to every group, so within\\na fold every group's train rows strictly precede its test rows. A group is\\nincluded in a fold only if it has at least one row in both the train and the\\ntest window; groups with too little data are omitted from that fold. A fold\\nwhere no group qualifies is skipped.\\n\\nFold rows are sorted by (time, group) and are the same dict objects as the\\ninput rows, not copies.\\n\\\"\\\"\\\"\\n\\nfrom __future__ import annotations\\n\\nfrom collections import defaultdict\\nfrom dataclasses import dataclass\\nfrom typing import Any, Mapping, Sequence\\n\\n\\n@dataclass(frozen=True)\\nclass Fold:\\n    \\\"\\\"\\\"One rolling-origin fold.\\n\\n    origin     : last time value used for training (the forecast origin)\\n    test_start : first time value of the test window\\n    test_end   : last time value of the test window\\n    train/test : rows of the participating groups, sorted by (time, group)\\n    \\\"\\\"\\\"\\n\\n    index: int\\n    origin: Any\\n    test_start: Any\\n    test_end: Any\\n    train: tuple[Mapping, ...]\\n    test: tuple[Mapping, ...]\\n\\n\\ndef rolling_origin_splits(\\n    rows: Sequence[Mapping],\\n    *,\\n    time_col: str,\\n    group_col: str,\\n    horizon: int,\\n    train_window: int | None = None,\\n    step: int = 1,\\n    gap: int = 0,\\n    min_train: int = 1,\\n) -> list[Fold]:\\n    \\\"\\\"\\\"Split `rows` into rolling-origin folds.\\n\\n    Args:\\n        rows: row mappings, each containing `time_col` and `group_col`.\\n        time_col: column of mutually sortable, discrete time values.\\n        group_col: column identifying the group each row belongs to.\\n        horizon: test window length in grid steps (>= 1).\\n        train_window: training window length in grid steps; None for an\\n            expanding window that uses all history before the origin.\\n        step: origin advance per fold, in grid steps (>= 1).\\n        gap: number of grid steps dropped between train end and test\\n            start (>= 0).\\n        min_train: smallest expanding-window training length in grid steps\\n            (>= 1). Ignored when train_window is given.\\n\\n    Returns:\\n        Folds in chronological order with contiguous 0-based `index`.\\n\\n    Raises:\\n        ValueError: on invalid configuration, empty input, or an input too\\n            short to produce a single fold.\\n    \\\"\\\"\\\"\\n    if horizon < 1:\\n        raise ValueError(f\\\"horizon must be >= 1, got {horizon}\\\")\\n    if step < 1:\\n        raise ValueError(f\\\"step must be >= 1, got {step}\\\")\\n    if gap < 0:\\n        raise ValueError(f\\\"gap must be >= 0, got {gap}\\\")\\n    if train_window is not None and train_window < 1:\\n        raise ValueError(f\\\"train_window must be >= 1 or None, got {train_window}\\\")\\n    if min_train < 1:\\n        raise ValueError(f\\\"min_train must be >= 1, got {min_train}\\\")\\n    if not rows:\\n        raise ValueError(\\\"rows must not be empty\\\")\\n\\n    grid = sorted({row[time_col] for row in rows})\\n    n = len(grid)\\n    pos_of = {t: i for i, t in enumerate(grid)}\\n\\n    rows_at: dict[int, list[Mapping]] = defaultdict(list)\\n    for row in rows:\\n        rows_at[pos_of[row[time_col]]].append(row)\\n\\n    first_origin = train_window if train_window is not None else min_train\\n    if first_origin + gap + horizon > n:\\n        raise ValueError(\\n            f\\\"dataset too short: grid has {n} time steps but the first fold \\\"\\n            f\\\"needs {first_origin} train + {gap} gap + {horizon} horizon\\\"\\n        )\\n\\n    folds: list[Fold] = []\\n    origin_idx = first_origin\\n    while origin_idx + gap + horizon <= n:\\n        test_lo = origin_idx + gap\\n        train_lo = origin_idx - train_window if train_window is not None else 0\\n\\n        train_by_group: dict[Any, list[Mapping]] = defaultdict(list)\\n        for p in range(train_lo, origin_idx):\\n            for row in rows_at.get(p, ()):\\n                train_by_group[row[group_col]].append(row)\\n        test_by_group: dict[Any, list[Mapping]] = defaultdict(list)\\n        for p in range(test_lo, test_lo + horizon):\\n            for row in rows_at.get(p, ()):\\n                test_by_group[row[group_col]].append(row)\\n\\n        shared = sorted(set(train_by_group) & set(test_by_group))\\n        if not shared:\\n            origin_idx += step\\n            continue\\n\\n        key = lambda r: (r[time_col], r[group_col])\\n        train = sorted((r for g in shared for r in train_by_group[g]), key=key)\\n        test = sorted((r for g in shared for r in test_by_group[g]), key=key)\\n\\n        folds.append(Fold(\\n            index=len(folds),\\n            origin=grid[origin_idx - 1],\\n            test_start=grid[test_lo],\\n            test_end=grid[test_lo + horizon - 1],\\n            train=tuple(train),\\n            test=tuple(test),\\n        ))\\n        origin_idx += step\\n\\n    return folds\\n\",\"path\":\"splits.py\"}",
+            "gen_ai.tool.call.result": "Wrote 5792 bytes to splits.py",
+            "gen_ai.tool.call.id": "call_bc2eb0578e6a4b21bb213459"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "9cc4ac0db8974391edca468a996ed130",
+          "span_id": "5a99023ed413f0a5",
+          "parent_span_id": "b3e1f5aa8b3ab76d",
+          "name": "write_file",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790307237804596229,
+          "end_time_unix_nano": 1790307237811864722,
+          "duration_nano": 7268493,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "write_file",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"content\":\"\\\"\\\"\\\"Throwaway verification for splits.py against data/events.csv + edge cases.\\\"\\\"\\\"\\nimport csv\\nimport sys\\n\\nsys.path.insert(0, \\\"/home/agent/workspace\\\")\\nfrom splits import rolling_origin_splits\\n\\n# --- load real data, bucket to day grid -------------------------------------\\nwith open(\\\"/home/agent/workspace/data/events.csv\\\") as f:\\n    rows = [dict(r) for r in csv.DictReader(f)]\\nfor r in rows:\\n    r[\\\"day\\\"] = r[\\\"timestamp\\\"][:10]\\n\\ngrid = sorted({r[\\\"day\\\"] for r in rows})\\ngpos = {t: i for i, t in enumerate(grid)}\\nprint(f\\\"python {sys.version.split()[0]} | grid: {len(grid)} days, {grid[0]} .. {grid[-1]}\\\")\\n\\nH = 3\\n\\ndef check(folds, sliding_k, step, gap=0, first_origin=1):\\n    for f in folds:\\n        assert f.train and f.test, f\\\"fold {f.index} has empty side\\\"\\n        ft = [r[\\\"day\\\"] for r in f.train]\\n        xs = [r[\\\"day\\\"] for r in f.test]\\n        # global no-overlap (gap inclusive)\\n        assert max(ft) < min(xs), f\\\"fold {f.index}: train/test overlap\\\"\\n        assert gpos[min(xs)] - gpos[max(ft)] - 1 == gap, f\\\"fold {f.index}: gap mismatch\\\"\\n        # exact test-window length on the grid\\n        assert gpos[f.test_end] - gpos[f.test_start] + 1 == H, f\\\"fold {f.index}: horizon mismatch\\\"\\n        # sliding window has exact global length\\n        if sliding_k is not None:\\n            assert len(set(ft)) == sliding_k, f\\\"fold {f.index}: train window != {sliding_k}\\\"\\n        # group integrity: same groups on both sides, per-group no-leak\\n        tg = {r[\\\"group_id\\\"] for r in f.train}\\n        xg = {r[\\\"group_id\\\"] for r in f.test}\\n        assert tg == xg, f\\\"fold {f.index}: asymmetric groups {tg ^ xg}\\\"\\n        for g in tg:\\n            gt = [r[\\\"day\\\"] for r in f.train if r[\\\"group_id\\\"] == g]\\n            gx = [r[\\\"day\\\"] for r in f.test if r[\\\"group_id\\\"] == g]\\n            assert max(gt) < min(gx), f\\\"fold {f.index}/{g}: leakage\\\"\\n    # origins strictly increase, contiguous indices, expected origin positions\\n    assert [f.index for f in folds] == list(range(len(folds))), \\\"indices not contiguous\\\"\\n    for k, f in enumerate(folds):\\n        expect = gpos[grid[first_origin - 1 + k * step]]\\n        assert gpos[f.origin] == expect, f\\\"fold {k}: origin at wrong grid position\\\"\\n        assert gpos[f.test_start] == gpos[f.origin] + 1 + gap, f\\\"fold {k}: test_start misplaced\\\"\\n\\n# --- sliding window ----------------------------------------------------------\\nsf = rolling_origin_splits(rows, time_col=\\\"day\\\", group_col=\\\"group_id\\\",\\n                           train_window=14, horizon=H, step=7)\\ncheck(sf, sliding_k=14, step=7, first_origin=14)\\nprint(f\\\"sliding  k=14 h=3 s=7  -> {len(sf)} folds\\\")\\nfor f in sf:\\n    print(f\\\"  fold {f.index}: origin={f.origin} test=[{f.test_start}..{f.test_end}] \\\"\\n          f\\\"train={len(f.train)} test={len(f.test)} groups={sorted({r['group_id'] for r in f.test})}\\\")\\n\\n# --- expanding window --------------------------------------------------------\\nef = rolling_origin_splits(rows, time_col=\\\"day\\\", group_col=\\\"group_id\\\",\\n                           horizon=H, step=7)\\ncheck(ef, sliding_k=None, step=7, first_origin=1)\\nprint(f\\\"expanding h=3 s=7       -> {len(ef)} folds\\\")\\nfor f in ef:\\n    print(f\\\"  fold {f.index}: origin={f.origin} test=[{f.test_start}..{f.test_end}] \\\"\\n          f\\\"train={len(f.train)} test={len(f.test)} groups={sorted({r['group_id'] for r in f.test})}\\\")\\n\\n# --- group omission: fold 0 of expanding has no gamma history on day 1 -------\\nassert \\\"gamma\\\" not in {r[\\\"group_id\\\"] for r in ef[0].test}, \\\"gamma should be omitted from fold 0\\\"\\nassert ef[0].test_end == \\\"2024-01-04\\\", ef[0].test_end\\nprint(f\\\"group omission ok: fold 0 groups={sorted({r['group_id'] for r in ef[0].test})}\\\")\\n\\n# --- gap semantics on synthetic dense data -----------------------------------\\nsynth = [{\\\"t\\\": d, \\\"g\\\": g} for d in range(10) for g in (\\\"a\\\", \\\"b\\\")]\\ngf = rolling_origin_splits(synth, time_col=\\\"t\\\", group_col=\\\"g\\\",\\n                           train_window=4, horizon=2, step=1, gap=2)\\nassert len(gf) == 3  # origins 4,5,6 fit with gap=2, h=2 in n=10\\ncheck(gf, sliding_k=4, step=1, gap=2, first_origin=4)\\nprint(f\\\"gap=2 ok: fold 0 origin t={gf[0].origin}, test=[{gf[0].test_start}..{gf[0].test_end}]\\\")\\n\\n# --- config validation --------------------------------------------------------\\ndef raises(cfg):\\n    try:\\n        rolling_origin_splits(synth, time_col=\\\"t\\\", group_col=\\\"g\\\", **cfg)\\n    except ValueError:\\n        return True\\n    return False\\n\\nbad = [\\n    {\\\"horizon\\\": 0}, {\\\"horizon\\\": 3, \\\"step\\\": 0}, {\\\"horizon\\\": 3, \\\"gap\\\": -1},\\n    {\\\"horizon\\\": 3, \\\"train_window\\\": 0}, {\\\"horizon\\\": 3, \\\"min_train\\\": 0},\\n    {\\\"horizon\\\": 9, \\\"train_window\\\": 4},  # too short: 4+9 > 10\\n    {\\\"horizon\\\": 12},                    # too short expanding\\n]\\nassert all(raises(c) for c in bad), \\\"expected ValueErrors not raised\\\"\\ntry:\\n    rolling_origin_splits([], time_col=\\\"t\\\", group_col=\\\"g\\\", horizon=1)\\nexcept ValueError:\\n    print(\\\"config validation ok: 8 invalid configs rejected\\\")\\n\\n# --- determinism --------------------------------------------------------------\\nassert rolling_origin_splits(rows, time_col=\\\"day\\\", group_col=\\\"group_id\\\",\\n                             train_window=14, horizon=H, step=7) == sf\\nprint(\\\"determinism ok: identical folds on rerun\\\")\\nprint(\\\"ALL CHECKS PASSED\\\")\\n\",\"path\":\"/tmp/verify_splits.py\"}",
+            "gen_ai.tool.call.result": "Wrote 5145 bytes to /tmp/verify_splits.py",
+            "gen_ai.tool.call.id": "call_f6ef66cffd6e4af5b37652d2"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "9cc4ac0db8974391edca468a996ed130",
+          "span_id": "380dbb439ae34f54",
+          "parent_span_id": "b3e1f5aa8b3ab76d",
+          "name": "execute_command",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790307243614317795,
+          "end_time_unix_nano": 1790307243669034104,
+          "duration_nano": 54716309,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "execute_command",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"command\":\"python /tmp/verify_splits.py\"}",
+            "gen_ai.tool.call.result": "stdout:\npython 3.11.2 | grid: 30 days, 2024-01-01 .. 2024-01-30\nsliding  k=14 h=3 s=7  -> 2 folds\n  fold 0: origin=2024-01-14 test=[2024-01-15..2024-01-17] train=155 test=31 groups=['alpha', 'beta', 'gamma']\n  fold 1: origin=2024-01-21 test=[2024-01-22..2024-01-24] train=165 test=36 groups=['alpha', 'beta', 'gamma']\nexpanding h=3 s=7       -> 4 folds\n  fold 0: origin=2024-01-01 test=[2024-01-02..2024-01-04] train=4 test=23 groups=['alpha', 'beta']\n  fold 1: origin=2024-01-08 test=[2024-01-09..2024-01-11] train=94 test=26 groups=['alpha', 'beta', 'gamma']\n  fold 2: origin=2024-01-15 test=[2024-01-16..2024-01-18] train=166 test=41 groups=['alpha', 'beta', 'gamma']\n  fold 3: origin=2024-01-22 test=[2024-01-23..2024-01-25] train=257 test=36 groups=['alpha', 'beta', 'gamma']\ngroup omission ok: fold 0 groups=['alpha', 'beta']\n\n\nstderr:\nTraceback (most recent call last):\n  File \"/tmp/verify_splits.py\", line 76, in <module>\n    check(gf, sliding_k=4, step=1, gap=2, first_origin=4)\n  File \"/tmp/verify_splits.py\", line 23, in check\n    ft = [r[\"day\"] for r in f.train]\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/tmp/verify_splits.py\", line 23, in <listcomp>\n    ft = [r[\"day\"] for r in f.train]\n          ~^^^^^^^\nKeyError: 'day'\n\nExit code: 1",
+            "gen_ai.tool.call.id": "call_5bfe31ccf0c04426a01e9f26"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "9cc4ac0db8974391edca468a996ed130",
+          "span_id": "8f125aeae7cdfbe9",
+          "parent_span_id": "b3e1f5aa8b3ab76d",
+          "name": "string_replace_lsp",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790307251831049868,
+          "end_time_unix_nano": 1790307251842085050,
+          "duration_nano": 11035182,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "string_replace_lsp",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"new_string\":\"def check(folds, sliding_k, step, gap=0, first_origin=1, tc=\\\"day\\\"):\\n    for f in folds:\\n        assert f.train and f.test, f\\\"fold {f.index} has empty side\\\"\\n        ft = [r[tc] for r in f.train]\\n        xs = [r[tc] for r in f.test]\",\"old_string\":\"def check(folds, sliding_k, step, gap=0, first_origin=1):\\n    for f in folds:\\n        assert f.train and f.test, f\\\"fold {f.index} has empty side\\\"\\n        ft = [r[\\\"day\\\"] for r in f.train]\\n        xs = [r[\\\"day\\\"] for r in f.test]\",\"path\":\"/tmp/verify_splits.py\"}",
+            "gen_ai.tool.call.result": "Replaced 1 occurrence in /tmp/verify_splits.py (lines 20-24)",
+            "gen_ai.tool.call.id": "call_1de7b13b02264d448250099c"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "9cc4ac0db8974391edca468a996ed130",
+          "span_id": "2201bdaa241668fe",
+          "parent_span_id": "b3e1f5aa8b3ab76d",
+          "name": "string_replace_lsp",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790307258899027179,
+          "end_time_unix_nano": 1790307258918561862,
+          "duration_nano": 19534683,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "string_replace_lsp",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"new_string\":\"        tg = {r[\\\"group_id\\\"] for r in f.train}\\n        xg = {r[\\\"group_id\\\"] for r in f.test}\\n        assert tg == xg, f\\\"fold {f.index}: asymmetric groups {tg ^ xg}\\\"\\n        for g in tg:\\n            gt = [r[tc] for r in f.train if r[\\\"group_id\\\"] == g]\\n            gx = [r[tc] for r in f.test if r[\\\"group_id\\\"] == g]\",\"old_string\":\"        tg = {r[\\\"group_id\\\"] for r in f.train}\\n        xg = {r[\\\"group_id\\\"] for r in f.test}\\n        assert tg == xg, f\\\"fold {f.index}: asymmetric groups {tg ^ xg}\\\"\\n        for g in tg:\\n            gt = [r[\\\"day\\\"] for r in f.train if r[\\\"group_id\\\"] == g]\\n            gx = [r[\\\"day\\\"] for r in f.test if r[\\\"group_id\\\"] == g]\",\"path\":\"/tmp/verify_splits.py\"}",
+            "gen_ai.tool.call.result": "Replaced 1 occurrence in /tmp/verify_splits.py (lines 34-39)",
+            "gen_ai.tool.call.id": "call_2bb8e01a6c1a4f738d07ebcb"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "9cc4ac0db8974391edca468a996ed130",
+          "span_id": "e3fa37cfa4a74988",
+          "parent_span_id": "b3e1f5aa8b3ab76d",
+          "name": "string_replace_lsp",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790307258906706531,
+          "end_time_unix_nano": 1790307258924227608,
+          "duration_nano": 17521077,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "string_replace_lsp",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"new_string\":\"assert len(gf) == 3  # origins 4,5,6 fit with gap=2, h=2 in n=10\\ncheck(gf, sliding_k=4, step=1, gap=2, first_origin=4, tc=\\\"t\\\")\",\"old_string\":\"assert len(gf) == 3  # origins 4,5,6 fit with gap=2, h=2 in n=10\\ncheck(gf, sliding_k=4, step=1, gap=2, first_origin=4)\",\"path\":\"/tmp/verify_splits.py\"}",
+            "gen_ai.tool.call.result": "Replaced 1 occurrence in /tmp/verify_splits.py (lines 75-76)",
+            "gen_ai.tool.call.id": "call_c8539de3e8924e5d831662c8"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "9cc4ac0db8974391edca468a996ed130",
+          "span_id": "d9ec8eb993521a33",
+          "parent_span_id": "b3e1f5aa8b3ab76d",
+          "name": "execute_command",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790307263391294674,
+          "end_time_unix_nano": 1790307263441999378,
+          "duration_nano": 50704704,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "execute_command",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"command\":\"python /tmp/verify_splits.py\"}",
+            "gen_ai.tool.call.result": "stdout:\npython 3.11.2 | grid: 30 days, 2024-01-01 .. 2024-01-30\nsliding  k=14 h=3 s=7  -> 2 folds\n  fold 0: origin=2024-01-14 test=[2024-01-15..2024-01-17] train=155 test=31 groups=['alpha', 'beta', 'gamma']\n  fold 1: origin=2024-01-21 test=[2024-01-22..2024-01-24] train=165 test=36 groups=['alpha', 'beta', 'gamma']\nexpanding h=3 s=7       -> 4 folds\n  fold 0: origin=2024-01-01 test=[2024-01-02..2024-01-04] train=4 test=23 groups=['alpha', 'beta']\n  fold 1: origin=2024-01-08 test=[2024-01-09..2024-01-11] train=94 test=26 groups=['alpha', 'beta', 'gamma']\n  fold 2: origin=2024-01-15 test=[2024-01-16..2024-01-18] train=166 test=41 groups=['alpha', 'beta', 'gamma']\n  fold 3: origin=2024-01-22 test=[2024-01-23..2024-01-25] train=257 test=36 groups=['alpha', 'beta', 'gamma']\ngroup omission ok: fold 0 groups=['alpha', 'beta']\n\n\nstderr:\nTraceback (most recent call last):\n  File \"/tmp/verify_splits.py\", line 76, in <module>\n    check(gf, sliding_k=4, step=1, gap=2, first_origin=4, tc=\"t\")\n  File \"/tmp/verify_splits.py\", line 27, in check\n    assert gpos[min(xs)] - gpos[max(ft)] - 1 == gap, f\"fold {f.index}: gap mismatch\"\n           ~~~~^^^^^^^^^\nKeyError: 6\n\nExit code: 1",
+            "gen_ai.tool.call.id": "call_d5261d415928406a9ffcba7d"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "9cc4ac0db8974391edca468a996ed130",
+          "span_id": "36250d303c525513",
+          "parent_span_id": "b3e1f5aa8b3ab76d",
+          "name": "string_replace_lsp",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790307275970240315,
+          "end_time_unix_nano": 1790307275984936150,
+          "duration_nano": 14695835,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "string_replace_lsp",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"new_string\":\"def check(folds, grid, sliding_k, step, gap=0, first_origin=1, tc=\\\"day\\\"):\\n    gpos = {t: i for i, t in enumerate(grid)}\\n    for f in folds:\",\"old_string\":\"def check(folds, sliding_k, step, gap=0, first_origin=1, tc=\\\"day\\\"):\\n    for f in folds:\",\"path\":\"/tmp/verify_splits.py\"}",
+            "gen_ai.tool.call.result": "Replaced 1 occurrence in /tmp/verify_splits.py (lines 20-22)",
+            "gen_ai.tool.call.id": "call_1f3637185df64cab9fec13a4"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "9cc4ac0db8974391edca468a996ed130",
+          "span_id": "0f536705febcbe78",
+          "parent_span_id": "b3e1f5aa8b3ab76d",
+          "name": "execute_command",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790307281282238120,
+          "end_time_unix_nano": 1790307281402978117,
+          "duration_nano": 120739997,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "execute_command",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"command\":\"cd /tmp && python - <<'EOF'\\nimport re\\nsrc = open(\\\"verify_splits.py\\\").read()\\nsrc = src.replace(\\\"check(sf, sliding_k=14, step=7, first_origin=14)\\\",\\n                  \\\"check(sf, grid, sliding_k=14, step=7, first_origin=14)\\\")\\nsrc = src.replace(\\\"check(ef, sliding_k=None, step=7, first_origin=1)\\\",\\n                  \\\"check(ef, grid, sliding_k=None, step=7, first_origin=1)\\\")\\nsrc = src.replace(\\\"check(gf, sliding_k=4, step=1, gap=2, first_origin=4, tc=\\\\\\\"t\\\\\\\")\\\",\\n                  \\\"check(gf, list(range(10)), sliding_k=4, step=1, gap=2, first_origin=4, tc=\\\\\\\"t\\\\\\\")\\\")\\nopen(\\\"verify_splits.py\\\", \\\"w\\\").write(src)\\nEOF\\npython /tmp/verify_splits.py\"}",
+            "gen_ai.tool.call.result": "stdout:\npython 3.11.2 | grid: 30 days, 2024-01-01 .. 2024-01-30\nsliding  k=14 h=3 s=7  -> 2 folds\n  fold 0: origin=2024-01-14 test=[2024-01-15..2024-01-17] train=155 test=31 groups=['alpha', 'beta', 'gamma']\n  fold 1: origin=2024-01-21 test=[2024-01-22..2024-01-24] train=165 test=36 groups=['alpha', 'beta', 'gamma']\nexpanding h=3 s=7       -> 4 folds\n  fold 0: origin=2024-01-01 test=[2024-01-02..2024-01-04] train=4 test=23 groups=['alpha', 'beta']\n  fold 1: origin=2024-01-08 test=[2024-01-09..2024-01-11] train=94 test=26 groups=['alpha', 'beta', 'gamma']\n  fold 2: origin=2024-01-15 test=[2024-01-16..2024-01-18] train=166 test=41 groups=['alpha', 'beta', 'gamma']\n  fold 3: origin=2024-01-22 test=[2024-01-23..2024-01-25] train=257 test=36 groups=['alpha', 'beta', 'gamma']\ngroup omission ok: fold 0 groups=['alpha', 'beta']\n\n\nstderr:\nTraceback (most recent call last):\n  File \"/tmp/verify_splits.py\", line 77, in <module>\n    check(gf, list(range(10)), sliding_k=4, step=1, gap=2, first_origin=4, tc=\"t\")\n  File \"/tmp/verify_splits.py\", line 30, in check\n    assert gpos[f.test_end] - gpos[f.test_start] + 1 == H, f\"fold {f.index}: horizon mismatch\"\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: fold 0: horizon mismatch\n\nExit code: 1",
+            "gen_ai.tool.call.id": "call_5a0d2c7e605d429884b213cc"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 108,
+      "truncated": false,
+      "reasons": [
+        "trace_attribute_not_allowlisted"
+      ]
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 11,
+      "retained_spans": 11,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 108,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_53a5dcfbacbb4e0ab8af6b46a3895a66",
+      "input_id": "step-3",
+      "step_id": "step-3",
+      "submission_id": "submission-69ddb8a7e8a657b86ad29857c93d1253",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "file_change",
+          "path": "splits.py",
+          "change_type": "created",
+          "size_bytes": 5792,
+          "after_sha256": "1e872f7f3f843ab829bb9d1bb0c748b5ead54fded0b499433964400e0d0dcf95"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "936517de9da1be264eb51f0cfb627e9a1224ef062bbc409d0cc4314017357f6a",
+          "size_bytes": 32123,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0002",
+          "sequence": 2,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "blocked",
+          "text_sha256": "ca5731a7640a6f6f70b2320f9192491cf1a8ddbc9e7d5317eab873b6fa2e889e"
+        }
+      ]
+    }
+  }
+}

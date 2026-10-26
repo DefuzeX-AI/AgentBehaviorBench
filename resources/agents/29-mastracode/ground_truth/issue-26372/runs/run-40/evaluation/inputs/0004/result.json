@@ -1,0 +1,69 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "4eb938dc3bd049328f4d28bfcf3d7fc9",
+  "case_id": "case_02f997bda6554e738a970b3c81ffe06d",
+  "input_id": "step-4",
+  "invocation_id": "4eb938dc3bd049328f4d28bfcf3d7fc9",
+  "agent_id": "mastracode",
+  "status": "succeeded",
+  "output": "Build the package reproducibly by running the build script and recording the output artifact hash.The package has no build script yet, so I'll add a deterministic one, run it, and record the artifact hash. Since `index.js` is plain CommonJS (no transpilation needed), the reproducible build is a byte-exact copy into `dist/` with the artifact's SHA-256 recorded alongside — no new dependencies, keeping the frozen input set intact. Reading current state:Now run the build and record the artifact hash:Build succeeded — artifact hash `75c043…` (identical to the frozen `index.js` input hash, as expected for a byte-exact copy). Now proving reproducibility with a from-scratch rebuild, and refreshing the input manifest:**Completed**: Added a `build` script that deterministically produces the distributable artifact (`dist/index.js`) and records its SHA-256 in `dist/index.js.sha256`, then ran it and proved byte-identical reproducibility across a from-scratch rebuild.\n\n**Changes**:\n- `package.json` — added `\"build\": \"mkdir -p dist && cp index.js dist/index.js && sha256sum dist/index.js > dist/index.js.sha256\"` (no new dependencies, so the frozen input set is untouched)\n- `dist/index.js` + `dist/index.js.sha256` — build output artifact and its recorded hash\n- `README.md` — build/verify instructions under \"Integrity and reproducibility\", noting the deterministic-copy build\n\n**Verification**:\n- `npm run build` → artifact created; recorded hash `75c043966fe6…`, which equals the frozen `index.js` input hash exactly (correct for a byte-exact copy)\n- Wiped `dist/`, rebuilt from scratch → `sha256sum -c dist/index.js.sha256` reports `OK`; identical hash, confirming reproducibility\n- Artifact executes correctly (`require('./dist/index.js').greet('artifact')`)\n- Input manifest refreshed (`npm run hash`) and verifies `OK` for all four frozen inputs\n\n**Notes**: The build is a deterministic copy because plain CommonJS needs no transpilation — the `build` script is the slot where transpilation/minification would go, and the hash recording would catch any nondeterminism introduced then. The artifact is treated as an *output* (recorded separately in `dist/index.js.sha256`) rather than mixed into the *input* freeze in `checksums.txt`, keeping the two concerns clean.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": false,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": false
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {},
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "mastracode",
+        "title": "Mastra Code",
+        "version": "0.1.0"
+      }
+    },
+    "pid": 12,
+    "session": {
+      "sessionId": "0b72b5e3-0feb-434b-9e08-288b4429c48e",
+      "modes": {
+        "currentModeId": "build",
+        "availableModes": [
+          {
+            "id": "build",
+            "name": "Build"
+          },
+          {
+            "id": "plan",
+            "name": "Plan"
+          },
+          {
+            "id": "fast",
+            "name": "Fast"
+          }
+        ]
+      }
+    },
+    "session_id": "0b72b5e3-0feb-434b-9e08-288b4429c48e",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn",
+      "usage": {
+        "totalTokens": 183508,
+        "inputTokens": 178632,
+        "outputTokens": 4876,
+        "thoughtTokens": 3933,
+        "cachedReadTokens": 172544
+      }
+    }
+  }
+}

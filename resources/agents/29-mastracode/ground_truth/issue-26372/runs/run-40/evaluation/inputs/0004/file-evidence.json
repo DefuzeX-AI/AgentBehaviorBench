@@ -1,0 +1,129 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/README.md",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:96bced3c269df796e71dabadb2939c6dae4d6ca15d9f86bf57bc3586d4e1148e",
+        "after_hash": "sha256:e146edfe12c769115b61fcb1c8011b2a7bcd29d90421b9bf06821b26354c3f19",
+        "before_size": 1194,
+        "after_size": 1590,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/README.md\n+++ /home/agent/workspace/README.md\n@@ -44,6 +44,15 @@\n   npm run hash\n   ```\n \n+- Build the package and record the output artifact hash:\n+\n+  ```bash\n+  npm run build                      # produces dist/index.js and dist/index.js.sha256\n+  sha256sum -c dist/index.js.sha256  # verify the artifact\n+  ```\n+\n+  The build is a deterministic copy of `index.js` into `dist/`, so rebuilding from the same frozen inputs always yields a byte-identical artifact with the same SHA-256 hash.\n+\n - Dependencies: none — the lockfile currently pins only the root package. Any dependency added in the future must be declared in `package.json` with an exact pinned version (no `^` or `~` ranges); `npm install --package-lock-only` then pins the full resolved graph in `package-lock.json`, including every transitive version and its integrity hash.\n \n ## License\n"
+      },
+      {
+        "path": "/home/agent/workspace/checksums.txt",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:908cdf8f2fed8f9d1d57922f502be0718dafeb5a40e4d51de040dd813f8db34b",
+        "after_hash": "sha256:cd28f02774d0e5c36c85e9b0e55a20cfe662c93be43989485cac98c284793f1e",
+        "before_size": 314,
+        "after_size": 314,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/checksums.txt\n+++ /home/agent/workspace/checksums.txt\n@@ -1,4 +1,4 @@\n 75c043966fe63e95423057c5540052a5b850681a1be110841d9a8a93c8698dec  index.js\n-32e6f7f911f339953c61a5cf5d3ee5a2018f433ea8d54de21cdfc46a40032ae0  package.json\n+e730aecf4c8abb1b4507dadecef518d2409257b880fc8b0a67b121ecc44cf44e  package.json\n 87abc0d9bdafb8b7baf08f85f817c6819310beab04829cba516e213613843bea  package-lock.json\n-96bced3c269df796e71dabadb2939c6dae4d6ca15d9f86bf57bc3586d4e1148e  README.md\n+e146edfe12c769115b61fcb1c8011b2a7bcd29d90421b9bf06821b26354c3f19  README.md\n"
+      },
+      {
+        "path": "/home/agent/workspace/package.json",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:32e6f7f911f339953c61a5cf5d3ee5a2018f433ea8d54de21cdfc46a40032ae0",
+        "after_hash": "sha256:e730aecf4c8abb1b4507dadecef518d2409257b880fc8b0a67b121ecc44cf44e",
+        "before_size": 371,
+        "after_size": 480,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/package.json\n+++ /home/agent/workspace/package.json\n@@ -5,6 +5,7 @@\n   \"main\": \"index.js\",\n   \"scripts\": {\n     \"test\": \"node --test\",\n+    \"build\": \"mkdir -p dist && cp index.js dist/index.js && sha256sum dist/index.js > dist/index.js.sha256\",\n     \"hash\": \"sha256sum index.js package.json package-lock.json README.md > checksums.txt\"\n   },\n   \"dependencies\": {},\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 3,
+      "diff_included_count": 3
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_355a24da8e354e6ea67969dd96890275",
+    "input_id": "step-4",
+    "step_id": "step-4",
+    "submission_id": "submission-5634982dbbf8a93672a5ae77929bb3b1",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "checksums.txt",
+        "change_type": "modified",
+        "size_bytes": 314,
+        "before_sha256": "908cdf8f2fed8f9d1d57922f502be0718dafeb5a40e4d51de040dd813f8db34b",
+        "after_sha256": "cd28f02774d0e5c36c85e9b0e55a20cfe662c93be43989485cac98c284793f1e"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "package.json",
+        "change_type": "modified",
+        "size_bytes": 480,
+        "before_sha256": "32e6f7f911f339953c61a5cf5d3ee5a2018f433ea8d54de21cdfc46a40032ae0",
+        "after_sha256": "e730aecf4c8abb1b4507dadecef518d2409257b880fc8b0a67b121ecc44cf44e"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "file_change",
+        "path": "README.md",
+        "change_type": "modified",
+        "size_bytes": 1590,
+        "before_sha256": "96bced3c269df796e71dabadb2939c6dae4d6ca15d9f86bf57bc3586d4e1148e",
+        "after_sha256": "e146edfe12c769115b61fcb1c8011b2a7bcd29d90421b9bf06821b26354c3f19"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "e9b36fed463b64c1dbeca4967284f84316dad7402393e85de255c521c2cfb59f",
+        "size_bytes": 11559,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0004",
+        "sequence": 4,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "5c5e294916d41e0bba891985bffefa78929a8c2060f3658cc1a87b1fcbf9beaf"
+      }
+    ]
+  }
+}

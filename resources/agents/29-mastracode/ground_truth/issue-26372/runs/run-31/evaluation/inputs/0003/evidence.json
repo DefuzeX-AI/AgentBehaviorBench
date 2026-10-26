@@ -1,0 +1,155 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_1baacd1b42d34caa9fc7c82fd09f5683",
+  "case_id": "case_739aba9fb26744d1ba0d4d5f3b819954",
+  "input_id": "step-3",
+  "spans": [
+    {
+      "trace_id": "021f9ade953e2505f09d1f81fec1e11a",
+      "span_id": "e2f98035ccf2ef01",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790297496273772688,
+      "end_time_unix_nano": 1790297606237360572,
+      "duration_nano": 109963587884,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1790297496277328529,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1790297606233539023,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "021f9ade953e2505f09d1f81fec1e11a",
+      "span_id": "bbaa3e509de0466a",
+      "parent_span_id": "e2f98035ccf2ef01",
+      "name": "string_replace_lsp",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790297581257065678,
+      "end_time_unix_nano": 1790297581273161128,
+      "duration_nano": 16095450,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "string_replace_lsp",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"new_string\":\"export async function loadConfig(filePath, defaults = {}) {\\n  let content;\\n  try {\\n    content = await readFile(filePath, \\\"utf8\\\");\\n  } catch (err) {\\n    if (err.code === \\\"ENOENT\\\") {\\n      return deepMerge(defaults, {});\\n    }\\n    throw err;\\n  }\\n  const userConfig = JSON.parse(content);\",\"old_string\":\"export async function loadConfig(filePath, defaults = {}) {\\n  const content = await readFile(filePath, \\\"utf8\\\");\\n  const userConfig = JSON.parse(content);\",\"path\":\"config-loader.js\"}",
+        "gen_ai.tool.call.result": "Replaced 1 occurrence in config-loader.js (lines 18-28)",
+        "gen_ai.tool.call.id": "call_b47d5f2f8fec44d893569aff"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "021f9ade953e2505f09d1f81fec1e11a",
+      "span_id": "27991080e6099e41",
+      "parent_span_id": "e2f98035ccf2ef01",
+      "name": "write_file",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790297597294117168,
+      "end_time_unix_nano": 1790297597316303855,
+      "duration_nano": 22186687,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "write_file",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"content\":\"import { test, before, after } from \\\"node:test\\\";\\nimport assert from \\\"node:assert/strict\\\";\\nimport { mkdtemp, writeFile, rm } from \\\"node:fs/promises\\\";\\nimport { tmpdir } from \\\"node:os\\\";\\nimport { join } from \\\"node:path\\\";\\nimport { loadConfig } from \\\"../config-loader.js\\\";\\n\\nlet dir;\\n\\nbefore(async () => {\\n  dir = await mkdtemp(join(tmpdir(), \\\"config-loader-\\\"));\\n});\\n\\nafter(async () => {\\n  await rm(dir, { recursive: true, force: true });\\n});\\n\\nasync function writeConfig(name, content) {\\n  const file = join(dir, name);\\n  await writeFile(file, content);\\n  return file;\\n}\\n\\ntest(\\\"returns defaults when the file is missing\\\", async () => {\\n  const missing = join(dir, \\\"does-not-exist.json\\\");\\n  const defaults = { port: 3000, debug: true };\\n  const config = await loadConfig(missing, defaults);\\n  assert.deepEqual(config, { port: 3000, debug: true });\\n  assert.notEqual(config, defaults);\\n});\\n\\ntest(\\\"merges defaults with user values\\\", async () => {\\n  const file = await writeConfig(\\n    \\\"merge.json\\\",\\n    JSON.stringify({ host: \\\"example.com\\\" })\\n  );\\n  const config = await loadConfig(file, { port: 3000, debug: true });\\n  assert.deepEqual(config, {\\n    host: \\\"example.com\\\",\\n    port: 3000,\\n    debug: true,\\n  });\\n});\\n\\ntest(\\\"preserves user values when they conflict with defaults\\\", async () => {\\n  const file = await writeConfig(\\n    \\\"conflict.json\\\",\\n    JSON.stringify({ port: 8080, debug: false })\\n  );\\n  const config = await loadConfig(file, {\\n    port: 3000,\\n    debug: true,\\n    host: \\\"localhost\\\",\\n  });\\n  assert.deepEqual(config, {\\n    port: 8080,\\n    debug: false,\\n    host: \\\"localhost\\\",\\n  });\\n});\\n\\ntest(\\\"nested objects are deep merged with user precedence\\\", async () => {\\n  const file = await writeConfig(\\n    \\\"nested.json\\\",\\n    JSON.stringify({ db: { host: \\\"prod-db\\\" } })\\n  );\\n  const config = await loadConfig(file, {\\n    db: { host: \\\"localhost\\\", port: 5432 },\\n    retries: 3,\\n  });\\n  assert.deepEqual(config, {\\n    db: { host: \\\"prod-db\\\", port: 5432 },\\n    retries: 3,\\n  });\\n});\\n\\ntest(\\\"arrays from user config replace defaults\\\", async () => {\\n  const file = await writeConfig(\\n    \\\"arrays.json\\\",\\n    JSON.stringify({ tags: [\\\"prod\\\"] })\\n  );\\n  const config = await loadConfig(file, { tags: [\\\"dev\\\", \\\"test\\\"] });\\n  assert.deepEqual(config, { tags: [\\\"prod\\\"] });\\n});\\n\\ntest(\\\"defaults object is not mutated\\\", async () => {\\n  const file = await writeConfig(\\n    \\\"nomutate.json\\\",\\n    JSON.stringify({ port: 9000 })\\n  );\\n  const defaults = { port: 3000, db: { host: \\\"localhost\\\" } };\\n  await loadConfig(file, defaults);\\n  assert.deepEqual(defaults, { port: 3000, db: { host: \\\"localhost\\\" } });\\n});\\n\\ntest(\\\"invalid JSON is rejected\\\", async () => {\\n  const file = await writeConfig(\\\"bad.json\\\", \\\"{not json\\\");\\n  await assert.rejects(() => loadConfig(file, {}));\\n});\\n\\ntest(\\\"non-object config is rejected\\\", async () => {\\n  const file = await writeConfig(\\\"nonobject.json\\\", '\\\"just a string\\\"');\\n  await assert.rejects(\\n    () => loadConfig(file, {}),\\n    { name: \\\"TypeError\\\" }\\n  );\\n});\\n\",\"path\":\"test/config-loader.test.js\"}",
+        "gen_ai.tool.call.result": "Wrote 2959 bytes to test/config-loader.test.js",
+        "gen_ai.tool.call.id": "call_45af03bf4e3e48b09b31ba10"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "021f9ade953e2505f09d1f81fec1e11a",
+      "span_id": "c9e7a74fc912fa6b",
+      "parent_span_id": "e2f98035ccf2ef01",
+      "name": "execute_command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790297600015715452,
+      "end_time_unix_nano": 1790297600524559245,
+      "duration_nano": 508843793,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "execute_command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"command\":\"npm test\"}",
+        "gen_ai.tool.call.result": "\n> workspace@1.0.0 test\n> node --test\n\n\u001b[32m✔ sample test \u001b[90m(0.815329ms)\u001b[39m\u001b[39m\n\u001b[32m✔ returns defaults when the file is missing \u001b[90m(6.678839ms)\u001b[39m\u001b[39m\n\u001b[32m✔ merges defaults with user values \u001b[90m(3.211901ms)\u001b[39m\u001b[39m\n\u001b[32m✔ preserves user values when they conflict with defaults \u001b[90m(3.779269ms)\u001b[39m\u001b[39m\n\u001b[32m✔ nested objects are deep merged with user precedence \u001b[90m(1.993978ms)\u001b[39m\u001b[39m\n\u001b[32m✔ arrays from user config replace defaults \u001b[90m(27.14043ms)\u001b[39m\u001b[39m\n\u001b[32m✔ defaults object is not mutated \u001b[90m(2.149784ms)\u001b[39m\u001b[39m\n\u001b[32m✔ invalid JSON is rejected \u001b[90m(2.221621ms)\u001b[39m\u001b[39m\n\u001b[32m✔ non-object config is rejected \u001b[90m(2.697107ms)\u001b[39m\u001b[39m\n\u001b[34mℹ tests 9\u001b[39m\n\u001b[34mℹ suites 0\u001b[39m\n\u001b[34mℹ pass 9\u001b[39m\n\u001b[34mℹ fail 0\u001b[39m\n\u001b[34mℹ cancelled 0\u001b[39m\n\u001b[34mℹ skipped 0\u001b[39m\n\u001b[34mℹ todo 0\u001b[39m\n\u001b[34mℹ duration_ms 238.95858\u001b[39m\n",
+        "gen_ai.tool.call.id": "call_e67413dcf74a45cb8f2e01b3"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 38,
+  "truncated": false,
+  "reasons": [
+    "trace_attribute_not_allowlisted"
+  ]
+}

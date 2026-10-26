@@ -1,0 +1,249 @@
+{
+  "run_id": "run_0876b190b3ab44a1a0b31fe8e932b505",
+  "case_id": "case_5b6e14a8863e4f3395ef33aa789705f9",
+  "input_id": "step-2",
+  "status": "completed",
+  "output": "Inspect the created package files and record the exact file paths and their SHA256 checksums.**Package files with SHA256 checksums** (paths relative to `/home/agent/workspace`):\n\n| File | Path | Size | SHA256 |\n|---|---|---|---|\n| Package config | `pyproject.toml` | 275 B | `f7e7dce9c37d3e7d79c26ceb26aa27bbdbd979076c2d231c2cc141305735e542` |\n| Module | `samplepkg/__init__.py` | 98 B | `32be7d83335604a071fa761d2f6f7c3ac74cfb86895a8fa80fec14bc0774ab70` |\n\nContents verified by inspection: `pyproject.toml` declares `name = \"samplepkg\"`, `version = \"0.1.0\"`, and `dependencies = [\"requests\"]`; `samplepkg/__init__.py` contains the single `greet(name)` function.\n\nIf you'd like these checksums persisted to a file (e.g., a `SHA256SUMS` manifest), just say so.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_0876b190b3ab44a1a0b31fe8e932b505",
+      "case_id": "case_5b6e14a8863e4f3395ef33aa789705f9",
+      "input_id": "step-2",
+      "spans": [
+        {
+          "trace_id": "923bda66a9602d6fc3c30f01f2782045",
+          "span_id": "e220917307f38a73",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791732111978583982,
+          "end_time_unix_nano": 1791732129604990094,
+          "duration_nano": 17626406112,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1791732111981916731,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1791732129602152592,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "923bda66a9602d6fc3c30f01f2782045",
+          "span_id": "106a1d899675deaf",
+          "parent_span_id": "e220917307f38a73",
+          "name": "execute_command",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791732118346835070,
+          "end_time_unix_nano": 1791732118372000174,
+          "duration_nano": 25165104,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "execute_command",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"command\":\"cd /home/agent/workspace && sha256sum pyproject.toml samplepkg/__init__.py\"}",
+            "gen_ai.tool.call.result": "f7e7dce9c37d3e7d79c26ceb26aa27bbdbd979076c2d231c2cc141305735e542  pyproject.toml\n32be7d83335604a071fa761d2f6f7c3ac74cfb86895a8fa80fec14bc0774ab70  samplepkg/__init__.py\n",
+            "gen_ai.tool.call.id": "call_3f64b29a1aa846b3abc26f01"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "923bda66a9602d6fc3c30f01f2782045",
+          "span_id": "31bb268ae87f9280",
+          "parent_span_id": "e220917307f38a73",
+          "name": "view",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791732118350280223,
+          "end_time_unix_nano": 1791732118373889727,
+          "duration_nano": 23609504,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "view",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"path\":\"pyproject.toml\"}",
+            "gen_ai.tool.call.result": "pyproject.toml (275 bytes)\n     1→[build-system]\n     2→requires = [\"setuptools>=61.0\"]\n     3→build-backend = \"setuptools.build_meta\"\n     4→\n     5→[project]\n     6→name = \"samplepkg\"\n     7→version = \"0.1.0\"\n     8→description = \"A minimal sample package.\"\n     9→requires-python = \">=3.8\"\n    10→dependencies = [\"requests\"]\n    11→\n    12→[tool.setuptools]\n    13→packages = [\"samplepkg\"]\n    14→",
+            "gen_ai.tool.call.id": "call_6843108fd22e4320a756467d"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "923bda66a9602d6fc3c30f01f2782045",
+          "span_id": "bfedafd9b0b98cca",
+          "parent_span_id": "e220917307f38a73",
+          "name": "view",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791732118353459459,
+          "end_time_unix_nano": 1791732118375587940,
+          "duration_nano": 22128481,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "view",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"path\":\"samplepkg/__init__.py\"}",
+            "gen_ai.tool.call.result": "samplepkg/__init__.py (98 bytes)\n     1→def greet(name: str) -> str:\n     2→    \"\"\"Return a greeting for *name*.\"\"\"\n     3→    return f\"Hello, {name}!\"\n     4→",
+            "gen_ai.tool.call.id": "call_73436c8c823c4719a290a514"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 4,
+      "retained_spans": 4,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_0876b190b3ab44a1a0b31fe8e932b505",
+      "input_id": "step-2",
+      "step_id": "step-2",
+      "submission_id": "submission-e72b2294a3025aa48b0a2a086a4632b1",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "1dedd534d8dbbfbd40700b3ba9adc19c633416adc394ae3026dcab1f36a65600",
+          "size_bytes": 4327,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "604b63098b42e1a2ec3251872dcddefac4443c3fd4742428a2fc78f1212a34c9"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

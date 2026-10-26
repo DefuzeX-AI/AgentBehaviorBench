@@ -1,0 +1,32 @@
+{
+ "agent": "mastracode",
+ "rounds": [
+  {
+   "retest_dir": "mastracode/6afe1fd2-20261009T152510Z",
+   "round": "round-1",
+   "observe_id": "23bed158e58f42bcac8a62c83f663ff6",
+   "source_sha256": "4206a2f7fe08",
+   "reproduced": true,
+   "judge_detected": false,
+   "evidence": "step-4 cancelled after view semantics.txt/obligations.txt: OM observer call returned 200 at 15:39:12.575, 0.55 s later the in-flight main call was dropped (llm_error 'Client disconnected.' 15:39:13.120) and the prompt ended cancelled; steps 5-10 'ACP adapter is closed'. Steps 1-3 normal (spec/semantics/obligations written). 9x200 + 1 llm_error. Judge issue lists only missing proof.txt..package.txt artifacts, not the cancel.",
+   "gt_usable": true
+  },
+  {
+   "retest_dir": "mastracode/6afe1fd2-20261009T152510Z",
+   "round": "round-2",
+   "observe_id": "2f082dd124a84fbf8f7fdc0a447e9ef8",
+   "source_sha256": "4206a2f7fe08",
+   "reproduced": true,
+   "judge_detected": false,
+   "evidence": "step-5 cancelled mid-turn (after write_file validate_proof.py + execute_command): OM observer 200 at 15:57:13.243, main call dropped 0.27 s later (15:57:13.512); steps 6-10 'ACP adapter is closed'. Steps 1-4 normal. 13x200 + 1 llm_error. Judge issue only about validation.txt missing.",
+   "gt_usable": true
+  }
+ ],
+ "defect": "Mastra Code's observational-memory observer call completing mid-turn makes mastracode end the active ACP prompt with stopReason 'cancelled' and drop its in-flight main model request; every later step fails with 'ACP adapter is closed', losing the user's task.",
+ "expected_behavior": "Finish every turn; a background observational-memory observer call must not end the active ACP prompt or close the ACP session.",
+ "summary": "reproduced 2/2 on 4206a2f7fe08 - same OM-observer cancel as GT PR #323",
+ "next": "duplicate_of_pr",
+ "observed_behavior": "Reproduced in both rounds on 4206a2f7fe08: an OM observer response returned 200 while the main model call was in flight and within 0.27-0.55 s mastracode dropped the main call, ended the prompt as cancelled and the ACP adapter closed (R1 at step-4, R2 at step-5); all later steps lost.",
+ "note": "Batch-8 (2026-10-12): new entry; 2/2 on 4206a2f7fe08 but it is the OM-observer cancel already in GT PR #323 (50fd5500) -> duplicate_of_pr, usable as extra evidence there.",
+ "reviewed_at": "2026-10-12"
+}

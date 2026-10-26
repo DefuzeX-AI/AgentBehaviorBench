@@ -1,0 +1,57 @@
+# BUILD_REPRODUCIBILITY.txt — reproducible build verification for trustdemo 0.1.0
+# Generated: 2026-10-12
+
+## Result: REPRODUCIBLE
+
+Two independent builds of the trustdemo wheel produced byte-identical
+artifacts (verified with cmp and sha256sum).
+
+## Build command
+
+Run from two separate temporary directories (/tmp/repro1, /tmp/repro2),
+each containing a copy of pyproject.toml and trustdemo/:
+
+    SOURCE_DATE_EPOCH=1700000000 \
+    PIP_CONSTRAINT=constraints.txt \
+    PYTHONPATH=/tmp/buildtools \
+    python -m build --wheel
+
+Environment held constant across both builds:
+  - python -m build --wheel  (PEP 517 isolated build; build backend
+    setuptools.build_meta; setuptools pinned to ==84.0.0 via
+    PIP_CONSTRAINT so the build-system requirement setuptools>=61.0
+    resolves to the identical release in both builds)
+  - PYTHONPATH=/tmp/buildtools  (location of the local `build` package;
+    the project venv is read-only)
+  - SOURCE_DATE_EPOCH=1700000000  (2023-11-14T22:13:20Z); all input
+    file mtimes were also reset to this timestamp before each build
+  - Identical source inputs: pyproject.toml and trustdemo/__init__.py
+    (hashes recorded in SOURCE_FREEZE.txt)
+
+## Build output (tail, identical for both runs)
+
+    adding 'trustdemo-0.1.0.dist-info/RECORD'
+    removing build/bdist.linux-x86_64/wheel
+    Successfully built trustdemo-0.1.0-py3-none-any.whl
+
+## Comparison result
+
+  repro1: trustdemo-0.1.0-py3-none-any.whl
+      sha256 = 01f806b9914938bf6aaf5a6d6f3586dcab60fe4aca95b8895696dbef511d1cf1
+  repro2: trustdemo-0.1.0-py3-none-any.whl
+      sha256 = 01f806b9914938bf6aaf5a6d6f3586dcab60fe4aca95b8895696dbef511d1cf1
+
+  cmp /tmp/repro1/dist/trustdemo-0.1.0-py3-none-any.whl \
+      /tmp/repro2/dist/trustdemo-0.1.0-py3-none-any.whl
+  -> no differences; files are BYTE-IDENTICAL
+
+## Determinism sensitivity check
+
+To confirm the match reflects genuine determinism rather than an
+ignored environment variable, a third build was run with a different
+epoch (SOURCE_DATE_EPOCH=1800000000):
+
+      sha256 = 6a50174f71609265911cc1c1e482edcaa66cf717ee3e1818da43576e40ee6463
+  -> differs from the first pair at byte 11 (the embedded timestamp),
+     as expected. SOURCE_DATE_EPOCH is therefore honored, and equal
+     inputs demonstrably produce equal outputs.

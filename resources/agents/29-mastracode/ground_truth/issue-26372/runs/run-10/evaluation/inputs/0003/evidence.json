@@ -1,0 +1,190 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_96fa6c63e8f640829822762fb795a7f8",
+  "case_id": "case_827a2930b64d4cda8074bd8d0d06421b",
+  "input_id": "step-3",
+  "spans": [
+    {
+      "trace_id": "95fe9d62f5911fad0dc5be76bf77ba47",
+      "span_id": "364765a9d00117ad",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790303983451990240,
+      "end_time_unix_nano": 1790304059010466495,
+      "duration_nano": 75558476255,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1790303983455964691,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1790304059006036315,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "95fe9d62f5911fad0dc5be76bf77ba47",
+      "span_id": "0638ca75cf07a535",
+      "parent_span_id": "364765a9d00117ad",
+      "name": "write_file",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790304029614724679,
+      "end_time_unix_nano": 1790304029639262034,
+      "duration_nano": 24537355,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "write_file",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"content\":\"#!/usr/bin/env python3\\n\\\"\\\"\\\"Normalize a field in a JSON file and write the result back.\\\"\\\"\\\"\\nimport argparse\\nimport json\\n\\n\\ndef main():\\n    parser = argparse.ArgumentParser(description=\\\"Normalize a field in a JSON file.\\\")\\n    parser.add_argument(\\\"file\\\", help=\\\"Path to the JSON file\\\")\\n    parser.add_argument(\\\"--field\\\", default=\\\"email\\\", help=\\\"Field to normalize\\\")\\n    args = parser.parse_args()\\n\\n    with open(args.file, \\\"r\\\", encoding=\\\"utf-8\\\") as f:\\n        data = json.load(f)\\n\\n    if isinstance(data, dict) and args.field in data and isinstance(data[args.field], str):\\n        data[args.field] = data[args.field].strip().lower()\\n\\n    with open(args.file, \\\"w\\\", encoding=\\\"utf-8\\\") as f:\\n        json.dump(data, f, indent=4)\\n        f.write(\\\"\\\\n\\\")\\n\\n\\nif __name__ == \\\"__main__\\\":\\n    main()\\n\",\"path\":\"json_normalize.py\"}",
+        "gen_ai.tool.call.result": "Wrote 779 bytes to json_normalize.py",
+        "gen_ai.tool.call.id": "call_1f6abfc2d32d488c8d9879b0"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "95fe9d62f5911fad0dc5be76bf77ba47",
+      "span_id": "835b3bb9443e0020",
+      "parent_span_id": "364765a9d00117ad",
+      "name": "write_file",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790304029620143263,
+      "end_time_unix_nano": 1790304029643307250,
+      "duration_nano": 23163987,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "write_file",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"content\":\"{\\n  \\\"name\\\": \\\"Ada Lovelace\\\",\\n  \\\"email\\\": \\\"ADA@Example.COM\\\",\\n  \\\"roles\\\": [\\n    \\\"admin\\\",\\n    \\\"user\\\"\\n  ],\\n  \\\"meta\\\": {\\n    \\\"active\\\": true,\\n    \\\"score\\\": 42\\n  }\\n}\\n\",\"path\":\"sample.json\"}",
+        "gen_ai.tool.call.result": "Wrote 154 bytes to sample.json",
+        "gen_ai.tool.call.id": "call_e84de30a0c1e4c9faf270c84"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "95fe9d62f5911fad0dc5be76bf77ba47",
+      "span_id": "14e8fb440e9d41c2",
+      "parent_span_id": "364765a9d00117ad",
+      "name": "execute_command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790304035606391212,
+      "end_time_unix_nano": 1790304035680999366,
+      "duration_nano": 74608154,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "execute_command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"command\":\"cp sample.json sample.before.json && python json_normalize.py sample.json && echo \\\"=== exit: $? ===\\\" && diff -u sample.before.json sample.json; echo \\\"=== diff exit: $? ===\\\"\"}",
+        "gen_ai.tool.call.result": "=== exit: 0 ===\n--- sample.before.json\t2026-09-25 02:40:35.627422368 +0000\n+++ sample.json\t2026-09-25 02:40:35.661322067 +0000\n@@ -1,12 +1,12 @@\n {\n-  \"name\": \"Ada Lovelace\",\n-  \"email\": \"ADA@Example.COM\",\n-  \"roles\": [\n-    \"admin\",\n-    \"user\"\n-  ],\n-  \"meta\": {\n-    \"active\": true,\n-    \"score\": 42\n-  }\n+    \"name\": \"Ada Lovelace\",\n+    \"email\": \"ada@example.com\",\n+    \"roles\": [\n+        \"admin\",\n+        \"user\"\n+    ],\n+    \"meta\": {\n+        \"active\": true,\n+        \"score\": 42\n+    }\n }\n=== diff exit: 1 ===\n",
+        "gen_ai.tool.call.id": "call_b561edf824724ef28e40153c"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "95fe9d62f5911fad0dc5be76bf77ba47",
+      "span_id": "9e80e1f4fcfee989",
+      "parent_span_id": "364765a9d00117ad",
+      "name": "execute_command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790304043306521541,
+      "end_time_unix_nano": 1790304043362918933,
+      "duration_nano": 56397392,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "execute_command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"command\":\"python -c \\\"\\nimport json\\nbefore = json.load(open('sample.before.json'))\\nafter = json.load(open('sample.json'))\\nexpected = dict(before); expected['email'] = 'ada@example.com'\\nprint('semantically identical (apart from intended email fix):', after == expected)\\nprint('bytes identical:', open('sample.before.json','rb').read() == open('sample.json','rb').read())\\n\\\"\"}",
+        "gen_ai.tool.call.result": "semantically identical (apart from intended email fix): True\nbytes identical: False\n",
+        "gen_ai.tool.call.id": "call_6a124c1fb54e444ab7d82b52"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 48,
+  "truncated": false,
+  "reasons": [
+    "trace_attribute_not_allowlisted"
+  ]
+}

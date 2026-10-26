@@ -1,0 +1,95 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_2e4464908ad241c7af089f66dc5cc408",
+  "case_id": "case_6878ef3d062141a791ca870118a6b1f0",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "d351f278b34c61446a2724fca62f6dca",
+      "span_id": "b4bb33a60acdf997",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790311670789990349,
+      "end_time_unix_nano": 1790311695534491286,
+      "duration_nano": 24744500937,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1790311675210157001,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1790311680655515548,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1790311680656985068,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1790311695531835587,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "d351f278b34c61446a2724fca62f6dca",
+      "span_id": "c892eb95772b879c",
+      "parent_span_id": "b4bb33a60acdf997",
+      "name": "write_file",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790311691459883934,
+      "end_time_unix_nano": 1790311691487596439,
+      "duration_nano": 27712505,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "write_file",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"content\":\"Specification: abs — Absolute Value of an Integer\\n\\n1. Overview\\n    abs is a total function on the integers Z, mapping each integer to a\\n    non-negative integer.\\n\\n2. Signature\\n    abs : Z -> Z\\n\\n3. Definition\\n    For all x in Z:\\n\\n        abs(x) =  x   if x >= 0\\n        abs(x) = -x   if x <  0\\n\\n4. Expected Properties\\n    For all integers x:\\n\\n        P1 (Non-negativity):  abs(x) >= 0\\n        P2 (Identity case):   abs(x) =  x    if x >= 0\\n        P3 (Negation case):   abs(x) = -x    if x <  0\\n\\n5. Notes\\n    - P1 follows from P2 and P3, since both branches return a\\n      non-negative value for every x in Z.\\n    - abs is idempotent: abs(abs(x)) = abs(x) for all x in Z.\\n    - abs(x) = 0 if and only if x = 0.\\n\",\"path\":\"spec.txt\"}",
+        "gen_ai.tool.call.result": "Wrote 712 bytes to spec.txt",
+        "gen_ai.tool.call.id": "call_6f9f33306c6941569290e88e"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 18,
+  "truncated": false,
+  "reasons": [
+    "trace_attribute_not_allowlisted"
+  ]
+}
