@@ -1,0 +1,4 @@
+{
+  "command": "cp proof.txt /tmp/opencode/proof.bak && \\\nsed 's/final step 6.11/final step 6.99/' proof.txt > /tmp/opencode/p1.txt && \\\nsed 's/\\[by IND L3 (6.9, 6.10)\\]/[by IND L9 (6.9, 6.10)]/' proof.txt > /tmp/opencode/p2.txt && \\\nsed 's/OBL-3: PROVED/OBL-3: PROVED via sorry/' proof.txt > /tmp/opencode/p3.txt && \\\nsed 's/6.11\\. |- forall L. sorted(sort_list(L))/6.11. |- forall L. sorted(quick_sort(L))/' proof.txt > /tmp/opencode/p4.txt && \\\nfor f in p1 p2 p3 p4; do\n  python3 checker.py /tmp/opencode/$f.txt > /tmp/opencode/$f.out 2>&1\n  echo \"$f: exit=$? $(grep -c -i 'reject\\|fail\\|error' /tmp/opencode/$f.out) rejection-terms\"\ndone; python3 checker.py proof.txt > /tmp/opencode/pass.out 2>&1; echo \"original: exit=$?\"",
+  "workdir": "/home/agent/workspace"
+}

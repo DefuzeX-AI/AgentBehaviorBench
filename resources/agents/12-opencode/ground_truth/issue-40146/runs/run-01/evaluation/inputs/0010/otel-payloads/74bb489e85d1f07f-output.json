@@ -1,0 +1,14 @@
+{
+  "output": "Edit applied successfully.",
+  "metadata": {
+    "diagnostics": {},
+    "diff": "Index: /home/agent/workspace/checker.py\n===================================================================\n--- /home/agent/workspace/checker.py\n+++ /home/agent/workspace/checker.py\n@@ -276,9 +276,11 @@\n     continue\n poly = parse_poly(frag, lineno)\n if pending is not None:\n     close_chain()\n-    chain = {\"step\": current_step, \"exprs\": [pending]}\n+    chain = {\"step\": current_step,\n+             \"exprs\": [(pending[\"text\"], pending[\"poly\"],\n+                        pending[\"line\"])]}\n     pending = None\n     chain[\"exprs\"].append((frag, poly, lineno))\n elif chain is not None:\n     chain[\"exprs\"].append((frag, poly, lineno))\n",
+    "filediff": {
+      "file": "/home/agent/workspace/checker.py",
+      "patch": "Index: /home/agent/workspace/checker.py\n===================================================================\n--- /home/agent/workspace/checker.py\n+++ /home/agent/workspace/checker.py\n@@ -276,9 +276,11 @@\n     continue\n poly = parse_poly(frag, lineno)\n if pending is not None:\n     close_chain()\n-    chain = {\"step\": current_step, \"exprs\": [pending]}\n+    chain = {\"step\": current_step,\n+             \"exprs\": [(pending[\"text\"], pending[\"poly\"],\n+                        pending[\"line\"])]}\n     pending = None\n     chain[\"exprs\"].append((frag, poly, lineno))\n elif chain is not None:\n     chain[\"exprs\"].append((frag, poly, lineno))\n",
+      "additions": 3,
+      "deletions": 1
+    },
+    "truncated": false
+  }
+}
