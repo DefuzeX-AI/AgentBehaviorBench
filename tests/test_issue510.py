@@ -10,7 +10,7 @@ import pytest
 from agentbench.adapter.langgraph.config import LangGraphAdapterConfig
 from agentbench.runtime.source.preparation import prepare_agent_source
 
-UNIT = Path(__file__).resolve().parents[1] / "resources/agents/123-structureclaw"
+UNIT = Path(__file__).resolve().parents[1] / "resources/agents/127-structureclaw"
 
 
 def bridge():

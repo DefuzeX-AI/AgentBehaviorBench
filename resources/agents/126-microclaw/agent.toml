@@ -1,0 +1,41 @@
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "microclaw"
+display_name = "MicroClaw (native ACP)"
+framework = "acp"
+[evaluation]
+replay_safe = false
+[evaluation.workspace]
+path = "/home/agent/workspace"
+initial_state = "empty"
+[evaluation.file_evidence]
+track_files = true
+upload_diff = true
+export_changed_files = true
+[source]
+method = "install"
+repository = "https://github.com/microclaw/microclaw"
+revision = "45ad5e7a8c705080a94543c92319f81b7e0e884f"
+downloaded_on = "2026-10-25"
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+cpus = 2
+env_keys = []
+[build]
+context = "."
+dockerfile = "Dockerfile"
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+[adapter]
+type = "acp"
+transport = "stdio"
+command = ["python", "/opt/agent/bootstrap/launch.py"]
+handshake_timeout = 120
+cwd = "/home/agent/workspace"
+permission_policy = "allow_once"
+[llm_interception]
+trust_plugin = "pem-env"
+network_config = "network/rules.toml"
+tool_routes = []

@@ -11,7 +11,7 @@ The unit installs official npm `@structureclaw/structureclaw@1.1.0`, with regist
 `gitHead` `5224d2dcbc3a74a515938d0d79a36bbaee412492` and a committed npm lockfile.
 It invokes the published TypeScript LangGraph service without modifying native
 prompts, graph or tools. See [source checks](source-checks.json) and the
-[unit README](../../../resources/agents/123-structureclaw/README.md).
+[unit README](../../../resources/agents/127-structureclaw/README.md).
 
 The published OpenSees Linux wheel contains an x86-64 ELF library. Docker uses
 amd64; ARM hosts require emulation. Build-time and separate non-root offline
@@ -125,3 +125,11 @@ changed. Raw execution, network, output and Judge artifacts remain under
 records and frozen run artifacts; it excludes credentials and downloaded package
 caches. No GT exploration was performed; automatic CLI GT summaries recorded zero
 calls.
+
+## PR preparation verification — 2026-10-26
+
+Merged upstream main `8349406e`, preserving every upstream registration, and moved the standalone integration to `127-structureclaw`. Current runnable references and the focused test path use that location; historical execution artifacts remain unchanged. Another onboarding merge will require reconciling the next available directory number.
+
+The 29 focused/manifest tests passed. Current and freshly materialized installation-input units passed combined configuration validation and the official Profile parser against a freshly fetched SDK catalog. The two restored installation files are the npm inputs; this does not mean a fresh npm dependency installation or solver execution was repeated.
+
+Native binding, manifest, Dockerfile, profile and locked package inputs are unchanged from the frozen runtime evidence at `b72a1e6d`. No paid execution was repeated for synchronization or path changes. The unsuccessful solver task, invalid local Judge and official issue/high remain unresolved acceptance limitations; this PR is a draft and the registration stays disabled/adapting.
