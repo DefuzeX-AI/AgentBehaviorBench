@@ -32,6 +32,7 @@ class ModelTargetConfig:
     )
 
     endpoint_paths: Mapping[str, str] | None = None
+    chat_thinking: str | None = None
 
 
 @runtime_checkable
@@ -71,8 +72,12 @@ class ConfiguredModelProvider:
         headers = {header: environ[variable].strip()
                    for header, variable in definition.get("header_env", {}).items()
                    if environ.get(variable, "").strip()}
+        chat_thinking = environ.get("ABB_CHAT_THINKING", "").strip() or None
+        if chat_thinking is not None and chat_thinking not in ("enabled", "disabled", "auto"):
+            raise InterceptionConfigurationError("ABB_CHAT_THINKING must be enabled, disabled, or auto")
         endpoints = definition.get("endpoint_paths")
         return ModelTargetConfig(
+            chat_thinking=chat_thinking,
             provider_id=self.provider_id,
             target_plugin=definition["target_plugin"],
             base_url=base_url.rstrip("/"),
