@@ -1,0 +1,501 @@
+"""以本機 CLI 訂閱當 LLM 後端：Claude Code（claude -p）與 Codex（codex exec）。
+
+免 API key、不吃 API 額度，改用使用者的 CLI 訂閱。介面與其他後端一致：
+`get_llm(...).with_structured_output(Model).invoke(messages)`。
+
+結構化輸出策略：CLI 回傳文字而非原生 function-calling，故以「JSON Schema 提示 →
+抽取 → Pydantic 驗證 → 失敗重試」實作（Codex 另用 --output-schema 由 CLI 強制 schema）。
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import tempfile
+import time
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Type
+
+from pydantic import BaseModel, ValidationError
+
+from app.llm_errors import LLMResponseFormatError, parse_structured_json
+from app.task_control import TaskCancelled, check_cancelled
+
+_MAX_TRIES = 3
+_TIMEOUT = 300
+
+# Windows：呼叫 CLI 子程序時不要彈出 console 視窗（視窗版 app 否則會一直閃黑窗）。
+# 非 Windows 取 0（無作用）。
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
+def _cli_search_paths(name: str) -> list[Path]:
+    """常見的 per-user CLI 安裝位置（npm / .local / bun / homebrew）。
+
+    GUI／打包版（雙擊 .exe、pywebview）啟動的程序常常不繼承終端機 profile 的 PATH，
+    因此終端機跑得動的 `claude`／`codex`，到 app 裡 shutil.which() 卻找不到、每個 LLM
+    呼叫都拋『找不到 CLI』被靜默降級。這裡補上這些路徑當第二道防線。
+    """
+    home = Path.home()
+    paths: list[Path] = []
+    if os.name == "nt":
+        names = [f"{name}.cmd", f"{name}.exe", name]
+        roots = [
+            Path(os.environ.get("APPDATA", str(home / "AppData" / "Roaming"))) / "npm",
+            Path(os.environ.get("LOCALAPPDATA", str(home / "AppData" / "Local"))) / "npm",
+            home / ".local" / "bin",
+            home / "AppData" / "Local" / "Programs" / name,
+            home / ".bun" / "bin",
+        ]
+    else:
+        names = [name]
+        roots = [
+            home / ".local" / "bin",
+            home / ".npm-global" / "bin",
+            home / ".bun" / "bin",
+            Path("/usr/local/bin"),
+            Path("/opt/homebrew/bin"),
+            Path("/usr/bin"),
+        ]
+    roots.extend([
+        home / ".volta" / "bin",
+        home / ".asdf" / "shims",
+    ])
+    for root in (home / ".nvm" / "versions" / "node").glob("*"):
+        roots.append(root / "bin")
+    for root in (home / ".local" / "share" / "fnm" / "node-versions").glob("*"):
+        roots.append(root / "installation" / "bin")
+    for root in roots:
+        for n in names:
+            paths.append(root / n)
+    return paths
+
+
+def _find_cli(name: str, env_var: str) -> str | None:
+    """穩健地找出 CLI 執行檔：環境變數覆寫 → PATH(shutil.which) → 常見安裝路徑。"""
+    override = (os.environ.get(env_var) or "").strip()
+    if override:
+        return override
+    found = shutil.which(name)
+    if found:
+        return found
+    for path in _cli_search_paths(name):
+        try:
+            if path.exists():
+                return str(path)
+        except OSError:
+            continue
+    return None
+
+
+def _prepend_cli_dir_to_path(env: dict[str, str], exe: str) -> dict[str, str]:
+    """讓 npm/nvm shim 在 GUI app 子程序中也找得到旁邊的 node。
+
+    macOS app bundle 不會載入 shell profile；即使 `_find_cli()` 掃到
+    `~/.nvm/.../bin/codex`，shim 內的 `#!/usr/bin/env node` 仍會因 child PATH
+    沒有該 bin 而失敗。把 CLI 所在資料夾只加到子程序環境，不污染主程序。
+    """
+    parent = Path(exe).expanduser().parent
+    if str(parent) in ("", "."):
+        return env
+    out = dict(env)
+    path_key = next((key for key in out if key.upper() == "PATH"), "PATH")
+    parts = [part for part in out.get(path_key, "").split(os.pathsep) if part]
+    parent_str = str(parent)
+    if parent_str not in parts:
+        parts.insert(0, parent_str)
+    out[path_key] = os.pathsep.join(parts)
+    return out
+
+
+def _run_process(
+    args: list[str],
+    *,
+    env: dict[str, str],
+    timeout: int,
+    stdin_text: str | None = None,
+):
+    """Run a CLI subprocess while honoring cooperative task cancellation."""
+    check_cancelled()
+    proc = subprocess.Popen(
+        args,
+        stdin=subprocess.PIPE if stdin_text is not None else subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        env=env,
+        creationflags=_NO_WINDOW,
+    )
+    if stdin_text is not None and proc.stdin is not None:
+        try:
+            proc.stdin.write(stdin_text)
+            proc.stdin.close()
+            proc.stdin = None
+        except BrokenPipeError:
+            pass
+    deadline = time.monotonic() + timeout
+    try:
+        while True:
+            check_cancelled()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                proc.kill()
+                stdout, stderr = proc.communicate()
+                raise RuntimeError(
+                    f"CLI 執行超時（>{timeout} 秒）：{(stderr or stdout or '').strip()[:300]}"
+                )
+            try:
+                stdout, stderr = proc.communicate(timeout=min(0.2, remaining))
+                return SimpleNamespace(returncode=proc.returncode, stdout=stdout, stderr=stderr)
+            except subprocess.TimeoutExpired:
+                continue
+    except TaskCancelled:
+        proc.terminate()
+        try:
+            proc.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+        raise
+
+
+def _safe_arg(text: str) -> str:
+    """移除 NUL：含 \\x00 的字串當 subprocess 參數會直接 ValueError("embedded null byte")。
+    履歷/JD 等外部文字（UTF-16 .txt、某些 PDF 抽取）偶有殘留，作為邊界防線一律先清掉。"""
+    return (text or "").replace("\x00", "").lstrip()
+
+
+def _messages_to_prompt(messages) -> tuple[str, str]:
+    """把 [(role, content), ...] 拆成 (system, human) 兩段合併字串。"""
+    system_parts, human_parts = [], []
+    for role, content in messages:
+        if role == "system":
+            system_parts.append(content)
+        else:
+            human_parts.append(content)
+    return "\n\n".join(system_parts), "\n\n".join(human_parts)
+
+
+def _join_prompt(*parts: str) -> str:
+    """Join prompt sections without leading blank lines.
+
+    Codex CLI treats prompts that start with blank lines as an empty interactive task in
+    some Windows invocations, so keep the first character meaningful.
+    """
+    return "\n\n".join(part.strip() for part in parts if (part or "").strip())
+
+
+def _extract_json(text: str) -> str:
+    """抽出第一個完整 JSON 物件：去 markdown 圍欄後用平衡括號掃描（巢狀安全、忽略字串內括號）。"""
+    text = (text or "").strip()
+    text = re.sub(r"^```(?:json)?\s*", "", text)
+    text = re.sub(r"\s*```$", "", text).strip()
+    start = text.find("{")
+    if start == -1:
+        return text
+    depth = 0
+    in_str = False
+    esc = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
+    return text[start:]  # 未閉合 → 交給驗證報錯
+
+
+def _schema_instruction(schema_model: Type[BaseModel]) -> str:
+    schema = schema_model.model_json_schema()
+    return (
+        "請『只』輸出一個符合下列 JSON Schema 的 JSON 物件，"
+        "不要任何說明文字、不要 markdown 圍欄：\n"
+        + json.dumps(schema, ensure_ascii=False)
+    )
+
+
+def _parse_into(schema_model: Type[BaseModel], raw: str, backend_label: str = "CLI") -> BaseModel:
+    return parse_structured_json(
+        schema_model,
+        raw,
+        backend_label=backend_label,
+        extract_json=_extract_json,
+    )
+
+
+def _repair_hint(exc: ValidationError) -> str:
+    """把 Pydantic 欄位級錯誤回灌提示，引導模型針對性修正（而非通用嘮叨）。"""
+    problems = []
+    for e in exc.errors()[:8]:
+        loc = ".".join(str(p) for p in e.get("loc", ())) or "(root)"
+        problems.append(f"- 欄位 `{loc}`：{e.get('msg')}")
+    return ("上次輸出不符合 schema，請修正下列欄位後，重新只輸出一個合法 JSON 物件："
+            "\n" + "\n".join(problems))
+
+
+def _structured_loop(run_prompt, schema, messages, backend_label: str = "CLI", max_tries: int = _MAX_TRIES):
+    """共用結構化輸出迴圈：組提示 → 跑 → 抽/驗 → 失敗帶欄位錯誤重試。"""
+    system, human = _messages_to_prompt(messages)
+    base = _join_prompt(system, human, _schema_instruction(schema))
+    prompt = base
+    last_err = None
+    last_raw = ""
+    for _ in range(max(1, max_tries)):
+        raw = run_prompt(prompt)
+        last_raw = raw
+        try:
+            return _parse_into(schema, raw, backend_label=backend_label)
+        except LLMResponseFormatError as exc:
+            last_err = exc
+            if exc.kind == "schema" and exc.validation_error is not None:
+                prompt = base + "\n\n" + _repair_hint(exc.validation_error)
+            elif exc.kind == "empty":
+                prompt = base + "\n\n上次回覆是空白，請只輸出一個合法 JSON 物件。"
+            else:
+                prompt = base + "\n\n上次回覆不是合法 JSON，請只輸出一個合法 JSON 物件。"
+        except ValidationError as exc:
+            last_err = exc
+            prompt = base + "\n\n" + _repair_hint(exc)
+        except json.JSONDecodeError as exc:
+            last_err = exc
+            prompt = (
+                base
+                + "\n\n（上次輸出不是合法 JSON，請只輸出一個合法 JSON 物件，不要任何其他文字）"
+            )
+    # 帶上『最後一次實際輸出』片段，方便診斷 codex/claude 到底吐了什麼導致解析失敗。
+    if isinstance(last_err, LLMResponseFormatError):
+        raise last_err
+    raise RuntimeError(
+        f"CLI 結構化輸出解析失敗：{last_err}；最後輸出：{(last_raw or '').strip()[:200]!r}"
+    ) from last_err
+
+
+# ---------------------------------------------------------------------------
+# Claude Code CLI（claude -p）
+# ---------------------------------------------------------------------------
+
+CLAUDE_TIER_MODELS = {"cheap": "haiku", "standard": "sonnet", "deep": "opus"}
+# 讓模型可上網查證的內建工具（讀取型、headless 下免權限提示）
+CLAUDE_RESEARCH_TOOLS = ["WebSearch", "WebFetch"]
+_RESEARCH_TIMEOUT = 420  # 上網查證多輪，timeout 放寬
+
+
+def _run_claude(prompt: str, model: str, allowed_tools: list[str] | None = None,
+                timeout: int = _TIMEOUT) -> str:
+    """呼叫 `claude -p`（訂閱），回傳模型文字。移除 ANTHROPIC_API_KEY 以走訂閱登入。
+
+    allowed_tools 非空時同時限制「可見」與「免確認」工具，並隔離本機設定、MCP 與
+    CLAUDE.md，避免網頁內容透過 prompt injection 轉用 Read/Bash 等本機能力。
+    """
+    exe = _find_cli("claude", "CLAUDE_CLI_PATH")
+    if not exe:
+        raise RuntimeError("找不到 claude CLI，請確認已安裝並在 PATH。")
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
+    env = _prepend_cli_dir_to_path(env, exe)
+    args = [exe, "-p", _safe_arg(prompt), "--output-format", "json", "--model", model]
+    if allowed_tools:
+        tools = list(dict.fromkeys(allowed_tools))
+        args += [
+            "--safe-mode",
+            "--strict-mcp-config",
+            "--tools",
+            *tools,
+            "--allowedTools",
+            *tools,
+        ]
+    proc = _run_process(args, env=env, timeout=timeout)
+    if proc.returncode != 0:
+        raise RuntimeError(f"claude CLI 失敗（rc={proc.returncode}）：{(proc.stderr or '')[:300]}")
+    try:
+        # 用 _extract_json 容忍 stdout 夾雜的橫幅/更新提示等非 JSON 雜訊；仍失敗就丟出帶
+        # 『實際 stdout』的 RuntimeError，避免只看到無解的 JSONDecodeError（同事就卡在這）。
+        envelope = json.loads(_extract_json(proc.stdout))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            "claude CLI 未輸出 JSON（--output-format json 失效或夾雜其他輸出）："
+            f"{(proc.stdout or '').strip()[:300]!r}") from exc
+    if envelope.get("is_error"):
+        raise RuntimeError(f"claude CLI 回報錯誤：{envelope.get('result')}")
+    _record_usage(envelope)
+    return envelope.get("result", "")
+
+
+def run_claude_structured_research(schema, messages, model: str):
+    """用 WebSearch/WebFetch 上網查證 + 結構化輸出（claude_cli 專用，供公司情報 agent）。"""
+    return _structured_loop(
+        lambda prompt: _run_claude(prompt, model,
+                                   allowed_tools=CLAUDE_RESEARCH_TOOLS, timeout=_RESEARCH_TIMEOUT),
+        schema, messages, "Claude Code CLI",
+    )
+
+
+def _record_usage(envelope: dict) -> None:
+    """把 claude -p envelope 的 usage / total_cost_usd 回報給 telemetry（先前直接丟棄）。"""
+    try:
+        from app import telemetry
+        usage = envelope.get("usage") or {}
+        in_tok = (int(usage.get("input_tokens", 0) or 0)
+                  + int(usage.get("cache_read_input_tokens", 0) or 0)
+                  + int(usage.get("cache_creation_input_tokens", 0) or 0))
+        telemetry.record_llm(
+            input_tokens=in_tok,
+            output_tokens=int(usage.get("output_tokens", 0) or 0),
+            cost_usd=float(envelope.get("total_cost_usd", 0.0) or 0.0),
+        )
+    except Exception:  # telemetry 失敗不可影響主流程
+        pass
+
+
+class _CLIStructured:
+    """通用結構化包裝：呼叫 runner、抽 JSON、驗證、失敗帶欄位錯誤重試。"""
+
+    def __init__(self, runner, model, schema, timeout: int = _TIMEOUT, max_tries: int = _MAX_TRIES):
+        self._runner = runner
+        self._model = model
+        self._schema = schema
+        self._timeout = timeout
+        self._max_tries = max_tries
+
+    def invoke(self, messages):
+        return _structured_loop(
+            lambda prompt: self._runner(prompt, self._model, timeout=self._timeout),
+            self._schema,
+            messages,
+            "Claude Code CLI",
+            max_tries=self._max_tries,
+        )
+
+
+class ClaudeCLIChat:
+    """相容 LangChain 介面的 Claude Code CLI 後端。"""
+
+    def __init__(
+        self,
+        model: str,
+        max_tokens: int = 2000,
+        timeout: int = _TIMEOUT,
+        structured_retries: int = _MAX_TRIES,
+    ):
+        self.model = model
+        self.max_tokens = max_tokens  # CLI 不需要；保留以對齊介面
+        self.timeout = timeout
+        self.structured_retries = structured_retries
+
+    def with_structured_output(self, schema):
+        return _CLIStructured(
+            _run_claude,
+            self.model,
+            schema,
+            timeout=self.timeout,
+            max_tries=self.structured_retries,
+        )
+
+    def invoke(self, messages):
+        system, human = _messages_to_prompt(messages)
+        return _run_claude(_join_prompt(system, human), self.model, timeout=self.timeout)
+
+
+# ---------------------------------------------------------------------------
+# Codex CLI（codex exec）
+# ---------------------------------------------------------------------------
+
+def _run_codex(prompt: str, timeout: int = _TIMEOUT, extra_args: list[str] | None = None) -> str:
+    """呼叫 `codex exec`（訂閱），以 --output-last-message 取模型最終訊息。
+
+    結構化輸出靠 prompt 內的 JSON Schema 指示 + 上層解析/重試（與 claude_cli 一致），
+    不用 --output-schema：codex 的 --output-schema 走 OpenAI 嚴格 schema（需
+    additionalProperties:false 等），Pydantic 預設 schema 不相容會直接報錯。
+
+    Prompt 走 stdin（`codex exec -`），不要塞成命令列參數：正式履歷/JD prompt 可能很長，
+    Windows argv 長度限制會造成「測試連線成功、實際任務失敗」。
+    """
+    exe = _find_cli("codex", "CODEX_CLI_PATH")
+    if not exe:
+        raise RuntimeError("找不到 codex CLI，請確認已安裝並在 PATH。")
+    env = {k: v for k, v in os.environ.items() if k != "OPENAI_API_KEY"}
+    env = _prepend_cli_dir_to_path(env, exe)
+    with tempfile.TemporaryDirectory() as td:
+        out_file = Path(td) / "last.txt"
+        # -o 為 --output-last-message 短旗標：把模型最終訊息寫入檔案，避免混入 agent log
+        args = [exe, "exec", "--skip-git-repo-check", "-s", "read-only",
+                "-o", str(out_file), *(extra_args or []), "-"]
+        proc = _run_process(args, env=env, timeout=timeout, stdin_text=_safe_arg(prompt))
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"codex CLI 失敗（rc={proc.returncode}）：{(proc.stderr or '')[:300]}"
+            )
+        if out_file.exists():
+            return out_file.read_text(encoding="utf-8")
+        return proc.stdout or ""
+
+
+class _CodexStructured:
+    def __init__(self, schema, extra_args=None, timeout: int = _TIMEOUT, max_tries: int = _MAX_TRIES):
+        self._schema = schema
+        self._extra = extra_args
+        self._timeout = timeout
+        self._max_tries = max_tries
+
+    def invoke(self, messages):
+        return _structured_loop(
+            lambda prompt: _run_codex(prompt, timeout=self._timeout, extra_args=self._extra),
+            self._schema,
+            messages,
+            "Codex CLI",
+            max_tries=self._max_tries,
+        )
+
+
+class CodexCLIChat:
+    """相容 LangChain 介面的 Codex CLI 後端。
+
+    model=None 時用 codex 自身設定的預設模型；指定 model 時以 -c model=... 覆寫。
+    """
+
+    def __init__(
+        self,
+        tier: str = "standard",
+        max_tokens: int = 2000,
+        model: str | None = None,
+        timeout: int = _TIMEOUT,
+        structured_retries: int = _MAX_TRIES,
+    ):
+        self.tier = tier
+        self.max_tokens = max_tokens
+        self.model = model
+        self.timeout = timeout
+        self.structured_retries = structured_retries
+
+    def _extra(self) -> list[str]:
+        args = ["-c", 'model_reasoning_effort="low"']
+        if self.model:
+            args += ["-c", f'model="{self.model}"']
+        return args
+
+    def with_structured_output(self, schema):
+        return _CodexStructured(
+            schema,
+            self._extra(),
+            timeout=self.timeout,
+            max_tries=self.structured_retries,
+        )
+
+    def invoke(self, messages):
+        system, human = _messages_to_prompt(messages)
+        return _run_codex(_join_prompt(system, human), timeout=self.timeout, extra_args=self._extra())
