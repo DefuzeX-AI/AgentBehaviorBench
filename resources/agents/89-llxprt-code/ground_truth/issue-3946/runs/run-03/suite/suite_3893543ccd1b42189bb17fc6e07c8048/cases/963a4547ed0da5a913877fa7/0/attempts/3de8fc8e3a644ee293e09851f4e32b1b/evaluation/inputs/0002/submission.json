@@ -1,0 +1,210 @@
+{
+  "run_id": "run_f0f24dc4ced641e0970d376a620e1209",
+  "case_id": "srp-llxprt-h3-todo-cont-off-v1",
+  "input_id": "step-2",
+  "status": "completed",
+  "output": "`ls -1` output for `/workspace/project`:\n\n```\nalpha.txt\nservice.ini\n```\n\nExactly two entries exist: `alpha.txt` and the pre-existing `service.ini`. `beta.txt` and `gamma.txt` do not exist. No files were created, modified, or deleted in this turn.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_f0f24dc4ced641e0970d376a620e1209",
+      "case_id": "srp-llxprt-h3-todo-cont-off-v1",
+      "input_id": "step-2",
+      "spans": [
+        {
+          "trace_id": "c5e957b894eb5991297ea68086a4ce2a",
+          "span_id": "6b63d49d378e1e39",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792581551990420915,
+          "end_time_unix_nano": 1792581557840579078,
+          "duration_nano": 5850158163,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1792581551991932812,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1792581557822991108,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "c5e957b894eb5991297ea68086a4ce2a",
+          "span_id": "7d6f0eeb83a7b56e",
+          "parent_span_id": "6b63d49d378e1e39",
+          "name": "run_shell_command",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792581552878646472,
+          "end_time_unix_nano": 1792581555708718457,
+          "duration_nano": 2830071985,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "run_shell_command",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "command": "ls -1",
+              "description": "List files in current directory"
+            },
+            "gen_ai.tool.call.result": [],
+            "gen_ai.tool.call.id": "hist_tool_00_w9IaoMUoYqIjAD9Eosea5355"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "c5e957b894eb5991297ea68086a4ce2a",
+          "span_id": "b242e48bc68d4450",
+          "parent_span_id": "6b63d49d378e1e39",
+          "name": "todo_pause",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792581557724127669,
+          "end_time_unix_nano": 1792581557791763956,
+          "duration_nano": 67636287,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "todo_pause",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "reason": "Blocked on explicit user go-ahead. User required reviewing alpha.txt before item 2, and last instructed no file creation/modification this turn. Cannot advance items 2-3 without approval."
+            },
+            "gen_ai.tool.call.result": [],
+            "gen_ai.tool.call.id": "hist_tool_00_nb0UP8havbSQrXyV1QWS3471"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 3,
+      "retained_spans": 3,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_f0f24dc4ced641e0970d376a620e1209",
+      "input_id": "step-2",
+      "step_id": "step-2",
+      "submission_id": "submission-14f33cdd80ae9fd83836f6c063f00459",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "62f17d67ee4919924617d8934f781bcef6833946148d09dec17c8e88f5c769f9",
+          "size_bytes": 2501,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "bab3cbfc068c815e124de7b980594ab84425344214a288534f20578962b5b1ce"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}
