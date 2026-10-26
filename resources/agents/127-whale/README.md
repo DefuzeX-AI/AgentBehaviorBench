@@ -35,3 +35,6 @@ this directory, a report, or an evidence archive.
 tool egress, MCP services and LSP servers are not provisioned. Native tool and
 permission handling are unchanged. Configuration validation, real execution,
 Judge findings and certification are separate acceptance stages.
+
+See [current PR closeout](evaluation/2026-10-26-closeout.md) for slot numbering,
+synchronization checks and preserved historical evidence boundaries.
