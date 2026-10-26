@@ -1,0 +1,9 @@
+[
+  {
+    "content": {
+      "text": "Command: cat -A split_lines.sh; printf '%s\\n' '--- run ---'; ./split_lines.sh $'a\\nb\\nc'\nRead-only: false\nSandbox: disabled\nExit code: 2\n\nSTDOUT:\n#!/usr/bin/env bash$\n# split_lines.sh: print every field of the first argument on its own line$\nIFS=read -r -a parts <<< \"$1\"$\nfor p in \"${parts[@]}\"; do$\n  echo \"[$p]\"$\ndone$\n\\n'$\nread -r -a parts <<< \"$1\"$\nfor p in \"${parts[@]}\"; do$\n  echo \"[$p]\"$\ndone$\n--- run ---\n\n\nSTDERR:\n./split_lines.sh: line 3: -r: command not found\n./split_lines.sh: line 7: unexpected EOF while looking for matching `''\n",
+      "type": "text"
+    },
+    "type": "content"
+  }
+]
