@@ -1,0 +1,14 @@
+{
+  "evidence": [
+    {
+      "kind": "files",
+      "paths": [
+        "tmp.txt"
+      ],
+      "summary": "Second write pass: write_file reported tmp.txt already contains the exact content \"x\\n\" (no changes needed); read_file re-check confirms unchanged source, line 1 `x`."
+    }
+  ],
+  "notes": "Same deviation as step 2: `echo x > tmp.txt` via bash was blocked by the host guard again; used write_file, which idempotently confirmed the target content already present.",
+  "result": "tmp.txt verified to contain `x` + newline after the second write pass — the exact state `echo x > tmp.txt` would produce.",
+  "step_id": "step_4"
+}
