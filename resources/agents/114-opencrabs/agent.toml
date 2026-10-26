@@ -1,0 +1,54 @@
+# Hand-written from the pinned OpenCrabs binary's ACP server (`opencrabs acp`) with a custom
+# OpenAI-compatible provider pointed at a loopback model relay.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "opencrabs"
+display_name = "OpenCrabs (ACP, shared model provider)"
+framework = "acp"
+
+[evaluation]
+replay_safe = false
+
+[evaluation.workspace]
+path = "/home/agent/workspace"
+initial_state = "empty"
+
+[evaluation.file_evidence]
+track_files = true
+upload_diff = true
+export_changed_files = true
+
+[source]
+method = "install"
+repository = "https://github.com/opencrabs/opencrabs"
+revision = "0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402"
+downloaded_on = "2026-10-25"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 1200
+env_keys = []
+secret_env_keys = []
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "acp"
+transport = "stdio"
+command = ["python", "/opt/agent/bootstrap/launch.py"]
+handshake_timeout = 120
+cwd = "/home/agent/workspace"
+permission_policy = "allow_once"
+
+[llm_interception]
+trust_plugin = "pem-env"
+network_config = "network/rules.toml"
+tool_routes = []
+
+# Model credentials and exact routes use the shared runtime default.

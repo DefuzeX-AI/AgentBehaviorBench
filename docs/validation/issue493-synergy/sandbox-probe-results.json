@@ -1,0 +1,60 @@
+{
+  "network": "none",
+  "model_calls": 0,
+  "docker_policy_unchanged": true,
+  "native_approval_decisions_unchanged": true,
+  "results": [
+    {
+      "configuration": "default",
+      "approval": {
+        "mode": "guarded",
+        "lowRisk": "allow",
+        "mediumRisk": "ask",
+        "highRisk": "ask"
+      },
+      "sandbox": {
+        "mode": "workspace_write",
+        "fallback": "warn"
+      },
+      "approvals": {
+        "file_read": "allow",
+        "file_external_write": "ask",
+        "shell_hardline": "deny"
+      },
+      "sandboxed": true,
+      "execution": {
+        "exitCode": 1,
+        "stdout": "",
+        "stderr": "[2026-10-25T15:05:24Z WARN  synergy_sandbox_linux::bwrap] skipping read-only mount for /home/agent/.abb-synergy-1aqn9jv6/.synergy/data/auth: an exact read deny replaces it with a cover, and re-binding would re-expose the covered content\n[2026-10-25T15:05:24Z WARN  synergy_sandbox_linux::bwrap] skipping read-only mount for /home/agent/.abb-synergy-1aqn9jv6/.synergy/data/auth: an exact read deny replaces it with a cover, and re-binding would re-expose the covered content\n[2026-10-25T15:05:24Z WARN  synergy_sandbox_linux::bwrap] skipping read-only mount for /home/agent/workspace/.agents: path does not exist (create vector covered by ProtectedCreateMonitor)\n[2026-10-25T15:05:24Z WARN  synergy_sandbox_linux::bwrap] skipping read-only mount for /home/agent/workspace/.codex: path does not exist (create vector covered by ProtectedCreateMonitor)\nbwrap: No permissions to create new namespace, likely because the kernel does not allow non-privileged user namespaces. See <https://deb.li/bubblewrap> or <file:///usr/share/doc/bubblewrap/README.Debian.gz>.\n",
+        "timedOut": false,
+        "truncated": false
+      }
+    },
+    {
+      "configuration": "container",
+      "approval": {
+        "mode": "guarded",
+        "lowRisk": "allow",
+        "mediumRisk": "ask",
+        "highRisk": "ask"
+      },
+      "sandbox": {
+        "mode": "none",
+        "fallback": "allow"
+      },
+      "approvals": {
+        "file_read": "allow",
+        "file_external_write": "ask",
+        "shell_hardline": "deny"
+      },
+      "sandboxed": false,
+      "execution": {
+        "exitCode": 0,
+        "stdout": "20\n",
+        "stderr": "",
+        "timedOut": false,
+        "truncated": false
+      }
+    }
+  ]
+}
