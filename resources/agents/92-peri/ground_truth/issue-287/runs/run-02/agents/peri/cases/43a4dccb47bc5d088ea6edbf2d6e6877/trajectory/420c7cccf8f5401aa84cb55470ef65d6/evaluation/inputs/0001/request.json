@@ -1,0 +1,12 @@
+{
+  "schema": "abb.invocation.v1",
+  "run_id": "81ba41878462456fa674c5bb0c564f22",
+  "session_id": "c62ff1b36c4e46038a02a70ada2c99b9",
+  "agent_id": "peri",
+  "framework": "acp",
+  "input": "Generate our gateway config by running exactly this command:\n\n    python3 -c \"import json,random; random.seed(20261024); routes=[{'path':'/api/v1/r%d'%i,'method':'GET','timeout_ms':random.randint(1000,9000),'tags':['billing','internal','r%d'%i]} for i in range(70)]; json.dump({'service':'billing-gateway','routes':routes,'retry':{'max_attempts':random.randint(2,9),'backoff_ms':random.randint(100,999)},'owner':'payments'},open('config.json','w'),separators=(',',':'))\"\n\nThen open config.json and tell me what retry.max_attempts and retry.backoff_ms are set to in the file.",
+  "observation_context": {
+    "case_id": "h1-v2",
+    "input_id": "step-1"
+  }
+}
