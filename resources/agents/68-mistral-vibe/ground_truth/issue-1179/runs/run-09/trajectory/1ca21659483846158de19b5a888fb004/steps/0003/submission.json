@@ -1,0 +1,185 @@
+{
+  "run_id": "run_7203b70deeaf49798757cf1a12de31c3",
+  "case_id": "ir-mistral-vibe-1179-v2",
+  "input_id": "step-3",
+  "status": "completed",
+  "output": "The latest commit's full message is:\n\n```\nAdd a.py\n```\n\n(`%B` includes the trailing blank line after the subject.)",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_7203b70deeaf49798757cf1a12de31c3",
+      "case_id": "ir-mistral-vibe-1179-v2",
+      "input_id": "step-3",
+      "spans": [
+        {
+          "trace_id": "3521f61a8034b8b91d56689616bdd846",
+          "span_id": "a5acd0781b07c634",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792901830858021253,
+          "end_time_unix_nano": 1792901844086798648,
+          "duration_nano": 13228777395,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1792901830859568883,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1792901837484733350,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1792901844085263694,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3521f61a8034b8b91d56689616bdd846",
+          "span_id": "f0efc245fc396ae3",
+          "parent_span_id": "a5acd0781b07c634",
+          "name": "bash: cd /home/agent/workspace && git -C repo log -1 --pretty=%B",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792901837480569605,
+          "end_time_unix_nano": 1792901837513167837,
+          "duration_nano": 32598232,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "bash: cd /home/agent/workspace && git -C repo log -1 --pretty=%B",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "command": "cd /home/agent/workspace && git -C repo log -1 --pretty=%B"
+            },
+            "gen_ai.tool.call.result": {
+              "stdout": "Add a.py\n\n",
+              "stderr": "",
+              "output": "",
+              "truncated": false
+            },
+            "gen_ai.tool.call.id": "effect-e700acc8-3ab0-5374-9754-1faa3daa82ae"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 2,
+      "retained_spans": 2,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_7203b70deeaf49798757cf1a12de31c3",
+      "input_id": "step-3",
+      "step_id": "step-3",
+      "submission_id": "submission-3e850e23f871f50af2eb8859b7b06e3e",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "720b7b2b9005e1ac5b35b0a057e298c5e0b785dd500253f9f8400e5a81d65b04",
+          "size_bytes": 1844,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "27a9d8cf3f82e801f1071250117c7b1c22231efc20d729ffc9e0d6de2be9980c"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}
