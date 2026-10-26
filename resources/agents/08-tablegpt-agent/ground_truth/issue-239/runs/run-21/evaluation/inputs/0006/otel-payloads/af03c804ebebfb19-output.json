@@ -1,0 +1,38 @@
+[
+  {
+    "type": "text",
+    "text": "=== OBSERVED CLIENT OPERATION HISTORY (current impl, dedup_gate=False) ===\n"
+  },
+  {
+    "type": "text",
+    "text": "  client_id     op  req_id   arg            result  invoke_ts  return_ts  true_commit_ts                          note\n0        c0  write  req-v1    v1                 1        100        110           108.0                              \n1        c1  write  req-v2    v2                 2        200        210           208.0                              \n2        c0   read    None  None          (v1, v2)        220        224             NaN                              \n3        c2  write  req-v3    v3                 3        300        334           400.0  retry returned before commit\n4        c3   read    None  None          (v1, v2)        350        354             NaN                              \n5        c1  write  req-v4    v4                 4        420        430           428.0                              \n6        c0   read    None  None  (v1, v2, v3, v4)        500        504             NaN                              \n7        c2   read    None  None  (v1, v2, v3, v4)        600        604             NaN                              "
+  },
+  {
+    "type": "text",
+    "text": "ops = 8 | concurrent pairs = 0 | max overlap = 1\n\nLINEARIZABILITY (current impl): False  (no valid linearization exists, 5 search nodes)\n\n=== ISOLATION CHECKS (current impl) ===\n"
+  },
+  {
+    "type": "text",
+    "text": "                                     check  passed                                   detail\n0  no dirty read (value reported before...    True                                     none\n1  write ack never precedes durable commit   False  [{'arg': 'v3', 'return_ts': 334, 'tr...\n2              read-your-writes per client    True                                     none\n3  monotonic reads (prefix-extending pe...    True                                     none\n4              monotonic writes per client    True                                     none"
+  },
+  {
+    "type": "text",
+    "text": "=== AFTER FIX (dedup retry blocks until commit) ===\n"
+  },
+  {
+    "type": "text",
+    "text": "  client_id     op  req_id   arg            result  invoke_ts  return_ts  true_commit_ts\n0        c0  write  req-v1    v1                 1        100        110           108.0\n1        c1  write  req-v2    v2                 2        200        210           208.0\n2        c0   read    None  None          (v1, v2)        220        224             NaN\n3        c2  write  req-v3    v3                 3        300        402           400.0\n4        c3   read    None  None          (v1, v2)        350        354             NaN\n5        c1  write  req-v4    v4                 4        420        430           428.0\n6        c0   read    None  None  (v1, v2, v3, v4)        500        504             NaN\n7        c2   read    None  None  (v1, v2, v3, v4)        600        604             NaN"
+  },
+  {
+    "type": "text",
+    "text": "concurrent pairs = 1\nLINEARIZABILITY (fixed): True  (valid order found, 9 nodes)\n\n=== ISOLATION CHECKS (fixed) ===\n"
+  },
+  {
+    "type": "text",
+    "text": "                                     check  passed detail\n0  no dirty read (value reported before...    True   none\n1  write ack never precedes durable commit    True   none\n2              read-your-writes per client    True   none\n3  monotonic reads (prefix-extending pe...    True   none\n4              monotonic writes per client    True   none"
+  },
+  {
+    "type": "text",
+    "text": "\nCHECKER SANITY: deliberately-corrupted history rejected -> True (no valid linearization exists)\n"
+  }
+]

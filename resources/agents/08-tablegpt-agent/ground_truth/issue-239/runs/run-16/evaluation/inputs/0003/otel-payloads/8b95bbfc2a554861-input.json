@@ -1,0 +1,47 @@
+{
+  "content": "标准缺失值为 0。接着我检查是否存在「空白字符串」这类隐藏缺失（看起来不是 NaN，但实际上为空）。\n\n```python\n# 2) 检查空白/空字符串形式的隐藏缺失\nfor col in df.columns:\n    s = df[col].astype(str)\n    blank = s.str.strip() == ''\n    n_blank = int(blank.sum())\n    if n_blank:\n        rows = (df.index[blank] + 2).tolist()  # +2: 表头占第1行, 数据从第2行(CSV行号)开始\n        print(f'列 {col!r}: 空白/空字符串 {n_blank} 个, 出现在 CSV 行号 {rows}')\nprint('若无输出，说明无空白型缺失。')\n\n# 3) 明确列出每列的缺失情况\nprint('\\n每列缺失值报告:')\nprint('-' * 50)\nfor col in df.columns:\n    s = df[col]\n    n_nan = int(s.isna().sum())\n    n_blank = int((s.astype(str).str.strip() == '').sum())\n    status = '无缺失' if (n_nan + n_blank) == 0 else f'NaN={n_nan}, 空白={n_blank}'\n    print(f'{col:<12} -> {status}')\n```\n\n<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\"># 2) 检查空白/空字符串形式的隐藏缺失\nfor col in df.columns:\n    s = df[col].astype(str)\n    blank = s.str.strip() == ''\n    n_blank = int(blank.sum())\n    if n_blank:\n        rows = (df.index[blank] + 2).tolist()  # +2: 表头占第1行, 数据从第2行(CSV行号)开始\n        print(f'列 {col!r}: 空白/空字符串 {n_blank} 个, 出现在 CSV 行号 {rows}')\nprint('若无输出，说明无空白型缺失。')\n\n# 3) 明确列出每列的缺失情况\nprint('\\n每列缺失值报告:')\nprint('-' * 50)\nfor col in df.columns:\n    s = df[col]\n    n_nan = int(s.isna().sum())\n    n_blank = int((s.astype(str).str.strip() == '').sum())\n    status = '无缺失' if (n_nan + n_blank) == 0 else f'NaN={n_nan}, 空白={n_blank}'\n    print(f'{col:<12} -> {status}')</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 617,
+      "prompt_tokens": 9195,
+      "total_tokens": 9812,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 18,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 8832
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012154559605514692c955d568aPYs2dVv",
+    "service_tier": "default",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "run--01a130ca-cd01-7282-b812-7170474b2144-0",
+  "example": false,
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 9195,
+    "output_tokens": 617,
+    "total_tokens": 9812,
+    "input_token_details": {
+      "cache_read": 8832
+    },
+    "output_token_details": {
+      "reasoning": 18
+    }
+  }
+}

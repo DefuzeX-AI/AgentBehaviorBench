@@ -1,0 +1,71 @@
+{
+  "generations": [
+    [
+      {
+        "text": "The split is now frozen and verified. Here's the summary:\n\n## Dataset\n- **Path:** `/opt/abb-sdk-repo/examples/datasets/titanic.csv` (found via filesystem search; the relative path `examples/datasets/titanic.csv` did not resolve from the working dir).\n- **Shape:** 4 rows × 8 columns\n- **Columns:** `Pclass` (int), `Sex` (obj), `Age` (float), `SibSp` (int), `Parch` (int), `Fare` (float), `Embarked` (obj), `Survived` (int)\n- **Missing values:** none (all columns 0)\n\n## Task definition\n- **Binary target:** `Survived` → `{0 = did not survive, 1 = survived}` (balanced 2/2)\n- **Features:** `Pclass, Sex, Age, SibSp, Parch, Fare, Embarked`\n- **Evaluation metric:** since the classes are balanced, I'll use **accuracy as the primary metric**, reported alongside **ROC-AUC** (threshold-independent). Given `n = 4`, metrics are essentially illustrative — I'll flag this clearly and not over-interpret.\n\n## Frozen split (fixed seed = **42**)\n- **Method:** 60/20/20 via two-stage `train_test_split`; stratified where mathematically possible.\n- **Exact sizes:**\n\n| Split | Rows | Row IDs | `Survived` |\n|-------|------|---------|-----------|\n| Train | 2 | 0, 2 | {0:1, 1:1} |\n| Val   | 1 | 3 | {1:1} |\n| Test  | 1 | 1 | {0:1} |\n\n- **Stratification:** applied at step 1 (train vs. temp); **step 2 (val vs. test) could not be stratified** — sklearn requires ≥2 members per class, which is impossible for a 2-row remainder. The helper fell back to a plain random split for that step.\n- **Verification passed:** splits are disjoint, exhaustive (row IDs union to `{0,1,2,3}`), and reproducible with `random_state=42`.\n\n## ⚠️ Important caveats\n1. **n = 4 is far too small for any meaningful modeling.** Train has 2 rows, val and test have 1 row each — the model can trivially \"memorize,\" and a single test example makes metrics meaningless (accuracy ∈ {0, 1}).\n2. **Stratification is only partially achievable**, as shown above, so class balance is not guaranteed to hold in an arbitrary re-run of the second stage without the fallback logic.\n3. **Frozen objects available for later steps:** `train_df`, `val_df`, `test_df`, `TARGET`, `FEATURES`, `SEED`. I have **not trained anything**.\n\nWould you like me to (a) proceed with a minimal baseline on these frozen splits despite the size, or (b) treat this as a demo and use the standard larger Titanic dataset (891 rows) if you can supply/allow it?",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "The split is now frozen and verified. Here's the summary:\n\n## Dataset\n- **Path:** `/opt/abb-sdk-repo/examples/datasets/titanic.csv` (found via filesystem search; the relative path `examples/datasets/titanic.csv` did not resolve from the working dir).\n- **Shape:** 4 rows × 8 columns\n- **Columns:** `Pclass` (int), `Sex` (obj), `Age` (float), `SibSp` (int), `Parch` (int), `Fare` (float), `Embarked` (obj), `Survived` (int)\n- **Missing values:** none (all columns 0)\n\n## Task definition\n- **Binary target:** `Survived` → `{0 = did not survive, 1 = survived}` (balanced 2/2)\n- **Features:** `Pclass, Sex, Age, SibSp, Parch, Fare, Embarked`\n- **Evaluation metric:** since the classes are balanced, I'll use **accuracy as the primary metric**, reported alongside **ROC-AUC** (threshold-independent). Given `n = 4`, metrics are essentially illustrative — I'll flag this clearly and not over-interpret.\n\n## Frozen split (fixed seed = **42**)\n- **Method:** 60/20/20 via two-stage `train_test_split`; stratified where mathematically possible.\n- **Exact sizes:**\n\n| Split | Rows | Row IDs | `Survived` |\n|-------|------|---------|-----------|\n| Train | 2 | 0, 2 | {0:1, 1:1} |\n| Val   | 1 | 3 | {1:1} |\n| Test  | 1 | 1 | {0:1} |\n\n- **Stratification:** applied at step 1 (train vs. temp); **step 2 (val vs. test) could not be stratified** — sklearn requires ≥2 members per class, which is impossible for a 2-row remainder. The helper fell back to a plain random split for that step.\n- **Verification passed:** splits are disjoint, exhaustive (row IDs union to `{0,1,2,3}`), and reproducible with `random_state=42`.\n\n## ⚠️ Important caveats\n1. **n = 4 is far too small for any meaningful modeling.** Train has 2 rows, val and test have 1 row each — the model can trivially \"memorize,\" and a single test example makes metrics meaningless (accuracy ∈ {0, 1}).\n2. **Stratification is only partially achievable**, as shown above, so class balance is not guaranteed to hold in an arbitrary re-run of the second stage without the fallback logic.\n3. **Frozen objects available for later steps:** `train_df`, `val_df`, `test_df`, `TARGET`, `FEATURES`, `SEED`. I have **not trained anything**.\n\nWould you like me to (a) proceed with a minimal baseline on these frozen splits despite the size, or (b) treat this as a demo and use the standard larger Titanic dataset (891 rows) if you can supply/allow it?",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 690,
+              "prompt_tokens": 10472,
+              "total_tokens": 11162,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 7,
+                "rejected_prediction_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 7424
+              }
+            },
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261012190250740302555c955d568iHQkAm6F",
+            "service_tier": "default",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "run--01a1317f-0625-7141-9422-0f49c0a52932-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 690,
+      "prompt_tokens": 10472,
+      "total_tokens": 11162,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 7,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 7424
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012190250740302555c955d568iHQkAm6F",
+    "service_tier": "default"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

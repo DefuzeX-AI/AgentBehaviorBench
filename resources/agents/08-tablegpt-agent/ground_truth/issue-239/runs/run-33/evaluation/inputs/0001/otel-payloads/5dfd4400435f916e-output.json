@@ -1,0 +1,22 @@
+{
+  "tool": "python",
+  "tool_input": "import site, sys, glob, os\n\n# Candidate user site-packages locations\ncandidates = []\nfor p in [site.getusersitepackages(), \"/tmp/.local/lib\"]:\n    candidates.append(p)\n\n# Also search common python version dirs under /tmp/.local/lib\ncandidates += glob.glob(\"/tmp/.local/lib/python*/site-packages\")\ncandidates += glob.glob(os.path.expanduser(\"~/.local/lib/python*/site-packages\"))\n\nprint(\"Current sys.path:\")\nfor p in sys.path:\n    print(\"  \", p)\n\nprint(\"\\nCandidates found:\")\nfor c in candidates:\n    if os.path.isdir(c):\n        print(\"  EXISTS:\", c, \"->\", os.listdir(c)[:10])\n    else:\n        print(\"  missing:\", c)",
+  "log": "The package was installed to a user directory that isn't on the current `sys.path`. Let me locate it and add it to the path.",
+  "type": "AgentActionMessageLog",
+  "message_log": [
+    {
+      "content": "The package was installed to a user directory that isn't on the current `sys.path`. Let me locate it and add it to the path.\n\n```python\nimport site, sys, glob, os\n\n# Candidate user site-packages locations\ncandidates = []\nfor p in [site.getusersitepackages(), \"/tmp/.local/lib\"]:\n    candidates.append(p)\n\n# Also search common python version dirs under /tmp/.local/lib\ncandidates += glob.glob(\"/tmp/.local/lib/python*/site-packages\")\ncandidates += glob.glob(os.path.expanduser(\"~/.local/lib/python*/site-packages\"))\n\nprint(\"Current sys.path:\")\nfor p in sys.path:\n    print(\"  \", p)\n\nprint(\"\\nCandidates found:\")\nfor c in candidates:\n    if os.path.isdir(c):\n        print(\"  EXISTS:\", c, \"->\", os.listdir(c)[:10])\n    else:\n        print(\"  missing:\", c)\n```",
+      "additional_kwargs": {
+        "thought": "The package was installed to a user directory that isn't on the current `sys.path`. Let me locate it and add it to the path.",
+        "action": {
+          "tool": "python",
+          "tool_input": "import site, sys, glob, os\n\n# Candidate user site-packages locations\ncandidates = []\nfor p in [site.getusersitepackages(), \"/tmp/.local/lib\"]:\n    candidates.append(p)\n\n# Also search common python version dirs under /tmp/.local/lib\ncandidates += glob.glob(\"/tmp/.local/lib/python*/site-packages\")\ncandidates += glob.glob(os.path.expanduser(\"~/.local/lib/python*/site-packages\"))\n\nprint(\"Current sys.path:\")\nfor p in sys.path:\n    print(\"  \", p)\n\nprint(\"\\nCandidates found:\")\nfor c in candidates:\n    if os.path.isdir(c):\n        print(\"  EXISTS:\", c, \"->\", os.listdir(c)[:10])\n    else:\n        print(\"  missing:\", c)"
+        }
+      },
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "570dbdd6-830d-4927-8a2a-0c9f864b2a9b"
+    }
+  ]
+}

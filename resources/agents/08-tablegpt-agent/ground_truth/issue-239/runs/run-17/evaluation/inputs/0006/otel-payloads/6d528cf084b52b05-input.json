@@ -1,0 +1,3 @@
+{
+  "query": "import os, glob\nimport pandas as pd\nfrom pyproj import Transformer\n\npath = 'survey_points.csv'\nexists = os.path.exists(path)\nfound = sorted(set(glob.glob('**/*.csv', recursive=True)) |\n               set(glob.glob('/tmp/**/*.csv', recursive=True)) |\n               set(glob.glob('/**/survey_points*', recursive=True)))\nprint(\"survey_points.csv exists:\", exists)\nprint(\"CSV/survey files anywhere:\", found if found else \"NONE\")\n\nif exists:\n    df = pd.read_csv(path)\n    print(df.head(3))\n    # t = Transformer.from_crs(SRC, \"EPSG:4979\", always_xy=True)\n    # print(t.transform(df.x, df.y, df.z))\nelse:\n    print(\"\\nRESULT: transformation cannot be executed - source data absent.\")"
+}

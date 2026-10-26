@@ -1,0 +1,3 @@
+{
+  "query": "import os\n\npaths = ['/tmp/events.csv']\nfor p in paths:\n    print(p, 'exists:', os.path.exists(p))\n\nfor d in ['/tmp', '.', '/mnt/data', os.path.expanduser('~')]:\n    if os.path.isdir(d):\n        try:\n            files = os.listdir(d)\n        except Exception as e:\n            print(d, 'error:', e); continue\n        matches = [f for f in files if 'event' in f.lower() or f.lower().endswith('.csv')]\n        print(f\"\\n{d}: {len(files)} entries; candidates -> {matches[:20]}\")\n\ntry:\n    df_try = read_df('/tmp/events.csv')\n    print(\"\\nread_df succeeded:\", df_try.shape)\nexcept Exception as e:\n    print(\"\\nread_df failed:\", type(e).__name__, e)"
+}

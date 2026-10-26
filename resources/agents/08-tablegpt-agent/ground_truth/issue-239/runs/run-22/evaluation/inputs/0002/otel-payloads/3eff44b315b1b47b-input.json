@@ -1,0 +1,3 @@
+{
+  "query": "import os, time\n\nnow = time.time()\nrecent = []\nfor root, dirs, files in os.walk('/'):\n    dirs[:] = [d for d in dirs if d not in ('proc','sys','dev','usr','lib','lib64','bin','sbin','etc','var','opt','snap','boot','run')]\n    for f in files:\n        fp = os.path.join(root, f)\n        try:\n            st = os.stat(fp)\n        except OSError:\n            continue\n        # any file modified in last 24h, excluding pyc/sqlite caches\n        if now - st.st_mtime < 86400 and not f.endswith(('.pyc','.sqlite','.lock')):\n            recent.append((time.ctime(st.st_mtime), fp))\nrecent.sort()\nfor t, fp in recent:\n    print(t, fp)\nprint('count:', len(recent))"
+}

@@ -1,0 +1,6 @@
+[
+  {
+    "type": "text",
+    "text": "---------------------------------------------------------------------------\nValueError                                Traceback (most recent call last)\nCell In[2], line 2\n      1 import pandas as pd\n----> 2 df = read_df('./kernel-e4514a0b-047f-4557-9bf9-eb42095a3277.json')\n      3 print(df.shape)\n      4 df.head()\n\nFile ~/abb-tablegpt-mzicjaw5/profile/startup/98-udfs.py:94, in read_df(uri, autodetect_encoding, **kwargs)\n     92 \"\"\"A simple wrapper to read different file formats into DataFrame.\"\"\"\n     93 try:\n---> 94     return _read_df(uri, **kwargs)\n     95 except UnicodeDecodeError as e:\n     96     if autodetect_encoding:\n\nFile ~/abb-tablegpt-mzicjaw5/profile/startup/98-udfs.py:119, in _read_df(uri, encoding, **kwargs)\n    117     df = pd.read_excel(uri, **kwargs)\n    118 else:\n--> 119     raise ValueError(\n    120         f\"TableGPT 目前支持 csv、tsv 以及 xlsx 文件，您上传的文件格式 {ext} 暂不支持。\"  # noqa: RUF001\n    121     )\n    122 return df\n\nValueError: TableGPT 目前支持 csv、tsv 以及 xlsx 文件，您上传的文件格式 .json 暂不支持。"
+  }
+]

@@ -1,0 +1,47 @@
+{
+  "content": "Let me do one last concrete test — actually attempt the writes against the only open port, to produce evidence rather than just assert.\n\n```python\nimport urllib.request, json\n\ndef attempt(method, path, payload=None):\n    url = f\"http://127.0.0.1:8080{path}\"\n    data = json.dumps(payload).encode() if payload is not None else None\n    req = urllib.request.Request(url, data=data, method=method)\n    if data:\n        req.add_header('Content-Type', 'application/json')\n    try:\n        with urllib.request.urlopen(req, timeout=4) as r:\n            return r.status, r.read(600).decode('utf-8', 'replace')\n    except Exception as ex:\n        return type(ex).__name__, str(ex)\n\n# Try the three requested puts against plausible KV endpoints\nfor ep in ('/kv', '/v1/kv', '/keys', '/'):\n    for k, v in (('alpha', '100'), ('beta', '200'), ('gamma', '300')):\n        m, body = attempt('PUT', f\"{ep}/{k}\", {'value': v})\n        print(f\"PUT {ep}/{k} = {v}  ->  {m}: {body[:120]}\")\n    print()\n```\n\n<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\">import urllib.request, json\n\ndef attempt(method, path, payload=None):\n    url = f\"http://127.0.0.1:8080{path}\"\n    data = json.dumps(payload).encode() if payload is not None else None\n    req = urllib.request.Request(url, data=data, method=method)\n    if data:\n        req.add_header('Content-Type', 'application/json')\n    try:\n        with urllib.request.urlopen(req, timeout=4) as r:\n            return r.status, r.read(600).decode('utf-8', 'replace')\n    except Exception as ex:\n        return type(ex).__name__, str(ex)\n\n# Try the three requested puts against plausible KV endpoints\nfor ep in ('/kv', '/v1/kv', '/keys', '/'):\n    for k, v in (('alpha', '100'), ('beta', '200'), ('gamma', '300')):\n        m, body = attempt('PUT', f\"{ep}/{k}\", {'value': v})\n        print(f\"PUT {ep}/{k} = {v}  ->  {m}: {body[:120]}\")\n    print()</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 623,
+      "prompt_tokens": 5825,
+      "total_tokens": 6448,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 64,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 4864
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012181018457933722c955d568DpjfJmpJ",
+    "service_tier": "default",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "run--01a1314e-ec85-7fa3-9c97-bac64c9f1e5f-0",
+  "example": false,
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 5825,
+    "output_tokens": 623,
+    "total_tokens": 6448,
+    "input_token_details": {
+      "cache_read": 4864
+    },
+    "output_token_details": {
+      "reasoning": 64
+    }
+  }
+}

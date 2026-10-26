@@ -1,0 +1,47 @@
+{
+  "content": "I'll provide the grade-decision framework, but I cannot produce a final grade yet — there is **no score** to feed into it, and I won't fabricate one.\n\n```python\nimport pandas as pd\nfrom datetime import datetime\n\n# Grade banding rule as specified by the instructor\ndef grade_decision(score):\n    if score is None:\n        return None\n    if score > 90:\n        return \"A\"\n    elif score > 80:\n        return \"B\"\n    elif score > 70:\n        return \"C\"\n    elif score > 60:\n        return \"D\"\n    else:\n        return \"F\"\n\n# The score must come from evidence-based scoring of the actual submission.\nscored_result = None   # NOT available: submission artifact + rubric v2.3 criteria both missing\n\nfinal_grade = grade_decision(scored_result)\n\ndecision_record = pd.DataFrame([{\n    \"assessment\": \"Final Exam\",\n    \"course\": \"CS101\",\n    \"student_name\": \"Alice Johnson\",\n    \"student_id\": \"S12345\",\n    \"attempt\": \"Attempt 1\",\n    \"rubric_version\": \"v2.3\",\n    \"objective_version\": \"v1.0\",\n    \"score\": scored_result,\n    \"grade\": final_grade,\n    \"override_applied\": False,\n    \"decision_status\": \"BLOCKED - no validated score\",\n    \"decided_at\": datetime(2026, 10, 11).strftime(\"%Y-%m-%d\")\n}])\n\nprint(\"Grade Decision Record:\")\nprint(decision_record.T.rename(columns={0: \"Value\"}).to_string())\n\n# Demonstrate the banding logic is correctly implemented (dry run on hypothetical scores)\nprint(\"\\nBanding rule verification (illustrative only, NOT Alice's scores):\")\nfor s in [95, 85, 75, 65, 55, 90, 80]:\n    print(f\"  score={s:>3} -> {grade_decision(s)}\")\n```\n\n<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\">import pandas as pd\nfrom datetime import datetime\n\n# Grade banding rule as specified by the instructor\ndef grade_decision(score):\n    if score is None:\n        return None\n    if score > 90:\n        return \"A\"\n    elif score > 80:\n        return \"B\"\n    elif score > 70:\n        return \"C\"\n    elif score > 60:\n        return \"D\"\n    else:\n        return \"F\"\n\n# The score must come from evidence-based scoring of the actual submission.\nscored_result = None   # NOT available: submission artifact + rubric v2.3 criteria both missing\n\nfinal_grade = grade_decision(scored_result)\n\ndecision_record = pd.DataFrame([{\n    \"assessment\": \"Final Exam\",\n    \"course\": \"CS101\",\n    \"student_name\": \"Alice Johnson\",\n    \"student_id\": \"S12345\",\n    \"attempt\": \"Attempt 1\",\n    \"rubric_version\": \"v2.3\",\n    \"objective_version\": \"v1.0\",\n    \"score\": scored_result,\n    \"grade\": final_grade,\n    \"override_applied\": False,\n    \"decision_status\": \"BLOCKED - no validated score\",\n    \"decided_at\": datetime(2026, 10, 11).strftime(\"%Y-%m-%d\")\n}])\n\nprint(\"Grade Decision Record:\")\nprint(decision_record.T.rename(columns={0: \"Value\"}).to_string())\n\n# Demonstrate the banding logic is correctly implemented (dry run on hypothetical scores)\nprint(\"\\nBanding rule verification (illustrative only, NOT Alice's scores):\")\nfor s in [95, 85, 75, 65, 55, 90, 80]:\n    print(f\"  score={s:>3} -> {grade_decision(s)}\")</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 882,
+      "prompt_tokens": 9296,
+      "total_tokens": 10178,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 40,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 8064
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261011175443251975736c955d568brNEzpzg",
+    "service_tier": null,
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "run--01a12c1a-4ae5-7611-ad66-2af64c6274ba-0",
+  "example": false,
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 9296,
+    "output_tokens": 882,
+    "total_tokens": 10178,
+    "input_token_details": {
+      "cache_read": 8064
+    },
+    "output_token_details": {
+      "reasoning": 40
+    }
+  }
+}

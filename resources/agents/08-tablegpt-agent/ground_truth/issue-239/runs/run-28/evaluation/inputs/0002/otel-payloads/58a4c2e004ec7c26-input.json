@@ -1,0 +1,47 @@
+{
+  "content": "I'll build a self-contained, bounded multiset (a *multiset*, not a set — so one `event_id` deliberately repeats), validate every record against the schema/contract from the previous step, then show how the duplicate and the negative correction net out.\n\n```python\nimport re\nimport pandas as pd\nfrom datetime import datetime, timedelta\nfrom decimal import Decimal\n\n# ---------------- bounded input window: closed interval ----------------\nWINDOW_START = datetime(2025, 1, 1, 0, 0, 0)\nWINDOW_END   = datetime(2025, 1, 1, 0, 10, 0)\n\ndef parse_ts(s: str) -> datetime:\n    return datetime.fromisoformat(s.replace(\"Z\", \"+00:00\")).replace(tzinfo=None)\n\n# ---------------- the 12-event multiset ----------------\n# (arrival_order, event_id, product_id, revenue, event_time)\n# arrival order is NOT event-time order -> exercises the ordering contract\nrecords = [\n    (1,  \"evt-003\", \"P3\", \"7.25\",   \"2025-01-01T00:02:00Z\"),\n    (2,  \"evt-001\", \"P1\", \"10.00\",  \"2025-01-01T00:00:30Z\"),\n    (3,  \"evt-007\", \"P1\", \"-10.00\", \"2025-01-01T00:06:00Z\"),   # CORRECTION (negative)\n    (4,  \"evt-002\", \"P2\", \"25.50\",  \"2025-01-01T00:01:15Z\"),\n    (5,  \"evt-005\", \"P2\", \"4.99\",   \"2025-01-01T00:04:05Z\"),\n    (6,  \"evt-001\", \"P1\", \"10.00\",  \"2025-01-01T00:00:30Z\"),   # DUPLICATE event_id\n    (7,  \"evt-004\", \"P1\", \"12.00\",  \"2025-01-01T00:03:20Z\"),\n    (8,  \"evt-010\", \"P3\", \"21.10\",  \"2025-01-01T00:08:55Z\"),\n    (9,  \"evt-006\", \"P3\", \"8.75\",   \"2025-01-01T00:05:10Z\"),\n    (10, \"evt-009\", \"P3\", \"3.50\",   \"2025-01-01T00:07:30Z\"),\n    (11, \"evt-011\", \"P2\", \"6.40\",   \"2025-01-01T00:09:40Z\"),\n    (12, \"evt-008\", \"P2\", \"15.00\",  \"2025-01-01T00:06:45Z\"),\n]\n\nraw = pd.DataFrame(records, columns=[\"arrival_order\", \"event_id\", \"product_id\",\n                                     \"revenue\", \"event_time_raw\"])\nraw[\"event_time\"] = raw[\"event_time_raw\"].map(parse_ts)\nraw[\"revenue\"]    = raw[\"revenue\"].map(Decimal)   # Decimal, never float\nraw = raw.drop(columns=[\"event_time_raw\"])\n\n# ingestion: processing_time is ABSENT at ingress (runtime-populated per contract)\nassert \"processing_time\" not in raw.columns\n\n# ---------------- validate every record ----------------\nREV_RE = re.compile(r\"^-?\\d{1,14}(\\.\\d{1,4})?$\")\n\ndef validate(row) -> list[str]:\n    errs = []\n    if not str(row.event_id).strip():\n        errs.append(\"event_id empty\")\n    if not str(row.product_id).strip():\n        errs.append(\"product_id empty\")\n    if not isinstance(row.revenue, Decimal):\n        errs.append(\"revenue not Decimal\")\n    elif not Decimal(\"-99999999999999.9999\") < row.revenue < Decimal(\"99999999999999.9999\"):\n        errs.append(\"revenue out of precision(18,4)\")\n    if not (WINDOW_START <= row.event_time <= WINDOW_END):\n        errs.append(f\"event_time {row.event_time} outside bounded window\")\n    return errs\n\nraw[\"validation_errors\"] = raw.apply(validate, axis=1)\nprint(\"records:\", len(raw), \"| distinct event_id:\", raw.event_id.nunique(),\n      \"| invalid:\", (raw.validation_errors.str.len() > 0).sum())\nprint(raw.to_string(index=False))\n```\n\n```python\n# ---------------- runtime stamps processing_time (>= every event_time) ----------------\n# runtime clock starts at window end, advances 1s per arrival -> invariant holds\nraw[\"processing_time\"] = [WINDOW_END + timedelta(seconds=i) for i in range(len(raw))]\nassert (raw.processing_time >= raw.event_time).all(), \"invariant processing_time >= event_time violated\"\n\nraw[\"lateness\"] = raw.processing_time - raw.event_time\nprint(\"max lateness:\", raw.lateness.max(), \"| all within 2h allowed lateness:\",\n      bool((raw.lateness <= timedelta(hours=2)).all()))\n\n# ---------------- dedup on event_id: first-write-wins ----------------\ndeduped = raw.sort_values(\"arrival_order\").drop_duplicates(\"event_id\", keep=\"first\")\ndropped = sorted(set(raw.event_id) - set(deduped.event_id))  # none: dup shares an id\ndups    = raw[raw.duplicated(\"event_id\", keep=False)].sort_values([\"event_id\", \"arrival_order\"])\nprint(\"\\nduplicate rows detected:\")\nprint(dups[[\"arrival_order\", \"event_id\", \"product_id\", \"revenue\", \"event_time\"]].to_string(index=False))\nprint(\"\\nrecords in:\", len(raw), \"-> after dedup:\", len(deduped))\n\n# ---------------- ledger aggregate over deduped events ----------------\nper_product = (deduped.groupby(\"product_id\")\n                      .agg(events=(\"event_id\", \"nunique\"),\n                           revenue=(\"revenue\", \"sum\"))\n                      .reset_index())\nper_product[\"revenue\"] = per_product.revenue.map(lambda d: f\"{d:.2f}\")\n\nprint(\"\\nnet revenue by product (event-time ledger):\")\nprint(per_product.to_string(index=False))\nprint(f\"\\nNET total           : {deduped.revenue.sum():.2f}\")\nprint(f\"RAW total (naive)   : {raw.revenue.sum():.2f}\")\nprint(f\"duplicate inflation : {raw.revenue.sum() - deduped.revenue.sum():.2f}\")\n```\n\n## Reading the result\n\n**Boundedness.** The multiset is finite (12 records) and every `event_time` falls inside the closed window `[2025-01-01T00:00:00Z, 2025-01-01T00:10:00Z]` — so it is a stream over a bounded interval, and the ledger below is a *final* (non-speculative) answer once the watermark passes `00:10:00`.\n\n**The multiset is not a set.** `evt-001` (P1, +10.00) appears twice, at arrival 2 and arrival 6, with byte-identical payloads. That is a producer retry, so it is the consumer's job to collapse it — `first-write-wins` on `event_id`. Note the 12 records carry only **11 distinct `event_id`s**, and a naive `SUM(revenue)` therefore over-counts by exactly 10.00.\n\n**The negative revenue is a correction, not a bug.** `evt-007` (P1, **−10.00**) arrives at 00:06:00 and fully reverses `evt-001`. Because the stream is **append-only / no-retraction**, this is the only sanctioned way to express \"that sale didn't happen\" — a compensating new fact. P1's net is therefore `10.00 + 12.00 − 10.00 = 12.00`, not 32.00.\n\n**Ordering.** Arrival order deliberately disagrees with event-time order (e.g. `evt-003` arrives first with an event time of 00:02:00, while `evt-001` arrives second at 00:00:30). All aggregation above is keyed on `event_time`, so the result is identical for any arrival permutation — the reproducibility guarantee the contract makes.\n\n**processing_time stayed out of the math.** It was stamped at ingestion and used only to compute lateness (max ≈ 10 min 11 s, comfortably inside the 2-hour allowed-lateness bound, so nothing routes to the late side-output). It never entered the revenue numbers — which is the whole point of keeping the two clocks separate.\n\nOne caveat worth flagging: because P1's −10.00 lands in the same 10-minute window as the sale it reverses, this multiset cannot distinguish \"event-time ledger\" from \"processing-time ledger\" for that pair. If you want the aggregate to *depend* on which clock you choose, push the correction outside the window or past the lateness bound and the two answers will diverge.",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 3974,
+      "prompt_tokens": 4225,
+      "total_tokens": 8199,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 1924,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 3072
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012193616552529309c955d568ICCW36nc",
+    "service_tier": "default",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "run--01a1319d-a137-7862-8f24-867f1b5c9c9f-0",
+  "example": false,
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 4225,
+    "output_tokens": 3974,
+    "total_tokens": 8199,
+    "input_token_details": {
+      "cache_read": 3072
+    },
+    "output_token_details": {
+      "reasoning": 1924
+    }
+  }
+}

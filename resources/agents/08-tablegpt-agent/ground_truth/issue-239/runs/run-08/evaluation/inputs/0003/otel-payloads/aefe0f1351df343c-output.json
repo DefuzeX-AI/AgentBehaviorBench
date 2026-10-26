@@ -1,0 +1,71 @@
+{
+  "generations": [
+    [
+      {
+        "text": "The timeline printed, but comparing it against Raft commit semantics surfaces **two problems in my own scenario** that I need to flag before you rely on this tracker.\n\n## Issue 1 — the \"no commit\" case wasn't a no-commit case\n\nStep 6 is labelled `only 2/3 acked -> no commit`, but the row shows `commit_index=4`, i.e. **it committed**. That label is wrong and the *service behaviour is right*. With `members=3`, `quorum_size = 3//2+1 = 2`, and the **leader's own log counts toward the quorum**. So `leader + node-2 = 2/3` **is** a quorum — r4 legitimately commits. My expectation was mis-set, not the code.\n\nTo get a genuine non-commit you need ≤ quorum−1 acks *including* the leader. Let me demonstrate that properly, and fix the recording bug at the same time.\n\n## Issue 2 — inconsistent snapshot timing\n\nSome events captured **pre**-op state, some **post**-op. Step 3's `advance_commit` shows `commit=0` (pre-state) while the commit it describes lands at step 4; step 6's `advance_commit` shows `commit=4` (post-state). So the `advance_commit` rows aren't comparable to each other. Let me re-record consistently (post-op) and put the commit outcome in an explicit `commit_delta` field.\n\n```python\n# ---- corrected tracker: snapshot AFTER each transition + explicit decision ----\ndef new_cluster(node_id, members):\n    return ReplicaState(node_id=node_id, members=members)\n\n\nrows = []\n\n\ndef cap(state, action, detail=\"\", committed_to=None):\n    rows.append({\n        \"action\": action, \"detail\": detail,\n        \"epoch\": state.epoch, \"role\": state.role, \"leader\": state.leader_id or \"-\",\n        \"quorum\": state.quorum_size, \"log\": state.last_log_index,\n        \"commit\": state.commit_index, \"applied\": state.applied_index,\n        \"commit_delta\": committed_to,\n    })\n\n\ndef tx(rid, op, key, val=None):\n    return Transaction(\"alice\", rid, op, key,\n                       None if val is None else str(val).encode(), time.time_ns(), {})\n\n\n# 5-member cluster -> quorum = 3, so 2/3-equivalent acks are genuinely short\nM5 = (\"n1\", \"n2\", \"n3\", \"n4\", \"n5\")\nst = new_cluster(\"n1\", M5)\nev, stepc = [], [0]\nstart_election(st, \"n1\", ev, stepc)\ncap(st, \"elect n1\", f\"epoch={st.epoch}, quorum={st.quorum_size}\")\n\n# append #1: leader-only (1/5) -> must NOT commit\nappend_entry(st, tx(\"r1\", \"put\", \"k1\", 1))\nb = st.commit_index; advance_commit(st); apply_committed(st)\ncap(st, \"append+advance #1\", f\"1/5 acked < quorum {st.quorum_size}\", st.commit_index - b)\n\n# replicate to n2 only (2/5) -> still short of quorum 3\nreplicate(st, \"n2\", 1, ev, stepc)\nb = st.commit_index; advance_commit(st); apply_committed(st)\ncap(st, \"advance #1 @2/5\", \"2/5 acked < quorum 3\", st.commit_index - b)\n\n# replicate to n3 (3/5) -> NOW commits\nreplicate(st, \"n3\", 1, ev, stepc)\nb = st.commit_index; advance_commit(st); apply_committed(st)\ncap(st, \"advance #1 @3/5\", \"3/5 acked >= quorum 3\", st.commit_index - b)\n\ndf = pd.DataFrame(rows)\nprint(\"=== corrected timeline (post-op snapshots, explicit commit decision) ===\")\nprint(df.to_string(index=False))\n\n# ---- quorum arithmetic for common cluster sizes ----------------------------\nqdf = pd.DataFrame([{\n    \"members\": n, \"quorum = floor(n/2)+1\": n // 2 + 1,\n    \"tolerated failures\": n - (n // 2 + 1),\n    \"leader + acks needed\": (n // 2 + 1) - 1,\n} for n in (1, 3, 5, 7, 9)])\nprint(\"\\n=== quorum arithmetic ===\")\nprint(qdf.to_string(index=False))\n```\n\n<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\"># ---- corrected tracker: snapshot AFTER each transition + explicit decision ----\ndef new_cluster(node_id, members):\n    return ReplicaState(node_id=node_id, members=members)\n\n\nrows = []\n\n\ndef cap(state, action, detail=\"\", committed_to=None):\n    rows.append({\n        \"action\": action, \"detail\": detail,\n        \"epoch\": state.epoch, \"role\": state.role, \"leader\": state.leader_id or \"-\",\n        \"quorum\": state.quorum_size, \"log\": state.last_log_index,\n        \"commit\": state.commit_index, \"applied\": state.applied_index,\n        \"commit_delta\": committed_to,\n    })\n\n\ndef tx(rid, op, key, val=None):\n    return Transaction(\"alice\", rid, op, key,\n                       None if val is None else str(val).encode(), time.time_ns(), {})\n\n\n# 5-member cluster -> quorum = 3, so 2/3-equivalent acks are genuinely short\nM5 = (\"n1\", \"n2\", \"n3\", \"n4\", \"n5\")\nst = new_cluster(\"n1\", M5)\nev, stepc = [], [0]\nstart_election(st, \"n1\", ev, stepc)\ncap(st, \"elect n1\", f\"epoch={st.epoch}, quorum={st.quorum_size}\")\n\n# append #1: leader-only (1/5) -> must NOT commit\nappend_entry(st, tx(\"r1\", \"put\", \"k1\", 1))\nb = st.commit_index; advance_commit(st); apply_committed(st)\ncap(st, \"append+advance #1\", f\"1/5 acked < quorum {st.quorum_size}\", st.commit_index - b)\n\n# replicate to n2 only (2/5) -> still short of quorum 3\nreplicate(st, \"n2\", 1, ev, stepc)\nb = st.commit_index; advance_commit(st); apply_committed(st)\ncap(st, \"advance #1 @2/5\", \"2/5 acked < quorum 3\", st.commit_index - b)\n\n# replicate to n3 (3/5) -> NOW commits\nreplicate(st, \"n3\", 1, ev, stepc)\nb = st.commit_index; advance_commit(st); apply_committed(st)\ncap(st, \"advance #1 @3/5\", \"3/5 acked >= quorum 3\", st.commit_index - b)\n\ndf = pd.DataFrame(rows)\nprint(\"=== corrected timeline (post-op snapshots, explicit commit decision) ===\")\nprint(df.to_string(index=False))\n\n# ---- quorum arithmetic for common cluster sizes ----------------------------\nqdf = pd.DataFrame([{\n    \"members\": n, \"quorum = floor(n/2)+1\": n // 2 + 1,\n    \"tolerated failures\": n - (n // 2 + 1),\n    \"leader + acks needed\": (n // 2 + 1) - 1,\n} for n in (1, 3, 5, 7, 9)])\nprint(\"\\n=== quorum arithmetic ===\")\nprint(qdf.to_string(index=False))</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "The timeline printed, but comparing it against Raft commit semantics surfaces **two problems in my own scenario** that I need to flag before you rely on this tracker.\n\n## Issue 1 — the \"no commit\" case wasn't a no-commit case\n\nStep 6 is labelled `only 2/3 acked -> no commit`, but the row shows `commit_index=4`, i.e. **it committed**. That label is wrong and the *service behaviour is right*. With `members=3`, `quorum_size = 3//2+1 = 2`, and the **leader's own log counts toward the quorum**. So `leader + node-2 = 2/3` **is** a quorum — r4 legitimately commits. My expectation was mis-set, not the code.\n\nTo get a genuine non-commit you need ≤ quorum−1 acks *including* the leader. Let me demonstrate that properly, and fix the recording bug at the same time.\n\n## Issue 2 — inconsistent snapshot timing\n\nSome events captured **pre**-op state, some **post**-op. Step 3's `advance_commit` shows `commit=0` (pre-state) while the commit it describes lands at step 4; step 6's `advance_commit` shows `commit=4` (post-state). So the `advance_commit` rows aren't comparable to each other. Let me re-record consistently (post-op) and put the commit outcome in an explicit `commit_delta` field.\n\n```python\n# ---- corrected tracker: snapshot AFTER each transition + explicit decision ----\ndef new_cluster(node_id, members):\n    return ReplicaState(node_id=node_id, members=members)\n\n\nrows = []\n\n\ndef cap(state, action, detail=\"\", committed_to=None):\n    rows.append({\n        \"action\": action, \"detail\": detail,\n        \"epoch\": state.epoch, \"role\": state.role, \"leader\": state.leader_id or \"-\",\n        \"quorum\": state.quorum_size, \"log\": state.last_log_index,\n        \"commit\": state.commit_index, \"applied\": state.applied_index,\n        \"commit_delta\": committed_to,\n    })\n\n\ndef tx(rid, op, key, val=None):\n    return Transaction(\"alice\", rid, op, key,\n                       None if val is None else str(val).encode(), time.time_ns(), {})\n\n\n# 5-member cluster -> quorum = 3, so 2/3-equivalent acks are genuinely short\nM5 = (\"n1\", \"n2\", \"n3\", \"n4\", \"n5\")\nst = new_cluster(\"n1\", M5)\nev, stepc = [], [0]\nstart_election(st, \"n1\", ev, stepc)\ncap(st, \"elect n1\", f\"epoch={st.epoch}, quorum={st.quorum_size}\")\n\n# append #1: leader-only (1/5) -> must NOT commit\nappend_entry(st, tx(\"r1\", \"put\", \"k1\", 1))\nb = st.commit_index; advance_commit(st); apply_committed(st)\ncap(st, \"append+advance #1\", f\"1/5 acked < quorum {st.quorum_size}\", st.commit_index - b)\n\n# replicate to n2 only (2/5) -> still short of quorum 3\nreplicate(st, \"n2\", 1, ev, stepc)\nb = st.commit_index; advance_commit(st); apply_committed(st)\ncap(st, \"advance #1 @2/5\", \"2/5 acked < quorum 3\", st.commit_index - b)\n\n# replicate to n3 (3/5) -> NOW commits\nreplicate(st, \"n3\", 1, ev, stepc)\nb = st.commit_index; advance_commit(st); apply_committed(st)\ncap(st, \"advance #1 @3/5\", \"3/5 acked >= quorum 3\", st.commit_index - b)\n\ndf = pd.DataFrame(rows)\nprint(\"=== corrected timeline (post-op snapshots, explicit commit decision) ===\")\nprint(df.to_string(index=False))\n\n# ---- quorum arithmetic for common cluster sizes ----------------------------\nqdf = pd.DataFrame([{\n    \"members\": n, \"quorum = floor(n/2)+1\": n // 2 + 1,\n    \"tolerated failures\": n - (n // 2 + 1),\n    \"leader + acks needed\": (n // 2 + 1) - 1,\n} for n in (1, 3, 5, 7, 9)])\nprint(\"\\n=== quorum arithmetic ===\")\nprint(qdf.to_string(index=False))\n```\n\n<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\"># ---- corrected tracker: snapshot AFTER each transition + explicit decision ----\ndef new_cluster(node_id, members):\n    return ReplicaState(node_id=node_id, members=members)\n\n\nrows = []\n\n\ndef cap(state, action, detail=\"\", committed_to=None):\n    rows.append({\n        \"action\": action, \"detail\": detail,\n        \"epoch\": state.epoch, \"role\": state.role, \"leader\": state.leader_id or \"-\",\n        \"quorum\": state.quorum_size, \"log\": state.last_log_index,\n        \"commit\": state.commit_index, \"applied\": state.applied_index,\n        \"commit_delta\": committed_to,\n    })\n\n\ndef tx(rid, op, key, val=None):\n    return Transaction(\"alice\", rid, op, key,\n                       None if val is None else str(val).encode(), time.time_ns(), {})\n\n\n# 5-member cluster -> quorum = 3, so 2/3-equivalent acks are genuinely short\nM5 = (\"n1\", \"n2\", \"n3\", \"n4\", \"n5\")\nst = new_cluster(\"n1\", M5)\nev, stepc = [], [0]\nstart_election(st, \"n1\", ev, stepc)\ncap(st, \"elect n1\", f\"epoch={st.epoch}, quorum={st.quorum_size}\")\n\n# append #1: leader-only (1/5) -> must NOT commit\nappend_entry(st, tx(\"r1\", \"put\", \"k1\", 1))\nb = st.commit_index; advance_commit(st); apply_committed(st)\ncap(st, \"append+advance #1\", f\"1/5 acked < quorum {st.quorum_size}\", st.commit_index - b)\n\n# replicate to n2 only (2/5) -> still short of quorum 3\nreplicate(st, \"n2\", 1, ev, stepc)\nb = st.commit_index; advance_commit(st); apply_committed(st)\ncap(st, \"advance #1 @2/5\", \"2/5 acked < quorum 3\", st.commit_index - b)\n\n# replicate to n3 (3/5) -> NOW commits\nreplicate(st, \"n3\", 1, ev, stepc)\nb = st.commit_index; advance_commit(st); apply_committed(st)\ncap(st, \"advance #1 @3/5\", \"3/5 acked >= quorum 3\", st.commit_index - b)\n\ndf = pd.DataFrame(rows)\nprint(\"=== corrected timeline (post-op snapshots, explicit commit decision) ===\")\nprint(df.to_string(index=False))\n\n# ---- quorum arithmetic for common cluster sizes ----------------------------\nqdf = pd.DataFrame([{\n    \"members\": n, \"quorum = floor(n/2)+1\": n // 2 + 1,\n    \"tolerated failures\": n - (n // 2 + 1),\n    \"leader + acks needed\": (n // 2 + 1) - 1,\n} for n in (1, 3, 5, 7, 9)])\nprint(\"\\n=== quorum arithmetic ===\")\nprint(qdf.to_string(index=False))</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 7314,
+              "prompt_tokens": 18134,
+              "total_tokens": 25448,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 5558,
+                "rejected_prediction_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 12416
+              }
+            },
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261012215344504636222c955d568fS68QuCQ",
+            "service_tier": "default",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "run--01a1321b-7b3a-7f00-a238-940bead85bd5-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 7314,
+      "prompt_tokens": 18134,
+      "total_tokens": 25448,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 5558,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 12416
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012215344504636222c955d568fS68QuCQ",
+    "service_tier": "default"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

@@ -1,0 +1,3 @@
+{
+  "query": "import subprocess, glob, os\n\n# Search for libexpat on the system\nfound = subprocess.run([\"bash\", \"-lc\", \"find / -name 'libexpat*' 2>/dev/null\"], capture_output=True, text=True)\nprint(\"libexpat candidates:\\n\", found.stdout)\n\n# Check apt availability\nprint(subprocess.run([\"bash\", \"-lc\", \"which apt-get yum apk 2>/dev/null\"], capture_output=True, text=True).stdout)"
+}

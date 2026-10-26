@@ -1,0 +1,44 @@
+[
+  [
+    {
+      "content": "You are TableGPT2, an expert Python data analyst developed by Zhejiang University. Your job is to help user analyze datasets by writing Python code. Each markdown codeblock you write will be executed in an IPython environment, and you will receive the execution output. You should provide results analysis based on the execution output.\nFor politically sensitive questions, security and privacy issues, or other non-data analyze questions, you will refuse to answer.\n\nRemember:\n- Comprehend the user's requirements carefully & to the letter.\n- If additional information is needed, feel free to ask the user.\n- Give a brief description for what you plan to do & write Python code.\n- You can use `read_df(uri: str) -> pd.DataFrame` function to read different file formats into DataFrame.\n- When creating charts, prefer using `seaborn`.\n- DO NOT include images using markdown syntax (![]()) in your response under ANY circumstances.\n- If error occurred, try to fix it.\n- Response in the same language as the user.\n- Today is 2026-10-12",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "system",
+      "name": null,
+      "id": null
+    },
+    {
+      "content": "You are an insurance claims analyst. A commercial property policyholder has reported a water damage loss. Begin by binding the claim to the policy and identifying the relevant parties and jurisdiction. Ask for any missing information needed to proceed.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": "251211bb-e19e-4269-a9cf-81644682848f",
+      "example": false
+    },
+    {
+      "content": "I don't yet have a policy or claim file loaded, and this task can't be \"bound\" from scratch without source documents. Before I build the claim-policy binder and the party/jurisdiction matrix, I need the underlying records.\n\nHere's what I'd normally pull together — please supply whatever you have.\n\n**1. Policy data (to bind the claim to the correct policy & coverage form)**\n- Policy number, and whether there's more than one candidate policy / excess or umbrella layer\n- Policy term (effective & expiration dates) and whether it's occurrence-based\n- Named insured legal entity, DBA/trade names, entity type (LLC, LP, corp., JV)\n- Policy form (ISO CP 00 10, manuscript, carrier-specific) and edition date\n- Scheduled location(s) — is the loss premises a scheduled location in the policy?\n- Property coverages & limits: building, business personal property, business income / extra expense, blanket vs. specific\n- Deductibles, coinsurance %, valuation basis (RCV/ACV)\n- Any endorsements touching water: flood exclusion, **water damage / backup of sewer & drain**, mold/fungus, sprinkler leakage, ordinance or law, vacancy\n\n**2. Claim data (to identify and bind the loss)**\n- Claim / loss reference number, date reported, date of loss, date discovered\n- Cause of loss narrative (burst pipe, appliance failure, roof/weather intrusion, sprinkler discharge, sewer backup)\n- Loss location address (full street address)\n- Reported / estimated damage and any emergency mitigation performed\n\n**3. Relevant parties**\n- Named insured & on-site contact / authorized representative\n- Additional insureds, loss payees, mortgagees, lenders\n- Producer / broker or agent of record\n- Assigned adjuster (staff or independent), examiner, and any retained experts (cause & origin engineer, restoration vendor, CPA for BI)\n- Potentially responsible third parties (for possible subrogation) — e.g., contractor, plumber, tenant, adjoining owner\n- Any other carrier / co-insurer / reinsurance treaty\n\n**4. Jurisdiction (drives law, licensing, and deadlines)**\n- Which state/territory is the **loss location** in?\n- Where was the policy issued / negotiated?\n- Policy's governing law, venue, and appraisal/arbitration provisions\n- Whether that jurisdiction imposes adjuster licensing, prompt-payment statutes, or specific water/mold deadlines (e.g., FL, TX, CA, NY differ materially)\n\n**Minimum to start** — if you can only give me four things: (a) the policy declarations page, (b) the loss notice/first report, (c) the loss location address, and (d) the named insured's legal name.\n\nOnce you provide these (any format — PDF, CSV, Excel, TXT, or the URI for the file), I'll:\n1. Extract and match the claim to the policy, flagging any coverage gap (e.g., loss premises not scheduled, exclusion triggered).\n2. Build a **parties table** (name, role, contact, source document).\n3. Build a **jurisdiction table** (loss location, policy issuance state, governing law, applicable deadlines).\n4. Return the missing-field list plus the open questions a claims analyst must resolve before coverage is confirmed.\n\nWhat do you have available?",
+      "additional_kwargs": {
+        "parent_id": "a01c8d28-3a28-4786-8019-b6baa956aa92"
+      },
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "c1e1bf86-6eab-4626-911a-915c16bf764a",
+      "example": false,
+      "tool_calls": [],
+      "invalid_tool_calls": [],
+      "usage_metadata": null
+    },
+    {
+      "content": "The policyholder is 'Harborview Retail LLC', policy number 'CP-2024-1187', effective 2024-01-01 to 2024-12-31, covering a retail store at 4820 Meridian Ave N, Seattle, WA 98103. The loss occurred on 2024-11-15 when a pipe burst in the store's back room. The claimant is the policyholder. Jurisdiction is Washington State. Record the claim intake and canonicalize the loss description.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": "48402315-43d8-43cd-92d9-4bc1a76808ae",
+      "example": false
+    }
+  ]
+]

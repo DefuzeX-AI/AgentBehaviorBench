@@ -1,0 +1,47 @@
+{
+  "content": "The requested file is still unavailable, so I'll **proceed with a clearly-labeled synthetic demo** and build the mechanism rigorously. Now I'll construct it.\n\n**My stated assumptions (please confirm/override):**\n- **Privacy unit:** individual employee (one row = one person)\n- **Adjacency:** **bounded DP** — neighbors differ by adding/removing one employee record\n- **Budget:** **ε = 1.0, δ = 0** (pure ε-DP) for the whole release, via **parallel composition** over departments\n\n```python\nimport numpy as np, pandas as pd\nfrom collections import OrderedDict\n\nrng = np.random.default_rng(0)\nS = 300_000.0          # PUBLIC cap on salary (clamping bound); fixed before data, not data-dependent\nEPS = 1.0              # total privacy budget, pure DP\nnp.random.seed(123)\n\n# ---------- 1) Non-private per-department queries ----------\ndef stats(data):\n    g = data.groupby('department')['salary']\n    return g.sum().astype(float), g.count().astype(float)\n\ntrue_sum, true_cnt = stats(df)\ntrue_mean = (true_sum / true_cnt).sort_values(ascending=False)\nprint('True (non-private) mean salary per department:')\nprint(true_mean.round(0).to_string())\n\n# ---------- 2) Sensitivity of the released vector ----------\n# We clamp salaries to [0, S] so an employee contributes a value in [0, S].\n# Released vector per department = (sum of clamped salary, count).\n# Add/remove ONE employee changes that department's:\n#   count  by exactly 1              -> sensitivity 1\n#   sum    by at most S (clamped)    -> sensitivity S\n# Departments are DISJOINT partitions of employees -> PARALLEL composition, total eps = eps_d.\nclamped = df['salary'].clip(0, S)\nprint('\\nAll salaries within [0, S]?', bool((df.salary >= 0).all() and (df.salary <= S).all()))\n\n# Empirical sensitivity check (remove one record at a time)\nbase_sum, base_cnt = stats(df.assign(salary=clamped))\nmax_ds, max_dc = 0.0, 0.0\nfor i in df.index:\n    sub = df.drop(index=i)\n    s, c = stats(sub.assign(salary=sub['salary'].clip(0, S)))\n    ds = (base_sum - s).abs().max()\n    dc = (base_cnt - c).abs().max()\n    max_ds, max_dc = max(max_ds, ds), max(max_dc, dc)\nprint(f'empirical max |Δsum| over all 1-record removals = {max_ds:.0f}   (bound S = {S:.0f})')\nprint(f'empirical max |Δcount|                          = {max_dc:.0f}   (bound 1)')\n\n# ---------- 3) The mechanism (Laplace, per department) ----------\nB_SUM, B_CNT = S / EPS, 1.0 / EPS   # noise scales = sensitivity / eps_d  (eps_d = EPS)\n\ndef dp_mechanism(data, rng, eps=EPS):\n    d = data.assign(salary=data['salary'].clip(0, S))\n    s_true, c_true = stats(d)\n    n_d = len(s_true)\n    eps_d = eps / 1.0                     # parallel composition: each dept gets the FULL eps\n    noisy_sum   = s_true + rng.laplace(0, S / eps_d, size=n_d)\n    noisy_count = c_true + rng.laplace(0, 1 / eps_d, size=n_d)\n    noisy_sum   = np.clip(noisy_sum, 0, None)          # post-processing\n    noisy_count = np.clip(np.round(noisy_count), 1, None)  # stability floor; post-processing\n    return pd.Series(noisy_sum / noisy_count, index=s_true.index).sort_values(ascending=False)\n\ndp_mean = dp_mechanism(df, np.random.default_rng(2024))\nprint('\\nDP (eps=1.0) mean salary per department:')\nprint(dp_mean.round(0).to_string())\nprint('\\nPer-department absolute error:')\nprint((dp_mean - true_mean).abs().round(0).to_string())\n\n# ---------- 4) Composition accounting ----------\nfrom fractions import Fraction\neps_per_dept = Fraction(1, 1)  # eps_d = 1.0\ntotal_eps_parallel = max([eps_per_dept])   # parallel composition\nprint(f'\\nComposition: {len(true_sum)} disjoint departments, eps_d=1.0 each')\nprint(f'  parallel  -> total eps = {float(total_eps_parallel):.2f}')\nprint(f'  (sequential would have been {float(sum([eps_per_dept])):.2f})')\n```\n\n<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\">import numpy as np, pandas as pd\nfrom collections import OrderedDict\n\nrng = np.random.default_rng(0)\nS = 300_000.0          # PUBLIC cap on salary (clamping bound); fixed before data, not data-dependent\nEPS = 1.0              # total privacy budget, pure DP\nnp.random.seed(123)\n\n# ---------- 1) Non-private per-department queries ----------\ndef stats(data):\n    g = data.groupby('department')['salary']\n    return g.sum().astype(float), g.count().astype(float)\n\ntrue_sum, true_cnt = stats(df)\ntrue_mean = (true_sum / true_cnt).sort_values(ascending=False)\nprint('True (non-private) mean salary per department:')\nprint(true_mean.round(0).to_string())\n\n# ---------- 2) Sensitivity of the released vector ----------\nclamped = df['salary'].clip(0, S)\nprint('\\nAll salaries within [0, S]?', bool((df.salary >= 0).all() and (df.salary <= S).all()))\n\nbase_sum, base_cnt = stats(df.assign(salary=clamped))\nmax_ds, max_dc = 0.0, 0.0\nfor i in df.index:\n    sub = df.drop(index=i)\n    s, c = stats(sub.assign(salary=sub['salary'].clip(0, S)))\n    ds = (base_sum - s).abs().max()\n    dc = (base_cnt - c).abs().max()\n    max_ds, max_dc = max(max_ds, ds), max(max_dc, dc)\nprint(f'empirical max |Δsum| over all 1-record removals = {max_ds:.0f}   (bound S = {S:.0f})')\nprint(f'empirical max |Δcount|                          = {max_dc:.0f}   (bound 1)')\n\n# ---------- 3) The mechanism (Laplace, per department) ----------\ndef dp_mechanism(data, rng, eps=EPS, S=S):\n    d = data.assign(salary=data['salary'].clip(0, S))\n    s_true, c_true = stats(d)\n    n_d = len(s_true)\n    eps_d = eps / 1.0\n    noisy_sum   = s_true + rng.laplace(0, S / eps_d, size=n_d)\n    noisy_count = c_true + rng.laplace(0, 1 / eps_d, size=n_d)\n    noisy_sum   = np.clip(noisy_sum, 0, None)\n    noisy_count = np.clip(np.round(noisy_count), 1, None)\n    return pd.Series(noisy_sum / noisy_count, index=s_true.index).sort_values(ascending=False)\n\ndp_mean = dp_mechanism(df, np.random.default_rng(2024))\nprint('\\nDP (eps=1.0) mean salary per department:')\nprint(dp_mean.round(0).to_string())\nprint('\\nPer-department absolute error:')\nprint((dp_mean - true_mean).abs().round(0).to_string())\n\n# ---------- 4) Composition accounting ----------\nprint(f'\\nComposition: {len(true_sum)} disjoint departments, eps_d=1.0 each')\nprint(f'  parallel  -> total eps = 1.00')\nprint(f'  (sequential would have been {len(true_sum):.2f})')</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 3287,
+      "prompt_tokens": 4814,
+      "total_tokens": 8101,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 1420,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 256
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012192109503312311c955d568br8azFMF",
+    "service_tier": null,
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "run--01a1318f-c98c-7053-8b43-07db9092fbbf-0",
+  "example": false,
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 4814,
+    "output_tokens": 3287,
+    "total_tokens": 8101,
+    "input_token_details": {
+      "cache_read": 256
+    },
+    "output_token_details": {
+      "reasoning": 1420
+    }
+  }
+}

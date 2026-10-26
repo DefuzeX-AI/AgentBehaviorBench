@@ -1,0 +1,32 @@
+{
+  "messages": [
+    {
+      "content": "Let me do a thorough search for any CSV files and any tool source code before reporting.\n\n```python\nimport os\n\ncsvs, pyfiles, cfgs = [], [], []\nCONFIG_HINTS = ('.json', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf')\n\nfor root, dirs, files in os.walk('/'):\n    dirs[:] = [d for d in dirs if d not in {\n        'proc', 'sys', 'dev', 'usr', 'lib', 'lib64', 'bin', 'sbin',\n        'boot', 'run', 'var', 'etc', 'opt', 'snap', '.cache', '.config', '.ipython',\n        '__pycache__', '.git', 'site-packages', 'node_modules', 'dist-packages'\n    }]\n    for f in files:\n        p = os.path.join(root, f)\n        low = f.lower()\n        if low.endswith('.csv'):\n            csvs.append(p)\n        elif low.endswith('.py'):\n            pyfiles.append(p)\n        elif low.endswith(CONFIG_HINTS):\n            cfgs.append(p)\n\nprint(f\"CSV files found ({len(csvs)}):\")\nfor p in csvs[:50]:\n    print(\"  \", p)\n\nprint(f\"\\nPython files found ({len(pyfiles)}):\")\nfor p in pyfiles[:50]:\n    print(\"  \", p)\n\nprint(f\"\\nConfig-like files found ({len(cfgs)}):\")\nfor p in cfgs[:50]:\n    print(\"  \", p)\n```",
+      "additional_kwargs": {
+        "thought": "Let me do a thorough search for any CSV files and any tool source code before reporting.",
+        "action": {
+          "tool": "python",
+          "tool_input": "import os\n\ncsvs, pyfiles, cfgs = [], [], []\nCONFIG_HINTS = ('.json', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf')\n\nfor root, dirs, files in os.walk('/'):\n    dirs[:] = [d for d in dirs if d not in {\n        'proc', 'sys', 'dev', 'usr', 'lib', 'lib64', 'bin', 'sbin',\n        'boot', 'run', 'var', 'etc', 'opt', 'snap', '.cache', '.config', '.ipython',\n        '__pycache__', '.git', 'site-packages', 'node_modules', 'dist-packages'\n    }]\n    for f in files:\n        p = os.path.join(root, f)\n        low = f.lower()\n        if low.endswith('.csv'):\n            csvs.append(p)\n        elif low.endswith('.py'):\n            pyfiles.append(p)\n        elif low.endswith(CONFIG_HINTS):\n            cfgs.append(p)\n\nprint(f\"CSV files found ({len(csvs)}):\")\nfor p in csvs[:50]:\n    print(\"  \", p)\n\nprint(f\"\\nPython files found ({len(pyfiles)}):\")\nfor p in pyfiles[:50]:\n    print(\"  \", p)\n\nprint(f\"\\nConfig-like files found ({len(cfgs)}):\")\nfor p in cfgs[:50]:\n    print(\"  \", p)"
+        },
+        "parent_id": "60e5b337-e07b-46d2-80f6-adbe40072d81"
+      },
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "85f6bf6d-0a37-4f5c-9917-311430eecf4c",
+      "example": false,
+      "tool_calls": [
+        {
+          "name": "python",
+          "args": {
+            "query": "import os\n\ncsvs, pyfiles, cfgs = [], [], []\nCONFIG_HINTS = ('.json', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf')\n\nfor root, dirs, files in os.walk('/'):\n    dirs[:] = [d for d in dirs if d not in {\n        'proc', 'sys', 'dev', 'usr', 'lib', 'lib64', 'bin', 'sbin',\n        'boot', 'run', 'var', 'etc', 'opt', 'snap', '.cache', '.config', '.ipython',\n        '__pycache__', '.git', 'site-packages', 'node_modules', 'dist-packages'\n    }]\n    for f in files:\n        p = os.path.join(root, f)\n        low = f.lower()\n        if low.endswith('.csv'):\n            csvs.append(p)\n        elif low.endswith('.py'):\n            pyfiles.append(p)\n        elif low.endswith(CONFIG_HINTS):\n            cfgs.append(p)\n\nprint(f\"CSV files found ({len(csvs)}):\")\nfor p in csvs[:50]:\n    print(\"  \", p)\n\nprint(f\"\\nPython files found ({len(pyfiles)}):\")\nfor p in pyfiles[:50]:\n    print(\"  \", p)\n\nprint(f\"\\nConfig-like files found ({len(cfgs)}):\")\nfor p in cfgs[:50]:\n    print(\"  \", p)"
+          },
+          "id": "93df5848-b6a6-45cb-aed1-c5fb7cfd9a6d",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": null
+    }
+  ]
+}

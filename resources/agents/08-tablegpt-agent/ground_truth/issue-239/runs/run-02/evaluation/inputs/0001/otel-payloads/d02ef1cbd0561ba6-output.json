@@ -1,0 +1,50 @@
+{
+  "messages": [
+    {
+      "content": "You are TableGPT2, an expert Python data analyst developed by Zhejiang University. Your job is to help user analyze datasets by writing Python code. Each markdown codeblock you write will be executed in an IPython environment, and you will receive the execution output. You should provide results analysis based on the execution output.\nFor politically sensitive questions, security and privacy issues, or other non-data analyze questions, you will refuse to answer.\n\nRemember:\n- Comprehend the user's requirements carefully & to the letter.\n- If additional information is needed, feel free to ask the user.\n- Give a brief description for what you plan to do & write Python code.\n- You can use `read_df(uri: str) -> pd.DataFrame` function to read different file formats into DataFrame.\n- When creating charts, prefer using `seaborn`.\n- DO NOT include images using markdown syntax (![]()) in your response under ANY circumstances.\n- If error occurred, try to fix it.\n- Response in the same language as the user.\n- Today is 2026-10-11",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "system",
+      "name": null,
+      "id": null
+    },
+    {
+      "content": "Bind the network intent, topology, address, protocol, and authority contract from the provided network description and device inventory. Summarize the intended design and the authoritative sources you will use for validation.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": "60331761-f492-4a61-86f5-656bfed0cf8a"
+    },
+    {
+      "content": "I don't see any attached dataset yet, so let me first check the working environment for any files I can read.\n\n```python\nimport os\nfor root, dirs, files in os.walk('.'):\n    # skip hidden/venv noise\n    if any(p in root for p in ('/.git', 'site-packages', '__pycache__')):\n        continue\n    for f in files:\n        if f.endswith(('.csv', '.json', '.yaml', '.yml', '.txt', '.xlsx', '.md', '.xml')):\n            print(os.path.join(root, f))\n```",
+      "additional_kwargs": {
+        "thought": "I don't see any attached dataset yet, so let me first check the working environment for any files I can read.",
+        "action": {
+          "tool": "python",
+          "tool_input": "import os\nfor root, dirs, files in os.walk('.'):\n    # skip hidden/venv noise\n    if any(p in root for p in ('/.git', 'site-packages', '__pycache__')):\n        continue\n    for f in files:\n        if f.endswith(('.csv', '.json', '.yaml', '.yml', '.txt', '.xlsx', '.md', '.xml')):\n            print(os.path.join(root, f))"
+        },
+        "parent_id": "d6c1ed38-5ef6-44dc-b545-6f3093a978aa"
+      },
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "e2b117ee-f071-4ef0-add9-3d4a06d906c5"
+    },
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "```pycon\n./kernel-e4514a0b-047f-4557-9bf9-eb42095a3277.json\n./.cache/matplotlib/fontlist-v3.11.0.json\n\n```"
+        }
+      ],
+      "additional_kwargs": {
+        "parent_id": "d6c1ed38-5ef6-44dc-b545-6f3093a978aa"
+      },
+      "response_metadata": {},
+      "type": "tool",
+      "name": "python",
+      "id": "d5b75a82-901f-49c7-8aed-2721ec9369ba"
+    }
+  ]
+}

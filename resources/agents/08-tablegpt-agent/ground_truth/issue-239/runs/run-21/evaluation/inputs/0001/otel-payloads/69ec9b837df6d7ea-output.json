@@ -1,0 +1,22 @@
+{
+  "messages": [
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "```pycon\nattempted ops = 40, committed entries = 32, refused = 1\n\n   clause                                guarantee                             verification\n0      C1        Atomic visibility (no torn entry)  entries keyed by index, written whol...\n1   C2/C6  Single total order, no divergent commit  divergent records = 0; integrity ass...\n2      C3  Committed log is contiguous prefix 1..m                m = 32, contiguous = True\n3      C4            Linearizability of operations  index assignment on commit = real-ti...\n..    ...                                      ...                                      ...\n7      D2  Durability under <= f concurrent cra...  min replicas holding a committed ent...\n8      D3  Recovery restores exact committed pr...  invariant held in 40/40 crash-restar...\n9      A2  Minority partition: fail fast, no fa...  rogue append -> 'no-quorum'; leaked ...\n10     A4          Eventual convergence after heal  all replicas identical to canonical ...\n\n[11 rows x 3 columns]\n```"
+        }
+      ],
+      "additional_kwargs": {
+        "parent_id": "3e241454-6948-44cd-824a-674117ff56ba"
+      },
+      "response_metadata": {},
+      "type": "tool",
+      "name": "python",
+      "id": "236310e9-b221-4b2d-86d1-43296591b5b5",
+      "tool_call_id": "2a900b9e-8ba7-4210-a3f5-1bd1a0ccb391",
+      "artifact": [],
+      "status": "success"
+    }
+  ]
+}
