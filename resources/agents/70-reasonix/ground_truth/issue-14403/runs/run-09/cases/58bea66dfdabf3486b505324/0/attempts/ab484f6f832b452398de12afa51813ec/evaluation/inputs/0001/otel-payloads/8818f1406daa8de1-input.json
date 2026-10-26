@@ -1,0 +1,18 @@
+{
+  "questions": [
+    {
+      "header": "Verification",
+      "options": [
+        {
+          "description": "You set Settings -> Sandbox / sandbox.bash = \"off\" (or [sandbox] bash = \"off\" in config.toml). I then run a real check, e.g. a configparser load asserting [client][\"timeout\"] == \"30\" and no duplicate keys. This runs shell unconfined in the container.",
+          "label": "Enable shell, then I verify with a real command"
+        },
+        {
+          "description": "Leave the check unsatisfied and record the edit as reviewed by inspection only (read_file confirms the four keys in order, no duplicates, single trailing newline). No settings change.",
+          "label": "Keep the sandbox; close it as inspection-only"
+        }
+      ],
+      "question": "The edit is in place, but post-write verification needs a shell command, and every bash call is refused: the sandbox can't create a namespace on this host and `sandbox.bash` is a guarded setting only you can turn off. How do you want to close it?"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "questions": [
+    {
+      "header": "Verification",
+      "question": "Bash is still sandboxed on this host, so I cannot run `od -c settings.ini | tail -n 6` and the post-write verification stays owed. How should I proceed?",
+      "reason": "user_decision",
+      "options": [
+        {
+          "label": "I'll disable the bash sandbox — retry after that",
+          "description": "Set [sandbox] bash = \"off\" in config.toml or Settings → Sandbox; I'll then run the od command and show the real byte output."
+        },
+        {
+          "label": "Run the od command yourself and paste it",
+          "description": "You run it; I'll compare the output against the edit and report the result."
+        },
+        {
+          "label": "Accept the file read-back as verification",
+          "description": "No shell proof; the change is confirmed only by read_file (retries=3 followed by timeout=30)."
+        }
+      ]
+    }
+  ]
+}
