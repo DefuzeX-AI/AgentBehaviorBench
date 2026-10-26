@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_raw):\n    import pandas as pd\n    import numpy as np\n    '''\n    Wrangle the data provided in data_raw.\n\n    data_raw: A pandas DataFrame, or a list of one or more pandas DataFrames\n    containing the raw data to be wrangled.\n\n    Pipeline:\n      1) Combine multiple datasets on shared columns (no Cartesian products).\n      2) Standardize column names and trim string whitespace.\n      3) Normalize types (dates, numerics, categoricals).\n      4) Flag missing values, then impute (median / ffill-bfill / 'unknown').\n      5) Remove exact duplicate rows.\n      6) Internal-consistency \"mapping\" validation: verify each row's total\n         equals unit price x quantity; flag records that cannot be verified.\n      7) Compact categorical dtypes for remaining text columns.\n    '''\n\n    # ------------------------------------------------------------------\n    # Step 0: Input handling — ensure we have a list of DataFrames\n    # ------------------------------------------------------------------\n    if not isinstance(data_raw, list):\n        data_raw = [data_raw]\n\n    frames = []\n    for item in data_raw:\n        if isinstance(item, pd.DataFrame):\n            frames.append(item.copy())\n\n    if len(frames) == 0:\n        return pd.DataFrame()\n\n    # ------------------------------------------------------------------\n    # Step 1: Combine multiple datasets on commonly shared columns\n    # ------------------------------------------------------------------\n    if len(frames) == 1:\n        df = frames[0]\n    else:\n        common_cols = list(frames[0].columns)\n        for f in frames[1:]:\n            kept = []\n            for c in common_cols:\n                if c in f.columns:\n                    kept.append(c)\n            common_cols = kept\n        df = pd.concat([f[common_cols] for f in frames], ignore_index=True)\n\n    # ------------------------------------------------------------------\n    # Step 2: Standardize column names; trim whitespace in string columns\n    # ------------------------------------------------------------------\n    df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]\n\n    for c in df.columns:\n        if df[c].dtype == object:\n            non_null = df[c].dropna()\n            if len(non_null) > 0:\n                all_str = True\n                for x in non_null:\n                    if not isinstance(x, str):\n                        all_str = False\n                        break\n                if all_str:\n                    df[c] = df[c].str.strip()\n\n    # ------------------------------------------------------------------\n    # Step 3: Normalize data types\n    # ------------------------------------------------------------------\n    # a) Date-like columns (name contains 'date') -> datetime\n    date_cols = []\n    for c in df.columns:\n        if 'date' in c:\n            date_cols.append(c)\n    for c in date_cols:\n        df[c] = pd.to_datetime(df[c], errors='coerce')\n\n    # b) Remaining object columns: numeric if >=90% parse, else categorical\n    for c in df.columns:\n        if c in date_cols:\n            continue\n        if df[c].dtype == object:\n            coerced = pd.to_numeric(df[c], errors='coerce')\n            n_nonnull = df[c].notna().sum()\n            if n_nonnull > 0:\n                if coerced.notna().sum() / n_nonnull >= 0.9:\n                    df[c] = coerced\n                else:\n                    df[c] = df[c].astype('category')\n            else:\n                df[c] = df[c].astype('category')\n\n    # ------------------------------------------------------------------\n    # Step 4: Missing values — flag first, then impute (no rows dropped)\n    # ------------------------------------------------------------------\n    missing_counts = df.isna().sum()\n    helper_cols = []\n    for c in list(df.columns):\n        if missing_counts[c] > 0:\n            flag_name = str(c) + '_is_missing'\n            df[flag_name] = df[c].isna()\n            helper_cols.append(flag_name)\n\n    df['missing_value_count'] = df.isna().sum(axis=1)\n    helper_cols.append('missing_value_count')\n\n    for c in df.columns:\n        if c in helper_cols:\n            continue\n        if pd.api.types.is_numeric_dtype(df[c]):\n            df[c] = df[c].fillna(df[c].median())\n        elif pd.api.types.is_datetime64_any_dtype(df[c]):\n            df[c] = df[c].ffill().bfill()\n        elif isinstance(df[c].dtype, pd.CategoricalDtype):\n            if 'unknown' not in df[c].cat.categories:\n                df[c] = df[c].cat.add_categories('unknown')\n            df[c] = df[c].fillna('unknown')\n        else:\n            df[c] = df[c].fillna('unknown')\n\n    # ------------------------------------------------------------------\n    # Step 5: Remove exact duplicate rows (on original columns only)\n    # ------------------------------------------------------------------\n    original_cols = []\n    for c in df.columns:\n        if c not in helper_cols:\n            original_cols.append(c)\n\n    if len(original_cols) > 0:\n        dup_mask = df.duplicated(subset=original_cols, keep='first')\n        df = df.loc[~dup_mask].reset_index(drop=True)\n    else:\n        df = df.reset_index(drop=True)\n\n    # ------------------------------------------------------------------\n    # Step 6: \"Mapping\" validation — total vs. price x quantity consistency\n    # ------------------------------------------------------------------\n    total_col = None\n    price_col = None\n    qty_col = None\n    total_keys = ('extended', 'total', 'amount', 'revenue')\n    qty_keys = ('quantity', 'qty')\n\n    for c in original_cols:\n        if total_col is None:\n            for k in total_keys:\n                if k in c:\n                    total_col = c\n                    break\n        if price_col is None:\n            if 'price' in c:\n                price_col = c\n        if qty_col is None:\n            for k in qty_keys:\n                if k in c:\n                    qty_col = c\n                    break\n\n    if (total_col is not None) and (price_col is not None) and (qty_col is not None):\n        try:\n            expected = df[price_col].astype(float) * df[qty_col].astype(float)\n            df['total_mapping_consistent'] = np.isclose(\n                df[total_col].astype(float), expected\n            )\n        except:\n            df['total_mapping_consistent'] = pd.NA\n        df['record_unmapped'] = (\n            df[total_col].isna() | df[price_col].isna() | df[qty_col].isna()\n        )\n    else:\n        df['total_mapping_consistent'] = pd.NA\n        df['record_unmapped'] = pd.NA\n\n    # ------------------------------------------------------------------\n    # Step 7: Compact category dtype for remaining text columns\n    # ------------------------------------------------------------------\n    for c in df.columns:\n        if df[c].dtype == object:\n            if c not in date_cols:\n                df[c] = df[c].astype('category')\n\n    return df\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 6546,
+      "prompt_tokens": 1942,
+      "total_tokens": 8488,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 5078,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 128,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "glm-5.3-flash",
+    "system_fingerprint": null,
+    "id": "20261020122908b942eebd7f3148a1",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a15792-021c-7db2-89ee-f719c9dc82c3-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 1942,
+    "output_tokens": 6546,
+    "total_tokens": 8488,
+    "input_token_details": {
+      "cache_read": 128
+    },
+    "output_token_details": {
+      "reasoning": 5078
+    }
+  }
+}

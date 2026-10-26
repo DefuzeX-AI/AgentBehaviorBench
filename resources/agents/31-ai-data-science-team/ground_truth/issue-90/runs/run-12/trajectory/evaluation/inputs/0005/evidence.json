@@ -1,0 +1,667 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_c8993cab5a544232be28da59fc0c25ec",
+  "case_id": "case_195b88aa7d854d7593148690e7924e73",
+  "input_id": "step-5",
+  "spans": [
+    {
+      "trace_id": "e19a29d34649aeba5323b3747694524e",
+      "span_id": "ee3a8386fece5d26",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792471295829093393,
+      "end_time_unix_nano": 1792471358048955129,
+      "duration_nano": 62219861736,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e19a29d34649aeba5323b3747694524e",
+      "span_id": "db144fdcae34afe0",
+      "parent_span_id": "ee3a8386fece5d26",
+      "name": "pandas_data_analyst",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792471295963162471,
+      "end_time_unix_nano": 1792471358045701987,
+      "duration_nano": 62082539516,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e19a29d34649aeba5323b3747694524e",
+      "span_id": "0eecedb30e6235db",
+      "parent_span_id": "db144fdcae34afe0",
+      "name": "prepare_messages",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792471296230713778,
+      "end_time_unix_nano": 1792471296414834703,
+      "duration_nano": 184120925,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e19a29d34649aeba5323b3747694524e",
+      "span_id": "c8edc024e65271cf",
+      "parent_span_id": "db144fdcae34afe0",
+      "name": "routing_preprocessor",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792471296532238961,
+      "end_time_unix_nano": 1792471303666373805,
+      "duration_nano": 7134134844,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e19a29d34649aeba5323b3747694524e",
+      "span_id": "e52af977ae7f35c0",
+      "parent_span_id": "c8edc024e65271cf",
+      "name": "RunnableSequence",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792471296690997231,
+      "end_time_unix_nano": 1792471303665654926,
+      "duration_nano": 6974657695,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e19a29d34649aeba5323b3747694524e",
+      "span_id": "ba8ae1fae1ce7493",
+      "parent_span_id": "e52af977ae7f35c0",
+      "name": "PromptTemplate",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792471296691870718,
+      "end_time_unix_nano": 1792471296693117506,
+      "duration_nano": 1246788,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e19a29d34649aeba5323b3747694524e",
+      "span_id": "e1b6868c3daeca16",
+      "parent_span_id": "e52af977ae7f35c0",
+      "name": "ChatOpenAI",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792471296693861754,
+      "end_time_unix_nano": 1792471303653121505,
+      "duration_nano": 6959259751,
+      "model_content": {
+        "schema_version": "kuma.model_content.v1",
+        "input": {
+          "status": "present",
+          "value": [
+            [
+              {
+                "content": "\n        You are an expert in routing decisions for a Pandas Data Manipulation Wrangling Agent, a Charting Visualization Agent, and a Pandas Table Agent. Your job is to tell the agents which actions to perform and determine the correct routing for the incoming user question:\n        \n        1. Determine what the correct format for a Users Question should be for use with a Pandas Data Wrangling Agent based on the incoming user question. Anything related to data wrangling and manipulation should be passed along. Anything related to data analysis can be handled by the Pandas Agent. Anything that uses Pandas can be passed along. Tables can be returned from this agent. Don't pass along anything about plotting or visualization.\n        2. Determine whether or not a chart should be generated or a table should be returned based on the users question.\n        3. If a chart is requested, determine the correct format of a Users Question should be used with a Data Visualization Agent. Anything related to plotting and visualization should be passed along.\n        \n        Use the following criteria on how to route the the initial user question:\n        \n        From the incoming user question, remove any details about the format of the final response as either a Chart or Table and return only the important part of the incoming user question that is relevant for the Pandas Data Wrangling and Transformation agent. This will be the 'user_instructions_data_wrangling'. If 'None' is found, return the original user question.\n        \n        Next, determine if the user would like a data visualization ('chart') or a 'table' returned with the results of the Data Wrangling Agent. If unknown, not specified or 'None' is found, then select 'table'.  \n        \n        If a 'chart' is requested, return the 'user_instructions_data_visualization'. If 'None' is found, return None.\n        \n        Return JSON with 'user_instructions_data_wrangling', 'user_instructions_data_visualization' and 'routing_preprocessor_decision'.\n        \n        INITIAL_USER_QUESTION: The user asks: 'What were the top 3 bike models by extended_sales in the first quarter of 2021?' Compute the answer from the dataset and return a table.\n        ",
+                "additional_kwargs": {},
+                "response_metadata": {},
+                "type": "human",
+                "name": null,
+                "id": null
+              }
+            ]
+          ]
+        },
+        "output": {
+          "status": "present",
+          "value": {
+            "generations": [
+              [
+                {
+                  "text": "```json\n{\n  \"user_instructions_data_wrangling\": \"What were the top 3 bike models by extended_sales in the first quarter of 2021? Compute the answer from the dataset.\",\n  \"user_instructions_data_visualization\": null,\n  \"routing_preprocessor_decision\": \"table\"\n}\n```\n\n**Routing Explanation:**\n\n1. **Data Wrangling Instructions**: The original question asks about computing top 3 bike models by extended_sales in Q1 2021 — this is a data manipulation/analysis task suited for the Pandas Data Wrangling Agent. The formatting instruction (\"return a table\") was removed, leaving only the core computational task.\n\n2. **Routing Decision**: The user explicitly requested the results be returned as a **table**, so the routing decision is set to `'table'`.\n\n3. **Visualization Instructions**: Since no chart was requested, `user_instructions_data_visualization` is `null`, and the Data Visualization Agent is not needed.",
+                  "generation_info": {
+                    "finish_reason": "stop",
+                    "logprobs": null
+                  },
+                  "type": "ChatGeneration",
+                  "message": {
+                    "content": "```json\n{\n  \"user_instructions_data_wrangling\": \"What were the top 3 bike models by extended_sales in the first quarter of 2021? Compute the answer from the dataset.\",\n  \"user_instructions_data_visualization\": null,\n  \"routing_preprocessor_decision\": \"table\"\n}\n```\n\n**Routing Explanation:**\n\n1. **Data Wrangling Instructions**: The original question asks about computing top 3 bike models by extended_sales in Q1 2021 — this is a data manipulation/analysis task suited for the Pandas Data Wrangling Agent. The formatting instruction (\"return a table\") was removed, leaving only the core computational task.\n\n2. **Routing Decision**: The user explicitly requested the results be returned as a **table**, so the routing decision is set to `'table'`.\n\n3. **Visualization Instructions**: Since no chart was requested, `user_instructions_data_visualization` is `null`, and the Data Visualization Agent is not needed.",
+                    "additional_kwargs": {
+                      "refusal": null
+                    },
+                    "response_metadata": {
+                      "token_usage": {
+                        "completion_tokens": 511,
+                        "prompt_tokens": 455,
+                        "total_tokens": 966,
+                        "completion_tokens_details": {
+                          "accepted_prediction_tokens": null,
+                          "audio_tokens": null,
+                          "reasoning_tokens": 314,
+                          "rejected_prediction_tokens": null,
+                          "text_tokens": null
+                        },
+                        "prompt_tokens_details": {
+                          "audio_tokens": null,
+                          "cache_write_tokens": null,
+                          "cached_tokens": 0,
+                          "image_tokens": null,
+                          "text_tokens": null
+                        }
+                      },
+                      "model_provider": "openai",
+                      "model_name": "glm-5.3-flash",
+                      "system_fingerprint": null,
+                      "id": "20261020124136759906cb5d844e2d",
+                      "finish_reason": "stop",
+                      "logprobs": null
+                    },
+                    "type": "ai",
+                    "name": null,
+                    "id": "lc_run--01a1579d-6ab5-77a2-a1c2-583c0bf563e2-0"
+                  }
+                }
+              ]
+            ],
+            "llm_output": {
+              "token_usage": {
+                "completion_tokens": 511,
+                "prompt_tokens": 455,
+                "total_tokens": 966,
+                "completion_tokens_details": {
+                  "accepted_prediction_tokens": null,
+                  "audio_tokens": null,
+                  "reasoning_tokens": 314,
+                  "rejected_prediction_tokens": null,
+                  "text_tokens": null
+                },
+                "prompt_tokens_details": {
+                  "audio_tokens": null,
+                  "cache_write_tokens": null,
+                  "cached_tokens": 0,
+                  "image_tokens": null,
+                  "text_tokens": null
+                }
+              },
+              "model_provider": "openai",
+              "model_name": "glm-5.3-flash",
+              "system_fingerprint": null,
+              "id": "20261020124136759906cb5d844e2d"
+            },
+            "run": null,
+            "type": "LLMResult"
+          }
+        }
+      },
+      "attributes": {
+        "gen_ai.operation.name": "chat"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e19a29d34649aeba5323b3747694524e",
+      "span_id": "ec10eafa38d66a60",
+      "parent_span_id": "e52af977ae7f35c0",
+      "name": "JsonOutputParser",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792471303654016143,
+      "end_time_unix_nano": 1792471303664895721,
+      "duration_nano": 10879578,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e19a29d34649aeba5323b3747694524e",
+      "span_id": "c1de09e6e3dd4626",
+      "parent_span_id": "db144fdcae34afe0",
+      "name": "data_wrangling_agent",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792471303777398610,
+      "end_time_unix_nano": 1792471357517876454,
+      "duration_nano": 53740477844,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e19a29d34649aeba5323b3747694524e",
+      "span_id": "7fe007ee69870666",
+      "parent_span_id": "c1de09e6e3dd4626",
+      "name": "data_wrangling_agent",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792471304045851633,
+      "end_time_unix_nano": 1792471357249852455,
+      "duration_nano": 53204000822,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e19a29d34649aeba5323b3747694524e",
+      "span_id": "90066a070099719d",
+      "parent_span_id": "7fe007ee69870666",
+      "name": "create_data_wrangler_code",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792471304313546778,
+      "end_time_unix_nano": 1792471355652311071,
+      "duration_nano": 51338764293,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e19a29d34649aeba5323b3747694524e",
+      "span_id": "19c3925384a8d48c",
+      "parent_span_id": "90066a070099719d",
+      "name": "RunnableSequence",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792471304523928913,
+      "end_time_unix_nano": 1792471355651315577,
+      "duration_nano": 51127386664,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e19a29d34649aeba5323b3747694524e",
+      "span_id": "85b7a32215aca91c",
+      "parent_span_id": "19c3925384a8d48c",
+      "name": "PromptTemplate",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792471304525094484,
+      "end_time_unix_nano": 1792471304526258548,
+      "duration_nano": 1164064,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e19a29d34649aeba5323b3747694524e",
+      "span_id": "38a1b666d3d1a3d5",
+      "parent_span_id": "19c3925384a8d48c",
+      "name": "ChatOpenAI",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792471304526902555,
+      "end_time_unix_nano": 1792471355648136524,
+      "duration_nano": 51121233969,
+      "model_content": {
+        "schema_version": "kuma.model_content.v1",
+        "input": {
+          "status": "present",
+          "value": [
+            [
+              {
+                "content": "\n            You are a Pandas Data Wrangling Coding Agent. Your job is to create a data_wrangler() function that can be run on the provided data. You should use Pandas and NumPy for data wrangling operations.\n            \n            User instructions:\n            What were the top 3 bike models by extended_sales in the first quarter of 2021? Compute the answer from the dataset.\n            \n            Follow these recommended steps (if present):\n            # Recommended Data Wrangling Steps:\n1. Inspect and standardize column names (lowercase, strip spaces) if needed.\n2. Normalize data types (numeric/categorical/datetime); coerce where reasonable.\n3. Handle missing values (simple imputation or flagging) without dropping data unless instructed.\n4. For multiple datasets, identify join keys and merge appropriately; avoid Cartesian products.\n5. Handle categorical encoding where necessary (one-hot or category cleanup).\n6. Remove duplicates and obvious anomalies, but avoid dropping rows unless requested.\n7. Return a single pandas DataFrame with the wrangled data.\n            \n            If multiple datasets are provided, you may need to merge or join them. Make sure to handle that scenario based on the recommended steps and user instructions.\n            \n            Below are summaries of all datasets provided. If more than one dataset is provided, you may need to merge or join them.:\n            Dataset Name: main\n        ----------------------------\n        Shape: 13149 rows x 5 columns\n\n        Column Data Types:\n        date: str\nbike_model: str\nprice: int64\nquantity_sold: int64\nextended_sales: int64\n\n        Data (first 5 rows):\n                 date          bike_model  price  quantity_sold  extended_sales\n0  2021-01-01      Commuter Swift    495             23           11385\n1  2021-01-01         Urban Rider    350             19            6650\n2  2021-01-01        City Cruiser    400             19            7600\n3  2021-01-01  Mountain Trail Pro   1250             11           13750\n4  2021-01-01     Gravel Explorer   2200              9           19800\n            \n            Return Python code in ```python``` format with a single function definition, data_wrangler(), that includes all imports inside the function. And returns a single pandas data frame.\n\n            ```python\n            def data_wrangler(data_list):\n                '''\n                Wrangle the data provided in data.\n                \n                data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n                '''\n                import pandas as pd\n                import numpy as np\n                # Implement the wrangling steps here\n                \n                # Return a single DataFrame \n                return data_wrangled\n            ```\n            \n            Avoid Errors:\n            1. If the incoming data is not a list. Convert it to a list first. \n            2. Do not specify data types inside the function arguments.\n            3. Do not hardcode column names; derive column usage from the provided data structures and user instructions.\n            \n            Important Notes:\n            1. Do Not use Print statements to display the data. Return the data frame instead with the data wrangling operation performed.\n            2. Do not plot graphs. Only return the data frame.\n            3. Only return a single pandas DataFrame and nothing else.\n            \n            Make sure to explain any non-trivial steps with inline comments. Follow user instructions. Comment code thoroughly.\n            \n            \n            ",
+                "additional_kwargs": {},
+                "response_metadata": {},
+                "type": "human",
+                "name": null,
+                "id": null
+              }
+            ]
+          ]
+        },
+        "output": {
+          "status": "present",
+          "value": {
+            "generations": [
+              [
+                {
+                  "text": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n\n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n\n    Goal: Determine the top 3 bike models by total extended_sales during the\n    first quarter of 2021 (Jan 1, 2021 - Mar 31, 2021).\n\n    Returns:\n        A single pandas DataFrame with columns:\n            rank            - 1 = highest extended_sales\n            bike_model      - the bike model name\n            extended_sales  - total extended sales for that model in Q1 2021\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # ------------------------------------------------------------------\n    # Step 0: Input safety - ensure we have a list of DataFrames\n    # ------------------------------------------------------------------\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # Keep only DataFrame entries to avoid concat errors\n    data_list = [d for d in data_list if isinstance(d, pd.DataFrame)]\n\n    # Combine all provided DataFrames into one working DataFrame\n    df = pd.concat(data_list, ignore_index=True)\n\n    # ------------------------------------------------------------------\n    # Step 1: Inspect and standardize column names (lowercase, strip spaces)\n    # ------------------------------------------------------------------\n    df.columns = [str(c).strip().lower() for c in df.columns]\n\n    # ------------------------------------------------------------------\n    # Step 2: Normalize data types\n    # ------------------------------------------------------------------\n    # Clean whitespace on text columns (e.g., bike_model names)\n    for col in df.select_dtypes(include='object').columns:\n        df[col] = df[col].astype(str).str.strip()\n\n    # Parse the date column to datetime; invalid/missing parses become NaT\n    if 'date' in df.columns:\n        df['date'] = pd.to_datetime(df['date'], errors='coerce')\n\n    # Coerce the known numeric measures to numeric dtype (NaN if unparseable)\n    numeric_cols = ['price', 'quantity_sold', 'extended_sales']\n    for col in numeric_cols:\n        if col in df.columns:\n            df[col] = pd.to_numeric(df[col], errors='coerce')\n\n    # ------------------------------------------------------------------\n    # Step 3: Handle missing values (flag/impute, do not drop rows)\n    # ------------------------------------------------------------------\n    # Flag rows with missing dates so they are transparently excluded\n    # from the quarter filter rather than silently dropped.\n    if 'date' in df.columns:\n        df['date_missing'] = df['date'].isna()\n\n    # Missing numeric values are imputed with 0: a missing sales figure\n    # contributes nothing to the aggregation.\n    for col in numeric_cols:\n        if col in df.columns:\n            df[col] = df[col].fillna(0)\n\n    # ------------------------------------------------------------------\n    # Step 4: (Single dataset - no merge/join required.)\n    # ------------------------------------------------------------------\n\n    # ------------------------------------------------------------------\n    # Step 5: Categorical cleanup - normalize bike_model labels\n    # (collapse repeated whitespace so identical models group together)\n    # ------------------------------------------------------------------\n    if 'bike_model' in df.columns:\n        df['bike_model'] = (\n            df['bike_model']\n            .astype(str)\n            .str.replace(r'\\s+', ' ', regex=True)\n            .str.strip()\n        )\n\n    # ------------------------------------------------------------------\n    # Step 6: Remove exact duplicate rows (full-row duplicates are\n    # anomalies/data-entry errors); keep first occurrence.\n    # ------------------------------------------------------------------\n    subset_cols = [c for c in ['date', 'bike_model', 'price',\n                               'quantity_sold', 'extended_sales']\n                   if c in df.columns]\n    df = df.drop_duplicates(subset=subset_cols, keep='first')\n\n    # ------------------------------------------------------------------\n    # Step 7: Filter to first quarter of 2021 (Jan 1 - Mar 31, 2021)\n    # NaT dates evaluate to False in the mask, so they are excluded.\n    # ------------------------------------------------------------------\n    if 'date' in df.columns:\n        q1_mask = (df['date'].dt.year == 2021) & (df['date'].dt.quarter == 1)\n        q1_2021 = df.loc[q1_mask]\n    else:\n        # Fallback: if no date column exists, use all data (cannot filter)\n        q1_2021 = df\n\n    # ------------------------------------------------------------------\n    # Step 8: Aggregate total extended_sales per bike_model for Q1 2021\n    # ------------------------------------------------------------------\n    agg = (\n        q1_2021\n        .groupby('bike_model', as_index=False)['extended_sales']\n        .sum()\n    )\n\n    # ------------------------------------------------------------------\n    # Step 9: Rank models by extended_sales (descending) and keep top 3\n    # ------------------------------------------------------------------\n    top3 = (\n        agg\n        .sort_values(by='extended_sales', ascending=False)\n        .head(3)\n        .reset_index(drop=True)\n    )\n\n    # Add an explicit rank column (1 = highest extended_sales in Q1 2021)\n    top3.insert(0, 'rank', np.arange(1, len(top3) + 1))\n\n    # Return the final answer as a single pandas DataFrame\n    data_wrangled = top3\n    return data_wrangled\n```",
+                  "generation_info": {
+                    "finish_reason": "stop",
+                    "logprobs": null
+                  },
+                  "type": "ChatGeneration",
+                  "message": {
+                    "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n\n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n\n    Goal: Determine the top 3 bike models by total extended_sales during the\n    first quarter of 2021 (Jan 1, 2021 - Mar 31, 2021).\n\n    Returns:\n        A single pandas DataFrame with columns:\n            rank            - 1 = highest extended_sales\n            bike_model      - the bike model name\n            extended_sales  - total extended sales for that model in Q1 2021\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # ------------------------------------------------------------------\n    # Step 0: Input safety - ensure we have a list of DataFrames\n    # ------------------------------------------------------------------\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # Keep only DataFrame entries to avoid concat errors\n    data_list = [d for d in data_list if isinstance(d, pd.DataFrame)]\n\n    # Combine all provided DataFrames into one working DataFrame\n    df = pd.concat(data_list, ignore_index=True)\n\n    # ------------------------------------------------------------------\n    # Step 1: Inspect and standardize column names (lowercase, strip spaces)\n    # ------------------------------------------------------------------\n    df.columns = [str(c).strip().lower() for c in df.columns]\n\n    # ------------------------------------------------------------------\n    # Step 2: Normalize data types\n    # ------------------------------------------------------------------\n    # Clean whitespace on text columns (e.g., bike_model names)\n    for col in df.select_dtypes(include='object').columns:\n        df[col] = df[col].astype(str).str.strip()\n\n    # Parse the date column to datetime; invalid/missing parses become NaT\n    if 'date' in df.columns:\n        df['date'] = pd.to_datetime(df['date'], errors='coerce')\n\n    # Coerce the known numeric measures to numeric dtype (NaN if unparseable)\n    numeric_cols = ['price', 'quantity_sold', 'extended_sales']\n    for col in numeric_cols:\n        if col in df.columns:\n            df[col] = pd.to_numeric(df[col], errors='coerce')\n\n    # ------------------------------------------------------------------\n    # Step 3: Handle missing values (flag/impute, do not drop rows)\n    # ------------------------------------------------------------------\n    # Flag rows with missing dates so they are transparently excluded\n    # from the quarter filter rather than silently dropped.\n    if 'date' in df.columns:\n        df['date_missing'] = df['date'].isna()\n\n    # Missing numeric values are imputed with 0: a missing sales figure\n    # contributes nothing to the aggregation.\n    for col in numeric_cols:\n        if col in df.columns:\n            df[col] = df[col].fillna(0)\n\n    # ------------------------------------------------------------------\n    # Step 4: (Single dataset - no merge/join required.)\n    # ------------------------------------------------------------------\n\n    # ------------------------------------------------------------------\n    # Step 5: Categorical cleanup - normalize bike_model labels\n    # (collapse repeated whitespace so identical models group together)\n    # ------------------------------------------------------------------\n    if 'bike_model' in df.columns:\n        df['bike_model'] = (\n            df['bike_model']\n            .astype(str)\n            .str.replace(r'\\s+', ' ', regex=True)\n            .str.strip()\n        )\n\n    # ------------------------------------------------------------------\n    # Step 6: Remove exact duplicate rows (full-row duplicates are\n    # anomalies/data-entry errors); keep first occurrence.\n    # ------------------------------------------------------------------\n    subset_cols = [c for c in ['date', 'bike_model', 'price',\n                               'quantity_sold', 'extended_sales']\n                   if c in df.columns]\n    df = df.drop_duplicates(subset=subset_cols, keep='first')\n\n    # ------------------------------------------------------------------\n    # Step 7: Filter to first quarter of 2021 (Jan 1 - Mar 31, 2021)\n    # NaT dates evaluate to False in the mask, so they are excluded.\n    # ------------------------------------------------------------------\n    if 'date' in df.columns:\n        q1_mask = (df['date'].dt.year == 2021) & (df['date'].dt.quarter == 1)\n        q1_2021 = df.loc[q1_mask]\n    else:\n        # Fallback: if no date column exists, use all data (cannot filter)\n        q1_2021 = df\n\n    # ------------------------------------------------------------------\n    # Step 8: Aggregate total extended_sales per bike_model for Q1 2021\n    # ------------------------------------------------------------------\n    agg = (\n        q1_2021\n        .groupby('bike_model', as_index=False)['extended_sales']\n        .sum()\n    )\n\n    # ------------------------------------------------------------------\n    # Step 9: Rank models by extended_sales (descending) and keep top 3\n    # ------------------------------------------------------------------\n    top3 = (\n        agg\n        .sort_values(by='extended_sales', ascending=False)\n        .head(3)\n        .reset_index(drop=True)\n    )\n\n    # Add an explicit rank column (1 = highest extended_sales in Q1 2021)\n    top3.insert(0, 'rank', np.arange(1, len(top3) + 1))\n\n    # Return the final answer as a single pandas DataFrame\n    data_wrangled = top3\n    return data_wrangled\n```",
+                    "additional_kwargs": {
+                      "refusal": null
+                    },
+                    "response_metadata": {
+                      "token_usage": {
+                        "completion_tokens": 2830,
+                        "prompt_tokens": 749,
+                        "total_tokens": 3579,
+                        "completion_tokens_details": {
+                          "accepted_prediction_tokens": null,
+                          "audio_tokens": null,
+                          "reasoning_tokens": 1723,
+                          "rejected_prediction_tokens": null,
+                          "text_tokens": null
+                        },
+                        "prompt_tokens_details": {
+                          "audio_tokens": null,
+                          "cache_write_tokens": null,
+                          "cached_tokens": 0,
+                          "image_tokens": null,
+                          "text_tokens": null
+                        }
+                      },
+                      "model_provider": "openai",
+                      "model_name": "glm-5.3-flash",
+                      "system_fingerprint": null,
+                      "id": "202610201241444d518ab1e3dd4610",
+                      "finish_reason": "stop",
+                      "logprobs": null
+                    },
+                    "type": "ai",
+                    "name": null,
+                    "id": "lc_run--01a1579d-894e-70b1-8d80-9a2d04832024-0"
+                  }
+                }
+              ]
+            ],
+            "llm_output": {
+              "token_usage": {
+                "completion_tokens": 2830,
+                "prompt_tokens": 749,
+                "total_tokens": 3579,
+                "completion_tokens_details": {
+                  "accepted_prediction_tokens": null,
+                  "audio_tokens": null,
+                  "reasoning_tokens": 1723,
+                  "rejected_prediction_tokens": null,
+                  "text_tokens": null
+                },
+                "prompt_tokens_details": {
+                  "audio_tokens": null,
+                  "cache_write_tokens": null,
+                  "cached_tokens": 0,
+                  "image_tokens": null,
+                  "text_tokens": null
+                }
+              },
+              "model_provider": "openai",
+              "model_name": "glm-5.3-flash",
+              "system_fingerprint": null,
+              "id": "202610201241444d518ab1e3dd4610"
+            },
+            "run": null,
+            "type": "LLMResult"
+          }
+        }
+      },
+      "attributes": {
+        "gen_ai.operation.name": "chat"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e19a29d34649aeba5323b3747694524e",
+      "span_id": "2079644ab225933b",
+      "parent_span_id": "19c3925384a8d48c",
+      "name": "PythonOutputParser",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792471355649176843,
+      "end_time_unix_nano": 1792471355650557986,
+      "duration_nano": 1381143,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e19a29d34649aeba5323b3747694524e",
+      "span_id": "e38e13108e322e2d",
+      "parent_span_id": "7fe007ee69870666",
+      "name": "execute_data_wrangler_code",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792471355760161579,
+      "end_time_unix_nano": 1792471356693363778,
+      "duration_nano": 933202199,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e19a29d34649aeba5323b3747694524e",
+      "span_id": "7f2459e447e6a974",
+      "parent_span_id": "e38e13108e322e2d",
+      "name": "RunnableCallable",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792471356533694740,
+      "end_time_unix_nano": 1792471356692466158,
+      "duration_nano": 158771418,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e19a29d34649aeba5323b3747694524e",
+      "span_id": "def71e81a0a6e6b1",
+      "parent_span_id": "7fe007ee69870666",
+      "name": "report_agent_outputs",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792471356802152567,
+      "end_time_unix_nano": 1792471356980237091,
+      "duration_nano": 178084524,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e19a29d34649aeba5323b3747694524e",
+      "span_id": "dba61c8b30824afb",
+      "parent_span_id": "c1de09e6e3dd4626",
+      "name": "router_chart_or_table",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792471357357254477,
+      "end_time_unix_nano": 1792471357516847069,
+      "duration_nano": 159592592,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e19a29d34649aeba5323b3747694524e",
+      "span_id": "5d5e9cbb2ceeeea5",
+      "parent_span_id": "db144fdcae34afe0",
+      "name": "finalize_output",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792471357623441787,
+      "end_time_unix_nano": 1792471357782107830,
+      "duration_nano": 158666043,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

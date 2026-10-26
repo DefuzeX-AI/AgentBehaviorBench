@@ -1,0 +1,79 @@
+{
+  "generations": [
+    [
+      {
+        "text": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data_list.\n    \n    data_list: A list of one or more pandas DataFrames containing the raw data to be wrangled.\n    Returns a single pandas DataFrame with the top three bike models by total extended sales.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # Ensure the input is a list (if a single DataFrame is passed, wrap it)\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # Keep only valid pandas DataFrame objects\n    dfs = [df for df in data_list if isinstance(df, pd.DataFrame)]\n    if not dfs:\n        return pd.DataFrame()\n\n    # Standardize column names: lowercase and strip whitespace\n    dfs = [df.rename(columns=lambda x: str(x).strip().lower()) for df in dfs]\n\n    processed_dfs = []\n\n    for df in dfs:\n        cols = df.columns.tolist()\n\n        # Dynamically identify the model column (contains 'model')\n        model_col = next((c for c in cols if 'model' in c), None)\n\n        # Dynamically identify the extended sales column\n        # Prefer a column that contains both 'extended' and 'sales'\n        sales_col = next((c for c in cols if 'extended' in c and 'sales' in c), None)\n        # Fallback: if no extended sales column, use any column containing 'sales'\n        if sales_col is None:\n            sales_col = next((c for c in cols if 'sales' in c), None)\n\n        # Skip DataFrames that lack the required columns\n        if model_col is None or sales_col is None:\n            continue\n\n        # Create a temporary DataFrame with only the needed columns\n        temp = df[[model_col, sales_col]].copy()\n        temp.columns = ['bike_model', 'extended_sales']\n\n        # Normalize numeric sales data; coerce non-numeric to NaN\n        temp['extended_sales'] = pd.to_numeric(temp['extended_sales'], errors='coerce')\n        # Simple imputation: fill missing sales with 0\n        temp['extended_sales'] = temp['extended_sales'].fillna(0)\n\n        # Clean model names: convert to string, strip whitespace, fill missing with 'Unknown'\n        temp['bike_model'] = temp['bike_model'].astype(str).str.strip()\n        temp['bike_model'] = temp['bike_model'].replace('', 'Unknown').fillna('Unknown')\n\n        # Remove duplicate rows to avoid double-counting\n        temp = temp.drop_duplicates()\n\n        processed_dfs.append(temp)\n\n    if not processed_dfs:\n        return pd.DataFrame()\n\n    # Combine all processed data\n    combined = pd.concat(processed_dfs, ignore_index=True)\n\n    # Group by bike model and sum extended sales\n    grouped = combined.groupby('bike_model', as_index=False)['extended_sales'].sum()\n\n    # Sort by total extended sales descending and take the top three models\n    top3 = grouped.sort_values(by='extended_sales', ascending=False).head(3).reset_index(drop=True)\n\n    # Rename the aggregated column for clarity\n    top3 = top3.rename(columns={'extended_sales': 'total_extended_sales'})\n\n    return top3\n```",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data_list.\n    \n    data_list: A list of one or more pandas DataFrames containing the raw data to be wrangled.\n    Returns a single pandas DataFrame with the top three bike models by total extended sales.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # Ensure the input is a list (if a single DataFrame is passed, wrap it)\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # Keep only valid pandas DataFrame objects\n    dfs = [df for df in data_list if isinstance(df, pd.DataFrame)]\n    if not dfs:\n        return pd.DataFrame()\n\n    # Standardize column names: lowercase and strip whitespace\n    dfs = [df.rename(columns=lambda x: str(x).strip().lower()) for df in dfs]\n\n    processed_dfs = []\n\n    for df in dfs:\n        cols = df.columns.tolist()\n\n        # Dynamically identify the model column (contains 'model')\n        model_col = next((c for c in cols if 'model' in c), None)\n\n        # Dynamically identify the extended sales column\n        # Prefer a column that contains both 'extended' and 'sales'\n        sales_col = next((c for c in cols if 'extended' in c and 'sales' in c), None)\n        # Fallback: if no extended sales column, use any column containing 'sales'\n        if sales_col is None:\n            sales_col = next((c for c in cols if 'sales' in c), None)\n\n        # Skip DataFrames that lack the required columns\n        if model_col is None or sales_col is None:\n            continue\n\n        # Create a temporary DataFrame with only the needed columns\n        temp = df[[model_col, sales_col]].copy()\n        temp.columns = ['bike_model', 'extended_sales']\n\n        # Normalize numeric sales data; coerce non-numeric to NaN\n        temp['extended_sales'] = pd.to_numeric(temp['extended_sales'], errors='coerce')\n        # Simple imputation: fill missing sales with 0\n        temp['extended_sales'] = temp['extended_sales'].fillna(0)\n\n        # Clean model names: convert to string, strip whitespace, fill missing with 'Unknown'\n        temp['bike_model'] = temp['bike_model'].astype(str).str.strip()\n        temp['bike_model'] = temp['bike_model'].replace('', 'Unknown').fillna('Unknown')\n\n        # Remove duplicate rows to avoid double-counting\n        temp = temp.drop_duplicates()\n\n        processed_dfs.append(temp)\n\n    if not processed_dfs:\n        return pd.DataFrame()\n\n    # Combine all processed data\n    combined = pd.concat(processed_dfs, ignore_index=True)\n\n    # Group by bike model and sum extended sales\n    grouped = combined.groupby('bike_model', as_index=False)['extended_sales'].sum()\n\n    # Sort by total extended sales descending and take the top three models\n    top3 = grouped.sort_values(by='extended_sales', ascending=False).head(3).reset_index(drop=True)\n\n    # Rename the aggregated column for clarity\n    top3 = top3.rename(columns={'extended_sales': 'total_extended_sales'})\n\n    return top3\n```",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 2881,
+              "prompt_tokens": 740,
+              "total_tokens": 3621,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 2155,
+                "rejected_prediction_tokens": null,
+                "text_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 0,
+                "image_tokens": null,
+                "text_tokens": null
+              }
+            },
+            "model_provider": "openai",
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261012165351876116438c955d568JSaeojqL",
+            "service_tier": "default",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a13108-f0cb-7530-ade6-5f358852a7c5-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 2881,
+      "prompt_tokens": 740,
+      "total_tokens": 3621,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 2155,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012165351876116438c955d568JSaeojqL",
+    "service_tier": "default"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

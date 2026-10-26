@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data_list.\n\n    Task: Calculate the total extended_sales by bike_model for June 2021.\n\n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # ------------------------------------------------------------------\n    # Step 0: Error handling - ensure the input is a list of DataFrames.\n    # If a single DataFrame is passed instead of a list, wrap it in a list.\n    # ------------------------------------------------------------------\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # Keep only valid DataFrame entries (defensive check)\n    frames = [df.copy() for df in data_list if isinstance(df, pd.DataFrame)]\n    if len(frames) == 0:\n        # Nothing usable was provided; return an empty DataFrame\n        return pd.DataFrame()\n\n    # If multiple datasets are provided, combine them row-wise.\n    # All datasets share the same schema, so concat is safe (no Cartesian product).\n    df = pd.concat(frames, ignore_index=True, sort=False)\n\n    # ------------------------------------------------------------------\n    # Step 1: Inspect and standardize column names\n    # (lowercase, strip whitespace, internal spaces -> underscores)\n    # ------------------------------------------------------------------\n    df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]\n\n    # Helper: locate a column by candidate names (case/spacing resilient),\n    # so we do not blindly hardcode a single column name.\n    def find_col(candidates):\n        for cand in candidates:\n            for col in df.columns:\n                if col == cand or col.replace('_', ' ').strip() == cand.replace('_', ' ').strip():\n                    return col\n        return None\n\n    date_col = find_col(['date'])\n    model_col = find_col(['bike_model', 'model'])\n    sales_col = find_col(['extended_sales', 'extended sales'])\n    price_col = find_col(['price'])\n    qty_col = find_col(['quantity_sold', 'quantity sold', 'qty_sold'])\n\n    # ------------------------------------------------------------------\n    # Step 2: Normalize data types\n    # ------------------------------------------------------------------\n    # Convert the date column to datetime; invalid/unparseable values -> NaT\n    if date_col is not None:\n        df[date_col] = pd.to_datetime(df[date_col], errors='coerce')\n\n    # Coerce numeric columns to numeric dtype; bad strings become NaN\n    numeric_candidates = [c for c in [sales_col, price_col, qty_col] if c is not None]\n    for col in numeric_candidates:\n        df[col] = pd.to_numeric(df[col], errors='coerce')\n\n    # Standardize bike_model as a clean categorical string\n    if model_col is not None:\n        df[model_col] = df[model_col].astype(str).str.strip()\n        # Treat literal 'nan'/'None'/empty strings as true missing values\n        df.loc[df[model_col].isin(['nan', 'None', '']), model_col] = np.nan\n        df[model_col] = df[model_col].astype('category')\n\n    # ------------------------------------------------------------------\n    # Step 3: Handle missing values (impute / flag, do NOT drop rows)\n    # ------------------------------------------------------------------\n    # Flag rows where the date could not be parsed (cannot be tied to June 2021)\n    if date_col is not None:\n        df['date_missing_flag'] = df[date_col].isna()\n\n    # Impute missing extended_sales using price * quantity_sold when both exist\n    if sales_col is not None and price_col is not None and qty_col is not None:\n        needs_impute = df[sales_col].isna() & df[price_col].notna() & df[qty_col].notna()\n        df.loc[needs_impute, sales_col] = df.loc[needs_impute, price_col] * df.loc[needs_impute, qty_col]\n\n    # Give unknown bike models an explicit label so those rows are aggregated\n    # under 'Unknown' rather than silently dropped from the grouping\n    if model_col is not None:\n        df[model_col] = df[model_col].cat.add_categories(['Unknown']).fillna('Unknown')\n\n    # ------------------------------------------------------------------\n    # Step 6: Remove duplicates / obvious anomalies (no row dropping otherwise)\n    # ------------------------------------------------------------------\n    # Drop exact duplicate rows (same values across all original columns)\n    original_cols = [c for c in df.columns if c != 'date_missing_flag']\n    df = df.drop_duplicates(subset=original_cols)\n\n    # Sanity check: extended_sales should equal price * quantity_sold.\n    # Rows violating this are flagged, not removed (avoid dropping data).\n    if sales_col is not None and price_col is not None and qty_col is not None:\n        expected = df[price_col] * df[qty_col]\n        df['sales_anomaly_flag'] = df[sales_col].notna() & expected.notna() & ~np.isclose(df[sales_col], expected)\n\n    # ------------------------------------------------------------------\n    # Filter: keep only records from June 2021\n    # ------------------------------------------------------------------\n    if date_col is None:\n        # No date column available; cannot filter, return empty result gracefully\n        return pd.DataFrame(columns=[model_col if model_col else 'bike_model', 'total_extended_sales'])\n\n    june_mask = (df[date_col].dt.year == 2021) & (df[date_col].dt.month == 6)\n    df_june = df.loc[june_mask]\n\n    # ------------------------------------------------------------------\n    # Aggregate: total extended_sales by bike_model for June 2021\n    # ------------------------------------------------------------------\n    result = (\n        df_june\n        .groupby(model_col, observed=True, as_index=False)[sales_col]\n        .sum()\n        .rename(columns={model_col: 'bike_model', sales_col: 'total_extended_sales'})\n    )\n\n    # Sort by total sales descending for readability and reset the index\n    result = (\n        result\n        .sort_values('total_extended_sales', ascending=False)\n        .reset_index(drop=True)\n    )\n\n    # Return a single pandas DataFrame\n    return result\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 2690,
+      "prompt_tokens": 740,
+      "total_tokens": 3430,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 1401,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "glm-5.3-flash",
+    "system_fingerprint": null,
+    "id": "2026102012354346b3d695353f4f29",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a15798-06f7-7c00-a92c-05d673d6102a-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 740,
+    "output_tokens": 2690,
+    "total_tokens": 3430,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 1401
+    }
+  }
+}

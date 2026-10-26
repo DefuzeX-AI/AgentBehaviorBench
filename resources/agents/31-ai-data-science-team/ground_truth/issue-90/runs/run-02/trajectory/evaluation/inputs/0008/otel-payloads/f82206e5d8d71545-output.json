@@ -1,0 +1,79 @@
+{
+  "generations": [
+    [
+      {
+        "text": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # Ensure data_list is a list\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # Filter out None or empty DataFrames\n    data_list = [df for df in data_list if isinstance(df, pd.DataFrame) and not df.empty]\n    if not data_list:\n        return pd.DataFrame()\n\n    # If multiple datasets are provided, attempt to concatenate if they share identical columns.\n    # Otherwise, use the first dataset as the primary source. (No join keys are available in the summary.)\n    if len(data_list) > 1:\n        base_cols = set(data_list[0].columns)\n        if all(set(df.columns) == base_cols for df in data_list):\n            df = pd.concat(data_list, ignore_index=True)\n        else:\n            # If columns differ and no join keys are known, fall back to the first dataset.\n            df = data_list[0].copy()\n    else:\n        df = data_list[0].copy()\n\n    # 1. Standardize column names: lowercase, strip spaces, replace spaces with underscores\n    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')\n\n    # 2. Normalize data types\n    for col in df.columns:\n        # Try datetime conversion for object columns\n        if df[col].dtype == 'object':\n            # Attempt to convert to datetime\n            try:\n                converted = pd.to_datetime(df[col], errors='coerce')\n                # If more than half are not NaT, consider it a datetime column\n                if converted.notna().sum() > len(df) * 0.5:\n                    df[col] = converted\n                    continue\n            except Exception:\n                pass\n            # Attempt to convert to numeric\n            try:\n                converted = pd.to_numeric(df[col], errors='coerce')\n                if converted.notna().sum() > len(df) * 0.5:\n                    df[col] = converted\n            except Exception:\n                pass\n\n    # 3. Handle missing values without dropping rows\n    for col in df.columns:\n        if pd.api.types.is_datetime64_any_dtype(df[col]):\n            # Forward fill then backward fill for datetime\n            df[col] = df[col].ffill().bfill()\n        elif pd.api.types.is_numeric_dtype(df[col]):\n            # Fill numeric missing with median\n            df[col] = df[col].fillna(df[col].median())\n        else:\n            # Fill categorical/object missing with mode or 'Unknown'\n            if not df[col].mode().empty:\n                df[col] = df[col].fillna(df[col].mode()[0])\n            else:\n                df[col] = df[col].fillna('Unknown')\n\n    # 4. Categorical cleanup: convert remaining object columns to category\n    for col in df.columns:\n        if df[col].dtype == 'object':\n            df[col] = df[col].astype('category')\n\n    # 5. Remove duplicates\n    df = df.drop_duplicates()\n\n    # 6. Remove obvious anomalies: for numeric columns, keep rows where at least one numeric value is >= 0\n    numeric_cols = df.select_dtypes(include=[np.number]).columns\n    if len(numeric_cols) > 0:\n        df = df[(df[numeric_cols] >= 0).any(axis=1)]\n\n    # 7. Reset index for a clean output\n    df = df.reset_index(drop=True)\n\n    # Return the wrangled DataFrame\n    return df\n```",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # Ensure data_list is a list\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # Filter out None or empty DataFrames\n    data_list = [df for df in data_list if isinstance(df, pd.DataFrame) and not df.empty]\n    if not data_list:\n        return pd.DataFrame()\n\n    # If multiple datasets are provided, attempt to concatenate if they share identical columns.\n    # Otherwise, use the first dataset as the primary source. (No join keys are available in the summary.)\n    if len(data_list) > 1:\n        base_cols = set(data_list[0].columns)\n        if all(set(df.columns) == base_cols for df in data_list):\n            df = pd.concat(data_list, ignore_index=True)\n        else:\n            # If columns differ and no join keys are known, fall back to the first dataset.\n            df = data_list[0].copy()\n    else:\n        df = data_list[0].copy()\n\n    # 1. Standardize column names: lowercase, strip spaces, replace spaces with underscores\n    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')\n\n    # 2. Normalize data types\n    for col in df.columns:\n        # Try datetime conversion for object columns\n        if df[col].dtype == 'object':\n            # Attempt to convert to datetime\n            try:\n                converted = pd.to_datetime(df[col], errors='coerce')\n                # If more than half are not NaT, consider it a datetime column\n                if converted.notna().sum() > len(df) * 0.5:\n                    df[col] = converted\n                    continue\n            except Exception:\n                pass\n            # Attempt to convert to numeric\n            try:\n                converted = pd.to_numeric(df[col], errors='coerce')\n                if converted.notna().sum() > len(df) * 0.5:\n                    df[col] = converted\n            except Exception:\n                pass\n\n    # 3. Handle missing values without dropping rows\n    for col in df.columns:\n        if pd.api.types.is_datetime64_any_dtype(df[col]):\n            # Forward fill then backward fill for datetime\n            df[col] = df[col].ffill().bfill()\n        elif pd.api.types.is_numeric_dtype(df[col]):\n            # Fill numeric missing with median\n            df[col] = df[col].fillna(df[col].median())\n        else:\n            # Fill categorical/object missing with mode or 'Unknown'\n            if not df[col].mode().empty:\n                df[col] = df[col].fillna(df[col].mode()[0])\n            else:\n                df[col] = df[col].fillna('Unknown')\n\n    # 4. Categorical cleanup: convert remaining object columns to category\n    for col in df.columns:\n        if df[col].dtype == 'object':\n            df[col] = df[col].astype('category')\n\n    # 5. Remove duplicates\n    df = df.drop_duplicates()\n\n    # 6. Remove obvious anomalies: for numeric columns, keep rows where at least one numeric value is >= 0\n    numeric_cols = df.select_dtypes(include=[np.number]).columns\n    if len(numeric_cols) > 0:\n        df = df[(df[numeric_cols] >= 0).any(axis=1)]\n\n    # 7. Reset index for a clean output\n    df = df.reset_index(drop=True)\n\n    # Return the wrangled DataFrame\n    return df\n```",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 4206,
+              "prompt_tokens": 775,
+              "total_tokens": 4981,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 3374,
+                "rejected_prediction_tokens": null,
+                "text_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 0,
+                "image_tokens": null,
+                "text_tokens": null
+              }
+            },
+            "model_provider": "openai",
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261012170603602944985c955d568CiP8588M",
+            "service_tier": "default",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a13114-1b0d-72b1-a43b-49126f9e8dbf-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 4206,
+      "prompt_tokens": 775,
+      "total_tokens": 4981,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 3374,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012170603602944985c955d568CiP8588M",
+    "service_tier": "default"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n    \n    # Ensure data_list is a list of DataFrames\n    if isinstance(data_list, pd.DataFrame):\n        data_list = [data_list]\n    elif not isinstance(data_list, list):\n        data_list = [data_list] if data_list is not None else []\n    \n    # Filter to only DataFrame elements\n    dfs = [df for df in data_list if isinstance(df, pd.DataFrame)]\n    if not dfs:\n        return pd.DataFrame()\n    \n    # Concatenate all DataFrames (assuming same structure; if not, we could merge, but here we combine rows)\n    df = pd.concat(dfs, ignore_index=True, sort=False)\n    \n    # 1. Standardize column names: lowercase, strip spaces\n    df.columns = df.columns.str.strip().str.lower()\n    \n    # 2. Normalize data types\n    # Identify date column (if present)\n    date_col = next((col for col in df.columns if 'date' in col), None)\n    if date_col:\n        df[date_col] = pd.to_datetime(df[date_col], errors='coerce')\n        # Filter for year 2021 as per user instruction\n        df = df[df[date_col].dt.year == 2021].copy()\n    \n    # Identify bike_model column\n    bike_col = next((col for col in df.columns if 'bike' in col and 'model' in col), None)\n    if bike_col is None:\n        bike_col = next((col for col in df.columns if 'model' in col), None)\n    \n    # Identify price column\n    price_col = next((col for col in df.columns if 'price' in col), None)\n    \n    # Identify quantity_sold column\n    qty_col = next((col for col in df.columns if 'quantity' in col and 'sold' in col), None)\n    if qty_col is None:\n        qty_col = next((col for col in df.columns if 'quantity' in col), None)\n    \n    # Coerce numeric columns to numeric types\n    for col in [price_col, qty_col]:\n        if col:\n            df[col] = pd.to_numeric(df[col], errors='coerce')\n    \n    # 3. Handle missing values\n    # For quantity_sold, fill missing with 0 (no sale)\n    if qty_col:\n        df[qty_col] = df[qty_col].fillna(0)\n    # For price, leave NaN so mean ignores it (avoids distortion)\n    # Drop rows with missing bike_model since we cannot group them\n    if bike_col:\n        df = df.dropna(subset=[bike_col])\n    \n    # 6. Remove duplicates\n    df = df.drop_duplicates()\n    \n    # 7. Group by bike_model and compute average price and total quantity_sold\n    if bike_col and price_col and qty_col:\n        result = df.groupby(bike_col, as_index=False).agg({\n            price_col: 'mean',\n            qty_col: 'sum'\n        })\n        # Rename columns to clear output names\n        result = result.rename(columns={\n            bike_col: 'bike_model',\n            price_col: 'average_price',\n            qty_col: 'total_quantity_sold'\n        })\n        # Ensure the desired column order\n        result = result[['bike_model', 'average_price', 'total_quantity_sold']]\n    else:\n        # Fallback: return the cleaned DataFrame if required columns are missing\n        result = df\n    \n    return result\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 5344,
+      "prompt_tokens": 764,
+      "total_tokens": 6108,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 4530,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261017215832250396037c955d568wd3mko9I",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a14bdf-a65c-7be0-8910-ee9f00188269-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 764,
+    "output_tokens": 5344,
+    "total_tokens": 6108,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 4530
+    }
+  }
+}

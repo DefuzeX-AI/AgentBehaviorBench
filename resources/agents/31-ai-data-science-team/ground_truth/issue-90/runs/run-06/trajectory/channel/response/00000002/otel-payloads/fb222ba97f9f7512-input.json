@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data_list.\n    \n    data_list: A list of one or more pandas DataFrames containing the raw data.\n    \n    Returns a single pandas DataFrame with the wrangled data.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # Ensure input is a list\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # Combine multiple DataFrames if provided\n    # If multiple, concatenate along rows (aligning columns) to avoid Cartesian products\n    if len(data_list) > 1:\n        df = pd.concat(data_list, ignore_index=True, sort=False)\n    else:\n        df = data_list[0].copy()\n\n    # 1. Standardize column names: lowercase, strip spaces, replace spaces with underscores\n    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')\n\n    # 2. Normalize data types\n    # Convert date-like columns to datetime\n    for col in df.columns:\n        if 'date' in col:\n            df[col] = pd.to_datetime(df[col], errors='coerce')\n\n    # Convert known numeric columns to numeric (based on provided summary)\n    # Also convert any object column whose name suggests numeric content\n    numeric_keywords = ['price', 'quantity', 'sales', 'amount', 'count', 'total']\n    for col in df.columns:\n        if df[col].dtype == 'object':\n            if any(kw in col for kw in numeric_keywords):\n                df[col] = pd.to_numeric(df[col], errors='coerce')\n\n    # 3. Handle missing values\n    # Numeric columns: impute with median\n    for col in df.select_dtypes(include=[np.number]).columns:\n        if df[col].isnull().any():\n            df[col] = df[col].fillna(df[col].median())\n    # Categorical columns: impute with mode or 'Unknown'\n    for col in df.select_dtypes(include=['object', 'category']).columns:\n        if df[col].isnull().any():\n            mode_val = df[col].mode()\n            fill_val = mode_val.iloc[0] if not mode_val.empty else 'Unknown'\n            df[col] = df[col].fillna(fill_val)\n\n    # 4. Remove duplicates\n    df = df.drop_duplicates()\n\n    # 5. Anomaly detection and repair\n    # Selected repair plan: Ensure extended_sales is consistent with price * quantity_sold.\n    # Justification: This maintains data consistency with minimal impact (only corrects inconsistent rows)\n    # and preserves lineage by storing original values and adding a repair flag.\n    # Exact versioned change: For any row where extended_sales != price * quantity_sold (within tolerance),\n    # set extended_sales = price * quantity_sold, add column 'extended_sales_original' with the pre-repair value,\n    # and add boolean column 'extended_sales_repaired' indicating whether the row was corrected.\n    price_col = next((c for c in df.columns if 'price' in c), None)\n    qty_col = next((c for c in df.columns if 'quantity' in c), None)\n    ext_col = next((c for c in df.columns if 'extended' in c and 'sales' in c), None)\n    if price_col and qty_col and ext_col:\n        expected = df[price_col] * df[qty_col]\n        # Use tolerance for floating point comparison\n        mismatch = ~np.isclose(df[ext_col], expected, rtol=1e-9, atol=1e-9)\n        if mismatch.any():\n            # Preserve original for lineage\n            df['extended_sales_original'] = df[ext_col]\n            # Apply repair\n            df.loc[mismatch, ext_col] = expected[mismatch]\n            # Flag repaired rows\n            df['extended_sales_repaired'] = mismatch\n        else:\n            # Add flag column with all False for consistency\n            df['extended_sales_repaired'] = False\n\n    # 6. Categorical encoding (optional) – not required, but we can ensure bike_model is category for memory\n    if 'bike_model' in df.columns:\n        df['bike_model'] = df['bike_model'].astype('category')\n\n    # 7. Return a single DataFrame\n    data_wrangled = df\n    return data_wrangled\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 6487,
+      "prompt_tokens": 773,
+      "total_tokens": 7260,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 5505,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261017220047413195572c955d5687nTJm5me",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a14be1-bc2c-74f0-b3e5-87024793d514-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 773,
+    "output_tokens": 6487,
+    "total_tokens": 7260,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 5505
+    }
+  }
+}
