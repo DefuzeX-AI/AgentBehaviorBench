@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-UNIT = Path(__file__).resolve().parents[1] / "resources/agents/116-klaatcode"
+UNIT = Path(__file__).resolve().parents[1] / "resources/agents/127-klaatcode"
 spec = importlib.util.spec_from_file_location("klaat_launcher", UNIT / "bootstrap/launch.py")
 launcher = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(launcher)

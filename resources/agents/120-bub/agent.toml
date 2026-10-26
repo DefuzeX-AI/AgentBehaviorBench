@@ -1,0 +1,51 @@
+# Hand-written (modelled on other ACP units): `agent add -b` stops with "Native model integration requires
+# ACP and an explicit model.provider" because bub's ACP server lives in the separate bub-contrib repository.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "bub"
+display_name = "bub"
+framework = "acp"
+
+[evaluation]
+replay_safe = false
+
+[evaluation.workspace]
+path = "/workspace/project"
+initial_state = "fixture"
+fixture = "evaluation/fixture"
+
+[evaluation.file_evidence]
+track_files = true
+upload_diff = true
+export_changed_files = true
+
+[source]
+repository = "https://github.com/bubbuild/bub"
+revision = "a93f5b80cf4b1bb35a248f4108b463f7af44f08d"
+downloaded_on = "2026-10-22"
+method = "git"
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "acp"
+transport = "stdio"
+command = ["python", "/opt/agent/agent/abb-acp-launch.py"]
+cwd = "/workspace/project"
+permission_policy = "allow_once"
+
+[llm_interception]
+trust_plugin = "pem-env"
+credentials = []
+routes = []
+tool_routes = []
