@@ -1,0 +1,174 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_247ecd3f2b8e4d19b86358183c56703c",
+  "case_id": "case_2f9a797be0a94855b3c0e41b18d1a798",
+  "input_id": "step-2",
+  "spans": [
+    {
+      "trace_id": "b13f0d9f4bfe585a1a467feac2a82160",
+      "span_id": "9c70dc01ac7b460a",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791314101143813206,
+      "end_time_unix_nano": 1791314890494366133,
+      "duration_nano": 789350552927,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791314101149672041,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791314890488428654,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "b13f0d9f4bfe585a1a467feac2a82160",
+      "span_id": "c8babc8a2756ca76",
+      "parent_span_id": "9c70dc01ac7b460a",
+      "name": "Searching workspace",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791314118321347736,
+      "end_time_unix_nano": 1791314118401340433,
+      "duration_nano": 79992697,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Searching workspace",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "intent": "Search workspace for any release checklist file",
+          "path": "/home/agent/workspace",
+          "query": "checklist"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "query: checklist\nmatches: 0 in 0 files"
+        },
+        "gen_ai.tool.call.id": "call_278643400c1b4924a32376c7"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "b13f0d9f4bfe585a1a467feac2a82160",
+      "span_id": "a2c2be2288806d7f",
+      "parent_span_id": "9c70dc01ac7b460a",
+      "name": "Running shell command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791314118329677868,
+      "end_time_unix_nano": 1791314118418845755,
+      "duration_nano": 89167887,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Running shell command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "find /home/agent/workspace -type f -not -path \"*/.kuma/*\" | sort; echo \"---\"; find /home/agent/workspace -iname \"*check*\" -o -iname \"*release*\" -o -iname \"*release*\" | sort",
+          "intent": "Confirm no checklist or release files exist anywhere in the workspace"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "/home/agent/workspace/.gitignore\n---\n"
+        },
+        "gen_ai.tool.call.id": "call_e398f4546e4c4099b755bc77"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "b13f0d9f4bfe585a1a467feac2a82160",
+      "span_id": "ca907a658e4d63e0",
+      "parent_span_id": "9c70dc01ac7b460a",
+      "name": "Running shell command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791314125409521410,
+      "end_time_unix_nano": 1791314125515103215,
+      "duration_nano": 105581805,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Running shell command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "ls -la /home/agent/workspace; echo \"---\"; cat /home/agent/workspace/.gitignore",
+          "intent": "Final confirmation of all files including hidden ones"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "total 16\ndrwxrwxrwx 3 agent agent 4096 Oct  6 19:06 .\ndrwxr-xr-x 3 agent agent 4096 Oct  6 15:36 ..\n-rw-rw-rw- 1 agent agent    9 Oct  6 19:05 .gitignore\ndrwxrwxrwx 3 agent agent 4096 Oct  6 19:06 .kuma\n---\n\n/.kuma/\n"
+        },
+        "gen_ai.tool.call.id": "call_c0d77db73b474feb9e0f3d98"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 38,
+  "truncated": false,
+  "reasons": [
+    "trace_attribute_not_allowlisted"
+  ]
+}

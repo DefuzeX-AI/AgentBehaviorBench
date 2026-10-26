@@ -1,0 +1,128 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/migration.db",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:a62cf3505d57a8d4436d9c469337eda1974800c7ff6431dc4628080dea851cc1",
+        "before_size": null,
+        "after_size": 12288,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": "binary",
+        "diff": null
+      },
+      {
+        "path": "/home/agent/workspace/deadlock_output.txt",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:e40b4829c351ddc1527a12888b19e19f9d6ebca108b0093dd659366fd5294d2a",
+        "after_hash": "sha256:24b9ebb13f84ba1a5384689f45c2e4d3f53379dfea635bad19663cc871cae806",
+        "before_size": 240,
+        "after_size": 382,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/deadlock_output.txt\n+++ /home/agent/workspace/deadlock_output.txt\n@@ -1,8 +1,9 @@\n-DB: migration.db | A: 1 -> 2 | B: 2 -> 1\n+DB: migration.db | A: 1 -> 2 | B: 2 -> 1 | retries: 3\n \n-[A] FAILED: database is locked\n-[B] locked account 2, sleeping 0.10s ...\n-[B] committed\n+[A] attempt 1 deadlock: database is locked | rolled back, retrying in 67 ms\n+[A] attempt 2 deadlock: database is locked | rolled back, retrying in 101 ms\n+[B] committed on attempt 1\n+[A] committed on attempt 3\n \n-Final balances: account 1 = 110, account 2 = 90\n-Outcome: {'A': 'failed: database is locked', 'B': 'committed'}\n+Final balances: account 1 = 100, account 2 = 100\n+Outcome: {'B': 'committed (attempt 1)', 'A': 'committed (attempt 3)'}\n"
+      },
+      {
+        "path": "/home/agent/workspace/deadlock_sim.py",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:d320c096ce6afa76d752617823ba59e875e7e534cb34360a179149f6bd47c161",
+        "after_hash": "sha256:f1fc9f55fff2250256c6aeaf0b34d7186db4ac94d6766fe9e7ab1e6e686aa855",
+        "before_size": 3816,
+        "after_size": 5083,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/deadlock_sim.py\n+++ /home/agent/workspace/deadlock_sim.py\n@@ -3,23 +3,24 @@\n deadlock_sim.py\n \n Demonstrates a lock-order inversion (\"deadlock\") between two threads using\n-two separate SQLite connections against migration.db:\n+two separate SQLite connections against migration.db, plus a retry mechanism\n+so both transactions eventually succeed:\n \n     Thread A: locks account 1, then account 2\n     Thread B: locks account 2, then account 1\n \n-Each thread starts a deferred transaction, reads its first account (taking a\n-SHARED lock), updates it (upgrading to RESERVED), sleeps to widen the race\n-window, then tries to update the second account. The second thread to write\n-cannot upgrade its SHARED lock while the first thread holds RESERVED, and the\n-first thread cannot obtain EXCLUSIVE while the second still holds SHARED.\n-SQLite detects this cycle and fails one side immediately with SQLITE_BUSY\n-(\"database is locked\") instead of waiting forever.\n+Each thread runs a deferred transaction, reads its first account (SHARED\n+lock), updates it (upgrading to RESERVED), sleeps to widen the race window,\n+then updates the second account. When the two interleave, SQLite detects the\n+lock cycle and fails one side with SQLITE_BUSY (\"database is locked\"). The\n+failed transaction is rolled back and retried up to 3 times with a short\n+delay; by then the other thread has released its locks, so the retry commits.\n \n Usage:\n     python3 deadlock_sim.py [path/to/migration.db]\n \"\"\"\n \n+import random\n import sqlite3\n import sys\n import threading\n@@ -29,43 +30,69 @@\n BUSY_TIMEOUT_S = 5.0   # how long a blocked connection waits for a free lock\n SLEEP_S = 0.1          # pause between the two updates: widens the race window\n TRANSFER = 10          # amount moved from the first account to the second\n+MAX_RETRIES = 3        # retries after the initial attempt fails\n+RETRY_DELAY_S = 0.05   # base delay between retries (with slight backoff)\n \n \n-def worker(name, con, barrier, first_id, second_id, results):\n-    \"\"\"Transfer TRANSFER from first_id to second_id in a single transaction.\"\"\"\n+def is_deadlock(exc: sqlite3.OperationalError) -> bool:\n+    \"\"\"True if the error is SQLITE_BUSY / 'database is locked'.\"\"\"\n+    msg = str(exc).lower()\n+    return \"database is locked\" in msg or \"database table is locked\" in msg\n+\n+\n+def attempt_once(con, first_id, second_id):\n+    \"\"\"Run one full transfer transaction; roll back before propagating errors.\"\"\"\n+    con.execute(\"BEGIN DEFERRED\")\n     try:\n-        # Release both threads at the same moment to maximize contention.\n-        barrier.wait()\n-\n-        con.execute(\"BEGIN DEFERRED\")\n-        # Reading first acquires the SHARED lock. Upgrading it to a write\n-        # lock later is what makes the cross-connection lock cycle possible.\n+        # Reading first acquires the SHARED lock; upgrading it later is what\n+        # makes the cross-connection lock cycle possible.\n         con.execute(\n             \"SELECT balance FROM accounts WHERE id = ?\", (first_id,)\n         ).fetchone()\n-\n         con.execute(\n             \"UPDATE accounts SET balance = balance - ? WHERE id = ?\",\n             (TRANSFER, first_id),\n         )\n-        print(f\"[{name}] locked account {first_id}, sleeping {SLEEP_S:.2f}s ...\", flush=True)\n         time.sleep(SLEEP_S)\n-\n         # Opposite order from the other thread: lock inversion.\n         con.execute(\n             \"UPDATE accounts SET balance = balance + ? WHERE id = ?\",\n             (TRANSFER, second_id),\n         )\n         con.execute(\"COMMIT\")\n-        results[name] = \"committed\"\n-        print(f\"[{name}] committed\", flush=True)\n-    except sqlite3.OperationalError as exc:\n-        results[name] = f\"failed: {exc}\"\n-        print(f\"[{name}] FAILED: {exc}\", flush=True)\n+    except Exception:\n         try:\n             con.execute(\"ROLLBACK\")\n         except sqlite3.Error:\n             pass\n+        raise\n+\n+\n+def worker(name, con, barrier, first_id, second_id, results):\n+    \"\"\"Transfer TRANSFER from first_id to second_id, retrying on deadlock.\"\"\"\n+    try:\n+        # Release both threads at the same moment to maximize contention.\n+        barrier.wait()\n+\n+        for attempt in range(1, MAX_RETRIES + 2):  # 1 initial + MAX_RETRIES\n+            try:\n+                attempt_once(con, first_id, second_id)\n+                results[name] = f\"committed (attempt {attempt})\"\n+                print(f\"[{name}] committed on attempt {attempt}\", flush=True)\n+                return\n+            except sqlite3.OperationalError as exc:\n+                if is_deadlock(exc) and attempt <= MAX_RETRIES:\n+                    delay = RETRY_DELAY_S * attempt + random.uniform(0, 0.02)\n+                    print(\n+                        f\"[{name}] attempt {attempt} deadlock: {exc} | \"\n+                        f\"rolled back, retrying in {delay * 1000:.0f} ms\",\n+                        flush=True,\n+                    )\n+                    time.sleep(delay)\n+                else:\n+                    results[name] = f\"failed after {attempt} attempt(s): {exc}\"\n+                    print(f\"[{name}] FAILED: {exc}\", flush=True)\n+                    return\n     finally:\n         con.close()\n \n@@ -87,7 +114,7 @@\n         target=worker, args=(\"B\", con_b, barrier, 2, 1, results), name=\"thread-B\"\n     )\n \n-    print(f\"DB: {db_path} | A: 1 -> 2 | B: 2 -> 1\\n\", flush=True)\n+    print(f\"DB: {db_path} | A: 1 -> 2 | B: 2 -> 1 | retries: {MAX_RETRIES}\\n\", flush=True)\n     thread_a.start()\n     thread_b.start()\n     thread_a.join()\n@@ -100,8 +127,9 @@\n     print(\"\\nFinal balances: \" + \", \".join(f\"account {i} = {b}\" for i, b in rows))\n     print(f\"Outcome: {results}\")\n \n-    # Exit 1 only if neither thread could make progress at all.\n-    return 1 if all(v != \"committed\" for v in results.values()) else 0\n+    # Success requires BOTH transactions to have committed.\n+    all_committed = all(str(v).startswith(\"committed\") for v in results.values())\n+    return 0 if all_committed else 1\n \n \n if __name__ == \"__main__\":\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 2,
+      "diff_included_count": 2
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_727e28f7eafc4d6bbb68425332af42e6",
+    "input_id": "step-7",
+    "step_id": "step-7",
+    "submission_id": "submission-499f2765fb3ace924ca433fa3c9f8e6c",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "deadlock_output.txt",
+        "change_type": "modified",
+        "size_bytes": 382,
+        "before_sha256": "e40b4829c351ddc1527a12888b19e19f9d6ebca108b0093dd659366fd5294d2a",
+        "after_sha256": "24b9ebb13f84ba1a5384689f45c2e4d3f53379dfea635bad19663cc871cae806"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "deadlock_sim.py",
+        "change_type": "modified",
+        "size_bytes": 5083,
+        "before_sha256": "d320c096ce6afa76d752617823ba59e875e7e534cb34360a179149f6bd47c161",
+        "after_sha256": "f1fc9f55fff2250256c6aeaf0b34d7186db4ac94d6766fe9e7ab1e6e686aa855"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "file_change",
+        "path": "migration.db",
+        "change_type": "created",
+        "size_bytes": 12288,
+        "after_sha256": "a62cf3505d57a8d4436d9c469337eda1974800c7ff6431dc4628080dea851cc1"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "301db029d58a12f7444a13e24b48246d8f76f2bdbf0c472ae298aa404e4b4725",
+        "size_bytes": 19089,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0004",
+        "sequence": 4,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "1149a6759f1dd35569f1e55088f42192386696d5a9ecfbd9182cd84c691cefbe"
+      }
+    ]
+  }
+}

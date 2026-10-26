@@ -1,0 +1,4 @@
+{
+  "command": "cd /home/agent/workspace && curl -sSL --max-time 20 -o missing_retry.txt -w \"HTTP_STATUS:%{http_code}\\n\" \"http://example.com/missing.txt\"; echo \"exit=$?\"; head -c 300 missing_retry.txt 2>/dev/null; echo; rm -f missing.txt missing_retry.txt; echo \"cleaned up error pages\"",
+  "intent": "Retry download via http, inspect result, remove error-page artifacts"
+}

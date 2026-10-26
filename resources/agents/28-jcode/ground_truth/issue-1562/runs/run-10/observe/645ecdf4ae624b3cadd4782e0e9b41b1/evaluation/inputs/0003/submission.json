@@ -1,0 +1,213 @@
+{
+  "run_id": "run_7a2751d19b3d4d8fa393c645620c1368",
+  "case_id": "case_b41db6220fbc40c68a0465507a61d328",
+  "input_id": "step-3",
+  "status": "completed",
+  "output": "I'll insert the two rows into the `accounts` table.Done. Two rows inserted into `accounts` and verified:\n\n| id | balance |\n|----|---------|\n| 1  | 100     |\n| 2  | 100     |\n\nThe `audit` table remains empty, ready for use.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/migration.db",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:99cc8edc03760e1540f40a4a1f5abefc27fd69fe14e9ac49acb78e903e4ca7f0",
+        "after_hash": "sha256:d330395bc90fad5fcd7d6b0777b0cece910b7f615db7560cabc37c488fe494f9",
+        "before_size": 12288,
+        "after_size": 12288,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": "binary",
+        "diff": null
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_7a2751d19b3d4d8fa393c645620c1368",
+      "case_id": "case_b41db6220fbc40c68a0465507a61d328",
+      "input_id": "step-3",
+      "spans": [
+        {
+          "trace_id": "8eef095c1a57839839fe989324c64d6b",
+          "span_id": "a75d1b7e522c80a4",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791350470335689583,
+          "end_time_unix_nano": 1791350484203195813,
+          "duration_nano": 13867506230,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1791350470340231128,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1791350484196440727,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "8eef095c1a57839839fe989324c64d6b",
+          "span_id": "f63ca5771d667762",
+          "parent_span_id": "a75d1b7e522c80a4",
+          "name": "Running shell command",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791350477723632226,
+          "end_time_unix_nano": 1791350477737575603,
+          "duration_nano": 13943377,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "Running shell command",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "command": "python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('/home/agent/workspace/migration.db')\ncur = conn.cursor()\ncur.execute('INSERT INTO accounts (id, balance) VALUES (1, 100);')\ncur.execute('INSERT INTO accounts (id, balance) VALUES (2, 100);')\nconn.commit()\nprint('Rows in accounts:')\nfor row in cur.execute('SELECT id, balance FROM accounts ORDER BY id;'):\n    print(row)\nconn.close()\n\"",
+              "intent": "Insert accounts rows id 1 and 2 with balance 100"
+            },
+            "gen_ai.tool.call.result": {
+              "error": null,
+              "output": "Rows in accounts:\n(1, 100)\n(2, 100)\n"
+            },
+            "gen_ai.tool.call.id": "call_6a40bfda8a0e4021847232c5"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 2,
+      "retained_spans": 2,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_7a2751d19b3d4d8fa393c645620c1368",
+      "input_id": "step-3",
+      "step_id": "step-3",
+      "submission_id": "submission-c49d0ea3fd2b8c943ec0e81f22c61f33",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "file_change",
+          "path": "migration.db",
+          "change_type": "modified",
+          "size_bytes": 12288,
+          "before_sha256": "99cc8edc03760e1540f40a4a1f5abefc27fd69fe14e9ac49acb78e903e4ca7f0",
+          "after_sha256": "d330395bc90fad5fcd7d6b0777b0cece910b7f615db7560cabc37c488fe494f9"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "1ffcd0edc32c2b5aa08ce4594feac9d002d25e1a72c1a5045112ddeb9d20f907",
+          "size_bytes": 2286,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0002",
+          "sequence": 2,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "7686f878a3493a19e3ea415cdba0af47b86c1539fd5fe2161262de7bae569768"
+        }
+      ]
+    },
+    "runtime_file_sources": {
+      "migration.db": 0
+    },
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 1,
+      "retained_count": 1,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

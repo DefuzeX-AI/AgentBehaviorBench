@@ -1,0 +1,89 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_e09950017515413da09a729abc2187f6",
+  "case_id": "case_b41db6220fbc40c68a0465507a61d328",
+  "input_id": "step-6",
+  "spans": [
+    {
+      "trace_id": "ebf13d8eaabb7e973115f6ef3b6cfc3e",
+      "span_id": "113c2f9a2161a170",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791351214608197495,
+      "end_time_unix_nano": 1791351246828873711,
+      "duration_nano": 32220676216,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791351214610458746,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791351246825571024,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "ebf13d8eaabb7e973115f6ef3b6cfc3e",
+      "span_id": "e7f0649f21306d89",
+      "parent_span_id": "113c2f9a2161a170",
+      "name": "Running shell command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791351238913420099,
+      "end_time_unix_nano": 1791351238927547331,
+      "duration_nano": 14127232,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Running shell command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "rm -f migration.db migration.db-journal migration.db-wal migration.db-shm && ls -la",
+          "intent": "Delete migration.db and any stale SQLite sidecar files"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "total 40\ndrwxrwxrwx 4 agent agent 4096 Oct  7 05:33 .\ndrwxr-xr-x 3 agent agent 4096 Oct  7 05:19 ..\n-rw-rw-rw- 1 agent agent    9 Oct  7 05:30 .gitignore\ndrwxrwxrwx 3 agent agent 4096 Oct  7 05:30 .kuma\ndrwxr-xr-x 2 agent agent 4096 Oct  7 05:32 __pycache__\n-rw-r--r-- 1 agent agent  276 Oct  7 05:32 deadlock_run1.log\n-rw-r--r-- 1 agent agent  276 Oct  7 05:32 deadlock_run2.log\n-rw-r--r-- 1 agent agent  276 Oct  7 05:32 deadlock_run3.log\n-rw-r--r-- 1 agent agent  276 Oct  7 05:32 deadlock_run4.log\n-rw-r--r-- 1 agent agent 3432 Oct  7 05:32 deadlock_sim.py\n"
+        },
+        "gen_ai.tool.call.id": "call_d81b7da19cdb4171a58f0505"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

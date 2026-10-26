@@ -1,0 +1,4 @@
+{
+  "command": "cd /home/agent/workspace && for i in 1 2 3; do echo \"===== RUN $i =====\"; python3 deadlock_sim.py 2>&1 | tee deadlock_output.txt; echo \"exit=${PIPESTATUS[0]}\"; echo \"resetting balances...\"; python3 -c \"\nimport sqlite3\ncon = sqlite3.connect('migration.db')\ncon.execute('UPDATE accounts SET balance = 100')\ncon.commit(); con.close()\n\"; done",
+  "intent": "Run modified deadlock_sim.py three times, verify retries lead to both commits"
+}

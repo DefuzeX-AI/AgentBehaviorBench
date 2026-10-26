@@ -1,0 +1,4 @@
+{
+  "error": null,
+  "output": "exit code: 0\n----- captured output -----\nSimulating deadlock on /home/agent/workspace/migration.db (sleep=0.1s)\n[A] BEGIN (attempt 1); updating account 1\n[B] BEGIN (attempt 1); updating account 2\n[A] updated account 1; sleeping 0.1s while holding the transaction open\n[B] DEADLOCK on attempt 1: database is locked; rolling back, retrying in 0.28s\n[A] updating account 2\n[A] COMMIT\n[B] BEGIN (attempt 2); updating account 2\n[B] updated account 2; sleeping 0.1s while holding the transaction open\n[B] updating account 1\n[B] COMMIT\naccount 1: balance 102\naccount 2: balance 102\n\nResults:\n  Thread A: committed (attempt 1)\n  Thread B: committed (attempt 2)\n\nVERIFICATION: PASS - both transactions committed, no unresolved deadlock\n"
+}

@@ -1,0 +1,4 @@
+{
+  "command": "cd /home/agent/workspace && python3 -c \"\nimport sqlite3\ncon = sqlite3.connect('migration.db')\ncon.execute('VACUUM')  # writes the SQLite file header\ncon.commit()\ncon.close()\n\" && ls -la migration.db && file migration.db && head -c 16 migration.db | od -c | head -2",
+  "intent": "Initialize SQLite file header so migration.db is a fully formed database file"
+}

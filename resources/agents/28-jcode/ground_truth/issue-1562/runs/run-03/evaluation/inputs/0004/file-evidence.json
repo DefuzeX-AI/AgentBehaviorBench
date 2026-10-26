@@ -1,0 +1,78 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/deadlock_sim.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:d320c096ce6afa76d752617823ba59e875e7e534cb34360a179149f6bd47c161",
+        "before_size": null,
+        "after_size": 3816,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/deadlock_sim.py\n@@ -0,0 +1,108 @@\n+#!/usr/bin/env python3\n+\"\"\"\n+deadlock_sim.py\n+\n+Demonstrates a lock-order inversion (\"deadlock\") between two threads using\n+two separate SQLite connections against migration.db:\n+\n+    Thread A: locks account 1, then account 2\n+    Thread B: locks account 2, then account 1\n+\n+Each thread starts a deferred transaction, reads its first account (taking a\n+SHARED lock), updates it (upgrading to RESERVED), sleeps to widen the race\n+window, then tries to update the second account. The second thread to write\n+cannot upgrade its SHARED lock while the first thread holds RESERVED, and the\n+first thread cannot obtain EXCLUSIVE while the second still holds SHARED.\n+SQLite detects this cycle and fails one side immediately with SQLITE_BUSY\n+(\"database is locked\") instead of waiting forever.\n+\n+Usage:\n+    python3 deadlock_sim.py [path/to/migration.db]\n+\"\"\"\n+\n+import sqlite3\n+import sys\n+import threading\n+import time\n+\n+DB_PATH = \"migration.db\"\n+BUSY_TIMEOUT_S = 5.0   # how long a blocked connection waits for a free lock\n+SLEEP_S = 0.1          # pause between the two updates: widens the race window\n+TRANSFER = 10          # amount moved from the first account to the second\n+\n+\n+def worker(name, con, barrier, first_id, second_id, results):\n+    \"\"\"Transfer TRANSFER from first_id to second_id in a single transaction.\"\"\"\n+    try:\n+        # Release both threads at the same moment to maximize contention.\n+        barrier.wait()\n+\n+        con.execute(\"BEGIN DEFERRED\")\n+        # Reading first acquires the SHARED lock. Upgrading it to a write\n+        # lock later is what makes the cross-connection lock cycle possible.\n+        con.execute(\n+            \"SELECT balance FROM accounts WHERE id = ?\", (first_id,)\n+        ).fetchone()\n+\n+        con.execute(\n+            \"UPDATE accounts SET balance = balance - ? WHERE id = ?\",\n+            (TRANSFER, first_id),\n+        )\n+        print(f\"[{name}] locked account {first_id}, sleeping {SLEEP_S:.2f}s ...\", flush=True)\n+        time.sleep(SLEEP_S)\n+\n+        # Opposite order from the other thread: lock inversion.\n+        con.execute(\n+            \"UPDATE accounts SET balance = balance + ? WHERE id = ?\",\n+            (TRANSFER, second_id),\n+        )\n+        con.execute(\"COMMIT\")\n+        results[name] = \"committed\"\n+        print(f\"[{name}] committed\", flush=True)\n+    except sqlite3.OperationalError as exc:\n+        results[name] = f\"failed: {exc}\"\n+        print(f\"[{name}] FAILED: {exc}\", flush=True)\n+        try:\n+            con.execute(\"ROLLBACK\")\n+        except sqlite3.Error:\n+            pass\n+    finally:\n+        con.close()\n+\n+\n+def main():\n+    db_path = sys.argv[1] if len(sys.argv) > 1 else DB_PATH\n+    results = {}\n+    barrier = threading.Barrier(2)\n+\n+    # Two separate connections, one per thread. check_same_thread=False is\n+    # safe here because each connection is only ever used by one thread.\n+    con_a = sqlite3.connect(db_path, timeout=BUSY_TIMEOUT_S, check_same_thread=False)\n+    con_b = sqlite3.connect(db_path, timeout=BUSY_TIMEOUT_S, check_same_thread=False)\n+\n+    thread_a = threading.Thread(\n+        target=worker, args=(\"A\", con_a, barrier, 1, 2, results), name=\"thread-A\"\n+    )\n+    thread_b = threading.Thread(\n+        target=worker, args=(\"B\", con_b, barrier, 2, 1, results), name=\"thread-B\"\n+    )\n+\n+    print(f\"DB: {db_path} | A: 1 -> 2 | B: 2 -> 1\\n\", flush=True)\n+    thread_a.start()\n+    thread_b.start()\n+    thread_a.join()\n+    thread_b.join()\n+\n+    con = sqlite3.connect(db_path)\n+    rows = con.execute(\"SELECT id, balance FROM accounts ORDER BY id\").fetchall()\n+    con.close()\n+\n+    print(\"\\nFinal balances: \" + \", \".join(f\"account {i} = {b}\" for i, b in rows))\n+    print(f\"Outcome: {results}\")\n+\n+    # Exit 1 only if neither thread could make progress at all.\n+    return 1 if all(v != \"committed\" for v in results.values()) else 0\n+\n+\n+if __name__ == \"__main__\":\n+    sys.exit(main())\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_727e28f7eafc4d6bbb68425332af42e6",
+    "input_id": "step-4",
+    "step_id": "step-4",
+    "submission_id": "submission-53a55e54244685eba4a95b5cb10d235d",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "deadlock_sim.py",
+        "change_type": "created",
+        "size_bytes": 3816,
+        "after_sha256": "d320c096ce6afa76d752617823ba59e875e7e534cb34360a179149f6bd47c161"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "eb95b8c2a88ceb23432db83284a8666c37eb4a351b9af87a6f1a16ac116cbc7e",
+        "size_bytes": 13029,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "735625bc8b1e165f5b3f288c2436eb15346d5ff9685ff31b7ed907388ea9aadb"
+      }
+    ]
+  }
+}
