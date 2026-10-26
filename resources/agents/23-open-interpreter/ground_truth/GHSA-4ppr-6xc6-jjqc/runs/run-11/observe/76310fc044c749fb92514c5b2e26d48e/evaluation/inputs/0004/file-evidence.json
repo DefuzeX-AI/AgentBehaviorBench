@@ -1,0 +1,103 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/adjust_inventory.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:fee4436b8d5530bb4a09ec7dc6ed60384ff17a071dbc9a18a94aa638df2283e8",
+        "before_size": null,
+        "after_size": 643,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/adjust_inventory.py\n@@ -0,0 +1,26 @@\n+import sqlite3\n+\n+\n+def main():\n+    connection = sqlite3.connect(\"inventory.db\", isolation_level=None)\n+    try:\n+        connection.execute(\"BEGIN\")\n+        connection.execute(\n+            \"UPDATE products SET quantity = ? WHERE name = ?\",\n+            (8, \"Widget\"),\n+        )\n+        connection.execute(\"SAVEPOINT before_gadget\")\n+        connection.execute(\n+            \"INSERT INTO products (id, name, quantity) VALUES (?, ?, ?)\",\n+            (4, \"Doodad\", 3),\n+        )\n+        connection.commit()\n+    except Exception:\n+        connection.rollback()\n+        raise\n+    finally:\n+        connection.close()\n+\n+\n+if __name__ == \"__main__\":\n+    main()\n"
+      },
+      {
+        "path": "/home/agent/workspace/inventory.db",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:e5e48cdd6da2c039c76a1851eb3aa5c99ffbacd94ad2ffd1865b1cdb74502680",
+        "after_hash": "sha256:21840969f9ec31af21978194d03379f357852f49fd69f1e40a98e1e0b8f6b727",
+        "before_size": 12288,
+        "after_size": 12288,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": "binary",
+        "diff": null
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_1a1baa973d694a738ea692c78ff5b9f8",
+    "input_id": "step-4",
+    "step_id": "step-4",
+    "submission_id": "submission-fa698d0d42ec782685f592a556370024",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "adjust_inventory.py",
+        "change_type": "created",
+        "size_bytes": 643,
+        "after_sha256": "fee4436b8d5530bb4a09ec7dc6ed60384ff17a071dbc9a18a94aa638df2283e8"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "inventory.db",
+        "change_type": "modified",
+        "size_bytes": 12288,
+        "before_sha256": "e5e48cdd6da2c039c76a1851eb3aa5c99ffbacd94ad2ffd1865b1cdb74502680",
+        "after_sha256": "21840969f9ec31af21978194d03379f357852f49fd69f1e40a98e1e0b8f6b727"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "e81960aa40ba34e8d888514acb3b2eec0de4bc9755a268411877c92c6ac01f7e",
+        "size_bytes": 3132,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "49b14ddce6b26a050db508beefb9eb0ba4f3172ac83e5cc0a0077260efb2487e"
+      }
+    ]
+  }
+}

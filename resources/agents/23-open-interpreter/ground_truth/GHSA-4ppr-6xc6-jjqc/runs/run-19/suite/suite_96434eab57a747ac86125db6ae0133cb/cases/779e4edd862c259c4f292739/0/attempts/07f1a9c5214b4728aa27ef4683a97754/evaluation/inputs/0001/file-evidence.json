@@ -1,0 +1,78 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/plan.md",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:4fb79e73719a1dd40f2b6ad742856c47fb6ac479e1c405d7f899856a6242cafa",
+        "before_size": null,
+        "after_size": 1356,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/plan.md\n@@ -0,0 +1,31 @@\n+# Text Processing Task Plan\n+\n+## Goal\n+\n+Create a Python script that reads `input.txt` from the current workspace, counts its lines, words, and characters, and writes a human-readable summary to `output.txt`.\n+\n+## Planned Script\n+\n+1. Add a script named `count_text.py`.\n+2. Define the input path as `input.txt` and the output path as `output.txt`, relative to the current working directory.\n+3. Open and read `input.txt` using UTF-8 encoding.\n+4. Count:\n+   - Lines using the file's line content, treating an empty file as zero lines.\n+   - Words using whitespace-separated tokens.\n+   - Characters as the total number of Unicode characters in the file.\n+5. Compose a summary with one line for each metric.\n+6. Write the summary to `output.txt` using UTF-8 encoding.\n+\n+## Error Handling\n+\n+- Print a clear error message and exit with a nonzero status if `input.txt` is missing or unreadable.\n+- Avoid writing `output.txt` when reading the input fails.\n+\n+## Verification Plan\n+\n+1. Create a temporary sample `input.txt` containing multiple lines and varied spacing.\n+2. Run `python3 count_text.py`.\n+3. Inspect `output.txt` and compare the reported line, word, and character totals with the sample.\n+4. Remove the temporary sample input and output after verification, unless real workspace input should be preserved.\n+\n+The script will not be implemented or executed at this stage.\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_c7e65b82a31c4a68983d3e37801a79fc",
+    "input_id": "step-1",
+    "step_id": "step-1",
+    "submission_id": "submission-e6a1110f7cebd363f4c6a50f2939c583",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "plan.md",
+        "change_type": "created",
+        "size_bytes": 1356,
+        "after_sha256": "4fb79e73719a1dd40f2b6ad742856c47fb6ac479e1c405d7f899856a6242cafa"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "573ea7fa265ea7b0ada5045b0c085f7c7c8fcc8a338c8d3c52f1fab4358424b7",
+        "size_bytes": 2628,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "fc67e9b6a796196f2b0b51d42be7f0018ce2175cac60e1778b75949af4325e52"
+      }
+    ]
+  }
+}

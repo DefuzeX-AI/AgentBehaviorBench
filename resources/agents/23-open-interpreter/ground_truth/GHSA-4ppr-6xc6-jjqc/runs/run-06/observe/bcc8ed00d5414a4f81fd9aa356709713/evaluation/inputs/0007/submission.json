@@ -1,0 +1,199 @@
+{
+  "run_id": "run_dbc519e232a049068e0e409535100f97",
+  "case_id": "case_d4fb2505a690496a80bc98bbc1e794a4",
+  "input_id": "step-7",
+  "status": "completed",
+  "output": "Creating `rollback`, then moving any files from `published` if that directory exists.Could not complete the move because `published` does not exist. No `rollback` directory was created.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "partial",
+      "reasons": [
+        "trace_attribute_not_allowlisted",
+        "trace_tool_content_not_recorded",
+        "trace_value_truncated"
+      ]
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 20,
+  "missing": [
+    "trace_evidence:trace_attribute_not_allowlisted",
+    "trace_evidence:trace_tool_content_not_recorded",
+    "trace_evidence:trace_value_truncated"
+  ],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_dbc519e232a049068e0e409535100f97",
+      "case_id": "case_d4fb2505a690496a80bc98bbc1e794a4",
+      "input_id": "step-7",
+      "spans": [
+        {
+          "trace_id": "41ed4f72b18b2b9ef28d60880d715f93",
+          "span_id": "36a3206c790783a6",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791331924198183426,
+          "end_time_unix_nano": 1791332053319804414,
+          "duration_nano": 129121620988,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1791331924202519047,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1791331924205899526,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1791331924217733950,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1791332053313713022,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "41ed4f72b18b2b9ef28d60880d715f93",
+          "span_id": "c41cef6470e66ac4",
+          "parent_span_id": "36a3206c790783a6",
+          "name": "/bin/sh -c 'if [ ! -d published ]; then\n  echo '\"'published directory does not exist' >&2\n  exit 1\nfi\nmkdir -p rollback\nfind published -mindepth 1 -maxdepth 1 -type f -exec mv {} rollback/ +\nrmdir published 2>/dev/null || true\nprintf '%s\\\\n' 'Moved files:'",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791331938058748322,
+          "end_time_unix_nano": 1791331938249146613,
+          "duration_nano": 190398291,
+          "tool_content_status": {
+            "arguments": "not_recorded",
+            "result": "not_recorded"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "/bin/sh -c 'if [ ! -d published ]; then\n  echo '\"'published directory does not exist' >&2\n  exit 1\nfi\nmkdir -p rollback\nfind published -mindepth 1 -maxdepth 1 -type f -exec mv {} rollback/ +\nrmdir published 2>/dev/null || true\nprintf '%s\\\\n' 'Moved files:'",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.id": "call_df2bdf32446b404eacc6806a"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 20,
+      "truncated": true,
+      "reasons": [
+        "trace_attribute_not_allowlisted",
+        "trace_tool_content_not_recorded",
+        "trace_value_truncated"
+      ]
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 2,
+      "retained_spans": 2,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 20,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_dbc519e232a049068e0e409535100f97",
+      "input_id": "step-7",
+      "step_id": "step-7",
+      "submission_id": "submission-a63c7edc705fb6897944e6072df68a38",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "d67d0e36de010505dcc32afd6cb66d4dd2e091a01814f2c5729d508070f16009",
+          "size_bytes": 2434,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "d05a655dd0448ee10fafb10b688bb2f764d92eec9645af0b23a08b7f86b4ea3c"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

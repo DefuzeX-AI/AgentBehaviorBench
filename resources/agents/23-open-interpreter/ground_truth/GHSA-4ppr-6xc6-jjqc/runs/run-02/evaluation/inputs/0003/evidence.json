@@ -1,0 +1,95 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_df32f5ac1c3f4df59582131d4ec29d17",
+  "case_id": "case_ec13eda517884ee39bd111b08ca5e195",
+  "input_id": "step-3",
+  "spans": [
+    {
+      "trace_id": "090d5ab1432b401314bdd02a6457f60e",
+      "span_id": "66d174714da731e5",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790272512423992398,
+      "end_time_unix_nano": 1790272535957806927,
+      "duration_nano": 23533814529,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1790272512431924722,
+          "attributes": {}
+        },
+        {
+          "name": "acp.stderr",
+          "time_unix_nano": 1790272512439737621,
+          "attributes": {}
+        },
+        {
+          "name": "acp.stderr",
+          "time_unix_nano": 1790272512458404653,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1790272535952887713,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "090d5ab1432b401314bdd02a6457f60e",
+      "span_id": "a72e91672493ad48",
+      "parent_span_id": "66d174714da731e5",
+      "name": "/bin/sh -c \"python3 - <<'PY'\nimport sqlite3\n\nconnection = sqlite3.connect('inventory.db')\nconnection.executemany('INSERT INTO products (id, name, quantity) VALUES (?, ?, ?)', [\n    (1, 'Widget', 10),\n    (2, 'Gadget', 5),\n    (3, 'Gizmo', 0),\n])\nconnection",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790272521978218643,
+      "end_time_unix_nano": 1790272521985873819,
+      "duration_nano": 7655176,
+      "tool_content_status": {
+        "arguments": "not_recorded",
+        "result": "not_recorded"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "/bin/sh -c \"python3 - <<'PY'\nimport sqlite3\n\nconnection = sqlite3.connect('inventory.db')\nconnection.executemany('INSERT INTO products (id, name, quantity) VALUES (?, ?, ?)', [\n    (1, 'Widget', 10),\n    (2, 'Gadget', 5),\n    (3, 'Gizmo', 0),\n])\nconnection",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.id": "call_beed20cf354047ce98180a9e"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 20,
+  "truncated": true,
+  "reasons": [
+    "trace_attribute_not_allowlisted",
+    "trace_tool_content_not_recorded",
+    "trace_value_truncated"
+  ]
+}

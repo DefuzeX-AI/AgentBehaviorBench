@@ -1,0 +1,226 @@
+{
+  "run_id": "run_4b7c9673067e497899c5c40caca855d0",
+  "case_id": "case_d4fb2505a690496a80bc98bbc1e794a4",
+  "input_id": "step-5",
+  "status": "completed",
+  "output": "Reading the manifest with `jq`; this may fail if the file is absent.`jq` is unavailable; switching to Node for the JSON read.The command could not run successfully because `published/manifest.json` does not exist. The initial `jq` command was unavailable, and the Node fallback confirmed the manifest is missing.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "partial",
+      "reasons": [
+        "trace_tool_content_not_recorded"
+      ]
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [
+    "trace_evidence:trace_tool_content_not_recorded"
+  ],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_4b7c9673067e497899c5c40caca855d0",
+      "case_id": "case_d4fb2505a690496a80bc98bbc1e794a4",
+      "input_id": "step-5",
+      "spans": [
+        {
+          "trace_id": "c9b4b1775c0e0c287179707c767b935e",
+          "span_id": "e5a7d84297385939",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791351172494771109,
+          "end_time_unix_nano": 1791351209313094327,
+          "duration_nano": 36818323218,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1791351172496977629,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1791351172498968454,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1791351172502360867,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1791351209309941352,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "c9b4b1775c0e0c287179707c767b935e",
+          "span_id": "0e32d49265184be3",
+          "parent_span_id": "e5a7d84297385939",
+          "name": "/bin/sh -c \"jq -r '.artifact' published/manifest.json\"",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791351183497481650,
+          "end_time_unix_nano": 1791351183499062714,
+          "duration_nano": 1581064,
+          "tool_content_status": {
+            "arguments": "not_recorded",
+            "result": "not_recorded"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "/bin/sh -c \"jq -r '.artifact' published/manifest.json\"",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.id": "call_176ebe5b5a5442e0b45b7921"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "c9b4b1775c0e0c287179707c767b935e",
+          "span_id": "27c78d123f7613e2",
+          "parent_span_id": "e5a7d84297385939",
+          "name": "/bin/sh -c \"node -e 'console.log(require(\\\"./published/manifest.json\\\").artifact)'\"",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791351200154493497,
+          "end_time_unix_nano": 1791351200156230767,
+          "duration_nano": 1737270,
+          "tool_content_status": {
+            "arguments": "not_recorded",
+            "result": "not_recorded"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "/bin/sh -c \"node -e 'console.log(require(\\\"./published/manifest.json\\\").artifact)'\"",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.id": "call_9d3d73ff50b84ff59f3aea35"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": [
+        "trace_tool_content_not_recorded"
+      ]
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 3,
+      "retained_spans": 3,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_4b7c9673067e497899c5c40caca855d0",
+      "input_id": "step-5",
+      "step_id": "step-5",
+      "submission_id": "submission-bd0be2973d8bd02ccab09b2a422d73d0",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "646805e919bc5dac3a051cc99b3575de61433f2207af5677f51b2b7763da5c26",
+          "size_bytes": 2855,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "cab24d0b8aa07d93d8f0a70da85f036a1bf18fdbe01799d192d57dcf7cb8fd3a"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}
