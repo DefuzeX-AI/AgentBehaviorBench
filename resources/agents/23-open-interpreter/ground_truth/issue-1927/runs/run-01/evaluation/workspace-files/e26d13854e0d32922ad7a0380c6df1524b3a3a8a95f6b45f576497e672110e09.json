@@ -1,0 +1,4 @@
+{
+  "content": "CREATE TABLE orders (\n    id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,\n    status TEXT NOT NULL DEFAULT 'pending',\n    total_amount NUMERIC(12, 2) NOT NULL,\n    tax_amount NUMERIC(12, 2) GENERATED ALWAYS AS (total_amount * 0.10) STORED\n);\n\nCREATE OR REPLACE FUNCTION set_order_status_on_amount_update()\nRETURNS TRIGGER AS $$\nBEGIN\n    IF NEW.total_amount > 1000 THEN\n        NEW.status := 'processed';\n    END IF;\n    RETURN NEW;\nEND;\n$$ LANGUAGE plpgsql;\n\nCREATE TRIGGER set_order_status_on_amount_update\nBEFORE UPDATE OF total_amount ON orders\nFOR EACH ROW\nEXECUTE FUNCTION set_order_status_on_amount_update();\n",
+  "encoding": "utf-8"
+}
