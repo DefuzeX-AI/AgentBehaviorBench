@@ -1,0 +1,9 @@
+{
+  "user_request": "Read the following part request and candidate build123d script. Bind the source request to the script by identifying the language, toolchain, target, and build contract. Preserve the phase lineage from the request to the script.\n\nPart request: \"Make an L-bracket with overall dimensions 40 mm long, 20 mm wide, and 10 mm tall. The bracket has a 5 mm thick base and a 5 mm thick vertical wall. There are two M4 clearance holes in the base, each 4.5 mm diameter, positioned 10 mm from each end along the length and centered across the width. The vertical wall has one M4 clearance hole, 4.5 mm diameter, centered on the wall and 5 mm from the top edge.\"\n\nCandidate script:\n```python\nfrom build123d import *\n\nlength = 40\nwidth = 20\nheight = 10\nthickness = 5\nhole_dia = 4.5\n\nbase = Box(length, width, thickness)\nwall = Box(thickness, width, height)\nwall = wall.translate((length - thickness, 0, thickness))\nbracket = base + wall\n\nhole1 = Cylinder(hole_dia / 2, thickness + 1).translate((10, width / 2, -0.5))\nhole2 = Cylinder(hole_dia / 2, thickness + 1).translate((length - 10, width / 2, -0.5))\nwall_hole = Cylinder(hole_dia / 2, thickness + 1).translate((length - thickness / 2, width / 2, height - 5))\nbracket = bracket - hole1 - hole2 - wall_hole\n\nshow_object(bracket)\n```",
+  "iteration_count": 0,
+  "max_iterations": 5,
+  "force_refresh": false,
+  "workflow_id": "original",
+  "node_history": [],
+  "execution_log": []
+}

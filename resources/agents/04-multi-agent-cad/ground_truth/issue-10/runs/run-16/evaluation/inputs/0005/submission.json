@@ -1,0 +1,605 @@
+{
+  "run_id": "run_b9470a981b1a4eab8ff941f1743c58a4",
+  "case_id": "case_c46debd38ff94a89b0270d5ce6b9168a",
+  "input_id": "step-5",
+  "status": "completed",
+  "output": "Status: HALTED (ErrorType.FATAL)\nIterations: 0\nCAD brief: {\"part_name\":\"l-bracket-40x30x5-m6\",\"part_category\":\"L-bracket\",\"length_unit\":\"mm\",\"origin_convention\":\"corner_min\",\"primary_workplane\":\"XY\",\"max_extent_x_mm\":40.0,\"max_extent_y_mm\":30.0,\"max_extent_z_mm\":30.0,\"target_volume_mm3\":10858.6,\"material\":\"PLA\",\"material_density_g_cm3\":1.24,\"key_parameters\":{\"OVERALL_WIDTH_X\":40.0,\"OVERALL_HEIGHT_Z\":30.0,\"MATERIAL_THICKNESS\":5.0,\"BASE_DEPTH_Y\":30.0,\"BASE_PLATE_THICKNESS_Z\":5.0,\"VERTICAL_PLATE_THICKNESS_Y\":5.0,\"HOLE_DIAMETER\":6.0,\"HOLE_RADIUS\":3.0,\"HOLE_FROM_TOP\":15.0,\"HOLE_CENTER_X\":20.0,\"HOLE_CENTER_Z\":15.0,\"SYMMETRY_PLANE_X\":20.0},\"verification_targets\":[{\"id\":\"overall-x\",\"kind\":\"overall_dimension\",\"description\":\"Overall width of the finished L-bracket measured along the global X axis (front edge length).\",\"nominal\":40.0,\"tolerance_upper\":0.5,\"tolerance_lower\":0.5,\"face_selector_expression\":null,\"edge_selector_expression\":null,\"reference_feature_id\":null,\"measurement_axis\":\"x\",\"critical\":true,\"notes\":\"Equals OVERALL_WIDTH_X; both vertical plate and base plate share this width.\"},{\"id\":\"overall-y\",\"kind\":\"overall_dimension\",\"description\":\"Overall depth of the finished L-bracket measured along the global Y axis (base leg run-out).\",\"nominal\":30.0,\"tolerance_upper\":0.5,\"tolerance_lower\":0.5,\"face_selector_expression\":null,\"edge_selector_expression\":null,\"reference_feature_id\":null,\"measurement_axis\":\"y\",\"critical\":true,\"notes\":\"Equals BASE_DEPTH_Y (inferred default, not stated explicitly by the user). Base plate spans Y=0..30.\"},{\"id\":\"overall-z\",\"kind\":\"overall_dimension\",\"description\":\"Overall height of the finished L-bracket measured along the global Z axis from the base plane (Z=0) to the top edge of the vertical plate.\",\"nominal\":30.0,\"tolerance_upper\":0.5,\"tolerance_lower\":0.5,\"face_selector_expression\":null,\"edge_selector_expression\":null,\"reference_feature_id\":null,\"measurement_axis\":\"z\",\"critical\":true,\"notes\":\"Equals OVERALL_HEIGHT_Z; vertical plate spans Z=0..30. Absolute coordinate measured from global Z=0.\"},{\"id\":\"single-body\",\"kind\":\"single_body\",\"description\":\"Vertical plate and base plate must fuse into exactly one connected solid (no disjoint shells).\",\"nominal\":null,\"tolerance_upper\":0.0,\"tolerance_lower\":0.0,\"face_selector_expression\":null,\"edge_selector_expression\":null,\"reference_feature_id\":null,\"measurement_axis\":null,\"critical\":true,\"notes\":\"Plates overlap in the region X=0..40, Y=0..5, Z=0..5 to guarantee a true union.\"},{\"id\":\"water-tightness\",\"kind\":\"water_tightness\",\"description\":\"Resulting solid must be a closed, watertight manifold (zero free/opened edges) after the through-hole cut.\",\"nominal\":null,\"tolerance_upper\":0.0,\"tolerance_lower\":0.0,\"face_selector_expression\":null,\"edge_selector_expression\":null,\"reference_feature_id\":null,\"measurement_axis\":null,\"critical\":true,\"notes\":\"Through-hole is a full-depth cylinder cut through the 5 mm vertical plate so both ends are open caps, preserving manifoldness.\"}],\"functional_requirements\":[\"Provides a 90-degree corner joint between a horizontal mounting surface and a vertical mounting surface.\",\"Single 6 mm through-hole on the vertical face accepts an M5 fastener for attaching a mating panel.\",\"Load path: vertical shear on the fastener is transferred through the vertical plate into the base plate and out through the bottom face.\",\"Base plate lower face is flat and intended to seat flush against a mounting surface.\"],\"manufacturing_method\":\"3d_print_fdm\",\"special_features\":[\"The part MUST be built as an L-shaped solid consisting of a vertical plate (X=0..OVERALL_WIDTH_X, Y=0..VERTICAL_PLATE_THICKNESS_Y, Z=0..OVERALL_HEIGHT_Z) unioned with a base plate (X=0..OVERALL_WIDTH_X, Y=0..BASE_DEPTH_Y, Z=0..BASE_PLATE_THICKNESS_Z).\",\"The base plate and vertical plate MUST overlap in the region X=0..OVERALL_WIDTH_X, Y=0..VERTICAL_PLATE_THICKNESS_Y, Z=0..BASE_PLATE_THICKNESS_Z so the union yields ONE connected solid with no disjoint shells.\",\"The through-hole MUST penetrate along the global Y axis (perpendicular to the vertical face), NOT along the X or Z axis — model it as Rot(X=90) * Cylinder if the default cylinder axis is Z.\",\"The through-hole MUST be centered on the vertical face at X = HOLE_CENTER_X (= OVERALL_WIDTH_X/2) and MUST be located HOLE_FROM_TOP below the top edge, i.e. its center MUST sit at Z = OVERALL_HEIGHT_Z - HOLE_FROM_TOP = HOLE_CENTER_Z.\",\"The through-hole MUST be a full through-hole (both ends open) with radius HOLE_RADIUS, cut completely through VERTICAL_PLATE_THICKNESS_Y.\",\"The bracket MUST be symmetric about the plane X = SYMMETRY_PLANE_X (= OVERALL_WIDTH_X/2): the hole axis and both plates are mirrored about this plane.\",\"The vertical plate MUST span the full OVERALL_HEIGHT_Z from the base plane (Z=0) to the top edge, so the overall part height equals OVERALL_HEIGHT_Z.\",\"The finished part MUST NOT exceed OVERALL_WIDTH_X in X, BASE_DEPTH_Y in Y, or OVERALL_HEIGHT_Z in Z.\"],\"user_request_raw\":\"You are Multi-Agent-CAD. Process the following part request: \\\"Create an L-bracket with overall width 40 mm, overall height 30 mm, thickness 5 mm, and one through-hole of diameter 6 mm centered on the vertical face, 15 mm from the top edge.\\\" Plan the CAD brief and the build123d modeling steps before executing the pipeline.\",\"spec_version\":1}\nQA report: {\"cad_brief_id\":\"(coder-failure)\",\"engine_a\":{\"engine_name\":\"cadpy_analysis\",\"results\":[],\"summary\":\"\",\"warnings\":[],\"errors\":[],\"raw_json\":null},\"engine_b\":{\"engine_name\":\"check_mesh\",\"results\":[],\"summary\":\"\",\"warnings\":[],\"errors\":[\"Deterministic coder execution failed: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\\n\\nTraceback:\\nTraceback (most recent call last):\\n  File \\\"/opt/agent/agent/multi_agent_cad/nodes.py\\\", line 552, in _node_python_coder_deterministic\\n    from cadpy.generation import EntrySpec, run_script_generator\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/generation.py\\\", line 40, in <module>\\n    from cadpy.glb import (\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/glb.py\\\", line 32, in <module>\\n    from cadpy.step_scene import ColorRGBA, LoadedStepScene, OccurrenceNode, SelectorBundle, occurrence_selector_id\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/step_scene.py\\\", line 32, in <module>\\n    from OCP.TDF import TDF_ChildIterator, TDF_Label, TDF_LabelSequence\\nImportError: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\\n\"],\"raw_json\":null},\"all_passed\":false,\"passed_count\":0,\"failed_count\":0,\"noise_only_fail_count\":0,\"error_type\":\"dimension\",\"error_details\":[\"Deterministic coder execution failed: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\\n\\nTraceback:\\nTraceback (most recent call last):\\n  File \\\"/opt/agent/agent/multi_agent_cad/nodes.py\\\", line 552, in _node_python_coder_deterministic\\n    from cadpy.generation import EntrySpec, run_script_generator\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/generation.py\\\", line 40, in <module>\\n    from cadpy.glb import (\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/glb.py\\\", line 32, in <module>\\n    from cadpy.step_scene import ColorRGBA, LoadedStepScene, OccurrenceNode, SelectorBundle, occurrence_selector_id\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/step_scene.py\\\", line 32, in <module>\\n    from OCP.TDF import TDF_ChildIterator, TDF_Label, TDF_LabelSequence\\nImportError: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\\n\"],\"improvement_suggestions\":[],\"connectivity_warning\":null,\"strength_score\":null,\"manufacturability_warnings\":[],\"topology_changed\":false,\"topology_delta\":{},\"iteration\":0}",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": null,
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_b9470a981b1a4eab8ff941f1743c58a4",
+      "case_id": "case_c46debd38ff94a89b0270d5ce6b9168a",
+      "input_id": "step-5",
+      "spans": [
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "77e0738db3af5110",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264462976027193,
+          "end_time_unix_nano": 1792264463683191785,
+          "duration_nano": 707164592,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "d7509c638b62cd76",
+          "parent_span_id": "77e0738db3af5110",
+          "name": "LangGraph",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264462980767102,
+          "end_time_unix_nano": 1792264463677954886,
+          "duration_nano": 697187784,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "2e60d82eaffa8bd6",
+          "parent_span_id": "d7509c638b62cd76",
+          "name": "__start__",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264462983478960,
+          "end_time_unix_nano": 1792264462993758920,
+          "duration_nano": 10279960,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "7fe4fa138c12cd75",
+          "parent_span_id": "2e60d82eaffa8bd6",
+          "name": "ChannelWrite<...>",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264462985310301,
+          "end_time_unix_nano": 1792264462987777731,
+          "duration_nano": 2467430,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "e33b93ca3bb06e99",
+          "parent_span_id": "2e60d82eaffa8bd6",
+          "name": "ChannelWrite<start:planner>",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264462988918231,
+          "end_time_unix_nano": 1792264462991669559,
+          "duration_nano": 2751328,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "26cfc765a2026452",
+          "parent_span_id": "d7509c638b62cd76",
+          "name": "planner",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264462995548566,
+          "end_time_unix_nano": 1792264463011037917,
+          "duration_nano": 15489351,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "09ebb9a53842e13a",
+          "parent_span_id": "26cfc765a2026452",
+          "name": "ChannelWrite<...,planner>",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264462999031445,
+          "end_time_unix_nano": 1792264463003611308,
+          "duration_nano": 4579863,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "efc57b88c9b23cc8",
+          "parent_span_id": "26cfc765a2026452",
+          "name": "route_after_planner",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264463005420484,
+          "end_time_unix_nano": 1792264463008320399,
+          "duration_nano": 2899915,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "b14a7908af5c4ee9",
+          "parent_span_id": "d7509c638b62cd76",
+          "name": "architect",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264463013262891,
+          "end_time_unix_nano": 1792264463042138006,
+          "duration_nano": 28875115,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "0986a8e86c22c256",
+          "parent_span_id": "b14a7908af5c4ee9",
+          "name": "ChannelWrite<...,architect>",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264463017442572,
+          "end_time_unix_nano": 1792264463027066830,
+          "duration_nano": 9624258,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "88f432edbe3eff19",
+          "parent_span_id": "b14a7908af5c4ee9",
+          "name": "route_after_architect",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264463030861100,
+          "end_time_unix_nano": 1792264463036768829,
+          "duration_nano": 5907729,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "a7e73f763165c161",
+          "parent_span_id": "d7509c638b62cd76",
+          "name": "coder",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264463046503420,
+          "end_time_unix_nano": 1792264463207525351,
+          "duration_nano": 161021931,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "1920b881bc014dc5",
+          "parent_span_id": "a7e73f763165c161",
+          "name": "ChannelWrite<...,coder>",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264463159222131,
+          "end_time_unix_nano": 1792264463172210377,
+          "duration_nano": 12988246,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "7d6afa850459c589",
+          "parent_span_id": "a7e73f763165c161",
+          "name": "route_after_coder",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264463181202550,
+          "end_time_unix_nano": 1792264463196892150,
+          "duration_nano": 15689600,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "4a171f2b26621e54",
+          "parent_span_id": "d7509c638b62cd76",
+          "name": "coder",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264463217988285,
+          "end_time_unix_nano": 1792264463402725286,
+          "duration_nano": 184737001,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "2e779e3d08346d34",
+          "parent_span_id": "4a171f2b26621e54",
+          "name": "ChannelWrite<...,coder>",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264463350666567,
+          "end_time_unix_nano": 1792264463363002477,
+          "duration_nano": 12335910,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "4c0bbb3adb7adabc",
+          "parent_span_id": "4a171f2b26621e54",
+          "name": "route_after_coder",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264463374844383,
+          "end_time_unix_nano": 1792264463394595191,
+          "duration_nano": 19750808,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "850698dbe92d7b3b",
+          "parent_span_id": "d7509c638b62cd76",
+          "name": "coder",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264463412244965,
+          "end_time_unix_nano": 1792264463591165651,
+          "duration_nano": 178920686,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "595168b14cc693c4",
+          "parent_span_id": "850698dbe92d7b3b",
+          "name": "ChannelWrite<...,coder>",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264463550082455,
+          "end_time_unix_nano": 1792264463561429227,
+          "duration_nano": 11346772,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "02727dcfc3bdf236",
+          "parent_span_id": "850698dbe92d7b3b",
+          "name": "route_after_coder",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264463571465660,
+          "end_time_unix_nano": 1792264463585914594,
+          "duration_nano": 14448934,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "6e057ed9699d6f0f",
+          "parent_span_id": "d7509c638b62cd76",
+          "name": "autonomous_skill_loop",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264463600255731,
+          "end_time_unix_nano": 1792264463667852722,
+          "duration_nano": 67596991,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3ee3026eafcae0b380f9f581993c1559",
+          "span_id": "4c3e257a0ad173c2",
+          "parent_span_id": "6e057ed9699d6f0f",
+          "name": "ChannelWrite<...,autonomous_skill_loop>",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792264463661210689,
+          "end_time_unix_nano": 1792264463665262203,
+          "duration_nano": 4051514,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 22,
+      "retained_spans": 22,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_b9470a981b1a4eab8ff941f1743c58a4",
+      "input_id": "step-5",
+      "step_id": "step-5",
+      "submission_id": "submission-56e03d5287910f25c63d8a6d47addadd",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "d3eb9140e786fb9ea176bfd7f205396a5becb5a429e5842aad98d143a9216c06",
+          "size_bytes": 10263,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "508e8ea1afd0ed96994a26819254fe35dd36cce19ba540f2185b5ac9b2b7384f"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "not_captured",
+      "observed_count": null,
+      "retained_count": 0,
+      "omitted_count": null,
+      "reasons": [
+        "not_enabled"
+      ]
+    }
+  }
+}
