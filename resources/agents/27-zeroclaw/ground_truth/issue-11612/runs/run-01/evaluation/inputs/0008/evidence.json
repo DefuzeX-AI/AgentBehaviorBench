@@ -1,0 +1,141 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_5a98e6cf4da94bfe8f6bb91cf9f451c7",
+  "case_id": "case_af9a7a70eb814606acfad95e51b728a3",
+  "input_id": "step-8",
+  "spans": [
+    {
+      "trace_id": "15299f86dcc77c07001b51a3bbc43c61",
+      "span_id": "d8e15ab8bb9a67a8",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "error",
+      "start_time_unix_nano": 1790289450932266875,
+      "end_time_unix_nano": 1790289475901534452,
+      "duration_nano": 24969267577,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1790289450935114088,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1790289468159369438,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1790289472458909138,
+          "attributes": {}
+        },
+        {
+          "name": "acp.failure",
+          "time_unix_nano": 1790289474790646300,
+          "attributes": {}
+        },
+        {
+          "name": "acp.stderr",
+          "time_unix_nano": 1790289475796629282,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "15299f86dcc77c07001b51a3bbc43c61",
+      "span_id": "d05ea76a469b8734",
+      "parent_span_id": "d8e15ab8bb9a67a8",
+      "name": "file_write",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790289468163392623,
+      "end_time_unix_nano": 1790289468174434660,
+      "duration_nano": 11042037,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "file_write",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "newText": "import os\nimport sys\n\n# apply_plan.py — idempotent executor for plan.txt (contract v1)\n# Policy: create only, never overwrite/modify existing resources.\n\nactions = []\n\n# [1] CREATE FILE notes.txt (only if absent)\nnotes = \"notes.txt\"\nif os.path.exists(notes):\n    if os.path.isfile(notes):\n        state = \"already-present (no-op)\"\n    else:\n        print(f\"HALT: {notes} exists but is not a regular file\", file=sys.stderr)\n        sys.exit(1)\nelse:\n    with open(notes, \"x\") as f:\n        pass  # empty content per plan\n    state = \"CREATED\"\nactions.append(f\"[1] {notes}: {state}\")\n\n# [2] CREATE DIRECTORY archive/ (only if absent)\narchive = \"archive\"\nif os.path.exists(archive):\n    if os.path.isdir(archive):\n        state = \"already-present (no-op)\"\n    else:\n        print(f\"HALT: {archive} exists but is not a directory\", file=sys.stderr)\n        sys.exit(1)\nelse:\n    os.mkdir(archive)\n    state = \"CREATED\"\nactions.append(f\"[2] {archive}/: {state}\")\n\n# [3] VERIFY (read-only)\nok = os.path.isfile(notes) and os.path.isdir(archive)\nactions.append(f\"[3] verify: {'PASS (2/2 declared resources present)' if ok else 'FAIL'}\")\n\nprint(\"\\n\".join(actions))\nsys.exit(0 if ok else 1)\n",
+          "path": "apply_plan.py"
+        },
+        "gen_ai.tool.call.result": "Written 1182 bytes to apply_plan.py",
+        "gen_ai.tool.call.id": "call_a56c7d61afb748709c9ed54e"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "15299f86dcc77c07001b51a3bbc43c61",
+      "span_id": "36f705b1c4bffafe",
+      "parent_span_id": "d8e15ab8bb9a67a8",
+      "name": "shell",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790289472464577560,
+      "end_time_unix_nano": 1790289472493047184,
+      "duration_nano": 28469624,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "shell",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "approved": true,
+          "command": "python3 apply_plan.py"
+        },
+        "gen_ai.tool.call.result": "[1] notes.txt: CREATED\n[2] archive/: CREATED\n[3] verify: PASS (2/2 declared resources present)\n",
+        "gen_ai.tool.call.id": "call_3d657ad9f22f4331a049a1fc"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 28,
+  "truncated": false,
+  "reasons": [
+    "trace_attribute_not_allowlisted"
+  ]
+}

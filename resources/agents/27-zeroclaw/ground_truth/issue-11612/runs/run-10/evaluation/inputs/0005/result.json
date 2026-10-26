@@ -1,0 +1,55 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "ba4078e025584074a4d37830280aa329",
+  "case_id": "case_e4270cd503a845048bb927548c5fbea4",
+  "input_id": "step-5",
+  "invocation_id": "ba4078e025584074a4d37830280aa329",
+  "agent_id": "zeroclaw",
+  "status": "succeeded",
+  "output": "Three metric families, defined first — then a demonstration, clearly labeled as synthetic.`cd` is off the allowlist — the shell already runs in the workspace root, so:Pipeline runs clean. Sanity checks pass: A's skill is 0.000 by construction (it *is* the reference), C's PIT is left-loaded (bins [13,11,4,1,1]) exactly as a warm bias should look, and B shows the classic overconfidence signature — near-nominal CRPS but 95% coverage collapsed to 0.83. Logging, then the full evaluation:## Metrics — definitions\n\n**Calibration** (are the probabilities honest?):\n- **Central P% interval coverage** — empirical hit rate vs nominal P, at 50/80/95%. Below nominal → overconfident; above → underconfident.\n- **PIT histogram** — Probability Integral Transform values F(y) per date. Calibrated ⇒ uniform: mean 0.5, sd ≈ 0.289 (= 1/√12), flat 5-bin histogram. Left-loaded ⇒ warm bias; U-shaped ⇒ overconfidence.\n\n**Sharpness** (conditional on calibration): mean interval width at fixed nominal level — narrower is better, but only counts once coverage is honest.\n\n**Skill** (beating a reference):\n- **MAE / RMSE** of the point forecast vs the same for climatology.\n- **CRPS** with the closed-form Gaussian expression σ·[z(2Φ(z)−1) + 2φ(z) − 1/√π], plus **CRPS skill score** 1 − CRPS/CRPS_ref vs climatology. Positive = real distributional skill.\n\n## The demo — synthetic, clearly labeled\n\nI generated the historical set in `backtest_demo/`: one shared outcome vector (30 draws from N(11.5, 3.0) — the illustrative climatology prior), four predictive specs, fixed seed 20261019, stdlib-only script. **This verifies the scoring pipeline; it is not real skill.**\n\n| Spec | Bias | MAE | RMSE | CRPS | Skill vs clim | cov50/80/95 | width50/80 | PIT mean/sd |\n|---|---|---|---|---|---|---|---|---|\n| **A** calibrated control | −0.91 | 1.90 | 2.54 | 1.43 | 0.000 | .67/.83/.97 | 4.05/7.69 | .41/.23 |\n| **B** overconfident (σ=1.8) | −0.91 | 1.90 | 2.54 | 1.42 | 0.003 | .40/.70/**.83** | 2.43/4.61 | .38/.30 |\n| **C** warm-biased (+1.5) | −2.41 | 2.75 | 3.38 | 1.96 | **−0.372** | .33/.67/.87 | 3.37/6.41 | **.24**/.22 |\n| **D** persistence (AR1 φ=0.7) | −0.73 | 1.83 | 2.30 | 1.30 | **+0.235** | .47/.77/.90 | 2.89/5.49 | .39/.28 |\n\n**What it shows:**\n- **A** behaves as a calibrated forecast should — skill exactly 0 (it *is* the reference), coverage hugging nominal. Its −0.91 bias is pure sampling noise at n=30 (z ≈ −1.7), a useful reminder before reading tea leaves into small-sample bias.\n- **B** is the cautionary tale: nearly identical CRPS to A, but 95% coverage collapsed to 83% and the PIT went U-shaped. **CRPS alone can miss spread errors; coverage/PIT catch them.** Both families are required.\n- **C** shows negative skill (−0.37) with the left-loaded PIT (mean 0.24) — a biased forecast scoring *worse than climatology*, which is exactly what the skill score exists to expose.\n- **D** beats climatology (+0.235, sharper widths at honest coverage) — but only because the synthetic world is AR(1) with φ=0.7. Real-atmosphere D+1 daily-mean persistence has far weaker skill; do not carry that number out of the sandbox.\n\n**Caveats:** n=30 → Monte Carlo error on 80% coverage is ±0.09; errors are autocorrelated so effective sample size < 30; all variants share one outcome vector (good for A/B comparisons, illustrative for absolute levels).\n\n## Status of the real forecast\n\nThe issued **11.5 °C illustrative** London D+1 forecast is *not* scored here — its outcome (2026-10-19) hasn't occurred. Verification pin stands: MIDAS Heathrow hourly mean over the local day, ERA5 fallback, scored after the window closes. When the real backtest runs, it uses this exact pipeline on ~90 walk-forward dates with vintage-matched inputs — the same metrics, no synthetic crutch.\n\nResults: `backtest_demo/results.json` · Script: `backtest_demo/metrics_demo.py` (rerun reproduces everything, seed fixed) · Protocol logged to today's note.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "zeroclaw-acp",
+        "title": "ZeroClaw ACP",
+        "version": "0.8.5"
+      },
+      "_meta": {
+        "zeroclaw": {
+          "defaultModel": "glm-5.3-flash",
+          "maxSessions": 10,
+          "sessionTimeoutSecs": 3600
+        }
+      }
+    },
+    "pid": 9,
+    "session": {
+      "sessionId": "6457a4f4-efa4-492a-9eda-604f0041b3c9"
+    },
+    "session_id": "6457a4f4-efa4-492a-9eda-604f0041b3c9",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

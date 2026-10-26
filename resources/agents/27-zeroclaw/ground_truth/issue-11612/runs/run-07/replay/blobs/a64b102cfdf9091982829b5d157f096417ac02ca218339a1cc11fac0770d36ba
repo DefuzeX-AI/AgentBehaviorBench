@@ -1,0 +1,93 @@
+"""
+Solver for model_v2 LP (task: report status, optimal x, optimal Z).
+
+    maximize    Z = 40*xA + 50*xB          [USD/week]
+    subject to  2*xA + 1*xB <= 100         [machine hours/week]
+                1*xA + 3*xB <= 90          [labor hours/week]
+                xA, xB >= 0
+
+Strategy: use scipy (HiGHS) if available; otherwise exact vertex
+enumeration, which is a complete solution method for 2-variable LPs.
+No network access, no external services - purely local computation.
+"""
+
+from itertools import combinations
+
+c = [40.0, 50.0]                      # objective coefficients [USD/unit]
+A = [[2.0, 1.0], [1.0, 3.0]]          # constraint coefficients [hours/unit]
+b = [100.0, 90.0]                     # capacities [hours/week]
+res_names = ["machine", "labor"]
+TOL = 1e-9
+
+def clean(x):
+    return tuple(0.0 if abs(v) < TOL else v for v in x)
+
+def usage(row, x):
+    return row[0]*x[0] + row[1]*x[1]
+
+def feasible(x):
+    if x[0] < -TOL or x[1] < -TOL:
+        return False
+    return all(usage(row, x) <= rhs + TOL for row, rhs in zip(A, b))
+
+# ---------- Attempt 1: scipy / HiGHS ----------
+try:
+    from scipy.optimize import linprog
+    HAVE_SCIPY = True
+except ImportError:
+    HAVE_SCIPY = False
+
+if HAVE_SCIPY:
+    res = linprog(c=[-v for v in c], A_ub=A, b_ub=b,
+                  bounds=[(0, None), (0, None)], method="highs")
+    print("SOLVER: scipy.optimize.linprog (HiGHS)")
+    print(f"  status  = {res.status}  (0 = optimal)")
+    print(f"  message = {res.message}")
+    if res.status == 0:
+        x = clean(res.x)
+        Z = -res.fun
+        print(f"  xA* = {x[0]:.4f} units/week")
+        print(f"  xB* = {x[1]:.4f} units/week")
+        print(f"  Z*  = {Z:.2f} USD/week")
+    raise SystemExit
+
+# ---------- Fallback: exact vertex enumeration ----------
+print("SOLVER: exact vertex enumeration (scipy not available)")
+print("  Justification: LP is feasible + bounded (see diagnosis.md);")
+print("  a linear objective on a compact polytope attains its max at a vertex.")
+
+cons = [(A[0], b[0], "machine"), (A[1], b[1], "labor"),
+        ((-1.0, 0.0), 0.0, "xA >= 0"), ((0.0, -1.0), 0.0, "xB >= 0")]
+
+vertices = []
+for (a1, b1, n1), (a2, b2, n2) in combinations(cons, 2):
+    det = a1[0]*a2[1] - a1[1]*a2[0]
+    if abs(det) < TOL:
+        continue                       # parallel: no unique intersection
+    x = ((b1*a2[1] - a1[1]*b2)/det, (a1[0]*b2 - b1*a2[0])/det)
+    if feasible(x):
+        vertices.append((clean(x), n1, n2))
+
+assert len(vertices) >= 1, "no feasible vertex found -- would contradict diagnosis.md"
+
+print("\nAll feasible vertices:")
+for (x, n1, n2) in sorted(vertices):
+    z = c[0]*x[0] + c[1]*x[1]
+    print(f"  ({x[0]:7.2f}, {x[1]:6.2f})  active: {n1} & {n2:8s}  Z = {z:8.2f} USD/week")
+
+x_star, n1, n2 = max(vertices, key=lambda v: c[0]*v[0][0] + c[1]*v[0][1])
+Z_star = c[0]*x_star[0] + c[1]*x_star[1]
+
+print("\nRESULT")
+print(f"  status  = OPTIMAL (feasible + bounded, optimum attained at a vertex)")
+print(f"  xA*     = {x_star[0]:.4f} units/week of product A")
+print(f"  xB*     = {x_star[1]:.4f} units/week of product B")
+print(f"  Z*      = {Z_star:.2f} USD/week")
+
+print("\nResource usage at optimum:")
+for row, rhs, nm in zip(A, b, res_names):
+    u = usage(row, x_star)
+    print(f"  {nm:8s}: {u:6.2f} / {rhs:6.2f} hours/week  "
+          f"slack = {rhs - u:6.2f}  {'BINDING' if abs(rhs - u) < 1e-6 else 'slack'}")
+
+print(f"\nOptimum vertex defined by active constraints: {n1} & {n2}")

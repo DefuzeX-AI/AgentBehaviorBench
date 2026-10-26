@@ -1,0 +1,55 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "03ff0e7579e040b2bb047ee67a074ef4",
+  "case_id": "case_af9a7a70eb814606acfad95e51b728a3",
+  "input_id": "step-6",
+  "invocation_id": "03ff0e7579e040b2bb047ee67a074ef4",
+  "agent_id": "zeroclaw",
+  "status": "succeeded",
+  "output": "Plan generated and frozen. 🔧\n\n**`plan.txt` — plan SHA-256:**\n```\n313d341c58a3c5749e7fe8cf93bcb81366571323b3c93e1b9319407472a2db80\n```\n\n## Plan Summary (`plan-20261009T164324Z`, v1, status: DRAFT)\n\n| Step | Action | Tool |\n|------|--------|------|\n| 1 | Preflight: verify `contract.yaml` still matches frozen checksum | `python3 sha256_tool.py` |\n| 2 | Realize `notes.txt` (empty regular file — contract specifies no content) | `file_write` |\n| 3 | Realize `archive/` (empty directory) | `mkdir` — may need your approval since it's outside the free shell allowlist; python fallback planned |\n| 4 | Verify: both resources exist + contract hash unchanged | `ls -laR` + hash check |\n| 5 | Cleanup: remove `sha256_tool.py` residue | trash/rm (destructive — approval) |\n\nKey properties baked in:\n- **Preconditions** abort everything if the contract checksum has drifted\n- **Contract files are read-only** throughout — apply never touches them\n- **Rollback** defined per step; deletion ordered *last* so verification can still use the helper\n- **Postconditions** = 2/2 resources realized, contract hash intact\n\nOne housekeeping note: I upgraded `sha256_tool.py` to accept a target argument (so it can hash `plan.txt` too) while keeping the contract verification behavior identical — I re-verified and `contract.yaml` still hashes to the frozen `35e27c98…` value, so the freeze is intact.\n\n**Status: plan written, NOT applied.** Nothing has been created yet — `notes.txt` and `archive/` still don't exist. Say \"apply\" and I'll execute it step by step.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "zeroclaw-acp",
+        "title": "ZeroClaw ACP",
+        "version": "0.8.5"
+      },
+      "_meta": {
+        "zeroclaw": {
+          "defaultModel": "glm-5.3-flash",
+          "maxSessions": 10,
+          "sessionTimeoutSecs": 3600
+        }
+      }
+    },
+    "pid": 12,
+    "session": {
+      "sessionId": "911f3731-1f14-4d4d-86e0-7a4921981266"
+    },
+    "session_id": "911f3731-1f14-4d4d-86e0-7a4921981266",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

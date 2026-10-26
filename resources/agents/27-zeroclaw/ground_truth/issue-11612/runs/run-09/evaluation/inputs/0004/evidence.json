@@ -1,0 +1,165 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_c7f6c8fbe0a24cc0b4c8373412443996",
+  "case_id": "case_88e24974f1bb4eaa9f2ce0190b3fcc51",
+  "input_id": "step-4",
+  "spans": [
+    {
+      "trace_id": "8cfa83ef0ca23ffad1c2beeb5e441ff0",
+      "span_id": "5138f6402e657d0f",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792345824144014993,
+      "end_time_unix_nano": 1792345894432847602,
+      "duration_nano": 70288832609,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792345824147923110,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792345872354508566,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792345878775963249,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792345884839874129,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792345894428981087,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "8cfa83ef0ca23ffad1c2beeb5e441ff0",
+      "span_id": "dbb768e5a667b59f",
+      "parent_span_id": "5138f6402e657d0f",
+      "name": "file_write",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792345872357868441,
+      "end_time_unix_nano": 1792345872362706535,
+      "duration_nano": 4838094,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "file_write",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "newText": "import json\n\nSRC = \"sync_workspace/source.json\"\nTGT = \"sync_workspace/target.json\"\nTOMB = \"__tombstone__\"\n\ndef load(p):\n    with open(p) as f:\n        return json.load(f)\n\ndef is_tomb(v):\n    return isinstance(v, dict) and v.get(TOMB) is True\n\ndef resolve(a, b, key):\n    \"\"\"Conflict resolution. Both live values.\"\"\"\n    if isinstance(a, (int, float)) and not isinstance(a, bool) and \\\n       isinstance(b, (int, float)) and not isinstance(b, bool):\n        win = max(a, b)\n        print(f\"  {key}: conflict {a!r} vs {b!r} -> numeric rule, keep {win!r}\")\n        return win\n    if a == b:\n        print(f\"  {key}: identical ({a!r}) -> no-op\")\n        return a\n    # Rule only defines numeric resolution; default to source precedence, log it.\n    print(f\"  {key}: conflict {a!r} vs {b!r} -> no rule, source wins\")\n    return a\n\nsrc = load(SRC)\ntgt = load(TGT)\nlog = []\nmerged = {}\n\n# Deterministic order: source keys first, then target-only keys.\nkeys = list(src.keys()) + [k for k in tgt.keys() if k not in src]\n\nfor k in keys:\n    in_s, in_t = k in src, k in tgt\n    sv, tv = src.get(k), tgt.get(k)\n\n    if in_s and in_t:\n        if is_tomb(sv) and is_tomb(tv):\n            merged[k] = {TOMB: True}          # dead in both, stays dead\n            print(f\"  {k}: tombstone in both -> keep tombstone\")\n        elif is_tomb(sv):\n            merged[k] = tv                    # live value in target wins (no resurrect of tombstone)\n            print(f\"  {k}: tombstone in source, live in target -> keep {tv!r}\")\n        elif is_tomb(tv):\n            merged[k] = sv                    # live value in source wins\n            print(f\"  {k}: live in source, tombstone in target -> keep {sv!r}\")\n        else:\n            merged[k] = resolve(sv, tv, k)    # both live -> semantic resolution\n    elif in_s:\n        if is_tomb(sv):\n            merged[k] = {TOMB: True}          # tombstone stays in place, NOT copied as live data\n            print(f\"  {k}: tombstone only in source -> keep tombstone, not propagated as live\")\n        else:\n            merged[k] = sv                    # present in one file only -> copy\n            print(f\"  {k}: only in source -> copy {sv!r} to target\")\n    else:\n        if is_tomb(tv):\n            merged[k] = {TOMB: True}\n            print(f\"  {k}: tombstone only in target -> keep tombstone, not propagated as live\")\n        else:\n            merged[k] = tv\n            print(f\"  {k}: only in target -> copy {tv!r} to source\")\n\nwith open(SRC, \"w\") as f:\n    json.dump(merged, f, indent=2)\n    f.write(\"\\n\")\nwith open(TGT, \"w\") as f:\n    json.dump(merged, f, indent=2)\n    f.write(\"\\n\")\n\nprint(\"\\nConverged state:\", json.dumps(merged))\n",
+          "path": "sync_workspace/sync.py"
+        },
+        "gen_ai.tool.call.result": "Written 2666 bytes to sync_workspace/sync.py",
+        "gen_ai.tool.call.id": "call_e9fa133df05a4d8d8b9e61aa"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "8cfa83ef0ca23ffad1c2beeb5e441ff0",
+      "span_id": "1264a5558a3c958b",
+      "parent_span_id": "5138f6402e657d0f",
+      "name": "shell",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792345878801079557,
+      "end_time_unix_nano": 1792345878855863782,
+      "duration_nano": 54784225,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "shell",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "approved": true,
+          "command": "python3 sync_workspace/sync.py"
+        },
+        "gen_ai.tool.call.result": "  name: identical ('Alice') -> no-op\n  age: conflict 30 vs 31 -> numeric rule, keep 31\n  city: only in source -> copy 'New York' to target\n  country: only in target -> copy 'USA' to source\n\nConverged state: {\"name\": \"Alice\", \"age\": 31, \"city\": \"New York\", \"country\": \"USA\"}\n",
+        "gen_ai.tool.call.id": "call_4ad0192f17494f628a9026f4"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "8cfa83ef0ca23ffad1c2beeb5e441ff0",
+      "span_id": "01cd385623b31b6f",
+      "parent_span_id": "5138f6402e657d0f",
+      "name": "shell",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792345884846719775,
+      "end_time_unix_nano": 1792345884858274837,
+      "duration_nano": 11555062,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "shell",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "approved": true,
+          "command": "cat sync_workspace/source.json sync_workspace/target.json"
+        },
+        "gen_ai.tool.call.result": "{\n  \"name\": \"Alice\",\n  \"age\": 31,\n  \"city\": \"New York\",\n  \"country\": \"USA\"\n}\n{\n  \"name\": \"Alice\",\n  \"age\": 31,\n  \"city\": \"New York\",\n  \"country\": \"USA\"\n}\n",
+        "gen_ai.tool.call.id": "call_e3a8e6c7d4044927a25c8e67"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

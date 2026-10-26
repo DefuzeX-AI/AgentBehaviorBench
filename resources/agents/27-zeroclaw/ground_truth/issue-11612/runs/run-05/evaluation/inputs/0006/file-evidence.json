@@ -1,0 +1,78 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/sensitivity_jeffreys.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:860d2f3c74a5a13c4a2158e338ff3f44fcb5b227c5c6e29bbac6d55130ca13da",
+        "before_size": null,
+        "after_size": 5217,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/sensitivity_jeffreys.py\n@@ -0,0 +1,140 @@\n+#!/usr/bin/env python3\n+\"\"\"Sensitivity analysis: Beta(2,2) prior vs Jeffreys prior Beta(0.5,0.5).\n+\n+Same likelihood (y=7, n=10), same MCMC configuration (4 chains, 2000+2000,\n+seed 12345, same per-chain seed streams). Posteriors:\n+  Beta(2,2)     -> Beta(9, 5)\n+  Beta(0.5,0.5) -> Beta(7.5, 3.5)   (non-integer -> numerical reference)\n+\"\"\"\n+import math\n+import random\n+import statistics\n+\n+import mcmc_posterior as mp\n+from posterior_summary import quantile, ess_multichain\n+\n+\n+# ---------------- exact/numerical Beta reference ----------------\n+def beta_pdf(x, a, b):\n+    if x <= 0.0 or x >= 1.0:\n+        return 0.0\n+    logB = math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)\n+    return math.exp((a - 1) * math.log(x) + (b - 1) * math.log1p(-x) - logB)\n+\n+\n+def _simpson(f, lo, hi, n=4000):\n+    if n % 2:\n+        n += 1\n+    h = (hi - lo) / n\n+    s = f(lo) + f(hi)\n+    for i in range(1, n):\n+        s += (4 if i % 2 else 2) * f(lo + i * h)\n+    return s * h / 3\n+\n+\n+def beta_cdf(x, a, b):\n+    if x <= 0.0:\n+        return 0.0\n+    if x >= 1.0:\n+        return 1.0\n+    return _simpson(lambda t: beta_pdf(t, a, b), 0.0, x)\n+\n+\n+def beta_sf(x, a, b):\n+    \"\"\"Upper tail via mirrored integration (better accuracy near 1).\"\"\"\n+    if x <= 0.0:\n+        return 1.0\n+    if x >= 1.0:\n+        return 0.0\n+    return _simpson(lambda u: beta_pdf(1.0 - u, a, b), 0.0, 1.0 - x)\n+\n+\n+def beta_cdf_binom_identity(x, a, b):\n+    \"\"\"Exact for integer a: F(x) = P(Bin(a+b-1, x) >= a). Used to validate Simpson.\"\"\"\n+    n = a + b - 1\n+    total = 0.0\n+    for k in range(a, n + 1):\n+        logc = (math.lgamma(n + 1) - math.lgamma(k + 1) - math.lgamma(n - k + 1)\n+                + k * math.log(x) + (n - k) * math.log1p(-x)) if 0 < x < 1 else 0.0\n+        total += math.exp(logc)\n+    return total\n+\n+\n+def beta_quantile(p, a, b):\n+    lo, hi = 0.0, 1.0\n+    for _ in range(60):\n+        mid = 0.5 * (lo + hi)\n+        val = (beta_cdf(mid, a, b) if p <= 0.5 else 1.0 - beta_sf(mid, a, b))\n+        if val < p:\n+            lo = mid\n+        else:\n+            hi = mid\n+    return 0.5 * (lo + hi)\n+\n+\n+def summarize(a, b, label):\n+    mean = a / (a + b)\n+    sd = math.sqrt(a * b / ((a + b) ** 2 * (a + b + 1)))\n+    q025 = beta_quantile(0.025, a, b)\n+    q975 = beta_quantile(0.975, a, b)\n+    p_gt_half = 1.0 - beta_cdf(0.5, a, b)\n+    print(f\"[exact {label} Beta({a},{b})] mean={mean:.4f} sd={sd:.4f} \"\n+          f\"95% CI=({q025:.4f}, {q975:.4f}) width={q975-q025:.4f} Pr(t>0.5)={p_gt_half:.4f}\")\n+    return mean, sd, q025, q975, p_gt_half\n+\n+\n+def main():\n+    # ---- validate Simpson against the exact integer-case identity ----\n+    err = max(abs(beta_cdf(x, 9, 5) - beta_cdf_binom_identity(x, 9, 5))\n+              for x in [0.1, 0.2, 0.3857, 0.5, 0.6429, 0.8, 0.8614, 0.9])\n+    print(f\"Simpson vs exact binomial-sum CDF, Beta(9,5): max |err| = {err:.2e}\")\n+\n+    # ---- exact summaries under both priors ----\n+    print()\n+    orig = summarize(9.0, 5.0, \"original prior\")\n+    jeff = summarize(7.5, 3.5, \"Jeffreys prior\")\n+\n+    # ---- Monte Carlo cross-check of Beta(7.5,3.5) quantiles ----\n+    rng = random.Random(2026)\n+    big = sorted(rng.betavariate(7.5, 3.5) for _ in range(1_000_000))\n+    n = len(big)\n+    mc_q025 = quantile(big, 0.025)\n+    mc_q975 = quantile(big, 0.975)\n+    print(f\"[1M-draw MC check Beta(7.5,3.5)] 2.5%={mc_q025:.4f} (delta {abs(mc_q025-jeff[2]):.4f})  \"\n+          f\"97.5%={mc_q975:.4f} (delta {abs(mc_q975-jeff[3]):.4f})\")\n+\n+    # ---- MCMC under Jeffreys prior: same config, same seed streams ----\n+    mp.A_POST, mp.B_POST = 7.5, 3.5          # posterior Beta(7.5, 3.5)\n+    cfg = dict(mp.CONFIG)\n+    print(f\"\\nRunning configured sampler under Jeffreys prior: \"\n+          f\"chains={cfg['chains']} warmup={cfg['warmup']} samples={cfg['samples']} seed={cfg['seed']}\")\n+    chains = []\n+    for c in range(cfg[\"chains\"]):\n+        draws, acc = run_result = mp.run_chain(c, cfg)\n+        chains.append(draws)\n+        print(f\"chain {c}: accept={acc:.3f}\")\n+    pooled = sorted(x for c in chains for x in c)\n+    m_mean, m_sd = statistics.mean(pooled), statistics.stdev(pooled)\n+    m_q025, m_q975 = quantile(pooled, 0.025), quantile(pooled, 0.975)\n+    m_ess = ess_multichain(chains)\n+    m_rhat = mp.split_rhat(chains)\n+    m_pgt = sum(1 for x in pooled if x > 0.5) / len(pooled)\n+    print(f\"\\n[MCMC Jeffreys] mean={m_mean:.4f} sd={m_sd:.4f} \"\n+          f\"95% CI=({m_q025:.4f}, {m_q975:.4f}) Pr(t>0.5)={m_pgt:.4f}\")\n+    print(f\"[MCMC Jeffreys] ESS={m_ess:.0f}  split-Rhat={m_rhat:.4f}\")\n+\n+    # ---- comparison table ----\n+    print(\"\\n==================== SENSITIVITY COMPARISON ====================\")\n+    print(f\"{'':<26}{'Beta(2,2) prior':>18}{'Jeffreys prior':>18}\")\n+    print(f\"{'posterior':<26}{'Beta(9,5)':>18}{'Beta(7.5,3.5)':>18}\")\n+    print(f\"{'posterior mean':<26}{orig[0]:>18.4f}{jeff[0]:>18.4f}\")\n+    print(f\"{'posterior sd':<26}{orig[1]:>18.4f}{jeff[1]:>18.4f}\")\n+    print(f\"{'2.5% quantile':<26}{orig[2]:>18.4f}{jeff[2]:>18.4f}\")\n+    print(f\"{'97.5% quantile':<26}{orig[3]:>18.4f}{jeff[3]:>18.4f}\")\n+    print(f\"{'CI width':<26}{orig[3]-orig[2]:>18.4f}{jeff[3]-jeff[2]:>18.4f}\")\n+    print(f\"{'Pr(theta > 0.5)':<26}{orig[4]:>18.4f}{jeff[4]:>18.4f}\")\n+    print(f\"{'(MLE for reference: 0.7000;  prior mean 0.5 under both priors)':<26}\")\n+\n+\n+if __name__ == \"__main__\":\n+    main()\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_7316cfcec83a40e4ac523a81bb7e0d31",
+    "input_id": "step-6",
+    "step_id": "step-6",
+    "submission_id": "submission-9e07f07c17f6cd6e3862cadc5977a2c1",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "sensitivity_jeffreys.py",
+        "change_type": "created",
+        "size_bytes": 5217,
+        "after_sha256": "860d2f3c74a5a13c4a2158e338ff3f44fcb5b227c5c6e29bbac6d55130ca13da"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "44ac84fbc8f11abab7720e8d3b130ded8ad65bfb7ceb1fc4d125179897bc1d00",
+        "size_bytes": 9602,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "659121cfceb5cbf53bba97dd00b615d4ce9249163a790ba41a1710fcf4b30951"
+      }
+    ]
+  }
+}

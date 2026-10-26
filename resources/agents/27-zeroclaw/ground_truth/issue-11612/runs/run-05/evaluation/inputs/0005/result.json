@@ -1,0 +1,55 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "c26f1d49a35d46f88f0f00aa3c76ff43",
+  "case_id": "case_0607cdf2f92f4be6ae123c6eec631443",
+  "input_id": "step-5",
+  "invocation_id": "c26f1d49a35d46f88f0f00aa3c76ff43",
+  "agent_id": "zeroclaw",
+  "status": "succeeded",
+  "output": "Posterior predictive check time. I'll simulate y_rep from the posterior predictive using the MCMC posterior sample (thinned to 1000 draws), compute the one-sided p-value Pr(y_rep ≥ 7), and validate against the exact Beta-Binomial(10, 9, 5) reference:## Posterior Predictive Check — Results\n\n**Procedure:** For each of 1000 posterior draws θ⁽ˢ⁾ (thinned from the 8000-draw MCMC sample, seed 12345), simulate y_rep⁽ˢ⁾ ~ Binomial(10, θ⁽ˢ⁾). Test statistic T(y) = y; p-value = Pr(y_rep ≥ 7 | y).\n\n### Predictive Distribution of y_rep\n\n| | Simulated (MCMC) | Exact Beta-Binomial(10, 9, 5) |\n|---|---|---|\n| Mean | 6.50 | 6.43 |\n| SD | 1.93 | 1.92 |\n\nThe replicated counts track the exact Beta-Binomial pmf closely across the whole range 0–10 (e.g., y=6: 0.202 vs 0.184; y=7: 0.187 vs 0.197; y=10: 0.042 vs 0.038) — the posterior predictive was reproduced correctly.\n\n### P-value\n\n| Source | Pr(y_rep ≥ 7 \\| y) |\n|---|---|\n| **MCMC posterior draws** | **0.517** (MC SE ≈ 0.016) |\n| Direct Beta(9, 5) draws (cross-check) | 0.498 |\n| Analytic exact tail (reference) | 0.5101 |\n\n**p-value ≈ 0.51** — all three routes agree within Monte Carlo error.\n\n### Interpretation\n\n- The observed y = 7 sits essentially at the **center of its own posterior predictive distribution** (predictive mean 6.43, and 7 is the joint-modal region together with 6). A one-sided p of 0.51 is as far from the rejection region (< 0.05 or > 0.95) as a p-value can get.\n- Put differently: if you re-ran this experiment 10 more times under the fitted model, a result at least as extreme as 7 successes would happen about half the time. There is **zero evidence of model misfit** — the observed data are exactly the kind of dataset this posterior expects.\n- Complement for context: Pr(y_rep ≤ 7) = 0.687, so 7 is around the 49th–69th percentile band of the predictive CDF — nowhere near either tail.\n\n✅ The Beta(2, 2) prior + Binomial model passes the posterior predictive check cleanly. Artifacts: `ppc_posterior.py` (runnable, includes the exact-analytic cross-check).",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "zeroclaw-acp",
+        "title": "ZeroClaw ACP",
+        "version": "0.8.5"
+      },
+      "_meta": {
+        "zeroclaw": {
+          "defaultModel": "glm-5.3-flash",
+          "maxSessions": 10,
+          "sessionTimeoutSecs": 3600
+        }
+      }
+    },
+    "pid": 12,
+    "session": {
+      "sessionId": "60fdc7a0-b77b-4872-aa30-456285d0d2b9"
+    },
+    "session_id": "60fdc7a0-b77b-4872-aa30-456285d0d2b9",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

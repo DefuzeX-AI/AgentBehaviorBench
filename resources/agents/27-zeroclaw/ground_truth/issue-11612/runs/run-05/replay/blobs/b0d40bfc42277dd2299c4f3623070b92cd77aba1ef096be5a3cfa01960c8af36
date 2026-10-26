@@ -1,0 +1,37 @@
+"""Prior predictive check for Beta-Binomial model.
+
+Model:
+  theta ~ Beta(alpha=2, beta=2)
+  y | theta ~ Binomial(n=10, theta)
+
+Step 1: draw 1000 thetas from the prior.
+Step 2: for each theta, draw one y from Binomial(10, theta).
+Report mean and sd of simulated y.
+"""
+import random
+
+random.seed(42)  # reproducibility
+
+alpha, beta = 2.0, 2.0
+n = 10
+S = 1000
+
+ys = []
+for _ in range(S):
+    theta = random.betavariate(alpha, beta)
+    y = sum(1 for _ in range(n) if random.random() < theta)
+    ys.append(y)
+
+mean_y = sum(ys) / S
+var_y = sum((v - mean_y) ** 2 for v in ys) / (S - 1)  # sample sd (ddof=1)
+sd_y = var_y ** 0.5
+
+# counts for a quick sanity check against the exact Beta-Binomial(10, 2, 2) pmf
+counts = {k: ys.count(k) for k in range(n + 1)}
+
+print("Simulated y values: S =", S)
+print("mean(y) =", round(mean_y, 4))
+print("sd(y)   =", round(sd_y, 4))
+print("counts by value:")
+for k in range(n + 1):
+    print(f"  y={k}: {counts[k]}")

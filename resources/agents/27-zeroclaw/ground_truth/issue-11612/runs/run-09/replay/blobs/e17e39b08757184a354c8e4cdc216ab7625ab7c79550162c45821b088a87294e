@@ -1,0 +1,67 @@
+# Synchronization Rules
+
+## Rule: R1 — Deletion Propagation via Tombstones
+
+**Status:** Active
+**Scope:** Bidirectional sync between `source.json` and `target.json`
+
+### Rule Statement
+
+When a field (key) is **deleted** from one file, the deletion must be
+propagated to the other file as a **tombstone marker** rather than by
+removing the key outright.
+
+### Transformation
+
+- **Trigger:** Field `K` exists in file A and file B at the start of a sync
+  cycle, but is absent from file A after a modification.
+- **Action:** In file B, set the key `K` to a tombstone object:
+
+  ```json
+  "K": { "__tombstone__": true }
+  ```
+
+  If a flat boolean is preferred for top-level fields, the marker may be
+  written directly as `"K": { "__tombstone__": true }` — the object form is
+  canonical because it leaves room for metadata (e.g. timestamps) later.
+
+### Example
+
+**Before deletion** (both files in sync):
+
+```json
+// source.json          // target.json
+{ "alpha": 1, "beta": 2 }   { "alpha": 1, "beta": 2 }
+```
+
+**User deletes `beta` from `source.json`:**
+
+```json
+// source.json          // target.json (after sync)
+{ "alpha": 1 }          { "alpha": 1, "beta": { "__tombstone__": true } }
+```
+
+### Semantics
+
+1. **Tombstones are not live data.** A key whose value is
+   `{ "__tombstone__": true }` must be treated as *deleted* by all
+   readers and sync passes — never as an ordinary field.
+2. **Idempotence:** Applying the tombstone rule to an already-tombstoned
+   key is a no-op. Existing tombstones are never overwritten by the
+   same deletion event.
+3. **Conflict — re-creation:** If a tombstoned key is assigned a new
+   (non-tombstone) value in either file, that write wins and the
+   tombstone is cleared in the other file on the next sync.
+4. **Conflict — delete vs. update:** If the key is deleted in file A but
+   *modified* in file B within the same sync window, the modification
+   wins and the deletion is discarded (update-beats-delete).
+5. **Cleanup (optional):** Tombstones may be garbage-collected after a
+   full successful sync cycle in which both files agree the key is dead.
+   Until then they must persist to preserve deletion knowledge.
+
+### Prohibited Behaviors
+
+- ❌ Silently removing the key from the peer file (destroys the record
+  that a deletion happened).
+- ❌ Treating `{ "__tombstone__": true }` as a user-supplied value.
+- ❌ Re-inserting a tombstoned key with its old value.

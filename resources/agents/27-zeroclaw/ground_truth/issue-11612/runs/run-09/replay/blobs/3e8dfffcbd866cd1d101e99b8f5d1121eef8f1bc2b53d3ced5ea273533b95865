@@ -1,0 +1,64 @@
+import json
+
+SRC = "sync_workspace/source.json"
+TGT = "sync_workspace/target.json"
+TOMB = "__tombstone__"
+
+def load(p):
+    with open(p) as f:
+        return json.load(f)
+
+def save(p, doc):
+    with open(p, "w") as f:
+        json.dump(doc, f, indent=2)
+        f.write("\n")
+
+def is_tomb(v):
+    return isinstance(v, dict) and v.get(TOMB) is True
+
+# ---- Step 1: simulate deletion of 'city' in source ----
+src = load(SRC)
+src.pop("city", None)          # remove live value
+src["city"] = {TOMB: True}     # plant tombstone per R1
+save(SRC, src)
+print("Step 1 — source.json after simulated deletion:")
+print(json.dumps(src, indent=2))
+
+# ---- Step 2: delta sync, source -> target ONLY ----
+tgt = load(TGT)
+print("\nStep 2 — delta sync (source -> target):")
+for k, sv in src.items():
+    if is_tomb(sv):
+        tgt[k] = {TOMB: True}   # propagate deletion as tombstone
+        print(f"  {k}: tombstone in source -> plant tombstone in target")
+    else:
+        tgt[k] = sv             # propagate live value
+        print(f"  {k}: live in source -> copy {sv!r} to target")
+untouched = [k for k in tgt if k not in src]
+if untouched:
+    print(f"  target-only keys left untouched (one-way sync): {untouched}")
+save(TGT, tgt)
+
+# ---- Step 3: verify ----
+print("\nStep 3 — verification:")
+ok = True
+def check(label, cond, detail=""):
+    global ok
+    print(f"  {'PASS' if cond else 'FAIL'}  {label}{'' if cond else '  ' + detail}")
+    ok = ok and cond
+
+src2, tgt2 = load(SRC), load(TGT)
+
+check("source: 'city' live value removed", src2.get("city") != "New York")
+check("source: 'city' tombstone present", is_tomb(src2.get("city")))
+check("target: 'city' live value ('New York') removed",
+      not (isinstance(tgt2.get("city"), str) and tgt2.get("city") == "New York"),
+      f"(got {tgt2.get('city')!r})")
+check("target: 'city' tombstone present", is_tomb(tgt2.get("city")),
+      f"(got {tgt2.get('city')!r})")
+
+for k, v in (("name", "Alice"), ("age", 31), ("country", "USA")):
+    check(f"target: '{k}' unchanged ({v!r})", tgt2.get(k) == v, f"(got {tgt2.get(k)!r})")
+
+print()
+print("RESULT:", "ALL CHECKS PASSED" if ok else "FAILURES DETECTED")

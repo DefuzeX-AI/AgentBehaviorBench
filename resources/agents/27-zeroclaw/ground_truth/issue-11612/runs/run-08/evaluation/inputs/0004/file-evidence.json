@@ -1,0 +1,152 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/delta_sync.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:6d4ffe160a984ca34492a33ce875d27017a6805ef75c1398bd5bc62d67aeffca",
+        "before_size": null,
+        "after_size": 1528,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/delta_sync.py\n@@ -0,0 +1,49 @@\n+\"\"\"Delta sync: capture new rows from customers.csv and apply them to customers.db.\n+\n+Delta capture = rows in the CSV whose `id` is not yet present in the DB.\n+Delta apply  = INSERT those rows (idempotent on repeat runs: an id already\n+in the DB is never re-inserted).\n+\"\"\"\n+\n+import csv\n+import sqlite3\n+\n+CSV_PATH = \"customers.csv\"\n+DB_PATH = \"customers.db\"\n+\n+\n+def capture_delta(conn: sqlite3.Connection) -> list[dict]:\n+    \"\"\"Return CSV rows whose id is not in the customers table.\"\"\"\n+    existing = {row[0] for row in conn.execute(\"SELECT id FROM customers\")}\n+    with open(CSV_PATH, newline=\"\", encoding=\"utf-8\") as f:\n+        return [r for r in csv.DictReader(f) if int(r[\"id\"]) not in existing]\n+\n+\n+def apply_delta(conn: sqlite3.Connection, rows: list[dict]) -> int:\n+    if not rows:\n+        return 0\n+    conn.executemany(\n+        \"INSERT INTO customers (id, name, email, city) VALUES (?, ?, ?, ?)\",\n+        [(int(r[\"id\"]), r[\"name\"], r[\"email\"], r[\"city\"]) for r in rows],\n+    )\n+    conn.commit()\n+    return len(rows)\n+\n+\n+def main() -> None:\n+    conn = sqlite3.connect(DB_PATH)\n+    try:\n+        delta = capture_delta(conn)\n+        print(f\"Captured delta: {len(delta)} row(s): \"\n+              f\"{[(int(r['id']), r['name']) for r in delta]}\")\n+        applied = apply_delta(conn, delta)\n+        print(f\"Applied {applied} row(s)\")\n+\n+        total = conn.execute(\"SELECT COUNT(*) FROM customers\").fetchone()[0]\n+        print(f\"Total rows in customers table: {total}\")\n+    finally:\n+        conn.close()\n+\n+\n+if __name__ == \"__main__\":\n+    main()\n"
+      },
+      {
+        "path": "/home/agent/workspace/verify.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:ce47a6870e694c435e1a0358597713347dc60e1ce35527979d0a72b58b4dc97d",
+        "before_size": null,
+        "after_size": 453,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/verify.py\n@@ -0,0 +1,14 @@\n+import csv\n+import sqlite3\n+\n+with open(\"customers.csv\", newline=\"\", encoding=\"utf-8\") as f:\n+    csv_rows = [(int(r[\"id\"]), r[\"name\"], r[\"email\"], r[\"city\"]) for r in csv.DictReader(f)]\n+\n+conn = sqlite3.connect(\"customers.db\")\n+db_rows = sorted(conn.execute(\"SELECT id, name, email, city FROM customers\"))\n+conn.close()\n+\n+print(\"CSV rows:\", len(csv_rows), \"| DB rows:\", len(db_rows))\n+print(\"Match:\", sorted(csv_rows) == db_rows)\n+for r in db_rows:\n+    print(r)\n"
+      },
+      {
+        "path": "/home/agent/workspace/customers.csv",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:420c4a98441c35c75ccec643fd244f6276ea9bfa3afbd759d9b170a1bfbdec77",
+        "after_hash": "sha256:9f31bcd178b544cb5642640c69d76f99d26f49fbbb40a665b1846a9d1cc08830",
+        "before_size": 130,
+        "after_size": 163,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/customers.csv\n+++ /home/agent/workspace/customers.csv\n@@ -2,3 +2,4 @@\n 1,Alice,alice@example.com,Springfield\n 2,Bob,bob@example.com,Shelbyville\n 3,Carol,carol@example.com,Capital City\n+4,Dan,dan@example.com,Ogdenville\n"
+      },
+      {
+        "path": "/home/agent/workspace/customers.db",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:17793af7f9752709eb9d1549626cccb1a2d529ecf7c012b9c3990cb59d797a76",
+        "after_hash": "sha256:ac0425fcd12737606378d4437764d2f9576175e052714eebdf8a65e44b8390e9",
+        "before_size": 8192,
+        "after_size": 8192,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": "binary",
+        "diff": null
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 3,
+      "diff_included_count": 3
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_941002f61c0747c1803bd71005e09b33",
+    "input_id": "step-4",
+    "step_id": "step-4",
+    "submission_id": "submission-06fa3eb7108b62bb226c2edebd1d9a82",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "customers.csv",
+        "change_type": "modified",
+        "size_bytes": 163,
+        "before_sha256": "420c4a98441c35c75ccec643fd244f6276ea9bfa3afbd759d9b170a1bfbdec77",
+        "after_sha256": "9f31bcd178b544cb5642640c69d76f99d26f49fbbb40a665b1846a9d1cc08830"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "customers.db",
+        "change_type": "modified",
+        "size_bytes": 8192,
+        "before_sha256": "17793af7f9752709eb9d1549626cccb1a2d529ecf7c012b9c3990cb59d797a76",
+        "after_sha256": "ac0425fcd12737606378d4437764d2f9576175e052714eebdf8a65e44b8390e9"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "file_change",
+        "path": "delta_sync.py",
+        "change_type": "created",
+        "size_bytes": 1528,
+        "after_sha256": "6d4ffe160a984ca34492a33ce875d27017a6805ef75c1398bd5bc62d67aeffca"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "file_change",
+        "path": "verify.py",
+        "change_type": "created",
+        "size_bytes": 453,
+        "after_sha256": "ce47a6870e694c435e1a0358597713347dc60e1ce35527979d0a72b58b4dc97d"
+      },
+      {
+        "component_id": "component-0004",
+        "sequence": 4,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "ae46b82565380ad48970b8af0c5c5f2aecba2989be29d6c3a19943e33cdb91f1",
+        "size_bytes": 7539,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0005",
+        "sequence": 5,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "44227dc1a6d112076717f799f5ed552afb9a7f70fdf8ac403e20770033c842a6"
+      }
+    ]
+  }
+}

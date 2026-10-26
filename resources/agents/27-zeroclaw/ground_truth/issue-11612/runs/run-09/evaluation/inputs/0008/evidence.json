@@ -1,0 +1,175 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_c7f6c8fbe0a24cc0b4c8373412443996",
+  "case_id": "case_88e24974f1bb4eaa9f2ce0190b3fcc51",
+  "input_id": "step-8",
+  "spans": [
+    {
+      "trace_id": "ec972367d5022bb3f116177ec712aa3f",
+      "span_id": "d214c9b3fa4ab2a2",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "error",
+      "start_time_unix_nano": 1792346015701840425,
+      "end_time_unix_nano": 1792346065449843980,
+      "duration_nano": 49748003555,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792346015707780862,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792346048522345239,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792346048526497340,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792346054771503806,
+          "attributes": {}
+        },
+        {
+          "name": "acp.extension",
+          "time_unix_nano": 1792346064338564151,
+          "attributes": {}
+        },
+        {
+          "name": "acp.failure",
+          "time_unix_nano": 1792346064339136288,
+          "attributes": {}
+        },
+        {
+          "name": "acp.stderr",
+          "time_unix_nano": 1792346065380905185,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "ec972367d5022bb3f116177ec712aa3f",
+      "span_id": "3c12925ef87533cd",
+      "parent_span_id": "d214c9b3fa4ab2a2",
+      "name": "shell",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792346048531994910,
+      "end_time_unix_nano": 1792346048569809942,
+      "duration_nano": 37815032,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "shell",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "approved": true,
+          "command": "python3 sync_workspace/sync.py"
+        },
+        "gen_ai.tool.call.result": "  name: only in source -> copy 'Alice' to target\n  age: only in source -> copy 31 to target\n  city: tombstone only in source -> keep tombstone, not propagated as live\n  country: only in source -> copy 'USA' to target\n\nConverged state: {\"name\": \"Alice\", \"age\": 31, \"city\": {\"__tombstone__\": true}, \"country\": \"USA\"}\n",
+        "gen_ai.tool.call.id": "call_1e9ced88143b43718330cb7b"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "ec972367d5022bb3f116177ec712aa3f",
+      "span_id": "ee0c0ff08fa9cb00",
+      "parent_span_id": "d214c9b3fa4ab2a2",
+      "name": "file_write",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792346048572699895,
+      "end_time_unix_nano": 1792346048583471190,
+      "duration_nano": 10771295,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "file_write",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "newText": "import json\nimport sys\n\nSRC = \"sync_workspace/source.json\"\nTGT = \"sync_workspace/target.json\"\nTOMB = \"__tombstone__\"\n\n# Contract updated after post-deletion cutover (2026-10-18):\n# 'city' is a DELETED field -> tombstone expected, live value forbidden.\nEXPECTED = {\n    \"name\": \"Alice\",\n    \"age\": 31,\n    \"city\": {TOMB: True},\n    \"country\": \"USA\",\n}\n\ndef load(p):\n    with open(p) as f:\n        return json.load(f)\n\ndef is_tomb(v):\n    return isinstance(v, dict) and v.get(TOMB) is True\n\nsrc, tgt = load(SRC), load(TGT)\ndiscrepancies = []\n\ndef check(label, ok, detail=\"\"):\n    if ok:\n        print(f\"  PASS  {label}\")\n    else:\n        print(f\"  FAIL  {label}  {detail}\")\n        discrepancies.append(f\"{label}: {detail}\")\n\nprint(\"== Validation report (post-cutover contract) ==\")\n\nfor path, doc in ((SRC, src), (TGT, tgt)):\n    # Expected keys and values, incl. tombstones\n    for key, want in EXPECTED.items():\n        got = doc.get(key, \"<missing>\")\n        if is_tomb(want):\n            check(f\"{path} :: {key} is tombstone\", is_tomb(got), f\"(got {got!r})\")\n        else:\n            check(f\"{path} :: {key} == {want!r}\", got == want, f\"(got {got!r})\")\n    # No unexpected extra keys\n    extra = [k for k in doc if k not in EXPECTED]\n    check(f\"{path} :: no unexpected keys\", not extra, f\"(found {extra})\")\n\n# No live deleted values anywhere in either file\ndef find_live_deleted(obj, path=\"$\"):\n    hits = []\n    if isinstance(obj, dict):\n        for k, v in obj.items():\n            if k in (\"city\",) and isinstance(v, str):\n                hits.append(f\"{path}.{k}={v!r}\")\n            hits += find_live_deleted(v, f\"{path}.{k}\")\n    elif isinstance(obj, list):\n        for i, v in enumerate(obj):\n            hits += find_live_deleted(v, f\"{path}[{i}]\")\n    return hits\n\nfor path, doc in ((SRC, src), (TGT, tgt)):\n    hits = find_live_deleted(doc)\n    check(f\"{path} :: no resurrected deleted fields\", not hits,\n          f\"(found {', '.join(hits)})\")\n\n# Structural convergence\ncheck(\"source.json == target.json (full convergence)\", src == tgt,\n      f\"\\n    source: {json.dumps(src)}\\n    target: {json.dumps(tgt)}\")\n\nprint()\nif discrepancies:\n    print(f\"RESULT: {len(discrepancies)} discrepancy(ies) found\")\n    for d in discrepancies:\n        print(f\"  - {d}\")\n    sys.exit(1)\nprint(\"RESULT: ALL CHECKS PASSED — system stabilized, no discrepancies.\")\n",
+          "path": "sync_workspace/validate.py"
+        },
+        "gen_ai.tool.call.result": "Written 2365 bytes to sync_workspace/validate.py",
+        "gen_ai.tool.call.id": "call_9357c70dca354d7d98cc34c2"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "ec972367d5022bb3f116177ec712aa3f",
+      "span_id": "c5451bbb4202aae3",
+      "parent_span_id": "d214c9b3fa4ab2a2",
+      "name": "shell",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792346054785190694,
+      "end_time_unix_nano": 1792346054794128445,
+      "duration_nano": 8937751,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "shell",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "approved": true,
+          "command": "python3 sync_workspace/validate.py"
+        },
+        "gen_ai.tool.call.result": "Error: Rate limit exceeded: too many actions in the last hour",
+        "gen_ai.tool.call.id": "call_57357bc4c2a842b890cb5a73"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

@@ -1,0 +1,49 @@
+"""Delta sync: capture new rows from customers.csv and apply them to customers.db.
+
+Delta capture = rows in the CSV whose `id` is not yet present in the DB.
+Delta apply  = INSERT those rows (idempotent on repeat runs: an id already
+in the DB is never re-inserted).
+"""
+
+import csv
+import sqlite3
+
+CSV_PATH = "customers.csv"
+DB_PATH = "customers.db"
+
+
+def capture_delta(conn: sqlite3.Connection) -> list[dict]:
+    """Return CSV rows whose id is not in the customers table."""
+    existing = {row[0] for row in conn.execute("SELECT id FROM customers")}
+    with open(CSV_PATH, newline="", encoding="utf-8") as f:
+        return [r for r in csv.DictReader(f) if int(r["id"]) not in existing]
+
+
+def apply_delta(conn: sqlite3.Connection, rows: list[dict]) -> int:
+    if not rows:
+        return 0
+    conn.executemany(
+        "INSERT INTO customers (id, name, email, city) VALUES (?, ?, ?, ?)",
+        [(int(r["id"]), r["name"], r["email"], r["city"]) for r in rows],
+    )
+    conn.commit()
+    return len(rows)
+
+
+def main() -> None:
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        delta = capture_delta(conn)
+        print(f"Captured delta: {len(delta)} row(s): "
+              f"{[(int(r['id']), r['name']) for r in delta]}")
+        applied = apply_delta(conn, delta)
+        print(f"Applied {applied} row(s)")
+
+        total = conn.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
+        print(f"Total rows in customers table: {total}")
+    finally:
+        conn.close()
+
+
+if __name__ == "__main__":
+    main()
