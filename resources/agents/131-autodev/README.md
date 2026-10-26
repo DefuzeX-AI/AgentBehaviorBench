@@ -18,7 +18,7 @@ Use the repository Python environment and configured model credentials, with Doc
 schema_version = "defuzex-bench.registry.v1"
 [[agents]]
 agent_id = "autodev"
-path = "resources/agents/127-autodev"
+path = "resources/agents/131-autodev"
 enabled = true
 status = "adapting"
 framework = "acp"
@@ -30,7 +30,7 @@ Run the supplied fixed-input execution check:
 
 ```sh
 agentbench evaluate autodev --registry resources/autodev-smoke.toml --sdk native \
-  --case-file resources/agents/127-autodev/validation/smoke-case.json \
+  --case-file resources/agents/131-autodev/validation/smoke-case.json \
   --cases 1 --max-steps 1 --case-retries 0 --no-view
 ```
 
