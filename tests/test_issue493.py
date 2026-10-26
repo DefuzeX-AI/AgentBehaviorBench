@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import unittest
 
-path = Path(__file__).resolve().parents[1] / "resources/agents/116-synergy/bootstrap/launch.py"
+path = Path(__file__).resolve().parents[1] / "resources/agents/124-synergy/bootstrap/launch.py"
 spec = importlib.util.spec_from_file_location("synergy_launcher", path)
 launcher = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(launcher)

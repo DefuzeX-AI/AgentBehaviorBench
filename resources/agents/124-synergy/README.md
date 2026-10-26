@@ -12,8 +12,8 @@ symbolic links. Source is ignored and must not be committed. Prepare the source
 in a Linux filesystem before evaluation, preserving this link:
 
 ```sh
-git clone https://github.com/SII-Holos/synergy.git resources/agents/116-synergy/agent
-git -C resources/agents/116-synergy/agent checkout --detach d82f52e4d137831dc3dfdf5ac186c0cb9b5ab584
+git clone https://github.com/SII-Holos/synergy.git resources/agents/124-synergy/agent
+git -C resources/agents/124-synergy/agent checkout --detach d82f52e4d137831dc3dfdf5ac186c0cb9b5ab584
 ```
 
 The link resolves inside the source tree. ABB's existing build staging
