@@ -93,6 +93,8 @@ for installation inputs and manual source prerequisites.
 - [Understanding the Agent registry](docs/Registry.md) — `registry.toml` fields, Agent selection, and Case budgets.
 - [How to add an Agent](docs/How%20To%20Add%20Agent.md)
 - [CLI reference](docs/cli.md)
+- [Native cases and independent Judges (no KUMA required)](docs/Native-Cases.md)
+- [Shared Python and JSON CLI evaluation service](docs/Evaluation-Service.md)
 - [How to start ABB](docs/Guide.md)
 
 ## Evaluation SDK and Judge
@@ -112,6 +114,7 @@ still incur costs. It is not the official Judge used for benchmark results.
 
 ## More documentation
 
+- [Agent-owned result storage and trajectory archives](docs/Result-Storage.md)
 - [Results and troubleshooting](docs/Troubleshooting.md)
 - [Per-Case execution timelines and persisted timings](docs/Runtime-Timings.md)
 

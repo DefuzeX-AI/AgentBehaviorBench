@@ -4,7 +4,7 @@
 
 [README に戻る](README.ja.md)
 
-以下の Agent ソースが現在 ABB に登録されています。
+現在 ABB に登録されている全 59 件の Agent 統合を以下に示します。
 
 ABB は現在、LangGraph Agent のネイティブ統合と、Agent Client Protocol（ACP）を介して
 公開される Agent をサポートしています。
@@ -37,8 +37,42 @@ Folder Mover Agent はローカルディレクトリからインポートされ�
 | `pi-coding-agent` | [earendil-works/pi](https://github.com/earendil-works/pi) | [`13cbf77`](https://github.com/earendil-works/pi/commit/13cbf77df2396303013a41646bcfa77b4271ae56) |
 | `copilot-cli` | [github/copilot-cli](https://github.com/github/copilot-cli) | [`ab6139c`](https://github.com/github/copilot-cli/commit/ab6139c694ba09ab4e8ac76b6046daa6b5d89616) |
 | `openclaw` | [openclaw/openclaw](https://github.com/openclaw/openclaw) | [`ec9c1a1`](https://github.com/openclaw/openclaw/commit/ec9c1a13db8938e5a3eaa51fca2e981cde2395a9) |
-| `hermes-agent` | [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) | [`345cd2b`](https://github.com/NousResearch/hermes-agent/commit/345cd2b057a452236de401d3534b8502a7465e8d) |
+| `hermes-agent` | [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) | [`f97608f`](https://github.com/NousResearch/hermes-agent/commit/f97608f178d1ffeca59860195ab7da295f7c8e5f) |
 | `openhands` | [OpenHands/OpenHands-CLI](https://github.com/OpenHands/OpenHands-CLI) | [`2963442`](https://github.com/OpenHands/OpenHands-CLI/commit/2963442dacc7cea44e39b7c4e73724295c853465) |
 | `deepagents-code` | [langchain-ai/deepagents](https://github.com/langchain-ai/deepagents) | [`a764619`](https://github.com/langchain-ai/deepagents/commit/a764619aa8c850bc75e2e916cf53a587637d8c81) |
+| `open-interpreter` | [openinterpreter/openinterpreter](https://github.com/openinterpreter/openinterpreter) | [`d9b49c8`](https://github.com/openinterpreter/openinterpreter/commit/d9b49c828bf61d820c30e343a22033e3e7999583) |
+| `claurst` | [Kuberwastaken/claurst](https://github.com/Kuberwastaken/claurst) | [`0f5d970`](https://github.com/Kuberwastaken/claurst/commit/0f5d970bd78738434afb0c7abae3350d03246938) |
+| `oh-my-pi` | [can1357/oh-my-pi](https://github.com/can1357/oh-my-pi) | [`e415159`](https://github.com/can1357/oh-my-pi/commit/e4151593ace2781d1dc2f06d760301f88af3e9dc) |
+| `kode-cli` | [shareAI-lab/Kode-CLI](https://github.com/shareAI-lab/Kode-CLI) | [`b5fff92`](https://github.com/shareAI-lab/Kode-CLI/commit/b5fff92e41c1acb1163eae68805790ed2061beb3) |
+| `zeroclaw` | [zeroclaw-labs/zeroclaw](https://github.com/zeroclaw-labs/zeroclaw) | [`cb2b20a`](https://github.com/zeroclaw-labs/zeroclaw/commit/cb2b20a9fe59004b7ef03e123942d31f29236d15) |
+| `jcode` | [1jehuang/jcode](https://github.com/1jehuang/jcode) | [`944f747`](https://github.com/1jehuang/jcode/commit/944f747e922b069a0a6110565103a0222fe1fe93) |
+| `mastracode` | [mastra-ai/mastra](https://github.com/mastra-ai/mastra) | [`429d7b9`](https://github.com/mastra-ai/mastra/commit/429d7b9f935a62a6fa1d71a6fadb5f633d75bbaf) |
+| `open-notebook` | [lfnovo/open-notebook](https://github.com/lfnovo/open-notebook) | [`3127f14`](https://github.com/lfnovo/open-notebook/commit/3127f14ea9dbb519f0e4ddc64a0742ca644ba6ef) |
+| `ai-data-science-team` | [business-science/ai-data-science-team](https://github.com/business-science/ai-data-science-team) | [`4ffeb7f`](https://github.com/business-science/ai-data-science-team/commit/4ffeb7f38178aa250917f29b01355f8b89ba809e) |
+| `local-deep-research` | [LearningCircuit/local-deep-research](https://github.com/LearningCircuit/local-deep-research) | [`ede8a7b`](https://github.com/LearningCircuit/local-deep-research/commit/ede8a7b4a8ac746db176285e1075f327e188be00) |
+| `nanocoder` | [Nano-Collective/nanocoder](https://github.com/Nano-Collective/nanocoder) | [`5987439`](https://github.com/Nano-Collective/nanocoder/commit/59874391f939bdfe93c273a10d23a7a94009edd1) |
+| `article-explainer` | [duartecaldascardoso/article-explainer](https://github.com/duartecaldascardoso/article-explainer) | [`2cf067d`](https://github.com/duartecaldascardoso/article-explainer/commit/2cf067dc4b9158b03361c7b3e2544e067b75f1ae) |
+| `gpt-researcher` | [assafelovic/gpt-researcher](https://github.com/assafelovic/gpt-researcher) | [`0957c30`](https://github.com/assafelovic/gpt-researcher/commit/0957c301ed06c2a5857b834358c7227c739041d4) |
+| `tradingagents` | [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents) | [`8b22d43`](https://github.com/TauricResearch/TradingAgents/commit/8b22d43d01d9ddda5d686d093d5385884622f3de) |
+| `evoscientist` | [EvoScientist/EvoScientist](https://github.com/EvoScientist/EvoScientist) | [`22dd14f`](https://github.com/EvoScientist/EvoScientist/commit/22dd14f1b6ffaf92da58b657086332d9aa3afe78) |
+| `biomedical-aiq-research-agent` | [NVIDIA-AI-Blueprints/biomedical-aiq-research-agent](https://github.com/NVIDIA-AI-Blueprints/biomedical-aiq-research-agent) | [`b5cd7b4`](https://github.com/NVIDIA-AI-Blueprints/biomedical-aiq-research-agent/commit/b5cd7b4c7ae544c1e21ac79ef9fa67641eeff5a4) |
+| `ai-find-customer` | [xiongQvQ/AI_Find_Customer](https://github.com/xiongQvQ/AI_Find_Customer) | [`9b2fde8`](https://github.com/xiongQvQ/AI_Find_Customer/commit/9b2fde8f719623c627516da2663707a893ee6805) |
+| `cra-agent` | [kulkarnirohit123/cra-agent](https://github.com/kulkarnirohit123/cra-agent) | [`4d819a5`](https://github.com/kulkarnirohit123/cra-agent/commit/4d819a56d825ca14013997958eeb3d0e13ab7ebb) |
+| `zhisaotong-agent` | [bamboo-moon/zhisaotong-Agent](https://github.com/bamboo-moon/zhisaotong-Agent) | [`92569e6`](https://github.com/bamboo-moon/zhisaotong-Agent/commit/92569e61ac22ef4d902953a7d916e941921ab92f) |
+| `kiroku` | [cnunescoelho/kiroku](https://github.com/cnunescoelho/kiroku) | [`4b09df8`](https://github.com/cnunescoelho/kiroku/commit/4b09df89774d74e5608a7978d171cccf4bead9a1) |
+| `beacon-math-agent` | [123-qw-as/Beacon](https://github.com/123-qw-as/Beacon) | [`36b0b7d`](https://github.com/123-qw-as/Beacon/commit/36b0b7de6774bc619dc39a80a00a41639909d7e9) |
+| `m-cube` | [yycyyv/M-Cube](https://github.com/yycyyv/M-Cube) | [`75ab640`](https://github.com/yycyyv/M-Cube/commit/75ab640723e19dd612cd13c284c5d6a059e2547b) |
+| `breadfree-simu` | [FeiCoder/BreadFree-Simu](https://github.com/FeiCoder/BreadFree-Simu) | [`6e5d9dd`](https://github.com/FeiCoder/BreadFree-Simu/commit/6e5d9dde204728e5b93571c027a9030fb22eb94c) |
+| `excelmind` | [Gen-Future/ExcelMind](https://github.com/Gen-Future/ExcelMind) | [`d8bc5c8`](https://github.com/Gen-Future/ExcelMind/commit/d8bc5c8bdd26e5bf5944807a01cc4732bb0250a9) |
+| `podcast` | [artnoage/Podcast](https://github.com/artnoage/Podcast) | [`9d0f3c4`](https://github.com/artnoage/Podcast/commit/9d0f3c4e261fb7363ef419639371443febbf0c13) |
+| `local-rag-researcher-deepseek` | [kaymen99/local-rag-researcher-deepseek](https://github.com/kaymen99/local-rag-researcher-deepseek) | [`98e8382`](https://github.com/kaymen99/local-rag-researcher-deepseek/commit/98e83829a7e506b1092e90467245e0caed686331) |
+| `air-lingjing` | [seanlxh/Air-Lingjing](https://github.com/seanlxh/Air-Lingjing) | [`d23060c`](https://github.com/seanlxh/Air-Lingjing/commit/d23060cc83b7e2e2fadef0db64f16de40c68ebc6) |
+| `langgraph-email-automation` | [kaymen99/langgraph-email-automation](https://github.com/kaymen99/langgraph-email-automation) | [`9ea0f54`](https://github.com/kaymen99/langgraph-email-automation/commit/9ea0f54cb30a493bbc25114cfc1769a25d45169a) |
+| `open-deepthink` | [iblameandrew/open-deepthink](https://github.com/iblameandrew/open-deepthink) | [`b440af1`](https://github.com/iblameandrew/open-deepthink/commit/b440af10fd8fc9550b3a70fc76761465aede7a4b) |
+| `garmin-ai-coach` | [leonzzz435/garmin-ai-coach](https://github.com/leonzzz435/garmin-ai-coach) | [`54a6494`](https://github.com/leonzzz435/garmin-ai-coach/commit/54a64942d52a04d624df4bb7cbc7fdc28c39113e) |
+| `timeseriesscientist` | [Y-Research-SBU/TimeSeriesScientist](https://github.com/Y-Research-SBU/TimeSeriesScientist) | [`41b3963`](https://github.com/Y-Research-SBU/TimeSeriesScientist/commit/41b396316fee25462c56cb53635b42660042d890) |
+| `sales-outreach-automation-langgraph` | [kaymen99/sales-outreach-automation-langgraph](https://github.com/kaymen99/sales-outreach-automation-langgraph) | [`2e2761c`](https://github.com/kaymen99/sales-outreach-automation-langgraph/commit/2e2761ccc16c26fe20adf101b4ec702cd0876b15) |
+| `omniwriter` | [twanew/OmniWriter](https://github.com/twanew/OmniWriter) | [`2d0aedc`](https://github.com/twanew/OmniWriter/commit/2d0aedc00552795bfa366fcbc123888042493dea) |
+| `jobsmith` | [kevin333353/jobsmith](https://github.com/kevin333353/jobsmith) | [`f5427c1`](https://github.com/kevin333353/jobsmith/commit/f5427c156d4d0289463f048a2beedb87c80e802b) |
 
 [resources/registry.toml](../../resources/registry.toml) が、Agent の有効状態、準備状態、Case 数、step 上限の正式な情報源です。

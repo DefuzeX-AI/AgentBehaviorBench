@@ -8,15 +8,15 @@ def prepare_output(directory):
     """Create shared output and Judge directories under a private host Run.
 
     The container exports Judge context here, then the host atomically writes
-    the report. Both UIDs need directory write access; the containing Run is
+    the report. Both UIDs need directory write access; the containing Case/preparation directory is
     host-owned and 0700. Creating these directories on the host retains host
     ownership through the worker's read-only permission publication.
     """
     root = Path(directory)
-    root.mkdir(mode=0o777)
+    root.mkdir(mode=0o777, exist_ok=True)
     root.chmod(0o777)
     judge = root / 'judge'
-    judge.mkdir(mode=0o777)
+    judge.mkdir(mode=0o777, exist_ok=True)
     judge.chmod(0o777)
     return root
 
@@ -24,7 +24,7 @@ def prepare_output(directory):
 def share_output(directory):
     """Allow host reads without changing identity, contents or write permissions.
 
-    The host's private run directory (0700) protects this mount. Atomic SDK
+    The host's private parent directory (0700) protects this mount. Atomic SDK
     writes use 0600, so the image's native UID must publish them before exit.
     Never follow symlinks or chmod files belonging to another UID.
     """

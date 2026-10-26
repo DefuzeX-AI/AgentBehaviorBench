@@ -113,6 +113,7 @@ test('a supplied top-level summary is preferred without overwriting remaining re
 });
 
 test('missing reports distinguish recorded-but-unavailable reports from failed and cancelled work', () => {
+  assert.equal(judgeReportUnavailable({ judge_delivery_status: 'not_requested', execution_status: 'completed' }).title, 'Judge not requested');
   assert.equal(judgeReportUnavailable({ report_received: true }).title, 'Judge report unavailable');
   const failure = judgeReportUnavailable({ stage: 'judge_failed', error: { type: 'TimeoutError', message: 'Request timed out.' } });
   assert.equal(failure.title, 'Judge did not complete');

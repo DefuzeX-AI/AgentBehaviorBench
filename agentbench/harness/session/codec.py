@@ -75,6 +75,7 @@ def benchmark_to_json(benchmark):
             'evidence_status': benchmark.evidence_status,
             'host_acceptance': benchmark.host_acceptance,
             'host_trace_validation': benchmark.host_trace_validation,
+            'judge_delivery_status': benchmark.judge_delivery_status,
             **({'execution_status': benchmark.execution_status,
                 'failures': json_value(benchmark.failures)} if benchmark.failures else {}),
             **({'dependency_failure': json_value(benchmark.dependency_failure)} if benchmark.dependency_failure else {}),
@@ -131,7 +132,8 @@ def benchmark_from_json(value):
                            host_acceptance=value.get('host_acceptance', 'unknown'),
                            host_trace_validation=value.get('host_trace_validation', 'unknown'),
                            failures=tuple(BenchmarkStepFailure(**failure) for failure in value.get('failures', ())),
-                           dependency_failure=value.get('dependency_failure'))
+                           dependency_failure=value.get('dependency_failure'),
+                           judge_delivery_status=value.get('judge_delivery_status', 'unknown'))
 
 
 def case_from_json(value):

@@ -85,6 +85,10 @@ export function judgeReportModel(report) {
 
 export function judgeReportUnavailable(item = {}) {
   item = object(item);
+  if (item.judge_delivery_status === 'not_requested') return {
+    type: 'info', title: 'Judge not requested',
+    description: 'Execution evidence is saved. This run did not request a behavioral judgment.',
+  };
   if (item.report_received || item.judge_status || item.judge_delivery_status === 'received') {
     return { type: 'warning', title: 'Judge report unavailable',
       description: 'This attempt records a report, but its contents are unavailable.' };

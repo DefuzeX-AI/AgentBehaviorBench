@@ -17,16 +17,18 @@ from .run import Report
 
 
 def read(path):
-    if Path(path).is_symlink():
+    from agentbench.observe.artifact_paths import resolve_artifact_path
+    path = resolve_artifact_path(path)
+    if path.is_symlink():
         raise ValueError('SDK artifacts must not be links')
-    return json.loads(Path(path).read_bytes())
+    return json.loads(path.read_bytes())
 
 
 def accepted(directory, *, execution):
     host = read(directory / 'run.json')
     required = ['status', 'cleanup_status'] + (['host_trace_validation'] if execution else [])
     if any(host.get(key) != 'succeeded' for key in required):
-        path = directory / 'evaluation/error.json'
+        path = directory / 'error.json'
         sdk_error = read(path) if Path(path).is_file() else {}
         detail = sdk_error.get('error') or 'inspect retained artifacts'
         error = RuntimeError('SDK execution, evidence validation or cleanup failed: ' + detail)
@@ -76,12 +78,13 @@ class ContainerSDKRunner:
 
     def _settings(self, registration, **values):
         return dict(sdk_factory=self.plugin.create_run, sdk_options=self.sdk_options,
+                    execution_only=getattr(self.plugin, 'execution_only', False),
                     agent_id=registration.agent_id, framework=registration.framework, **values)
 
     def _run(self, registration, *, settings, context, on_progress, **kwargs):
         def ready(directory):
             self.directory = directory
-            emit_progress(on_progress, stage='case_generation' if settings['mode'] == 'generate'
+            emit_progress(on_progress, stage='case_generation' if settings['mode'] in ('generate', 'context')
                           else 'benchmark_execution', status='started',
                           agent_id=registration.agent_id, artifact_directory=str(directory),
                           detail='SDK artifacts available')
@@ -98,7 +101,7 @@ class ContainerSDKRunner:
             settings=self._settings(registration, mode='generate', case_indices=indices),
             execute_agent=False, generation_indices=indices)
         accepted(directory, execution=False)
-        collection = read(directory / 'evaluation/case-collection.json')
+        collection = read(directory / 'case-collection.json')
         if (not isinstance(collection, list) or len(collection) != len(indices)
                 or [entry.get('case_index') for entry in collection] != list(indices)):
             raise ValueError('SDK generation returned an incomplete Case collection')
@@ -108,7 +111,7 @@ class ContainerSDKRunner:
             relative = f'cases/{index:04d}.json'
             if entry.get('artifact') != relative:
                 raise ValueError('Unexpected generated Case artifact path')
-            path = directory / 'evaluation' / relative
+            path = directory / relative
             document = read(path)
             case = unpack_case(document, factory=self.plugin.create_run, index=index)
             if (entry.get('artifact_sha256') != digest(Path(path).read_bytes())
@@ -134,7 +137,8 @@ class ContainerSDKRunner:
                 or case.case_index >= registration.case_count):
             raise ValueError('Default SDK execution requires a prepared Case')
         document = read(case.artifact_path)
-        snapshot = unpack_case(document, factory=self.plugin.create_run, index=case.case_index)
+        source_index = document.get('case_index') if getattr(self.plugin, 'execution_only', False) else case.case_index
+        snapshot = unpack_case(document, factory=self.plugin.create_run, index=source_index)
         workspace = document.get('workspace')
         if (digest(Path(case.artifact_path).read_bytes()) != case.artifact_sha256
                 or digest(case_bytes(snapshot)) != case.content_sha256
@@ -145,6 +149,7 @@ class ContainerSDKRunner:
                           'case_index': case.case_index, 'case_id': case.case_id})
         directory = self._run(registration, context=context, on_progress=on_progress,
             settings=self._settings(registration, mode='execute', case_index=case.case_index,
+                source_case_index=source_index,
                 expected_case_id=case.case_id, expected_content_sha256=case.content_sha256,
                 expected_artifact_sha256=case.artifact_sha256),
             private_files={'case.json': case.artifact_path},
@@ -152,6 +157,9 @@ class ContainerSDKRunner:
         try:
             result = self._read_result(directory, registration, case, document)
         except Exception as exc:
+            if (getattr(exc, 'artifacts', None) or {}).get('phase') == 'judge':
+                # Judge delivery must never rewrite accepted Agent execution.
+                raise
             host = read(directory / 'run.json')
             host.update(status='failed', validation='failed', validation_error=str(exc))
             Artifacts(directory, environ=self.context.environ).save('run.json', host)
@@ -161,7 +169,7 @@ class ContainerSDKRunner:
         # after host validation. SDKs do not implement a second callback loop.
         by_id = {step.input_id: (step, on_step_complete) for step in result.steps}
         by_id.update({step.input_id: (step, on_step_failure) for step in result.failures})
-        for entry in read(directory / 'evaluation/manifest.json')['steps']:
+        for entry in read(directory / 'manifest.json')['steps']:
             step, callback = by_id[entry['input_id']]
             if on_step_start is not None:
                 on_step_start(result.agent_id, step.input_id, step.payload)
@@ -173,9 +181,13 @@ class ContainerSDKRunner:
         return result
 
     def _read_result(self, directory, registration, case, document):
+        from agentbench.observe.artifact_paths import resolve_artifact_path
         host = accepted(directory, execution=True)
-        root = directory / 'evaluation'
-        manifest, report = read(root / 'manifest.json'), read(root / 'judge/report.json')
+        root = directory
+        manifest = read(root / 'manifest.json')
+        unjudged = (getattr(self.plugin, 'execution_only', False)
+                    and manifest.get('judge_delivery_status') == 'not_requested')
+        report = None if unjudged else read(root / 'judge/report.json')
         if (host.get('agent_id') != registration.agent_id or host.get('case_id') != case.case_id
                 or host.get('case_index') != case.case_index
                 or manifest.get('schema') != 'abb.sdk.execution.v1'
@@ -183,12 +195,12 @@ class ContainerSDKRunner:
                 or manifest.get('case_id') != case.case_id or read(root / 'case.json') != document
                 or not isinstance(manifest.get('run_id'), str) or not manifest['run_id']
                 or type(manifest.get('history_count')) is not int or manifest['history_count'] < 0
-                or not isinstance(report.get('status'), str) or not report['status']):
+                or (not unjudged and (not isinstance(report.get('status'), str) or not report['status']))):
             raise ValueError('SDK result identity or completion mismatch')
         steps, failures, seen = [], [], set()
         for index, entry in enumerate(manifest['steps'], 1):
-            relative = f'inputs/{index:04d}'
-            if entry.get('directory') != relative or entry.get('submitted') is not True:
+            relative = f'steps/{index:04d}'
+            if entry.get('directory') not in (relative, f'inputs/{index:04d}') or entry.get('submitted') is not True:
                 raise ValueError('SDK step was not committed')
             item, request, output, submission = [read(root / relative / name) for name in (
                 'input.json', 'request.json', 'result.json', 'submission.json')]
@@ -202,7 +214,7 @@ class ContainerSDKRunner:
                     or request.get('observation_context') != {'case_id': case.case_id, 'input_id': item['input_id']}
                     or not request.get('run_id') or output.get('run_id') != request['run_id']
                     or read(root / relative / 'otel-status.json').get('status') != 'complete'
-                    or not Path(root / relative / 'spans.jsonl').is_file()):
+                    or not resolve_artifact_path(root / relative / 'spans.jsonl').is_file()):
                 raise ValueError('SDK input, output, submission or evidence mismatch')
             seen.add(item['input_id'])
             if output['status'] == 'succeeded':
@@ -216,9 +228,10 @@ class ContainerSDKRunner:
                 raise ValueError('Unknown Agent result status')
         if not seen:
             raise ValueError('SDK result has no executed inputs')
-        normalized = Report(report['status'], report.get('confidence'),
+        normalized = None if unjudged else Report(report['status'], report.get('confidence'),
                             tuple(report['issues']), tuple(report['evidence_gaps']))
         return BenchmarkResult(registration.agent_id, registration.framework, manifest['run_id'],
             manifest['run_state'], normalized, tuple(steps), manifest['history_count'], provider_mode='sdk-container',
             evidence_status='captured', host_acceptance='accepted',
-            host_trace_validation='succeeded', failures=tuple(failures))
+            host_trace_validation='succeeded', failures=tuple(failures),
+            judge_delivery_status='not_requested' if unjudged else 'received')

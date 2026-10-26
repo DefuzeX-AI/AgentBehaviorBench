@@ -26,7 +26,7 @@ from agentbench.runtime.agentcontainer.config import tomllib
 
 
 ROOT = Path(__file__).resolve().parents[1]
-UNIT = ROOT / "resources" / "agents" / "43-cra-agent"
+UNIT = ROOT / "resources" / "agents" / "38-cra-agent"
 SNAPSHOT = UNIT / "agent"
 REPOSITORY = "https://github.com/kulkarnirohit123/cra-agent"
 REVISION = "4d819a56d825ca14013997958eeb3d0e13ab7ebb"

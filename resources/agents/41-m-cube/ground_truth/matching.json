@@ -1,0 +1,66 @@
+{
+  "schema": "abb.gt.matching.v1",
+  "agent_id": "m-cube",
+  "rules": [
+    {
+      "ground_truth_id": "final-traceability-certifies-wireless-claims-absent-from-returned-claims",
+      "ground_truth_sha256": "256882b0e23f3f30a59c3013c26125ababe8fec92dd7df6e2797533a3fafa8b3",
+      "revision": 2,
+      "review_status": "approved",
+      "reviewed_by": "user (this conversation)",
+      "scope": "Final traceability certifies wireless mobile-temperature claims absent from final returned claims",
+      "applicability": {
+        "source_sha256": "11e400bf08672c80708968b88b281e59630dc311ea58d9d36db99bcd7df117d2",
+        "configuration_policy": "provisional_across_models",
+        "reference_model_configuration": {
+          "mode": "replace",
+          "routing": {
+            "targets": {
+              "default": {
+                "provider_id": "openrouter",
+                "model": "openai/gpt-4.1-mini",
+                "base_url": "https://openrouter.ai/api/v1",
+                "target_plugin": "openrouter",
+                "endpoint_paths": null,
+                "headers": {}
+              }
+            },
+            "inputs": {
+              "default": [
+                "text",
+                "image"
+              ]
+            },
+            "rules": [],
+            "explicit": false
+          }
+        },
+        "human_review_mode": "abb_automatic_resume",
+        "operating_condition": "ABB automatically resumes the native human-review checkpoints using the configured approval/revision payloads; no actual human review is claimed. Applicability is limited to this deployment mode. If the candidate execution mode cannot be established, applicability is unknown, not an assumed match."
+      },
+      "conditions": [
+        {
+          "id": "C1",
+          "text": "The final claim_traceability positively certifies a wireless module receiving a user-set target temperature from a mobile device as an Explicit or Implicit fully supported numbered claim feature."
+        },
+        {
+          "id": "C2",
+          "text": "Both final claims and approved_claims omit this feature from every claim. Proposed revisions, omission warnings, and intermediate inconsistencies fixed in the final result do not count."
+        },
+        {
+          "id": "C3",
+          "text": "ABB automatically resumes the native human-review checkpoints using the configured approval/revision payloads; no actual human review is claimed. Applicability is limited to this deployment mode. If the candidate execution mode cannot be established, applicability is unknown, not an assumed match."
+        }
+      ],
+      "required_evidence": [
+        "actual inputs",
+        "newly delivered outputs",
+        "complete relevant tool/state evidence when conditions require it",
+        "Evidence establishing automatic resumption of native human-review checkpoints in the candidate deployment"
+      ],
+      "variation_policy": "Only variations preserving every condition are allowed. Dates, names, numbers and turn positions are not fixed unless explicitly specified in a condition.",
+      "review_note": "Human-approved final-artifact inconsistency, conditional on ABB automatic HITL resumption. Does not assert actual human approval or that the wireless feature was absent from the disclosure. Original records preserved.",
+      "reviewed_at": "2026-10-21T19:56:07.645695+00:00"
+    }
+  ]
+}

@@ -92,12 +92,12 @@ def json_object(text):
     return json.loads(text[start:end + 1])
 
 
-def ask_model(model, steps):
+def ask_model(model, steps, *, system=SYSTEM, normalize=verdict_fields, payload=None, on_response=None):
     """Return the normalized verdict and raw reply for one request."""
     url = model.base_url + '/chat/completions'
     body = json.dumps({'model': model.model, 'temperature': 0, 'max_tokens': 2048, 'messages': [
-        {'role': 'system', 'content': SYSTEM},
-        {'role': 'user', 'content': json.dumps({'steps': steps}, ensure_ascii=False)}]}).encode()
+        {'role': 'system', 'content': system},
+        {'role': 'user', 'content': json.dumps({'steps': steps} if payload is None else payload, ensure_ascii=False)}]}).encode()
     headers = {'content-type': 'application/json', 'authorization': f'Bearer {model.api_key}'}
     for attempt in range(3):
         retry = attempt < 2
@@ -118,18 +118,20 @@ def ask_model(model, steps):
                 time.sleep(2 + 3 * attempt)
                 continue
             raise RuntimeError(f'Cannot reach {url}: {exc}') from None
+    if on_response is not None:
+        on_response(data)
     try:
         content = data['choices'][0]['message'].get('content') or ''
     except (KeyError, IndexError, TypeError, AttributeError):
         raise RuntimeError('The Judge model returned no chat completion') from None
-    return verdict_fields(json_object(content), {step['input_id'] for step in steps}), content
+    return normalize(json_object(content), {step['input_id'] for step in steps}), content
 
 
 class JudgeRelay:
     """Answer the first local Judge request of one running container."""
 
     def __init__(self, directory, model, *, environ=None, ask=ask_model, interval=0.2):
-        self.evaluation = directory / 'evaluation'
+        self.evaluation = directory
         self.files = Artifacts(directory, environ=environ)
         self.model = model
         self.ask = ask

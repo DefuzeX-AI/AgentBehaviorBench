@@ -355,23 +355,23 @@ Docker 需要安装真实依赖，把 binding 复制到选定 Agent root 旁边�
 | 单元 | 可参考的实现或需要复核的地方 |
 | --- | --- |
 | [01 Folder Mover](../../resources/agents/01-folder-mover-agent/bindings/bridge.py) | 直接返回原生对象；实际输入校验在 `agent/folder_mover.py`。 |
-| [02 Company Research](../../resources/agents/02-company-research-agent/bindings/company_research_agent.py) | 构造阶段的业务参数、消费异步流和提取最终报告。 |
-| [03 ReAct](../../resources/agents/03-react-agent/bindings/bridge.py) | 文字/messages 转换、原生 context 与 config 转发。 |
-| [04 Crypto Hedge Fund](../../resources/agents/04-ai-hedge-fund-crypto/bindings/bridge.py) | 配置驱动的 portfolio 和市场 state；需复核未转发 config 的问题。 |
-| [05 LabScript](../../resources/agents/05-labscript-ai/bindings/bridge.py) | 硬件 state 和只能异步执行的图；需复核 config 被替换的问题。 |
-| [06 Multi Agent CAD](../../resources/agents/06-multi-agent-cad/bindings/bridge.py) | 原生默认 state 与递归配置合并。 |
-| [07 Autoresearch](../../resources/agents/07-autoresearch-agents/bindings/bridge.py) | 计算器和单位转换 Agent；当前未保留传入 config。 |
-| [08 Streamlit Template](../../resources/agents/08-langchain-streamlit-template/bindings/bridge.py) | 提取原生工厂而不启动 UI；需复核私有 thread 配置。 |
-| [09 Curiosity](../../resources/agents/09-curiosity/bindings/bridge.py) | SQLite 路径和原生 thread；需复核私有 thread 配置。 |
-| [10 Readwren](../../resources/agents/10-readwren/bindings/bridge.py) | 先启动访谈再传输入；公开方法没有 config 参数。 |
-| [11 TableGPT](../../resources/agents/11-tablegpt-agent/bindings/bridge.py) | Sandbox、日期与 parent ID；当前文字输入未转换附件。 |
-| [33 Open Notebook](../../resources/agents/33-open-notebook/bindings/bridge.py) | 异步服务和会话初始化，及拥有的进程清理。 |
-| [34 AI Data Science Team](../../resources/agents/34-ai-data-science-team/bindings/bridge.py) | 固定 CSV、公开 `invoke_agent` 和结果读取。 |
-| [35 Local Deep Research](../../resources/agents/35-local-deep-research/bindings/ldr_bridge.py) | Settings snapshot 和原生 API 的主线程限制。 |
-| [37 Article Explainer](../../resources/agents/37-article-explainer/bindings/bridge.py) | 严格的当前消息输入；实际已启用 checkpoint，文字说明仍有相反描述。 |
-| [38 GPT Researcher](../../resources/agents/38-gpt-researcher/bindings/gpt_researcher_bridge.py) | 包含 `publish_formats` 的完整 task 和异步研究图。 |
-| [39 TradingAgents](../../resources/agents/39-tradingagents/bindings/tradingagents_bridge.py) | 显式 ticker/日期解析与公开生命周期外的配置上下文。 |
-| [40 EvoScientist](../../resources/agents/40-evoscientist/bindings/bridge.py) | Workspace 准备和明确的无人值守部署配置。 |
+| [02 Company Research](../../resources/agents/56-company-research-agent/bindings/company_research_agent.py) | 构造阶段的业务参数、消费异步流和提取最终报告。 |
+| [03 ReAct](../../resources/agents/57-react-agent/bindings/bridge.py) | 文字/messages 转换、原生 context 与 config 转发。 |
+| [04 Crypto Hedge Fund](../../resources/agents/02-ai-hedge-fund-crypto/bindings/bridge.py) | 配置驱动的 portfolio 和市场 state；需复核未转发 config 的问题。 |
+| [05 LabScript](../../resources/agents/03-labscript-ai/bindings/bridge.py) | 硬件 state 和只能异步执行的图；需复核 config 被替换的问题。 |
+| [06 Multi Agent CAD](../../resources/agents/04-multi-agent-cad/bindings/bridge.py) | 原生默认 state 与递归配置合并。 |
+| [07 Autoresearch](../../resources/agents/05-autoresearch-agents/bindings/bridge.py) | 计算器和单位转换 Agent；当前未保留传入 config。 |
+| [08 Streamlit Template](../../resources/agents/06-langchain-streamlit-template/bindings/bridge.py) | 提取原生工厂而不启动 UI；需复核私有 thread 配置。 |
+| [09 Curiosity](../../resources/agents/58-curiosity/bindings/bridge.py) | SQLite 路径和原生 thread；需复核私有 thread 配置。 |
+| [10 Readwren](../../resources/agents/07-readwren/bindings/bridge.py) | 先启动访谈再传输入；公开方法没有 config 参数。 |
+| [11 TableGPT](../../resources/agents/08-tablegpt-agent/bindings/bridge.py) | Sandbox、日期与 parent ID；当前文字输入未转换附件。 |
+| [33 Open Notebook](../../resources/agents/30-open-notebook/bindings/bridge.py) | 异步服务和会话初始化，及拥有的进程清理。 |
+| [34 AI Data Science Team](../../resources/agents/31-ai-data-science-team/bindings/bridge.py) | 固定 CSV、公开 `invoke_agent` 和结果读取。 |
+| [35 Local Deep Research](../../resources/agents/32-local-deep-research/bindings/ldr_bridge.py) | Settings snapshot 和原生 API 的主线程限制。 |
+| [37 Article Explainer](../../resources/agents/34-article-explainer/bindings/bridge.py) | 严格的当前消息输入；实际已启用 checkpoint，文字说明仍有相反描述。 |
+| [38 GPT Researcher](../../resources/agents/59-gpt-researcher/bindings/gpt_researcher_bridge.py) | 包含 `publish_formats` 的完整 task 和异步研究图。 |
+| [39 TradingAgents](../../resources/agents/35-tradingagents/bindings/tradingagents_bridge.py) | 显式 ticker/日期解析与公开生命周期外的配置上下文。 |
+| [40 EvoScientist](../../resources/agents/36-evoscientist/bindings/bridge.py) | Workspace 准备和明确的无人值守部署配置。 |
 
 ## 审核和验证
 

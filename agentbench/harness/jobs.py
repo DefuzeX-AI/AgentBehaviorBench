@@ -200,7 +200,7 @@ def run_case_job(job: CaseJob, *, control: RunControl,
 def _case_result(job, benchmark):
     failure = next(iter(benchmark.failures), None)
     return CaseResult(job.registration.agent_id, job.case.case_index, str(job.identity['job_id']),
-                      'succeeded' if benchmark.passed else 'failed', case_id=job.case.case_id,
+                      'succeeded' if benchmark.passed or (benchmark.execution_only and not benchmark.failures) else 'failed', case_id=job.case.case_id,
                       benchmark=benchmark,
                       artifacts={'dependency_failure': benchmark.dependency_failure} if benchmark.dependency_failure else None,
                       error_type=failure.error_type if failure else None,

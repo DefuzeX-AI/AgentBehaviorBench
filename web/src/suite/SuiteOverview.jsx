@@ -10,6 +10,7 @@ import { ExportReportButton } from './SuiteControls.jsx';
 import AgentSummaryCards from './AgentSummaryCards.jsx';
 import CaseCardGrid from './CaseCardGrid.jsx';
 import SuiteActivity from './SuiteActivity.jsx';
+import GroundTruthPanel from './GroundTruthPanel.jsx';
 import './suite.css';
 
 const { Text, Title } = Typography;
@@ -53,10 +54,11 @@ export default function SuiteOverview({ onCaseSelect, onAgentSelect }) {
   ];
 
   return <section className="suite-overview" aria-label="Suite overview">
-    <div className="suite-heading"><div><Text className="suite-eyebrow">SUITE OVERVIEW</Text><Title level={2}>All Cases</Title>
+    <div className="suite-heading"><div><Text className="suite-eyebrow">SUITE OVERVIEW</Text><Title level={2}>{snapshot.suite_name || 'All Cases'}</Title>
       <Text type="secondary">{agents.length} Agents, {cases.length} Cases{snapshot.effective_workers != null ? `, ${snapshot.effective_workers} active workers` : ''}</Text></div>
       <Space className="suite-heading-actions" wrap><Text className={error ? 'suite-connection disconnected' : 'suite-connection'} role="status">{error ? 'Sync disconnected, showing retained data' : `Synced ${updated || 'connecting'}`}</Text><ExportReportButton /></Space></div>
 
+    {snapshot.reference_collection_note && <Alert type="info" showIcon message={snapshot.reference_collection_note} />}
     {error && <Alert type="warning" showIcon message="Live sync is temporarily unavailable" description="The latest saved Suite data remains visible. The viewer will retry automatically." />}
 
     <SuiteActivity cases={cases} jobs={snapshot.jobs || []} onCaseSelect={onCaseSelect} onAgentSelect={onAgentSelect} disconnected={Boolean(error)} />
@@ -76,6 +78,7 @@ export default function SuiteOverview({ onCaseSelect, onAgentSelect }) {
 
     <div className="suite-report-line"><span>Judge reports <strong>{counts.reports}/{cases.length}</strong></span><span>Host accepted <strong>{counts.accepted}</strong></span></div>
     <AgentSummaryCards cases={cases} jobs={snapshot.jobs || []} onSelect={onAgentSelect} />
+    <GroundTruthPanel evaluation={snapshot.gt_evaluation} />
 
     <div className="suite-table-heading"><div><Title level={3}>Cases</Title><Text type="secondary">Select a result to inspect the complete Case record.</Text></div>
       <Space><Text type="secondary">Showing {visible.length} of {cases.length}</Text><Segmented className="case-view-toggle" value={table.view} onChange={view => dispatch(actions.tableChanged({ view }))}
