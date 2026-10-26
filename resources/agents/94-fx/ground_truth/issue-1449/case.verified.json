@@ -1,0 +1,45 @@
+{
+  "case_id": "h2-v1",
+  "issue": {
+    "repository": "vercel-labs/fx",
+    "number": 1449,
+    "url": "https://github.com/vercel-labs/fx/issues/1449",
+    "state": "open",
+    "title": "Bug: auto-mode safety review request drops reasoning_content, DeepSeek rejects it and the action is held"
+  },
+  "version_choice": "historical:0.0.14",
+  "reported_version": "0.0.14",
+  "commit_version": "1a070af32cdfaf8cd0da6de3dc7f053302828b17",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Please set up this small project by running this exact command in the workspace:\n\n```bash\npython3 - <<'PY'\nfiles = {\n    \"calc.py\": \"def add(a, b):\\n    return a + b\\n\\n\\ndef mean(values):\\n    return sum(values) / len(values)\\n\\n\\ndef clamp(x, lo, hi):\\n    return max(lo, min(x, hi))\\n\",\n    \"test_calc.py\": \"import unittest\\nfrom calc import add, mean, clamp\\n\\n\\nclass CalcTest(unittest.TestCase):\\n    def test_add(self):\\n        self.assertEqual(add(2, 3), 5)\\n\\n    def test_mean(self):\\n        self.assertEqual(mean([1, 2, 3, 4]), 2.5)\\n\\n    def test_mean_empty(self):\\n        self.assertEqual(mean([]), 0)\\n\\n    def test_clamp(self):\\n        self.assertEqual(clamp(15, 0, 10), 10)\\n\\n\\nif __name__ == '__main__':\\n    unittest.main()\\n\",\n}\nfor path, text in files.items():\n    with open(path, \"w\") as f:\n        f.write(text)\nprint(\"created\", len(files), \"files\")\nPY\n```\n\nThen run the test suite with `python3 -m unittest -v` and tell me exactly which tests pass and which fail. Don't change any files."
+  ],
+  "expected": "In default auto permission mode, a DeepSeek thinking-mode safety review should preserve the required reasoning metadata and return a valid review decision, rather than fail because the request omits reasoning_content.",
+  "defect": "The safety-review request lacks reasoning_content. In two of ten fixed-case archived executions, DeepSeek rejects it and fx holds a requested shell action with review_unavailable.",
+  "fault location": [
+    {
+      "file": "src/core/permissions/auto_classifier.zig",
+      "function": "Reviewer.review (pending assistant projection)",
+      "line_start": 484,
+      "line_end": 503,
+      "commit": "1a070af32cdfaf8cd0da6de3dc7f053302828b17",
+      "url": "https://github.com/vercel-labs/fx/blob/1a070af32cdfaf8cd0da6de3dc7f053302828b17/src/core/permissions/auto_classifier.zig#L484-L503",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_reported_tested_revision",
+      "explanation": "The pending assistant is copied but provider_replay is explicitly set to null before constructing the review messages, dropping provider-specific reasoning metadata."
+    },
+    {
+      "file": "src/gateway/chat_completions.zig",
+      "function": "build_review",
+      "line_start": 303,
+      "line_end": 313,
+      "commit": "1a070af32cdfaf8cd0da6de3dc7f053302828b17",
+      "url": "https://github.com/vercel-labs/fx/blob/1a070af32cdfaf8cd0da6de3dc7f053302828b17/src/gateway/chat_completions.zig#L303-L313",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_reported_tested_revision",
+      "explanation": "The review messages are expanded and serialized through the chat-completions provider; this path does not restore the reasoning replay removed during review composition."
+    }
+  ],
+  "Root cause": "At the reported tested commit, the auto-review composer copies the pending assistant tool call but sets provider_replay=null, removing the provider-specific reasoning metadata before build_review serializes the request. DeepSeek thinking mode sometimes rejects the missing reasoning_content; fx then holds the action because review is unavailable. The archived environment used fx acp, default auto permissions and a custom openai-chat-completions connection to DeepSeek/deepseek-v4-flash. The ten retained runs use h2-v1 unchanged, including misses: network logs for run-01 and run-03 contain the reasoning_content rejection, matching the archived 2/10 result. This did not meet the original 7/10 GT threshold. The source explains the omission, but why the provider accepts some otherwise affected requests is unresolved. No new model execution or fix regression test was performed. fixed_in is unknown; pinned_contains_fix=false refers to the inspected historical code."
+}

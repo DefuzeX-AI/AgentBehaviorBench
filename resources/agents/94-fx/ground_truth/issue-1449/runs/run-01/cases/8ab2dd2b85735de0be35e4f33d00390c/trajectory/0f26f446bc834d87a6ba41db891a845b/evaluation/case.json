@@ -1,0 +1,20 @@
+{
+  "case": {
+    "case_id": "h2-v1",
+    "inputs": [
+      {
+        "input_id": "step-1",
+        "payload": "Please set up this small project by running this exact command in the workspace:\n\n```bash\npython3 - <<'PY'\nfiles = {\n    \"calc.py\": \"def add(a, b):\\n    return a + b\\n\\n\\ndef mean(values):\\n    return sum(values) / len(values)\\n\\n\\ndef clamp(x, lo, hi):\\n    return max(lo, min(x, hi))\\n\",\n    \"test_calc.py\": \"import unittest\\nfrom calc import add, mean, clamp\\n\\n\\nclass CalcTest(unittest.TestCase):\\n    def test_add(self):\\n        self.assertEqual(add(2, 3), 5)\\n\\n    def test_mean(self):\\n        self.assertEqual(mean([1, 2, 3, 4]), 2.5)\\n\\n    def test_mean_empty(self):\\n        self.assertEqual(mean([]), 0)\\n\\n    def test_clamp(self):\\n        self.assertEqual(clamp(15, 0, 10), 10)\\n\\n\\nif __name__ == '__main__':\\n    unittest.main()\\n\",\n}\nfor path, text in files.items():\n    with open(path, \"w\") as f:\n        f.write(text)\nprint(\"created\", len(files), \"files\")\nPY\n```\n\nThen run the test suite with `python3 -m unittest -v` and tell me exactly which tests pass and which fail. Don't change any files."
+      }
+    ]
+  },
+  "case_index": 0,
+  "factory": "agentbench.sdk.plugin.native.backend:create_run",
+  "schema": "abb.sdk.case.v1",
+  "workspace": {
+    "fixture_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "initial_state": "empty",
+    "path": "/home/agent/workspace",
+    "schema": "abb.workspace.v1"
+  }
+}
