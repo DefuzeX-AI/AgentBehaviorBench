@@ -1,0 +1,75 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "566077cd2eb442fb8e53ab8c07d18922",
+  "case_id": "srp-fast-agent-h2-shell-comment-v1",
+  "input_id": "step-1",
+  "invocation_id": "566077cd2eb442fb8e53ab8c07d18922",
+  "agent_id": "fast-agent",
+  "status": "succeeded",
+  "output": "I ran the command exactly as given, and the `#` was interpreted by the shell as the start of a comment. So the effective command was `touch build.log`, and `# ci-marker` was ignored as a comment.\n\nHowever, the shell wrapper behaved oddly: three files now exist:\n\n| File | Size |\n|---|---|\n| `build.log` | 0 bytes |\n| `ci-marker` | 0 bytes |\n| `#` | 0 bytes |\n\nPlus `.` and `..` (directories).\n\nSo the directory actually contains: `build.log`, `ci-marker`, and a file literally named `#`.\n\nThe intent was clearly to create only `build.log`. The extra `#` and `ci-marker` files appear because the commentary text was somehow passed along as arguments, most likely due to how the executor tokenized the string. Would you like me to delete `#` and `ci-marker` so only `build.log` remains? I won't touch anything unless you confirm.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "resume": {}
+        },
+        "auth": {},
+        "_meta": {
+          "co.huggingface": {
+            "structuredOutput": true
+          }
+        }
+      },
+      "authMethods": [
+        {
+          "id": "fast-agent-ai-secrets",
+          "name": "Configure fast-agent",
+          "description": "Set provider keys in fast-agent.secrets.yaml or env vars. See docs: [Configuration Reference](https://fast-agent.ai/ref/config_file/)"
+        }
+      ],
+      "agentInfo": {
+        "name": "fast-agent-acp",
+        "version": "0.10.46"
+      }
+    },
+    "pid": 9,
+    "session": {
+      "sessionId": "2610211633-MgAS3c",
+      "modes": {
+        "currentModeId": "agent",
+        "availableModes": [
+          {
+            "id": "agent",
+            "name": "Agent",
+            "description": "You are a helpful AI Agent."
+          }
+        ]
+      }
+    },
+    "session_id": "2610211633-MgAS3c",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn",
+      "_meta": {
+        "field_meta": {
+          "openhands.dev/metrics": {
+            "status_line": "2,526 in, 291 out, 2 tools"
+          }
+        }
+      }
+    }
+  }
+}
