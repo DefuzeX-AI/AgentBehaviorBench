@@ -1,0 +1,103 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_8508b19a8f004798acd974ec8808ff04",
+  "case_id": "case_f7366d7c24ba41e8afb9c233f6038354",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "72db31bbfdf6b02a85263611cb7d093f",
+      "span_id": "52bdb44a409cc361",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791919417883207327,
+      "end_time_unix_nano": 1791919437000815677,
+      "duration_nano": 19117608350,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1791919421743834923,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1791919422076851363,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791919422082683720,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1791919430071820982,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791919436991218321,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "72db31bbfdf6b02a85263611cb7d093f",
+      "span_id": "31b27a145566b357",
+      "parent_span_id": "52bdb44a409cc361",
+      "name": "Write `/home/agent/workspace/broken.c`",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791919430064786591,
+      "end_time_unix_nano": 1791919430134392102,
+      "duration_nano": 69605511,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Write `/home/agent/workspace/broken.c`",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "content": "#include <stdio.h>\nint main() {\n    printf(\"Hello, World!\\n\")\n    return 0;\n}",
+          "file_path": "/home/agent/workspace/broken.c"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "Updated file /home/agent/workspace/broken.c",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_861b6449299a4ca193856801"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}
