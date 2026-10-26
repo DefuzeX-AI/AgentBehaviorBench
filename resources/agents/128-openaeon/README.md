@@ -29,3 +29,5 @@ Startup remains bounded at180seconds, ACP handshake at300seconds, and the overal
 ## Evaluation
 
 `requirement.md` is the KUMA Profile. The custom native-read fixture is under `fixtures/local-smoke/`; it tests a real native read of the installed package manifest, not shell execution, messaging, browsers or filesystem-preservation certification. Fixtures remain outside the image. Keep unsuccessful builds/preflights and strict Judge/evidence failures; do not relabel them or sample until a desired verdict appears. Official GT follows stage1 merge and the Issue's stated process.
+
+The bridge explicitly selects a fresh `agent:main:abb-<random>` native session key. The upstream bridge default `acp:<uuid>` normalizes into the reserved external-ACP backend namespace at this pin; with external ACP dispatch unconfigured, it yields `ACP_DISPATCH_DISABLED` before any model invocation. Selecting the documented `--session` option routes to the original embedded main Agent; it does not enable a different backend, patch upstream dispatch, or remove tools. The original empty-answer Smoke and Judge issue remain separate from any post-fix acceptance.

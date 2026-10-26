@@ -75,7 +75,8 @@ def prepare(environ, home, workspace, *, source=Path('/opt/agent/agent'), compil
                NODE_COMPILE_CACHE=str(cache_home), JITI_FS_CACHE='true', TMPDIR=str(home / '.cache'))
     native = ['node', str(Path(source) / 'openaeon.mjs')]
     gateway = native + ['gateway', 'run', '--bind', 'loopback', '--port', str(port)]
-    acp = native + ['acp', '--url', 'ws://127.0.0.1:' + str(port), '--token-file', str(token_file)]
+    acp = native + ['acp', '--url', 'ws://127.0.0.1:' + str(port), '--token-file', str(token_file),
+                    '--session', 'agent:main:abb-' + secrets.token_hex(8)]
     return gateway, acp, env, port
 
 

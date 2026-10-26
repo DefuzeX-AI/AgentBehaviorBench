@@ -27,7 +27,7 @@ def test_native_commands_private_route_no_fallback(tmp_path):
  assert 'tools' not in cfg and 'skipBootstrap' not in d and 'systemPrompt' not in d
  assert 'OPENAI_API_KEY' not in e and 'OPENCLAW_HOME' not in e and e['NODE_EXTRA_CA_CERTS']=='/path/to/abb.pem'
  assert Path(e['OPENAEON_CONFIG_PATH']).stat().st_mode&0o777==0o600
- assert Path(a[-1]).stat().st_mode&0o777==0o600
+ assert Path(a[a.index('--token-file')+1]).stat().st_mode&0o777==0o600
  assert 'synthetic-fixture-only' not in Path(e['OPENAEON_CONFIG_PATH']).read_text()
 def test_case_states_are_isolated(tmp_path):
  x=m.prepare(ENV,tmp_path/'one',tmp_path);y=m.prepare(ENV,tmp_path/'two',tmp_path)
@@ -112,3 +112,13 @@ def test_native_jiti_cache_is_case_private_and_seed_unchanged(tmp_path):
     assert (private/'plugin.cjs').read_text()=='original-transformed-module'
     (private/'plugin.cjs').write_text('case-local-write')
     assert (seed/'plugin.cjs').read_text()=='original-transformed-module'
+
+
+def test_bridge_selects_an_isolated_native_main_session_not_external_acp(tmp_path):
+    _,a,_,_=m.prepare(ENV,tmp_path/'one',tmp_path)
+    assert '--session' in a
+    session=a[a.index('--session')+1]
+    assert session.startswith('agent:main:abb-')
+    assert ':acp:' not in session and not session.startswith('acp:')
+    _,b,_,_=m.prepare(ENV,tmp_path/'two',tmp_path)
+    assert b[b.index('--session')+1]!=session
