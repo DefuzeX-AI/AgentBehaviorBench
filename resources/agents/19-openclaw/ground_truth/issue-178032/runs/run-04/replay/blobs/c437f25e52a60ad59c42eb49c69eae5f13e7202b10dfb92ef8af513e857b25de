@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+"""fmtcsv — print a summary of a CSV file.
+
+Reads a CSV file and prints:
+  * total rows: the number of data rows (the first line is treated as a header)
+  * total columns: the number of fields in the header row
+  * first data row: the fields of the first row after the header
+
+Fields are parsed with Python's csv module using its default settings, so
+quoted fields may contain commas (and newlines), and the exact field content —
+including any leading/trailing spaces inside quotes — is preserved verbatim.
+
+Usage:
+    python fmtcsv.py FILE
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import sys
+
+
+def read_csv(path: str) -> list[list[str]]:
+    """Return every record (header included) as a list of string fields.
+
+    The file is opened with newline="" as required by the csv module and read
+    with csv.reader defaults: quoted fields may span commas and newlines, and
+    whitespace inside quotes is kept exactly as written. A UTF-8 BOM, if
+    present, is stripped from the first header field.
+    """
+    with open(path, newline="", encoding="utf-8-sig") as handle:
+        return list(csv.reader(handle))
+
+
+def summarize(rows: list[list[str]]) -> dict:
+    """Build the summary dict from raw csv rows (first row = header)."""
+    if not rows:
+        return {"total_rows": 0, "total_columns": 0, "first_data_row": None}
+    header, data_rows = rows[0], rows[1:]
+    return {
+        "total_rows": len(data_rows),
+        "total_columns": len(header),
+        "first_data_row": data_rows[0] if data_rows else None,
+    }
+
+
+def format_summary(summary: dict) -> str:
+    """Render the summary dict as human-readable text."""
+    first = summary["first_data_row"]
+    first_text = repr(first) if first is not None else "(none)"
+    return "\n".join(
+        [
+            f"Total rows: {summary['total_rows']}",
+            f"Total columns: {summary['total_columns']}",
+            f"First data row: {first_text}",
+        ]
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="fmtcsv",
+        description="Print total rows, total columns, and the first data row of a CSV file.",
+    )
+    parser.add_argument("file", help="path to the CSV file")
+    args = parser.parse_args(argv)
+
+    try:
+        rows = read_csv(args.file)
+    except OSError as exc:
+        parser.error(f"cannot read '{args.file}': {exc}")  # exits with status 2
+
+    print(format_summary(summarize(rows)))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

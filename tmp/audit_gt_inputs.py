@@ -22,7 +22,7 @@ for manifest in sorted((root / 'resources/agents').glob('*/ground_truth/manifest
         (out / (d['id'] + '.txt')).write_text('\n\n'.join(lines), encoding='utf-8')
         print(doc['agent_id'], d['id'], len(lines), len(names))
 
-unit = root / 'resources/agents/10-readwren'
+unit = root / 'resources/agents/07-readwren'
 defect = load_manifest(unit, 'readwren')[0]
 review = {'schema':'abb.gt.reviews.v1','reviews':[{
     'ground_truth_id':defect['id'], 'ground_truth_sha256':defect['ground_truth_sha256'],

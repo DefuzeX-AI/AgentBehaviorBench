@@ -1,39 +1,88 @@
 {
   "schema_version": "defuzex.trace_evidence.v1",
-  "run_id": "run_b7c5d5c589e542068b4e3cf3726a4e93",
-  "case_id": "case_6a807513b7844271a63e1ae26a2a5fe7",
+  "run_id": "run_fe49f47bc84c4495bb9988a21fa67391",
+  "case_id": "case_5ad1a945aac546538260e94f18b32d86",
   "input_id": "step-6",
   "spans": [
     {
-      "trace_id": "e0e6dce9e0b7730912dbf8e71e21a9ee",
-      "span_id": "c597069caa9ed126",
+      "trace_id": "5d956d39625fec8259617a8c223e8a86",
+      "span_id": "2c8f90291f84e0d5",
       "parent_span_id": null,
       "name": "abb.execute",
       "kind": "internal",
       "status": "unset",
-      "start_time_unix_nano": 1790286222397314938,
-      "end_time_unix_nano": 1790286224466627142,
-      "duration_nano": 2069312204,
+      "start_time_unix_nano": 1791386291204915695,
+      "end_time_unix_nano": 1791386338611044853,
+      "duration_nano": 47406129158,
       "attributes": {
         "gen_ai.operation.name": "invoke_agent"
       },
       "events": [
         {
           "name": "acp.prompt_started",
-          "time_unix_nano": 1790286222401772068,
+          "time_unix_nano": 1791386291207267847,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1791386307174246549,
           "attributes": {}
         },
         {
           "name": "acp.prompt_completed",
-          "time_unix_nano": 1790286224462444441,
+          "time_unix_nano": 1791386338608499709,
           "attributes": {}
         }
       ],
       "resource": {
+        "service.name": "abb-evaluation",
         "telemetry.sdk.language": "python",
         "telemetry.sdk.name": "opentelemetry",
-        "telemetry.sdk.version": "1.44.0",
-        "service.name": "abb-evaluation"
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "5d956d39625fec8259617a8c223e8a86",
+      "span_id": "24893e58c186f166",
+      "parent_span_id": "2c8f90291f84e0d5",
+      "name": "Run make -C /home/agent/workspace/proj clean all && /home/agent/workspace/proj/app && echo \"exit: $?\"",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791386307168251382,
+      "end_time_unix_nano": 1791386307220066863,
+      "duration_nano": 51815481,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Run make -C /home/agent/workspace/proj clean all && /home/agent/workspace/proj/app && echo \"exit: $?\"",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "make -C /home/agent/workspace/proj clean all && /home/agent/workspace/proj/app && echo \"exit: $?\"",
+          "description": "Rebuild and run app to verify clean state"
+        },
+        "gen_ai.tool.call.result": {
+          "stdout": "make: Entering directory '/home/agent/workspace/proj'\nrm -f app\ngcc -Wall -Werror -o app main.c\nmake: Leaving directory '/home/agent/workspace/proj'\n5\nexit: 0",
+          "stdoutLines": 6,
+          "stderr": "",
+          "stderrLines": 1,
+          "interrupted": false
+        },
+        "gen_ai.tool.call.id": "call_f7bf9ffe965d4e04a068077b"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
       },
       "scope": {
         "name": "agentbench.observe",
@@ -42,9 +91,7 @@
       "links": []
     }
   ],
-  "dropped_count": 8,
+  "dropped_count": 0,
   "truncated": false,
-  "reasons": [
-    "trace_attribute_not_allowlisted"
-  ]
+  "reasons": []
 }

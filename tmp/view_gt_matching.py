@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from zipfile import ZipFile
 from agentbench.cli.viewer import start_viewer_server
-p = Path('resources/agents/10-readwren/ground_truth/manifest.json')
+p = Path('resources/agents/07-readwren/ground_truth/manifest.json')
 d = json.loads(p.read_bytes())['defects'][0]
 with ZipFile(p.parent / d['observations'][0]['evidence_path']) as z:
     path = Path(json.loads(z.read('suite/plan.json'))['result_log_path'])

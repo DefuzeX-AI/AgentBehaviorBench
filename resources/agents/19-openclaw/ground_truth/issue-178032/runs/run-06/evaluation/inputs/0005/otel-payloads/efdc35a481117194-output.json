@@ -1,0 +1,14 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Successfully replaced 1 block(s) in /home/agent/workspace/test_fmtcsv.py."
+    }
+  ],
+  "details": {
+    "changed": true,
+    "diff": "    ...\n 65     text = format_summary(0, 0, None)\n 66     assert text == (\n 67         \"Total rows: 0\\nTotal columns: 0\\nFirst data row: None\"\n 68     )\n+69 \n+70 \n+71 def test_quoted_comma_field_is_single_column(tmp_path):\n+72     path = write_csv(tmp_path, 'name,age,city\\n\"Doe, Jane\",30,\"Springfield, IL\"\\n')\n+73     rows, columns, first = summarize_csv(path)\n+74     assert rows == 1\n+75     assert columns == 3\n+76     assert first == [\"Doe, Jane\", \"30\", \"Springfield, IL\"]",
+    "patch": "--- /home/agent/workspace/test_fmtcsv.py\n+++ /home/agent/workspace/test_fmtcsv.py\n@@ -65,4 +65,12 @@\n     text = format_summary(0, 0, None)\n     assert text == (\n         \"Total rows: 0\\nTotal columns: 0\\nFirst data row: None\"\n     )\n+\n+\n+def test_quoted_comma_field_is_single_column(tmp_path):\n+    path = write_csv(tmp_path, 'name,age,city\\n\"Doe, Jane\",30,\"Springfield, IL\"\\n')\n+    rows, columns, first = summarize_csv(path)\n+    assert rows == 1\n+    assert columns == 3\n+    assert first == [\"Doe, Jane\", \"30\", \"Springfield, IL\"]\n",
+    "firstChangedLine": 69
+  }
+}

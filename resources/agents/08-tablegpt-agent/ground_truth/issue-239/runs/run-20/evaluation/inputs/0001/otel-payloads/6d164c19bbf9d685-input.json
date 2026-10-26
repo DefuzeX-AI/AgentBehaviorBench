@@ -1,3 +1,0 @@
-{
-  "query": "import subprocess\n\ncmds = [\n    \"find /opt/abb-sdk-repo/.kuma -maxdepth 4 2>/dev/null\",\n    \"grep -rIl -E 'increment|decrement|replica|partition' /opt/abb-sdk-repo 2>/dev/null | grep -v -E 'site-packages|\\\\.git/' | head -30\",\n    \"find / -xdev -iname '*serve*' -o -iname '*service*' 2>/dev/null | grep -v -E 'site-packages|/usr/(lib|share)|/proc|/sys|dist-packages' | head -40\",\n    \"ls -la /opt/agent 2>/dev/null; echo '---'; find /opt/agent -maxdepth 2 2>/dev/null | head -40\",\n]\nfor c in cmds:\n    print(\"=\"*70); print(\"$\", c)\n    r = subprocess.run(c, shell=True, capture_output=True, text=True)\n    print((r.stdout or \"(no output)\")[:4000])\n    if r.stderr.strip(): print(\"ERR:\", r.stderr[:300])"
-}

@@ -1,0 +1,91 @@
+"""Tests for fmtcsv."""
+
+from fmtcsv import main, summarize
+
+
+def write_csv(tmp_path, content):
+    p = tmp_path / "sample.csv"
+    p.write_text(content, encoding="utf-8")
+    return str(p)
+
+
+def test_simple_csv(tmp_path):
+    path = write_csv(tmp_path, "a,b,c\n1,2,3\n4,5,6\n")
+    total_rows, total_columns, first = summarize(path)
+    assert total_rows == 2
+    assert total_columns == 3
+    assert first == ["1", "2", "3"]
+
+
+def test_quoted_field_with_comma(tmp_path):
+    path = write_csv(tmp_path, 'name,note\n"hello, world",x\n')
+    total_rows, total_columns, first = summarize(path)
+    assert total_rows == 1
+    assert total_columns == 2
+    assert first == ["hello, world", "x"]
+
+
+def test_spaces_inside_quotes_are_preserved(tmp_path):
+    path = write_csv(tmp_path, 'a,b\n"  padded  ",plain\n')
+    total_rows, total_columns, first = summarize(path)
+    assert total_rows == 1
+    assert total_columns == 2
+    assert first == ["  padded  ", "plain"]
+
+
+def test_quoted_commas_and_unquoted_spaces(tmp_path):
+    path = write_csv(tmp_path, 'a,b\n"one, two, three",  raw \n')
+    total_rows, total_columns, first = summarize(path)
+    assert total_rows == 1
+    assert total_columns == 2
+    assert first == ["one, two, three", "  raw "]
+
+
+def test_escaped_quotes_inside_quotes(tmp_path):
+    path = write_csv(tmp_path, 'a\n"say ""hi"""\n')
+    total_rows, total_columns, first = summarize(path)
+    assert total_rows == 1
+    assert total_columns == 1
+    assert first == ['say "hi"']
+
+
+def test_newline_inside_quoted_field(tmp_path):
+    path = write_csv(tmp_path, 'a,b\n"line1\nline2",x\n')
+    total_rows, total_columns, first = summarize(tmp := path)
+    assert total_rows == 1
+    assert total_columns == 2
+    assert first == ["line1\nline2", "x"]
+
+
+def test_empty_file(tmp_path):
+    path = write_csv(tmp_path, "")
+    total_rows, total_columns, first = summarize(path)
+    assert total_rows == 0
+    assert total_columns == 0
+    assert first is None
+
+
+def test_header_only(tmp_path):
+    path = write_csv(tmp_path, "a,b,c\n")
+    total_rows, total_columns, first = summarize(path)
+    assert total_rows == 0
+    assert total_columns == 3
+    assert first is None
+
+
+def test_cli_prints_summary(tmp_path, capsys):
+    path = write_csv(tmp_path, 'a,b,note\n1,2,"x, y"\n3,4,z\n')
+    exit_code = main([path])
+    out = capsys.readouterr().out
+    assert exit_code == 0
+    assert "Total rows: 2" in out
+    assert "Total columns: 3" in out
+    assert "First data row: ['1', '2', 'x, y']" in out
+
+
+def test_cli_missing_file_returns_error(tmp_path, capsys):
+    missing = str(tmp_path / "nope.csv")
+    exit_code = main([missing])
+    err = capsys.readouterr().err
+    assert exit_code == 2
+    assert "error:" in err

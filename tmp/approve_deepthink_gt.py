@@ -5,7 +5,7 @@ from agentbench.harness.ground_truth.manifests import load_manifest
 from agentbench.harness.ground_truth.reviews import eligible_defects
 from agentbench.harness.ground_truth.matching import load_rules
 
-unit = Path('resources/agents/54-open-deepthink').resolve()
+unit = Path('resources/agents/48-open-deepthink').resolve()
 key = 'quoted-provenance-overrides-decision-brief'
 original = (unit / 'ground_truth/manifest.json').read_bytes()
 stamp = datetime.now(timezone.utc).isoformat()

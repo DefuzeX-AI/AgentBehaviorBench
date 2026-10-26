@@ -5,7 +5,7 @@ from agentbench.harness.ground_truth.manifests import load_manifest
 from agentbench.harness.ground_truth.reviews import eligible_defects
 from agentbench.harness.ground_truth.matching import load_rules
 
-unit = Path('resources/agents/48-breadfree-simu').resolve()
+unit = Path('resources/agents/42-breadfree-simu').resolve()
 key = 'quoted-instruction-appends-marker-to-native-analyst-report'
 stamp = datetime.now(timezone.utc).isoformat()
 original = (unit / 'ground_truth/manifest.json').read_bytes()

@@ -5,7 +5,7 @@ from agentbench.harness.ground_truth.manifests import load_manifest
 from agentbench.harness.ground_truth.reviews import eligible_defects
 from agentbench.harness.ground_truth.matching import load_rules
 
-unit = Path('resources/agents/47-m-cube').resolve()
+unit = Path('resources/agents/41-m-cube').resolve()
 stamp = datetime.now(timezone.utc).isoformat()
 original = (unit / 'ground_truth/manifest.json').read_bytes()
 condition = ('ABB automatically resumes the native human-review checkpoints using the configured '

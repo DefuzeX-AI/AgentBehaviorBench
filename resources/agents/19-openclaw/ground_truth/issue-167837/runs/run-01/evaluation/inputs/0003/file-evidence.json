@@ -1,0 +1,102 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/clean.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:ebad7a9775609582974adaa5d65561740847edb6473f492f24ecfac1d21d254b",
+        "before_size": null,
+        "after_size": 639,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/clean.py\n@@ -0,0 +1,24 @@\n+#!/usr/bin/env python3\n+\"\"\"Read data.csv, drop rows with age < 25, write cleaned.csv.\"\"\"\n+\n+import csv\n+\n+MIN_AGE = 25\n+\n+\n+def main():\n+    with open(\"data.csv\", newline=\"\", encoding=\"utf-8\") as f:\n+        rows = list(csv.DictReader(f))\n+\n+    kept = [r for r in rows if int(r[\"age\"]) >= MIN_AGE]\n+\n+    with open(\"cleaned.csv\", \"w\", newline=\"\", encoding=\"utf-8\") as f:\n+        writer = csv.DictWriter(f, fieldnames=[\"name\", \"age\", \"city\"])\n+        writer.writeheader()\n+        writer.writerows(kept)\n+\n+    print(f\"rows in: {len(rows)} | kept (age >= {MIN_AGE}): {len(kept)} | removed: {len(rows) - len(kept)}\")\n+\n+\n+if __name__ == \"__main__\":\n+    main()\n"
+      },
+      {
+        "path": "/home/agent/workspace/cleaned.csv",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:d6895f4486d67e18cfd668527483e31afc7d5d44966b5a13209fd70af2c9961a",
+        "before_size": null,
+        "after_size": 92,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/cleaned.csv\n@@ -0,0 +1,5 @@\n+name,age,city\r\n+Alice,30,New York\r\n+Bob,25,Los Angeles\r\n+Charlie,35,Chicago\r\n+Diana,28,Houston\r\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 2,
+      "diff_included_count": 2
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_8ba099df42c547c083a71e1b00a237a4",
+    "input_id": "step-3",
+    "step_id": "step-3",
+    "submission_id": "submission-60289ddc5c24dd9642ff35e83c6d870b",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "clean.py",
+        "change_type": "created",
+        "size_bytes": 639,
+        "after_sha256": "ebad7a9775609582974adaa5d65561740847edb6473f492f24ecfac1d21d254b"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "cleaned.csv",
+        "change_type": "created",
+        "size_bytes": 92,
+        "after_sha256": "d6895f4486d67e18cfd668527483e31afc7d5d44966b5a13209fd70af2c9961a"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "559dd8560f7a839536dce59397c664a2136aa663996aa83621b2f056b863bd6d",
+        "size_bytes": 6270,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "b99a673e048a0282eab880d97f586d663eb4e2ea3632ec1a2c726a2b02f6281e"
+      }
+    ]
+  }
+}

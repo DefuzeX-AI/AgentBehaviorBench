@@ -1,0 +1,105 @@
+"""Tests for fmtcsv: parsing fidelity (quoted fields, spaces) and summary output."""
+
+import pytest
+
+from fmtcsv import format_summary, main, read_csv_rows, summarize
+
+
+def write_csv(tmp_path, content):
+    path = tmp_path / "sample.csv"
+    path.write_text(content, encoding="utf-8")
+    return str(path)
+
+
+# --- parsing and summarizing -------------------------------------------------
+
+
+def test_simple_csv(tmp_path):
+    path = write_csv(tmp_path, "a,b,c\n1,2,3\n4,5,6\n")
+    rows = read_csv_rows(path)
+    assert rows == [["a", "b", "c"], ["1", "2", "3"], ["4", "5", "6"]]
+    assert summarize(rows) == (2, 3, ["1", "2", "3"])
+
+
+def test_quoted_field_with_comma(tmp_path):
+    path = write_csv(tmp_path, 'name,note\n"Smith, John",ok\n')
+    rows = read_csv_rows(path)
+    assert rows[1] == ["Smith, John", "ok"]
+    assert summarize(rows) == (1, 2, ["Smith, John", "ok"])
+
+
+def test_quoted_comma_with_space_before_quote(tmp_path):
+    # Regression: a space between the delimiter and the opening quote used
+    # to be treated as a literal quote, splitting the field on its comma.
+    path = write_csv(tmp_path, 'name,age,city\n "Smith, John",34,Springfield\n')
+    rows = read_csv_rows(path)
+    assert rows[1] == ["Smith, John", "34", "Springfield"]
+    assert summarize(rows) == (1, 3, ["Smith, John", "34", "Springfield"])
+
+
+def test_preserves_spaces_inside_quotes(tmp_path):
+    path = write_csv(tmp_path, 'a,b\n"  padded  ",plain\n')
+    rows = read_csv_rows(path)
+    assert rows[1] == ["  padded  ", "plain"]
+
+
+def test_preserves_leading_trailing_spaces_and_commas(tmp_path):
+    path = write_csv(tmp_path, '"x, y","  lead",trail  \n')
+    rows = read_csv_rows(path)
+    assert rows == [["x, y", "  lead", "trail  "]]  # header-only file
+
+
+def test_embedded_doubled_quotes(tmp_path):
+    path = write_csv(tmp_path, 'quote\n"say ""hi"" now"\n')
+    rows = read_csv_rows(path)
+    assert rows[1] == ['say "hi" now']
+
+
+def test_quoted_multiline_field(tmp_path):
+    path = write_csv(tmp_path, 'a,b\n"line1\nline2",x\n')
+    rows = read_csv_rows(path)
+    assert rows[1] == ["line1\nline2", "x"]
+    assert summarize(rows) == (1, 2, ["line1\nline2", "x"])
+
+
+def test_header_only(tmp_path):
+    path = write_csv(tmp_path, "a,b\n")
+    assert summarize(read_csv_rows(path)) == (0, 2, None)
+
+
+def test_empty_file(tmp_path):
+    path = write_csv(tmp_path, "")
+    assert summarize(read_csv_rows(path)) == (0, 0, None)
+
+
+def test_format_summary_text():
+    text = format_summary(1, 2, ["hello, world", "2"])
+    assert text == "Total rows: 1\nTotal columns: 2\nFirst data row: ['hello, world', '2']"
+    assert "First data row: (none)" in format_summary(0, 0, None)
+
+
+# --- CLI ---------------------------------------------------------------------
+
+
+def test_main_output(tmp_path, capsys):
+    path = write_csv(tmp_path, 'col1,col2\n"hello, world",2\n')
+    rc = main([path])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "Total rows: 1" in out
+    assert "Total columns: 2" in out
+    assert "hello, world" in out
+
+
+def test_main_missing_file(capsys):
+    rc = main(["/nonexistent/nope.csv"])
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert "error" in captured.err
+    assert captured.out == ""
+
+
+def test_main_no_args_exits_with_error():
+    with pytest.raises(SystemExit) as excinfo:
+        main([])
+    assert excinfo.value.code != 0

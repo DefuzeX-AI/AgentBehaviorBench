@@ -1,0 +1,104 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/fmtcsv.py",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:32e72736827a626592a6b7ed033e3bdda73fa1aeda0a6f87c608d43650e6c3d6",
+        "after_hash": "sha256:c3b88c6af4c63f3d2f015af4668de64a9beec20c9ffa749d8c0668b661eef1dc",
+        "before_size": 2151,
+        "after_size": 5231,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/fmtcsv.py\n+++ /home/agent/workspace/fmtcsv.py\n@@ -6,9 +6,11 @@\n   * total columns -- number of fields in the header row\n   * first data row -- the first row after the header, if any\n \n-Quoted fields are handled per RFC 4180 (via Python's csv module), so\n-fields containing commas, escaped double-quotes, newlines, and\n-leading/trailing spaces *inside* quotes are preserved exactly.\n+Quoted fields are parsed per RFC 4180, so fields containing commas,\n+escaped double-quotes, newlines, and leading/trailing spaces *inside*\n+quotes are preserved exactly.  As a lenient extension, whitespace\n+between a delimiter and an opening quote is ignored, so ``a, \"x, y\"``\n+stays a single field.\n \n Usage:\n     python fmtcsv.py FILE.csv\n@@ -17,9 +19,96 @@\n from __future__ import annotations\n \n import argparse\n-import csv\n import sys\n from typing import List, Optional, Sequence, Tuple\n+\n+\n+def _parse_csv(text: str) -> List[List[str]]:\n+    \"\"\"Parse CSV text into a list of rows (RFC 4180 quoting).\n+\n+    Quoted fields may contain commas, escaped double-quotes (``\"\"``), and\n+    newlines; their content is kept verbatim.  One lenient extension is\n+    applied: whitespace between a delimiter and an opening quote is\n+    ignored, so ``a, \"x, y\"`` parses as the two fields ``a`` and ``x, y``\n+    instead of splitting on the inner comma.  Unquoted fields keep every\n+    character, including leading/trailing spaces.\n+    \"\"\"\n+    rows: List[List[str]] = []\n+    row: List[str] = []\n+    field: List[str] = []\n+    pending: List[str] = []  # whitespace buffered at the start of a field\n+    at_start = True          # positioned at the start of a field\n+    in_quoted = False        # inside a quoted region\n+    just_closed = False      # positioned right after a closing quote\n+    i, n = 0, len(text)\n+\n+    def end_field() -> None:\n+        nonlocal field, pending, at_start\n+        row.append(\"\".join(field))\n+        field, pending, at_start = [], [], True\n+\n+    def end_row() -> None:\n+        nonlocal row\n+        end_field()\n+        rows.append(row)\n+        row = []\n+\n+    while i < n:\n+        ch = text[i]\n+        if in_quoted:\n+            if ch == '\"':\n+                if i + 1 < n and text[i + 1] == '\"':\n+                    field.append('\"')  # escaped quote\n+                    i += 2\n+                    continue\n+                in_quoted = False\n+                just_closed = True\n+            else:\n+                field.append(ch)  # commas, newlines, spaces kept verbatim\n+            i += 1\n+            continue\n+        if ch == \"\\r\" or ch == \"\\n\":  # row terminator (handles \\r\\n)\n+            if ch == \"\\r\" and i + 1 < n and text[i + 1] == \"\\n\":\n+                i += 1\n+            end_row()\n+            i += 1\n+            continue\n+        if just_closed:\n+            just_closed = False\n+            if ch == \",\":\n+                end_field()\n+            else:\n+                field.append(ch)  # literal tail after a closing quote\n+            i += 1\n+            continue\n+        if at_start:\n+            if ch in \" \\t\":\n+                pending.append(ch)\n+            elif ch == '\"':\n+                pending.clear()  # lenient fix: drop space(s) before quote\n+                at_start = False\n+                in_quoted = True\n+            elif ch == \",\":\n+                end_field()  # emits buffered whitespace as the field\n+            else:\n+                field.extend(pending)\n+                pending.clear()\n+                at_start = False\n+                field.append(ch)\n+            i += 1\n+            continue\n+        # Plain unquoted field body.\n+        if ch == \",\":\n+            end_field()\n+        else:\n+            field.append(ch)\n+        i += 1\n+\n+    # Flush the final row (missing trailing newline, unterminated quoted\n+    # field, or a trailing delimiter).\n+    if in_quoted or just_closed or not at_start or pending or row:\n+        end_row()\n+    return rows\n \n \n def summarize(path: str) -> Tuple[int, int, Optional[List[str]]]:\n@@ -30,10 +119,10 @@\n       is empty).\n     - ``first_data_row``: the first row after the header, or ``None``.\n     \"\"\"\n-    # newline=\"\" is required by the csv module so embedded newlines inside\n-    # quoted fields are handled correctly.\n+    # newline=\"\" keeps line endings untouched; _parse_csv handles \\r\\n,\n+    # \\n, and newlines embedded in quoted fields itself.\n     with open(path, \"r\", newline=\"\", encoding=\"utf-8\") as f:\n-        rows = list(csv.reader(f))\n+        rows = _parse_csv(f.read())\n \n     if not rows:\n         return 0, 0, None\n"
+      },
+      {
+        "path": "/home/agent/workspace/test_fmtcsv.py",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:60dd7ba2adb2d6a76b445c56c1cdf0e281d4ccdc15020c1570281dfb9235c453",
+        "after_hash": "sha256:27e8c39dd4525b57e9e2ae77bbcf331b568a07a373c5d928c337a412d6d10498",
+        "before_size": 2725,
+        "after_size": 3160,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/test_fmtcsv.py\n+++ /home/agent/workspace/test_fmtcsv.py\n@@ -23,6 +23,16 @@\n     assert total_rows == 1\n     assert total_columns == 2\n     assert first == [\"hello, world\", \"x\"]\n+\n+\n+def test_quoted_comma_with_space_before_quote(tmp_path):\n+    # Regression: a space between the delimiter and the opening quote used\n+    # to make the inner comma split the field into extra columns.\n+    path = write_csv(tmp_path, 'name,note\\nBob, \"Hello, world\"\\nAlice,fine\\n')\n+    total_rows, total_columns, first = summarize(path)\n+    assert total_rows == 2\n+    assert total_columns == 2\n+    assert first == [\"Bob\", \"Hello, world\"]\n \n \n def test_spaces_inside_quotes_are_preserved(tmp_path):\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 2,
+      "diff_included_count": 2
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_77d4b8a11830417fa8657c62cc432aca",
+    "input_id": "step-5",
+    "step_id": "step-5",
+    "submission_id": "submission-5c0d2f867b9c4936f5c368c8686b702a",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "fmtcsv.py",
+        "change_type": "modified",
+        "size_bytes": 5231,
+        "before_sha256": "32e72736827a626592a6b7ed033e3bdda73fa1aeda0a6f87c608d43650e6c3d6",
+        "after_sha256": "c3b88c6af4c63f3d2f015af4668de64a9beec20c9ffa749d8c0668b661eef1dc"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "test_fmtcsv.py",
+        "change_type": "modified",
+        "size_bytes": 3160,
+        "before_sha256": "60dd7ba2adb2d6a76b445c56c1cdf0e281d4ccdc15020c1570281dfb9235c453",
+        "after_sha256": "27e8c39dd4525b57e9e2ae77bbcf331b568a07a373c5d928c337a412d6d10498"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "7ebecd6af54af0445a4b39f0232b496d235cb4aec8c9aec2347a0eb9ed98e9ed",
+        "size_bytes": 47352,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  }
+}

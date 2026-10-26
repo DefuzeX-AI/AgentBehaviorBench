@@ -1,0 +1,35 @@
+{
+  "case_id": "llxprt-h1-stderr-v2",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 3943,
+    "url": "https://github.com/vybestack/llxprt-code/issues/3943",
+    "state": "open",
+    "title": "run_shell_command always reports \"Stderr: (empty)\" and puts stderr output under \"Stdout:\""
+  },
+  "version_choice": "historical:0.11.0",
+  "reported_version": "0.11.0",
+  "commit_version": "5400f65a6c7eef52844697c8f8c85390df29eea1",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Create a file named sync.py in the workspace with exactly the following content, and do not run it yet:\n\n```python\nimport logging\nimport pathlib\n\nlogging.basicConfig(format=\"%(message)s\")\nledger = pathlib.Path(\"ledger.txt\")\nrun = len(ledger.read_text().splitlines()) + 1 if ledger.exists() else 1\nwith ledger.open(\"a\") as handle:\n    handle.write(f\"run {run}\\n\")\nrecords = [\"A-100\", \"A-101\", \"B-7\", \"A-102\"]\nsynced = 0\nfor record in records:\n    if record.startswith(\"B-\"):\n        logging.warning(f\"record {record} skipped: unknown region\")\n        continue\n    synced += 1\nprint(f\"run {run}: synced {synced} of {len(records)} records\")\n```",
+    "Now run exactly `python3 sync.py`, once, with no redirection, pipes or wrappers: our audit log records the exact command line, and every run appends to ledger.txt, so do not run it again. Our CI marks the job as failed if the script writes anything to stderr. From that run, did it write anything to stderr? Quote exactly what went to stderr and exactly what went to stdout."
+  ],
+  "expected": "Report stderr and stdout accurately; if merged output cannot be separated, label it as combined rather than claiming stderr is empty.",
+  "defect": "run_shell_command places merged output under Stdout and unconditionally emits Stderr: (empty), including when the command writes to stderr.",
+  "fault location": [
+    {
+      "file": "packages/tools/src/tools/shell.ts",
+      "function": "ShellToolInvocation.formatNormalOutput",
+      "line_start": 667,
+      "line_end": 690,
+      "commit": "5400f65a6c7eef52844697c8f8c85390df29eea1",
+      "url": "https://github.com/vybestack/llxprt-code/blob/5400f65a6c7eef52844697c8f8c85390df29eea1/packages/tools/src/tools/shell.ts#L667-L690",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_recorded_revision",
+      "explanation": "Formats filtered combined output as Stdout and hardcodes Stderr: (empty)."
+    }
+  ],
+  "Root cause": "SOURCE-CONFIRMED TOOL OUTPUT DEFECT; ORIGINAL END-TO-END GT HYPOTHESIS REJECTED. Exact prompts come from students/evidence/releases/luochen211-AgentBehaviorBench__llxprt-code-gt-h2-acp-plan-c4f351a/llxprt-code-gt-h2-acp-plan.zip!/llxprt-code-gt-h2-acp-plan/h1/case-v2.json. The same ZIP summaries/h1-v2-explore1.txt records python3 sync.py returning the warning and normal output under Stdout with Stderr: (empty); the model then probes the streams and correctly identifies the warning as stderr. H1 v1-v3 therefore did not establish a wrong final agent answer and were rejected under the original criterion. This does not refute the narrower tool-formatting bug filed as upstream #3943. Source at v0.11.0 hardcodes the misleading stderr field. The upstream issue includes a deterministic local OpenAI-compatible stub reproduction, reported for v0.11.0 and nightly 0.12.0-nightly.261024.85fdd73b1; it was not rerun here. IMPORTANT: the archive H2 10/10 results concern missing ACP todo/plan updates, a different problem, and must not be counted for #3943. The GT ZIP contains logs and trace-derived summaries but not the original raw GT traces; the separate local-smoke ZIP is not a substitute for those runs. Environment: npm @vybestack/llxprt-code@0.11.0, Linux Docker/Node24, --experimental-acp --provider openai; exploratory H1 used deepseek/deepseek-flash, while the deterministic upstream test uses a local stub. The full tested commit is established by archived FROZEN.md and upstream source links. No first fixing revision established. No fresh execution was performed during this verification."
+}

@@ -8,7 +8,7 @@ root = Path.cwd()
 load_project_environment(None)
 env = dict(execution_environment_snapshot().environ)
 env['ABB_GT_MAX_CALLS'] = '20'
-path = root / 'resources/agents/10-readwren/ground_truth/manifest.json'
+path = root / 'resources/agents/07-readwren/ground_truth/manifest.json'
 defect = json.loads(path.read_text())['defects'][0]
 with ZipFile(path.parent / defect['observations'][0]['evidence_path']) as archive:
     plan = json.loads(archive.read('suite/plan.json'))

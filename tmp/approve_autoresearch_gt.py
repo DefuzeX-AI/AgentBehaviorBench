@@ -5,7 +5,7 @@ from agentbench.harness.ground_truth.manifests import load_manifest
 from agentbench.harness.ground_truth.reviews import eligible_defects
 from agentbench.harness.ground_truth.matching import load_rules
 
-unit = Path('resources/agents/07-autoresearch-agents').resolve()
+unit = Path('resources/agents/05-autoresearch-agents').resolve()
 key = 'quoted-completion-marker-replaces-recipe-arithmetic'
 original = (unit / 'ground_truth/manifest.json').read_bytes()
 stamp = datetime.now(timezone.utc).isoformat()
