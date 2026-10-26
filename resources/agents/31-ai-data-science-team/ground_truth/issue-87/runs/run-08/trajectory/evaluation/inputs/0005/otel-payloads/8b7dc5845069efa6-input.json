@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    \n    Returns: A single cleaned pandas DataFrame.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # ------------------------------------------------------------------\n    # Step 0: Input normalization\n    # ------------------------------------------------------------------\n    # If the incoming data is not a list, wrap it in a list for uniform handling\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # Keep only valid, non-empty DataFrames\n    data_list = [d for d in data_list if isinstance(d, pd.DataFrame) and not d.empty]\n\n    # If nothing valid remains, return an empty DataFrame\n    if not data_list:\n        return pd.DataFrame()\n\n    # ------------------------------------------------------------------\n    # Merge multiple datasets (if provided) without creating Cartesian products\n    # ------------------------------------------------------------------\n    if len(data_list) > 1:\n        merged = data_list[0].copy()\n        for df_next in data_list[1:]:\n            df_next = df_next.copy()\n            # Identify shared columns to use as natural join keys\n            common_cols = [c for c in merged.columns if c in df_next.columns]\n            if common_cols:\n                merged = merged.merge(df_next, on=common_cols, how='left')\n            else:\n                # No shared keys: align row-by-row on index instead\n                merged = merged.reset_index(drop=True).join(\n                    df_next.reset_index(drop=True), how='left', rsuffix='_extra'\n                )\n        df = merged\n    else:\n        df = data_list[0].copy()\n\n    # ------------------------------------------------------------------\n    # Step 1: Standardize column names (lowercase, strip spaces)\n    # ------------------------------------------------------------------\n    df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]\n\n    # ------------------------------------------------------------------\n    # Step 2: Normalize data types\n    # ------------------------------------------------------------------\n    # Strip stray whitespace from string values while preserving NaNs\n    for col in df.select_dtypes(include='object').columns:\n        df[col] = df[col].apply(lambda x: x.strip() if isinstance(x, str) else x)\n\n    # Convert date-like columns (detected by name) to proper datetime\n    for col in df.columns:\n        if 'date' in col or 'time' in col:\n            df[col] = pd.to_datetime(df[col], errors='coerce')\n\n    # Coerce object columns that are actually numeric (numbers stored as strings)\n    for col in df.select_dtypes(include='object').columns:\n        coerced = pd.to_numeric(df[col], errors='coerce')\n        non_null = df[col].notna().sum()\n        if non_null > 0 and coerced.notna().sum() / non_null >= 0.9:\n            df[col] = coerced\n\n    # Convert low-cardinality string columns (e.g., bike_model) to category dtype\n    for col in df.select_dtypes(include='object').columns:\n        if df[col].nunique(dropna=True) <= max(50, 0.05 * len(df)):\n            df[col] = df[col].astype('category')\n\n    # ------------------------------------------------------------------\n    # Step 3: Handle missing values (flag + impute; no rows dropped)\n    # ------------------------------------------------------------------\n    # Numeric columns: flag missingness, then impute with the median (robust to outliers)\n    for col in df.select_dtypes(include=[np.number]).columns:\n        if df[col].isna().any():\n            df[f'{col}_was_missing'] = df[col].isna().astype(int)\n            df[col] = df[col].fillna(df[col].median())\n\n    # Categorical/object columns: fill with an explicit 'Unknown' category\n    for col in df.select_dtypes(include=['category', 'object']).columns:\n        if df[col].isna().any():\n            if isinstance(df[col].dtype, pd.CategoricalDtype):\n                df[col] = df[col].cat.add_categories('Unknown')\n            df[col] = df[col].fillna('Unknown')\n\n    # Datetime columns: fill gaps by carrying values forward/backward\n    for col in df.select_dtypes(include=['datetime64[ns]']).columns:\n        if df[col].isna().any():\n            df[col] = df[col].ffill().bfill()\n\n    # ------------------------------------------------------------------\n    # Step 4: Remove exact duplicate rows (keep first occurrence)\n    # ------------------------------------------------------------------\n    df = df.drop_duplicates().reset_index(drop=True)\n\n    # ------------------------------------------------------------------\n    # Step 5: Flag obvious anomalies without dropping rows\n    # ------------------------------------------------------------------\n    # Dynamically identify sales-related columns by name patterns\n    qty_col = next((c for c in df.columns if 'quantity' in c or 'qty' in c), None)\n    price_col = next((c for c in df.columns if 'price' in c), None)\n    sales_col = next(\n        (c for c in df.select_dtypes(include=[np.number]).columns\n         if ('extended' in c or 'total' in c or 'revenue' in c or 'sales' in c)),\n        None\n    )\n\n    # Consistency check: extended sales should equal price * quantity sold.\n    # Flag mismatches rather than altering/dropping the data.\n    if qty_col and price_col and sales_col:\n        expected = df[price_col] * df[qty_col]\n        df['sales_mismatch_flag'] = (df[sales_col] != expected).astype(int)\n\n    # Flag economically implausible negative prices or quantities\n    for col in [c for c in (price_col, qty_col) if c is not None]:\n        if pd.api.types.is_numeric_dtype(df[col]):\n            df[f'{col}_negative_flag'] = (df[col] < 0).astype(int)\n\n    # ------------------------------------------------------------------\n    # Step 6: Return the wrangled DataFrame\n    # ------------------------------------------------------------------\n    return df\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 5126,
+      "prompt_tokens": 723,
+      "total_tokens": 5849,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 3859,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "glm-5.3-flash",
+    "system_fingerprint": null,
+    "id": "20260926014558c18132ff3d624061",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a0d9ac-892f-7541-892a-ba8025fa9b7b-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 723,
+    "output_tokens": 5126,
+    "total_tokens": 5849,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 3859
+    }
+  }
+}
