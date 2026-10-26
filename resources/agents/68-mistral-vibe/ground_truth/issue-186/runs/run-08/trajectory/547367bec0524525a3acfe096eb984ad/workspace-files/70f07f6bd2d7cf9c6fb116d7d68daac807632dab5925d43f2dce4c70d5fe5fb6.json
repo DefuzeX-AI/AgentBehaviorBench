@@ -1,0 +1,4 @@
+{
+  "content": "\"\"\"Wrappers to call pyproject.toml-based build backend hooks.\n\"\"\"\n\nfrom typing import TYPE_CHECKING\n\nfrom ._impl import (\n    BackendUnavailable,\n    BuildBackendHookCaller,\n    HookMissing,\n    UnsupportedOperation,\n    default_subprocess_runner,\n    quiet_subprocess_runner,\n)\n\n__version__ = \"1.2.0\"\n__all__ = [\n    \"BackendUnavailable\",\n    \"BackendInvalid\",\n    \"HookMissing\",\n    \"UnsupportedOperation\",\n    \"default_subprocess_runner\",\n    \"quiet_subprocess_runner\",\n    \"BuildBackendHookCaller\",\n]\n\nBackendInvalid = BackendUnavailable  # Deprecated alias, previously a separate exception\n\nif TYPE_CHECKING:\n    from ._impl import SubprocessRunner\n\n    __all__ += [\"SubprocessRunner\"]\n",
+  "encoding": "utf-8"
+}

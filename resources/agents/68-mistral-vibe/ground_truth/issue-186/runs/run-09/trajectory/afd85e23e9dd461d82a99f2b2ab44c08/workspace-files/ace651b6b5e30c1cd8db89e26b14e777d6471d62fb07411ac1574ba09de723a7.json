@@ -1,0 +1,4 @@
+{
+  "content": "import os\nimport sys\n\n# Remove '' and current working directory from the first entry\n# of sys.path, if present to avoid using current directory\n# in pip commands check, freeze, install, list and show,\n# when invoked as python -m pip <command>\nif sys.path[0] in (\"\", os.getcwd()):\n    sys.path.pop(0)\n\n# If we are running from a wheel, add the wheel to sys.path\n# This allows the usage python pip-*.whl/pip install pip-*.whl\nif not __spec__ or __spec__.parent == \"\":\n    # __file__ is pip-*.whl/pip/__main__.py\n    # first dirname call strips of '/__main__.py', second strips off '/pip'\n    # Resulting path is the name of the wheel itself\n    # Add that to sys.path so we can import pip\n    path = os.path.dirname(os.path.dirname(__file__))\n    sys.path.insert(0, path)\n\nif __name__ == \"__main__\":\n    from pip._internal.cli.main import main as _main\n\n    sys.exit(_main())\n",
+  "encoding": "utf-8"
+}

@@ -1,0 +1,4 @@
+{
+  "content": "\"\"\"Filetype information.\"\"\"\n\nfrom pip._internal.utils.misc import splitext\n\nWHEEL_EXTENSION = \".whl\"\nBZ2_EXTENSIONS: tuple[str, ...] = (\".tar.bz2\", \".tbz\")\nXZ_EXTENSIONS: tuple[str, ...] = (\n    \".tar.xz\",\n    \".txz\",\n    \".tlz\",\n    \".tar.lz\",\n    \".tar.lzma\",\n)\nZIP_EXTENSIONS: tuple[str, ...] = (\".zip\", WHEEL_EXTENSION)\nTAR_EXTENSIONS: tuple[str, ...] = (\".tar.gz\", \".tgz\", \".tar\")\nARCHIVE_EXTENSIONS = ZIP_EXTENSIONS + BZ2_EXTENSIONS + TAR_EXTENSIONS + XZ_EXTENSIONS\n\n\ndef is_archive_file(name: str) -> bool:\n    \"\"\"Return True if `name` is a considered as an archive file.\"\"\"\n    ext = splitext(name)[1].lower()\n    if ext in ARCHIVE_EXTENSIONS:\n        return True\n    return False\n",
+  "encoding": "utf-8"
+}

@@ -1,0 +1,4 @@
+{
+  "content": "from abc import ABC, abstractmethod\nfrom typing import Any\n\n\nclass Pager(ABC):\n    \"\"\"Base class for a pager.\"\"\"\n\n    @abstractmethod\n    def show(self, content: str) -> None:\n        \"\"\"Show content in pager.\n\n        Args:\n            content (str): Content to be displayed.\n        \"\"\"\n\n\nclass SystemPager(Pager):\n    \"\"\"Uses the pager installed on the system.\"\"\"\n\n    def _pager(self, content: str) -> Any:  #  pragma: no cover\n        return __import__(\"pydoc\").pager(content)\n\n    def show(self, content: str) -> None:\n        \"\"\"Use the same pager used by pydoc.\"\"\"\n        self._pager(content)\n\n\nif __name__ == \"__main__\":  # pragma: no cover\n    from .__main__ import make_test_card\n    from .console import Console\n\n    console = Console()\n    with console.pager(styles=True):\n        console.print(make_test_card())\n",
+  "encoding": "utf-8"
+}
