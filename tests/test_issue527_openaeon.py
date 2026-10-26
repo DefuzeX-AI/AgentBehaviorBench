@@ -122,3 +122,12 @@ def test_bridge_selects_an_isolated_native_main_session_not_external_acp(tmp_pat
     assert ':acp:' not in session and not session.startswith('acp:')
     _,b,_,_=m.prepare(ENV,tmp_path/'two',tmp_path)
     assert b[b.index('--session')+1]!=session
+
+
+def test_native_stderr_tee_preserves_exact_bytes(tmp_path,monkeypatch):
+    import os,io,types
+    payload='[acp] newSession: original -> agent:main:abb-0123456789abcdef\nUTF8: \u539f\u6587\n'.encode()
+    read_fd,write_fd=os.pipe();os.write(write_fd,payload);os.close(write_fd)
+    forwarded=io.BytesIO();monkeypatch.setattr(m.sys,'stderr',types.SimpleNamespace(buffer=forwarded))
+    with os.fdopen(read_fd,'rb') as stream:m.tee_native_stderr(stream,tmp_path/'native.log')
+    assert (tmp_path/'native.log').read_bytes()==payload and forwarded.getvalue()==payload

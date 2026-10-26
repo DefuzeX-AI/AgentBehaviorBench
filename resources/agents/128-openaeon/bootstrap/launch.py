@@ -10,6 +10,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from urllib.parse import urlsplit
 
@@ -75,8 +76,12 @@ def prepare(environ, home, workspace, *, source=Path('/opt/agent/agent'), compil
                NODE_COMPILE_CACHE=str(cache_home), JITI_FS_CACHE='true', TMPDIR=str(home / '.cache'))
     native = ['node', str(Path(source) / 'openaeon.mjs')]
     gateway = native + ['gateway', 'run', '--bind', 'loopback', '--port', str(port)]
+    session_key = 'agent:main:abb-' + secrets.token_hex(8)
+    metadata = home / 'abb-native-session.json'
+    metadata.write_text(json.dumps({'session_key':session_key,'state_dir':str(state)}))
+    metadata.chmod(0o600)
     acp = native + ['acp', '--url', 'ws://127.0.0.1:' + str(port), '--token-file', str(token_file),
-                    '--session', 'agent:main:abb-' + secrets.token_hex(8)]
+                    '--session', session_key, '--verbose']
     return gateway, acp, env, port
 
 
@@ -111,8 +116,20 @@ def wait_gateway(process, port, timeout=180):
     raise TimeoutError('Native Gateway startup exceeded its declared budget')
 
 
+def tee_native_stderr(stream, path):
+    """Retain original native session mapping while forwarding exact stderr bytes."""
+    with Path(path).open('ab') as saved:
+        while True:
+            chunk=os.read(stream.fileno(),8192)
+            if not chunk:
+                return
+            saved.write(chunk);saved.flush()
+            sys.stderr.buffer.write(chunk);sys.stderr.buffer.flush()
+
+
 def main():
     gateway = acp = None
+    stderr_thread = None
     home = Path(tempfile.mkdtemp(prefix='abb-openaeon-'))
     def interrupted(signum, frame):
         raise SystemExit(128 + signum)
@@ -124,7 +141,9 @@ def main():
                                    stdout=sys.stderr, stderr=sys.stderr, start_new_session=True)
         wait_gateway(gateway, port)
         acp = subprocess.Popen(acmd, env=env, stdin=sys.stdin, stdout=sys.stdout,
-                               stderr=sys.stderr, start_new_session=True)
+                               stderr=subprocess.PIPE, start_new_session=True)
+        stderr_thread=threading.Thread(target=tee_native_stderr,args=(acp.stderr,home/'acp-native.stderr.log'),daemon=True)
+        stderr_thread.start()
         while acp.poll() is None:
             if gateway.poll() is not None:
                 raise RuntimeError('Native Gateway exited during the ACP session')
@@ -132,6 +151,8 @@ def main():
         return acp.returncode
     finally:
         stop(acp); stop(gateway)
+        if stderr_thread is not None:
+            stderr_thread.join(timeout=2)
 
 
 if __name__ == '__main__':
