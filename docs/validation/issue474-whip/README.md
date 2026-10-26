@@ -84,7 +84,7 @@ an automatic GT summary with zero calls; no GT exploration was started.
 ## Source and checks
 
 The native source revision is `1c5da05987d2869687dfc95fc9128ad2ad68e0f0`.
-See the [unit README](../../../resources/agents/123-whip/README.md) for the exact
+See the [unit README](../../../resources/agents/127-whip/README.md) for the exact
 manual prerequisite: checkout the pinned Git tree, validate it is clean, and
 materialize its internal `.claude/skills` directory link without changing source
 file bytes. ABB does not automatically restore this bundled unit.
@@ -119,3 +119,20 @@ were not changed or hidden by this integration.
 Raw attempts, Case, output, ACP/network traces, manifests and Judge records remain
 under `cache/onboarding/whip-474/` in the isolated worktree. No GT exploration was
 performed as part of this onboarding validation.
+
+## Submission synchronization — 2026-10-26
+
+This closeout merges upstream `8349406e` and relocates the current unit from
+`123-whip` to `127-whip`. The earlier integration/evidence commit is
+`1ff65d2c`. Native source, launcher, Dockerfile, profile, manifest and runtime
+configuration are byte-identical to that integration; only the current registry,
+unit location, runnable references and this submission record change. Existing
+Case/output/Judge artifacts and hashes retain their historical paths. No model
+call or new runtime acceptance is claimed for this synchronization.
+
+The focused integration, manifest and ACP configuration checks passed: 44 tests.
+Fresh source preparation and official profile/configuration validation also passed
+(the bundled Whip source still requires the documented manual prerequisite).
+This independent PR uses the next available slot, 127, after upstream's 126; if
+another onboarding PR merges first, renumber this unit and its current references
+before merging. Do not remove or renumber existing upstream registrations.

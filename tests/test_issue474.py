@@ -7,7 +7,7 @@ import tomllib
 
 import pytest
 
-UNIT = Path(__file__).resolve().parents[1] / 'resources/agents/123-whip'
+UNIT = Path(__file__).resolve().parents[1] / 'resources/agents/127-whip'
 
 
 def module(name, path):

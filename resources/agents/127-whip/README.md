@@ -19,7 +19,7 @@ provided manual preparation helper from the ABB root:
 ```sh
 git clone https://github.com/context-labs/whip /tmp/whip-source-474
 git -C /tmp/whip-source-474 checkout 1c5da05987d2869687dfc95fc9128ad2ad68e0f0
-python resources/agents/123-whip/prepare_source.py /tmp/whip-source-474
+python resources/agents/127-whip/prepare_source.py /tmp/whip-source-474
 ```
 
 The helper refuses an existing destination or dirty/wrong source (including ignored files). It checks that
