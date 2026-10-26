@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import unittest
 
-PATH = Path(__file__).resolve().parents[1] / "resources/agents/116-icode/bootstrap/launch.py"
+PATH = Path(__file__).resolve().parents[1] / "resources/agents/128-icode/bootstrap/launch.py"
 spec = importlib.util.spec_from_file_location("icode_launcher", PATH)
 launcher = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(launcher)
