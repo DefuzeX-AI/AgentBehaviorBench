@@ -81,7 +81,7 @@ Telemetry and npm's update notifier are disabled by their normal settings.
 
 For this contribution, real text-generation acceptance uses only
 `glm-5.3-flash`. Local model tensors above are embedding/reranking assets, not
-alternate text-generation APIs. `validation/local-case/` contains a custom,
+alternate text-generation APIs. `fixtures/local-smoke/` contains a custom,
 single-step filesystem/shell Smoke Case; it is not official KUMA or GT. Run it
 through the ordinary ABB local SDK with a dedicated enabled evaluation registry.
 The shared registration remains disabled/adapting for review. Keep Case, output,
