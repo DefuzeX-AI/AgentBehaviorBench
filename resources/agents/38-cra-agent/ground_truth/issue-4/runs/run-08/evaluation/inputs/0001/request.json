@@ -1,0 +1,12 @@
+{
+  "schema": "abb.invocation.v1",
+  "run_id": "83387a7bc3aa44cd91aaaaf84d14c0c2",
+  "session_id": "run_10cc89594232439495e96a99e9c657ac",
+  "observation_context": {
+    "case_id": "case_5825c26eace04a8fb2f306649c3a7d9d",
+    "input_id": "step-1"
+  },
+  "agent_id": "cra-agent",
+  "framework": "langgraph",
+  "input": "Review the following Python source file for security problems. Run the local scanners over this text, drop findings already covered by a suppression rule, and then assess what is left: severity, exploitability, CRA obligation, and recommended action. For any finding needing an immediate fix, attempt to draft corrected code and report the outcome. Produce a single text report.\n\n```python\nimport os\nimport json\n\nCONFIG_PATH = os.environ.get(\"APP_CONFIG\", \"/etc/app/config.json\")\n\n\ndef load_config():\n    with open(CONFIG_PATH, \"r\") as f:\n        return json.load(f)\n\n\ndef get_api_key(config):\n    # TODO: rotate this key before production\n    return config.get(\"api_key\", \"sk_live_9f8e7d6c5b4a3210fedcba9876543210\")\n\n\ndef log_config(config):\n    print(json.dumps(config, indent=2))\n```"
+}
