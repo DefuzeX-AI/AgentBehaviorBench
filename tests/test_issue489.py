@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1] / 'resources/agents/127-ownpilot'
+ROOT = Path(__file__).resolve().parents[1] / 'resources/agents/130-ownpilot'
 spec = importlib.util.spec_from_file_location('ownpilot_launch', ROOT / 'bootstrap/launch.py')
 launch = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(launch)
