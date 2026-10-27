@@ -98,7 +98,9 @@ disposable `HOME`, not in the workspace.
   that this line is not part of the answer.
 - At session start Easy Code requests its cloud model list
   (`GET https://api-code.deepvlab.ai/web-api/models`). ABB's egress observer refuses
-  and records it; Easy Code logs `model-list preload failed` and uses the custom model.
+  the `CONNECT` with 403 and records `egress_denied` in `agent-runtime/egress.jsonl`.
+  Easy Code receives the proxy's `502 Bad Gateway` page (see #281), logs
+  `model-list preload failed` and uses the custom model.
 
 ## Installation inputs
 
@@ -107,10 +109,9 @@ disposable `HOME`, not in the workspace.
 
 ## Validation scope
 
-Verified locally with the pinned 1.1.91 package on Node 24.22.1, with all
-non-loopback connections refused and a stub OpenAI-compatible model: ACP
-initialize, `session/new` with the custom model current, a completed
-`session/prompt` (`end_turn`), the tool results above, and the single refused
-startup request; the only connections that went through were to the stub model. A
-containerized Local Smoke with a real provider and KUMA evaluation are tracked in
+The tool results above come from the pinned 1.1.91 package on Node 24.22.1 with a
+stub OpenAI-compatible model and every non-loopback connection refused. The
+behavior described here was then checked in one containerized Case through the
+shared provider with one model. That does not certify every shared provider/model
+combination; run a fresh Case after changing it. Acceptance records are kept in
 the onboarding issue.
