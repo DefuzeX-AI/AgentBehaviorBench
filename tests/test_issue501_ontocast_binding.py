@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-PATH = Path(__file__).resolve().parents[1] / 'resources/agents/129-ontocast/bindings/ontocast_bridge.py'
+PATH = Path(__file__).resolve().parents[1] / 'resources/agents/135-ontocast/bindings/ontocast_bridge.py'
 
 
 @pytest.fixture
