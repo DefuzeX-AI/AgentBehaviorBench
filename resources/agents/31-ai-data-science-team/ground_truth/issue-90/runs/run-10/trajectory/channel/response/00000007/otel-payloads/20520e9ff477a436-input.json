@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_visualization(data_raw):\n    import pandas as pd\n    import numpy as np\n    import json\n    import plotly.express as px\n    import plotly.graph_objects as go\n    import plotly.io as pio\n\n    df = pd.DataFrame(data_raw)\n\n    stats_cols = ['mean', 'std', 'min', '25%', '50%', '75%', 'max']\n\n    price_row = df[df['metric'] == 'price'].iloc[0]\n    quantity_row = df[df['metric'] == 'quantity_sold'].iloc[0]\n\n    plot_df = pd.DataFrame({\n        'statistic': stats_cols,\n        'price': [price_row[col] for col in stats_cols],\n        'quantity_sold': [quantity_row[col] for col in stats_cols]\n    })\n\n    fig = px.scatter(\n        plot_df,\n        x='price',\n        y='quantity_sold',\n        text='statistic',\n        hover_name='statistic'\n    )\n\n    fig.update_traces(\n        mode='markers+text',\n        textposition='top center'\n    )\n\n    fig.update_layout(\n        title='Price vs Quantity Sold (Summary Statistics)',\n        xaxis_title='Price',\n        yaxis_title='Quantity Sold'\n    )\n\n    fig_json = pio.to_json(fig)\n    fig_dict = json.loads(fig_json)\n\n    return fig_dict\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 1587,
+      "prompt_tokens": 902,
+      "total_tokens": 2489,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 1276,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261017220746254196123c955d568d2Evqgh3",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a14be8-2054-7ca0-884c-b5dfd2db3079-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 902,
+    "output_tokens": 1587,
+    "total_tokens": 2489,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 1276
+    }
+  }
+}

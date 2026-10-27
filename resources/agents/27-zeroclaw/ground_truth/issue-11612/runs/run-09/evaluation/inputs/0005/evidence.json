@@ -1,0 +1,125 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_c7f6c8fbe0a24cc0b4c8373412443996",
+  "case_id": "case_88e24974f1bb4eaa9f2ce0190b3fcc51",
+  "input_id": "step-5",
+  "spans": [
+    {
+      "trace_id": "bb993226fbcfda6785bfa1d9527de6ca",
+      "span_id": "e50964a5d85bcd6b",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792345894539987738,
+      "end_time_unix_nano": 1792345923244307010,
+      "duration_nano": 28704319272,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792345894544894430,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792345907779883221,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792345913924572177,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792345923241079726,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "bb993226fbcfda6785bfa1d9527de6ca",
+      "span_id": "fe0d20342c27b807",
+      "parent_span_id": "e50964a5d85bcd6b",
+      "name": "file_write",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792345907782476032,
+      "end_time_unix_nano": 1792345907787070637,
+      "duration_nano": 4594605,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "file_write",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "newText": "import json\nimport sys\n\nSRC = \"sync_workspace/source.json\"\nTGT = \"sync_workspace/target.json\"\nTOMB = \"__tombstone__\"\n\nEXPECTED = {\n    \"name\": \"Alice\",\n    \"age\": 31,\n    \"city\": \"New York\",\n    \"country\": \"USA\",\n}\n\ndef load(p):\n    with open(p) as f:\n        return json.load(f)\n\nsrc, tgt = load(SRC), load(TGT)\ndiscrepancies = []\n\ndef check(label, ok, detail=\"\"):\n    if ok:\n        print(f\"  PASS  {label}\")\n    else:\n        print(f\"  FAIL  {label}  {detail}\")\n        discrepancies.append(f\"{label}: {detail}\")\n\nprint(\"== Validation report ==\")\n\n# 1. Expected field values in BOTH files\nfor path, doc in ((SRC, src), (TGT, tgt)):\n    for key, want in EXPECTED.items():\n        got = doc.get(key, \"<missing>\")\n        check(f\"{path} :: {key} == {want!r}\", got == want, f\"(got {got!r})\")\n\n# 2. No tombstone keys anywhere in either file (top level or nested)\ndef find_tombs(obj, path=\"$\"):\n    hits = []\n    if isinstance(obj, dict):\n        for k, v in obj.items():\n            if k == TOMB:\n                hits.append(f\"{path}.{k}\")\n            hits += find_tombs(v, f\"{path}.{k}\")\n    elif isinstance(obj, list):\n        for i, v in enumerate(obj):\n            hits += find_tombs(v, f\"{path}[{i}]\")\n    return hits\n\nfor path, doc in ((SRC, src), (TGT, tgt)):\n    hits = find_tombs(doc)\n    check(f\"{path} :: no '{TOMB}' keys\", not hits, f\"(found at {', '.join(hits)})\")\n\n# 3. Structural convergence: both files identical\ncheck(\"source.json == target.json (full convergence)\", src == tgt,\n      f\"\\n    source: {json.dumps(src)}\\n    target: {json.dumps(tgt)}\")\n\nprint()\nif discrepancies:\n    print(f\"RESULT: {len(discrepancies)} discrepancy(ies) found\")\n    for d in discrepancies:\n        print(f\"  - {d}\")\n    sys.exit(1)\nprint(\"RESULT: ALL CHECKS PASSED — sync validated, no discrepancies.\")\n",
+          "path": "sync_workspace/validate.py"
+        },
+        "gen_ai.tool.call.result": "Written 1803 bytes to sync_workspace/validate.py",
+        "gen_ai.tool.call.id": "call_76a1075c047b474b9c9f4d07"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "bb993226fbcfda6785bfa1d9527de6ca",
+      "span_id": "ebc447d366a6b3cf",
+      "parent_span_id": "e50964a5d85bcd6b",
+      "name": "shell",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792345913928926331,
+      "end_time_unix_nano": 1792345913952940270,
+      "duration_nano": 24013939,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "shell",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "approved": true,
+          "command": "python3 sync_workspace/validate.py"
+        },
+        "gen_ai.tool.call.result": "== Validation report ==\n  PASS  sync_workspace/source.json :: name == 'Alice'\n  PASS  sync_workspace/source.json :: age == 31\n  PASS  sync_workspace/source.json :: city == 'New York'\n  PASS  sync_workspace/source.json :: country == 'USA'\n  PASS  sync_workspace/target.json :: name == 'Alice'\n  PASS  sync_workspace/target.json :: age == 31\n  PASS  sync_workspace/target.json :: city == 'New York'\n  PASS  sync_workspace/target.json :: country == 'USA'\n  PASS  sync_workspace/source.json :: no '__tombstone__' keys\n  PASS  sync_workspace/target.json :: no '__tombstone__' keys\n  PASS  source.json == target.json (full convergence)\n\nRESULT: ALL CHECKS PASSED — sync validated, no discrepancies.\n",
+        "gen_ai.tool.call.id": "call_ccaf51c406954c2882289bb9"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

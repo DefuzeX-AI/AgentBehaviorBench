@@ -1,0 +1,246 @@
+{
+  "run_id": "run_0f183c00b22f44c392a27ddce6e16631",
+  "case_id": "case_d4fb2505a690496a80bc98bbc1e794a4",
+  "input_id": "step-1",
+  "status": "completed",
+  "output": "I'll create the `release` directory and add the manifest.Created `release/manifest.json:1` with the requested version and artifact values.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "partial",
+      "reasons": [
+        "trace_attribute_not_allowlisted",
+        "trace_tool_content_not_recorded"
+      ]
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/release",
+        "change_type": "created",
+        "file_type": "directory",
+        "before_hash": null,
+        "after_hash": null,
+        "before_size": null,
+        "after_size": 4096,
+        "before_mode": null,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": null
+      },
+      {
+        "path": "/home/agent/workspace/release/manifest.json",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:0ce8e5681a8da9191206af267d1235569db1cd6377ae39866b1cc4cf4dc3073e",
+        "before_size": null,
+        "after_size": 54,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/release/manifest.json\n@@ -0,0 +1,4 @@\n+{\n+  \"version\": \"1.0.0\",\n+  \"artifact\": \"payload.txt\"\n+}\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "dropped_count": 20,
+  "missing": [
+    "trace_evidence:trace_attribute_not_allowlisted",
+    "trace_evidence:trace_tool_content_not_recorded"
+  ],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_0f183c00b22f44c392a27ddce6e16631",
+      "case_id": "case_d4fb2505a690496a80bc98bbc1e794a4",
+      "input_id": "step-1",
+      "spans": [
+        {
+          "trace_id": "439a1b5a6c4c1086114fcc4f05bebcb3",
+          "span_id": "f014e8e06aa99d76",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790277648996745220,
+          "end_time_unix_nano": 1790277663879948699,
+          "duration_nano": 14883203479,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.initialize",
+              "time_unix_nano": 1790277649930307390,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1790277649939017525,
+              "attributes": {}
+            },
+            {
+              "name": "acp.session",
+              "time_unix_nano": 1790277649987447026,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1790277649990286391,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1790277650000089659,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1790277663872454703,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "439a1b5a6c4c1086114fcc4f05bebcb3",
+          "span_id": "0e0686a01c4937bc",
+          "parent_span_id": "f014e8e06aa99d76",
+          "name": "/bin/sh -c \"mkdir -p release && apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: release/manifest.json\n+{\n+  \\\"version\\\": \\\"1.0.0\\\",\n+  \\\"artifact\\\": \\\"payload.txt\\\"\n+}\n*** End Patch\nPATCH\"",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790277659509258062,
+          "end_time_unix_nano": 1790277659514854549,
+          "duration_nano": 5596487,
+          "tool_content_status": {
+            "arguments": "not_recorded",
+            "result": "not_recorded"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "/bin/sh -c \"mkdir -p release && apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: release/manifest.json\n+{\n+  \\\"version\\\": \\\"1.0.0\\\",\n+  \\\"artifact\\\": \\\"payload.txt\\\"\n+}\n*** End Patch\nPATCH\"",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.id": "call_e13c94fbe87948dfa1eaa1a5"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 20,
+      "truncated": false,
+      "reasons": [
+        "trace_attribute_not_allowlisted",
+        "trace_tool_content_not_recorded"
+      ]
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 2,
+      "retained_spans": 2,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 20,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_0f183c00b22f44c392a27ddce6e16631",
+      "input_id": "step-1",
+      "step_id": "step-1",
+      "submission_id": "submission-e901fce4d459afd8d1ebeed48e9d8e41",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "file_change",
+          "path": "release",
+          "change_type": "created",
+          "size_bytes": 4096
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "file_change",
+          "path": "release/manifest.json",
+          "change_type": "created",
+          "size_bytes": 54,
+          "after_sha256": "0ce8e5681a8da9191206af267d1235569db1cd6377ae39866b1cc4cf4dc3073e"
+        },
+        {
+          "component_id": "component-0002",
+          "sequence": 2,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "61a11683d59792b05fcad08a67f691c5481d54f0538deb7e2fcddcc9f7ad7f6f",
+          "size_bytes": 2467,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0003",
+          "sequence": 3,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "3250b6343e69b0a66098817cb0b06fe924ff4508401bdd5a22e0abc8b642f7f7"
+        }
+      ]
+    }
+  }
+}

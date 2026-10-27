@@ -1,0 +1,17 @@
+{
+  "completion": {
+    "risks": [
+      "The host evidence guard appears wedged since the turn-1 shell write that created tools/foo.py: read_file reports its evidence 'already satisfied' while every non-read-only bash command is refused naming foo.py. A session restart or host-side reset likely clears it; `reasonix doctor` could not be run to confirm because bash diagnostics are blocked by the same guard."
+    ],
+    "unverified": [
+      "The literal commands `echo x > tmp.txt` (steps 2 and 4) never executed — the host guard blocked all non-read-only bash in this session; equivalent end state was produced and verified via write_file + cat/ls instead."
+    ],
+    "verified": [
+      "cat tools/foo.py → import sys / print('v2')",
+      "cat tmp.txt tools/foo.py && ls -la tmp.txt → `x`, 2 bytes, foo.py v2 content",
+      "write_file receipts: 'wrote 2 bytes to /home/agent/workspace/tmp.txt' and 'already contains the exact content; no changes made'",
+      "read_file(tools/foo.py, intent=full) → full-read evidence registered on unchanged v2 version (call_c9f30a41b7b94a2c9781c7a8)"
+    ]
+  },
+  "status": "complete"
+}

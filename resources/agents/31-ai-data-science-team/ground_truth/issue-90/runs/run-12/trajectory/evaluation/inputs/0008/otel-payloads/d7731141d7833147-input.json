@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_visualization(data_raw):\n    import pandas as pd\n    import numpy as np\n    import json\n    import plotly.graph_objects as go\n    import plotly.io as pio\n    import plotly.express as px\n\n    # Extract Dataset_0 from data_raw (handle dict of datasets or raw DataFrame)\n    if isinstance(data_raw, dict) and \"Dataset_0\" in data_raw:\n        df = data_raw[\"Dataset_0\"]\n    else:\n        df = data_raw\n\n    # Create scatter plot using all records (no sampling or filtering)\n    fig = px.scatter(\n        df,\n        x=\"price\",\n        y=\"quantity_sold\",\n        title=\"Price vs. Quantity Sold (All Records)\",\n    )\n\n    # Style markers: small size and reduced opacity to mitigate overplotting (13k+ points)\n    fig.update_traces(\n        marker=dict(size=5, opacity=0.5)\n    )\n\n    # Set axis titles (price is in USD per unit hints)\n    fig.update_xaxes(title_text=\"Price (USD)\")\n    fig.update_yaxes(title_text=\"Quantity Sold\")\n\n    fig_json = pio.to_json(fig)\n    fig_dict = json.loads(fig_json)\n\n    return fig_dict\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 611,
+      "prompt_tokens": 771,
+      "total_tokens": 1382,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 349,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "glm-5.3-flash",
+    "system_fingerprint": null,
+    "id": "202610201248188281699d86a94a93",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a157a3-8bce-7353-8527-5f9f5ad7a68a-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 771,
+    "output_tokens": 611,
+    "total_tokens": 1382,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 349
+    }
+  }
+}

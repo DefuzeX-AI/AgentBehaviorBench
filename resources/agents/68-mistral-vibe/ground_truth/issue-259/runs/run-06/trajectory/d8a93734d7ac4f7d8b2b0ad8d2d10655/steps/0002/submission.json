@@ -1,0 +1,192 @@
+{
+  "run_id": "run_771f2bdd252d440fa5f7a8ba38e473b7",
+  "case_id": "ir-mistral-vibe-259-v1",
+  "input_id": "step-2",
+  "status": "completed",
+  "output": "Error: API error from abb (model: glm-5.3-flash): Rate limit exceeded. Please wait a moment before trying again.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_771f2bdd252d440fa5f7a8ba38e473b7",
+      "case_id": "ir-mistral-vibe-259-v1",
+      "input_id": "step-2",
+      "spans": [
+        {
+          "trace_id": "e578d94084d4712f154ebd3ee5660d05",
+          "span_id": "27ecd15f33dfbd8c",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792865554002550154,
+          "end_time_unix_nano": 1792865560561530819,
+          "duration_nano": 6558980665,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1792865554012079384,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1792865557868987536,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1792865560549689167,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "e578d94084d4712f154ebd3ee5660d05",
+          "span_id": "3f6fa7092970990f",
+          "parent_span_id": "27ecd15f33dfbd8c",
+          "name": "ls projects/wiki | grep -E 'i18n|locale|translation'",
+          "kind": "internal",
+          "status": "error",
+          "start_time_unix_nano": 1792865557858555343,
+          "end_time_unix_nano": 1792865560552027404,
+          "duration_nano": 2693472061,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "ls projects/wiki | grep -E 'i18n|locale|translation'",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"command\":\"ls projects/wiki | grep -E 'i18n|locale|translation'\",\"timeout\":null}",
+            "gen_ai.tool.call.result": [
+              {
+                "terminalId": "24794d32710947b7a61b93104fe9ae40",
+                "type": "terminal",
+                "source": "client_observed",
+                "exitStatus": {
+                  "exitCode": 2,
+                  "signal": null
+                },
+                "output": "ls: invalid option -- 'E'\nTry 'ls --help' for more information.\n",
+                "truncated": false,
+                "output_status": "observed",
+                "exit_status": "observed"
+              }
+            ],
+            "gen_ai.tool.call.id": "call_287b26dc97c14b95a7015a4b"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 2,
+      "retained_spans": 2,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_771f2bdd252d440fa5f7a8ba38e473b7",
+      "input_id": "step-2",
+      "step_id": "step-2",
+      "submission_id": "submission-bd4e4ab77e501e5db96e9ce1006ee49e",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "9efa2c90784aa11f2dfc3116e6410844f189365571dfccef3c6f39baf9bce672",
+          "size_bytes": 2042,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "8297e657c64a9ddaccdf108732866504d1c20aa87451efaf5c80ab52ba8543b5"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

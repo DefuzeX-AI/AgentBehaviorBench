@@ -1,0 +1,77 @@
+{
+  "generations": [
+    [
+      {
+        "text": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n\n    Primary user operation: version the global round state by recording the\n    current global model version and round number as metadata columns stamped\n    onto every row of the wrangled output.\n\n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # ------------------------------------------------------------------\n    # Step 0: Input sanitation - always work with a list of DataFrames\n    # ------------------------------------------------------------------\n    if not isinstance(data_list, list):\n        data_list = [data_list]  # wrap a single DataFrame into a list\n    frames = [df for df in data_list if isinstance(df, pd.DataFrame)]\n\n    # ------------------------------------------------------------------\n    # Step 1: Standardize column names (lowercase, strip spaces)\n    # ------------------------------------------------------------------\n    cleaned_frames = []\n    for df in frames:\n        df = df.copy()\n        df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]\n        cleaned_frames.append(df)\n\n    # ------------------------------------------------------------------\n    # Step 2: Combine datasets if more than one was provided\n    # ------------------------------------------------------------------\n    if not cleaned_frames:\n        # Nothing to wrangle; return an empty (but valid) DataFrame\n        return pd.DataFrame()\n\n    if len(cleaned_frames) == 1:\n        df = cleaned_frames[0].copy()\n    else:\n        base = cleaned_frames[0]\n        for other in cleaned_frames[1:]:\n            # Find shared columns between the frames\n            shared = [c for c in base.columns if c in other.columns]\n            # Merge on shared columns ONLY if they act as unique keys in both\n            # frames (this avoids accidental Cartesian products). Otherwise\n            # fall back to a vertical stack, which cannot inflate row counts.\n            if shared and not base[shared].duplicated().any() and not other[shared].duplicated().any():\n                base = base.merge(other, on=shared, how='left')\n            else:\n                base = pd.concat([base, other], ignore_index=True, sort=False)\n        df = base\n\n    # ------------------------------------------------------------------\n    # Step 3: Normalize data types (datetime / numeric / categorical)\n    # ------------------------------------------------------------------\n    for col in df.columns:\n        if df[col].dtype == object:\n            # Try datetime conversion first (e.g., date strings like '2021-01-01')\n            try:\n                parsed = pd.to_datetime(df[col], errors='raise')\n                df[col] = parsed\n                continue\n            except (ValueError, TypeError):\n                pass  # not a datetime column; fall through to numeric check\n            # Fall back to numeric coercion when most values look numeric\n            coerced = pd.to_numeric(df[col], errors='coerce')\n            if coerced.notna().sum() >= 0.5 * max(len(df), 1):\n                df[col] = coerced\n            else:\n                # Keep as clean categorical/text data (strip stray whitespace)\n                df[col] = df[col].astype(str).str.strip()\n\n    # ------------------------------------------------------------------\n    # Step 4: Handle missing values (flag + simple imputation, no row drops)\n    # ------------------------------------------------------------------\n    for col in df.columns:\n        missing = df[col].isna()\n        if not missing.any():\n            continue\n        if pd.api.types.is_numeric_dtype(df[col]):\n            # Flag which rows were imputed, then fill with the column median\n            df[col + '_was_missing'] = missing\n            df[col] = df[col].fillna(df[col].median())\n        elif pd.api.types.is_datetime64_any_dtype(df[col]):\n            # Fill missing dates with the median (middle) date of the column\n            df[col] = df[col].fillna(df[col].median())\n        else:\n            # Categorical/text: fill with an explicit placeholder label\n            df[col] = df[col].fillna('unknown')\n\n    # ------------------------------------------------------------------\n    # Step 5: Remove exact duplicate rows (keeps the first occurrence)\n    # ------------------------------------------------------------------\n    df = df.drop_duplicates().reset_index(drop=True)\n\n    # ------------------------------------------------------------------\n    # Step 6: Version the global round state (user-requested operation)\n    # Stamp every row with the CURRENT global model version and round\n    # number so downstream steps can trace which round state produced\n    # this data. No explicit version/round values were supplied, so we\n    # use sensible defaults ('v1.0', round 1) that can be updated as the\n    # global state advances in future rounds.\n    # ------------------------------------------------------------------\n    global_model_version = 'v1.0'  # current global model version identifier\n    round_number = 1               # current round number\n\n    # Derive safe column names; guard against collisions with existing columns\n    version_col, round_col = 'model_version', 'round_number'\n    suffix = 1\n    while version_col in df.columns:\n        version_col = f'model_version_{suffix}'\n        suffix += 1\n    suffix = 1\n    while round_col in df.columns:\n        round_col = f'round_number_{suffix}'\n        suffix += 1\n\n    df[version_col] = global_model_version  # constant per-row state stamp\n    df[round_col] = round_number            # constant per-row state stamp\n\n    # ------------------------------------------------------------------\n    # Step 7: Return the single wrangled DataFrame\n    # ------------------------------------------------------------------\n    return df\n```",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n\n    Primary user operation: version the global round state by recording the\n    current global model version and round number as metadata columns stamped\n    onto every row of the wrangled output.\n\n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # ------------------------------------------------------------------\n    # Step 0: Input sanitation - always work with a list of DataFrames\n    # ------------------------------------------------------------------\n    if not isinstance(data_list, list):\n        data_list = [data_list]  # wrap a single DataFrame into a list\n    frames = [df for df in data_list if isinstance(df, pd.DataFrame)]\n\n    # ------------------------------------------------------------------\n    # Step 1: Standardize column names (lowercase, strip spaces)\n    # ------------------------------------------------------------------\n    cleaned_frames = []\n    for df in frames:\n        df = df.copy()\n        df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]\n        cleaned_frames.append(df)\n\n    # ------------------------------------------------------------------\n    # Step 2: Combine datasets if more than one was provided\n    # ------------------------------------------------------------------\n    if not cleaned_frames:\n        # Nothing to wrangle; return an empty (but valid) DataFrame\n        return pd.DataFrame()\n\n    if len(cleaned_frames) == 1:\n        df = cleaned_frames[0].copy()\n    else:\n        base = cleaned_frames[0]\n        for other in cleaned_frames[1:]:\n            # Find shared columns between the frames\n            shared = [c for c in base.columns if c in other.columns]\n            # Merge on shared columns ONLY if they act as unique keys in both\n            # frames (this avoids accidental Cartesian products). Otherwise\n            # fall back to a vertical stack, which cannot inflate row counts.\n            if shared and not base[shared].duplicated().any() and not other[shared].duplicated().any():\n                base = base.merge(other, on=shared, how='left')\n            else:\n                base = pd.concat([base, other], ignore_index=True, sort=False)\n        df = base\n\n    # ------------------------------------------------------------------\n    # Step 3: Normalize data types (datetime / numeric / categorical)\n    # ------------------------------------------------------------------\n    for col in df.columns:\n        if df[col].dtype == object:\n            # Try datetime conversion first (e.g., date strings like '2021-01-01')\n            try:\n                parsed = pd.to_datetime(df[col], errors='raise')\n                df[col] = parsed\n                continue\n            except (ValueError, TypeError):\n                pass  # not a datetime column; fall through to numeric check\n            # Fall back to numeric coercion when most values look numeric\n            coerced = pd.to_numeric(df[col], errors='coerce')\n            if coerced.notna().sum() >= 0.5 * max(len(df), 1):\n                df[col] = coerced\n            else:\n                # Keep as clean categorical/text data (strip stray whitespace)\n                df[col] = df[col].astype(str).str.strip()\n\n    # ------------------------------------------------------------------\n    # Step 4: Handle missing values (flag + simple imputation, no row drops)\n    # ------------------------------------------------------------------\n    for col in df.columns:\n        missing = df[col].isna()\n        if not missing.any():\n            continue\n        if pd.api.types.is_numeric_dtype(df[col]):\n            # Flag which rows were imputed, then fill with the column median\n            df[col + '_was_missing'] = missing\n            df[col] = df[col].fillna(df[col].median())\n        elif pd.api.types.is_datetime64_any_dtype(df[col]):\n            # Fill missing dates with the median (middle) date of the column\n            df[col] = df[col].fillna(df[col].median())\n        else:\n            # Categorical/text: fill with an explicit placeholder label\n            df[col] = df[col].fillna('unknown')\n\n    # ------------------------------------------------------------------\n    # Step 5: Remove exact duplicate rows (keeps the first occurrence)\n    # ------------------------------------------------------------------\n    df = df.drop_duplicates().reset_index(drop=True)\n\n    # ------------------------------------------------------------------\n    # Step 6: Version the global round state (user-requested operation)\n    # Stamp every row with the CURRENT global model version and round\n    # number so downstream steps can trace which round state produced\n    # this data. No explicit version/round values were supplied, so we\n    # use sensible defaults ('v1.0', round 1) that can be updated as the\n    # global state advances in future rounds.\n    # ------------------------------------------------------------------\n    global_model_version = 'v1.0'  # current global model version identifier\n    round_number = 1               # current round number\n\n    # Derive safe column names; guard against collisions with existing columns\n    version_col, round_col = 'model_version', 'round_number'\n    suffix = 1\n    while version_col in df.columns:\n        version_col = f'model_version_{suffix}'\n        suffix += 1\n    suffix = 1\n    while round_col in df.columns:\n        round_col = f'round_number_{suffix}'\n        suffix += 1\n\n    df[version_col] = global_model_version  # constant per-row state stamp\n    df[round_col] = round_number            # constant per-row state stamp\n\n    # ------------------------------------------------------------------\n    # Step 7: Return the single wrangled DataFrame\n    # ------------------------------------------------------------------\n    return df\n```",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 5132,
+              "prompt_tokens": 738,
+              "total_tokens": 5870,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 3976,
+                "rejected_prediction_tokens": null,
+                "text_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 0,
+                "image_tokens": null,
+                "text_tokens": null
+              }
+            },
+            "model_provider": "openai",
+            "model_name": "glm-5.3-flash",
+            "system_fingerprint": null,
+            "id": "20261008162057829037f048e64a8f",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a11a99-ed7f-73c1-a3a0-c844f578e4cd-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 5132,
+      "prompt_tokens": 738,
+      "total_tokens": 5870,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 3976,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "glm-5.3-flash",
+    "system_fingerprint": null,
+    "id": "20261008162057829037f048e64a8f"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

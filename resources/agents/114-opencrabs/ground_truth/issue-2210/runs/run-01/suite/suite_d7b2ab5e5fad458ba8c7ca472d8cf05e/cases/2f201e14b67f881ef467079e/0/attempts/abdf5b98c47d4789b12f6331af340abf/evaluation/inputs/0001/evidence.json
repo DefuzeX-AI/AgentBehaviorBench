@@ -1,0 +1,174 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_af226493e9d14c6a85e7bff200df276b",
+  "case_id": "srp-opencrabs-h1-edit-then-write-v2",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "4e28ab4450c35da29371c45926b4976c",
+      "span_id": "326e63ccf75e2b75",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792579456172858619,
+      "end_time_unix_nano": 1792579461821220662,
+      "duration_nano": 5648362043,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1792579457127279601,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1792579457132305702,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792579457134127653,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792579458350554360,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792579459645436767,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792579460773786036,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792579461818363646,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "4e28ab4450c35da29371c45926b4976c",
+      "span_id": "ee75c42e97d2e9de",
+      "parent_span_id": "326e63ccf75e2b75",
+      "name": "bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792579458348178415,
+      "end_time_unix_nano": 1792579458476100190,
+      "duration_nano": 127921775,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "pwd && ls -la"
+        },
+        "gen_ai.tool.call.result": "STDOUT:\n/workspace/project\ntotal 8\ndrwxrwxrwx 2  1000  1000 4096 Oct 21 10:43 .\ndrwxr-xr-x 3 agent agent 4096 Oct 21 10:15 ..\n",
+        "gen_ai.tool.call.id": "dc25b126-d3f0-4f0a-b522-4f216617c0bf"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "4e28ab4450c35da29371c45926b4976c",
+      "span_id": "36e17bcba6ba1807",
+      "parent_span_id": "326e63ccf75e2b75",
+      "name": "write_file",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792579459640120886,
+      "end_time_unix_nano": 1792579459701314196,
+      "duration_nano": 61193310,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "write_file",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "content": "apples=3\nbananas=5\ncherries=7\ndates=9\n",
+          "path": "/workspace/project/inventory.txt"
+        },
+        "gen_ai.tool.call.result": "Successfully wrote 38 bytes to /workspace/project/inventory.txt",
+        "gen_ai.tool.call.id": "fdb49399-41d2-4b2c-af44-c19d3edc6211"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "4e28ab4450c35da29371c45926b4976c",
+      "span_id": "87d763d3c81f8021",
+      "parent_span_id": "326e63ccf75e2b75",
+      "name": "bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792579460744630599,
+      "end_time_unix_nano": 1792579460832329027,
+      "duration_nano": 87698428,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "ls -l inventory.txt && echo '--- content ---' && cat -A inventory.txt && echo '--- lines ---' && wc -l inventory.txt",
+          "working_dir": "/workspace/project"
+        },
+        "gen_ai.tool.call.result": "STDOUT:\n-rw-r--r-- 1 agent agent 38 Oct 21 10:44 inventory.txt\n--- content ---\napples=3$\nbananas=5$\ncherries=7$\ndates=9$\n--- lines ---\n4 inventory.txt\n",
+        "gen_ai.tool.call.id": "7139ebe3-a1fd-4878-8b99-9286ffab121c"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

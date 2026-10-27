@@ -1,0 +1,858 @@
+# TradingAgents/graph/trading_graph.py
+
+import logging
+import os
+from pathlib import Path
+import json
+from datetime import datetime, timedelta
+from typing import Dict, Any, Tuple, List, Optional
+
+import yfinance as yf
+
+logger = logging.getLogger(__name__)
+
+from langgraph.prebuilt import ToolNode
+
+from tradingagents.llm_clients import create_llm_client
+
+from tradingagents.agents import *
+from tradingagents.default_config import DEFAULT_CONFIG
+from tradingagents.agents.utils.memory import TradingMemoryLog
+from tradingagents.dataflows.utils import safe_ticker_component
+from tradingagents.agents.utils.agent_states import (
+    AgentState,
+    InvestDebateState,
+    RiskDebateState,
+)
+from tradingagents.dataflows.config import set_config
+from tradingagents.dataflows.missing_data import (
+    attach_missing_data_snapshot,
+    mark_resolved_tasks_consumed,
+    make_tool_call_recorder,
+    reset_missing_tasks_for_run,
+)
+
+# Import the new abstract tool methods from agent_utils
+from tradingagents.agents.utils.agent_utils import (
+    get_stock_data,
+    get_indicators,
+    get_fundamentals,
+    get_balance_sheet,
+    get_cashflow,
+    get_income_statement,
+    get_news,
+    get_insider_transactions,
+    get_global_news,
+    get_profit_forecast,
+    get_hot_stocks,
+    get_northbound_flow,
+    get_concept_blocks,
+    get_fund_flow,
+    get_dragon_tiger_board,
+    get_lockup_expiry,
+    get_industry_comparison,
+)
+
+from .checkpointer import checkpoint_step, clear_checkpoint, get_checkpointer, thread_id
+from .conditional_logic import ConditionalLogic
+from .setup import ROLE_KEYS, GraphSetup
+from .propagation import Propagator
+from .reflection import Reflector
+from .signal_processing import SignalProcessor
+from ..llm_clients.factory import _OPENAI_COMPATIBLE
+
+# 七个分析师角色——它们受 `selected_analysts` 控制，没选中就不会进图。
+_ANALYST_ROLES = frozenset({
+    "market", "social", "news", "fundamentals", "policy", "hot_money", "lockup",
+})
+
+# 各家 provider 私有的参数：换了 provider 就不能带过去（别家可能直接拒收）。
+# ⚠️ 超时/重试**不在**这张表里——它们由 `_resilience_kwargs()` 按目标 provider
+#    重算（见那里的注释）。放进来会变成第二道判据，两道判据迟早对不上。
+_PROVIDER_SPECIFIC_KWARGS = frozenset({
+    "reasoning_effort",   # openai
+    "thinking_level",     # google
+    "effort",             # anthropic
+})
+
+# 超时与重试三件套：由 `_resilience_kwargs()` 统一产出，也由它统一覆盖。
+# 任何继承来的 llm_kwargs 在换目标 provider 时，这几个键都要先剔除再重算。
+_RESILIENCE_KWARGS = frozenset({
+    "timeout", "max_retries", "app_retries", "app_retry_delay",
+})
+
+
+def _normalize_yfinance_ticker(ticker: str) -> str:
+    """Return the Yahoo Finance symbol for a ticker used by the graph.
+
+    A-stock decisions are stored with their six-digit code (for example
+    ``600519``), while Yahoo Finance requires an exchange suffix for mainland
+    China listings (``600519.SS``).  Without the suffix ``Ticker.history``
+    usually returns an empty frame, so deferred memory outcomes remain pending
+    indefinitely.  Common A-share prefixes/suffixes are normalized as well;
+    non-A-share symbols remain unchanged so the graph remains usable for other
+    markets too.
+    """
+    symbol = str(ticker).strip().upper()
+
+    # The A-stock layer accepts SH/SZ/BJ prefixes and uses .SH for Shanghai,
+    # whereas Yahoo uses .SS.  Normalize those forms before handling bare
+    # six-digit codes. Yahoo has no Beijing exchange suffix, so keep BJ codes
+    # unqualified instead of inventing a symbol that cannot return data.
+    if (
+        len(symbol) == 9
+        and symbol[:6].isdigit()
+        and symbol[6:] in (".SH", ".SZ", ".BJ")
+    ):
+        code, exchange = symbol[:6], symbol[7:]
+        if exchange == "SH":
+            return f"{code}.SS"
+        if exchange == "SZ":
+            return f"{code}.SZ"
+        return code
+    if (
+        len(symbol) == 8
+        and symbol[:2] in ("SH", "SZ", "BJ")
+        and symbol[2:].isdigit()
+    ):
+        code, exchange = symbol[2:], symbol[:2]
+        if exchange == "SH":
+            return f"{code}.SS"
+        if exchange == "SZ":
+            return f"{code}.SZ"
+        return code
+
+    if len(symbol) != 6 or not symbol.isdigit():
+        return symbol
+
+    # The 920xxx range is Beijing-listed; Yahoo has no supported suffix for it.
+    if symbol.startswith("92"):
+        return symbol
+    # Shanghai-listed A shares, B shares and ETFs use the .SS suffix on Yahoo.
+    if symbol.startswith(("5", "6", "9")):
+        return f"{symbol}.SS"
+    # Other Beijing-listed six-digit ranges are not covered by Yahoo either.
+    if symbol.startswith(("4", "8")):
+        return symbol
+    # Shenzhen-listed stocks (000/001/002/003/300/301, etc.).
+    return f"{symbol}.SZ"
+
+
+def _is_unsupported_by_yfinance(symbol: str) -> bool:
+    """True for codes Yahoo Finance has no coverage for at all.
+
+    Beijing Stock Exchange listings (920xxx current, 43x/83x/87x legacy) are
+    absent from Yahoo under every suffix — verified 2026-07-31: ``920002``,
+    ``920002.BJ``, ``920002.SS`` and ``920002.SZ`` all return an empty frame.
+    Retrying them every run only burns a request and leaves the memory entry
+    pending forever with no stated reason, so short-circuit and say why once.
+    """
+    return (
+        len(symbol) == 6
+        and symbol.isdigit()
+        and (symbol.startswith("92") or symbol[:2] in ("43", "83", "87"))
+    )
+
+
+def merge_config(config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """用户传入的 config 是**覆盖项**，不是完整配置：缺的键一律取 DEFAULT_CONFIG。
+
+    README 快速开始的示例只给 4 个键（llm_provider / 两个模型 / output_language）。
+    此前这里是 ``config or DEFAULT_CONFIG`` —— 整体替换、不合并，紧接着
+    ``os.makedirs(config["data_cache_dir"])`` 就 KeyError，照 README 粘贴即崩（#101）。
+    dataflows 层的 set_config() 本来就是合并语义，这里与之对齐。
+    浅合并：嵌套字典（如 role_llms）按用户给的整份为准。
+    """
+    merged = DEFAULT_CONFIG.copy()
+    if config:
+        merged.update(config)
+    return merged
+
+
+class TradingAgentsGraph:
+    """Main class that orchestrates the trading agents framework."""
+
+    def __init__(
+        self,
+        selected_analysts=["market", "social", "news", "fundamentals", "policy", "hot_money", "lockup"],
+        debug=False,
+        config: Dict[str, Any] = None,
+        callbacks: Optional[List] = None,
+    ):
+        """Initialize the trading agents graph and components.
+
+        Args:
+            selected_analysts: List of analyst types to include
+            debug: Whether to run in debug mode
+            config: Configuration dictionary. If None, uses default config
+            callbacks: Optional list of callback handlers (e.g., for tracking LLM/tool stats)
+        """
+        self.debug = debug
+        self.config = merge_config(config)
+        self.callbacks = callbacks or []
+
+        # Update the interface's config
+        set_config(self.config)
+
+        # Create necessary directories
+        os.makedirs(self.config["data_cache_dir"], exist_ok=True)
+        os.makedirs(self.config["results_dir"], exist_ok=True)
+
+        # Initialize LLMs with provider-specific thinking configuration
+        llm_kwargs = self._get_provider_kwargs()
+
+        # Add callbacks to kwargs if provided (passed to LLM constructor)
+        if self.callbacks:
+            llm_kwargs["callbacks"] = self.callbacks
+
+        # Optional: route nodes through a personal Claude Pro/Max subscription
+        # via the Claude Agent SDK. `deep_think_provider_override` covers the
+        # deep nodes (Research / Portfolio Manager); `quick_think_provider_override`
+        # covers the quick nodes (7 tool-using analysts + Bull/Bear / trader /
+        # risk debaters). Both on ⇒ every node runs on the subscription. Off by
+        # default — behaviour is unchanged when both are None.
+        deep_on = self.config.get("deep_think_provider_override") == "claude_agent_sdk"
+        quick_on = self.config.get("quick_think_provider_override") == "claude_agent_sdk"
+
+        # F-004 guardrail: ANTHROPIC_API_KEY outranks the subscription OAuth token
+        # and would silently bill the pay-per-token API instead of the subscription.
+        # Refuse to start rather than surprise-bill the user.
+        if (deep_on or quick_on) and os.getenv("ANTHROPIC_API_KEY"):
+            # 该 key 优先级高于订阅凭据，泄进 Agent SDK 子进程就会悄悄走按 token
+            # 计费的 API。客户端已在子进程环境里把它显式置空，所以这里**不再一律
+            # 中止**——否则把 anthropic 用作降级 provider 就成了死结：留着 key 启动
+            # 被拦，删掉 key 又会在撞额度真要降级时认证失败。
+            logger.warning(
+                "ANTHROPIC_API_KEY is set while the claude_agent_sdk override is on. "
+                "It is stripped from the Agent SDK subprocess so subscription quota is "
+                "used, and kept in this process only so an `anthropic` fallback can "
+                "still authenticate. If you did not intend to keep a paid Anthropic "
+                "fallback, unset it."
+            )
+
+        # 降级配置必须成对给：只改 provider 不改 model，会把主 provider 的模型名
+        # 配到另一家去（如 AnthropicClient(model="deepseek-chat")），而这条路径
+        # **恰好在撞额度、最需要它工作的时候才被走到**——那时再炸就太晚了。
+        # 启动时就校验，而不是留到运行中。
+        _fb_provider = self.config.get("agent_sdk_fallback_provider")
+        _fb_model = self.config.get("agent_sdk_fallback_model")
+        if (deep_on or quick_on) and bool(_fb_provider) != bool(_fb_model):
+            missing = "agent_sdk_fallback_model" if _fb_provider else "agent_sdk_fallback_provider"
+            given = "agent_sdk_fallback_provider" if _fb_provider else "agent_sdk_fallback_model"
+            raise ValueError(
+                f"{given} is set but {missing} is not — the two must be configured "
+                f"together. Otherwise the fallback pairs one provider with another "
+                f"provider's model name and fails exactly when the subscription hits "
+                f"its quota. Set both, or leave both unset to fall back to "
+                f"llm_provider + its own model."
+            )
+
+        def _make_client(override_on, sdk_model_key, fallback_model_key):
+            """Build a subscription-backed client when overridden, else the normal
+            llm_provider client. Fallback rejoins the paid provider on quota/failure."""
+            if override_on:
+                # backend_url 是为 llm_provider 配的端点。显式指定了**另一家**
+                # provider 做降级时不能把它带过去（例如把 anthropic 降级请求发到
+                # MiniMax 网关），否则同样是撞额度那一刻才炸。None ⇒ 该 provider
+                # 用自己的默认端点。
+                # provider 比较一律 strip+lower：配成 "DeepSeek" 时**同一家**会被判成
+                # 跨厂商，`backend_url` 就被扔掉，降级请求发去该 provider 的默认端点
+                # ——同样是撞额度那一刻才炸。
+                _fb_norm = str(_fb_provider or "").strip().lower()
+                _main_norm = str(self.config["llm_provider"] or "").strip().lower()
+                cross_provider = bool(_fb_norm) and _fb_norm != _main_norm
+                _fb_effective = _fb_norm or _main_norm
+                fallback_spec = {
+                    "provider": _fb_effective,
+                    "model": _fb_model or self.config[fallback_model_key],
+                    "base_url": None if cross_provider else self.config.get("backend_url"),
+                    # 带上 callbacks：降级意味着**开始计费**，此时统计/成本回调
+                    # 反而看不到这些调用的话，恰好在花钱的时候统计是瞎的。
+                    **({"callbacks": self.callbacks} if self.callbacks else {}),
+                    # 用户显式配的输出上限也要带过去。否则撞额度降级之后，降级
+                    # provider 用它自己的默认上限，报告照样被截断——而这正是
+                    # 用户配 max_tokens 想避免的事（#91）。
+                    **({"max_tokens": self.config["max_tokens"]}
+                       if self.config.get("max_tokens") else {}),
+                    # 超时与应用层重试同样要带过去，理由和上面两条一样：降级是
+                    # **撞额度那一刻**才走到的路径，而降级目标往往就是一个 OpenAI
+                    # 兼容网关——正是 #100 那个"永不返回"的洞所在。漏带的话，这个
+                    # 挂死会恰好在最需要它工作的时候原样复现。
+                    # 判据按 `_fb_effective`（真正的目标）算，不是按 llm_provider。
+                    **self._resilience_kwargs(_fb_effective),
+                }
+                return create_llm_client(
+                    provider="claude_agent_sdk",
+                    model=self.config[sdk_model_key],
+                    base_url=self.config.get("backend_url"),
+                    fallback_spec=fallback_spec,
+                    # 订阅**主路径**自己也要超时。它不走 LangChain 客户端，所以
+                    # v0.5.19 给所有 provider 加的那份 timeout 一点都罩不到它——
+                    # 上面 fallback_spec 里那个只在**已经降级之后**才生效，
+                    # 而卡死恰恰发生在降级之前。判据按 "claude_agent_sdk" 自己算：
+                    # 它不是 OpenAI 兼容客户端，只该拿 timeout，不该拿应用层重试。
+                    **self._resilience_kwargs("claude_agent_sdk"),
+                )
+            return create_llm_client(
+                provider=self.config["llm_provider"],
+                model=self.config[fallback_model_key],
+                base_url=self.config.get("backend_url"),
+                **llm_kwargs,
+            )
+
+        deep_client = _make_client(deep_on, "agent_sdk_model", "deep_think_llm")
+        quick_client = _make_client(quick_on, "agent_sdk_quick_model", "quick_think_llm")
+
+        self.deep_thinking_llm = deep_client.get_llm()
+        self.quick_thinking_llm = quick_client.get_llm()
+
+        # 可选：给单个角色指定模型（#39）。不配 = 完全维持 quick/deep 两档的原行为。
+        self.role_llms = self._build_role_llms(
+            llm_kwargs, deep_on or quick_on, selected_analysts
+        )
+
+        self.memory_log = TradingMemoryLog(self.config)
+
+        # Create tool nodes
+        self.tool_nodes = self._create_tool_nodes()
+
+        # Initialize components
+        self.conditional_logic = ConditionalLogic(
+            max_debate_rounds=self.config["max_debate_rounds"],
+            max_risk_discuss_rounds=self.config["max_risk_discuss_rounds"],
+        )
+        self.graph_setup = GraphSetup(
+            self.quick_thinking_llm,
+            self.deep_thinking_llm,
+            self.tool_nodes,
+            self.conditional_logic,
+            resolve_llm=self.role_llms.get,
+        )
+
+        self.propagator = Propagator()
+        self.reflector = Reflector(self.quick_thinking_llm)
+        self.signal_processor = SignalProcessor(self.quick_thinking_llm)
+
+        # State tracking
+        self.curr_state = None
+        self.ticker = None
+        self.log_states_dict = {}  # date to full state dict
+
+        # Set up the graph: keep the workflow for recompilation with a checkpointer.
+        self.workflow = self.graph_setup.setup_graph(selected_analysts)
+        self.graph = self.workflow.compile()
+        self._checkpointer_ctx = None
+
+    def _build_role_llms(
+        self,
+        llm_kwargs: Dict[str, Any],
+        subscription_on: bool,
+        selected_analysts=None,
+    ) -> Dict[str, Any]:
+        """按 `config["role_llms"]` 给单个角色单独建 LLM（#39）。
+
+        默认是空表 —— 不配任何角色时行为与以前完全一致（全部走 quick/deep 两档）。
+        配了才有意义：让多空辩手用不同厂商的模型，避免同源模型互相不反驳。
+
+        相同 (provider, model, endpoint) 的角色复用同一个实例，不会因为写了 7 个
+        角色就建 7 条连接。
+        """
+        specs = self.config.get("role_llms") or {}
+        if not specs:
+            return {}
+
+        unknown = sorted(set(specs) - set(ROLE_KEYS))
+        if unknown:
+            raise ValueError(
+                f"role_llms 里有无法识别的角色名：{unknown}。"
+                f"合法角色：{', '.join(ROLE_KEYS)}。"
+                f"（写错的角色名如果被静默忽略，你会以为配置生效了，实际没有。）"
+            )
+
+        # 没被选中的分析师不会进图，就别为它建模型：那会让一个**永远不执行**的节点
+        # 因为缺 API key 或缺可选依赖，把一次本来完全正常的分析在启动时就打断。
+        if selected_analysts is not None:
+            active = set(selected_analysts)
+            skipped = [r for r in specs if r in _ANALYST_ROLES and r not in active]
+            if skipped:
+                specs = {k: v for k, v in specs.items() if k not in skipped}
+                logger.info(
+                    "role_llms: 跳过未选中的分析师角色 %s（不建模型）",
+                    ", ".join(sorted(skipped)),
+                )
+            if not specs:
+                return {}
+
+        if subscription_on:
+            # 订阅覆盖是为了不产生 API 账单，这里显式点名哪些角色会绕开它去计费，
+            # 不能让人以为"全部走订阅"却在某几个角色上悄悄花钱。
+            logger.warning(
+                "role_llms 为以下角色单独指定了模型，它们会绕开 claude_agent_sdk "
+                "订阅覆盖、按 token 计费：%s", ", ".join(sorted(specs)),
+            )
+
+        main_provider = self.config["llm_provider"]
+        cache: Dict[tuple, Any] = {}
+        resolved: Dict[str, Any] = {}
+        for role, spec in specs.items():
+            if not isinstance(spec, dict) or not spec.get("model"):
+                raise ValueError(
+                    f"role_llms['{role}'] 必须是带 model 的字典，"
+                    f'例如 {{"provider": "deepseek", "model": "deepseek-chat"}}。'
+                )
+            provider = spec.get("provider") or main_provider
+            # role_llms 的 provider 是用户手写的自由字符串（README 通篇写作
+            # "DeepSeek"）。下面四处判据 —— base_url / 专属参数 / 韧性参数 / 缓存键
+            # —— 必须用**同一个**归一化结果，否则会出现"这处算同一家、那处算跨厂商"。
+            # 口径与 factory.create_llm_client 一致：strip().lower()。
+            provider_norm = provider.strip().lower()
+            main_norm = str(main_provider or "").strip().lower()
+            # backend_url 是给主 provider 配的端点。换了厂商还把它带过去，请求就会
+            # 发到另一家的网关（和 agent_sdk 降级那里同一个坑）。None = 用该
+            # provider 自己的默认端点。
+            if "backend_url" in spec:
+                base_url = spec["backend_url"]
+            elif provider_norm == main_norm:
+                base_url = self.config.get("backend_url")
+            else:
+                base_url = None
+
+            # 主 provider 的**专属**参数不能带给另一家：openai 的
+            # `reasoning_effort`、google 的 `thinking_level`、anthropic 的 `effort`
+            # 都是各家私有的，塞进 qwen / glm / 自建网关的请求体里可能直接被拒。
+            # 通用参数（max_tokens / callbacks 等）保留。
+            # `dict(...)` 是防御性的：下面要 pop 韧性键，同名分支直接复用引用就会
+            # 就地改掉调用方的 llm_kwargs。**当前观察不到后果**（主 quick/deep 两个
+            # 客户端已在本方法之前建好），所以没有测试钉它；留着是为了别人挪动建
+            # 客户端的顺序时不会踩到。
+            role_kwargs = (
+                dict(llm_kwargs) if provider_norm == main_norm
+                else {k: v for k, v in llm_kwargs.items()
+                      if k not in _PROVIDER_SPECIFIC_KWARGS}
+            )
+            # 超时/重试按**这个角色的** provider 重算，不沿用主 provider 的那份：
+            # 主 anthropic + bull=deepseek 时，deepseek 角色本该拿到应用层退避重试
+            # （它的 SDK 重试被我们置 0 了）；反方向则绝不能把 max_retries=0 套到
+            # anthropic 头上。两个方向都只有按目标算才对。
+            for key in _RESILIENCE_KWARGS:
+                role_kwargs.pop(key, None)
+            role_kwargs.update(self._resilience_kwargs(provider_norm))
+
+            key = (provider_norm, spec["model"], base_url, spec.get("api_key"))
+            if key not in cache:
+                client_kwargs = dict(role_kwargs)
+                if spec.get("api_key"):
+                    client_kwargs["api_key"] = spec["api_key"]
+                cache[key] = create_llm_client(
+                    provider=provider,
+                    model=spec["model"],
+                    base_url=base_url,
+                    **client_kwargs,
+                ).get_llm()
+            resolved[role] = cache[key]
+
+        logger.info(
+            "role_llms: %d 个角色单独配置，实际建了 %d 个模型实例",
+            len(resolved), len(cache),
+        )
+        return resolved
+
+    def _resilience_kwargs(self, target_provider: Any) -> Dict[str, Any]:
+        """超时与重试参数 —— 按**目标 provider** 算，而不是按 `llm_provider`。
+
+        这份 kwargs 有三个消费方（主客户端 / 订阅降级 fallback_spec / role_llms），
+        每一个都可能指向**不同的** provider，所以判据必须跟着目标走，不能当成
+        共享字典的一个属性（v0.5.19：三个调用点各自调本方法）。
+
+        · `timeout` —— **所有 provider 都给**。这不是 OpenAI 专属问题：
+          langchain 的三个封装层（ChatOpenAI / ChatAnthropic / AzureChatOpenAI）
+          在用户没给超时时都把 `None` **显式**传给底层 SDK，而 httpx 收到显式
+          `None` 的语义是"不设超时"，不是"用 SDK 默认值"。实测构造出来的对象：
+              不给 timeout → client.timeout=None（无限等）
+              给 timeout=150 → client.timeout=150.0
+          所以"另几家 SDK 本来就有 600 秒读超时"是假的 —— 那是**裸 SDK**
+          的常量，本项目一次都没走过裸 SDK。不给超时 = 给它们重开 #100 那个
+          "进程活着、零输出、永不返回"的洞。
+        · `max_retries=0` + `app_retries` / `app_retry_delay` —— **只给走
+          OpenAIClient 的 provider**。应用层退避重试只在 NormalizedChatOpenAI 里
+          实现；给别家注入 `max_retries=0` 等于静默关掉它们 SDK 自带的重试，
+          而 `app_retries` 它们根本不读。
+        """
+        provider = str(target_provider or "").strip().lower()
+        kwargs: Dict[str, Any] = {}
+
+        timeout = self.config.get("llm_timeout")
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+
+        if provider in _OPENAI_COMPATIBLE:
+            kwargs["max_retries"] = 0
+            kwargs["app_retries"] = self.config.get("llm_max_retries", 3)
+            kwargs["app_retry_delay"] = self.config.get("llm_retry_delay", 5)
+
+        return kwargs
+
+    def _get_provider_kwargs(self) -> Dict[str, Any]:
+        """Get provider-specific kwargs for LLM client creation."""
+        kwargs = {}
+        provider = self.config.get("llm_provider", "").strip().lower()
+
+        # 与 provider 无关：单次回复的输出上限。撞上它就是报告写一半被截断（#91）。
+        max_tokens = self.config.get("max_tokens")
+        if max_tokens:
+            kwargs["max_tokens"] = max_tokens
+
+        # 项目级 LLM 请求超时/重试（#300705 静默卡死兜底）。
+        kwargs.update(self._resilience_kwargs(provider))
+
+        if provider == "google":
+            thinking_level = self.config.get("google_thinking_level")
+            if thinking_level:
+                kwargs["thinking_level"] = thinking_level
+
+        elif provider == "openai":
+            reasoning_effort = self.config.get("openai_reasoning_effort")
+            if reasoning_effort:
+                kwargs["reasoning_effort"] = reasoning_effort
+
+        elif provider == "anthropic":
+            effort = self.config.get("anthropic_effort")
+            if effort:
+                kwargs["effort"] = effort
+
+        return kwargs
+
+    def _create_tool_nodes(self) -> Dict[str, ToolNode]:
+        """Create tool nodes for different data sources using abstract methods."""
+        return {
+            "market": ToolNode(
+                [
+                    # Core stock data tools
+                    get_stock_data,
+                    # Technical indicators
+                    get_indicators,
+                ],
+                wrap_tool_call=make_tool_call_recorder("market"),
+            ),
+            "social": ToolNode(
+                [
+                    # 情绪分析不只读新闻：资金流是最硬的情绪证据，量价给强度，
+                    # 强势股榜给热度归因，新闻负责解释成因（#61）。
+                    get_news,
+                    get_fund_flow,
+                    get_hot_stocks,
+                    get_stock_data,
+                ],
+                wrap_tool_call=make_tool_call_recorder("social"),
+            ),
+            "news": ToolNode(
+                [
+                    # News and insider information
+                    get_news,
+                    get_global_news,
+                    get_insider_transactions,
+                ],
+                wrap_tool_call=make_tool_call_recorder("news"),
+            ),
+            "fundamentals": ToolNode(
+                [
+                    get_fundamentals,
+                    get_balance_sheet,
+                    get_cashflow,
+                    get_income_statement,
+                    get_profit_forecast,
+                    get_industry_comparison,
+                ],
+                wrap_tool_call=make_tool_call_recorder("fundamentals"),
+            ),
+            "policy": ToolNode(
+                [
+                    get_news,
+                    get_global_news,
+                ],
+                wrap_tool_call=make_tool_call_recorder("policy"),
+            ),
+            "hot_money": ToolNode(
+                [
+                    get_stock_data,
+                    get_news,
+                    get_insider_transactions,
+                    get_hot_stocks,
+                    get_northbound_flow,
+                    get_concept_blocks,
+                    get_fund_flow,
+                    get_dragon_tiger_board,
+                    get_industry_comparison,
+                ],
+                wrap_tool_call=make_tool_call_recorder("hot_money"),
+            ),
+            "lockup": ToolNode(
+                [
+                    get_insider_transactions,
+                    get_news,
+                    get_fundamentals,
+                    get_lockup_expiry,
+                ],
+                wrap_tool_call=make_tool_call_recorder("lockup"),
+            ),
+        }
+
+    def _fetch_returns(
+        self, ticker: str, trade_date: str, holding_days: int = 5
+    ) -> Tuple[Optional[float], Optional[float], Optional[int]]:
+        """Fetch raw and alpha return for ticker over holding_days from trade_date.
+
+        Returns (raw_return, alpha_return, actual_holding_days) or
+        (None, None, None) if price data is unavailable (too recent, delisted,
+        or network error).
+        """
+        try:
+            start = datetime.strptime(trade_date, "%Y-%m-%d")
+            end = start + timedelta(days=holding_days + 7)  # buffer for weekends/holidays
+            end_str = end.strftime("%Y-%m-%d")
+
+            yf_symbol = _normalize_yfinance_ticker(ticker)
+            if _is_unsupported_by_yfinance(yf_symbol):
+                # Say why instead of leaving a silent forever-pending entry.
+                logger.warning(
+                    "Cannot resolve outcome for %s: Yahoo Finance has no Beijing "
+                    "Stock Exchange coverage under any suffix, so this entry stays "
+                    "pending. Use a non-BSE ticker if you need memory reflection.",
+                    ticker,
+                )
+                return None, None, None
+
+            stock = yf.Ticker(yf_symbol).history(start=trade_date, end=end_str)
+            benchmark = yf.Ticker("000300.SS").history(start=trade_date, end=end_str)
+
+            if len(stock) < 2 or len(benchmark) < 2:
+                return None, None, None
+
+            actual_days = min(holding_days, len(stock) - 1, len(benchmark) - 1)
+            raw = float(
+                (stock["Close"].iloc[actual_days] - stock["Close"].iloc[0])
+                / stock["Close"].iloc[0]
+            )
+            bench_ret = float(
+                (benchmark["Close"].iloc[actual_days] - benchmark["Close"].iloc[0])
+                / benchmark["Close"].iloc[0]
+            )
+            alpha = raw - bench_ret
+            return raw, alpha, actual_days
+        except Exception as e:
+            logger.warning(
+                "Could not resolve outcome for %s on %s (will retry next run): %s",
+                ticker, trade_date, e,
+            )
+            return None, None, None
+
+    def _resolve_pending_entries(self, ticker: str) -> None:
+        """Resolve pending log entries for ticker at the start of a new run.
+
+        Fetches returns for each same-ticker pending entry, generates reflections,
+        then writes all updates in a single atomic batch write to avoid redundant I/O.
+        Skips entries whose price data is not yet available (too recent or delisted).
+
+        Trade-off: only same-ticker entries are resolved per run.  Entries for
+        other tickers accumulate until that ticker is run again.
+        """
+        pending = [e for e in self.memory_log.get_pending_entries() if e["ticker"] == ticker]
+        if not pending:
+            return
+
+        updates = []
+        for entry in pending:
+            raw, alpha, days = self._fetch_returns(ticker, entry["date"])
+            if raw is None:
+                continue  # price not available yet — try again next run
+            reflection = self.reflector.reflect_on_final_decision(
+                final_decision=entry.get("decision", ""),
+                raw_return=raw,
+                alpha_return=alpha,
+            )
+            updates.append({
+                "ticker": ticker,
+                "trade_date": entry["date"],
+                "raw_return": raw,
+                "alpha_return": alpha,
+                "holding_days": days,
+                "reflection": reflection,
+            })
+
+        if updates:
+            self.memory_log.batch_update_with_outcomes(updates)
+
+    def propagate(self, company_name, trade_date):
+        """Run the trading agents graph for a company on a specific date.
+
+        When ``checkpoint_enabled`` is set in config, the graph is recompiled
+        with a per-ticker SqliteSaver so a crashed run can resume from the last
+        successful node on a subsequent invocation with the same ticker+date.
+        """
+        return self._run_graph(company_name, trade_date)
+
+    def prepare_graph_run(
+        self,
+        company_name,
+        trade_date,
+        callbacks: Optional[List] = None,
+    ) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any], Optional[int]]:
+        """Prepare graph input/args for a fresh or resumed run.
+
+        Returns ``(initial_state, args, checkpoint_step)``. When a checkpoint
+        already exists, ``initial_state`` is ``None`` so LangGraph resumes the
+        existing thread instead of replaying completed nodes.
+        """
+        self.ticker = company_name
+
+        # Resolve any pending memory-log entries for this ticker before the pipeline runs.
+        self._resolve_pending_entries(company_name)
+
+        checkpoint_enabled = self.config.get("checkpoint_enabled")
+        resume_step = None
+
+        # Recompile with a checkpointer if the user opted in.
+        if checkpoint_enabled:
+            self._checkpointer_ctx = get_checkpointer(
+                self.config["data_cache_dir"], company_name
+            )
+            saver = self._checkpointer_ctx.__enter__()
+            self.graph = self.workflow.compile(checkpointer=saver)
+
+            resume_step = checkpoint_step(
+                self.config["data_cache_dir"], company_name, str(trade_date)
+            )
+            if resume_step is not None:
+                logger.info(
+                    "Resuming from step %d for %s on %s",
+                    resume_step,
+                    company_name,
+                    trade_date,
+                )
+            else:
+                logger.info("Starting fresh for %s on %s", company_name, trade_date)
+
+        args = self.propagator.get_graph_args(callbacks=callbacks)
+
+        # Inject thread_id so same ticker+date resumes, different date starts fresh.
+        if checkpoint_enabled:
+            tid = thread_id(company_name, str(trade_date))
+            args.setdefault("config", {}).setdefault("configurable", {})["thread_id"] = tid
+
+        if checkpoint_enabled and resume_step is not None:
+            return None, args, resume_step
+
+        # Initialize state only for fresh runs. Passing a new initial state to
+        # LangGraph would start a new run and replay completed nodes.
+        reset_missing_tasks_for_run(company_name, str(trade_date))
+        past_context = self.memory_log.get_past_context(company_name)
+        init_agent_state = self.propagator.create_initial_state(
+            company_name, trade_date, past_context=past_context
+        )
+        return init_agent_state, args, resume_step
+
+    def finalize_graph_run(self, company_name, trade_date, final_state):
+        """Persist a completed run and clear its checkpoint."""
+        attach_missing_data_snapshot(final_state, company_name, str(trade_date))
+        self.curr_state = final_state
+
+        # Log state to disk.
+        self._log_state(trade_date, final_state)
+        mark_resolved_tasks_consumed(company_name, str(trade_date))
+
+        # Store decision for deferred reflection on the next same-ticker run.
+        self.memory_log.store_decision(
+            ticker=company_name,
+            trade_date=trade_date,
+            final_trade_decision=final_state["final_trade_decision"],
+        )
+
+        # Clear checkpoint on successful completion to avoid stale state.
+        if self.config.get("checkpoint_enabled"):
+            clear_checkpoint(
+                self.config["data_cache_dir"], company_name, str(trade_date)
+            )
+
+        return self.process_signal(final_state["final_trade_decision"])
+
+    def close_graph_run(self) -> None:
+        """Close the active checkpointer context, if any."""
+        if self._checkpointer_ctx is not None:
+            self._checkpointer_ctx.__exit__(None, None, None)
+            self._checkpointer_ctx = None
+            self.graph = self.workflow.compile()
+
+    def _run_graph(self, company_name, trade_date):
+        """Execute the graph and write the resulting state to disk and memory log."""
+        init_agent_state, args, _ = self.prepare_graph_run(company_name, trade_date)
+
+        try:
+            if self.debug:
+                trace = []
+                for chunk in self.graph.stream(init_agent_state, **args):
+                    if len(chunk["messages"]) == 0:
+                        pass
+                    else:
+                        chunk["messages"][-1].pretty_print()
+                        trace.append(chunk)
+                final_state = trace[-1]
+            else:
+                final_state = self.graph.invoke(init_agent_state, **args)
+
+            signal = self.finalize_graph_run(company_name, trade_date, final_state)
+            return final_state, signal
+        finally:
+            self.close_graph_run()
+
+    def _log_state(self, trade_date, final_state):
+        """Log the final state to a JSON file."""
+        self.log_states_dict[str(trade_date)] = {
+            "company_of_interest": final_state["company_of_interest"],
+            "trade_date": final_state["trade_date"],
+            "market_report": final_state["market_report"],
+            "sentiment_report": final_state["sentiment_report"],
+            "news_report": final_state["news_report"],
+            "fundamentals_report": final_state["fundamentals_report"],
+            "policy_report": final_state.get("policy_report", ""),
+            "hot_money_report": final_state.get("hot_money_report", ""),
+            "lockup_report": final_state.get("lockup_report", ""),
+            "missing_data_tasks": final_state.get("missing_data_tasks", []),
+            "missing_data_complete": final_state.get("missing_data_complete", True),
+            "missing_data_requires_reanalysis": final_state.get("missing_data_requires_reanalysis", False),
+            "missing_data_updated_at": final_state.get("missing_data_updated_at"),
+            "investment_debate_state": {
+                "bull_history": final_state["investment_debate_state"]["bull_history"],
+                "bear_history": final_state["investment_debate_state"]["bear_history"],
+                "history": final_state["investment_debate_state"]["history"],
+                "current_response": final_state["investment_debate_state"][
+                    "current_response"
+                ],
+                "judge_decision": final_state["investment_debate_state"][
+                    "judge_decision"
+                ],
+            },
+            "trader_investment_decision": final_state["trader_investment_plan"],
+            "risk_debate_state": {
+                "aggressive_history": final_state["risk_debate_state"]["aggressive_history"],
+                "conservative_history": final_state["risk_debate_state"]["conservative_history"],
+                "neutral_history": final_state["risk_debate_state"]["neutral_history"],
+                "history": final_state["risk_debate_state"]["history"],
+                "judge_decision": final_state["risk_debate_state"]["judge_decision"],
+            },
+            "investment_plan": final_state["investment_plan"],
+            "final_trade_decision": final_state["final_trade_decision"],
+        }
+
+        # Save to file. Reject ticker values that would escape the
+        # results directory when joined as a path component.
+        safe_ticker = safe_ticker_component(self.ticker)
+        directory = Path(self.config["results_dir"]) / safe_ticker / "TradingAgentsStrategy_logs"
+        directory.mkdir(parents=True, exist_ok=True)
+
+        log_path = directory / f"full_states_log_{trade_date}.json"
+        with open(log_path, "w", encoding="utf-8") as f:
+            json.dump(self.log_states_dict[str(trade_date)], f, indent=4)
+
+    def process_signal(self, full_signal):
+        """Process a signal to extract the core decision."""
+        return self.signal_processor.process_signal(full_signal)

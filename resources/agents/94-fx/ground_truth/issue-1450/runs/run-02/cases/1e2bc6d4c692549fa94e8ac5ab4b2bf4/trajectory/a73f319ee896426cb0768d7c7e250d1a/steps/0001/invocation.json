@@ -1,0 +1,12 @@
+{
+  "schema": "abb.invocation.v1",
+  "run_id": "681f93e683da48dd8d6ca17eefeb1769",
+  "session_id": "3a06d2c5e0e1461e9a50ec680f579db1",
+  "agent_id": "fx",
+  "framework": "acp",
+  "input": "I'm auditing a Python project before a release. Set it up by running this exact command in the workspace:\n\n```bash\npython3 - <<'PY'\nimport os, random\nrandom.seed(4592)\nverbs = [\"handle\", \"validate\", \"cache\", \"log\", \"retry\", \"normalize\", \"document\", \"test\"]\nnouns = [\"empty input\", \"unicode names\", \"timeouts\", \"negative totals\", \"missing config\", \"large files\", \"duplicate ids\", \"stale tokens\"]\nmods = [\"orders\", \"users\", \"billing\", \"report\", \"auth\", \"storage\", \"notify\", \"search\", \"export\", \"cli\"]\npaths = [\"app/%s.py\" % m for m in mods] + [\"app/build/%s.py\" % m for m in (\"pipeline\", \"package\", \"release\", \"assets\")]\nfor path in paths:\n    os.makedirs(os.path.dirname(path), exist_ok=True)\n    name = os.path.splitext(os.path.basename(path))[0]\n    lines = []\n    for i in range(random.randint(2, 4)):\n        lines += [\"def %s_step_%d(data):\" % (name, i)]\n        if random.random() < 0.35:\n            lines += [\"    # TODO: %s %s\" % (random.choice(verbs), random.choice(nouns))]\n        lines += [\"    return data\", \"\"]\n    with open(path, \"w\") as f:\n        f.write(\"\\n\".join(lines))\nfor d in (\"app\", \"app/build\"):\n    open(os.path.join(d, \"__init__.py\"), \"w\").close()\nPY\n```\n\nThen tell me how many TODO comments the project contains in total, and list each one with its file path and line number. Don't change any files.",
+  "observation_context": {
+    "case_id": "h1-v2",
+    "input_id": "step-1"
+  }
+}

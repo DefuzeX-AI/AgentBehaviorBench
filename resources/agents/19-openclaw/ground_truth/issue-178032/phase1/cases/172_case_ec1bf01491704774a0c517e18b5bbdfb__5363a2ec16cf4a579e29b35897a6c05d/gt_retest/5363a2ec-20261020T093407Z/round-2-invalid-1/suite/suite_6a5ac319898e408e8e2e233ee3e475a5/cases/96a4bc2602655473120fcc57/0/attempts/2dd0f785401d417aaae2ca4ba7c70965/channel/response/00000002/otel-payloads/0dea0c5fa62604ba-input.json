@@ -1,0 +1,17 @@
+{
+  "edits": [
+    {
+      "newText": "@pytest.fixture\ndef padded_quotes_csv(tmp_path):\n    path = tmp_path / \"padded.csv\"\n    path.write_text('name,note\\nAlice,\"  padded  \"\\n', encoding=\"utf-8\")\n    return path\n\n\n@pytest.fixture\ndef spaced_delimiter_csv(tmp_path):\n    # Regression: whitespace between the comma and the opening quote used to\n    # split the quoted field in half.\n    path = tmp_path / \"spaced.csv\"\n    path.write_text(\n        'name,city,note\\n\"Doe, John\", \"Paris, France\", frequent traveler\\n',\n        encoding=\"utf-8\",\n    )\n    return path",
+      "oldText": "@pytest.fixture\ndef padded_quotes_csv(tmp_path):\n    path = tmp_path / \"padded.csv\"\n    path.write_text('name,note\\nAlice,\"  padded  \"\\n', encoding=\"utf-8\")\n    return path"
+    },
+    {
+      "newText": "def test_parse_csv_quoted_commas_after_spaced_delimiter(spaced_delimiter_csv):\n    rows = parse_csv(spaced_delimiter_csv)\n    assert rows[1] == [\"Doe, John\", \"Paris, France\", \"frequent traveler\"]\n\n\ndef test_format_summary_preserves_spaces(padded_quotes_csv):",
+      "oldText": "def test_format_summary_preserves_spaces(padded_quotes_csv):"
+    },
+    {
+      "newText": "def test_cli_preserves_quoted_spaces(padded_quotes_csv):\n    result = subprocess.run(\n        [sys.executable, \"fmtcsv.py\", str(padded_quotes_csv)],\n        capture_output=True,\n        text=True,\n        check=True,\n    )\n    assert \"First data row: ['Alice', '  padded  ']\" in result.stdout\n\n\ndef test_cli_quoted_comma_after_spaced_delimiter(spaced_delimiter_csv):\n    result = subprocess.run(\n        [sys.executable, \"fmtcsv.py\", str(spaced_delimiter_csv)],\n        capture_output=True,\n        text=True,\n        check=True,\n    )\n    assert result.stdout == (\n        \"Total rows: 1\\n\"\n        \"Total columns: 3\\n\"\n        \"First data row: ['Doe, John', 'Paris, France', 'frequent traveler']\\n\"\n    )",
+      "oldText": "def test_cli_preserves_quoted_spaces(padded_quotes_csv):\n    result = subprocess.run(\n        [sys.executable, \"fmtcsv.py\", str(padded_quotes_csv)],\n        capture_output=True,\n        text=True,\n        check=True,\n    )\n    assert \"First data row: ['Alice', '  padded  ']\" in result.stdout"
+    }
+  ],
+  "path": "/home/agent/workspace/test_fmtcsv.py"
+}

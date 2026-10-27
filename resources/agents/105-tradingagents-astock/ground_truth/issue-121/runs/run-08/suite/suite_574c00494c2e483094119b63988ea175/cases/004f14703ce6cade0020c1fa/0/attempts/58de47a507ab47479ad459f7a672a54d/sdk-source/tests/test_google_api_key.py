@@ -1,0 +1,42 @@
+import unittest
+from unittest.mock import patch
+
+import pytest
+
+# langchain-google-genai is no longer installable alongside mootdx (#87), so it
+# is not part of the default environment. Skip instead of failing collection —
+# otherwise `pytest tests/` aborts before running any test at all.
+# (pytest.importorskip does not catch the actionable ImportError that
+# google_client raises, so branch on it explicitly.)
+try:
+    from tradingagents.llm_clients.google_client import GoogleClient
+except ImportError as exc:
+    pytest.skip(
+        f"langchain-google-genai not installed (see #87): {exc}",
+        allow_module_level=True,
+    )
+
+
+@pytest.mark.unit
+class TestGoogleApiKeyStandardization(unittest.TestCase):
+    """Verify GoogleClient accepts unified api_key parameter."""
+
+    @patch("tradingagents.llm_clients.google_client.NormalizedChatGoogleGenerativeAI")
+    def test_api_key_handling(self, mock_chat):
+        test_cases = [
+            ("unified api_key is mapped", {"api_key": "test-key-123"}, "test-key-123"),
+            ("legacy google_api_key still works", {"google_api_key": "legacy-key-456"}, "legacy-key-456"),
+            ("unified api_key takes precedence", {"api_key": "unified", "google_api_key": "legacy"}, "unified"),
+        ]
+
+        for msg, kwargs, expected_key in test_cases:
+            with self.subTest(msg=msg):
+                mock_chat.reset_mock()
+                client = GoogleClient("gemini-2.5-flash", **kwargs)
+                client.get_llm()
+                call_kwargs = mock_chat.call_args[1]
+                self.assertEqual(call_kwargs.get("google_api_key"), expected_key)
+
+
+if __name__ == "__main__":
+    unittest.main()

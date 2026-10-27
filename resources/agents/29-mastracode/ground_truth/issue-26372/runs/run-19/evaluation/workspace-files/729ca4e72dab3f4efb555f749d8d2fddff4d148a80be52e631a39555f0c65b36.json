@@ -1,0 +1,4 @@
+{
+  "content": "#!/usr/bin/env bash\n# Build the compiler toolchain: bytecode-compile the compiler and prepare build/.\nset -euo pipefail\ncd \"$(dirname \"$0\")\"\n\ncommand -v gcc >/dev/null || {\n    echo \"error: gcc is required to assemble and link test programs\" >&2\n    exit 1\n}\n\nmkdir -p build\n\n# Bytecode-compile so syntax/import errors surface here rather than at test time.\nPYTHONPYCACHEPREFIX=build/pycache python3 -m py_compile src/compiler.py tools/snapshot.py\nchmod +x src/compiler.py test.sh tools/snapshot.py\n\necho \"Build OK (src/compiler.py, tools/snapshot.py)\"\n",
+  "encoding": "utf-8"
+}

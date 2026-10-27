@@ -2,7 +2,7 @@ from pathlib import Path
 import importlib.util,json,subprocess,sys,time
 import pytest
 ROOT=Path(__file__).resolve().parents[1]
-P=ROOT/'resources/agents/135-openaeon/bootstrap/launch.py'
+P=ROOT/'resources/agents/138-openaeon/bootstrap/launch.py'
 spec=importlib.util.spec_from_file_location('openaeon_candidate',P);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 ENV={'ABB_AGENT_MODEL':'glm-5.3-flash','ABB_AGENT_MODEL_BASE_URL':'https://model.example.test/v1','ABB_AGENT_MODEL_API_KEY':'synthetic-fixture-only'}
 @pytest.mark.parametrize('key',list(ENV))

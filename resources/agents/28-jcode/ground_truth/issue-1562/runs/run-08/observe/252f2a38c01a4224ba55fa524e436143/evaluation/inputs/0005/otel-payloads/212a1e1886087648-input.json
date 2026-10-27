@@ -1,0 +1,4 @@
+{
+  "command": "cd /home/agent/workspace && DIGEST=$(awk '{print $1}' release/digest.txt) && printf '{\\n  \"1.0.0\": \"%s\"\\n}\\n' \"$DIGEST\" > release/mapping.json && cat release/mapping.json && python3 -m json.tool release/mapping.json > /dev/null && echo \"valid JSON\"",
+  "intent": "Build mapping.json from version and digest, then validate JSON"
+}

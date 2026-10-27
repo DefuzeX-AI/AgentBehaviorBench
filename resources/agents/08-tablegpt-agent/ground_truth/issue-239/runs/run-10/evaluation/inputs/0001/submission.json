@@ -1,0 +1,564 @@
+{
+  "run_id": "run_95f6be6eac08450cbfe62fcaf831734b",
+  "case_id": "case_2c1683f3a69e44b4ad162257df778a75",
+  "input_id": "step-1",
+  "status": "completed",
+  "output": "## Understanding of the brief\n\n**Deliverable:** A single summary report of the uploaded sales spreadsheet, rendered natively as a **Markdown document** with **embedded tables** and **charts**.\n\n**Audience:** A business manager — so the report must prioritize clarity and decision-relevant comparisons over technical detail. Lead with headline numbers, then drill into breakdowns.\n\n**Consumer contract (hard constraint):** Every figure in the report must be a **computed result from the provided data**. No estimated, assumed, remembered, or illustrative numbers. If a value can't be derived from the file, it doesn't appear — or it's explicitly flagged as unavailable.\n\n## What I'll produce (planned structure)\n\n| Section | Content |\n|---|---|\n| Headline KPIs | Total revenue, total units/orders, average order value, date coverage |\n| Trend | Revenue over time (period-over-period comparison), chart |\n| Segmentation | Performance by the categorical dimensions present in the file (e.g., region, product, rep, channel), ranked table + chart |\n| Concentration / outliers | Top contributors, any data quality flags |\n\n## Constraints I'll operate under\n\n1. **Traceability** — each number traceable to a specific aggregation on the loaded DataFrame.\n2. **Data-first shape** — I will inspect the actual columns, dtypes, and null/duplicate patterns before choosing which aggregations are even valid. No assumptions about column names.\n3. **Markdown-only output** — no Markdown image syntax; charts will be rendered by the seaborn/matplotlib execution layer, not embedded as `![]()` links.\n4. **Honesty about gaps** — missing fields, ambiguous date formats, or non-additive metrics (e.g., ratios, averages) will be handled correctly and disclosed, not silently aggregated.\n5. **Consistency** — totals in tables will reconcile with the headline KPIs.\n\n## What I need from you to start\n\nThe brief specifies \"the uploaded sales spreadsheet,\" but I don't have a URI/path for it in this session. Please provide:\n\n- The **file path or URI** for the sales spreadsheet (I'll load it with `read_df`).\n- Any **metric definitions** you want enforced — e.g., does \"revenue\" mean a `Revenue` column, or `Quantity × UnitPrice`? Does \"sales\" mean units or currency?\n- The **desired time grain** for the trend (day / week / month) and any specific comparison period (e.g., MoM, YoY).\n\nOnce I have the file, my first step will be a schema/integrity probe — printing column names, dtypes, row count, null counts, and a head sample — and I'll show you that output before computing any aggregations, so the metric definitions are grounded in what's actually there.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": null,
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_95f6be6eac08450cbfe62fcaf831734b",
+      "case_id": "case_2c1683f3a69e44b4ad162257df778a75",
+      "input_id": "step-1",
+      "spans": [
+        {
+          "trace_id": "5131488c85d53cbc4f33e931bffd8c76",
+          "span_id": "f091842c2752146e",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791834597377784923,
+          "end_time_unix_nano": 1791834612538951820,
+          "duration_nano": 15161166897,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "5131488c85d53cbc4f33e931bffd8c76",
+          "span_id": "8d5878c8c77d507b",
+          "parent_span_id": "f091842c2752146e",
+          "name": "LangGraph",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791834603592636443,
+          "end_time_unix_nano": 1791834612535867149,
+          "duration_nano": 8943230706,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "5131488c85d53cbc4f33e931bffd8c76",
+          "span_id": "901eb37b4088ab42",
+          "parent_span_id": "8d5878c8c77d507b",
+          "name": "__start__",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791834603599866449,
+          "end_time_unix_nano": 1791834603614242859,
+          "duration_nano": 14376410,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "5131488c85d53cbc4f33e931bffd8c76",
+          "span_id": "4c4cab789a72a5ba",
+          "parent_span_id": "901eb37b4088ab42",
+          "name": "router",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791834603606425016,
+          "end_time_unix_nano": 1791834603611010753,
+          "duration_nano": 4585737,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "5131488c85d53cbc4f33e931bffd8c76",
+          "span_id": "fb20f6e01b6f2189",
+          "parent_span_id": "8d5878c8c77d507b",
+          "name": "data_analyze_graph",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791834603616517239,
+          "end_time_unix_nano": 1791834612532625526,
+          "duration_nano": 8916108287,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "5131488c85d53cbc4f33e931bffd8c76",
+          "span_id": "cfae07e3ae113739",
+          "parent_span_id": "fb20f6e01b6f2189",
+          "name": "LangGraph",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791834603619267026,
+          "end_time_unix_nano": 1791834612529720863,
+          "duration_nano": 8910453837,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "5131488c85d53cbc4f33e931bffd8c76",
+          "span_id": "898106dbf9cf5484",
+          "parent_span_id": "cfae07e3ae113739",
+          "name": "input_guard",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791834603624334470,
+          "end_time_unix_nano": 1791834603630882265,
+          "duration_nano": 6547795,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "5131488c85d53cbc4f33e931bffd8c76",
+          "span_id": "5b70f60c79a3d800",
+          "parent_span_id": "cfae07e3ae113739",
+          "name": "retrieve_columns",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791834603627591407,
+          "end_time_unix_nano": 1791834603632969384,
+          "duration_nano": 5377977,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "5131488c85d53cbc4f33e931bffd8c76",
+          "span_id": "64dd51a5a0354f2e",
+          "parent_span_id": "cfae07e3ae113739",
+          "name": "agent_node",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791834603635592378,
+          "end_time_unix_nano": 1791834612526461133,
+          "duration_nano": 8890868755,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "5131488c85d53cbc4f33e931bffd8c76",
+          "span_id": "09f2a9b319d65e76",
+          "parent_span_id": "64dd51a5a0354f2e",
+          "name": "RunnableSequence",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791834603643411007,
+          "end_time_unix_nano": 1791834612518364587,
+          "duration_nano": 8874953580,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "5131488c85d53cbc4f33e931bffd8c76",
+          "span_id": "cc5d0a0c6e8a65ef",
+          "parent_span_id": "09f2a9b319d65e76",
+          "name": "ChatPromptTemplate",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791834603648519835,
+          "end_time_unix_nano": 1791834603657735769,
+          "duration_nano": 9215934,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "5131488c85d53cbc4f33e931bffd8c76",
+          "span_id": "57f5950b661369e6",
+          "parent_span_id": "09f2a9b319d65e76",
+          "name": "ChatOpenAI",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791834603662458371,
+          "end_time_unix_nano": 1791834612411066987,
+          "duration_nano": 8748608616,
+          "model_content": {
+            "schema_version": "kuma.model_content.v1",
+            "input": {
+              "status": "present",
+              "value": [
+                [
+                  {
+                    "content": "You are TableGPT2, an expert Python data analyst developed by Zhejiang University. Your job is to help user analyze datasets by writing Python code. Each markdown codeblock you write will be executed in an IPython environment, and you will receive the execution output. You should provide results analysis based on the execution output.\nFor politically sensitive questions, security and privacy issues, or other non-data analyze questions, you will refuse to answer.\n\nRemember:\n- Comprehend the user's requirements carefully & to the letter.\n- If additional information is needed, feel free to ask the user.\n- Give a brief description for what you plan to do & write Python code.\n- You can use `read_df(uri: str) -> pd.DataFrame` function to read different file formats into DataFrame.\n- When creating charts, prefer using `seaborn`.\n- DO NOT include images using markdown syntax (![]()) in your response under ANY circumstances.\n- If error occurred, try to fix it.\n- Response in the same language as the user.\n- Today is 2026-10-12",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "system",
+                    "name": null,
+                    "id": null
+                  },
+                  {
+                    "content": "Bind the deliverable brief: The analyst needs a summary report of the uploaded sales spreadsheet. The audience is a business manager who wants clear, accurate aggregations and comparisons. The native format is a Markdown report with embedded tables and charts. The consumer contract requires that all numbers come from computed results on the provided data, not guesses. State your understanding of the brief and the constraints.",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "human",
+                    "name": null,
+                    "id": "3b4347b5-19c7-4491-8db2-a7ebe4b8c925",
+                    "example": false
+                  }
+                ]
+              ]
+            },
+            "output": {
+              "status": "present",
+              "value": {
+                "generations": [
+                  [
+                    {
+                      "text": "## Understanding of the brief\n\n**Deliverable:** A single summary report of the uploaded sales spreadsheet, rendered natively as a **Markdown document** with **embedded tables** and **charts**.\n\n**Audience:** A business manager — so the report must prioritize clarity and decision-relevant comparisons over technical detail. Lead with headline numbers, then drill into breakdowns.\n\n**Consumer contract (hard constraint):** Every figure in the report must be a **computed result from the provided data**. No estimated, assumed, remembered, or illustrative numbers. If a value can't be derived from the file, it doesn't appear — or it's explicitly flagged as unavailable.\n\n## What I'll produce (planned structure)\n\n| Section | Content |\n|---|---|\n| Headline KPIs | Total revenue, total units/orders, average order value, date coverage |\n| Trend | Revenue over time (period-over-period comparison), chart |\n| Segmentation | Performance by the categorical dimensions present in the file (e.g., region, product, rep, channel), ranked table + chart |\n| Concentration / outliers | Top contributors, any data quality flags |\n\n## Constraints I'll operate under\n\n1. **Traceability** — each number traceable to a specific aggregation on the loaded DataFrame.\n2. **Data-first shape** — I will inspect the actual columns, dtypes, and null/duplicate patterns before choosing which aggregations are even valid. No assumptions about column names.\n3. **Markdown-only output** — no Markdown image syntax; charts will be rendered by the seaborn/matplotlib execution layer, not embedded as `![]()` links.\n4. **Honesty about gaps** — missing fields, ambiguous date formats, or non-additive metrics (e.g., ratios, averages) will be handled correctly and disclosed, not silently aggregated.\n5. **Consistency** — totals in tables will reconcile with the headline KPIs.\n\n## What I need from you to start\n\nThe brief specifies \"the uploaded sales spreadsheet,\" but I don't have a URI/path for it in this session. Please provide:\n\n- The **file path or URI** for the sales spreadsheet (I'll load it with `read_df`).\n- Any **metric definitions** you want enforced — e.g., does \"revenue\" mean a `Revenue` column, or `Quantity × UnitPrice`? Does \"sales\" mean units or currency?\n- The **desired time grain** for the trend (day / week / month) and any specific comparison period (e.g., MoM, YoY).\n\nOnce I have the file, my first step will be a schema/integrity probe — printing column names, dtypes, row count, null counts, and a head sample — and I'll show you that output before computing any aggregations, so the metric definitions are grounded in what's actually there.",
+                      "generation_info": {
+                        "finish_reason": "stop",
+                        "logprobs": null
+                      },
+                      "type": "ChatGeneration",
+                      "message": {
+                        "content": "## Understanding of the brief\n\n**Deliverable:** A single summary report of the uploaded sales spreadsheet, rendered natively as a **Markdown document** with **embedded tables** and **charts**.\n\n**Audience:** A business manager — so the report must prioritize clarity and decision-relevant comparisons over technical detail. Lead with headline numbers, then drill into breakdowns.\n\n**Consumer contract (hard constraint):** Every figure in the report must be a **computed result from the provided data**. No estimated, assumed, remembered, or illustrative numbers. If a value can't be derived from the file, it doesn't appear — or it's explicitly flagged as unavailable.\n\n## What I'll produce (planned structure)\n\n| Section | Content |\n|---|---|\n| Headline KPIs | Total revenue, total units/orders, average order value, date coverage |\n| Trend | Revenue over time (period-over-period comparison), chart |\n| Segmentation | Performance by the categorical dimensions present in the file (e.g., region, product, rep, channel), ranked table + chart |\n| Concentration / outliers | Top contributors, any data quality flags |\n\n## Constraints I'll operate under\n\n1. **Traceability** — each number traceable to a specific aggregation on the loaded DataFrame.\n2. **Data-first shape** — I will inspect the actual columns, dtypes, and null/duplicate patterns before choosing which aggregations are even valid. No assumptions about column names.\n3. **Markdown-only output** — no Markdown image syntax; charts will be rendered by the seaborn/matplotlib execution layer, not embedded as `![]()` links.\n4. **Honesty about gaps** — missing fields, ambiguous date formats, or non-additive metrics (e.g., ratios, averages) will be handled correctly and disclosed, not silently aggregated.\n5. **Consistency** — totals in tables will reconcile with the headline KPIs.\n\n## What I need from you to start\n\nThe brief specifies \"the uploaded sales spreadsheet,\" but I don't have a URI/path for it in this session. Please provide:\n\n- The **file path or URI** for the sales spreadsheet (I'll load it with `read_df`).\n- Any **metric definitions** you want enforced — e.g., does \"revenue\" mean a `Revenue` column, or `Quantity × UnitPrice`? Does \"sales\" mean units or currency?\n- The **desired time grain** for the trend (day / week / month) and any specific comparison period (e.g., MoM, YoY).\n\nOnce I have the file, my first step will be a schema/integrity probe — printing column names, dtypes, row count, null counts, and a head sample — and I'll show you that output before computing any aggregations, so the metric definitions are grounded in what's actually there.",
+                        "additional_kwargs": {
+                          "refusal": null
+                        },
+                        "response_metadata": {
+                          "token_usage": {
+                            "completion_tokens": 790,
+                            "prompt_tokens": 327,
+                            "total_tokens": 1117,
+                            "completion_tokens_details": {
+                              "accepted_prediction_tokens": null,
+                              "audio_tokens": null,
+                              "reasoning_tokens": 204,
+                              "rejected_prediction_tokens": null
+                            },
+                            "prompt_tokens_details": {
+                              "audio_tokens": null,
+                              "cache_write_tokens": null,
+                              "cached_tokens": 0
+                            }
+                          },
+                          "model_name": "deepseek-v4.1-flash",
+                          "system_fingerprint": null,
+                          "id": "chatcmpl-20261012195005265288052c955d568bdakznsz",
+                          "service_tier": "default",
+                          "finish_reason": "stop",
+                          "logprobs": null
+                        },
+                        "type": "ai",
+                        "name": null,
+                        "id": "run--01a131aa-408d-7e82-a015-4f5d8bf4d50c-0"
+                      }
+                    }
+                  ]
+                ],
+                "llm_output": {
+                  "token_usage": {
+                    "completion_tokens": 790,
+                    "prompt_tokens": 327,
+                    "total_tokens": 1117,
+                    "completion_tokens_details": {
+                      "accepted_prediction_tokens": null,
+                      "audio_tokens": null,
+                      "reasoning_tokens": 204,
+                      "rejected_prediction_tokens": null
+                    },
+                    "prompt_tokens_details": {
+                      "audio_tokens": null,
+                      "cache_write_tokens": null,
+                      "cached_tokens": 0
+                    }
+                  },
+                  "model_name": "deepseek-v4.1-flash",
+                  "system_fingerprint": null,
+                  "id": "chatcmpl-20261012195005265288052c955d568bdakznsz",
+                  "service_tier": "default"
+                },
+                "run": null,
+                "type": "LLMResult"
+              }
+            }
+          },
+          "attributes": {
+            "gen_ai.operation.name": "chat"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "5131488c85d53cbc4f33e931bffd8c76",
+          "span_id": "367a34f7f387c014",
+          "parent_span_id": "09f2a9b319d65e76",
+          "name": "MarkdownOutputParser",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791834612427038187,
+          "end_time_unix_nano": 1791834612515772032,
+          "duration_nano": 88733845,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "5131488c85d53cbc4f33e931bffd8c76",
+          "span_id": "0881d2c222ab0edd",
+          "parent_span_id": "64dd51a5a0354f2e",
+          "name": "should_continue",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791834612520282912,
+          "end_time_unix_nano": 1791834612524013781,
+          "duration_nano": 3730869,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 14,
+      "retained_spans": 14,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_95f6be6eac08450cbfe62fcaf831734b",
+      "input_id": "step-1",
+      "step_id": "step-1",
+      "submission_id": "submission-940f735d9e504bca3770d5d3c2505b6e",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "dfe3df86c54a4b894a5ca3393461c78fb7a4483ad8f33d6da5a07119551d5f00",
+          "size_bytes": 16591,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "11a74fdf501725411f748337c0c8f4d55edc2ff42f1b0670b0979fa3ba3be087"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "not_captured",
+      "observed_count": null,
+      "retained_count": 0,
+      "omitted_count": null,
+      "reasons": [
+        "not_enabled"
+      ]
+    }
+  }
+}

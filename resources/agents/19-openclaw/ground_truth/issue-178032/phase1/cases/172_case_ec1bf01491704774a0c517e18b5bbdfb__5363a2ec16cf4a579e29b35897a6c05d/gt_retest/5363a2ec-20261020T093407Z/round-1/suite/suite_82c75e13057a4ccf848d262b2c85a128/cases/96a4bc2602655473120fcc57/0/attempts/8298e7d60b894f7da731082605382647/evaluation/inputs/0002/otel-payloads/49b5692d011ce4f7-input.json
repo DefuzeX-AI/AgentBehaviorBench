@@ -1,0 +1,6 @@
+{
+  "command": "cat > /tmp/bug_stress.csv <<'EOF'\nid,name,city,comment\n1,\"Doe, Jane\",Boston,\"river, harbor, and trails\"\n2,\"Smith, John \" \"III\",Salem,\"\"quoted\"\", ok\nEOF\necho \"--- workspace .venv python ---\"; .venv/bin/python fmtcsv.py /tmp/bug_stress.csv\necho \"--- system /opt/venv python ---\"; /opt/venv/bin/python fmtcsv.py /tmp/bug_stress.csv\necho \"--- other fmtcsv on PATH? ---\"; which fmtcsv || echo \"no fmtcsv binary on PATH\"\nrm /tmp/bug_stress.csv",
+  "title": "Stress-test quoted-comma handling across interpreters",
+  "workdir": "/home/agent/workspace",
+  "yieldMs": 30000
+}

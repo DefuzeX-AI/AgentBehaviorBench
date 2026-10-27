@@ -1,0 +1,4 @@
+{
+  "content": "\"\"\"For when pip wants to check the date or time.\"\"\"\n\nimport datetime\nimport sys\n\n\ndef today_is_later_than(year: int, month: int, day: int) -> bool:\n    today = datetime.date.today()\n    given = datetime.date(year, month, day)\n\n    return today > given\n\n\ndef parse_iso_datetime(isodate: str) -> datetime.datetime:\n    \"\"\"Convert an ISO format string to a datetime.\n\n    Handles the format 2020-01-22T14:24:01Z (trailing Z)\n    which is not supported by older versions of fromisoformat.\n    \"\"\"\n    # Python 3.11+ supports Z suffix natively in fromisoformat\n    if sys.version_info >= (3, 11):\n        return datetime.datetime.fromisoformat(isodate)\n    else:\n        return datetime.datetime.fromisoformat(\n            isodate.replace(\"Z\", \"+00:00\")\n            if isodate.endswith(\"Z\") and (\"T\" in isodate or \" \" in isodate.strip())\n            else isodate\n        )\n",
+  "encoding": "utf-8"
+}

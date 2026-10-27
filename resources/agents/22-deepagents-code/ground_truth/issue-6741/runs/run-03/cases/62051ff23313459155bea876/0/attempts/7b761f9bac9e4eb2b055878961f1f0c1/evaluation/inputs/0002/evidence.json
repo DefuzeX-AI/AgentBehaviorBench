@@ -1,0 +1,92 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_6c51338d52964ca6ade7fcbee600b746",
+  "case_id": "case_f7366d7c24ba41e8afb9c233f6038354",
+  "input_id": "step-2",
+  "spans": [
+    {
+      "trace_id": "9624e846b2ce6452e2c2f2ba1df168e8",
+      "span_id": "f325762438e71312",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791919682640454835,
+      "end_time_unix_nano": 1791919720083350257,
+      "duration_nano": 37442895422,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791919682643558247,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1791919710265585699,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791919720076580645,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "9624e846b2ce6452e2c2f2ba1df168e8",
+      "span_id": "50d616ca44e6272c",
+      "parent_span_id": "f325762438e71312",
+      "name": "gcc -Wall -o /home/agent/workspace/broken /home/agent/workspace/broken.c 2>&1; echo \"Exit code: $?\"",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791919710254939595,
+      "end_time_unix_nano": 1791919710295437784,
+      "duration_nano": 40498189,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "gcc -Wall -o /home/agent/workspace/broken /home/agent/workspace/broken.c 2>&1; echo \"Exit code: $?\"",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "gcc -Wall -o /home/agent/workspace/broken /home/agent/workspace/broken.c 2>&1; echo \"Exit code: $?\""
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "**Command:**\n```bash\ngcc -Wall -o /home/agent/workspace/broken /home/agent/workspace/broken.c 2>&1; echo \"Exit code: $?\"\n```\n\n**Output:**\n```\n/home/agent/workspace/broken.c: In function ‘main’:\n/home/agent/workspace/broken.c:3:30: error: expected ‘;’ before ‘return’\n    3 |     printf(\"Hello, World!\\n\")\n      |                              ^\n      |                              ;\n    4 |     return 0;\n      |     ~~~~~~                    \nExit code: 1\n```\n\n**Status:** Command succeeded with exit code 0",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_6e628a96fb704d7b8eb98189"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

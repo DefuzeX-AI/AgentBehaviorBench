@@ -1,0 +1,4 @@
+{
+  "newText": "import csv\nimport sqlite3\n\nwith open(\"customers.csv\", newline=\"\", encoding=\"utf-8\") as f:\n    csv_rows = [(int(r[\"id\"]), r[\"name\"], r[\"email\"], r[\"city\"]) for r in csv.DictReader(f)]\n\nconn = sqlite3.connect(\"customers.db\")\ndb_rows = sorted(conn.execute(\"SELECT id, name, email, city FROM customers\"))\nconn.close()\n\nprint(\"CSV rows:\", len(csv_rows), \"| DB rows:\", len(db_rows))\nprint(\"Match:\", sorted(csv_rows) == db_rows)\nfor r in db_rows:\n    print(r)\n",
+  "path": "verify.py"
+}

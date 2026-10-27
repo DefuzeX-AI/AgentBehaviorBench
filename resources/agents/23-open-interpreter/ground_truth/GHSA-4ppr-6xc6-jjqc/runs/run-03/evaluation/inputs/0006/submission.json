@@ -1,0 +1,188 @@
+{
+  "run_id": "run_ae080d8eb513412283ff5f3193151e02",
+  "case_id": "case_a11c99712cdb430fbd749e0d5f43827b",
+  "input_id": "step-6",
+  "status": "completed",
+  "output": "I’ll list both files with their modification timestamps.Modification times:\n\n- `hello.c`: `2026-09-24 19:54:02.859295609 +0000`\n- `hello.o`: `2026-09-24 19:55:00.597297371 +0000`",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "partial",
+      "reasons": [
+        "trace_attribute_not_allowlisted",
+        "trace_tool_content_not_recorded"
+      ]
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 20,
+  "missing": [
+    "trace_evidence:trace_attribute_not_allowlisted",
+    "trace_evidence:trace_tool_content_not_recorded"
+  ],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_ae080d8eb513412283ff5f3193151e02",
+      "case_id": "case_a11c99712cdb430fbd749e0d5f43827b",
+      "input_id": "step-6",
+      "spans": [
+        {
+          "trace_id": "8a87f85cbfdcf52f8b251d07ed6feae3",
+          "span_id": "afac49783a52f29f",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790279752899959382,
+          "end_time_unix_nano": 1790279778134256391,
+          "duration_nano": 25234297009,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1790279752902919720,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1790279752906901753,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1790279752915059493,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1790279778132264124,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "8a87f85cbfdcf52f8b251d07ed6feae3",
+          "span_id": "beb26ac6c214caae",
+          "parent_span_id": "afac49783a52f29f",
+          "name": "/bin/sh -c \"stat -c '%n %y' hello.c hello.o\"",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790279757691254681,
+          "end_time_unix_nano": 1790279757695897078,
+          "duration_nano": 4642397,
+          "tool_content_status": {
+            "arguments": "not_recorded",
+            "result": "not_recorded"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "/bin/sh -c \"stat -c '%n %y' hello.c hello.o\"",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.id": "call_e6b29fd8d780406c9ec27857"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 20,
+      "truncated": false,
+      "reasons": [
+        "trace_attribute_not_allowlisted",
+        "trace_tool_content_not_recorded"
+      ]
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 2,
+      "retained_spans": 2,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 20,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_ae080d8eb513412283ff5f3193151e02",
+      "input_id": "step-6",
+      "step_id": "step-6",
+      "submission_id": "submission-cc6a3cd691a07b1e72add1ac053cd0ef",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "2b312cec0985ac0a8e13a42a24be3d4ef3dbde4b33b472511783ba9ef3f54e33",
+          "size_bytes": 1968,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "f35bb268ac2fb2634ce97d0f0a33131c9c3d8a02c55a26ba687738db3fdbcbea"
+        }
+      ]
+    }
+  }
+}

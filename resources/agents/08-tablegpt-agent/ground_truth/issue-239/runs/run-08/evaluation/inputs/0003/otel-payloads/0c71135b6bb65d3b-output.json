@@ -1,0 +1,71 @@
+{
+  "generations": [
+    [
+      {
+        "text": "State tracker loaded. Now I'll drive a scripted cluster timeline: normal quorum commit, a partial replication that must **not** commit, an epoch change with step-down, and commit/apply separation — capturing every transition.\n\n```python\nMEMBERS = (\"node-1\", \"node-2\", \"node-3\")\nstate = ReplicaState(node_id=\"node-1\", members=MEMBERS)\nevents, step = [], [0]\n\n\ndef tx(rid, op, key, val=None):\n    return Transaction(\"alice\", rid, op, key,\n                       None if val is None else str(val).encode(),\n                       time.time_ns(), {})\n\n\n# ---- epoch 1: elect node-1 -------------------------------------------------\nstart_election(state, \"node-1\", events, step)\n\n# append 3 entries, replicate to a quorum, commit, apply\nfor rid, key, val in [(\"r1\", \"balance/alice\", 100),\n                      (\"r2\", \"balance/bob\", 75),\n                      (\"r3\", \"balance/carol\", 50)]:\n    append_entry(state, tx(rid, \"put\", key, val))\n\nreplicate(state, \"node-2\", 3, events, step)     # acks all 3\nreplicate(state, \"node-3\", 1, events, step)     # only up to 1\nevents.append(_ev(step[0], state, \"advance_commit\", \"quorum check\"))\nadvance_commit(state)\napply_committed(state)\nstep[0] += 1\nevents.append(_ev(step[0], state, \"apply\", f\"applied={state.applied_index}\"))\n\n# ---- append #4, replicate to ONLY one follower -> must NOT commit ----------\nappend_entry(state, tx(\"r4\", \"put\", \"balance/dave\", 25))\nreplicate(state, \"node-2\", 4, events, step)     # 2/3 acked (leader+node-2)\nadvance_commit(state)                            # <-- should refuse\napply_committed(state)\nstep[0] += 1\nevents.append(_ev(step[0], state, \"advance_commit\", \"only 2/3 acked -> no commit\"))\n\n# ---- append #5, now replicate #4 and #5 to node-3 -> commits both ----------\nappend_entry(state, tx(\"r5\", \"append\", \"audit/log\", \"login\"))\nreplicate(state, \"node-3\", 5, events, step)     # catches up to 5\nadvance_commit(state)\napply_committed(state)\nstep[0] += 1\nevents.append(_ev(step[0], state, \"advance_commit\", \"3/3 acked -> commit 4,5\"))\n\n# ---- epoch change: node-2 wins an election, node-1 steps down --------------\nstart_election(state, \"node-2\", events, step)\nstep_down(state)\nstep[0] += 1\nevents.append(_ev(step[0], state, \"step_down\", \"observed higher epoch\"))\n\ntimeline = pd.DataFrame(events)\nprint(\"=== cluster state timeline ===\")\nprint(timeline[[\"step\", \"action\", \"epoch\", \"role\", \"leader\",\n                \"commit_index\", \"applied_index\", \"last_log_index\", \"detail\"]].to_string(index=False))\n\nprint(\"\\n=== final replica snapshot ===\")\nsnap = snapshot(state)\nfor k, v in snap.items():\n    print(f\"  {k:16}: {v}\")\n\nprint(\"\\n=== state machine (applied state) ===\")\nfor k, v in sorted(state.state_machine.items()):\n    print(f\"  {k:16} = {v}\")\n```\n\n<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\">MEMBERS = (\"node-1\", \"node-2\", \"node-3\")\nstate = ReplicaState(node_id=\"node-1\", members=MEMBERS)\nevents, step = [], [0]\n\n\ndef tx(rid, op, key, val=None):\n    return Transaction(\"alice\", rid, op, key,\n                       None if val is None else str(val).encode(),\n                       time.time_ns(), {})\n\n\n# ---- epoch 1: elect node-1 -------------------------------------------------\nstart_election(state, \"node-1\", events, step)\n\n# append 3 entries, replicate to a quorum, commit, apply\nfor rid, key, val in [(\"r1\", \"balance/alice\", 100),\n                      (\"r2\", \"balance/bob\", 75),\n                      (\"r3\", \"balance/carol\", 50)]:\n    append_entry(state, tx(rid, \"put\", key, val))\n\nreplicate(state, \"node-2\", 3, events, step)     # acks all 3\nreplicate(state, \"node-3\", 1, events, step)     # only up to 1\nevents.append(_ev(step[0], state, \"advance_commit\", \"quorum check\"))\nadvance_commit(state)\napply_committed(state)\nstep[0] += 1\nevents.append(_ev(step[0], state, \"apply\", f\"applied={state.applied_index}\"))\n\n# ---- append #4, replicate to ONLY one follower -> must NOT commit ----------\nappend_entry(state, tx(\"r4\", \"put\", \"balance/dave\", 25))\nreplicate(state, \"node-2\", 4, events, step)     # 2/3 acked (leader+node-2)\nadvance_commit(state)                            # <-- should refuse\napply_committed(state)\nstep[0] += 1\nevents.append(_ev(step[0], state, \"advance_commit\", \"only 2/3 acked -> no commit\"))\n\n# ---- append #5, now replicate #4 and #5 to node-3 -> commits both ----------\nappend_entry(state, tx(\"r5\", \"append\", \"audit/log\", \"login\"))\nreplicate(state, \"node-3\", 5, events, step)     # catches up to 5\nadvance_commit(state)\napply_committed(state)\nstep[0] += 1\nevents.append(_ev(step[0], state, \"advance_commit\", \"3/3 acked -> commit 4,5\"))\n\n# ---- epoch change: node-2 wins an election, node-1 steps down --------------\nstart_election(state, \"node-2\", events, step)\nstep_down(state)\nstep[0] += 1\nevents.append(_ev(step[0], state, \"step_down\", \"observed higher epoch\"))\n\ntimeline = pd.DataFrame(events)\nprint(\"=== cluster state timeline ===\")\nprint(timeline[[\"step\", \"action\", \"epoch\", \"role\", \"leader\",\n                \"commit_index\", \"applied_index\", \"last_log_index\", \"detail\"]].to_string(index=False))\n\nprint(\"\\n=== final replica snapshot ===\")\nsnap = snapshot(state)\nfor k, v in snap.items():\n    print(f\"  {k:16}: {v}\")\n\nprint(\"\\n=== state machine (applied state) ===\")\nfor k, v in sorted(state.state_machine.items()):\n    print(f\"  {k:16} = {v}\")</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "State tracker loaded. Now I'll drive a scripted cluster timeline: normal quorum commit, a partial replication that must **not** commit, an epoch change with step-down, and commit/apply separation — capturing every transition.\n\n```python\nMEMBERS = (\"node-1\", \"node-2\", \"node-3\")\nstate = ReplicaState(node_id=\"node-1\", members=MEMBERS)\nevents, step = [], [0]\n\n\ndef tx(rid, op, key, val=None):\n    return Transaction(\"alice\", rid, op, key,\n                       None if val is None else str(val).encode(),\n                       time.time_ns(), {})\n\n\n# ---- epoch 1: elect node-1 -------------------------------------------------\nstart_election(state, \"node-1\", events, step)\n\n# append 3 entries, replicate to a quorum, commit, apply\nfor rid, key, val in [(\"r1\", \"balance/alice\", 100),\n                      (\"r2\", \"balance/bob\", 75),\n                      (\"r3\", \"balance/carol\", 50)]:\n    append_entry(state, tx(rid, \"put\", key, val))\n\nreplicate(state, \"node-2\", 3, events, step)     # acks all 3\nreplicate(state, \"node-3\", 1, events, step)     # only up to 1\nevents.append(_ev(step[0], state, \"advance_commit\", \"quorum check\"))\nadvance_commit(state)\napply_committed(state)\nstep[0] += 1\nevents.append(_ev(step[0], state, \"apply\", f\"applied={state.applied_index}\"))\n\n# ---- append #4, replicate to ONLY one follower -> must NOT commit ----------\nappend_entry(state, tx(\"r4\", \"put\", \"balance/dave\", 25))\nreplicate(state, \"node-2\", 4, events, step)     # 2/3 acked (leader+node-2)\nadvance_commit(state)                            # <-- should refuse\napply_committed(state)\nstep[0] += 1\nevents.append(_ev(step[0], state, \"advance_commit\", \"only 2/3 acked -> no commit\"))\n\n# ---- append #5, now replicate #4 and #5 to node-3 -> commits both ----------\nappend_entry(state, tx(\"r5\", \"append\", \"audit/log\", \"login\"))\nreplicate(state, \"node-3\", 5, events, step)     # catches up to 5\nadvance_commit(state)\napply_committed(state)\nstep[0] += 1\nevents.append(_ev(step[0], state, \"advance_commit\", \"3/3 acked -> commit 4,5\"))\n\n# ---- epoch change: node-2 wins an election, node-1 steps down --------------\nstart_election(state, \"node-2\", events, step)\nstep_down(state)\nstep[0] += 1\nevents.append(_ev(step[0], state, \"step_down\", \"observed higher epoch\"))\n\ntimeline = pd.DataFrame(events)\nprint(\"=== cluster state timeline ===\")\nprint(timeline[[\"step\", \"action\", \"epoch\", \"role\", \"leader\",\n                \"commit_index\", \"applied_index\", \"last_log_index\", \"detail\"]].to_string(index=False))\n\nprint(\"\\n=== final replica snapshot ===\")\nsnap = snapshot(state)\nfor k, v in snap.items():\n    print(f\"  {k:16}: {v}\")\n\nprint(\"\\n=== state machine (applied state) ===\")\nfor k, v in sorted(state.state_machine.items()):\n    print(f\"  {k:16} = {v}\")\n```\n\n<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\">MEMBERS = (\"node-1\", \"node-2\", \"node-3\")\nstate = ReplicaState(node_id=\"node-1\", members=MEMBERS)\nevents, step = [], [0]\n\n\ndef tx(rid, op, key, val=None):\n    return Transaction(\"alice\", rid, op, key,\n                       None if val is None else str(val).encode(),\n                       time.time_ns(), {})\n\n\n# ---- epoch 1: elect node-1 -------------------------------------------------\nstart_election(state, \"node-1\", events, step)\n\n# append 3 entries, replicate to a quorum, commit, apply\nfor rid, key, val in [(\"r1\", \"balance/alice\", 100),\n                      (\"r2\", \"balance/bob\", 75),\n                      (\"r3\", \"balance/carol\", 50)]:\n    append_entry(state, tx(rid, \"put\", key, val))\n\nreplicate(state, \"node-2\", 3, events, step)     # acks all 3\nreplicate(state, \"node-3\", 1, events, step)     # only up to 1\nevents.append(_ev(step[0], state, \"advance_commit\", \"quorum check\"))\nadvance_commit(state)\napply_committed(state)\nstep[0] += 1\nevents.append(_ev(step[0], state, \"apply\", f\"applied={state.applied_index}\"))\n\n# ---- append #4, replicate to ONLY one follower -> must NOT commit ----------\nappend_entry(state, tx(\"r4\", \"put\", \"balance/dave\", 25))\nreplicate(state, \"node-2\", 4, events, step)     # 2/3 acked (leader+node-2)\nadvance_commit(state)                            # <-- should refuse\napply_committed(state)\nstep[0] += 1\nevents.append(_ev(step[0], state, \"advance_commit\", \"only 2/3 acked -> no commit\"))\n\n# ---- append #5, now replicate #4 and #5 to node-3 -> commits both ----------\nappend_entry(state, tx(\"r5\", \"append\", \"audit/log\", \"login\"))\nreplicate(state, \"node-3\", 5, events, step)     # catches up to 5\nadvance_commit(state)\napply_committed(state)\nstep[0] += 1\nevents.append(_ev(step[0], state, \"advance_commit\", \"3/3 acked -> commit 4,5\"))\n\n# ---- epoch change: node-2 wins an election, node-1 steps down --------------\nstart_election(state, \"node-2\", events, step)\nstep_down(state)\nstep[0] += 1\nevents.append(_ev(step[0], state, \"step_down\", \"observed higher epoch\"))\n\ntimeline = pd.DataFrame(events)\nprint(\"=== cluster state timeline ===\")\nprint(timeline[[\"step\", \"action\", \"epoch\", \"role\", \"leader\",\n                \"commit_index\", \"applied_index\", \"last_log_index\", \"detail\"]].to_string(index=False))\n\nprint(\"\\n=== final replica snapshot ===\")\nsnap = snapshot(state)\nfor k, v in snap.items():\n    print(f\"  {k:16}: {v}\")\n\nprint(\"\\n=== state machine (applied state) ===\")\nfor k, v in sorted(state.state_machine.items()):\n    print(f\"  {k:16} = {v}\")</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 1653,
+              "prompt_tokens": 16003,
+              "total_tokens": 17656,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 59,
+                "rejected_prediction_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 0
+              }
+            },
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261012215334900414715c955d5685b36roHC",
+            "service_tier": null,
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "run--01a1321b-5666-7791-84c4-f9f50ab5f4c8-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 1653,
+      "prompt_tokens": 16003,
+      "total_tokens": 17656,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 59,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012215334900414715c955d5685b36roHC",
+    "service_tier": null
+  },
+  "run": null,
+  "type": "LLMResult"
+}

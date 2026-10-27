@@ -1,0 +1,55 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "49d64bae63374ae9a3efd6a4e0560c0e",
+  "case_id": "case_4b60595affb14b7dab89f0fb6abbc49a",
+  "input_id": "step-6",
+  "invocation_id": "49d64bae63374ae9a3efd6a4e0560c0e",
+  "agent_id": "zeroclaw",
+  "status": "succeeded",
+  "output": "The failed first batch of calculator calls used the wrong parameter form (operands instead of a values array) — retried correctly, and I have all the numbers I need. Now updating `solution_v1.md` with the full interpretation section:`solution_v1.md` is updated with the full interpretation section. The key points, briefly:\n\n**Solver status — OPTIMAL** is a certificate, not a description: the search terminated with proof no feasible point does better (as opposed to `FEASIBLE`, where the solver merely ran out of time with a good solution in hand).\n\n**Incumbent** — the best feasible plan found during the search. Our run improved it monotonically: (0,0) Z=0 → (0,30) Z=1500 → (50,0) Z=2000 → **(42,16) Z=2480**, exactly the branch-and-bound improvement pattern. The final incumbent is the reported plan.\n\n**Bounds** — for a max problem: primal/lower bound = incumbent = **2480** (achievable); dual/upper bound = **2480** (proven ceiling, because vertex enumeration evaluated *every* vertex of the polytope — the max over the complete set is a true UB). The optimum is trapped in **[2480, 2480]**.\n\n**Optimality gap** — (2480 − 2480)/2480 = **0.00%, exactly**. Every number in this computation is an exact integer, so there's no tolerance subtlety hiding behind that zero. I included a concrete contrast in the report: a hypothetical time-limited MIP run with UB 2520 would give a 1.61% gap — plan still implementable, but Z* would be an estimate, not a proof. Our run has no such ambiguity.\n\n**For the production plan:** run 42 A + 16 B weekly, both resources at 100% utilization, zero slack. I added the marginal analysis showing *why* the corner wins: along the labor edge shifting toward A gains +23.3 USD/unit, along the machine edge it loses −60 USD/unit — both edges point to the same corner. There are no free tweaks; growth above 2480 requires buying more capacity, not rescheduling.\n\n**Proven optimal?** Yes — with a stated scope caveat: optimal *relative to model_v2's assumptions* (static capacities, constant prices, no demand caps). The certificate is only as strong as the model.\n\nOne note: a first batch of calculator calls failed on a parameter-form error; I retried with the correct `values` array form and verified all figures (2480, 2000, 1500, 0, 1.61% contrast) before writing them into the report.\n\nNatural next step if you want it: shadow prices (duals) — how much one extra machine-hour or labor-hour is actually worth. 🦀",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "zeroclaw-acp",
+        "title": "ZeroClaw ACP",
+        "version": "0.8.5"
+      },
+      "_meta": {
+        "zeroclaw": {
+          "defaultModel": "glm-5.3-flash",
+          "maxSessions": 10,
+          "sessionTimeoutSecs": 3600
+        }
+      }
+    },
+    "pid": 9,
+    "session": {
+      "sessionId": "2aa5067f-9fbf-406f-9073-d7482d6e0cb9"
+    },
+    "session_id": "2aa5067f-9fbf-406f-9073-d7482d6e0cb9",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

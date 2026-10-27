@@ -1,0 +1,179 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_3d829409743648ed8de0f5ba6bbc314a",
+  "case_id": "case_b3f2fef9625e4cd0832a56552f41334f",
+  "input_id": "step-2",
+  "spans": [
+    {
+      "trace_id": "450c70b94ea03d8a8e29a546df380657",
+      "span_id": "ed058a49b8e1a6be",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790298351398138181,
+      "end_time_unix_nano": 1790298382078275508,
+      "duration_nano": 30680137327,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1790298351401492419,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1790298373314476640,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1790298375819081905,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1790298378542138631,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1790298382073053743,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "450c70b94ea03d8a8e29a546df380657",
+      "span_id": "8386828affb344a0",
+      "parent_span_id": "ed058a49b8e1a6be",
+      "name": "shell",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790298373327045052,
+      "end_time_unix_nano": 1790298373334361120,
+      "duration_nano": 7316068,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "shell",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "approved": true,
+          "command": "ls -l *.txt | awk '{print $9, $5}'"
+        },
+        "gen_ai.tool.call.result": "Error: Command not allowed by security policy: ls -l *.txt | awk '{print $9, $5}'",
+        "gen_ai.tool.call.id": "call_8c920e9593464e96a46fcf07"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "450c70b94ea03d8a8e29a546df380657",
+      "span_id": "16a91852d2d3a7f1",
+      "parent_span_id": "ed058a49b8e1a6be",
+      "name": "shell",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790298375823258527,
+      "end_time_unix_nano": 1790298375830380144,
+      "duration_nano": 7121617,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "shell",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "approved": true,
+          "command": "ls -l /home/agent/workspace"
+        },
+        "gen_ai.tool.call.result": "total 12\n-rw-r--r-- 1 agent agent 5 Sep 25 01:05 alpha.txt\n-rw-r--r-- 1 agent agent 6 Sep 25 01:05 beta.txt\n-rw-r--r-- 1 agent agent 6 Sep 25 01:05 gamma.txt\n",
+        "gen_ai.tool.call.id": "call_a495158637794b81bf71b8f6"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "450c70b94ea03d8a8e29a546df380657",
+      "span_id": "a6ec87154707718d",
+      "parent_span_id": "ed058a49b8e1a6be",
+      "name": "file_write",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790298378546254393,
+      "end_time_unix_nano": 1790298378551318602,
+      "duration_nano": 5064209,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "file_write",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "newText": "File Inventory Report\nGenerated: 2026-09-25 01:05 UTC\n\nalpha.txt   5 bytes\nbeta.txt    6 bytes\ngamma.txt   6 bytes\n\nTotal: 3 files, 17 bytes\n",
+          "path": "inventory.txt"
+        },
+        "gen_ai.tool.call.result": "Written 141 bytes to inventory.txt",
+        "gen_ai.tool.call.id": "call_f2da594f24be4b4089fae1d4"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 38,
+  "truncated": false,
+  "reasons": [
+    "trace_attribute_not_allowlisted"
+  ]
+}

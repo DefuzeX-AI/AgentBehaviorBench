@@ -1,0 +1,95 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_d46179cb65b146d881fe140aea390804",
+  "case_id": "case_4b60595affb14b7dab89f0fb6abbc49a",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "53710d221c00d765a6f01fa8f0ca10a3",
+      "span_id": "3a12a5f1dd06c064",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792277466131163341,
+      "end_time_unix_nano": 1792277518040331064,
+      "duration_nano": 51909167723,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1792277468437422272,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1792277468514511882,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792277468516791117,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792277507335148058,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792277518033787018,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "53710d221c00d765a6f01fa8f0ca10a3",
+      "span_id": "9aab11938abf9e55",
+      "parent_span_id": "3a12a5f1dd06c064",
+      "name": "file_write",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792277507345165427,
+      "end_time_unix_nano": 1792277507358563438,
+      "duration_nano": 13398011,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "file_write",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "newText": "# Production Planning Model — Version 1\n\n**Status:** v1 — initial binding of purpose, data, and decision semantics\n**Date:** 2026-10-17\n**Scope:** Weekly production planning for a workshop making two products (A and B)\n\n---\n\n## 1. Purpose\n\nDecide how many units of product A and product B the workshop should produce\nper week so that total weekly profit is as large as possible, while respecting\nthe workshop's limited machine time and labor capacity.\n\n## 2. Data (given)\n\n| Item                            | Product A | Product B |\n|---------------------------------|-----------|-----------|\n| Machine time (hours per unit)   | 2         | 1         |\n| Labor time (hours per unit)     | 1         | 3         |\n| Profit (USD per unit)           | 40        | 50        |\n\nCapacities available per week:\n- Machine time: **100 hours**\n- Labor: **90 hours**\n\n## 3. Decision Variables (in words)\n\n- **xA** — the number of units of product A to produce per week.\n- **xB** — the number of units of product B to produce per week.\n\nThese are the quantities the planner is free to choose; everything else\n(hours consumed, profit earned) follows from them.\n\n## 4. Objective (in words)\n\nMaximize total weekly profit: $40 earned for every unit of A produced, plus\n$50 earned for every unit of B produced.\n\nIn symbols: **maximize 40·xA + 50·xB** (USD per week).\n\n## 5. Constraints (in words)\n\n1. **Machine capacity:** total machine time used — 2 hours for each unit of A\n   plus 1 hour for each unit of B — must not exceed 100 hours per week.\n2. **Labor capacity:** total labor used — 1 hour for each unit of A plus 3\n   hours for each unit of B — must not exceed 90 hours per week.\n3. **Nonnegativity:** production quantities cannot be negative (no negative\n   production).\n\nIn symbols:\n- 2·xA + 1·xB ≤ 100  (machine hours)\n- 1·xA + 3·xB ≤ 90   (labor hours)\n- xA ≥ 0, xB ≥ 0\n\n## 6. Assumptions & Modeling Choices (v1)\n\n- **Divisibility:** units are treated as continuously divisible (linear\n  program). If whole units are required, this becomes an integer program —\n  check after solving whether the LP optimum is already integral.\n- **Determinism:** all coefficients (processing times, profits, capacities)\n  are known constants for the planning week.\n- **Proportionality:** profit and resource consumption scale linearly with\n  output; no setup costs, batch minimums, or volume discounts.\n- **Single period:** one week only; inventory, demand ceilings, and carry-over\n  between weeks are out of scope in v1.\n- **Unused capacity has no value:** machine/labor hours not used cannot be\n  banked or sold.\n",
+          "path": "model_v1.md"
+        },
+        "gen_ai.tool.call.result": "Written 2626 bytes to model_v1.md",
+        "gen_ai.tool.call.id": "call_a8aa4c50f4e74cdab69e8e4e"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

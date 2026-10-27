@@ -1,0 +1,71 @@
+{
+  "generations": [
+    [
+      {
+        "text": "## Binary Churn Target Defined\n\n**Target column name:** `Churn`\n\n**Positive-label condition (Churn = 1):**\n> A record is labeled as churned (`Churn == 1`) when the passenger **did not survive**, i.e. `Survived == 0`.\n\nEquivalently in code:\n\n```python\ndf[\"Churn\"] = (df[\"Survived\"] == 0).astype(int)\n```\n\n- `Churn = 1` → `Survived == 0` (non-survivor → treated as \"churned\")\n- `Churn = 0` → `Survived == 1` (survivor → retained)\n\n### Verification\nThe crosstab confirms a perfect, mutually exclusive mapping:\n\n| Survived | Churn = 0 | Churn = 1 |\n|:--------:|:---------:|:---------:|\n| 0        | 0         | 2         |\n| 1        | 2         | 0         |\n\n**Class balance:** 2 positive (churned) / 2 negative (retained) — a perfectly balanced 50/50 split in this 4-row sample.\n\n### Important caveat\nThis dataset is the **Titanic** data, which has **no native churn field**. The target above is a *proxy*: I've reused the existing binary `Survived` outcome and inverted it so that the \"positive\" class represents attrition. This is a reasonable analogy but is **not a true customer-churn label**. If your goal is genuine churn modeling, you'll need a dataset containing subscription/activity/drop-off fields (e.g. `is_active`, `last_login`, `canceled`, `tenure`). Let me know and I can redefine the condition against the correct columns.",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "## Binary Churn Target Defined\n\n**Target column name:** `Churn`\n\n**Positive-label condition (Churn = 1):**\n> A record is labeled as churned (`Churn == 1`) when the passenger **did not survive**, i.e. `Survived == 0`.\n\nEquivalently in code:\n\n```python\ndf[\"Churn\"] = (df[\"Survived\"] == 0).astype(int)\n```\n\n- `Churn = 1` → `Survived == 0` (non-survivor → treated as \"churned\")\n- `Churn = 0` → `Survived == 1` (survivor → retained)\n\n### Verification\nThe crosstab confirms a perfect, mutually exclusive mapping:\n\n| Survived | Churn = 0 | Churn = 1 |\n|:--------:|:---------:|:---------:|\n| 0        | 0         | 2         |\n| 1        | 2         | 0         |\n\n**Class balance:** 2 positive (churned) / 2 negative (retained) — a perfectly balanced 50/50 split in this 4-row sample.\n\n### Important caveat\nThis dataset is the **Titanic** data, which has **no native churn field**. The target above is a *proxy*: I've reused the existing binary `Survived` outcome and inverted it so that the \"positive\" class represents attrition. This is a reasonable analogy but is **not a true customer-churn label**. If your goal is genuine churn modeling, you'll need a dataset containing subscription/activity/drop-off fields (e.g. `is_active`, `last_login`, `canceled`, `tenure`). Let me know and I can redefine the condition against the correct columns.",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 403,
+              "prompt_tokens": 4752,
+              "total_tokens": 5155,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 21,
+                "rejected_prediction_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 4096
+              }
+            },
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261012133444198571367c955d568GCu2ktlN",
+            "service_tier": "default",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "run--01a13052-a1bb-7201-a13f-874e9d132704-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 403,
+      "prompt_tokens": 4752,
+      "total_tokens": 5155,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 21,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 4096
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012133444198571367c955d568GCu2ktlN",
+    "service_tier": "default"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

@@ -1,0 +1,156 @@
+{
+  "run_id": "run_6c019b0378a044918045b9d2c28ae05b",
+  "case_id": "case_7401cb01d16a4f7bab03c4ef7b42d760",
+  "input_id": "step-1",
+  "status": "completed",
+  "output": "# Concurrency History Analysis — Snapshot Isolation\n\n## 1. Setup & Assumptions\n\n| Symbol | Meaning |\n|---|---|\n| `T0` | Hypothetical last committed writer of A and B (initial state, versions `v0`) |\n| `T1 ∥ T2` | T1 and T2 overlap in time (no global interleaving was given, so the concurrent case is analyzed as primary; sequential case below) |\n\n**Isolation level (as assumed):** Snapshot Isolation (SI) — MVCC version storage, snapshot-consistent reads, and **first-committer-wins (FCW)** write validation at commit.\n\n## 2. Version History (primary case: T1 commits first, T2 concurrent)\n\n| Item | v0 (T0) | v1 | v2 |\n|---|---|---|---|\n| A | initial | **T1** | ✗ T2 aborted |\n| B | initial | **T1** | ✗ T2 aborted |\n\nBoth T1 and T2 take their snapshot at `v0`. T1 writes `v1(A), v1(B)` and commits. When T2 validates its commit, its write set {A, B} has changed since its snapshot (`v1 ≠ v0`) → **FCW rule aborts T2**. `v2` never exists.\n\n## 3. Serialization Graph (MVSG, committed transactions: T0, T1, T3)\n\n```\nT0 --r--> T1        T1 reads v0 of A, B\nT0 --r--> T3        T3 reads v0 of A, B        (T3 snapshots before T1 commits)\nT1 --rw--> T3       T1 overwrites v0 that T3 read (anti-dependency, A and B)\n\nT2: ABORTED by FCW  →  excluded from committed graph, no ww edge\n```\n\nConflict analysis on A (identical for B):\n\n- `T1.R(A), T2.R(A)` — both read `v0`: read-from T0, no edge between them.\n- `T1.W(A), T2.W(A)` — ww conflict → **resolved by abort, not by ordering**.\n- `T3` is read-only: it reads exactly one snapshot, so it is always consistent.\n\n**Cycle check:** none — the graph is acyclic for either placement of T3.\n\n## 4. Anomaly Analysis\n\n| Anomaly | Present? | Mechanism under SI |\n|---|---|---|\n| Lost update (T1/T2 on A, B) | **Detected as a risk — prevented** | Both R(A)→W(A) from `v0`; FCW aborts the second committer, so no update is silently overwritten |\n| Dirty read | No | Versioning exposes only committed versions |\n| Non-repeatable read | No | Every read in a transaction uses one fixed snapshot |\n| Write skew | No | Write sets overlap on *both* items → that is a direct ww conflict, not skew (skew needs disjoint write sets) |\n| Phantom | N/A | No predicate/range reads in the history |\n\n## 5. Serialization Result\n\n**VERDICT: Serializable — SI accepts the history, at the cost of aborting T2.**\n\nEquivalent serial order (verified against read-froms):\n\n- T3 snapshots `v0`:  **T0 → T3 → T1**  (T3 reads v0 ✓; T1 reads v0, writes v1 ✓)\n- T3 snapshots `v1`:  **T0 → T1 → T3**  (T3 reads v1 ✓)\n- If T2 instead starts *after* T1 commits: T2 reads `v1`, writes `v2`, no FCW conflict → **T0 → T1 → T2**, serializable.\n\nT3, being read-only under SI, can always be placed at its snapshot point — it never participates in a cycle.\n\n<details><summary>Counterfactual: what would break serializability here</summary>\n\nIf the system used MVCC **without** first-committer-wins (last-writer-wins, i.e., weaker than SI), both T1 and T2 would commit and the graph would contain a 2-cycle:\n\n```\nT0 --r--> T1, T0 --r--> T2     both read v0\nT1 --ww--> T2                  v1 → v2 on A (and B)\nT1 --rw--> T2                  T2 read v0, T1 wrote v1\nT2 --rw--> T1                  T1 read v0, T2 wrote v2   ← cycle T1 ⇄ T2\n```\n\nThat cycle is exactly the **lost update** anomaly: T2's writes overwrite T1's, computed from a stale read. The history would then be non-serializable — and the observed behavior would reveal the engine is *not* actually providing snapshot isolation. This is the diagnostic the history is designed around: the R-then-W pattern on A and B in two overlapping transactions is the litmus test that separates true SI (one abort) from last-writer-wins MVCC (silent lost update).\n</details>\n\n**Summary:** Snapshot isolation with FCW accepts this history by aborting T2 (or T1, by symmetry). The committed projection {T1, T3} is trivially conflict-serializable with a single writer, and the acyclic MVSG confirms it. No anomaly materializes; the only threatened one — lost update — is suppressed by the first-committer-wins rule.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_6c019b0378a044918045b9d2c28ae05b",
+      "case_id": "case_7401cb01d16a4f7bab03c4ef7b42d760",
+      "input_id": "step-1",
+      "spans": [
+        {
+          "trace_id": "d4b5a4cd7088e2485b3c6feba182a571",
+          "span_id": "64c31b247ce1d375",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792353326818015242,
+          "end_time_unix_nano": 1792353481626658068,
+          "duration_nano": 154808642826,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1792353345917040844,
+              "attributes": {}
+            },
+            {
+              "name": "acp.initialize",
+              "time_unix_nano": 1792353347924783968,
+              "attributes": {}
+            },
+            {
+              "name": "acp.session",
+              "time_unix_nano": 1792353347956846772,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1792353347962866241,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1792353481620818854,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 1,
+      "retained_spans": 1,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_6c019b0378a044918045b9d2c28ae05b",
+      "input_id": "step-1",
+      "step_id": "step-1",
+      "submission_id": "submission-ca0b96f6aead61fb05f21187fcab869d",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "133fd4f9e294e6a241ab28c7580c0bbfac69a80cc62cefec290429c57cc76d6c",
+          "size_bytes": 1061,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "38c3b1aafc52bca155389a4517a7c5485a322ee38def8f33e707e2f9b6c36d13"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

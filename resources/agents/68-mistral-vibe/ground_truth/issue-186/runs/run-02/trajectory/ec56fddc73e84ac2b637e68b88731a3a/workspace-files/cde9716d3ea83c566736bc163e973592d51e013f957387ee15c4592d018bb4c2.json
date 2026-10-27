@@ -1,0 +1,4 @@
+{
+  "content": "\"\"\"\nTimer context manager, only used in debug.\n\n\"\"\"\n\nfrom time import time\n\nimport contextlib\nfrom typing import Generator\n\n\n@contextlib.contextmanager\ndef timer(subject: str = \"time\") -> Generator[None, None, None]:\n    \"\"\"print the elapsed time. (only used in debugging)\"\"\"\n    start = time()\n    yield\n    elapsed = time() - start\n    elapsed_ms = elapsed * 1000\n    print(f\"{subject} elapsed {elapsed_ms:.1f}ms\")\n",
+  "encoding": "utf-8"
+}

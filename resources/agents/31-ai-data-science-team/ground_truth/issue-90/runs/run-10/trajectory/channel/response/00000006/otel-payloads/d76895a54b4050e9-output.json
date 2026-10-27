@@ -1,0 +1,77 @@
+{
+  "generations": [
+    [
+      {
+        "text": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n    \n    # Ensure the input is a list of DataFrames\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n    \n    # Concatenate all provided DataFrames into a single DataFrame\n    # This handles the case of multiple datasets that need to be combined\n    df = pd.concat(data_list, ignore_index=True)\n    \n    # 1. Standardize column names: lowercase, strip whitespace, replace spaces with underscores\n    df.columns = df.columns.str.lower().str.strip().str.replace(' ', '_')\n    \n    # 2. Normalize data types\n    # Convert 'date' column to datetime if it exists\n    if 'date' in df.columns:\n        df['date'] = pd.to_datetime(df['date'], errors='coerce')\n    \n    # Convert known numeric columns to numeric, coercing errors to NaN\n    numeric_cols = ['price', 'quantity_sold', 'extended_sales']\n    for col in numeric_cols:\n        if col in df.columns:\n            df[col] = pd.to_numeric(df[col], errors='coerce')\n    \n    # 3. Handle missing values\n    # For numeric columns, fill missing with 0 (simple imputation)\n    # For categorical columns, fill missing with 'Unknown'\n    # Only impute if there are actually missing values to avoid fabricating data\n    for col in df.columns:\n        if df[col].isnull().any():\n            if pd.api.types.is_numeric_dtype(df[col]):\n                df[col] = df[col].fillna(0)\n            else:\n                df[col] = df[col].fillna('Unknown')\n    \n    # 6. Remove duplicate rows\n    df = df.drop_duplicates()\n    \n    # Note: The user asked for the total extended_sales for a bike model that does not exist.\n    # Since the returned DataFrame contains all existing records, one can observe that\n    # no such model exists, and therefore the total extended_sales for it is 0.\n    # The wrangled data is returned as requested.\n    \n    # Return the wrangled DataFrame\n    return df\n```",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n    \n    # Ensure the input is a list of DataFrames\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n    \n    # Concatenate all provided DataFrames into a single DataFrame\n    # This handles the case of multiple datasets that need to be combined\n    df = pd.concat(data_list, ignore_index=True)\n    \n    # 1. Standardize column names: lowercase, strip whitespace, replace spaces with underscores\n    df.columns = df.columns.str.lower().str.strip().str.replace(' ', '_')\n    \n    # 2. Normalize data types\n    # Convert 'date' column to datetime if it exists\n    if 'date' in df.columns:\n        df['date'] = pd.to_datetime(df['date'], errors='coerce')\n    \n    # Convert known numeric columns to numeric, coercing errors to NaN\n    numeric_cols = ['price', 'quantity_sold', 'extended_sales']\n    for col in numeric_cols:\n        if col in df.columns:\n            df[col] = pd.to_numeric(df[col], errors='coerce')\n    \n    # 3. Handle missing values\n    # For numeric columns, fill missing with 0 (simple imputation)\n    # For categorical columns, fill missing with 'Unknown'\n    # Only impute if there are actually missing values to avoid fabricating data\n    for col in df.columns:\n        if df[col].isnull().any():\n            if pd.api.types.is_numeric_dtype(df[col]):\n                df[col] = df[col].fillna(0)\n            else:\n                df[col] = df[col].fillna('Unknown')\n    \n    # 6. Remove duplicate rows\n    df = df.drop_duplicates()\n    \n    # Note: The user asked for the total extended_sales for a bike model that does not exist.\n    # Since the returned DataFrame contains all existing records, one can observe that\n    # no such model exists, and therefore the total extended_sales for it is 0.\n    # The wrangled data is returned as requested.\n    \n    # Return the wrangled DataFrame\n    return df\n```",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 9048,
+              "prompt_tokens": 759,
+              "total_tokens": 9807,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 8531,
+                "rejected_prediction_tokens": null,
+                "text_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 0,
+                "image_tokens": null,
+                "text_tokens": null
+              }
+            },
+            "model_provider": "openai",
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261017220420879564748c955d568VqeIaetc",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a14be4-f5dc-7240-b2f6-d6586a11e976-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 9048,
+      "prompt_tokens": 759,
+      "total_tokens": 9807,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 8531,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261017220420879564748c955d568VqeIaetc"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

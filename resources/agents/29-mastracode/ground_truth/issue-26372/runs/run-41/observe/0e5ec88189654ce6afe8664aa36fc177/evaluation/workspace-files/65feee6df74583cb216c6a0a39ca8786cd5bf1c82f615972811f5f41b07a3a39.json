@@ -1,0 +1,4 @@
+{
+  "content": "\"\"\"Create a deterministic zip archive.\n\nUsage: python3 make-release.py <zip-path> <member> [<member> ...]\n\nMembers are stored in the given order with fixed 2-digit-second precision\nmtimes as recorded on disk (caller is responsible for setting them).\nzipfile writes no extra fields, so with fixed mtimes the output is\nbyte-deterministic.\n\"\"\"\nimport sys\nimport zipfile\n\nzip_path = sys.argv[1]\nmembers = sys.argv[2:]\n\nwith zipfile.ZipFile(zip_path, \"w\", zipfile.ZIP_DEFLATED, compresslevel=9) as z:\n    for m in members:\n        z.write(m)\n",
+  "encoding": "utf-8"
+}

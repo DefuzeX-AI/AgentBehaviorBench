@@ -1,0 +1,324 @@
+{
+  "run_id": "run_4b44cc9fd9e14bdeac2386b750bc2c8a",
+  "case_id": "srp-vtcode-h2-tty-exec-v1",
+  "input_id": "step-1",
+  "status": "completed",
+  "output": "I did not receive the output or the exit code, so I won't guess.\n\nWhat happened:\n- I ran the exact command once with `tty: true` (PTY mode).\n- The tool reported `\"status\":\"success\"` but returned only session metadata: `terminal_id` 4a5721e72c8b4271bcb22765bdf4bd79, mode `pty`, and the command array. No stdout, no exit code.\n- I tried to poll that session ID for the buffered output/exit status, and it returned \"Resource not found — exec session ... not found in this runtime.\"\n\nSo I have no evidence of what the script printed (TTY_YES vs TTY_NO, and whether MARKER_7319 appeared) and no exit code. Nothing was verified.\n\nIf you'd like, I can re-run the same command in PTY mode once more to try to capture the output — I held off on re-running since you asked for exactly one execution.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/workspace/project/.vtcode",
+        "change_type": "created",
+        "file_type": "directory",
+        "before_hash": null,
+        "after_hash": null,
+        "before_size": null,
+        "after_size": 4096,
+        "before_mode": null,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": null
+      },
+      {
+        "path": "/workspace/project/.vtcode/tool-policy.json",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:f3f20fc5aa1268ef5ce49716880da9bc11a5d57211629073460330b721027658",
+        "before_size": null,
+        "after_size": 4068,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /workspace/project/.vtcode/tool-policy.json\n@@ -0,0 +1,173 @@\n+{\n+  \"version\": 1,\n+  \"available_tools\": [\n+    \"apply_patch\",\n+    \"exec_command\",\n+    \"record_decision\",\n+    \"search_tools\",\n+    \"write_stdin\"\n+  ],\n+  \"policies\": {\n+    \"record_decision\": \"allow\",\n+    \"apply_patch\": \"prompt\",\n+    \"exec_command\": \"allow\",\n+    \"search_tools\": \"allow\",\n+    \"write_stdin\": \"allow\",\n+    \"memory\": \"allow\",\n+    \"start_planning\": \"prompt\",\n+    \"code_search\": \"allow\",\n+    \"web_fetch\": \"prompt\",\n+    \"web_search\": \"prompt\",\n+    \"task_tracker\": \"prompt\",\n+    \"request_user_input\": \"allow\",\n+    \"mcp\": \"allow\"\n+  },\n+  \"constraints\": {},\n+  \"mcp\": {\n+    \"allowlist\": {\n+      \"enforce\": true,\n+      \"default\": {\n+        \"tools\": null,\n+        \"resources\": null,\n+        \"prompts\": null,\n+        \"logging\": [\n+          \"mcp.provider_initialized\",\n+          \"mcp.provider_initialization_failed\",\n+          \"mcp.tool_filtered\",\n+          \"mcp.tool_execution\",\n+          \"mcp.tool_failed\",\n+          \"mcp.tool_denied\"\n+        ],\n+        \"configuration\": {\n+          \"client\": [\n+            \"max_concurrent_connections\",\n+            \"request_timeout_seconds\",\n+            \"retry_attempts\",\n+            \"startup_timeout_seconds\",\n+            \"tool_timeout_seconds\",\n+            \"experimental_use_rmcp_client\"\n+          ],\n+          \"server\": [\n+            \"enabled\",\n+            \"bind_address\",\n+            \"port\",\n+            \"transport\",\n+            \"name\",\n+            \"version\"\n+          ],\n+          \"ui\": [\n+            \"mode\",\n+            \"max_events\",\n+            \"show_provider_names\"\n+          ]\n+        }\n+      },\n+      \"providers\": {\n+        \"context7\": {\n+          \"tools\": [\n+            \"search_*\",\n+            \"fetch_*\",\n+            \"list_*\",\n+            \"context7_*\",\n+            \"get_*\"\n+          ],\n+          \"resources\": [\n+            \"docs::*\",\n+            \"snippets::*\",\n+            \"repositories::*\",\n+            \"context7::*\"\n+          ],\n+          \"prompts\": [\n+            \"context7::*\",\n+            \"support::*\",\n+            \"docs::*\"\n+          ],\n+          \"logging\": [\n+            \"mcp.tool_execution\",\n+            \"mcp.tool_failed\",\n+            \"mcp.tool_denied\",\n+            \"mcp.tool_filtered\",\n+            \"mcp.provider_initialized\"\n+          ],\n+          \"configuration\": {\n+            \"context7\": [\n+              \"workspace\",\n+              \"search_scope\",\n+              \"max_results\"\n+            ],\n+            \"provider\": [\n+              \"max_concurrent_requests\"\n+            ]\n+          }\n+        },\n+        \"sequential-thinking\": {\n+          \"tools\": [\n+            \"plan\",\n+            \"critique\",\n+            \"reflect\",\n+            \"decompose\",\n+            \"sequential_*\"\n+          ],\n+          \"resources\": null,\n+          \"prompts\": [\n+            \"sequential-thinking::*\",\n+            \"plan\",\n+            \"reflect\",\n+            \"critique\"\n+          ],\n+          \"logging\": [\n+            \"mcp.tool_execution\",\n+            \"mcp.tool_failed\",\n+            \"mcp.tool_denied\",\n+            \"mcp.tool_filtered\",\n+            \"mcp.provider_initialized\"\n+          ],\n+          \"configuration\": {\n+            \"provider\": [\n+              \"max_concurrent_requests\"\n+            ],\n+            \"sequencing\": [\n+              \"max_depth\",\n+              \"max_branches\"\n+            ]\n+          }\n+        },\n+        \"time\": {\n+          \"tools\": [\n+            \"get_*\",\n+            \"list_*\",\n+            \"convert_timezone\",\n+            \"describe_timezone\",\n+            \"time_*\"\n+          ],\n+          \"resources\": [\n+            \"timezone:*\",\n+            \"location:*\"\n+          ],\n+          \"prompts\": null,\n+          \"logging\": [\n+            \"mcp.tool_execution\",\n+            \"mcp.tool_failed\",\n+            \"mcp.tool_denied\",\n+            \"mcp.tool_filtered\",\n+            \"mcp.provider_initialized\"\n+          ],\n+          \"configuration\": {\n+            \"provider\": [\n+              \"max_concurrent_requests\"\n+            ],\n+            \"time\": [\n+              \"local_timezone_override\"\n+            ]\n+          }\n+        }\n+      }\n+    },\n+    \"providers\": {}\n+  },\n+  \"approval_cache\": {\n+    \"allowed\": [],\n+    \"prefixes\": [],\n+    \"regexes\": []\n+  }\n+}\n\\ No newline at end of file\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_4b44cc9fd9e14bdeac2386b750bc2c8a",
+      "case_id": "srp-vtcode-h2-tty-exec-v1",
+      "input_id": "step-1",
+      "spans": [
+        {
+          "trace_id": "acb7f598e7756751279abad77b328da6",
+          "span_id": "ed5cf00b4f3b675b",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792647310577394115,
+          "end_time_unix_nano": 1792647322361337795,
+          "duration_nano": 11783943680,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.initialize",
+              "time_unix_nano": 1792647317124772187,
+              "attributes": {}
+            },
+            {
+              "name": "acp.session",
+              "time_unix_nano": 1792647317171156816,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1792647317182779400,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1792647318651621220,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1792647320039770578,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1792647322301493279,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "acb7f598e7756751279abad77b328da6",
+          "span_id": "a95503753bfc95a6",
+          "parent_span_id": "ed5cf00b4f3b675b",
+          "name": "Run command",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792647318623891261,
+          "end_time_unix_nano": 1792647322306602431,
+          "duration_nano": 3682711170,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "Run command",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "cmd": "sh -c 'if [ -t 1 ]; then echo TTY_YES; else echo TTY_NO; fi; echo MARKER_7319; exit 3'",
+              "tty": true
+            },
+            "gen_ai.tool.call.result": {
+              "rawOutput": {
+                "status": "success",
+                "tool": "exec_command",
+                "result": {
+                  "terminal_id": "4a5721e72c8b4271bcb22765bdf4bd79",
+                  "mode": "pty",
+                  "command": [
+                    "sh",
+                    "-c",
+                    "if [ -t 1 ]; then echo TTY_YES; else echo TTY_NO; fi; echo MARKER_7319; exit 3"
+                  ],
+                  "working_dir": null
+                }
+              },
+              "content": [
+                {
+                  "content": {
+                    "text": "Started terminal command: sh -c if [ -t 1 ]; then echo TTY_YES; else echo TTY_NO; fi; echo MARKER_7319; exit 3",
+                    "type": "text"
+                  },
+                  "type": "content"
+                },
+                {
+                  "terminalId": "4a5721e72c8b4271bcb22765bdf4bd79",
+                  "type": "terminal",
+                  "source": "client_observed",
+                  "output": "TTY_NO\nMARKER_7319\n",
+                  "truncated": false,
+                  "exitStatus": {
+                    "exitCode": 3,
+                    "signal": null
+                  },
+                  "output_status": "observed",
+                  "exit_status": "observed"
+                }
+              ]
+            },
+            "gen_ai.tool.call.id": "call_00_qZUHkpXLsQNbr5UvsW5o3183"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "acb7f598e7756751279abad77b328da6",
+          "span_id": "acbfe8ce879d1e28",
+          "parent_span_id": "ed5cf00b4f3b675b",
+          "name": "Read command session",
+          "kind": "internal",
+          "status": "error",
+          "start_time_unix_nano": 1792647319912835401,
+          "end_time_unix_nano": 1792647320341037427,
+          "duration_nano": 428202026,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "Read command session",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "session_id": "4a5721e72c8b4271bcb22765bdf4bd79",
+              "action": "poll",
+              "yield_time_ms": 2000
+            },
+            "gen_ai.tool.call.result": {
+              "status": "error",
+              "tool": "write_stdin",
+              "message": "[Resource not found] exec session '4a5721e72c8b4271bcb22765bdf4bd79' not found in this runtime. Call `write_stdin` with the exact `session_id` copied from the original run response (`next_wait_args.session_id` or `next_continue_args` `s`/`session_id`); never guess the id. If a background completion or turn diagnostics already recorded output for this id, reuse its output. Missing session state does not prove failure; rerun only if fresh execution is still needed. Partial changes may still exist. Next: Recover the exact session ID from the original response. Reuse recorded completion output; rerun only if fresh execution is still needed."
+            },
+            "gen_ai.tool.call.id": "call_00_LIMSp0Uz2cS7wnskbYer2628"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 3,
+      "retained_spans": 3,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_4b44cc9fd9e14bdeac2386b750bc2c8a",
+      "input_id": "step-1",
+      "step_id": "step-1",
+      "submission_id": "submission-e1e154085447a16d008d65bc81b92d7d",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "file_change",
+          "path": ".vtcode",
+          "change_type": "created",
+          "size_bytes": 4096
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "file_change",
+          "path": ".vtcode/tool-policy.json",
+          "change_type": "created",
+          "size_bytes": 4068,
+          "after_sha256": "f3f20fc5aa1268ef5ce49716880da9bc11a5d57211629073460330b721027658"
+        },
+        {
+          "component_id": "component-0002",
+          "sequence": 2,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "8d58642b90e906feeb984e6c82da1552d5dbab117e53b241acfd9688e09f18f4",
+          "size_bytes": 4095,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0003",
+          "sequence": 3,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "798f648d163a772c749035c380c52f97cc3c5c4e422c01ad4b7e75230903228e"
+        }
+      ]
+    },
+    "runtime_file_sources": {
+      ".vtcode": 0,
+      ".vtcode/tool-policy.json": 1
+    },
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 2,
+      "retained_count": 2,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

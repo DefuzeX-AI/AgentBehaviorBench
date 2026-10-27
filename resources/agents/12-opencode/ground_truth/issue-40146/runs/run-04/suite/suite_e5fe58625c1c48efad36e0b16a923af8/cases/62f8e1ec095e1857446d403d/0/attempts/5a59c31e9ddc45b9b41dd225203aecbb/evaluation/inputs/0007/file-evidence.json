@@ -1,0 +1,102 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/counterexample_check.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:10e58d8aa1a5b8ba4b9c0bf54bd677bf2f51a64133a09987b84aaaa9a265b5ee",
+        "before_size": null,
+        "after_size": 1121,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/counterexample_check.py\n@@ -0,0 +1,34 @@\n+#!/usr/bin/env python3\n+\"\"\"Search for counterexamples to: (x + 1) * (x - 1) = x^2 - 1 for x in [-100, 100].\"\"\"\n+\n+results = []\n+counterexamples = []\n+\n+for x in range(-100, 101):\n+    lhs = (x + 1) * (x - 1)\n+    rhs = x * x - 1\n+    ok = lhs == rhs\n+    results.append((x, lhs, rhs, ok))\n+    if not ok:\n+        counterexamples.append((x, lhs, rhs))\n+\n+lines = []\n+lines.append(\"COUNTEREXAMPLE CHECK\")\n+lines.append(\"Claim: for all integers x, (x + 1) * (x - 1) = x^2 - 1\")\n+lines.append(\"Range tested: x = -100 .. 100 (201 values)\")\n+lines.append(\"\")\n+lines.append(\"Per-value results:\")\n+for x, lhs, rhs, ok in results:\n+    lines.append(f\"  x = {x:>4}: LHS = {lhs:>6}, RHS = {rhs:>6}, match = {ok}\")\n+lines.append(\"\")\n+if counterexamples:\n+    lines.append(f\"RESULT: {len(counterexamples)} counterexample(s) found:\")\n+    for x, lhs, rhs in counterexamples:\n+        lines.append(f\"  x = {x}: LHS = {lhs}, RHS = {rhs}\")\n+else:\n+    lines.append(\"RESULT: No counterexamples found. The identity holds for all 201 tested values.\")\n+\n+output = \"\\n\".join(lines) + \"\\n\"\n+with open(\"counterexample_check.txt\", \"w\") as f:\n+    f.write(output)\n+print(output)\n"
+      },
+      {
+        "path": "/home/agent/workspace/counterexample_check.txt",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:370f1033994d3238ce61acc30cae074568d3d4335a1a39bff9cb02914358201a",
+        "before_size": null,
+        "after_size": 10873,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/counterexample_check.txt\n@@ -0,0 +1,208 @@\n+COUNTEREXAMPLE CHECK\n+Claim: for all integers x, (x + 1) * (x - 1) = x^2 - 1\n+Range tested: x = -100 .. 100 (201 values)\n+\n+Per-value results:\n+  x = -100: LHS =   9999, RHS =   9999, match = True\n+  x =  -99: LHS =   9800, RHS =   9800, match = True\n+  x =  -98: LHS =   9603, RHS =   9603, match = True\n+  x =  -97: LHS =   9408, RHS =   9408, match = True\n+  x =  -96: LHS =   9215, RHS =   9215, match = True\n+  x =  -95: LHS =   9024, RHS =   9024, match = True\n+  x =  -94: LHS =   8835, RHS =   8835, match = True\n+  x =  -93: LHS =   8648, RHS =   8648, match = True\n+  x =  -92: LHS =   8463, RHS =   8463, match = True\n+  x =  -91: LHS =   8280, RHS =   8280, match = True\n+  x =  -90: LHS =   8099, RHS =   8099, match = True\n+  x =  -89: LHS =   7920, RHS =   7920, match = True\n+  x =  -88: LHS =   7743, RHS =   7743, match = True\n+  x =  -87: LHS =   7568, RHS =   7568, match = True\n+  x =  -86: LHS =   7395, RHS =   7395, match = True\n+  x =  -85: LHS =   7224, RHS =   7224, match = True\n+  x =  -84: LHS =   7055, RHS =   7055, match = True\n+  x =  -83: LHS =   6888, RHS =   6888, match = True\n+  x =  -82: LHS =   6723, RHS =   6723, match = True\n+  x =  -81: LHS =   6560, RHS =   6560, match = True\n+  x =  -80: LHS =   6399, RHS =   6399, match = True\n+  x =  -79: LHS =   6240, RHS =   6240, match = True\n+  x =  -78: LHS =   6083, RHS =   6083, match = True\n+  x =  -77: LHS =   5928, RHS =   5928, match = True\n+  x =  -76: LHS =   5775, RHS =   5775, match = True\n+  x =  -75: LHS =   5624, RHS =   5624, match = True\n+  x =  -74: LHS =   5475, RHS =   5475, match = True\n+  x =  -73: LHS =   5328, RHS =   5328, match = True\n+  x =  -72: LHS =   5183, RHS =   5183, match = True\n+  x =  -71: LHS =   5040, RHS =   5040, match = True\n+  x =  -70: LHS =   4899, RHS =   4899, match = True\n+  x =  -69: LHS =   4760, RHS =   4760, match = True\n+  x =  -68: LHS =   4623, RHS =   4623, match = True\n+  x =  -67: LHS =   4488, RHS =   4488, match = True\n+  x =  -66: LHS =   4355, RHS =   4355, match = True\n+  x =  -65: LHS =   4224, RHS =   4224, match = True\n+  x =  -64: LHS =   4095, RHS =   4095, match = True\n+  x =  -63: LHS =   3968, RHS =   3968, match = True\n+  x =  -62: LHS =   3843, RHS =   3843, match = True\n+  x =  -61: LHS =   3720, RHS =   3720, match = True\n+  x =  -60: LHS =   3599, RHS =   3599, match = True\n+  x =  -59: LHS =   3480, RHS =   3480, match = True\n+  x =  -58: LHS =   3363, RHS =   3363, match = True\n+  x =  -57: LHS =   3248, RHS =   3248, match = True\n+  x =  -56: LHS =   3135, RHS =   3135, match = True\n+  x =  -55: LHS =   3024, RHS =   3024, match = True\n+  x =  -54: LHS =   2915, RHS =   2915, match = True\n+  x =  -53: LHS =   2808, RHS =   2808, match = True\n+  x =  -52: LHS =   2703, RHS =   2703, match = True\n+  x =  -51: LHS =   2600, RHS =   2600, match = True\n+  x =  -50: LHS =   2499, RHS =   2499, match = True\n+  x =  -49: LHS =   2400, RHS =   2400, match = True\n+  x =  -48: LHS =   2303, RHS =   2303, match = True\n+  x =  -47: LHS =   2208, RHS =   2208, match = True\n+  x =  -46: LHS =   2115, RHS =   2115, match = True\n+  x =  -45: LHS =   2024, RHS =   2024, match = True\n+  x =  -44: LHS =   1935, RHS =   1935, match = True\n+  x =  -43: LHS =   1848, RHS =   1848, match = True\n+  x =  -42: LHS =   1763, RHS =   1763, match = True\n+  x =  -41: LHS =   1680, RHS =   1680, match = True\n+  x =  -40: LHS =   1599, RHS =   1599, match = True\n+  x =  -39: LHS =   1520, RHS =   1520, match = True\n+  x =  -38: LHS =   1443, RHS =   1443, match = True\n+  x =  -37: LHS =   1368, RHS =   1368, match = True\n+  x =  -36: LHS =   1295, RHS =   1295, match = True\n+  x =  -35: LHS =   1224, RHS =   1224, match = True\n+  x =  -34: LHS =   1155, RHS =   1155, match = True\n+  x =  -33: LHS =   1088, RHS =   1088, match = True\n+  x =  -32: LHS =   1023, RHS =   1023, match = True\n+  x =  -31: LHS =    960, RHS =    960, match = True\n+  x =  -30: LHS =    899, RHS =    899, match = True\n+  x =  -29: LHS =    840, RHS =    840, match = True\n+  x =  -28: LHS =    783, RHS =    783, match = True\n+  x =  -27: LHS =    728, RHS =    728, match = True\n+  x =  -26: LHS =    675, RHS =    675, match = True\n+  x =  -25: LHS =    624, RHS =    624, match = True\n+  x =  -24: LHS =    575, RHS =    575, match = True\n+  x =  -23: LHS =    528, RHS =    528, match = True\n+  x =  -22: LHS =    483, RHS =    483, match = True\n+  x =  -21: LHS =    440, RHS =    440, match = True\n+  x =  -20: LHS =    399, RHS =    399, match = True\n+  x =  -19: LHS =    360, RHS =    360, match = True\n+  x =  -18: LHS =    323, RHS =    323, match = True\n+  x =  -17: LHS =    288, RHS =    288, match = True\n+  x =  -16: LHS =    255, RHS =    255, match = True\n+  x =  -15: LHS =    224, RHS =    224, match = True\n+  x =  -14: LHS =    195, RHS =    195, match = True\n+  x =  -13: LHS =    168, RHS =    168, match = True\n+  x =  -12: LHS =    143, RHS =    143, match = True\n+  x =  -11: LHS =    120, RHS =    120, match = True\n+  x =  -10: LHS =     99, RHS =     99, match = True\n+  x =   -9: LHS =     80, RHS =     80, match = True\n+  x =   -8: LHS =     63, RHS =     63, match = True\n+  x =   -7: LHS =     48, RHS =     48, match = True\n+  x =   -6: LHS =     35, RHS =     35, match = True\n+  x =   -5: LHS =     24, RHS =     24, match = True\n+  x =   -4: LHS =     15, RHS =     15, match = True\n+  x =   -3: LHS =      8, RHS =      8, match = True\n+  x =   -2: LHS =      3, RHS =      3, match = True\n+  x =   -1: LHS =      0, RHS =      0, match = True\n+  x =    0: LHS =     -1, RHS =     -1, match = True\n+  x =    1: LHS =      0, RHS =      0, match = True\n+  x =    2: LHS =      3, RHS =      3, match = True\n+  x =    3: LHS =      8, RHS =      8, match = True\n+  x =    4: LHS =     15, RHS =     15, match = True\n+  x =    5: LHS =     24, RHS =     24, match = True\n+  x =    6: LHS =     35, RHS =     35, match = True\n+  x =    7: LHS =     48, RHS =     48, match = True\n+  x =    8: LHS =     63, RHS =     63, match = True\n+  x =    9: LHS =     80, RHS =     80, match = True\n+  x =   10: LHS =     99, RHS =     99, match = True\n+  x =   11: LHS =    120, RHS =    120, match = True\n+  x =   12: LHS =    143, RHS =    143, match = True\n+  x =   13: LHS =    168, RHS =    168, match = True\n+  x =   14: LHS =    195, RHS =    195, match = True\n+  x =   15: LHS =    224, RHS =    224, match = True\n+  x =   16: LHS =    255, RHS =    255, match = True\n+  x =   17: LHS =    288, RHS =    288, match = True\n+  x =   18: LHS =    323, RHS =    323, match = True\n+  x =   19: LHS =    360, RHS =    360, match = True\n+  x =   20: LHS =    399, RHS =    399, match = True\n+  x =   21: LHS =    440, RHS =    440, match = True\n+  x =   22: LHS =    483, RHS =    483, match = True\n+  x =   23: LHS =    528, RHS =    528, match = True\n+  x =   24: LHS =    575, RHS =    575, match = True\n+  x =   25: LHS =    624, RHS =    624, match = True\n+  x =   26: LHS =    675, RHS =    675, match = True\n+  x =   27: LHS =    728, RHS =    728, match = True\n+  x =   28: LHS =    783, RHS =    783, match = True\n+  x =   29: LHS =    840, RHS =    840, match = True\n+  x =   30: LHS =    899, RHS =    899, match = True\n+  x =   31: LHS =    960, RHS =    960, match = True\n+  x =   32: LHS =   1023, RHS =   1023, match = True\n+  x =   33: LHS =   1088, RHS =   1088, match = True\n+  x =   34: LHS =   1155, RHS =   1155, match = True\n+  x =   35: LHS =   1224, RHS =   1224, match = True\n+  x =   36: LHS =   1295, RHS =   1295, match = True\n+  x =   37: LHS =   1368, RHS =   1368, match = True\n+  x =   38: LHS =   1443, RHS =   1443, match = True\n+  x =   39: LHS =   1520, RHS =   1520, match = True\n+  x =   40: LHS =   1599, RHS =   1599, match = True\n+  x =   41: LHS =   1680, RHS =   1680, match = True\n+  x =   42: LHS =   1763, RHS =   1763, match = True\n+  x =   43: LHS =   1848, RHS =   1848, match = True\n+  x =   44: LHS =   1935, RHS =   1935, match = True\n+  x =   45: LHS =   2024, RHS =   2024, match = True\n+  x =   46: LHS =   2115, RHS =   2115, match = True\n+  x =   47: LHS =   2208, RHS =   2208, match = True\n+  x =   48: LHS =   2303, RHS =   2303, match = True\n+  x =   49: LHS =   2400, RHS =   2400, match = True\n+  x =   50: LHS =   2499, RHS =   2499, match = True\n+  x =   51: LHS =   2600, RHS =   2600, match = True\n+  x =   52: LHS =   2703, RHS =   2703, match = True\n+  x =   53: LHS =   2808, RHS =   2808, match = True\n+  x =   54: LHS =   2915, RHS =   2915, match = True\n+  x =   55: LHS =   3024, RHS =   3024, match = True\n+  x =   56: LHS =   3135, RHS =   3135, match = True\n+  x =   57: LHS =   3248, RHS =   3248, match = True\n+  x =   58: LHS =   3363, RHS =   3363, match = True\n+  x =   59: LHS =   3480, RHS =   3480, match = True\n+  x =   60: LHS =   3599, RHS =   3599, match = True\n+  x =   61: LHS =   3720, RHS =   3720, match = True\n+  x =   62: LHS =   3843, RHS =   3843, match = True\n+  x =   63: LHS =   3968, RHS =   3968, match = True\n+  x =   64: LHS =   4095, RHS =   4095, match = True\n+  x =   65: LHS =   4224, RHS =   4224, match = True\n+  x =   66: LHS =   4355, RHS =   4355, match = True\n+  x =   67: LHS =   4488, RHS =   4488, match = True\n+  x =   68: LHS =   4623, RHS =   4623, match = True\n+  x =   69: LHS =   4760, RHS =   4760, match = True\n+  x =   70: LHS =   4899, RHS =   4899, match = True\n+  x =   71: LHS =   5040, RHS =   5040, match = True\n+  x =   72: LHS =   5183, RHS =   5183, match = True\n+  x =   73: LHS =   5328, RHS =   5328, match = True\n+  x =   74: LHS =   5475, RHS =   5475, match = True\n+  x =   75: LHS =   5624, RHS =   5624, match = True\n+  x =   76: LHS =   5775, RHS =   5775, match = True\n+  x =   77: LHS =   5928, RHS =   5928, match = True\n+  x =   78: LHS =   6083, RHS =   6083, match = True\n+  x =   79: LHS =   6240, RHS =   6240, match = True\n+  x =   80: LHS =   6399, RHS =   6399, match = True\n+  x =   81: LHS =   6560, RHS =   6560, match = True\n+  x =   82: LHS =   6723, RHS =   6723, match = True\n+  x =   83: LHS =   6888, RHS =   6888, match = True\n+  x =   84: LHS =   7055, RHS =   7055, match = True\n+  x =   85: LHS =   7224, RHS =   7224, match = True\n+  x =   86: LHS =   7395, RHS =   7395, match = True\n+  x =   87: LHS =   7568, RHS =   7568, match = True\n+  x =   88: LHS =   7743, RHS =   7743, match = True\n+  x =   89: LHS =   7920, RHS =   7920, match = True\n+  x =   90: LHS =   8099, RHS =   8099, match = True\n+  x =   91: LHS =   8280, RHS =   8280, match = True\n+  x =   92: LHS =   8463, RHS =   8463, match = True\n+  x =   93: LHS =   8648, RHS =   8648, match = True\n+  x =   94: LHS =   8835, RHS =   8835, match = True\n+  x =   95: LHS =   9024, RHS =   9024, match = True\n+  x =   96: LHS =   9215, RHS =   9215, match = True\n+  x =   97: LHS =   9408, RHS =   9408, match = True\n+  x =   98: LHS =   9603, RHS =   9603, match = True\n+  x =   99: LHS =   9800, RHS =   9800, match = True\n+  x =  100: LHS =   9999, RHS =   9999, match = True\n+\n+RESULT: No counterexamples found. The identity holds for all 201 tested values.\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 2,
+      "diff_included_count": 2
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_bb1dd0900fdc49bd942be2342b4d8cd5",
+    "input_id": "step-7",
+    "step_id": "step-7",
+    "submission_id": "submission-9c39f6a72824bddd8c6f3b2e3237d5d4",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "counterexample_check.py",
+        "change_type": "created",
+        "size_bytes": 1121,
+        "after_sha256": "10e58d8aa1a5b8ba4b9c0bf54bd677bf2f51a64133a09987b84aaaa9a265b5ee"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "counterexample_check.txt",
+        "change_type": "created",
+        "size_bytes": 10873,
+        "after_sha256": "370f1033994d3238ce61acc30cae074568d3d4335a1a39bff9cb02914358201a"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "f9abae3526f0fc5947298fab28c3c4c679a928beb4b8f608ea73a99f031a67d2",
+        "size_bytes": 27186,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "c00c6dcb331aeedc6a4eacfa58a14047f31e9119a01433ba5e72b873f1289321"
+      }
+    ]
+  }
+}

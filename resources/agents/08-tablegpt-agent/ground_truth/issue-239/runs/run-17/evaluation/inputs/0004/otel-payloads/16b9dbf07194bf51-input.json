@@ -1,0 +1,47 @@
+{
+  "content": "`survey_points.csv` is still not present, so I can't compute the transform against your actual data. A coordinate *operation* is defined strictly by the **source CRS → target CRS** pair, so without knowing the source I can't name one authoritative operation. What I can do is lay out exactly how to choose it, and what parameters each candidate requires. Once you provide the file (or just the source CRS/values), I'll select and execute the specific one.\n\n## The key point: the operation depends on the source CRS\n\nTransforming to **EPSG:4326 (WGS 84, geographic 2D, lat–lon, degrees)** requires a definite source. Based on the `epoch` column you described, the source is most likely one of the *dynamic/geodetic* frames below, not a projected grid.\n\n### Case 1 — Source is a geocentric/geographic ITRF frame (most likely, given `epoch`)\n- **Operation type:** *coordinate frame* transformation (frame ↔ frame), or *point motion* if re-referencing epochs.\n- **EPSG:4326 ↔ ITRF2014 (EPSG:7789):** these are essentially coincident; the operation is the **ITRF2014 → WGS 84 (G1762)** frame transformation. Parameters are **zero-order (0 m, 0, 0, 0, 0, 0, 0)** at the reference epoch — WGS 84 (G1762) is aligned to ITRF2008 and ITRF2014 at the mm level. **No 7-parameter Helmert values needed.**\n- **If the source is ITRF2008 (EPSG:7912) or ITRF2000 (EPSG:7900):** use the official **14-parameter Helmert** (7 transformation + 7 rates), e.g. ITRF2008→ITRF2014. These give small mm-to-cm shifts; the standard published values apply.\n- **Critical parameter:** the **coordinate epoch** (the `epoch` column). WGS 84 is quasi-static; if your points are at epoch 2010.0 and you compare to a 2015.0 realization, you must either (a) propagate the point motion to a common epoch, or (b) use a *point motion* operation. The plate-motion velocity (from a model such as the ITRF2014 PMM) is needed for (a).\n\n### Case 2 — Source is ETRS89 (EPSG:4258) or an ETRS89 UTM zone (EPSG:258xx)\n- **Projected → geographic:** first an *inverse projection* (UTM inverse) to get ETRS89 lat/lon, then a datum step.\n- **ETRS89 → WGS 84 (4326):** treated as **equal to within ~1 m** for most work. A null/identity transformation is standard (EUREF convention). If cm-level is required, apply the small ETRS89–ITRF2014 frame offset with the epoch difference (ETRS89 is fixed to epoch 1989.0).\n\n### Case 3 — Source is NAD83(2011) (EPSG:6318) or a State Plane / UTM zone on NAD83\n- **Projected → geographic:** inverse projection first.\n- **NAD83(2011) → WGS 84:** approximately equal at the ~1–2 m level (both aligned to ITRF). If higher accuracy is needed, use the **NAD83(2011) → ITRF2014 → WGS 84 (G1762)** chain with published 14-parameter values and epoch handling.\n\n### Case 4 — Source is a local/national projected CRS (Gauss-Krüger, national grid)\n- Use the CRS's own **projection parameters**: central meridian, latitude of origin, scale factor, false easting, false northing, plus the underlying geodetic datum's transformation to WGS 84. These parameters are defined in the source EPSG entry.\n\n## Parameters you'll need to supply (or let me derive)\n1. **Source EPSG code** (or enough info to identify it: coordinate magnitudes, region, and the `epoch` values).\n2. **Coordinate epoch** per point (from the `epoch` column) and the **target epoch** if a dynamic frame is involved.\n3. **Axis order confirmation** — EPSG:4326 is officially lat–lon, so the output must be ordered accordingly (or you'll get swapped results).\n4. **Accuracy requirement** — decides whether a null transform suffices (~1 m) or a 14-parameter + velocity model is needed (cm/mm).\n5. **Z handling** — EPSG:4326 is 2D; if `z` is ellipsoidal height and you want it preserved, target **EPSG:4979 (WGS 84 3D)** instead.\n\n## Tooling I'll use to execute it once the source is known\n```python\n# Illustrative only — cannot run without the file / a known source CRS\nfrom pyproj import Transformer\n# e.g. source = \"EPSG:25832\" (ETRS89 / UTM 32N), order = x,y,z\nt = Transformer.from_crs(\"EPSG:25832\", \"EPSG:4979\", always_xy=True)  # keep 3D\nlon, lat, h = t.transform(df.x, df.y, df.z)\n# if points are time-tagged in a dynamic frame, add epoch propagation via a\n# 14-parameter Helmert + ITRF velocity model, then re-order to lat, lon for 4326.\n```\n\n**Bottom line:** I can't name a single operation or its parameters without the source CRS and the epoch values, because the operation is *defined* by that source→target pair. Give me the file (or just tell me the source CRS / region / the x, y, z magnitudes and epoch range) and I'll select the exact operation, list the concrete parameters, and run the transformation to EPSG:4326.",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 1391,
+      "prompt_tokens": 4317,
+      "total_tokens": 5708,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 76,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 3840
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012125527479043323c955d5686V4rouJt",
+    "service_tier": "default",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "run--01a1302e-ab6f-7ed2-9109-063b87dd37d6-0",
+  "example": false,
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 4317,
+    "output_tokens": 1391,
+    "total_tokens": 5708,
+    "input_token_details": {
+      "cache_read": 3840
+    },
+    "output_token_details": {
+      "reasoning": 76
+    }
+  }
+}

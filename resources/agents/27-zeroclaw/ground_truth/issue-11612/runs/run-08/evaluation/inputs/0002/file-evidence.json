@@ -1,0 +1,78 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/load_customers.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:8f6451c27653fced3f90f77fdc78b2d0a83f6e2ef029c42827472ab511703daa",
+        "before_size": null,
+        "after_size": 1750,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/load_customers.py\n@@ -0,0 +1,71 @@\n+\"\"\"Bind source (customers.csv) to target (customers.db -> customers table).\n+\n+Source schema (verified):\n+    id, name, email, city   -- 1 header row + 3 data rows\n+\n+Target schema:\n+    CREATE TABLE customers (\n+        id    INTEGER PRIMARY KEY,\n+        name  TEXT,\n+        email TEXT,\n+        city  TEXT\n+    )\n+\n+Column mapping (identity, by name):\n+    csv.id    -> customers.id\n+    csv.name  -> customers.name\n+    csv.email -> customers.email\n+    csv.city  -> customers.city\n+Type coercion:\n+    id: str -> int  (all other fields stay TEXT)\n+\"\"\"\n+\n+import csv\n+import sqlite3\n+\n+CSV_PATH = \"customers.csv\"\n+DB_PATH = \"customers.db\"\n+\n+# Target schema definition\n+CREATE_TABLE_SQL = \"\"\"\n+CREATE TABLE IF NOT EXISTS customers (\n+    id    INTEGER PRIMARY KEY,\n+    name  TEXT,\n+    email TEXT,\n+    city  TEXT\n+)\n+\"\"\"\n+\n+INSERT_SQL = \"INSERT INTO customers (id, name, email, city) VALUES (?, ?, ?, ?)\"\n+\n+\n+def transform_row(row: dict) -> tuple:\n+    \"\"\"Map one CSV record (dict) to the target column tuple.\"\"\"\n+    return (\n+        int(row[\"id\"]),      # id: TEXT source -> INTEGER primary key\n+        row[\"name\"],         # TEXT (identity)\n+        row[\"email\"],        # TEXT (identity)\n+        row[\"city\"],         # TEXT (identity)\n+    )\n+\n+\n+def main() -> None:\n+    conn = sqlite3.connect(DB_PATH)\n+    try:\n+        conn.execute(CREATE_TABLE_SQL)\n+\n+        with open(CSV_PATH, newline=\"\", encoding=\"utf-8\") as f:\n+            reader = csv.DictReader(f)\n+            rows = [transform_row(r) for r in reader]\n+\n+        conn.executemany(INSERT_SQL, rows)\n+        conn.commit()\n+\n+        count = conn.execute(\"SELECT COUNT(*) FROM customers\").fetchone()[0]\n+        print(f\"Loaded {count} rows into customers table\")\n+    finally:\n+        conn.close()\n+\n+\n+if __name__ == \"__main__\":\n+    main()\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_941002f61c0747c1803bd71005e09b33",
+    "input_id": "step-2",
+    "step_id": "step-2",
+    "submission_id": "submission-b364cf51f503d512d67698e40117c37e",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "load_customers.py",
+        "change_type": "created",
+        "size_bytes": 1750,
+        "after_sha256": "8f6451c27653fced3f90f77fdc78b2d0a83f6e2ef029c42827472ab511703daa"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "3aba3a94ef3f999a01952e08988c3ade80fe10614d4e5ee4b9196eed685df599",
+        "size_bytes": 5238,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "c19735998e3856d0d7140ce37d5bd7d8536e0d60db4c75803cc15f6ae2f0c76d"
+      }
+    ]
+  }
+}

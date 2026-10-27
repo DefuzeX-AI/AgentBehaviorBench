@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_visualization(data_raw):\n    import pandas as pd\n    import numpy as np\n    import json\n    import plotly.express as px\n    import plotly.graph_objects as go\n    import plotly.io as pio\n\n    # Work on a copy and sort by share (largest to smallest) before plotting\n    df = data_raw.copy()\n    df = df.sort_values(by='share_of_extended_sales', ascending=False).reset_index(drop=True)\n\n    # Clean, colorblind-friendly discrete color sequence\n    color_seq = px.colors.qualitative.Safe\n\n    # Create the pie chart\n    fig = px.pie(\n        df,\n        names='bike_model',\n        values='share_of_extended_sales',\n        hole=0,  # standard pie (not a donut)\n        color='bike_model',\n        color_discrete_sequence=color_seq,\n        title='Share of Extended Sales by Bike Model',\n        custom_data=['total_extended_sales']\n    )\n\n    # Slice labels + percentages, and currency-formatted sales in hover\n    fig.update_traces(\n        texttemplate='%{label}<br>%{percent:.1%}',\n        textposition='inside',\n        insidetextorientation='horizontal',\n        sort=False,  # preserve the pre-sorted (descending) order\n        hovertemplate=(\n            '<b>%{label}</b><br>'\n            'Share of Extended Sales: %{percent:.2%}<br>'\n            'Total Extended Sales: $%{customdata[0]:,.0f}'\n            '<extra></extra>'\n        )\n    )\n\n    fig.update_layout(\n        title={\n            'text': 'Share of Extended Sales by Bike Model',\n            'x': 0.5,\n            'xanchor': 'center'\n        },\n        legend_title_text='Bike Model',\n        template='plotly_white',\n        margin=dict(t=80, l=40, r=40, b=40)\n    )\n\n    # Brief summary of results\n    top_model = df.iloc[0]['bike_model']\n    top_share = df.iloc[0]['share_of_extended_sales'] * 100\n    top_sales = df.iloc[0]['total_extended_sales']\n    second_model = df.iloc[1]['bike_model']\n    second_share = df.iloc[1]['share_of_extended_sales'] * 100\n    third_model = df.iloc[2]['bike_model']\n    third_share = df.iloc[2]['share_of_extended_sales'] * 100\n    smallest_model = df.iloc[-1]['bike_model']\n    smallest_share = df.iloc[-1]['share_of_extended_sales'] * 100\n    smallest_sales = df.iloc[-1]['total_extended_sales']\n\n    summary = (\n        f\"Summary: {top_model} holds the largest share of extended sales at \"\n        f\"{top_share:.1f}% (total extended sales of ${top_sales:,.0f}). \"\n        f\"The next largest contributors are {second_model} ({second_share:.1f}%) and \"\n        f\"{third_model} ({third_share:.1f}%). \"\n        f\"The smallest share in the dataset belongs to {smallest_model} at \"\n        f\"{smallest_share:.1f}% (${smallest_sales:,.0f}).\"\n    )\n    print(summary)\n\n    fig_json = pio.to_json(fig)\n    fig_dict = json.loads(fig_json)\n\n    return fig_dict\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 2193,
+      "prompt_tokens": 994,
+      "total_tokens": 3187,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 1486,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "glm-5.3-flash",
+    "system_fingerprint": null,
+    "id": "20261020121622e90db65bf8e641f8",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a15786-51a3-7c02-9eba-3d675a3097b9-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 994,
+    "output_tokens": 2193,
+    "total_tokens": 3187,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 1486
+    }
+  }
+}

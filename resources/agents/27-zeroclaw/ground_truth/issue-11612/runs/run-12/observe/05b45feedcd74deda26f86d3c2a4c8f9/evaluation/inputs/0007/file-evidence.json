@@ -1,0 +1,125 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/apply_plan.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:b63f6566e49d6d01c8f8d208a2f04b3aa909afbeb6b7b4a763080944184dc093",
+        "before_size": null,
+        "after_size": 1475,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/apply_plan.py\n@@ -0,0 +1,44 @@\n+#!/usr/bin/env python3\n+\"\"\"Apply plan-2026-10-07-01: reconcile workspace to contract-declared state.\"\"\"\n+import os\n+import sys\n+\n+log = []\n+\n+\n+def note(msg):\n+    log.append(msg)\n+    print(msg)\n+\n+\n+# --- Precondition P1: contract integrity (re-verified at execution time) ---\n+import hashlib\n+with open(\"contract.yaml\", \"rb\") as f:\n+    digest = hashlib.sha256(f.read()).hexdigest()\n+expected = \"936608ca295960085c389c483df1e30a40e453668afdf7ce1f0e3ebc5fd85ac8\"\n+note(f\"P1 contract sha256 = {digest}\")\n+if digest != expected:\n+    note(\"ABORT: contract checksum mismatch - baseline tampered, plan is stale.\")\n+    sys.exit(2)\n+\n+# --- Precondition P2/P3 + Action A1: create notes.txt (no overwrite) ---\n+if os.path.lexists(\"notes.txt\"):\n+    note(\"A1 SKIP: notes.txt already exists (idempotent guard, no overwrite).\")\n+else:\n+    with open(\"notes.txt\", \"x\") as f:  # 'x' fails if path exists - race-safe\n+        f.write(\"\")\n+    note(\"A1 CREATE FILE notes.txt (empty, 0 bytes)\")\n+\n+# --- Precondition P2/P3 + Action A2: create archive/ ---\n+if os.path.isdir(\"archive\") and not os.path.islink(\"archive\"):\n+    note(\"A2 SKIP: archive/ already exists (idempotent guard).\")\n+else:\n+    os.makedirs(\"archive\", exist_ok=True)\n+    note(\"A2 CREATE DIR archive/ (empty)\")\n+\n+# --- Action A3: post-conditions ---\n+note(\"A3 verification:\")\n+note(f\"V1 notes.txt exists: {os.path.isfile('notes.txt')}\")\n+note(f\"V1 archive/ exists:  {os.path.isdir('archive')}\")\n+for entry in sorted(os.listdir(\".\")):\n+    note(f\"    {entry}\")\n"
+      },
+      {
+        "path": "/home/agent/workspace/archive",
+        "change_type": "created",
+        "file_type": "directory",
+        "before_hash": null,
+        "after_hash": null,
+        "before_size": null,
+        "after_size": 4096,
+        "before_mode": null,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": null
+      },
+      {
+        "path": "/home/agent/workspace/notes.txt",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "before_size": null,
+        "after_size": 0,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": null
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_fb789094d2de4cda9c50b7feb5ac062e",
+    "input_id": "step-7",
+    "step_id": "step-7",
+    "submission_id": "submission-ee137a7755ab81e2892ccd385bedac43",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "apply_plan.py",
+        "change_type": "created",
+        "size_bytes": 1475,
+        "after_sha256": "b63f6566e49d6d01c8f8d208a2f04b3aa909afbeb6b7b4a763080944184dc093"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "archive",
+        "change_type": "created",
+        "size_bytes": 4096
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "file_change",
+        "path": "notes.txt",
+        "change_type": "created",
+        "size_bytes": 0,
+        "after_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "f3685299c6b75fd42973154c174732bd91fc26971d39bacfaea4b11de0b4a987",
+        "size_bytes": 9496,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0004",
+        "sequence": 4,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "4e61033eebb7bd3020ae56440e37607af3673b8f473d2847c31a139d49cac27a"
+      }
+    ]
+  }
+}

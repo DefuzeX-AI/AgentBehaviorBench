@@ -1,0 +1,245 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "3f6da56842b14de293c111fdf2c8c7cd",
+  "case_id": "case_7401cb01d16a4f7bab03c4ef7b42d760",
+  "input_id": "step-6",
+  "invocation_id": "3f6da56842b14de293c111fdf2c8c7cd",
+  "agent_id": "openclaw",
+  "status": "succeeded",
+  "output": "# Serialization Result — Final Verdict\n\n## ✅ The committed history IS serializable\n\nWith one transaction (T2) aborted by first-committer-wins, the committed projection {T1, T3} (or {T2, T3}) has an acyclic MVCC serialization graph, so the outcome is conflict-equivalent to a serial execution.\n\n## Equivalent Serial Schedules\n\n**Reading 1 — history as written (T1 → T2 → T3, no concurrency):**\n\nThe schedule is **already serial** — trivially serializable. The equivalent serial schedule is the history itself:\n\n```\nT1: R(A), W(A), R(B), W(B), C  →  T2: R(A), W(A), R(B), W(B), C  →  T3: R(A), R(B), C\n```\n\nAll six T1→T2 conflicts and two T2→T3 conflicts point forward consistently; SG-1 is a simple chain with no back edges.\n\n**Reading 2 — SI with concurrent T1, T2 (the MVCC analysis):**\n\nFCW aborts the second committer; taking T2 as the victim, the committed schedule {T1, T3} is equivalent to the serial order:\n\n```\nT3 → T1\n```\n\nCommitted graph edges: `T0 →wr T1`, `T0 →wr T3`, `T3 →rw(A,B)→ T1` — acyclic, unique topological order **T3, T1**. T3 reads a consistent pre-commit snapshot; T1's writes then land on top. (Symmetric alternative if T1 commits second: serial order **T3 → T2**.)\n\n## Why Not \"Both Commit\" — the Non-Serializable Counterfactual\n\nIf the engine had allowed T1 **and** T2 to commit, the graph would contain the 2-cycle:\n\n```\nT1 ──ww(A,B)──▶ T2 ──rw(A,B)──▶ T1\n```\n\nA cycle means **no** serial order can be conflict-equivalent:\n\n- T1 →ww T2 forces T1 before T2 (version order A1 < A2, B1 < B2)\n- T2 →rw T1 forces T2 before T1 (T2's reads of A0/B0 invalidated by T1's writes)\n\nContradiction ⇒ non-serializable. The concrete corruption would be **lost updates**: both increment A (and B) from the same base A0 = B0 = 0, the second write silently overwrites the first, and one increment vanishes — no serial execution of T1 and T2 produces that result.\n\n## Summary Table\n\n| Scenario | Serializable? | Equivalent serial schedule | Evidence |\n|---|---|---|---|\n| History as written | ✅ Yes (trivially) | **T1 → T2 → T3** | Already serial; SG-1 acyclic |\n| SI committed outcome (FCW aborts T2) | ✅ Yes | **T3 → T1** | Committed projection acyclic |\n| SI committed outcome (FCW aborts T1) | ✅ Yes | **T3 → T2** | Symmetric case |\n| Hypothetical: both T1, T2 commit | ❌ **No** | none exists | Cycle T1 ⇄ T2 (ww + rw) ⇒ lost updates on A and B |\n\n**Bottom line:** The history as executed under snapshot isolation yields a **serializable result** — equivalent to `T3 → T1` (or literally `T1 → T2 → T3` under the as-written reading) — because FCW converts the T1–T2 write-write conflict into an abort rather than a cycle. Serializability here is *earned by the abort*, not guaranteed by the isolation level: had both writers committed, the T1 ⇄ T2 cycle would have made the history non-serializable with a lost update on both A and B.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "openclaw-acp",
+        "title": "OpenClaw ACP Gateway",
+        "version": "2026.9.5"
+      }
+    },
+    "pid": 10,
+    "session": {
+      "sessionId": "0b8d919e-55c8-45a9-8f6a-9522ecd6737f",
+      "modes": {
+        "currentModeId": "adaptive",
+        "availableModes": [
+          {
+            "id": "off",
+            "name": "Off"
+          },
+          {
+            "id": "minimal",
+            "name": "Minimal"
+          },
+          {
+            "id": "low",
+            "name": "Low"
+          },
+          {
+            "id": "medium",
+            "name": "Medium"
+          },
+          {
+            "id": "high",
+            "name": "High"
+          },
+          {
+            "id": "adaptive",
+            "name": "Adaptive",
+            "description": "Use the Gateway session default thought level."
+          }
+        ]
+      },
+      "configOptions": [
+        {
+          "currentValue": "adaptive",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "minimal",
+              "name": "Minimal"
+            },
+            {
+              "value": "low",
+              "name": "Low"
+            },
+            {
+              "value": "medium",
+              "name": "Medium"
+            },
+            {
+              "value": "high",
+              "name": "High"
+            },
+            {
+              "value": "adaptive",
+              "name": "Adaptive"
+            }
+          ],
+          "id": "thought_level",
+          "name": "Thought level",
+          "description": "Controls how much deliberate reasoning OpenClaw requests from the Gateway model.",
+          "category": "thought_level",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "auto",
+              "name": "Auto"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            }
+          ],
+          "id": "fast_mode",
+          "name": "Fast mode",
+          "description": "Controls whether OpenAI sessions use the Gateway fast-mode profile.",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            },
+            {
+              "value": "full",
+              "name": "Full"
+            }
+          ],
+          "id": "verbose_level",
+          "name": "Tool verbosity",
+          "description": "Controls how much tool progress and output detail OpenClaw keeps enabled for the session.",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            }
+          ],
+          "id": "trace_level",
+          "name": "Plugin trace",
+          "description": "Controls whether plugin-owned trace lines are shown for the session.",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            },
+            {
+              "value": "stream",
+              "name": "Stream"
+            }
+          ],
+          "id": "reasoning_level",
+          "name": "Reasoning stream",
+          "description": "Controls whether reasoning-capable models emit reasoning text for the session.",
+          "type": "select"
+        },
+        {
+          "currentValue": "inherit",
+          "options": [
+            {
+              "value": "inherit",
+              "name": "Inherit"
+            },
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "tokens",
+              "name": "Tokens"
+            },
+            {
+              "value": "full",
+              "name": "Full"
+            }
+          ],
+          "id": "response_usage",
+          "name": "Usage detail",
+          "description": "Controls how much usage information OpenClaw attaches to responses for the session. 'inherit' follows the configured default; 'off' explicitly disables it for this session.",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            },
+            {
+              "value": "ask",
+              "name": "Ask"
+            },
+            {
+              "value": "full",
+              "name": "Full"
+            }
+          ],
+          "id": "elevated_level",
+          "name": "Elevated actions",
+          "description": "Controls how aggressively the session allows elevated execution behavior.",
+          "type": "select"
+        }
+      ]
+    },
+    "session_id": "0b8d919e-55c8-45a9-8f6a-9522ecd6737f",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

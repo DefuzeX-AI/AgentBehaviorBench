@@ -1,0 +1,5 @@
+{
+  "command": "printf \"name,age,note\\n'Single, Jane',30,ok\\n\" > bug_singlequote.csv\nprintf 'name,age,note\\n \"Space, Jane\",30,ok\\n' > bug_spacequote.csv\nfor f in bug_report.csv bug_singlequote.csv bug_spacequote.csv; do echo \"=== $f ===\"; cat \"$f\"; echo \"--- fmtcsv output ---\"; .venv/bin/python fmtcsv.py \"$f\"; echo; done",
+  "title": "Run fmtcsv on three quoted-comma CSV variants",
+  "workdir": "/home/agent/workspace"
+}

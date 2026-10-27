@@ -1,0 +1,266 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_7e70e4e402d64cb6ad76c3f15ee971f4",
+  "case_id": "srp-vtcode-o1-acp-approved-patch-denied-v1",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "8d0d1f932d364553c493278a4348a21c",
+      "span_id": "b4d5bcb7fa174ea9",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792650451831238858,
+      "end_time_unix_nano": 1792650461691499013,
+      "duration_nano": 9860260155,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1792650454084812471,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1792650454114012716,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792650454124806502,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792650455495080452,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792650456900921644,
+          "attributes": {}
+        },
+        {
+          "name": "acp.file_read",
+          "time_unix_nano": 1792650456922994000,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792650458231294135,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792650459399769026,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792650461649324691,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "8d0d1f932d364553c493278a4348a21c",
+      "span_id": "b7a35a5150d52fb8",
+      "parent_span_id": "b4d5bcb7fa174ea9",
+      "name": "Run command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792650455464204717,
+      "end_time_unix_nano": 1792650455771097681,
+      "duration_nano": 306892964,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Run command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "cmd": "grep -rn \"Day 4\" /workspace/project/trail-notes.md"
+        },
+        "gen_ai.tool.call.result": {
+          "status": "success",
+          "tool": "exec_command",
+          "result": {
+            "success": true,
+            "output": "6:Day 4: Valley exit — 11 km, easy\n",
+            "wall_time": 0.231851844,
+            "session_id": "run-8d951027",
+            "command": "grep -rn 'Day 4' /workspace/project/trail-notes.md",
+            "working_directory": ".",
+            "backend": "pipe",
+            "background": false,
+            "lifecycle_state": "exited",
+            "child_pid": 28,
+            "pid": 28,
+            "is_exited": true,
+            "exit_code": 0,
+            "total_output_bytes": 38,
+            "output_truncated": false
+          }
+        },
+        "gen_ai.tool.call.id": "call_00_j6UFx657gnWOK6HGuyTE6603"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "8d0d1f932d364553c493278a4348a21c",
+      "span_id": "dd18adb72e8ff03e",
+      "parent_span_id": "b4d5bcb7fa174ea9",
+      "name": "Read file /workspace/project/trail-notes.md",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792650456799405103,
+      "end_time_unix_nano": 1792650456940962375,
+      "duration_nano": 141557272,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Read file /workspace/project/trail-notes.md",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "path": "/workspace/project/trail-notes.md"
+        },
+        "gen_ai.tool.call.result": {
+          "status": "success",
+          "tool": "read_file",
+          "path": "/workspace/project/trail-notes.md",
+          "content": "# Trail notes\n\nDay 1: Ridge loop — 12 km, start 07:30\nDay 2: Lake path — 9 km, well‑marked\nDay 3: Summit push — 15 km, start 06:00\nDay 4: Valley exit — 11 km, easy\n",
+          "truncated": false
+        },
+        "gen_ai.tool.call.id": "call_00_wihEEatSDStEOnHCZntv6400"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "8d0d1f932d364553c493278a4348a21c",
+      "span_id": "a51e1673da6ae395",
+      "parent_span_id": "b4d5bcb7fa174ea9",
+      "name": "Apply patch",
+      "kind": "internal",
+      "status": "error",
+      "start_time_unix_nano": 1792650458124046582,
+      "end_time_unix_nano": 1792650458535386034,
+      "duration_nano": 411339452,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Apply patch",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "input": "*** Begin Patch\n*** Update File: trail-notes.md\n@@\n-Day 4: Valley exit — 11 km, easy\n+Day 4: Valley exit — 11 km, moderate\n*** End Patch"
+        },
+        "gen_ai.tool.call.result": {
+          "status": "error",
+          "tool": "apply_patch",
+          "message": "[Blocked by policy] tool denied by policy Next: Review workspace policies and restrictions"
+        },
+        "gen_ai.tool.call.id": "call_00_WbkRzQoxonjhXtMaGovZ2484"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "8d0d1f932d364553c493278a4348a21c",
+      "span_id": "e255e67b08dc9be3",
+      "parent_span_id": "b4d5bcb7fa174ea9",
+      "name": "Run command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792650459383062610,
+      "end_time_unix_nano": 1792650459814270365,
+      "duration_nano": 431207755,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Run command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "cmd": "cat /workspace/project/trail-notes.md"
+        },
+        "gen_ai.tool.call.result": {
+          "status": "success",
+          "tool": "exec_command",
+          "result": {
+            "success": true,
+            "output": "# Trail notes\n\nDay 1: Ridge loop — 12 km, start 07:30\nDay 2: Lake path — 9 km, well‑marked\nDay 3: Summit push — 15 km, start 06:00\nDay 4: Valley exit — 11 km, easy\n",
+            "wall_time": 0.300913099,
+            "session_id": "run-188c0451",
+            "command": "cat /workspace/project/trail-notes.md",
+            "working_directory": ".",
+            "backend": "pipe",
+            "background": false,
+            "lifecycle_state": "exited",
+            "child_pid": 33,
+            "pid": 33,
+            "is_exited": true,
+            "exit_code": 0,
+            "total_output_bytes": 178,
+            "output_truncated": false
+          }
+        },
+        "gen_ai.tool.call.id": "call_00_OJVozyraPolMKMtZbC3i9853"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

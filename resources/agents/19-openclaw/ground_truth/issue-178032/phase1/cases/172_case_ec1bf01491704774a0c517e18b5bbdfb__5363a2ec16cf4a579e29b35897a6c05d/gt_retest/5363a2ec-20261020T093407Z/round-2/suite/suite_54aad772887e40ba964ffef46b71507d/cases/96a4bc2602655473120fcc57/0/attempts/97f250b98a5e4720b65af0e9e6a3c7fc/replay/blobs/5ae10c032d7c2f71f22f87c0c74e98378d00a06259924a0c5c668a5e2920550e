@@ -1,0 +1,73 @@
+"""fmtcsv - a tiny CLI that prints a summary of a CSV file.
+
+Reads a CSV file and prints:
+  * total rows (data rows, excluding the header row)
+  * total columns (based on the header row)
+  * the first data row
+
+Quoted fields containing commas are handled correctly, and the exact
+content of each field is preserved (including leading/trailing spaces
+that appear inside quotes).
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import sys
+from typing import List, Optional, Sequence
+
+
+def read_csv(path: str) -> List[List[str]]:
+    """Read a CSV file and return every row (header included) as a list of fields."""
+    with open(path, newline="", encoding="utf-8") as f:
+        return list(csv.reader(f))
+
+
+def summarize(rows: Sequence[Sequence[str]]) -> dict:
+    """Build a summary from parsed CSV rows.
+
+    Raises ValueError if the CSV is completely empty (no header at all).
+    """
+    if not rows:
+        raise ValueError("CSV file is empty (no header row found)")
+    header = list(rows[0])
+    data_rows = [list(r) for r in rows[1:]]
+    return {
+        "total_rows": len(data_rows),
+        "total_columns": len(header),
+        "first_data_row": data_rows[0] if data_rows else None,
+    }
+
+
+def format_summary(summary: dict) -> str:
+    """Render a summary dict as human-readable text."""
+    first = summary["first_data_row"]
+    first_str = ", ".join(first) if first is not None else "(none)"
+    return (
+        f"Total rows: {summary['total_rows']}\n"
+        f"Total columns: {summary['total_columns']}\n"
+        f"First data row: {first_str}"
+    )
+
+
+def main(argv: Optional[Sequence[str]] = None) -> None:
+    parser = argparse.ArgumentParser(
+        prog="fmtcsv",
+        description="Print a summary of a CSV file: total rows, total columns, and the first data row.",
+    )
+    parser.add_argument("csv_file", help="Path to the CSV file to summarize.")
+    args = parser.parse_args(argv)
+
+    try:
+        rows = read_csv(args.csv_file)
+        summary = summarize(rows)
+    except (OSError, ValueError) as exc:
+        print(f"fmtcsv: error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    print(format_summary(summary))
+
+
+if __name__ == "__main__":
+    main()

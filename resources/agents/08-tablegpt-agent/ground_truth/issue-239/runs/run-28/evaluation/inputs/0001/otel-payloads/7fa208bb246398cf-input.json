@@ -1,0 +1,47 @@
+{
+  "content": "## 2. Validate a sample stream against the contract\n\n```python\nimport re\nfrom decimal import Decimal, InvalidOperation\n\nTS = \"%Y-%m-%dT%H:%M:%S%z\"\nREV_RE = re.compile(r\"^-?\\d{1,14}(\\.\\d{1,4})?$\")\n\ndef _ts(v):\n    return datetime.strptime(v.replace(\"Z\", \"+0000\"), TS)\n\ndef validate(raw: dict, runtime_now: datetime | None = None) -> SalesEvent:\n    keys = set(raw)\n    extra = keys - {\"event_id\", \"product_id\", \"revenue\", \"event_time\", \"processing_time\"}\n    assert not extra, f\"additionalProperties not allowed: {extra}\"\n    assert raw.get(\"event_id\", \"\").strip(), \"event_id required, non-empty\"\n    assert raw.get(\"product_id\", \"\").strip(), \"product_id required, non-empty\"\n    rev = raw[\"revenue\"]\n    assert isinstance(rev, str) and REV_RE.match(rev), f\"revenue malformed: {rev!r}\"\n    d = Decimal(rev)                          # Decimal, never float\n    assert -(10 ** 14) < d < 10 ** 14, \"revenue out of precision(18,4) range\"\n    et = _ts(raw[\"event_time\"])               # -> tiny offset\n    pt = raw.get(\"processing_time\")\n    pt = et if pt is None else _ts(pt)        # runtime populates when absent\n    assert pt >= et, f\"invariant violated: processing_time {pt} < event_time {et}\"\n    return SalesEvent(raw[\"event_id\"], raw[\"product_id\"], d, et, pt)\n\n# Three realistic cases: normal, retry-replay, refund-correction\nraw_stream = [\n    {\"event_id\": \"018f2a3b-0000-7000-8000-000000000001\", \"product_id\": \"SKU-1001\",\n     \"revenue\": \"19.99\",   \"event_time\": \"2026-10-12T09:15:00Z\"},\n    {\"event_id\": \"018f2a3b-0000-7000-8000-000000000001\", \"product_id\": \"SKU-1001\",\n     \"revenue\": \"19.99\",   \"event_time\": \"2026-10-12T09:15:00Z\"},   # duplicate replay\n    {\"event_id\": \"018f2a3b-0000-7000-8000-000000000002\", \"product_id\": \"SKU-1001\",\n     \"revenue\": \"-19.99\",  \"event_time\": \"2026-10-12T11:40:00Z\",     # late-arriving refund\n     \"processing_time\": \"2026-10-12T12:05:00Z\"},\n]\n\nenv = []\nfor raw in raw_stream:\n    try:\n        env.append(validate(raw))\n    except AssertionError as e:\n        print(\"REJECT:\", e)\n\n# Dedup on event_id -> first-write-wins\nseen, deduped = set(), []\nfor e in env:\n    if e.event_id not in seen:\n        seen.add(e.event_id); deduped.append(e)\n\n# Event-time aggregate (ledger sums, corrections net out)\nfrom collections import defaultdict\nledger = defaultdict(Decimal)\nfor e in deduped:\n    key = (e.product_id, e.event_time.strftime(\"%Y-%m-%dT%H:00Z\"))\n    ledger[key] += e.revenue\n\nprint(f\"{'product':<10}{'event_hour':<22}{'revenue':>10}\")\nfor (p, h), v in sorted(ledger.items()):\n    print(f\"{p:<10}{h:<22}{v:>10}\")\n\n# Late-data check (2h allowed lateness, processing-time judged)\nfor e in deduped:\n    lateness = e.processing_time - e.event_time\n    print(f\"{e.event_id[-4:]}  lateness={lateness}  \"\n          f\"{'LATE->side-output' if lateness > timedelta(hours=2) else 'on-time'}\")\n</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 936,
+      "prompt_tokens": 3199,
+      "total_tokens": 4135,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 8,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 256
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012193609772723984c955d568llLdwqEx",
+    "service_tier": "default",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "run--01a1319d-86e4-72b1-9026-7ff0c51c64c5-0",
+  "example": false,
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 3199,
+    "output_tokens": 936,
+    "total_tokens": 4135,
+    "input_token_details": {
+      "cache_read": 256
+    },
+    "output_token_details": {
+      "reasoning": 8
+    }
+  }
+}

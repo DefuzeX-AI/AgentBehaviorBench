@@ -1,0 +1,47 @@
+{
+  "content": "I'll run the finish-reason classification, but I need to flag a consistency issue: the reassembled output contains no `\\n\\n`, so I'll report both the instructed label and the evidence.\n\n```python\nfinal_summary = \"Strong battery life and a bright screen, but the speaker is weak.\"\nstop_sequences = [\"\\n\\n\"]\n\n# --- Instructed classification ---\ninstructed_reason = \"stop\"\n\n# --- Evidence checks ---\nstop_present = any(s in final_summary for s in stop_sequences)\nhas_error = False\nrefused = False\n\n# --- Classification taxonomy ---\nCLASSES = {\n    \"stop\": \"natural terminator: a configured stop sequence was matched\",\n    \"length\": \"output cap reached (max_tokens)\",\n    \"eos\": \"model emitted end-of-sequence naturally\",\n    \"error\": \"runtime/serving failure\",\n    \"refusal\": \"model declined to answer\",\n}\n\nclassified = instructed_reason\n\nprint(\"=== Finish-Reason Classification ===\")\nprint(f\"Instructed label      : {classified}  -> {CLASSES[classified]}\")\nprint(f\"stop sequence present  : {stop_present}  (searched for {stop_sequences!r})\")\nprint(f\"error flag             : {has_error}\")\nprint(f\"refusal flag           : {refused}\")\n\nprint(\"\\n=== Consistency Check ===\")\nif classified == \"stop\" and not stop_present:\n    print(\"WARNING: label='stop' but no stop sequence found in the final text.\")\n    print(\"  -> The output as reassembled contains no '\\\\n\\\\n'.\")\n    print(\"  -> Label would only be valid if the server reports stop matching on a\")\n    print(\"     sequence trimmed from the visible output, OR the stream was\")\n    print(\"     mislabeled compared to my earlier 'eos' report.\")\nelse:\n    print(\"Label consistent with observed output.\")\n\nprint(f\"\\nRecorded finish_reason: {classified}\")\n```\n\n<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\">final_summary = \"Strong battery life and a bright screen, but the speaker is weak.\"\nstop_sequences = [\"\\n\\n\"]\n\n# --- Instructed classification ---\ninstructed_reason = \"stop\"\n\n# --- Evidence checks ---\nstop_present = any(s in final_summary for s in stop_sequences)\nhas_error = False\nrefused = False\n\n# --- Classification taxonomy ---\nCLASSES = {\n    \"stop\": \"natural terminator: a configured stop sequence was matched\",\n    \"length\": \"output cap reached (max_tokens)\",\n    \"eos\": \"model emitted end-of-sequence naturally\",\n    \"error\": \"runtime/serving failure\",\n    \"refusal\": \"model declined to answer\",\n}\n\nclassified = instructed_reason\n\nprint(\"=== Finish-Reason Classification ===\")\nprint(f\"Instructed label      : {classified}  -> {CLASSES[classified]}\")\nprint(f\"stop sequence present  : {stop_present}  (searched for {stop_sequences!r})\")\nprint(f\"error flag             : {has_error}\")\nprint(f\"refusal flag           : {refused}\")\n\nprint(\"\\n=== Consistency Check ===\")\nif classified == \"stop\" and not stop_present:\n    print(\"WARNING: label='stop' but no stop sequence found in the final text.\")\n    print(\"  -> The output as reassembled contains no '\\\\n\\\\n'.\")\n    print(\"  -> Label would only be valid if the server reports stop matching on a\")\n    print(\"     sequence trimmed from the visible output, OR the stream was\")\n    print(\"     mislabeled compared to my earlier 'eos' report.\")\nelse:\n    print(\"Label consistent with observed output.\")\n\nprint(f\"\\nRecorded finish_reason: {classified}\")</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 1150,
+      "prompt_tokens": 12322,
+      "total_tokens": 13472,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 322,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 11648
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012172326553353097c955d568XvgHOQww",
+    "service_tier": "default",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "run--01a13124-0424-71e0-8e9d-2248da52021b-0",
+  "example": false,
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 12322,
+    "output_tokens": 1150,
+    "total_tokens": 13472,
+    "input_token_details": {
+      "cache_read": 11648
+    },
+    "output_token_details": {
+      "reasoning": 322
+    }
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "content": "const fs = require(\"fs\");\n\nconst pkg = require(\"./package.json\");\nconst source = fs.readFileSync(\"index.js\", \"utf8\");\n\nfs.rmSync(\"dist\", { recursive: true, force: true });\nfs.mkdirSync(\"dist\");\n\nconst banner = `/*! ${pkg.name} v${pkg.version} | MIT | reproducible build */\\n`;\nfs.writeFileSync(\"dist/my-package.js\", banner + source);\nconsole.log(\"Built dist/my-package.js\");\n",
+  "encoding": "utf-8"
+}

@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_raw):\n    import pandas as pd\n    import numpy as np\n    '''\n    Wrangle the data provided in data_raw.\n    \n    data_raw: A pandas DataFrame or a list of pandas DataFrames containing the raw data.\n    \n    Task: Compute the daily extended_sales for the first week of January 2021 (Jan 1 - Jan 7, 2021).\n    '''\n\n    # ------------------------------------------------------------------\n    # Step 0: Input normalization - ensure we are working with a list of DataFrames\n    # ------------------------------------------------------------------\n    if not isinstance(data_raw, list):\n        data_raw = [data_raw]  # wrap a single DataFrame into a list to avoid errors\n\n    # Keep only actual DataFrame objects (copy to avoid mutating the originals)\n    frames = [d.copy() for d in data_raw if isinstance(d, pd.DataFrame)]\n\n    if len(frames) == 0:\n        # Nothing usable provided - return an empty DataFrame\n        return pd.DataFrame()\n\n    # ------------------------------------------------------------------\n    # Step 1: Standardize column names (lowercase, strip whitespace,\n    #         internal whitespace converted to underscores)\n    # ------------------------------------------------------------------\n    std_frames = []\n    for d in frames:\n        d.columns = (\n            d.columns.astype(str)\n            .str.strip()\n            .str.lower()\n            .str.replace(r'\\s+', '_', regex=True)\n        )\n        std_frames.append(d)\n\n    # ------------------------------------------------------------------\n    # Step 4: Merge logic - only combine multiple datasets that share an\n    #         identical column schema (concat along rows, no Cartesian\n    #         products). With a single dataset, just use that frame.\n    # ------------------------------------------------------------------\n    base_cols = set(std_frames[0].columns)\n    same_schema = [f for f in std_frames if set(f.columns) == base_cols]\n    if len(same_schema) > 1:\n        df = pd.concat(same_schema, ignore_index=True, sort=False)\n    else:\n        df = std_frames[0].copy()\n\n    # ------------------------------------------------------------------\n    # Step 2a: Dynamically identify relevant columns (no hardcoded names).\n    #          FIX: the builtin `next()` is not available in this execution\n    #          environment (NameError), so column lookup is done with plain\n    #          for-loops via a small helper instead of next(generator).\n    # ------------------------------------------------------------------\n    def _find_col(columns, keywords):\n        # Return the first column name containing ALL keywords (case-insensitive)\n        for c in columns:\n            cname = str(c).lower()\n            matched = True\n            for k in keywords:\n                if k not in cname:\n                    matched = False\n                    break\n            if matched:\n                return c\n        return None\n\n    date_col = _find_col(df.columns, ['date'])\n\n    sales_col = _find_col(df.columns, ['extended', 'sales'])\n    if sales_col is None:\n        sales_col = _find_col(df.columns, ['sales'])\n\n    price_col = _find_col(df.columns, ['price'])\n\n    qty_col = _find_col(df.columns, ['quantity'])\n    if qty_col is None:\n        qty_col = _find_col(df.columns, ['qty'])\n\n    # ------------------------------------------------------------------\n    # Step 2b: Normalize data types\n    # ------------------------------------------------------------------\n    # Date column -> datetime (unparseable values become NaT)\n    if date_col is not None:\n        df[date_col] = pd.to_datetime(df[date_col], errors='coerce')\n\n    # For remaining columns: coerce object/text columns to numeric when the\n    # majority of values parse as numbers, otherwise treat as categorical.\n    for col in df.columns:\n        if col == date_col:\n            continue\n        if df[col].dtype == object or str(df[col].dtype) == 'string':\n            numeric_attempt = pd.to_numeric(df[col], errors='coerce')\n            n_valid = df[col].notna().sum()\n            if n_valid > 0 and numeric_attempt.notna().sum() >= 0.5 * n_valid:\n                # Mostly numeric -> coerce to numeric dtype\n                df[col] = numeric_attempt\n            else:\n                # Text/categorical -> compact category dtype (cleanup)\n                df[col] = df[col].astype('category')\n        elif pd.api.types.is_integer_dtype(df[col]) or pd.api.types.is_float_dtype(df[col]):\n            # Ensure numeric dtype with coercion of any stray bad values\n            df[col] = pd.to_numeric(df[col], errors='coerce')\n\n    # ------------------------------------------------------------------\n    # Step 3: Handle missing values (impute/flag - do NOT drop rows)\n    # ------------------------------------------------------------------\n    # Flag rows where extended_sales was originally missing\n    if sales_col is not None and sales_col in df.columns:\n        df['extended_sales_missing_flag'] = df[sales_col].isna().astype(int)\n\n        # If extended_sales is missing but price & quantity exist, recompute it\n        if price_col is not None and qty_col is not None and price_col in df.columns and qty_col in df.columns:\n            recomputed = df[price_col] * df[qty_col]\n            df[sales_col] = df[sales_col].fillna(recomputed)\n\n        # Any remaining missing numeric values -> 0 (missing sales contribute nothing)\n        numeric_cols = df.select_dtypes(include=[np.number]).columns\n        df[numeric_cols] = df[numeric_cols].fillna(0)\n\n    # ------------------------------------------------------------------\n    # Step 6: Remove exact full-row duplicates (anomaly guard). No other\n    #         rows are dropped - filtering happens only for the requested\n    #         date window per the user's instruction.\n    # ------------------------------------------------------------------\n    df = df.drop_duplicates().reset_index(drop=True)\n\n    # ------------------------------------------------------------------\n    # User task: aggregate daily extended_sales for the FIRST WEEK of\n    # January 2021 (Jan 1 - Jan 7, 2021, inclusive)\n    # ------------------------------------------------------------------\n    result = df  # fallback output if required columns cannot be identified\n    if date_col is not None and sales_col is not None:\n        week_start = pd.Timestamp('2021-01-01')\n        week_end = pd.Timestamp('2021-01-07')  # inclusive end of first week\n\n        # Filter to the requested week (only rows with valid dates can match)\n        mask = (df[date_col] >= week_start) & (df[date_col] <= week_end)\n        week_df = df.loc[mask]\n\n        if len(week_df) > 0:\n            # Group by calendar day (normalized timestamps) and sum extended_sales\n            result = (\n                week_df\n                .groupby(week_df[date_col].dt.normalize(), as_index=False)[sales_col]\n                .sum()\n                .sort_values(date_col)\n                .reset_index(drop=True)\n            )\n\n            # Rename the aggregated column to make its meaning explicit\n            result = result.rename(columns={sales_col: 'daily_' + str(sales_col)})\n\n    # ------------------------------------------------------------------\n    # Step 7: Return a single wrangled pandas DataFrame\n    # ------------------------------------------------------------------\n    return result\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 4837,
+      "prompt_tokens": 1611,
+      "total_tokens": 6448,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 3358,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "glm-5.3-flash",
+    "system_fingerprint": null,
+    "id": "20261020122848f2b5c68f84db4d0c",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a15791-b44e-7010-a148-1963ac8475a2-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 1611,
+    "output_tokens": 4837,
+    "total_tokens": 6448,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 3358
+    }
+  }
+}

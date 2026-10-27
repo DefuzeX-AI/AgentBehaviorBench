@@ -1,0 +1,69 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "c8d48faf294a45c596745a07c73913f4",
+  "case_id": "case_b4330c9097ea4e8680d807de16d999a0",
+  "input_id": "step-2",
+  "invocation_id": "c8d48faf294a45c596745a07c73913f4",
+  "agent_id": "mastracode",
+  "status": "succeeded",
+  "output": "Create a migration plan document that outlines the steps to migrate the database schema and data.Created **`MIGRATION_PLAN.md`** at the workspace root. Summary of what it covers:\n\n- **Scope:** No existing database — the migration bootstraps a SQLite DB (`data/app.db`) from zero using Python's built-in `sqlite3`.\n- **Schema (v1):** `orders` table with `id` (auto-increment PK), `customer_id`, `amount` (non-negative check), `created_at` (defaulted timestamp).\n- **8 execution steps:** versioned SQL script → Python migration runner (WAL mode, explicit transactions, `schema_migrations` tracking table) → execute → verify schema via `PRAGMA table_info` → insert sample data → export query results → backup via SQLite's online backup API + `integrity_check` → final state report.\n- **Verification criteria:** schema correctness, transactional consistency, durability (WAL), backup integrity, migration manifest.\n- **Rollback plan & risks:** idempotent scripts make full rebuild possible; WAL-aware backup avoids corrupt copies.\n\nReady to proceed with Step 1 (write `migrations/001_create_orders.sql`) whenever you want.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": false,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": false
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {},
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "mastracode",
+        "title": "Mastra Code",
+        "version": "0.1.0"
+      }
+    },
+    "pid": 12,
+    "session": {
+      "sessionId": "32e2dffd-94e8-4fdd-8095-8f68cdb59455",
+      "modes": {
+        "currentModeId": "build",
+        "availableModes": [
+          {
+            "id": "build",
+            "name": "Build"
+          },
+          {
+            "id": "plan",
+            "name": "Plan"
+          },
+          {
+            "id": "fast",
+            "name": "Fast"
+          }
+        ]
+      }
+    },
+    "session_id": "32e2dffd-94e8-4fdd-8095-8f68cdb59455",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn",
+      "usage": {
+        "totalTokens": 37343,
+        "inputTokens": 35336,
+        "outputTokens": 2007,
+        "thoughtTokens": 458,
+        "cachedReadTokens": 32896
+      }
+    }
+  }
+}

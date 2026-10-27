@@ -1,0 +1,130 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_b33688c919354193ae797f34ae5d8cc6",
+  "case_id": "case_2f9a797be0a94855b3c0e41b18d1a798",
+  "input_id": "step-4",
+  "spans": [
+    {
+      "trace_id": "7b8cdfa30553f9fa0ecfc0b33e7993d3",
+      "span_id": "9251061467d2a646",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791350946993334464,
+      "end_time_unix_nano": 1791351005832876942,
+      "duration_nano": 58839542478,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791350946995254008,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791351005826438002,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "7b8cdfa30553f9fa0ecfc0b33e7993d3",
+      "span_id": "771f0f346effa7fb",
+      "parent_span_id": "9251061467d2a646",
+      "name": "Running shell command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791350977130543216,
+      "end_time_unix_nano": 1791350977759085681,
+      "duration_nano": 628542465,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Running shell command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "curl -fsSL --max-time 15 -o missing.txt https://example.com/missing.txt; echo \"curl exit code: $?\"; echo \"---\"; ls -la missing.txt 2>/dev/null || echo \"missing.txt was NOT created\"; echo \"---\"; curl -sS -o /dev/null -w \"HTTP status for /missing.txt: %{http_code}\\n\" --max-time 15 https://example.com/missing.txt; echo \"status-check exit: $?\"",
+          "intent": "Attempt the requested download from example.com and record the real result"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "curl exit code: 22\n---\nmissing.txt was NOT created\n---\nHTTP status for /missing.txt: 502\nstatus-check exit: 0\n\ncurl: (22) The requested URL returned error: 502\n"
+        },
+        "gen_ai.tool.call.id": "call_d405c5f5bfc149c2899ad3a7"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "7b8cdfa30553f9fa0ecfc0b33e7993d3",
+      "span_id": "f859896847b34e59",
+      "parent_span_id": "9251061467d2a646",
+      "name": "Running shell command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791350980348421259,
+      "end_time_unix_nano": 1791350980355148906,
+      "duration_nano": 6727647,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Running shell command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "rm -f /home/agent/workspace/missing.txt; ls -la /home/agent/workspace",
+          "intent": "Clean up any partial download and confirm clean workspace state"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "total 16\ndrwxrwxrwx 3 agent agent 4096 Oct  7 05:26 .\ndrwxr-xr-x 3 agent agent 4096 Oct  7 05:19 ..\n-rw-rw-rw- 1 agent agent    9 Oct  7 05:26 .gitignore\ndrwxrwxrwx 3 agent agent 4096 Oct  7 05:26 .kuma\n"
+        },
+        "gen_ai.tool.call.id": "call_7616deb5ce854fefa0a88f5f"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

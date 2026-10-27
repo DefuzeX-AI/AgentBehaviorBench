@@ -1,0 +1,33 @@
+{
+ "agent": "mastracode",
+ "rounds": [
+  {
+   "retest_dir": "mastracode/a3ba681f-20261012T133841Z",
+   "round": "round-1",
+   "observe_id": "81bb347d629b43b5a8ad2babe7aac0f7",
+   "source_sha256": "cbddab535e56",
+   "reproduced": true,
+   "judge_detected": false,
+   "evidence": "step-5 aborted 'ACP Agent cancelled the prompt' (acp prompt_completed stopReason=cancelled at 13:57:18.936, step ran 556 s < 900 s limit, so not an ABB timeout). OM observer call started 13:53:16 and streamed 241.75 s (latency_ms) -> finished ~13:57:17.86, i.e. ~1.1 s before the cancel (interceptor wrote the 4 MB llm_response event late, at 13:57:20.1); in-flight main call (13:57:07.9) dropped 'Client disconnected.'. Steps 1-4 normal; an earlier OM return at 13:48:20 did not cancel. 41x200 + 1 llm_error (the dropped main call), no 429. Judge issue only about an invalid proof step, not the cancel.",
+   "gt_usable": true
+  },
+  {
+   "retest_dir": "mastracode/a3ba681f-20261012T133841Z",
+   "round": "round-2",
+   "observe_id": "a01042691e8f4e839abc687cf9e685f4",
+   "source_sha256": "cbddab535e56",
+   "reproduced": false,
+   "judge_detected": false,
+   "evidence": "All 10 steps succeeded; three OM observer calls returned 200 mid-turn (14:45:52, 14:51:48, 14:56:19) with no cancel. 63x200, no errors. Verdict pass. round-2-invalid-1/2 (no result.json) not counted.",
+   "gt_usable": true
+  }
+ ],
+ "defect": "Mastra Code's background observational-memory (OM) observer call returns mid-turn and mastracode then ends the active ACP prompt with stopReason 'cancelled' ('ACP Agent cancelled the prompt'), dropping its in-flight main model request; the user's task for that turn is lost and later steps fail (same defect as GT PR #323 / mastra-ai/mastra#26372).",
+ "expected_behavior": "Finish every turn; an OM observer call completing in the background must not cancel the active ACP prompt.",
+ "summary": "1/2 on cbddab535e56 (R1 step-5 cancel ~1.1 s after OM observer finished; R2 3 OM returns without cancel)",
+ "next": "duplicate_of_pr",
+ "observed_behavior": "Original smoke32 run: step-3 cancelled 0.35 s after an OM observer 200. Retest on new source cbddab535e56: R1 reproduced at step-5 (OM observer stream ended, ~1.1 s later the prompt was cancelled and the in-flight main request dropped); R2 completed all 10 steps although the OM observer returned three times mid-turn.",
+ "duplicate_of": "#323",
+ "note": "Batch-9 (2026-10-12): new entry from abb_smoke32; 133841Z R1 reproduced (step-5, ~1.1 s after OM stream end), R2 not (3 OM returns, no cancel) -> 1/2 on new source cbddab535e56. Same defect as GT PR #323 (shown there on 4206a2f7fe08) -> duplicate_of_pr; R1 is supporting evidence that the cancel persists on cbddab535e56.",
+ "reviewed_at": "2026-10-12"
+}

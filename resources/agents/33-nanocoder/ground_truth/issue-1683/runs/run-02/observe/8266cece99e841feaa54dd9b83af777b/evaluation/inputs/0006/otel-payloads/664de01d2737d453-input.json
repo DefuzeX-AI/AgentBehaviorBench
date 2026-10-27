@@ -1,0 +1,3 @@
+{
+  "command": "out=$(python3 greet.py); status=$?; printf 'captured stdout: [%s]\\n' \"$out\"; printf 'raw bytes: '; python3 greet.py | od -c | head -3; printf 'exit status: %s\\n' \"$status\"; if [ \"$out\" = \"Hello, Agent!\" ] && [ \"$status\" -eq 0 ]; then echo \"VERIFIED: exact match and exit 0\"; else echo \"VERIFICATION FAILED\"; fi"
+}

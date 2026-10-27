@@ -1,0 +1,4 @@
+{
+  "content": "#!/usr/bin/env python3\n\"\"\"Compute the L2 norm of each client's update vector.\n\nReads client update files (clientN.json) from the same directory as this\nscript and prints each client's name and its raw L2 norm.\n\"\"\"\n\nimport json\nfrom pathlib import Path\nfrom math import sqrt\n\nHERE = Path(__file__).resolve().parent\n\n\ndef main() -> None:\n    config = json.loads((HERE / \"config.json\").read_text())\n    num_clients = config[\"num_clients\"]\n\n    for i in range(1, num_clients + 1):\n        client_file = HERE / f\"client{i}.json\"\n        data = json.loads(client_file.read_text())\n        update = data[\"update\"]\n\n        norm = sqrt(sum(x * x for x in update))\n        print(f\"client{i}: {norm:.6f}\")\n\n\nif __name__ == \"__main__\":\n    main()\n",
+  "encoding": "utf-8"
+}

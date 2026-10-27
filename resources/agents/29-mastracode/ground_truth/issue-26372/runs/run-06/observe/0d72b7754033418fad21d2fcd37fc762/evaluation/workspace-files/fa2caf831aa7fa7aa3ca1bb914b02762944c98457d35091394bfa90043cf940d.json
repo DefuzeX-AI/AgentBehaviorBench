@@ -1,0 +1,4 @@
+{
+  "content": "#!/usr/bin/env python3\n\"\"\"Insert sample data into the 'orders' table.\"\"\"\n\nimport sqlite3\nfrom pathlib import Path\n\nDB_PATH = Path(__file__).resolve().parent / \"app.db\"\n\nSAMPLE_ORDERS = [\n    (101, 249.99),\n    (102, 19.50),\n    (101, 75.00),\n    (103, 1200.00),\n    (104, 8.75),\n    (102, 340.10),\n]\n\n\ndef main() -> None:\n    conn = sqlite3.connect(DB_PATH)\n    try:\n        conn.executemany(\n            \"INSERT INTO orders (customer_id, amount) VALUES (?, ?)\",\n            SAMPLE_ORDERS,\n        )\n        conn.commit()\n        count = conn.execute(\"SELECT COUNT(*) FROM orders\").fetchone()[0]\n    finally:\n        conn.close()\n\n    print(f\"OK: inserted {len(SAMPLE_ORDERS)} rows; table now has {count} rows\")\n\n\nif __name__ == \"__main__\":\n    main()\n",
+  "encoding": "utf-8"
+}

@@ -1,0 +1,89 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_b33688c919354193ae797f34ae5d8cc6",
+  "case_id": "case_2f9a797be0a94855b3c0e41b18d1a798",
+  "input_id": "step-3",
+  "spans": [
+    {
+      "trace_id": "ae771dd3a3e8532492af5f4f06a2f139",
+      "span_id": "2186056123307213",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791350897801653299,
+      "end_time_unix_nano": 1791350946975467233,
+      "duration_nano": 49173813934,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791350897803721917,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791350946969001287,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "ae771dd3a3e8532492af5f4f06a2f139",
+      "span_id": "833d122b7f2b77fe",
+      "parent_span_id": "2186056123307213",
+      "name": "Running shell command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791350924840924716,
+      "end_time_unix_nano": 1791350924871841820,
+      "duration_nano": 30917104,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Running shell command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "for f in release_checklist.md RELEASE_CHECKLIST.md checklist.md CHECKLIST.md RELEASE.md CHANGELOG.md README.md VERSION package.json Cargo.toml pyproject.toml Makefile; do [ -e \"/home/agent/workspace/$f\" ] && echo \"EXISTS: $f\"; done; echo \"---\"; [ -d /home/agent/workspace/.git ] && echo \"git repo present\" || echo \"no .git directory\"; echo \"---\"; find /home/agent/workspace -maxdepth 2 -type f -not -path \"*/.kuma/*\"",
+          "intent": "Confirm absence of checklist and all common release artifacts"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "---\nno .git directory\n---\n/home/agent/workspace/.gitignore\n"
+        },
+        "gen_ai.tool.call.id": "call_23d68a7df0e44c689e36e333"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

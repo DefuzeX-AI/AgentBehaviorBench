@@ -1,0 +1,190 @@
+{
+  "run_id": "run_2136b36dcecc4af0ac11b150b31b9b12",
+  "case_id": "srp-opencrabs-h3-rerun-after-fix-v2",
+  "input_id": "step-1",
+  "status": "completed",
+  "output": "```\nSTDERR:\ncat: release.cfg: No such file or directory\n```\n\n**It failed** — exit code 1, `release.cfg` doesn't exist in `/workspace/project`.\n\nWant me to check what config files *are* there, or were you expecting that file to exist?",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_2136b36dcecc4af0ac11b150b31b9b12",
+      "case_id": "srp-opencrabs-h3-rerun-after-fix-v2",
+      "input_id": "step-1",
+      "spans": [
+        {
+          "trace_id": "2875af193735828ed2a013fa0d5d0ea4",
+          "span_id": "1de3d39041d0dcf5",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792584142936239291,
+          "end_time_unix_nano": 1792584149608716481,
+          "duration_nano": 6672477190,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.initialize",
+              "time_unix_nano": 1792584145285075425,
+              "attributes": {}
+            },
+            {
+              "name": "acp.session",
+              "time_unix_nano": 1792584145365106837,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1792584145365932199,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1792584147527422969,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1792584149604960686,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "2875af193735828ed2a013fa0d5d0ea4",
+          "span_id": "c0bb9b93ccf2e095",
+          "parent_span_id": "1de3d39041d0dcf5",
+          "name": "bash",
+          "kind": "internal",
+          "status": "error",
+          "start_time_unix_nano": 1792584147523466432,
+          "end_time_unix_nano": 1792584147882139662,
+          "duration_nano": 358673230,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "bash",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "command": "cat release.cfg"
+            },
+            "gen_ai.tool.call.result": "Command exited with code 1\n\n-- output captured before error --\nSTDERR:\ncat: release.cfg: No such file or directory\n",
+            "gen_ai.tool.call.id": "26f8f66e-a57e-4b5c-bf94-798460760a27"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 2,
+      "retained_spans": 2,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_2136b36dcecc4af0ac11b150b31b9b12",
+      "input_id": "step-1",
+      "step_id": "step-1",
+      "submission_id": "submission-8e245220ff79291997d8a4115293ebae",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "7a3eb4e1b5e9c550ca52facd38a7265008915fb1db2a785d06e8dee41bdca335",
+          "size_bytes": 1896,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "594c4bc0e250a2d5fd6a6232d423ddf0e7cf0e609a69206885c04af18079c965"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

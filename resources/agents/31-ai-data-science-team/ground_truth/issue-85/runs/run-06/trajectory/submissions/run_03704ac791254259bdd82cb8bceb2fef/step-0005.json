@@ -1,0 +1,989 @@
+{
+  "input_id": "step-6",
+  "status": "completed",
+  "output": "Wrangled table shape: 5 rows x 16 cols.\n\nReturning the data table:\n  table_name object_type     column_name source_column_name raw_data_type normalized_data_type  row_count  null_count  null_pct  distinct_count  is_nullable                 constraints  duplicate_rows_table_wide missing_value_strategy                     dependencies                 ownership\n0    table_1       TABLE            date               date           str             datetime      13149           0       0.0            1461        False  NOT NULL, VALID DATE PARSE                          0          none required                    none detected  source dataset \"table_1\"\n1    table_1       TABLE      bike_model         bike_model           str          categorical      13149           0       0.0               9        False                    NOT NULL                          0          none required                    none detected  source dataset \"table_1\"\n2    table_1       TABLE           price              price         int64              numeric      13149           0       0.0               9        False       NOT NULL, CHECK (> 0)                          0          none required                    none detected  source dataset \"table_1\"\n3    table_1       TABLE   quantity_sold      quantity_sold         int64              numeric      13149           0       0.0             107        False       NOT NULL, CHECK (> 0)                          0          none required                    none detected  source dataset \"table_1\"\n4    table_1       TABLE  extended_sales     extended_sales         int64              numeric      13149           0       0.0             217        False       NOT NULL, CHECK (> 0)                          0          none required  derived = price * quantity_sold  source dataset \"table_1\"",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "file_evidence": null,
+  "local_diffs": {},
+  "logs": [],
+  "missing": [],
+  "dropped_count": 0,
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_03704ac791254259bdd82cb8bceb2fef",
+      "case_id": "case_db6eaec143974201af6136a4137e8d9a",
+      "input_id": "step-6",
+      "spans": [
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "2586da074e06cec1",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924221087867574,
+          "end_time_unix_nano": 1791924472928827787,
+          "duration_nano": 251840960213,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "1025a64c062d5513",
+          "parent_span_id": "2586da074e06cec1",
+          "name": "pandas_data_analyst",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924221281709011,
+          "end_time_unix_nano": 1791924472918406135,
+          "duration_nano": 251636697124,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "76978b435ed82206",
+          "parent_span_id": "1025a64c062d5513",
+          "name": "prepare_messages",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924221696704379,
+          "end_time_unix_nano": 1791924221928015597,
+          "duration_nano": 231311218,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "b883545a1ef9bee8",
+          "parent_span_id": "1025a64c062d5513",
+          "name": "routing_preprocessor",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924222089741901,
+          "end_time_unix_nano": 1791924237775821287,
+          "duration_nano": 15686079386,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "048421f89eef2885",
+          "parent_span_id": "b883545a1ef9bee8",
+          "name": "RunnableSequence",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924222329742966,
+          "end_time_unix_nano": 1791924237774870882,
+          "duration_nano": 15445127916,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "fbf29bf64efa95ed",
+          "parent_span_id": "048421f89eef2885",
+          "name": "PromptTemplate",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924222331795987,
+          "end_time_unix_nano": 1791924222334414573,
+          "duration_nano": 2618586,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "199d3d630c062ea1",
+          "parent_span_id": "048421f89eef2885",
+          "name": "ChatOpenAI",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924222335778617,
+          "end_time_unix_nano": 1791924237759853629,
+          "duration_nano": 15424075012,
+          "model_content": {
+            "schema_version": "kuma.model_content.v1",
+            "input": {
+              "status": "present",
+              "value": [
+                [
+                  {
+                    "content": "\n        You are an expert in routing decisions for a Pandas Data Manipulation Wrangling Agent, a Charting Visualization Agent, and a Pandas Table Agent. Your job is to tell the agents which actions to perform and determine the correct routing for the incoming user question:\n        \n        1. Determine what the correct format for a Users Question should be for use with a Pandas Data Wrangling Agent based on the incoming user question. Anything related to data wrangling and manipulation should be passed along. Anything related to data analysis can be handled by the Pandas Agent. Anything that uses Pandas can be passed along. Tables can be returned from this agent. Don't pass along anything about plotting or visualization.\n        2. Determine whether or not a chart should be generated or a table should be returned based on the users question.\n        3. If a chart is requested, determine the correct format of a Users Question should be used with a Data Visualization Agent. Anything related to plotting and visualization should be passed along.\n        \n        Use the following criteria on how to route the the initial user question:\n        \n        From the incoming user question, remove any details about the format of the final response as either a Chart or Table and return only the important part of the incoming user question that is relevant for the Pandas Data Wrangling and Transformation agent. This will be the 'user_instructions_data_wrangling'. If 'None' is found, return the original user question.\n        \n        Next, determine if the user would like a data visualization ('chart') or a 'table' returned with the results of the Data Wrangling Agent. If unknown, not specified or 'None' is found, then select 'table'.  \n        \n        If a 'chart' is requested, return the 'user_instructions_data_visualization'. If 'None' is found, return None.\n        \n        Return JSON with 'user_instructions_data_wrangling', 'user_instructions_data_visualization' and 'routing_preprocessor_decision'.\n        \n        INITIAL_USER_QUESTION: Produce a concise schema identity report summarizing the tables, views, columns, constraints, dependencies, and ownership.\n        ",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "human",
+                    "name": null,
+                    "id": null
+                  }
+                ]
+              ]
+            },
+            "output": {
+              "status": "present",
+              "value": {
+                "generations": [
+                  [
+                    {
+                      "text": "```json\n{\n  \"user_instructions_data_wrangling\": \"Produce a concise schema identity report summarizing the tables, views, columns, constraints, dependencies, and ownership.\",\n  \"user_instructions_data_visualization\": null,\n  \"routing_preprocessor_decision\": \"table\"\n}\n```\n\n**Routing Rationale:**\n\n1. **Data Wrangling Instructions:** The user's question is entirely about data analysis and schema summarization (tables, views, columns, constraints, dependencies, ownership). This is appropriate for the Pandas Data Wrangling Agent. The word \"report\" is a general format term, not an explicit Chart or Table request, so the original question is passed along intact.\n\n2. **Output Format Decision:** The user did not request any visualization, plot, or chart. There are no charting-related keywords (e.g., \"plot,\" \"graph,\" \"visualize,\" \"chart\"). Per the criteria, when the format is not specified, the default routing decision is **'table'**.\n\n3. **Visualization Agent:** Since no chart was requested, `user_instructions_data_visualization` is set to `null`, and the request does not need to be routed to the Data Visualization Agent.",
+                      "generation_info": {
+                        "finish_reason": "stop",
+                        "logprobs": null
+                      },
+                      "type": "ChatGeneration",
+                      "message": {
+                        "content": "```json\n{\n  \"user_instructions_data_wrangling\": \"Produce a concise schema identity report summarizing the tables, views, columns, constraints, dependencies, and ownership.\",\n  \"user_instructions_data_visualization\": null,\n  \"routing_preprocessor_decision\": \"table\"\n}\n```\n\n**Routing Rationale:**\n\n1. **Data Wrangling Instructions:** The user's question is entirely about data analysis and schema summarization (tables, views, columns, constraints, dependencies, ownership). This is appropriate for the Pandas Data Wrangling Agent. The word \"report\" is a general format term, not an explicit Chart or Table request, so the original question is passed along intact.\n\n2. **Output Format Decision:** The user did not request any visualization, plot, or chart. There are no charting-related keywords (e.g., \"plot,\" \"graph,\" \"visualize,\" \"chart\"). Per the criteria, when the format is not specified, the default routing decision is **'table'**.\n\n3. **Visualization Agent:** Since no chart was requested, `user_instructions_data_visualization` is set to `null`, and the request does not need to be routed to the Data Visualization Agent.",
+                        "additional_kwargs": {
+                          "refusal": null
+                        },
+                        "response_metadata": {
+                          "token_usage": {
+                            "completion_tokens": 647,
+                            "prompt_tokens": 441,
+                            "total_tokens": 1088,
+                            "completion_tokens_details": {
+                              "accepted_prediction_tokens": null,
+                              "audio_tokens": null,
+                              "reasoning_tokens": 400,
+                              "rejected_prediction_tokens": null,
+                              "text_tokens": null
+                            },
+                            "prompt_tokens_details": {
+                              "audio_tokens": null,
+                              "cache_write_tokens": null,
+                              "cached_tokens": 0,
+                              "image_tokens": null,
+                              "text_tokens": null
+                            }
+                          },
+                          "model_provider": "openai",
+                          "model_name": "glm-5.3-flash",
+                          "system_fingerprint": null,
+                          "id": "20261014044343df69a2afc27b415b",
+                          "finish_reason": "stop",
+                          "logprobs": null
+                        },
+                        "type": "ai",
+                        "name": null,
+                        "id": "lc_run--01a13701-b97f-7463-9e44-84c5e2ec2b3e-0"
+                      }
+                    }
+                  ]
+                ],
+                "llm_output": {
+                  "token_usage": {
+                    "completion_tokens": 647,
+                    "prompt_tokens": 441,
+                    "total_tokens": 1088,
+                    "completion_tokens_details": {
+                      "accepted_prediction_tokens": null,
+                      "audio_tokens": null,
+                      "reasoning_tokens": 400,
+                      "rejected_prediction_tokens": null,
+                      "text_tokens": null
+                    },
+                    "prompt_tokens_details": {
+                      "audio_tokens": null,
+                      "cache_write_tokens": null,
+                      "cached_tokens": 0,
+                      "image_tokens": null,
+                      "text_tokens": null
+                    }
+                  },
+                  "model_provider": "openai",
+                  "model_name": "glm-5.3-flash",
+                  "system_fingerprint": null,
+                  "id": "20261014044343df69a2afc27b415b"
+                },
+                "run": null,
+                "type": "LLMResult"
+              }
+            }
+          },
+          "attributes": {
+            "gen_ai.operation.name": "chat"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "6d3d5160f26c8b4f",
+          "parent_span_id": "048421f89eef2885",
+          "name": "JsonOutputParser",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924237760920542,
+          "end_time_unix_nano": 1791924237773763828,
+          "duration_nano": 12843286,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "0c45dff57c350f5f",
+          "parent_span_id": "1025a64c062d5513",
+          "name": "data_wrangling_agent",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924237906620326,
+          "end_time_unix_nano": 1791924472122914943,
+          "duration_nano": 234216294617,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "ae89a157a14e7a8b",
+          "parent_span_id": "0c45dff57c350f5f",
+          "name": "data_wrangling_agent",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924238268728119,
+          "end_time_unix_nano": 1791924471742997100,
+          "duration_nano": 233474268981,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "9408df79e54de6fa",
+          "parent_span_id": "ae89a157a14e7a8b",
+          "name": "create_data_wrangler_code",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924238663092358,
+          "end_time_unix_nano": 1791924417986873225,
+          "duration_nano": 179323780867,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "79f60667f6782acd",
+          "parent_span_id": "9408df79e54de6fa",
+          "name": "RunnableSequence",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924238955274748,
+          "end_time_unix_nano": 1791924417985569786,
+          "duration_nano": 179030295038,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "79f53f9722c268ce",
+          "parent_span_id": "79f60667f6782acd",
+          "name": "PromptTemplate",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924238957551760,
+          "end_time_unix_nano": 1791924238960091072,
+          "duration_nano": 2539312,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "dbccd88c435ea630",
+          "parent_span_id": "79f60667f6782acd",
+          "name": "ChatOpenAI",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924238961306389,
+          "end_time_unix_nano": 1791924417980920916,
+          "duration_nano": 179019614527,
+          "model_content": {
+            "schema_version": "kuma.model_content.v1",
+            "input": {
+              "status": "present",
+              "value": [
+                [
+                  {
+                    "content": "\n            You are a Pandas Data Wrangling Coding Agent. Your job is to create a data_wrangler() function that can be run on the provided data. You should use Pandas and NumPy for data wrangling operations.\n            \n            User instructions:\n            Produce a concise schema identity report summarizing the tables, views, columns, constraints, dependencies, and ownership.\n            \n            Follow these recommended steps (if present):\n            # Recommended Data Wrangling Steps:\n1. Inspect and standardize column names (lowercase, strip spaces) if needed.\n2. Normalize data types (numeric/categorical/datetime); coerce where reasonable.\n3. Handle missing values (simple imputation or flagging) without dropping data unless instructed.\n4. For multiple datasets, identify join keys and merge appropriately; avoid Cartesian products.\n5. Handle categorical encoding where necessary (one-hot or category cleanup).\n6. Remove duplicates and obvious anomalies, but avoid dropping rows unless requested.\n7. Return a single pandas DataFrame with the wrangled data.\n            \n            If multiple datasets are provided, you may need to merge or join them. Make sure to handle that scenario based on the recommended steps and user instructions.\n            \n            Below are summaries of all datasets provided. If more than one dataset is provided, you may need to merge or join them.:\n            Dataset Name: main\n        ----------------------------\n        Shape: 13149 rows x 5 columns\n\n        Column Data Types:\n        date: str\nbike_model: str\nprice: int64\nquantity_sold: int64\nextended_sales: int64\n\n        Data (first 5 rows):\n                 date          bike_model  price  quantity_sold  extended_sales\n0  2021-01-01      Commuter Swift    495             23           11385\n1  2021-01-01         Urban Rider    350             19            6650\n2  2021-01-01        City Cruiser    400             19            7600\n3  2021-01-01  Mountain Trail Pro   1250             11           13750\n4  2021-01-01     Gravel Explorer   2200              9           19800\n            \n            Return Python code in ```python``` format with a single function definition, data_wrangler(), that includes all imports inside the function. And returns a single pandas data frame.\n\n            ```python\n            def data_wrangler(data_list):\n                '''\n                Wrangle the data provided in data.\n                \n                data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n                '''\n                import pandas as pd\n                import numpy as np\n                # Implement the wrangling steps here\n                \n                # Return a single DataFrame \n                return data_wrangled\n            ```\n            \n            Avoid Errors:\n            1. If the incoming data is not a list. Convert it to a list first. \n            2. Do not specify data types inside the function arguments.\n            3. Do not hardcode column names; derive column usage from the provided data structures and user instructions.\n            \n            Important Notes:\n            1. Do Not use Print statements to display the data. Return the data frame instead with the data wrangling operation performed.\n            2. Do not plot graphs. Only return the data frame.\n            3. Only return a single pandas DataFrame and nothing else.\n            \n            Make sure to explain any non-trivial steps with inline comments. Follow user instructions. Comment code thoroughly.\n            \n            \n            ",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "human",
+                    "name": null,
+                    "id": null
+                  }
+                ]
+              ]
+            },
+            "output": {
+              "status": "present",
+              "value": {
+                "generations": [
+                  [
+                    {
+                      "text": "```python\ndef data_wrangler(data_list):\n    '''\n    Produce a concise schema identity report summarizing the tables, columns,\n    inferred constraints, dependencies (derived-column / FK / join-key\n    candidates), and ownership for every dataset supplied.\n\n    data_list: A list of one or more pandas data frames containing the raw data.\n    Returns:   A single pandas DataFrame; one row per column of schema metadata.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # ------------------------------------------------------------------\n    # 0. Input safety: always operate on a list of DataFrames (Error guard #1)\n    # ------------------------------------------------------------------\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    report_rows = []        # one dict of metadata per column (final report rows)\n    dep_lists = []          # parallel list of dependency labels per report row\n    table_col_values = {}   # {(table, column): set of values} for cross-table checks\n\n    # Expected output schema (also guarantees a well-formed empty result)\n    report_columns = [\n        'table_name', 'object_type', 'column_name', 'source_column_name',\n        'raw_data_type', 'normalized_data_type', 'row_count', 'null_count',\n        'null_pct', 'distinct_count', 'is_nullable', 'constraints',\n        'duplicate_rows_table_wide', 'missing_value_strategy',\n        'dependencies', 'ownership'\n    ]\n\n    # ------------------------------------------------------------------\n    # Loop over every provided table / view-like object\n    # ------------------------------------------------------------------\n    for idx, df in enumerate(data_list):\n        if not isinstance(df, pd.DataFrame) or df.empty:\n            continue  # skip anything that is not a usable DataFrame\n\n        # Derive a stable table name from metadata if present; never hardcode names\n        table_name = df.attrs.get('name', f'table_{idx + 1}')\n\n        # --------------------------------------------------------------\n        # Step 1: inspect + standardize column names (lowercase, strip,\n        #         spaces -> underscores) while retaining the originals\n        # --------------------------------------------------------------\n        original_cols = {str(c).strip().lower().replace(' ', '_'): c for c in df.columns}\n        clean = df.copy()\n        clean.columns = list(original_cols.keys())\n        n_rows = len(clean)\n\n        # --------------------------------------------------------------\n        # Step 2: normalize data types (datetime / numeric / categorical /\n        #         string). Coercion is validated by success rate; no data\n        #         is dropped -- failures are simply reported as nulls.\n        # --------------------------------------------------------------\n        norm_types, coerced = {}, {}\n        for col in clean.columns:\n            s = clean[col]\n            if pd.api.types.is_datetime64_any_dtype(s):\n                norm_types[col], coerced[col] = 'datetime', s\n            elif pd.api.types.is_numeric_dtype(s):\n                norm_types[col], coerced[col] = 'numeric', s\n            else:\n                dt = pd.to_datetime(s, errors='coerce')\n                num = pd.to_numeric(s, errors='coerce')\n                if dt.notna().mean() >= 0.8:                      # looks like dates\n                    norm_types[col], coerced[col] = 'datetime', dt\n                elif num.notna().mean() >= 0.8:                   # numeric stored as text\n                    norm_types[col], coerced[col] = 'numeric', num\n                elif s.nunique(dropna=True) <= max(50, 0.5 * n_rows):\n                    norm_types[col], coerced[col] = 'categorical', s.astype('category')\n                else:\n                    norm_types[col], coerced[col] = 'string', s.astype('string')\n\n        numeric_cols = [c for c in clean.columns if norm_types[c] == 'numeric']\n\n        # --------------------------------------------------------------\n        # Step 6 (flag-only, per instructions): count duplicates rather\n        #         than dropping rows.\n        # --------------------------------------------------------------\n        dup_count = int(clean.duplicated().sum())\n\n        # --------------------------------------------------------------\n        # Dependency detection (schema lineage): flag any numeric column\n        # whose values exactly equal the product or sum of two peer\n        # numeric columns, e.g. an \"extended\" total derived from\n        # unit price x quantity. This reveals intra-table dependencies.\n        # --------------------------------------------------------------\n        derived = {}\n        for target in numeric_cols:\n            t = pd.to_numeric(coerced[target], errors='coerce').astype(float)\n            others = [c for c in numeric_cols if c != target]\n            for i in range(len(others)):\n                for j in range(i + 1, len(others)):\n                    a = pd.to_numeric(coerced[others[i]], errors='coerce').astype(float)\n                    b = pd.to_numeric(coerced[others[j]], errors='coerce').astype(float)\n                    if np.allclose(t.values, (a * b).values, equal_nan=True):\n                        derived[target] = f'derived = {others[i]} * {others[j]}'\n                    elif np.allclose(t.values, (a + b).values, equal_nan=True):\n                        derived[target] = f'derived = {others[i]} + {others[j]}'\n\n        # Cache normalized value sets for cross-table FK / join-key checks\n        for col in clean.columns:\n            table_col_values[(table_name, col)] = set(\n                coerced[col].dropna().astype(str)\n            )\n\n        # --------------------------------------------------------------\n        # Build one report row per column, inferring constraints\n        # --------------------------------------------------------------\n        for col in clean.columns:\n            s = clean[col]\n            n_missing = int(s.isna().sum())\n            n_unique = int(s.nunique(dropna=True))\n\n            # ---- inferred constraints (NULL / UNIQUE / CHECK / PK) ----\n            constraints = []\n            if n_missing == 0:\n                constraints.append('NOT NULL')\n            if n_rows > 0 and n_unique == n_rows:\n                constraints.append('UNIQUE')\n            if 'NOT NULL' in constraints and 'UNIQUE' in constraints:\n                constraints.append('PRIMARY KEY CANDIDATE')\n            if norm_types[col] == 'numeric':\n                vals = pd.to_numeric(coerced[col], errors='coerce').dropna()\n                if len(vals) and (vals > 0).all():\n                    constraints.append('CHECK (> 0)')\n                elif len(vals) and (vals >= 0).all():\n                    constraints.append('CHECK (>= 0)')\n            if norm_types[col] == 'datetime' and coerced[col].notna().all():\n                constraints.append('VALID DATE PARSE')\n\n            # ---- Step 3: missing-value strategy (documented, not applied) ----\n            if n_missing == 0:\n                impute = 'none required'\n            elif norm_types[col] == 'numeric':\n                impute = f\"impute median = {pd.to_numeric(s, errors='coerce').median()}\"\n            elif norm_types[col] == 'datetime':\n                impute = 'forward-fill recommended'\n            else:\n                impute = \"impute mode or 'unknown' label\"\n\n            # Dependency label for this column (extended below for cross-table)\n            dep_list = [derived[col]] if col in derived else []\n\n            report_rows.append({\n                'table_name': table_name,\n                'object_type': 'TABLE',  # DataFrames arrive as tables, not views\n                'column_name': col,\n                'source_column_name': original_cols[col],\n                'raw_data_type': str(s.dtype),\n                'normalized_data_type': norm_types[col],\n                'row_count': n_rows,\n                'null_count': n_missing,\n                'null_pct': round(100.0 * n_missing / n_rows, 2) if n_rows else 0.0,\n                'distinct_count': n_unique,\n                'is_nullable': bool(n_missing > 0),\n                'constraints': ', '.join(constraints) if constraints else 'none inferred',\n                'duplicate_rows_table_wide': dup_count,\n                'missing_value_strategy': impute,\n                'dependencies': '',\n                'ownership': f'source dataset \"{table_name}\"',\n            })\n            dep_lists.append(dep_list)\n\n    # ------------------------------------------------------------------\n    # Build the report; skip cross-table scan if it is empty\n    # ------------------------------------------------------------------\n    report = pd.DataFrame(report_rows, columns=report_columns)\n\n    # ------------------------------------------------------------------\n    # Step 4-style dependency scan across MULTIPLE tables: flag columns\n    # whose value sets are fully contained in a same-typed column of\n    # another table (foreign-key / safe join-key candidates).\n    # ------------------------------------------------------------------\n    if len(data_list) > 1 and not report.empty:\n        for pos, row in report.iterrows():\n            own = table_col_values.get((row['table_name'], row['column_name']), set())\n            if not own:\n                continue\n            for (t, c), vals in table_col_values.items():\n                if (t, c) == (row['table_name'], row['column_name']) or not vals:\n                    continue\n                mask = (report['table_name'] == t) & (report['column_name'] == c)\n                if not mask.any():\n                    continue\n                peer_type = report.loc[mask, 'normalized_data_type'].iloc[0]\n                # Only compare like-typed columns; subset test avoids Cartesian joins\n                if peer_type == row['normalized_data_type'] and own.issubset(vals):\n                    dep_lists[pos].append(f'FK/JOIN candidate -> {t}.{c}')\n\n    # Finalize the dependencies column (concise labels per row)\n    if not report.empty:\n        report['dependencies'] = [\n            '; '.join(d) if d else 'none detected' for d in dep_lists\n        ]\n\n    # ------------------------------------------------------------------\n    # Step 7: return the finished schema identity report as ONE DataFrame\n    # ------------------------------------------------------------------\n    return report\n```",
+                      "generation_info": {
+                        "finish_reason": "stop",
+                        "logprobs": null
+                      },
+                      "type": "ChatGeneration",
+                      "message": {
+                        "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Produce a concise schema identity report summarizing the tables, columns,\n    inferred constraints, dependencies (derived-column / FK / join-key\n    candidates), and ownership for every dataset supplied.\n\n    data_list: A list of one or more pandas data frames containing the raw data.\n    Returns:   A single pandas DataFrame; one row per column of schema metadata.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # ------------------------------------------------------------------\n    # 0. Input safety: always operate on a list of DataFrames (Error guard #1)\n    # ------------------------------------------------------------------\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    report_rows = []        # one dict of metadata per column (final report rows)\n    dep_lists = []          # parallel list of dependency labels per report row\n    table_col_values = {}   # {(table, column): set of values} for cross-table checks\n\n    # Expected output schema (also guarantees a well-formed empty result)\n    report_columns = [\n        'table_name', 'object_type', 'column_name', 'source_column_name',\n        'raw_data_type', 'normalized_data_type', 'row_count', 'null_count',\n        'null_pct', 'distinct_count', 'is_nullable', 'constraints',\n        'duplicate_rows_table_wide', 'missing_value_strategy',\n        'dependencies', 'ownership'\n    ]\n\n    # ------------------------------------------------------------------\n    # Loop over every provided table / view-like object\n    # ------------------------------------------------------------------\n    for idx, df in enumerate(data_list):\n        if not isinstance(df, pd.DataFrame) or df.empty:\n            continue  # skip anything that is not a usable DataFrame\n\n        # Derive a stable table name from metadata if present; never hardcode names\n        table_name = df.attrs.get('name', f'table_{idx + 1}')\n\n        # --------------------------------------------------------------\n        # Step 1: inspect + standardize column names (lowercase, strip,\n        #         spaces -> underscores) while retaining the originals\n        # --------------------------------------------------------------\n        original_cols = {str(c).strip().lower().replace(' ', '_'): c for c in df.columns}\n        clean = df.copy()\n        clean.columns = list(original_cols.keys())\n        n_rows = len(clean)\n\n        # --------------------------------------------------------------\n        # Step 2: normalize data types (datetime / numeric / categorical /\n        #         string). Coercion is validated by success rate; no data\n        #         is dropped -- failures are simply reported as nulls.\n        # --------------------------------------------------------------\n        norm_types, coerced = {}, {}\n        for col in clean.columns:\n            s = clean[col]\n            if pd.api.types.is_datetime64_any_dtype(s):\n                norm_types[col], coerced[col] = 'datetime', s\n            elif pd.api.types.is_numeric_dtype(s):\n                norm_types[col], coerced[col] = 'numeric', s\n            else:\n                dt = pd.to_datetime(s, errors='coerce')\n                num = pd.to_numeric(s, errors='coerce')\n                if dt.notna().mean() >= 0.8:                      # looks like dates\n                    norm_types[col], coerced[col] = 'datetime', dt\n                elif num.notna().mean() >= 0.8:                   # numeric stored as text\n                    norm_types[col], coerced[col] = 'numeric', num\n                elif s.nunique(dropna=True) <= max(50, 0.5 * n_rows):\n                    norm_types[col], coerced[col] = 'categorical', s.astype('category')\n                else:\n                    norm_types[col], coerced[col] = 'string', s.astype('string')\n\n        numeric_cols = [c for c in clean.columns if norm_types[c] == 'numeric']\n\n        # --------------------------------------------------------------\n        # Step 6 (flag-only, per instructions): count duplicates rather\n        #         than dropping rows.\n        # --------------------------------------------------------------\n        dup_count = int(clean.duplicated().sum())\n\n        # --------------------------------------------------------------\n        # Dependency detection (schema lineage): flag any numeric column\n        # whose values exactly equal the product or sum of two peer\n        # numeric columns, e.g. an \"extended\" total derived from\n        # unit price x quantity. This reveals intra-table dependencies.\n        # --------------------------------------------------------------\n        derived = {}\n        for target in numeric_cols:\n            t = pd.to_numeric(coerced[target], errors='coerce').astype(float)\n            others = [c for c in numeric_cols if c != target]\n            for i in range(len(others)):\n                for j in range(i + 1, len(others)):\n                    a = pd.to_numeric(coerced[others[i]], errors='coerce').astype(float)\n                    b = pd.to_numeric(coerced[others[j]], errors='coerce').astype(float)\n                    if np.allclose(t.values, (a * b).values, equal_nan=True):\n                        derived[target] = f'derived = {others[i]} * {others[j]}'\n                    elif np.allclose(t.values, (a + b).values, equal_nan=True):\n                        derived[target] = f'derived = {others[i]} + {others[j]}'\n\n        # Cache normalized value sets for cross-table FK / join-key checks\n        for col in clean.columns:\n            table_col_values[(table_name, col)] = set(\n                coerced[col].dropna().astype(str)\n            )\n\n        # --------------------------------------------------------------\n        # Build one report row per column, inferring constraints\n        # --------------------------------------------------------------\n        for col in clean.columns:\n            s = clean[col]\n            n_missing = int(s.isna().sum())\n            n_unique = int(s.nunique(dropna=True))\n\n            # ---- inferred constraints (NULL / UNIQUE / CHECK / PK) ----\n            constraints = []\n            if n_missing == 0:\n                constraints.append('NOT NULL')\n            if n_rows > 0 and n_unique == n_rows:\n                constraints.append('UNIQUE')\n            if 'NOT NULL' in constraints and 'UNIQUE' in constraints:\n                constraints.append('PRIMARY KEY CANDIDATE')\n            if norm_types[col] == 'numeric':\n                vals = pd.to_numeric(coerced[col], errors='coerce').dropna()\n                if len(vals) and (vals > 0).all():\n                    constraints.append('CHECK (> 0)')\n                elif len(vals) and (vals >= 0).all():\n                    constraints.append('CHECK (>= 0)')\n            if norm_types[col] == 'datetime' and coerced[col].notna().all():\n                constraints.append('VALID DATE PARSE')\n\n            # ---- Step 3: missing-value strategy (documented, not applied) ----\n            if n_missing == 0:\n                impute = 'none required'\n            elif norm_types[col] == 'numeric':\n                impute = f\"impute median = {pd.to_numeric(s, errors='coerce').median()}\"\n            elif norm_types[col] == 'datetime':\n                impute = 'forward-fill recommended'\n            else:\n                impute = \"impute mode or 'unknown' label\"\n\n            # Dependency label for this column (extended below for cross-table)\n            dep_list = [derived[col]] if col in derived else []\n\n            report_rows.append({\n                'table_name': table_name,\n                'object_type': 'TABLE',  # DataFrames arrive as tables, not views\n                'column_name': col,\n                'source_column_name': original_cols[col],\n                'raw_data_type': str(s.dtype),\n                'normalized_data_type': norm_types[col],\n                'row_count': n_rows,\n                'null_count': n_missing,\n                'null_pct': round(100.0 * n_missing / n_rows, 2) if n_rows else 0.0,\n                'distinct_count': n_unique,\n                'is_nullable': bool(n_missing > 0),\n                'constraints': ', '.join(constraints) if constraints else 'none inferred',\n                'duplicate_rows_table_wide': dup_count,\n                'missing_value_strategy': impute,\n                'dependencies': '',\n                'ownership': f'source dataset \"{table_name}\"',\n            })\n            dep_lists.append(dep_list)\n\n    # ------------------------------------------------------------------\n    # Build the report; skip cross-table scan if it is empty\n    # ------------------------------------------------------------------\n    report = pd.DataFrame(report_rows, columns=report_columns)\n\n    # ------------------------------------------------------------------\n    # Step 4-style dependency scan across MULTIPLE tables: flag columns\n    # whose value sets are fully contained in a same-typed column of\n    # another table (foreign-key / safe join-key candidates).\n    # ------------------------------------------------------------------\n    if len(data_list) > 1 and not report.empty:\n        for pos, row in report.iterrows():\n            own = table_col_values.get((row['table_name'], row['column_name']), set())\n            if not own:\n                continue\n            for (t, c), vals in table_col_values.items():\n                if (t, c) == (row['table_name'], row['column_name']) or not vals:\n                    continue\n                mask = (report['table_name'] == t) & (report['column_name'] == c)\n                if not mask.any():\n                    continue\n                peer_type = report.loc[mask, 'normalized_data_type'].iloc[0]\n                # Only compare like-typed columns; subset test avoids Cartesian joins\n                if peer_type == row['normalized_data_type'] and own.issubset(vals):\n                    dep_lists[pos].append(f'FK/JOIN candidate -> {t}.{c}')\n\n    # Finalize the dependencies column (concise labels per row)\n    if not report.empty:\n        report['dependencies'] = [\n            '; '.join(d) if d else 'none detected' for d in dep_lists\n        ]\n\n    # ------------------------------------------------------------------\n    # Step 7: return the finished schema identity report as ONE DataFrame\n    # ------------------------------------------------------------------\n    return report\n```",
+                        "additional_kwargs": {
+                          "refusal": null
+                        },
+                        "response_metadata": {
+                          "token_usage": {
+                            "completion_tokens": 9026,
+                            "prompt_tokens": 744,
+                            "total_tokens": 9770,
+                            "completion_tokens_details": {
+                              "accepted_prediction_tokens": null,
+                              "audio_tokens": null,
+                              "reasoning_tokens": 6964,
+                              "rejected_prediction_tokens": null,
+                              "text_tokens": null
+                            },
+                            "prompt_tokens_details": {
+                              "audio_tokens": null,
+                              "cache_write_tokens": null,
+                              "cached_tokens": 704,
+                              "image_tokens": null,
+                              "text_tokens": null
+                            }
+                          },
+                          "model_provider": "openai",
+                          "model_name": "glm-5.3-flash",
+                          "system_fingerprint": null,
+                          "id": "20261014044358b656b8bd09e74733",
+                          "finish_reason": "stop",
+                          "logprobs": null
+                        },
+                        "type": "ai",
+                        "name": null,
+                        "id": "lc_run--01a13701-fa70-72e2-aae6-ea2f1f266a68-0"
+                      }
+                    }
+                  ]
+                ],
+                "llm_output": {
+                  "token_usage": {
+                    "completion_tokens": 9026,
+                    "prompt_tokens": 744,
+                    "total_tokens": 9770,
+                    "completion_tokens_details": {
+                      "accepted_prediction_tokens": null,
+                      "audio_tokens": null,
+                      "reasoning_tokens": 6964,
+                      "rejected_prediction_tokens": null,
+                      "text_tokens": null
+                    },
+                    "prompt_tokens_details": {
+                      "audio_tokens": null,
+                      "cache_write_tokens": null,
+                      "cached_tokens": 704,
+                      "image_tokens": null,
+                      "text_tokens": null
+                    }
+                  },
+                  "model_provider": "openai",
+                  "model_name": "glm-5.3-flash",
+                  "system_fingerprint": null,
+                  "id": "20261014044358b656b8bd09e74733"
+                },
+                "run": null,
+                "type": "LLMResult"
+              }
+            }
+          },
+          "attributes": {
+            "gen_ai.operation.name": "chat"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "aaa22b471a08f3b1",
+          "parent_span_id": "79f60667f6782acd",
+          "name": "PythonOutputParser",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924417982579314,
+          "end_time_unix_nano": 1791924417984461096,
+          "duration_nano": 1881782,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "ff14d260dffee92f",
+          "parent_span_id": "ae89a157a14e7a8b",
+          "name": "execute_data_wrangler_code",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924418146105088,
+          "end_time_unix_nano": 1791924419833406683,
+          "duration_nano": 1687301595,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "aec7b0236a8493a9",
+          "parent_span_id": "ff14d260dffee92f",
+          "name": "RunnableCallable",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924419589333597,
+          "end_time_unix_nano": 1791924419831530988,
+          "duration_nano": 242197391,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "1897182521cb1267",
+          "parent_span_id": "ae89a157a14e7a8b",
+          "name": "fix_data_wrangler_code",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924419991788167,
+          "end_time_unix_nano": 1791924469131583352,
+          "duration_nano": 49139795185,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "4f3f1f9f7f8c34ad",
+          "parent_span_id": "1897182521cb1267",
+          "name": "RunnableSequence",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924420249392530,
+          "end_time_unix_nano": 1791924469130299924,
+          "duration_nano": 48880907394,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "2b6f9e37432a2300",
+          "parent_span_id": "4f3f1f9f7f8c34ad",
+          "name": "ChatOpenAI",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924420251612816,
+          "end_time_unix_nano": 1791924469125687945,
+          "duration_nano": 48874075129,
+          "model_content": {
+            "schema_version": "kuma.model_content.v1",
+            "input": {
+              "status": "present",
+              "value": [
+                [
+                  {
+                    "content": "\n        You are a Data Wrangling Agent. Your job is to create a data_wrangler() function that can be run on the data provided. The function is currently broken and needs to be fixed.\n        \n        Make sure to only return the function definition for data_wrangler().\n        \n        Return Python code in ```python``` format with a single function definition, data_wrangler(data_raw), that includes all imports inside the function.\n        \n        This is the broken code (please fix): \n        # Disclaimer: This function was generated by AI. Please review before using.\n# Agent Name: data_wrangling_agent\n# Time Created: 2026-10-13 20:46:57\n\ndef data_wrangler(data_list):\n    import pandas as pd\n    import numpy as np\n    '''\n    Produce a concise schema identity report summarizing the tables, columns,\n    inferred constraints, dependencies (derived-column / FK / join-key\n    candidates), and ownership for every dataset supplied.\n\n    data_list: A list of one or more pandas data frames containing the raw data.\n    Returns:   A single pandas DataFrame; one row per column of schema metadata.\n    '''\n\n\n    # ------------------------------------------------------------------\n    # 0. Input safety: always operate on a list of DataFrames (Error guard #1)\n    # ------------------------------------------------------------------\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    report_rows = []        # one dict of metadata per column (final report rows)\n    dep_lists = []          # parallel list of dependency labels per report row\n    table_col_values = {}   # {(table, column): set of values} for cross-table checks\n\n    # Expected output schema (also guarantees a well-formed empty result)\n    report_columns = [\n        'table_name', 'object_type', 'column_name', 'source_column_name',\n        'raw_data_type', 'normalized_data_type', 'row_count', 'null_count',\n        'null_pct', 'distinct_count', 'is_nullable', 'constraints',\n        'duplicate_rows_table_wide', 'missing_value_strategy',\n        'dependencies', 'ownership'\n    ]\n\n    # ------------------------------------------------------------------\n    # Loop over every provided table / view-like object\n    # ------------------------------------------------------------------\n    for idx, df in enumerate(data_list):\n        if not isinstance(df, pd.DataFrame) or df.empty:\n            continue  # skip anything that is not a usable DataFrame\n\n        # Derive a stable table name from metadata if present; never hardcode names\n        table_name = df.attrs.get('name', f'table_{idx + 1}')\n\n        # --------------------------------------------------------------\n        # Step 1: inspect + standardize column names (lowercase, strip,\n        #         spaces -> underscores) while retaining the originals\n        # --------------------------------------------------------------\n        original_cols = {str(c).strip().lower().replace(' ', '_'): c for c in df.columns}\n        clean = df.copy()\n        clean.columns = list(original_cols.keys())\n        n_rows = len(clean)\n\n        # --------------------------------------------------------------\n        # Step 2: normalize data types (datetime / numeric / categorical /\n        #         string). Coercion is validated by success rate; no data\n        #         is dropped -- failures are simply reported as nulls.\n        # --------------------------------------------------------------\n        norm_types, coerced = {}, {}\n        for col in clean.columns:\n            s = clean[col]\n            if pd.api.types.is_datetime64_any_dtype(s):\n                norm_types[col], coerced[col] = 'datetime', s\n            elif pd.api.types.is_numeric_dtype(s):\n                norm_types[col], coerced[col] = 'numeric', s\n            else:\n                dt = pd.to_datetime(s, errors='coerce')\n                num = pd.to_numeric(s, errors='coerce')\n                if dt.notna().mean() >= 0.8:                      # looks like dates\n                    norm_types[col], coerced[col] = 'datetime', dt\n                elif num.notna().mean() >= 0.8:                   # numeric stored as text\n                    norm_types[col], coerced[col] = 'numeric', num\n                elif s.nunique(dropna=True) <= max(50, 0.5 * n_rows):\n                    norm_types[col], coerced[col] = 'categorical', s.astype('category')\n                else:\n                    norm_types[col], coerced[col] = 'string', s.astype('string')\n\n        numeric_cols = [c for c in clean.columns if norm_types[c] == 'numeric']\n\n        # --------------------------------------------------------------\n        # Step 6 (flag-only, per instructions): count duplicates rather\n        #         than dropping rows.\n        # --------------------------------------------------------------\n        dup_count = int(clean.duplicated().sum())\n\n        # --------------------------------------------------------------\n        # Dependency detection (schema lineage): flag any numeric column\n        # whose values exactly equal the product or sum of two peer\n        # numeric columns, e.g. an \"extended\" total derived from\n        # unit price x quantity. This reveals intra-table dependencies.\n        # --------------------------------------------------------------\n        derived = {}\n        for target in numeric_cols:\n            t = pd.to_numeric(coerced[target], errors='coerce').astype(float)\n            others = [c for c in numeric_cols if c != target]\n            for i in range(len(others)):\n                for j in range(i + 1, len(others)):\n                    a = pd.to_numeric(coerced[others[i]], errors='coerce').astype(float)\n                    b = pd.to_numeric(coerced[others[j]], errors='coerce').astype(float)\n                    if np.allclose(t.values, (a * b).values, equal_nan=True):\n                        derived[target] = f'derived = {others[i]} * {others[j]}'\n                    elif np.allclose(t.values, (a + b).values, equal_nan=True):\n                        derived[target] = f'derived = {others[i]} + {others[j]}'\n\n        # Cache normalized value sets for cross-table FK / join-key checks\n        for col in clean.columns:\n            table_col_values[(table_name, col)] = set(\n                coerced[col].dropna().astype(str)\n            )\n\n        # --------------------------------------------------------------\n        # Build one report row per column, inferring constraints\n        # --------------------------------------------------------------\n        for col in clean.columns:\n            s = clean[col]\n            n_missing = int(s.isna().sum())\n            n_unique = int(s.nunique(dropna=True))\n\n            # ---- inferred constraints (NULL / UNIQUE / CHECK / PK) ----\n            constraints = []\n            if n_missing == 0:\n                constraints.append('NOT NULL')\n            if n_rows > 0 and n_unique == n_rows:\n                constraints.append('UNIQUE')\n            if 'NOT NULL' in constraints and 'UNIQUE' in constraints:\n                constraints.append('PRIMARY KEY CANDIDATE')\n            if norm_types[col] == 'numeric':\n                vals = pd.to_numeric(coerced[col], errors='coerce').dropna()\n                if len(vals) and (vals > 0).all():\n                    constraints.append('CHECK (> 0)')\n                elif len(vals) and (vals >= 0).all():\n                    constraints.append('CHECK (>= 0)')\n            if norm_types[col] == 'datetime' and coerced[col].notna().all():\n                constraints.append('VALID DATE PARSE')\n\n            # ---- Step 3: missing-value strategy (documented, not applied) ----\n            if n_missing == 0:\n                impute = 'none required'\n            elif norm_types[col] == 'numeric':\n                impute = f\"impute median = {pd.to_numeric(s, errors='coerce').median()}\"\n            elif norm_types[col] == 'datetime':\n                impute = 'forward-fill recommended'\n            else:\n                impute = \"impute mode or 'unknown' label\"\n\n            # Dependency label for this column (extended below for cross-table)\n            dep_list = [derived[col]] if col in derived else []\n\n            report_rows.append({\n                'table_name': table_name,\n                'object_type': 'TABLE',  # DataFrames arrive as tables, not views\n                'column_name': col,\n                'source_column_name': original_cols[col],\n                'raw_data_type': str(s.dtype),\n                'normalized_data_type': norm_types[col],\n                'row_count': n_rows,\n                'null_count': n_missing,\n                'null_pct': round(100.0 * n_missing / n_rows, 2) if n_rows else 0.0,\n                'distinct_count': n_unique,\n                'is_nullable': bool(n_missing > 0),\n                'constraints': ', '.join(constraints) if constraints else 'none inferred',\n                'duplicate_rows_table_wide': dup_count,\n                'missing_value_strategy': impute,\n                'dependencies': '',\n                'ownership': f'source dataset \"{table_name}\"',\n            })\n            dep_lists.append(dep_list)\n\n    # ------------------------------------------------------------------\n    # Build the report; skip cross-table scan if it is empty\n    # ------------------------------------------------------------------\n    report = pd.DataFrame(report_rows, columns=report_columns)\n\n    # ------------------------------------------------------------------\n    # Step 4-style dependency scan across MULTIPLE tables: flag columns\n    # whose value sets are fully contained in a same-typed column of\n    # another table (foreign-key / safe join-key candidates).\n    # ------------------------------------------------------------------\n    if len(data_list) > 1 and not report.empty:\n        for pos, row in report.iterrows():\n            own = table_col_values.get((row['table_name'], row['column_name']), set())\n            if not own:\n                continue\n            for (t, c), vals in table_col_values.items():\n                if (t, c) == (row['table_name'], row['column_name']) or not vals:\n                    continue\n                mask = (report['table_name'] == t) & (report['column_name'] == c)\n                if not mask.any():\n                    continue\n                peer_type = report.loc[mask, 'normalized_data_type'].iloc[0]\n                # Only compare like-typed columns; subset test avoids Cartesian joins\n                if peer_type == row['normalized_data_type'] and own.issubset(vals):\n                    dep_lists[pos].append(f'FK/JOIN candidate -> {t}.{c}')\n\n    # Finalize the dependencies column (concise labels per row)\n    if not report.empty:\n        report['dependencies'] = [\n            '; '.join(d) if d else 'none detected' for d in dep_lists\n        ]\n\n    # ------------------------------------------------------------------\n    # Step 7: return the finished schema identity report as ONE DataFrame\n    # ------------------------------------------------------------------\n    return report\n\n        Last Known Error:\n        An error occurred during data wrangling: Function execution failed: name 'round' is not defined\\nTraceback (most recent call last):\n  File \"<string>\", line 210, in main\n  File \"<string>\", line 160, in data_wrangler\nNameError: name 'round' is not defined\n\n        ",
+                    "additional_kwargs": {},
+                    "response_metadata": {},
+                    "type": "human",
+                    "name": null,
+                    "id": null
+                  }
+                ]
+              ]
+            },
+            "output": {
+              "status": "present",
+              "value": {
+                "generations": [
+                  [
+                    {
+                      "text": "```python\n# Disclaimer: This function was generated by AI. Please review before using.\n# Agent Name: data_wrangling_agent\n# Fix: replaced restricted builtin round() with np.round() to resolve NameError.\n\ndef data_wrangler(data_raw):\n    import pandas as pd\n    import numpy as np\n    '''\n    Produce a concise schema identity report summarizing the tables, columns,\n    inferred constraints, dependencies (derived-column / FK / join-key\n    candidates), and ownership for every dataset supplied.\n\n    data_raw: A list of one or more pandas DataFrames containing the raw data\n              (a single DataFrame is also accepted and wrapped automatically).\n    Returns:  A single pandas DataFrame; one row per column of schema metadata.\n    '''\n\n    # ------------------------------------------------------------------\n    # 0. Input safety: always operate on a list of DataFrames (Error guard #1)\n    # ------------------------------------------------------------------\n    data_list = data_raw\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    report_rows = []        # one dict of metadata per column (final report rows)\n    dep_lists = []          # parallel list of dependency labels per report row\n    table_col_values = {}   # {(table, column): set of values} for cross-table checks\n\n    # Expected output schema (also guarantees a well-formed empty result)\n    report_columns = [\n        'table_name', 'object_type', 'column_name', 'source_column_name',\n        'raw_data_type', 'normalized_data_type', 'row_count', 'null_count',\n        'null_pct', 'distinct_count', 'is_nullable', 'constraints',\n        'duplicate_rows_table_wide', 'missing_value_strategy',\n        'dependencies', 'ownership'\n    ]\n\n    # ------------------------------------------------------------------\n    # Loop over every provided table / view-like object\n    # ------------------------------------------------------------------\n    for idx, df in enumerate(data_list):\n        if not isinstance(df, pd.DataFrame) or df.empty:\n            continue  # skip anything that is not a usable DataFrame\n\n        # Derive a stable table name from metadata if present; never hardcode names\n        table_name = df.attrs.get('name', f'table_{idx + 1}')\n\n        # --------------------------------------------------------------\n        # Step 1: inspect + standardize column names (lowercase, strip,\n        #         spaces -> underscores) while retaining the originals\n        # --------------------------------------------------------------\n        original_cols = {str(c).strip().lower().replace(' ', '_'): c for c in df.columns}\n        clean = df.copy()\n        clean.columns = list(original_cols.keys())\n        n_rows = len(clean)\n\n        # --------------------------------------------------------------\n        # Step 2: normalize data types (datetime / numeric / categorical /\n        #         string). Coercion is validated by success rate; no data\n        #         is dropped -- failures are simply reported as nulls.\n        # --------------------------------------------------------------\n        norm_types, coerced = {}, {}\n        for col in clean.columns:\n            s = clean[col]\n            if pd.api.types.is_datetime64_any_dtype(s):\n                norm_types[col], coerced[col] = 'datetime', s\n            elif pd.api.types.is_numeric_dtype(s):\n                norm_types[col], coerced[col] = 'numeric', s\n            else:\n                dt = pd.to_datetime(s, errors='coerce')\n                num = pd.to_numeric(s, errors='coerce')\n                if dt.notna().mean() >= 0.8:                      # looks like dates\n                    norm_types[col], coerced[col] = 'datetime', dt\n                elif num.notna().mean() >= 0.8:                   # numeric stored as text\n                    norm_types[col], coerced[col] = 'numeric', num\n                elif s.nunique(dropna=True) <= max(50, 0.5 * n_rows):\n                    norm_types[col], coerced[col] = 'categorical', s.astype('category')\n                else:\n                    norm_types[col], coerced[col] = 'string', s.astype('string')\n\n        numeric_cols = [c for c in clean.columns if norm_types[c] == 'numeric']\n\n        # --------------------------------------------------------------\n        # Step 6 (flag-only, per instructions): count duplicates rather\n        #         than dropping rows.\n        # --------------------------------------------------------------\n        dup_count = int(clean.duplicated().sum())\n\n        # --------------------------------------------------------------\n        # Dependency detection (schema lineage): flag any numeric column\n        # whose values exactly equal the product or sum of two peer\n        # numeric columns, e.g. an \"extended\" total derived from\n        # unit price x quantity. This reveals intra-table dependencies.\n        # --------------------------------------------------------------\n        derived = {}\n        for target in numeric_cols:\n            t = pd.to_numeric(coerced[target], errors='coerce').astype(float)\n            others = [c for c in numeric_cols if c != target]\n            for i in range(len(others)):\n                for j in range(i + 1, len(others)):\n                    a = pd.to_numeric(coerced[others[i]], errors='coerce').astype(float)\n                    b = pd.to_numeric(coerced[others[j]], errors='coerce').astype(float)\n                    if np.allclose(t.values, (a * b).values, equal_nan=True):\n                        derived[target] = f'derived = {others[i]} * {others[j]}'\n                    elif np.allclose(t.values, (a + b).values, equal_nan=True):\n                        derived[target] = f'derived = {others[i]} + {others[j]}'\n\n        # Cache normalized value sets for cross-table FK / join-key checks\n        for col in clean.columns:\n            table_col_values[(table_name, col)] = set(\n                coerced[col].dropna().astype(str)\n            )\n\n        # --------------------------------------------------------------\n        # Build one report row per column, inferring constraints\n        # --------------------------------------------------------------\n        for col in clean.columns:\n            s = clean[col]\n            n_missing = int(s.isna().sum())\n            n_unique = int(s.nunique(dropna=True))\n\n            # ---- inferred constraints (NULL / UNIQUE / CHECK / PK) ----\n            constraints = []\n            if n_missing == 0:\n                constraints.append('NOT NULL')\n            if n_rows > 0 and n_unique == n_rows:\n                constraints.append('UNIQUE')\n            if 'NOT NULL' in constraints and 'UNIQUE' in constraints:\n                constraints.append('PRIMARY KEY CANDIDATE')\n            if norm_types[col] == 'numeric':\n                vals = pd.to_numeric(coerced[col], errors='coerce').dropna()\n                if len(vals) and (vals > 0).all():\n                    constraints.append('CHECK (> 0)')\n                elif len(vals) and (vals >= 0).all():\n                    constraints.append('CHECK (>= 0)')\n            if norm_types[col] == 'datetime' and coerced[col].notna().all():\n                constraints.append('VALID DATE PARSE')\n\n            # ---- Step 3: missing-value strategy (documented, not applied) ----\n            if n_missing == 0:\n                impute = 'none required'\n            elif norm_types[col] == 'numeric':\n                impute = f\"impute median = {pd.to_numeric(s, errors='coerce').median()}\"\n            elif norm_types[col] == 'datetime':\n                impute = 'forward-fill recommended'\n            else:\n                impute = \"impute mode or 'unknown' label\"\n\n            # Dependency label for this column (extended below for cross-table)\n            dep_list = [derived[col]] if col in derived else []\n\n            report_rows.append({\n                'table_name': table_name,\n                'object_type': 'TABLE',  # DataFrames arrive as tables, not views\n                'column_name': col,\n                'source_column_name': original_cols[col],\n                'raw_data_type': str(s.dtype),\n                'normalized_data_type': norm_types[col],\n                'row_count': n_rows,\n                'null_count': n_missing,\n                # FIX: builtin round() is unavailable in this environment;\n                # use numpy's round instead.\n                'null_pct': float(np.round(100.0 * n_missing / n_rows, 2)) if n_rows else 0.0,\n                'distinct_count': n_unique,\n                'is_nullable': bool(n_missing > 0),\n                'constraints': ', '.join(constraints) if constraints else 'none inferred',\n                'duplicate_rows_table_wide': dup_count,\n                'missing_value_strategy': impute,\n                'dependencies': '',\n                'ownership': f'source dataset \"{table_name}\"',\n            })\n            dep_lists.append(dep_list)\n\n    # ------------------------------------------------------------------\n    # Build the report; skip cross-table scan if it is empty\n    # ------------------------------------------------------------------\n    report = pd.DataFrame(report_rows, columns=report_columns)\n\n    # ------------------------------------------------------------------\n    # Step 4-style dependency scan across MULTIPLE tables: flag columns\n    # whose value sets are fully contained in a same-typed column of\n    # another table (foreign-key / safe join-key candidates).\n    # ------------------------------------------------------------------\n    if len(data_list) > 1 and not report.empty:\n        for pos, row in report.iterrows():\n            own = table_col_values.get((row['table_name'], row['column_name']), set())\n            if not own:\n                continue\n            for (t, c), vals in table_col_values.items():\n                if (t, c) == (row['table_name'], row['column_name']) or not vals:\n                    continue\n                mask = (report['table_name'] == t) & (report['column_name'] == c)\n                if not mask.any():\n                    continue\n                peer_type = report.loc[mask, 'normalized_data_type'].iloc[0]\n                # Only compare like-typed columns; subset test avoids Cartesian joins\n                if peer_type == row['normalized_data_type'] and own.issubset(vals):\n                    dep_lists[pos].append(f'FK/JOIN candidate -> {t}.{c}')\n\n    # Finalize the dependencies column (concise labels per row)\n    if not report.empty:\n        report['dependencies'] = [\n            '; '.join(d) if d else 'none detected' for d in dep_lists\n        ]\n\n    # ------------------------------------------------------------------\n    # Step 7: return the finished schema identity report as ONE DataFrame\n    # ------------------------------------------------------------------\n    return report\n```",
+                      "generation_info": {
+                        "finish_reason": "stop",
+                        "logprobs": null
+                      },
+                      "type": "ChatGeneration",
+                      "message": {
+                        "content": "```python\n# Disclaimer: This function was generated by AI. Please review before using.\n# Agent Name: data_wrangling_agent\n# Fix: replaced restricted builtin round() with np.round() to resolve NameError.\n\ndef data_wrangler(data_raw):\n    import pandas as pd\n    import numpy as np\n    '''\n    Produce a concise schema identity report summarizing the tables, columns,\n    inferred constraints, dependencies (derived-column / FK / join-key\n    candidates), and ownership for every dataset supplied.\n\n    data_raw: A list of one or more pandas DataFrames containing the raw data\n              (a single DataFrame is also accepted and wrapped automatically).\n    Returns:  A single pandas DataFrame; one row per column of schema metadata.\n    '''\n\n    # ------------------------------------------------------------------\n    # 0. Input safety: always operate on a list of DataFrames (Error guard #1)\n    # ------------------------------------------------------------------\n    data_list = data_raw\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    report_rows = []        # one dict of metadata per column (final report rows)\n    dep_lists = []          # parallel list of dependency labels per report row\n    table_col_values = {}   # {(table, column): set of values} for cross-table checks\n\n    # Expected output schema (also guarantees a well-formed empty result)\n    report_columns = [\n        'table_name', 'object_type', 'column_name', 'source_column_name',\n        'raw_data_type', 'normalized_data_type', 'row_count', 'null_count',\n        'null_pct', 'distinct_count', 'is_nullable', 'constraints',\n        'duplicate_rows_table_wide', 'missing_value_strategy',\n        'dependencies', 'ownership'\n    ]\n\n    # ------------------------------------------------------------------\n    # Loop over every provided table / view-like object\n    # ------------------------------------------------------------------\n    for idx, df in enumerate(data_list):\n        if not isinstance(df, pd.DataFrame) or df.empty:\n            continue  # skip anything that is not a usable DataFrame\n\n        # Derive a stable table name from metadata if present; never hardcode names\n        table_name = df.attrs.get('name', f'table_{idx + 1}')\n\n        # --------------------------------------------------------------\n        # Step 1: inspect + standardize column names (lowercase, strip,\n        #         spaces -> underscores) while retaining the originals\n        # --------------------------------------------------------------\n        original_cols = {str(c).strip().lower().replace(' ', '_'): c for c in df.columns}\n        clean = df.copy()\n        clean.columns = list(original_cols.keys())\n        n_rows = len(clean)\n\n        # --------------------------------------------------------------\n        # Step 2: normalize data types (datetime / numeric / categorical /\n        #         string). Coercion is validated by success rate; no data\n        #         is dropped -- failures are simply reported as nulls.\n        # --------------------------------------------------------------\n        norm_types, coerced = {}, {}\n        for col in clean.columns:\n            s = clean[col]\n            if pd.api.types.is_datetime64_any_dtype(s):\n                norm_types[col], coerced[col] = 'datetime', s\n            elif pd.api.types.is_numeric_dtype(s):\n                norm_types[col], coerced[col] = 'numeric', s\n            else:\n                dt = pd.to_datetime(s, errors='coerce')\n                num = pd.to_numeric(s, errors='coerce')\n                if dt.notna().mean() >= 0.8:                      # looks like dates\n                    norm_types[col], coerced[col] = 'datetime', dt\n                elif num.notna().mean() >= 0.8:                   # numeric stored as text\n                    norm_types[col], coerced[col] = 'numeric', num\n                elif s.nunique(dropna=True) <= max(50, 0.5 * n_rows):\n                    norm_types[col], coerced[col] = 'categorical', s.astype('category')\n                else:\n                    norm_types[col], coerced[col] = 'string', s.astype('string')\n\n        numeric_cols = [c for c in clean.columns if norm_types[c] == 'numeric']\n\n        # --------------------------------------------------------------\n        # Step 6 (flag-only, per instructions): count duplicates rather\n        #         than dropping rows.\n        # --------------------------------------------------------------\n        dup_count = int(clean.duplicated().sum())\n\n        # --------------------------------------------------------------\n        # Dependency detection (schema lineage): flag any numeric column\n        # whose values exactly equal the product or sum of two peer\n        # numeric columns, e.g. an \"extended\" total derived from\n        # unit price x quantity. This reveals intra-table dependencies.\n        # --------------------------------------------------------------\n        derived = {}\n        for target in numeric_cols:\n            t = pd.to_numeric(coerced[target], errors='coerce').astype(float)\n            others = [c for c in numeric_cols if c != target]\n            for i in range(len(others)):\n                for j in range(i + 1, len(others)):\n                    a = pd.to_numeric(coerced[others[i]], errors='coerce').astype(float)\n                    b = pd.to_numeric(coerced[others[j]], errors='coerce').astype(float)\n                    if np.allclose(t.values, (a * b).values, equal_nan=True):\n                        derived[target] = f'derived = {others[i]} * {others[j]}'\n                    elif np.allclose(t.values, (a + b).values, equal_nan=True):\n                        derived[target] = f'derived = {others[i]} + {others[j]}'\n\n        # Cache normalized value sets for cross-table FK / join-key checks\n        for col in clean.columns:\n            table_col_values[(table_name, col)] = set(\n                coerced[col].dropna().astype(str)\n            )\n\n        # --------------------------------------------------------------\n        # Build one report row per column, inferring constraints\n        # --------------------------------------------------------------\n        for col in clean.columns:\n            s = clean[col]\n            n_missing = int(s.isna().sum())\n            n_unique = int(s.nunique(dropna=True))\n\n            # ---- inferred constraints (NULL / UNIQUE / CHECK / PK) ----\n            constraints = []\n            if n_missing == 0:\n                constraints.append('NOT NULL')\n            if n_rows > 0 and n_unique == n_rows:\n                constraints.append('UNIQUE')\n            if 'NOT NULL' in constraints and 'UNIQUE' in constraints:\n                constraints.append('PRIMARY KEY CANDIDATE')\n            if norm_types[col] == 'numeric':\n                vals = pd.to_numeric(coerced[col], errors='coerce').dropna()\n                if len(vals) and (vals > 0).all():\n                    constraints.append('CHECK (> 0)')\n                elif len(vals) and (vals >= 0).all():\n                    constraints.append('CHECK (>= 0)')\n            if norm_types[col] == 'datetime' and coerced[col].notna().all():\n                constraints.append('VALID DATE PARSE')\n\n            # ---- Step 3: missing-value strategy (documented, not applied) ----\n            if n_missing == 0:\n                impute = 'none required'\n            elif norm_types[col] == 'numeric':\n                impute = f\"impute median = {pd.to_numeric(s, errors='coerce').median()}\"\n            elif norm_types[col] == 'datetime':\n                impute = 'forward-fill recommended'\n            else:\n                impute = \"impute mode or 'unknown' label\"\n\n            # Dependency label for this column (extended below for cross-table)\n            dep_list = [derived[col]] if col in derived else []\n\n            report_rows.append({\n                'table_name': table_name,\n                'object_type': 'TABLE',  # DataFrames arrive as tables, not views\n                'column_name': col,\n                'source_column_name': original_cols[col],\n                'raw_data_type': str(s.dtype),\n                'normalized_data_type': norm_types[col],\n                'row_count': n_rows,\n                'null_count': n_missing,\n                # FIX: builtin round() is unavailable in this environment;\n                # use numpy's round instead.\n                'null_pct': float(np.round(100.0 * n_missing / n_rows, 2)) if n_rows else 0.0,\n                'distinct_count': n_unique,\n                'is_nullable': bool(n_missing > 0),\n                'constraints': ', '.join(constraints) if constraints else 'none inferred',\n                'duplicate_rows_table_wide': dup_count,\n                'missing_value_strategy': impute,\n                'dependencies': '',\n                'ownership': f'source dataset \"{table_name}\"',\n            })\n            dep_lists.append(dep_list)\n\n    # ------------------------------------------------------------------\n    # Build the report; skip cross-table scan if it is empty\n    # ------------------------------------------------------------------\n    report = pd.DataFrame(report_rows, columns=report_columns)\n\n    # ------------------------------------------------------------------\n    # Step 4-style dependency scan across MULTIPLE tables: flag columns\n    # whose value sets are fully contained in a same-typed column of\n    # another table (foreign-key / safe join-key candidates).\n    # ------------------------------------------------------------------\n    if len(data_list) > 1 and not report.empty:\n        for pos, row in report.iterrows():\n            own = table_col_values.get((row['table_name'], row['column_name']), set())\n            if not own:\n                continue\n            for (t, c), vals in table_col_values.items():\n                if (t, c) == (row['table_name'], row['column_name']) or not vals:\n                    continue\n                mask = (report['table_name'] == t) & (report['column_name'] == c)\n                if not mask.any():\n                    continue\n                peer_type = report.loc[mask, 'normalized_data_type'].iloc[0]\n                # Only compare like-typed columns; subset test avoids Cartesian joins\n                if peer_type == row['normalized_data_type'] and own.issubset(vals):\n                    dep_lists[pos].append(f'FK/JOIN candidate -> {t}.{c}')\n\n    # Finalize the dependencies column (concise labels per row)\n    if not report.empty:\n        report['dependencies'] = [\n            '; '.join(d) if d else 'none detected' for d in dep_lists\n        ]\n\n    # ------------------------------------------------------------------\n    # Step 7: return the finished schema identity report as ONE DataFrame\n    # ------------------------------------------------------------------\n    return report\n```",
+                        "additional_kwargs": {
+                          "refusal": null
+                        },
+                        "response_metadata": {
+                          "token_usage": {
+                            "completion_tokens": 3335,
+                            "prompt_tokens": 2282,
+                            "total_tokens": 5617,
+                            "completion_tokens_details": {
+                              "accepted_prediction_tokens": null,
+                              "audio_tokens": null,
+                              "reasoning_tokens": 1190,
+                              "rejected_prediction_tokens": null,
+                              "text_tokens": null
+                            },
+                            "prompt_tokens_details": {
+                              "audio_tokens": null,
+                              "cache_write_tokens": null,
+                              "cached_tokens": 0,
+                              "image_tokens": null,
+                              "text_tokens": null
+                            }
+                          },
+                          "model_provider": "openai",
+                          "model_name": "glm-5.3-flash",
+                          "system_fingerprint": null,
+                          "id": "202610140447004ab36852f8dd4c76",
+                          "finish_reason": "stop",
+                          "logprobs": null
+                        },
+                        "type": "ai",
+                        "name": null,
+                        "id": "lc_run--01a13704-be9b-7481-be3a-95f4407fbdbb-0"
+                      }
+                    }
+                  ]
+                ],
+                "llm_output": {
+                  "token_usage": {
+                    "completion_tokens": 3335,
+                    "prompt_tokens": 2282,
+                    "total_tokens": 5617,
+                    "completion_tokens_details": {
+                      "accepted_prediction_tokens": null,
+                      "audio_tokens": null,
+                      "reasoning_tokens": 1190,
+                      "rejected_prediction_tokens": null,
+                      "text_tokens": null
+                    },
+                    "prompt_tokens_details": {
+                      "audio_tokens": null,
+                      "cache_write_tokens": null,
+                      "cached_tokens": 0,
+                      "image_tokens": null,
+                      "text_tokens": null
+                    }
+                  },
+                  "model_provider": "openai",
+                  "model_name": "glm-5.3-flash",
+                  "system_fingerprint": null,
+                  "id": "202610140447004ab36852f8dd4c76"
+                },
+                "run": null,
+                "type": "LLMResult"
+              }
+            }
+          },
+          "attributes": {
+            "gen_ai.operation.name": "chat"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "3e895d3d5a10e88d",
+          "parent_span_id": "4f3f1f9f7f8c34ad",
+          "name": "PythonOutputParser",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924469127296316,
+          "end_time_unix_nano": 1791924469129285151,
+          "duration_nano": 1988835,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "13c65523b8cf023e",
+          "parent_span_id": "ae89a157a14e7a8b",
+          "name": "execute_data_wrangler_code",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924469260024119,
+          "end_time_unix_nano": 1791924470971838370,
+          "duration_nano": 1711814251,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "6ee79a74d535b929",
+          "parent_span_id": "13c65523b8cf023e",
+          "name": "RunnableCallable",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924470733880316,
+          "end_time_unix_nano": 1791924470969451528,
+          "duration_nano": 235571212,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "7504af0338b3bb67",
+          "parent_span_id": "ae89a157a14e7a8b",
+          "name": "report_agent_outputs",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924471128287220,
+          "end_time_unix_nano": 1791924471360392779,
+          "duration_nano": 232105559,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "62bfdd981f323da1",
+          "parent_span_id": "0c45dff57c350f5f",
+          "name": "router_chart_or_table",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924471895368465,
+          "end_time_unix_nano": 1791924472120423712,
+          "duration_nano": 225055247,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b5a5b82af5719ae2a61ef324f54529f0",
+          "span_id": "ef1a7dce9bc9b49d",
+          "parent_span_id": "1025a64c062d5513",
+          "name": "finalize_output",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791924472271259897,
+          "end_time_unix_nano": 1791924472520365356,
+          "duration_nano": 249105459,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 26,
+      "retained_spans": 26,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_03704ac791254259bdd82cb8bceb2fef",
+      "input_id": "step-6",
+      "step_id": "step-6",
+      "submission_id": "submission-1ebe72595faef2ed85208a879a0d5f09",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "afb55784494b1260bbd22ff71e17c17b6bd6e7344f4eb90bb85aabe90e6eb17d",
+          "size_bytes": 80090,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "23472b6cc9bf94cf3d1140f3eaa7b2d49e48e6c791273e0a5596c4e083fa263e"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "not_captured",
+      "observed_count": null,
+      "retained_count": 0,
+      "omitted_count": null,
+      "reasons": [
+        "not_enabled"
+      ]
+    }
+  }
+}

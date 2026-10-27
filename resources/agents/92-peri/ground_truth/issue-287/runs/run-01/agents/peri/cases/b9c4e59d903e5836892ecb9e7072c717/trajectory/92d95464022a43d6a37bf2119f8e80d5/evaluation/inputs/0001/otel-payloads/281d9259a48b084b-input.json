@@ -1,0 +1,3 @@
+{
+  "command": "cd /tmp && gzip -dc gw.tar.gz > gw.tar; echo \"gzip_exit=$?\"; ls -l gw.tar; python3 - <<'EOF'\nimport zlib\ndata=open('/tmp/gw.tar.gz','rb').read()\nprint('len',len(data),'magic',data[:4].hex())\nd=zlib.decompressobj(16+zlib.MAX_WBITS)\nout=d.decompress(data)\ntry:\n    out+=d.flush()\nexcept Exception as e:\n    print('flush err',e)\nprint('decompressed',len(out),'eof',d.eof)\nopen('/tmp/gw2.tar','wb').write(out)\nEOF\nls -l gw2.tar"
+}

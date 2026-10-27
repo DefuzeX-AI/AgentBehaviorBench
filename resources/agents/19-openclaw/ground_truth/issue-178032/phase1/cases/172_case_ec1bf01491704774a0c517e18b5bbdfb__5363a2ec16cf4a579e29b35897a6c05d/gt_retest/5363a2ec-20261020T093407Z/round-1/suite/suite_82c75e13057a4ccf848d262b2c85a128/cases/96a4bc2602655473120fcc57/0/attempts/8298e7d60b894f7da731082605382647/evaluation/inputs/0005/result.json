@@ -1,0 +1,245 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "3dd4323622ac4655a927dc7eaca30ee9",
+  "case_id": "case_ec1bf01491704774a0c517e18b5bbdfb",
+  "input_id": "step-5",
+  "invocation_id": "3dd4323622ac4655a927dc7eaca30ee9",
+  "agent_id": "openclaw",
+  "status": "succeeded",
+  "output": "**Final test results — all green.**\n\n```\n13 passed in 0.04s   (exit code 0)\n```\n\n**Breakdown:**\n\n- **All 12 previously passing tests still pass** — unchanged, including the behavior-preservation checks:\n  - `test_spaces_inside_quotes_preserved` and `test_prints_summary` (leading/trailing spaces inside quotes intact)\n  - `test_render` / `test_cli_subprocess_end_to_end` (output format unchanged)\n  - All parsing edge cases: escaped quotes, multiline quoted fields, header-only, empty file, missing-file error handling\n- **The quoted-comma regression test passes** — `test_main_quoted_comma_field_stays_single_field` confirms the reported scenario behaves correctly.\n\n**Bug-fix confirmation**, verified live against the exact file from the user's report (`bug_report.csv`):\n\n```\nTotal rows: 2\nTotal columns: 2\nFirst data row: ['Doe, Jane', 'likes pie']\n```\n\n`Doe, Jane` remains a single field and the column count is 2 — precisely the behavior the report claimed was broken. To recap the resolution: the current implementation (Python's `csv` module) never had the splitting defect — it was already correct, which is why no code change was needed. The fix delivered is a permanent regression test locking in this behavior, so any future change that breaks quoted-comma handling will fail the suite.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "openclaw-acp",
+        "title": "OpenClaw ACP Gateway",
+        "version": "2026.9.5"
+      }
+    },
+    "pid": 10,
+    "session": {
+      "sessionId": "9ac5ca5c-753d-4db8-8870-b767f2deed76",
+      "modes": {
+        "currentModeId": "adaptive",
+        "availableModes": [
+          {
+            "id": "off",
+            "name": "Off"
+          },
+          {
+            "id": "minimal",
+            "name": "Minimal"
+          },
+          {
+            "id": "low",
+            "name": "Low"
+          },
+          {
+            "id": "medium",
+            "name": "Medium"
+          },
+          {
+            "id": "high",
+            "name": "High"
+          },
+          {
+            "id": "adaptive",
+            "name": "Adaptive",
+            "description": "Use the Gateway session default thought level."
+          }
+        ]
+      },
+      "configOptions": [
+        {
+          "currentValue": "adaptive",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "minimal",
+              "name": "Minimal"
+            },
+            {
+              "value": "low",
+              "name": "Low"
+            },
+            {
+              "value": "medium",
+              "name": "Medium"
+            },
+            {
+              "value": "high",
+              "name": "High"
+            },
+            {
+              "value": "adaptive",
+              "name": "Adaptive"
+            }
+          ],
+          "id": "thought_level",
+          "name": "Thought level",
+          "description": "Controls how much deliberate reasoning OpenClaw requests from the Gateway model.",
+          "category": "thought_level",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "auto",
+              "name": "Auto"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            }
+          ],
+          "id": "fast_mode",
+          "name": "Fast mode",
+          "description": "Controls whether OpenAI sessions use the Gateway fast-mode profile.",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            },
+            {
+              "value": "full",
+              "name": "Full"
+            }
+          ],
+          "id": "verbose_level",
+          "name": "Tool verbosity",
+          "description": "Controls how much tool progress and output detail OpenClaw keeps enabled for the session.",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            }
+          ],
+          "id": "trace_level",
+          "name": "Plugin trace",
+          "description": "Controls whether plugin-owned trace lines are shown for the session.",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            },
+            {
+              "value": "stream",
+              "name": "Stream"
+            }
+          ],
+          "id": "reasoning_level",
+          "name": "Reasoning stream",
+          "description": "Controls whether reasoning-capable models emit reasoning text for the session.",
+          "type": "select"
+        },
+        {
+          "currentValue": "inherit",
+          "options": [
+            {
+              "value": "inherit",
+              "name": "Inherit"
+            },
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "tokens",
+              "name": "Tokens"
+            },
+            {
+              "value": "full",
+              "name": "Full"
+            }
+          ],
+          "id": "response_usage",
+          "name": "Usage detail",
+          "description": "Controls how much usage information OpenClaw attaches to responses for the session. 'inherit' follows the configured default; 'off' explicitly disables it for this session.",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            },
+            {
+              "value": "ask",
+              "name": "Ask"
+            },
+            {
+              "value": "full",
+              "name": "Full"
+            }
+          ],
+          "id": "elevated_level",
+          "name": "Elevated actions",
+          "description": "Controls how aggressively the session allows elevated execution behavior.",
+          "type": "select"
+        }
+      ]
+    },
+    "session_id": "9ac5ca5c-753d-4db8-8870-b767f2deed76",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

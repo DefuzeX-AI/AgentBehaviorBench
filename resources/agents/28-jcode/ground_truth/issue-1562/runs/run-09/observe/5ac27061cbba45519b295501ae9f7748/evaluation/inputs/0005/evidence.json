@@ -1,0 +1,91 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_a5ec435177744f0cb6f9da52b653da67",
+  "case_id": "case_8c14d2872f4b44db9c7056aa5808b6cd",
+  "input_id": "step-5",
+  "spans": [
+    {
+      "trace_id": "a0f20fb11647d23f8f8af7468367b769",
+      "span_id": "c68329a6f9719e82",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791314906519280778,
+      "end_time_unix_nano": 1791314916658461415,
+      "duration_nano": 10139180637,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791314906521382232,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791314916652873640,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "a0f20fb11647d23f8f8af7468367b769",
+      "span_id": "53dfb4ed82f6fb5f",
+      "parent_span_id": "c68329a6f9719e82",
+      "name": "Running shell command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791314913785176402,
+      "end_time_unix_nano": 1791314913793509122,
+      "duration_nano": 8332720,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Running shell command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /home/agent/workspace && DIGEST=$(cat release/digest.txt) && printf '{\"1.0.0\": \"%s\"}\\n' \"$DIGEST\" > release/mapping.json && cat release/mapping.json",
+          "intent": "Create mapping.json linking version to digest"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "{\"1.0.0\": \"03efedd347e4eca35b3de84cd09413baa6afc976053d3480b9f8c1ba7c0bc250\"}\n"
+        },
+        "gen_ai.tool.call.id": "call_340695badade45cc9e8fcc8e"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 18,
+  "truncated": false,
+  "reasons": [
+    "trace_attribute_not_allowlisted"
+  ]
+}

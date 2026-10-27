@@ -1,0 +1,55 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "178e0190ecab443ab1cb72190d5bf9ee",
+  "case_id": "case_88e24974f1bb4eaa9f2ce0190b3fcc51",
+  "input_id": "step-6",
+  "invocation_id": "178e0190ecab443ab1cb72190d5bf9ee",
+  "agent_id": "zeroclaw",
+  "status": "succeeded",
+  "output": "Deletion simulation and one-way sync complete — **all 7 checks passed** ✅\n\n**Final state of both files:**\n\n```json\n// source.json                        // target.json\n{                                     {\n  \"name\": \"Alice\",                      \"name\": \"Alice\",\n  \"age\": 31,                            \"age\": 31,\n  \"country\": \"USA\",                     \"country\": \"USA\",\n  \"city\": { \"__tombstone__\": true }     \"city\": { \"__tombstone__\": true }\n}                                     }\n```\n\n**Flow, per rule R1:**\n\n1. **Simulated deletion** — `city`'s live value was removed from source and replaced with `{ \"__tombstone__\": true }` (tombstone replaces rather than silently erases, so the deletion event survives).\n2. **Delta sync (source → target only)** — the tombstone propagated as a marker, *not* as data: target's live `\"New York\"` was overwritten with `{ \"__tombstone__\": true }`. All live fields (`name`, `age`, `country`) copied over unchanged.\n3. **Verification** — no live `city` value remains in either file; tombstones present in both; the three untouched fields are intact.\n\nWorth noting per R1's semantics: if `city` gets assigned a new real value in either file later, that write wins and the tombstone clears in the peer on the next sync. Script saved as `sync_workspace/simulate_deletion.py` if you want to rerun or extend the test.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "zeroclaw-acp",
+        "title": "ZeroClaw ACP",
+        "version": "0.8.5"
+      },
+      "_meta": {
+        "zeroclaw": {
+          "defaultModel": "glm-5.3-flash",
+          "maxSessions": 10,
+          "sessionTimeoutSecs": 3600
+        }
+      }
+    },
+    "pid": 10,
+    "session": {
+      "sessionId": "1017edd1-c6f0-4a25-afba-e161cae3a4e6"
+    },
+    "session_id": "1017edd1-c6f0-4a25-afba-e161cae3a4e6",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

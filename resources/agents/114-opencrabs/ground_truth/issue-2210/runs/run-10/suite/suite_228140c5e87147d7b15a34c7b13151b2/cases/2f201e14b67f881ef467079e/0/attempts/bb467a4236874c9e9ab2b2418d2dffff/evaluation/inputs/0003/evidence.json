@@ -1,0 +1,125 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_67a227a893584cc1aa0e4f1debac6704",
+  "case_id": "srp-opencrabs-h1-edit-then-write-v2",
+  "input_id": "step-3",
+  "spans": [
+    {
+      "trace_id": "a4f93f432745115249cf6f7b8fe7774b",
+      "span_id": "ba4f90df6c446d3f",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792581328955048659,
+      "end_time_unix_nano": 1792581333235399141,
+      "duration_nano": 4280350482,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792581328956505614,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792581330793757122,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792581331967750336,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792581333222112597,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "a4f93f432745115249cf6f7b8fe7774b",
+      "span_id": "cbea8305b8ae7a93",
+      "parent_span_id": "ba4f90df6c446d3f",
+      "name": "write_file",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792581330790249877,
+      "end_time_unix_nano": 1792581330803927204,
+      "duration_nano": 13677327,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "write_file",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "content": "kiwis=1\nlemons=2\n",
+          "overwrite_read_confirm": true,
+          "path": "/workspace/project/inventory.txt"
+        },
+        "gen_ai.tool.call.result": "Successfully wrote 17 bytes to /workspace/project/inventory.txt",
+        "gen_ai.tool.call.id": "3d098d60-8e6a-4fd9-be33-eff395181edb"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "a4f93f432745115249cf6f7b8fe7774b",
+      "span_id": "620544700365abf1",
+      "parent_span_id": "ba4f90df6c446d3f",
+      "name": "bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792581331934760833,
+      "end_time_unix_nano": 1792581332097175578,
+      "duration_nano": 162414745,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /workspace/project && wc -l inventory.txt && cat -A inventory.txt"
+        },
+        "gen_ai.tool.call.result": "STDOUT:\n2 inventory.txt\nkiwis=1$\nlemons=2$\n",
+        "gen_ai.tool.call.id": "67fdc8ed-b316-4cf3-827e-cf08ac5a8445"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

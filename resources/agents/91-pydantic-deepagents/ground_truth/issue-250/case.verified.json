@@ -1,0 +1,67 @@
+{
+  "case_id": "srp-pydeep-h1-model-flag-v1",
+  "issue": {
+    "repository": "vstorm-co/pydantic-deepagents",
+    "number": 250,
+    "url": "https://github.com/vstorm-co/pydantic-deepagents/issues/250",
+    "state": "open",
+    "title": "ACP entry point ignores model selection and forces the Anthropic default"
+  },
+  "version_choice": "commit:650b592b6accd7dc994226abbaa0cf717527e457",
+  "reported_version": "650b592b6accd7dc994226abbaa0cf717527e457 (issue); pydantic-deep 0.3.50 (archived workspace)",
+  "commit_version": "650b592b6accd7dc994226abbaa0cf717527e457",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Create a file named hello.txt in the current directory containing exactly the line: hello from pydantic-deep"
+  ],
+  "expected": "A new ACP session uses the model explicitly selected with --model or PYDANTIC_DEEP_MODEL unless the client deliberately changes it.",
+  "defect": "The stock ACP entry point supplies a hard-coded model list whose first item is anthropic:claude-opus-4-6. New sessions select that item, overriding the requested model through ctx.model; without Anthropic credentials, initialization of the prompt fails before any model request.",
+  "fault location": [
+    {
+      "file": "apps/acp/__main__.py",
+      "function": "main",
+      "line_start": 43,
+      "line_end": 75,
+      "commit": "650b592b6accd7dc994226abbaa0cf717527e457",
+      "url": "https://github.com/vstorm-co/pydantic-deepagents/blob/650b592b6accd7dc994226abbaa0cf717527e457/apps/acp/__main__.py#L43-L75",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Computes the requested default, but passes a fixed Opus-first model list; the factory prefers ctx.model over default_model."
+    },
+    {
+      "file": "apps/acp/server.py",
+      "function": "DeepAgentACP.new_session",
+      "line_start": 205,
+      "line_end": 220,
+      "commit": "650b592b6accd7dc994226abbaa0cf717527e457",
+      "url": "https://github.com/vstorm-co/pydantic-deepagents/blob/650b592b6accd7dc994226abbaa0cf717527e457/apps/acp/server.py#L205-L220",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Initializes the session model to the first list entry, regardless of the requested CLI/environment default."
+    },
+    {
+      "file": "apps/acp/server.py",
+      "function": "DeepAgentACP._get_or_create_agent",
+      "line_start": 132,
+      "line_end": 143,
+      "commit": "650b592b6accd7dc994226abbaa0cf717527e457",
+      "url": "https://github.com/vstorm-co/pydantic-deepagents/blob/650b592b6accd7dc994226abbaa0cf717527e457/apps/acp/server.py#L132-L143",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Passes the selected session model into the factory context."
+    },
+    {
+      "file": "apps/acp/server.py",
+      "function": "DeepAgentACP.prompt",
+      "line_start": 288,
+      "line_end": 300,
+      "commit": "650b592b6accd7dc994226abbaa0cf717527e457",
+      "url": "https://github.com/vstorm-co/pydantic-deepagents/blob/650b592b6accd7dc994226abbaa0cf717527e457/apps/acp/server.py#L288-L300",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Constructs the agent before entering the streaming try block; provider configuration errors propagate as protocol errors."
+    }
+  ],
+  "Root cause": "SOURCE LOCATION CONFIRMED AT THE TESTED COMMIT; BEHAVIOR SUPPORTED BY THE ARCHIVED CANDIDATE REPORT. __main__.py resolves --model or PYDANTIC_DEEP_MODEL into default_model, but always supplies an eight-entry hard-coded models list with anthropic:claude-opus-4-6 first. new_session stores that first value in _session_models. The factory subsequently evaluates ctx.model or default_model, so the nonempty session choice overrides the explicit requested model. The archived setup uses python -m apps.acp --model openai-chat:deepseek-chat, sets PYDANTIC_DEEP_MODEL to the same model, provides the intended provider configuration, supplies no Anthropic API key, and does not send a client model-selection change. All 10 archived executions report the Opus session selection and ANTHROPIC_API_KEY failure, with zero LLM requests and no hello.txt. A network.jsonl file exists but does not imply that a model request was made. The failure occurs while creating the agent outside the prompt streaming try block. These executions use the stock entry point, unlike #248/#249, which require the documented factory configuration. The branch where an Anthropic key is present and an unintended model call succeeds was not tested and is not claimed as observed. The original report labels this a candidate pending human review. This preparation checked historical source and the open issue, but did not run a fresh agent or a before/after patch test. The issue comment proposes error-path history persistence, which concerns the neighboring history problem rather than proving a fix for this model-selection fault. No fixing revision/release was established. Tested source provenance: archived pydantic-deep 0.3.50 workspace at 650b592b6accd7dc994226abbaa0cf717527e457. The archive records pydantic-ai-slim 2.59.0, pydantic-ai-backend 0.2.37, pydantic-ai-harness 0.59.0, agent-client-protocol 0.12.1 and openai 3.35.1; dependencies were resolved without a lockfile. Reproducing only the repository commit does not guarantee the same dependency environment. pinned_contains_fix=false refers to this historical tested commit, not the current upstream default branch. Issue state was checked on 2026-10-26."
+}

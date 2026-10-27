@@ -1,0 +1,274 @@
+[
+  [
+    {
+      "content": "You are TableGPT2, an expert Python data analyst developed by Zhejiang University. Your job is to help user analyze datasets by writing Python code. Each markdown codeblock you write will be executed in an IPython environment, and you will receive the execution output. You should provide results analysis based on the execution output.\nFor politically sensitive questions, security and privacy issues, or other non-data analyze questions, you will refuse to answer.\n\nRemember:\n- Comprehend the user's requirements carefully & to the letter.\n- If additional information is needed, feel free to ask the user.\n- Give a brief description for what you plan to do & write Python code.\n- You can use `read_df(uri: str) -> pd.DataFrame` function to read different file formats into DataFrame.\n- When creating charts, prefer using `seaborn`.\n- DO NOT include images using markdown syntax (![]()) in your response under ANY circumstances.\n- If error occurred, try to fix it.\n- Response in the same language as the user.\n- Today is 2026-10-12",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "system",
+      "name": null,
+      "id": null
+    },
+    {
+      "content": "Bind the dataset contract: identify the producer, consumer, dialect, profile, and version for the uploaded dataset. State any assumptions you make.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": "538ee707-c827-4236-98f0-56d8fc8cfc95",
+      "example": false
+    },
+    {
+      "content": "I'll start by looking for the uploaded dataset in the working environment, then inspect it to derive the contract fields.\n\n```python\nimport os, json, glob\n\n# Look for likely data files in common locations\ncandidates = []\nfor root in [\".\", \"/mnt/data\", \"/content\", \"data\", \"/home\", \"/tmp\"]:\n    if os.path.exists(root):\n        for path in glob.glob(os.path.join(root, \"**\", \"*\"), recursive=True):\n            if os.path.isfile(path):\n                ext = os.path.splitext(path)[1].lower()\n                if ext in {\".csv\", \".tsv\", \".json\", \".jsonl\", \".parquet\", \".xlsx\", \".xls\", \".feather\", \".orc\", \".txt\", \".yaml\", \".yml\"}:\n                    candidates.append(path)\n\nfor c in sorted(set(candidates)):\n    try:\n        print(f\"{os.path.getsize(c):>12,} bytes  {c}\")\n    except OSError:\n        pass\n\nprint(\"\\nTotal candidate files:\", len(set(candidates)))\n```",
+      "additional_kwargs": {
+        "thought": "I'll start by looking for the uploaded dataset in the working environment, then inspect it to derive the contract fields.",
+        "action": {
+          "tool": "python",
+          "tool_input": "import os, json, glob\n\n# Look for likely data files in common locations\ncandidates = []\nfor root in [\".\", \"/mnt/data\", \"/content\", \"data\", \"/home\", \"/tmp\"]:\n    if os.path.exists(root):\n        for path in glob.glob(os.path.join(root, \"**\", \"*\"), recursive=True):\n            if os.path.isfile(path):\n                ext = os.path.splitext(path)[1].lower()\n                if ext in {\".csv\", \".tsv\", \".json\", \".jsonl\", \".parquet\", \".xlsx\", \".xls\", \".feather\", \".orc\", \".txt\", \".yaml\", \".yml\"}:\n                    candidates.append(path)\n\nfor c in sorted(set(candidates)):\n    try:\n        print(f\"{os.path.getsize(c):>12,} bytes  {c}\")\n    except OSError:\n        pass\n\nprint(\"\\nTotal candidate files:\", len(set(candidates)))"
+        },
+        "parent_id": "0626f77b-02b7-4d23-83d2-cad6a7b8d138"
+      },
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "4c9f3194-ddf3-4aad-9aa8-2120b892f5e9",
+      "example": false,
+      "tool_calls": [
+        {
+          "name": "python",
+          "args": {
+            "query": "import os, json, glob\n\n# Look for likely data files in common locations\ncandidates = []\nfor root in [\".\", \"/mnt/data\", \"/content\", \"data\", \"/home\", \"/tmp\"]:\n    if os.path.exists(root):\n        for path in glob.glob(os.path.join(root, \"**\", \"*\"), recursive=True):\n            if os.path.isfile(path):\n                ext = os.path.splitext(path)[1].lower()\n                if ext in {\".csv\", \".tsv\", \".json\", \".jsonl\", \".parquet\", \".xlsx\", \".xls\", \".feather\", \".orc\", \".txt\", \".yaml\", \".yml\"}:\n                    candidates.append(path)\n\nfor c in sorted(set(candidates)):\n    try:\n        print(f\"{os.path.getsize(c):>12,} bytes  {c}\")\n    except OSError:\n        pass\n\nprint(\"\\nTotal candidate files:\", len(set(candidates)))"
+          },
+          "id": "7b947402-fa6b-4071-9c8b-1ba236fcb606",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": null
+    },
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "```pycon\n         270 bytes  ./kernel-b7516334-f81c-44ce-9d5f-9a94c1bd84f5.json\n         270 bytes  /tmp/kernel-b7516334-f81c-44ce-9d5f-9a94c1bd84f5.json\n\nTotal candidate files: 2\n\n```"
+        }
+      ],
+      "additional_kwargs": {
+        "parent_id": "0626f77b-02b7-4d23-83d2-cad6a7b8d138"
+      },
+      "response_metadata": {},
+      "type": "tool",
+      "name": "python",
+      "id": "1fc69cf1-0361-4f01-b48e-cb2a59da3c0f",
+      "tool_call_id": "7b947402-fa6b-4071-9c8b-1ba236fcb606",
+      "artifact": [],
+      "status": "success"
+    },
+    {
+      "content": "Let me check those files in case they contain metadata about an uploaded dataset.\n\n```python\nfor p in [\"./kernel-b7516334-f81c-44ce-9d5f-9a94c1bd84f5.json\",\n          \"/tmp/kernel-b7516334-f81c-44ce-9d5f-9a94c1bd84f5.json\"]:\n    if os.path.exists(p):\n        print(\"=\" * 60)\n        print(p)\n        try:\n            print(json.dumps(json.load(open(p)), indent=2)[:2000])\n        except Exception as e:\n            print(\"read error:\", e)\n```",
+      "additional_kwargs": {
+        "thought": "Let me check those files in case they contain metadata about an uploaded dataset.",
+        "action": {
+          "tool": "python",
+          "tool_input": "for p in [\"./kernel-b7516334-f81c-44ce-9d5f-9a94c1bd84f5.json\",\n          \"/tmp/kernel-b7516334-f81c-44ce-9d5f-9a94c1bd84f5.json\"]:\n    if os.path.exists(p):\n        print(\"=\" * 60)\n        print(p)\n        try:\n            print(json.dumps(json.load(open(p)), indent=2)[:2000])\n        except Exception as e:\n            print(\"read error:\", e)"
+        },
+        "parent_id": "0626f77b-02b7-4d23-83d2-cad6a7b8d138"
+      },
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "b1576b6a-b978-46b8-9e61-f38c3f4ad568",
+      "example": false,
+      "tool_calls": [
+        {
+          "name": "python",
+          "args": {
+            "query": "for p in [\"./kernel-b7516334-f81c-44ce-9d5f-9a94c1bd84f5.json\",\n          \"/tmp/kernel-b7516334-f81c-44ce-9d5f-9a94c1bd84f5.json\"]:\n    if os.path.exists(p):\n        print(\"=\" * 60)\n        print(p)\n        try:\n            print(json.dumps(json.load(open(p)), indent=2)[:2000])\n        except Exception as e:\n            print(\"read error:\", e)"
+          },
+          "id": "975269f5-bc24-4d0a-bef6-c9983695216c",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": null
+    },
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "```pycon\n============================================================\n./kernel-b7516334-f81c-44ce-9d5f-9a94c1bd84f5.json\n{\n  \"shell_port\": 60847,\n  \"iopub_port\": 58831,\n  \"stdin_port\": 49427,\n  \"control_port\": 35871,\n  \"hb_port\": 54687,\n  \"ip\": \"127.0.0.1\",\n  \"key\": \"c6f4087e-5ebb33dd89b03dc86dc7ec9b\",\n  \"transport\": \"tcp\",\n  \"signature_scheme\": \"hmac-sha256\",\n  \"kernel_name\": \"python3\"\n}\n============================================================\n/tmp/kernel-b7516334-f81c-44ce-9d5f-9a94c1bd84f5.json\n{\n  \"shell_port\": 60847,\n  \"iopub_port\": 58831,\n  \"stdin_port\": 49427,\n  \"control_port\": 35871,\n  \"hb_port\": 54687,\n  \"ip\": \"127.0.0.1\",\n  \"key\": \"c6f4087e-5ebb33dd89b03dc86dc7ec9b\",\n  \"transport\": \"tcp\",\n  \"signature_scheme\": \"hmac-sha256\",\n  \"kernel_name\": \"python3\"\n}\n\n```"
+        }
+      ],
+      "additional_kwargs": {
+        "parent_id": "0626f77b-02b7-4d23-83d2-cad6a7b8d138"
+      },
+      "response_metadata": {},
+      "type": "tool",
+      "name": "python",
+      "id": "d5878d59-83a3-4299-bbb7-169dfa1e298d",
+      "tool_call_id": "975269f5-bc24-4d0a-bef6-c9983695216c",
+      "artifact": [],
+      "status": "success"
+    },
+    {
+      "content": "Those are just Jupyter kernel connection files, not a dataset. Let me check the kernel environment for anything already loaded in memory or registered as an upload.\n\n```python\nimport sys\n# 1) Any DataFrames already in the session?\ntry:\n    import pandas as pd\n    dfs = {k: v for k, v in globals().items() if isinstance(v, pd.DataFrame)}\n    print(\"DataFrames in globals:\", {k: v.shape for k, v in dfs.items()} or \"none\")\nexcept Exception as e:\n    print(\"pandas check failed:\", e)\n\n# 2) Interesting environment variables\nimport os\nfor k in sorted(os.environ):\n    if any(t in k.lower() for t in [\"data\", \"upload\", \"file\", \"dataset\", \"path\", \"input\", \"work\"]):\n        print(f\"{k} = {os.environ[k]}\")\n\n# 3) Current working directory contents (incl. hidden)\nprint(\"\\nCWD:\", os.getcwd())\nprint(\"Entries:\", os.listdir(\".\"))\n```",
+      "additional_kwargs": {
+        "thought": "Those are just Jupyter kernel connection files, not a dataset. Let me check the kernel environment for anything already loaded in memory or registered as an upload.",
+        "action": {
+          "tool": "python",
+          "tool_input": "import sys\n# 1) Any DataFrames already in the session?\ntry:\n    import pandas as pd\n    dfs = {k: v for k, v in globals().items() if isinstance(v, pd.DataFrame)}\n    print(\"DataFrames in globals:\", {k: v.shape for k, v in dfs.items()} or \"none\")\nexcept Exception as e:\n    print(\"pandas check failed:\", e)\n\n# 2) Interesting environment variables\nimport os\nfor k in sorted(os.environ):\n    if any(t in k.lower() for t in [\"data\", \"upload\", \"file\", \"dataset\", \"path\", \"input\", \"work\"]):\n        print(f\"{k} = {os.environ[k]}\")\n\n# 3) Current working directory contents (incl. hidden)\nprint(\"\\nCWD:\", os.getcwd())\nprint(\"Entries:\", os.listdir(\".\"))"
+        },
+        "parent_id": "0626f77b-02b7-4d23-83d2-cad6a7b8d138"
+      },
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "a2da76cb-622a-4e3e-ae0d-f1b2f3ace884",
+      "example": false,
+      "tool_calls": [
+        {
+          "name": "python",
+          "args": {
+            "query": "import sys\n# 1) Any DataFrames already in the session?\ntry:\n    import pandas as pd\n    dfs = {k: v for k, v in globals().items() if isinstance(v, pd.DataFrame)}\n    print(\"DataFrames in globals:\", {k: v.shape for k, v in dfs.items()} or \"none\")\nexcept Exception as e:\n    print(\"pandas check failed:\", e)\n\n# 2) Interesting environment variables\nimport os\nfor k in sorted(os.environ):\n    if any(t in k.lower() for t in [\"data\", \"upload\", \"file\", \"dataset\", \"path\", \"input\", \"work\"]):\n        print(f\"{k} = {os.environ[k]}\")\n\n# 3) Current working directory contents (incl. hidden)\nprint(\"\\nCWD:\", os.getcwd())\nprint(\"Entries:\", os.listdir(\".\"))"
+          },
+          "id": "9a74f8d5-0a85-45c0-b280-2b8301cedcc1",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": null
+    },
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "```pycon\nDataFrames in globals: none\nGRPC_DEFAULT_SSL_ROOTS_FILE_PATH = /tmp/abb-ca-bundle.pem\nPATH = /usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\nPYTHONPATH = /opt/abb-runtime\nSSL_CERT_FILE = /tmp/abb-ca-bundle.pem\n\nCWD: /tmp\nEntries: ['.cache', '.config', 'kernel-b7516334-f81c-44ce-9d5f-9a94c1bd84f5.json', '.ipython', 'abb-tablegpt-64awg_bw', 'kuma', 'kuma-active-run.lock', 'abb-ca-bundle.pem']\n\n```"
+        }
+      ],
+      "additional_kwargs": {
+        "parent_id": "0626f77b-02b7-4d23-83d2-cad6a7b8d138"
+      },
+      "response_metadata": {},
+      "type": "tool",
+      "name": "python",
+      "id": "d0f3a5ac-aeaf-4868-9319-dac1571f715c",
+      "tool_call_id": "9a74f8d5-0a85-45c0-b280-2b8301cedcc1",
+      "artifact": [],
+      "status": "success"
+    },
+    {
+      "content": "There are a couple of unexplored directories. Let me do one final sweep before concluding.\n\n```python\nfor d in [\"abb-tablegpt-64awg_bw\", \"kuma\", \".cache\", \".config\"]:\n    if os.path.isdir(d):\n        print(\"=\" * 60)\n        print(d)\n        for path in sorted(glob.glob(os.path.join(d, \"**\", \"*\"), recursive=True))[:50]:\n            print(\"   \", path)\n```",
+      "additional_kwargs": {
+        "thought": "There are a couple of unexplored directories. Let me do one final sweep before concluding.",
+        "action": {
+          "tool": "python",
+          "tool_input": "for d in [\"abb-tablegpt-64awg_bw\", \"kuma\", \".cache\", \".config\"]:\n    if os.path.isdir(d):\n        print(\"=\" * 60)\n        print(d)\n        for path in sorted(glob.glob(os.path.join(d, \"**\", \"*\"), recursive=True))[:50]:\n            print(\"   \", path)"
+        },
+        "parent_id": "0626f77b-02b7-4d23-83d2-cad6a7b8d138"
+      },
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "cb1d3a61-789a-479e-8c62-1cbd69f71e24",
+      "example": false,
+      "tool_calls": [
+        {
+          "name": "python",
+          "args": {
+            "query": "for d in [\"abb-tablegpt-64awg_bw\", \"kuma\", \".cache\", \".config\"]:\n    if os.path.isdir(d):\n        print(\"=\" * 60)\n        print(d)\n        for path in sorted(glob.glob(os.path.join(d, \"**\", \"*\"), recursive=True))[:50]:\n            print(\"   \", path)"
+          },
+          "id": "6ada5ca0-f94b-44e0-a2da-cbc25363d620",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": null
+    },
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "```pycon\n============================================================\nabb-tablegpt-64awg_bw\n    abb-tablegpt-64awg_bw/profile\n    abb-tablegpt-64awg_bw/profile/history.sqlite\n    abb-tablegpt-64awg_bw/profile/log\n    abb-tablegpt-64awg_bw/profile/pid\n    abb-tablegpt-64awg_bw/profile/security\n    abb-tablegpt-64awg_bw/profile/startup\n    abb-tablegpt-64awg_bw/profile/startup/00-pandas.py\n    abb-tablegpt-64awg_bw/profile/startup/98-udfs.py\n    abb-tablegpt-64awg_bw/profile/startup/99-cfont.py\n    abb-tablegpt-64awg_bw/profile/startup/__pycache__\n    abb-tablegpt-64awg_bw/profile/startup/__pycache__/00-pandas.cpython-312.pyc\n    abb-tablegpt-64awg_bw/profile/startup/__pycache__/98-udfs.cpython-312.pyc\n    abb-tablegpt-64awg_bw/profile/startup/__pycache__/99-cfont.cpython-312.pyc\n============================================================\nkuma\n    kuma/run_93ee57a767a4471c953a831aea733de6\n============================================================\n.cache\n    .cache/matplotlib\n    .cache/matplotlib/fontlist-v3.11.0.json\n============================================================\n.config\n    .config/matplotlib\n\n```"
+        }
+      ],
+      "additional_kwargs": {
+        "parent_id": "0626f77b-02b7-4d23-83d2-cad6a7b8d138"
+      },
+      "response_metadata": {},
+      "type": "tool",
+      "name": "python",
+      "id": "2943718c-0885-4dbf-81e6-a6b3e8a6942d",
+      "tool_call_id": "6ada5ca0-f94b-44e0-a2da-cbc25363d620",
+      "artifact": [],
+      "status": "success"
+    },
+    {
+      "content": "Let me check the runtime's helper definitions so I can describe supported input dialects accurately.\n\n```python\nfor f in [\"abb-tablegpt-64awg_bw/profile/startup/98-udfs.py\",\n          \"abb-tablegpt-64awg_bw/profile/startup/00-pandas.py\"]:\n    if os.path.exists(f):\n        print(\"=\" * 60)\n        print(f)\n        txt = open(f).read()\n        print(txt[:1500])\n```",
+      "additional_kwargs": {
+        "thought": "Let me check the runtime's helper definitions so I can describe supported input dialects accurately.",
+        "action": {
+          "tool": "python",
+          "tool_input": "for f in [\"abb-tablegpt-64awg_bw/profile/startup/98-udfs.py\",\n          \"abb-tablegpt-64awg_bw/profile/startup/00-pandas.py\"]:\n    if os.path.exists(f):\n        print(\"=\" * 60)\n        print(f)\n        txt = open(f).read()\n        print(txt[:1500])"
+        },
+        "parent_id": "0626f77b-02b7-4d23-83d2-cad6a7b8d138"
+      },
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "e9d9652e-4693-4bf2-8a45-e627a47b6748",
+      "example": false,
+      "tool_calls": [
+        {
+          "name": "python",
+          "args": {
+            "query": "for f in [\"abb-tablegpt-64awg_bw/profile/startup/98-udfs.py\",\n          \"abb-tablegpt-64awg_bw/profile/startup/00-pandas.py\"]:\n    if os.path.exists(f):\n        print(\"=\" * 60)\n        print(f)\n        txt = open(f).read()\n        print(txt[:1500])"
+          },
+          "id": "24e99a80-8891-41c0-bd85-8a320d43e860",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": null
+    },
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "```pycon\n============================================================\nabb-tablegpt-64awg_bw/profile/startup/98-udfs.py\nfrom __future__ import annotations\n\nimport concurrent.futures\nimport os\nfrom pathlib import Path\nfrom typing import NamedTuple, cast\n\nimport pandas as pd\n\n\nclass FileEncoding(NamedTuple):\n    \"\"\"File encoding as the NamedTuple.\"\"\"\n\n    encoding: str | None\n    \"\"\"The encoding of the file.\"\"\"\n    confidence: float\n    \"\"\"The confidence of the encoding.\"\"\"\n    language: str | None\n    \"\"\"The language of the file.\"\"\"\n\n\ndef detect_file_encodings(\n    file_path: str | Path, timeout: int = 5\n) -> list[FileEncoding]:\n    \"\"\"Try to detect the file encoding.\n\n    Returns a list of `FileEncoding` tuples with the detected encodings ordered\n    by confidence.\n\n    Args:\n        file_path: The path to the file to detect the encoding for.\n        timeout: The timeout in seconds for the encoding detection.\n    \"\"\"\n    import chardet\n\n    file_path = str(file_path)\n\n    def read_and_detect(file_path: str) -> list[dict]:\n        with open(file_path, \"rb\") as f:\n            rawdata = f.read()\n        return cast(list[dict], chardet.detect_all(rawdata))\n\n    with concurrent.futures.ThreadPoolExecutor() as executor:\n        future = executor.submit(read_and_detect, file_path)\n        try:\n            encodings = future.result(timeout=timeout)\n        except concurrent.futures.TimeoutError:\n            raise TimeoutError(\n                f\"Timeout reached while detecting encoding for {file_path}\"\n            )\n\n    if all(encoding[\"encoding\"] is None for encoding in encodings):\n        raise Runt\n============================================================\nabb-tablegpt-64awg_bw/profile/startup/00-pandas.py\nimport pandas as pd\n\npd.set_option(\"display.width\", 2048)\n# 8 is the minimum value to display `df.describe()`. We have other truncation mechanisms so it's OK to flex this a bit.\npd.set_option(\"display.max_rows\", 8)\npd.set_option(\"display.max_columns\", 40)\npd.set_option(\"display.max_colwidth\", 40)\npd.set_option(\"display.precision\", 3)\npd.set_option(\"future.no_silent_downcasting\", True)\n\n\n```"
+        }
+      ],
+      "additional_kwargs": {
+        "parent_id": "0626f77b-02b7-4d23-83d2-cad6a7b8d138"
+      },
+      "response_metadata": {},
+      "type": "tool",
+      "name": "python",
+      "id": "b02cd813-42b6-4cde-a765-a2bf04373c0c",
+      "tool_call_id": "24e99a80-8891-41c0-bd85-8a320d43e860",
+      "artifact": [],
+      "status": "success"
+    },
+    {
+      "content": "## Result: no dataset is present — the contract cannot be bound yet\n\nI searched the whole environment exhaustively and found **no uploaded dataset**. Here is what actually exists on disk:\n\n| Path | What it is |\n|---|---|\n| `kernel-b7516334-…json` | Jupyter kernel connection file (ports + HMAC key) |\n| `abb-tablegpt-64awg_bw/profile/*` | IPython startup profile (`00-pandas.py`, `98-udfs.py`, `99-cfont.py`) |\n| `kuma/run_93ee57a7…` | Runtime run directory, no data file |\n| `.cache/matplotlib/…` | Matplotlib font cache |\n\nVerified facts:\n- **No** `.csv / .tsv / .json / .parquet / .xlsx / .feather / .orc / .txt` data files anywhere under `.`, `/tmp`, `/mnt/data`, `/content`, `data`, `/home`.\n- **No** DataFrame exists in the session namespace (`globals()` scan → `none`).\n- No environment variable points to an input/upload path.\n- The only `.json` files found are Jupyter kernel specs, not data.\n\nI won't guess at a producer/consumer/dialect/profile/version from an empty environment — that would be fabrication, not analysis.\n\n### Please provide the dataset\n\nAttach or point me to the file (or variable name, e.g. `df`). Then I'll run the contract-binding pass and report all five fields.\n\n### Fields I will bind, and the evidence for each\n\n| Contract field | How I'll determine it | Fallback if not derivable |\n|---|---|---|\n| **Producer** | `_producer`/`provenance`/`source`/`origin` columns or attrs; file owner, path/source system, header comments, `df.attrs` | Report \"unknown — inferred from <path>\" |\n| **Consumer** | Stated `consumer`/`audience` metadata; else the downstream role implied by schema (e.g. BI mart vs. ML training set) | Report \"unknown — schema suggests X\" |\n| **Dialect** | File extension + real parse behavior: delimiter for CSV/TSV, JSON lines vs. nested, Parquet/Excel, encoding via `detect_file_encodings` | Concretely observed parse settings |\n| **Profile** | Row/column counts, dtypes, null rates, uniqueness, min/max/quantiles, sentinel values | Empirical summary of the loaded frame |\n| **Version** | `_version`/`schema_version` columns, embedded metadata, filename date/semver tags, git/ETL run IDs | Report \"unknown — no version marker found\" |\n\n### Assumptions I'll apply unless you say otherwise\n1. **Exactly one** uploaded dataset is the target; if several, I'll ask which is canonical and treat the rest as lineage.\n2. Fields absent from the data are recorded as **unknown**, never invented — I'll flag inferred values as inference.\n3. **Dialect** is determined empirically (what `read_df` actually had to assume), not from the extension alone.\n4. **Consumer** is taken from explicit metadata if present; otherwise inferred from schema shape and labeled as a hypothesis.\n5. Comparisons/versioning use **semantic versioning** if a version string is parseable.\n6. Profile statistics are computed on the data **as loaded** (no type coercion, no imputation) so the contract reflects the raw artifact.\n\nUpload the file and I'll produce the completed contract table.",
+      "additional_kwargs": {
+        "parent_id": "0626f77b-02b7-4d23-83d2-cad6a7b8d138"
+      },
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "6622a023-5b99-4d5a-8ad7-e0a6b7a59404",
+      "example": false,
+      "tool_calls": [],
+      "invalid_tool_calls": [],
+      "usage_metadata": null
+    },
+    {
+      "content": "Resolve the schema and references: list the columns, their types, and any relationships or vocabulary terms used in the dataset.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": "bab6b576-4f2b-4420-9bd0-1dd8c6dcd70e",
+      "example": false
+    }
+  ]
+]

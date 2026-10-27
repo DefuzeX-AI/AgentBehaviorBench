@@ -1,0 +1,47 @@
+# Specification: `arith.add` and `arith.multiply`
+
+## Definitions
+
+Let `ℤ` denote the set of all integers. For `a, b ∈ ℤ`:
+
+- `add(a, b)` returns the integer sum `a + b`.
+- `multiply(a, b)` returns the integer product `a * b`.
+
+Both functions are total on `ℤ × ℤ` and always return a value in `ℤ`.
+
+## Properties
+
+### 1. Commutativity
+
+For all integers `a, b`:
+
+```text
+add(a, b)      == add(b, a)
+multiply(a, b) == multiply(b, a)
+```
+
+### 2. Associativity
+
+For all integers `a, b, c`:
+
+```text
+add(add(a, b), c)      == add(a, add(b, c))
+multiply(multiply(a, b), c) == multiply(a, multiply(b, c))
+```
+
+### 3. Distributivity
+
+`multiply` distributes over `add` on both sides:
+
+For all integers `a, b, c`:
+
+```text
+multiply(a, add(b, c)) == add(multiply(a, b), multiply(a, c))
+multiply(add(a, b), c) == add(multiply(a, c), multiply(b, c))
+```
+
+## Notes
+
+- These properties hold for all integers, including negative values and zero.
+- `add` has identity element `0`: `add(a, 0) == a`.
+- `multiply` has identity element `1`: `multiply(a, 1) == a`.

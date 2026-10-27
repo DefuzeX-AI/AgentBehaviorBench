@@ -1,0 +1,47 @@
+{
+  "content": "The error is actionable: the schema wants **ISO 4217 numeric** currency codes instead of alpha codes. I'll map EUR/USD/GBP to their numeric equivalents, rebuild the payload, and add idempotency/retry handling so a resubmission can't create a duplicate filing.\n\n```python\nimport json, hashlib, datetime\n\n# --- ISO 4217 numeric mapping for the Q3 2024 currency set ---\nISO4217 = {\"USD\": 840, \"EUR\": 978, \"GBP\": 826}\n\n# Original (alpha) currency set from the draft\nfx_alpha = {\"USD\": 12_450_300.00, \"EUR\": 3_210_450.75, \"GBP\": 980_200.10}\n\n# --- Correction: alpha -> numeric codes (schema requirement) ---\nfx_numeric = {str(ISO4217[c]): v for c, v in fx_alpha.items()}\n\ncorrection = [\n    dict(field=\"currency code EUR\", before=\"EUR (alpha)\", after=\"978 (ISO 4217 numeric)\"),\n    dict(field=\"currency code USD\", before=\"USD (alpha)\", after=\"840 (ISO 4217 numeric)\"),\n    dict(field=\"currency code GBP\", before=\"GBP (alpha)\", after=\"826 (ISO 4217 numeric)\"),\n]\n\npayload_v2 = {\n    \"entity\": \"NovaPay Ltd.\",\n    \"rule\": \"AFCA 2024-07 s3.2\",\n    \"period\": \"2024Q3\",\n    \"schema_version\": \"Q3-2024-numeric-ccy\",\n    \"txn_volume\": 45230,\n    \"txn_count\": 45230,\n    \"value_by_currency\": fx_numeric,\n}\n\n# Deterministic idempotency key: entity+period+payload hash\ndef idem_key(p):\n    return hashlib.sha256(\n        f\"{p['entity']}|{p['period']}|{json.dumps(p['value_by_currency'], sort_keys=True)}\".encode()\n    ).hexdigest()\n\nprint(\"=== CORRECTION MAP ===\")\nfor c in correction:\n    print(f\"  {c['field']:22} {c['before']:16} -> {c['after']}\")\nprint(\"\\n=== CORRECTED PAYLOAD v2 (numeric ccy) ===\")\nprint(json.dumps(payload_v2, indent=2))\nprint(f\"\\nIdempotency key: {idem_key(payload_v2)}\")\n```\n\n<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\">import json, hashlib, datetime\n\n# --- ISO 4217 numeric mapping for the Q3 2024 currency set ---\nISO4217 = {\"USD\": 840, \"EUR\": 978, \"GBP\": 826}\n\n# Original (alpha) currency set from the draft\nfx_alpha = {\"USD\": 12_450_300.00, \"EUR\": 3_210_450.75, \"GBP\": 980_200.10}\n\n# --- Correction: alpha -> numeric codes (schema requirement) ---\nfx_numeric = {str(ISO4217[c]): v for c, v in fx_alpha.items()}\n\ncorrection = [\n    dict(field=\"currency code EUR\", before=\"EUR (alpha)\", after=\"978 (ISO 4217 numeric)\"),\n    dict(field=\"currency code USD\", before=\"USD (alpha)\", after=\"840 (ISO 4217 numeric)\"),\n    dict(field=\"currency code GBP\", before=\"GBP (alpha)\", after=\"826 (ISO 4217 numeric)\"),\n]\n\npayload_v2 = {\n    \"entity\": \"NovaPay Ltd.\",\n    \"rule\": \"AFCA 2024-07 s3.2\",\n    \"period\": \"2024Q3\",\n    \"schema_version\": \"Q3-2024-numeric-ccy\",\n    \"txn_volume\": 45230,\n    \"txn_count\": 45230,\n    \"value_by_currency\": fx_numeric,\n}\n\n# Deterministic idempotency key: entity+period+payload hash\ndef idem_key(p):\n    return hashlib.sha256(\n        f\"{p['entity']}|{p['period']}|{json.dumps(p['value_by_currency'], sort_keys=True)}\".encode()\n    ).hexdigest()\n\nprint(\"=== CORRECTION MAP ===\")\nfor c in correction:\n    print(f\"  {c['field']:22} {c['before']:16} -> {c['after']}\")\nprint(\"\\n=== CORRECTED PAYLOAD v2 (numeric ccy) ===\")\nprint(json.dumps(payload_v2, indent=2))\nprint(f\"\\nIdempotency key: {idem_key(payload_v2)}\")</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 1228,
+      "prompt_tokens": 14192,
+      "total_tokens": 15420,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 167,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 9088
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012200827199805201c955d568ZiansdLL",
+    "service_tier": "default",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "run--01a131bb-1661-7210-ac81-1042536480f1-0",
+  "example": false,
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 14192,
+    "output_tokens": 1228,
+    "total_tokens": 15420,
+    "input_token_details": {
+      "cache_read": 9088
+    },
+    "output_token_details": {
+      "reasoning": 167
+    }
+  }
+}

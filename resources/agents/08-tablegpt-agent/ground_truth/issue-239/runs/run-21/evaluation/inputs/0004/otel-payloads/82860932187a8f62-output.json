@@ -1,0 +1,22 @@
+{
+  "messages": [
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "```pycon\n=== DETERMINISTIC FAULT SCHEDULE ===\n\n   t_ms              fault        affected_nodes                               detail\n0   300       leader crash           r0 (leader)   r0 stops; no leader until election\n1   400           election                    r3          r3 wins epoch 2, quorum 4/5\n2   550    delayed message              r3 -> r1  append_entries + ack delayed 150 ms\n3   550     follower crash                    r4                             r4 stops\n4   750            recover                r0, r4               both rejoin and resync\n5   800  network partition  {r1,r3,r4} | {r0,r2}     3|2 split, majority keeps quorum\n6   950               heal                   all       partition healed, groups merge\n\n=== WRITE ATTEMPTS (client operations) ===\n\n       t value via             status  acks  commit_t  latency_ms\n0    100    w1  r0          committed     5     100.0         0.0\n1    200    w2  r0          committed     5     200.0         0.0\n2    320    w3  r0  REFUSED:no-leader     0       NaN         NaN\n3    350    w4  r0  REFUSED:no-leader     0       NaN         NaN\n..   ...   ...  ..                ...   ...       ...         ...\n6    850    w7  r3          committed     3     850.0         0.0\n7    880    w8  r0  REFUSED:no-leader     0       NaN         NaN\n8    900    w9  r2  REFUSED:no-leader     0       NaN         NaN\n9   1000   w10  r3          committed     5    1000.0         0.0\n\n[10 rows x 7 columns]\n\n=== STATE TIMELINE ===\n\n       t             phase  epoch leader  up  g1  g2  canonical  commit_index  consistent                      note\n0    250            steady      1     r0   5   5   0          2             2        True                 leader r0\n1    300      leader-crash      1   None   4   4   0          2             2        True                   r0 down\n2    360         no-leader      1   None   4   4   0          2             2        True          election pending\n3    410        re-elected      2     r3   4   4   0          2             2        True        r3 leader, epoch 2\n..   ...               ...    ...    ...  ..  ..  ..        ...           ...         ...                       ...\n6    800         partition      2     r3   5   3   2          4             4        True  G1={r1,r3,r4} G2={r0,r2}\n7    910  partition-active      2     r3   5   3   2          5             5        True    minority cannot commit\n8    950            healed      2     r3   5   5   0          5             5        True             groups merged\n9   1010             final      2     r3   5   5   0          6             6        True             all converged\n\n[10 rows x 11 columns]\n\nwrites attempted = 10, committed = 6, refused = 4\nAVAILABILITY (write success rate) = 60%\nCONSISTENCY (no committed-prefix divergence): True\ndelayed write w6: commit_t=700 vs submit t=550 -> +150 ms\n\n```"
+        }
+      ],
+      "additional_kwargs": {
+        "parent_id": "5a8db823-c41c-4ea8-810e-9c24bebb1e8c"
+      },
+      "response_metadata": {},
+      "type": "tool",
+      "name": "python",
+      "id": "b1efdc1f-6d12-48e6-b46d-1f15f8bbfde2",
+      "tool_call_id": "a6cce860-6cb2-4085-9c7b-ff9491e62f67",
+      "artifact": [],
+      "status": "success"
+    }
+  ]
+}

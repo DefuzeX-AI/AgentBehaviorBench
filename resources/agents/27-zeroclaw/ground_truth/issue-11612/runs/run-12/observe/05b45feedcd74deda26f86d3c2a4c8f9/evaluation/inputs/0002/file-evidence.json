@@ -1,0 +1,102 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/contract.sha256",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:77ebe83a516420c85a438719e16663943bcf9bc485d61cf5fb797838668d93c4",
+        "before_size": null,
+        "after_size": 80,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/contract.sha256\n@@ -0,0 +1 @@\n+936608ca295960085c389c483df1e30a40e453668afdf7ce1f0e3ebc5fd85ac8  contract.yaml\n"
+      },
+      {
+        "path": "/home/agent/workspace/hash_contract.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:111fa6b4ee3a7490134b52fbcdd7e9325e05d4f204f1afa59fe2ba46d6812553",
+        "before_size": null,
+        "after_size": 215,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/hash_contract.py\n@@ -0,0 +1,10 @@\n+import hashlib\n+\n+with open(\"contract.yaml\", \"rb\") as f:\n+    data = f.read()\n+\n+digest = hashlib.sha256(data).hexdigest()\n+with open(\"contract.sha256\", \"w\") as f:\n+    f.write(f\"{digest}  contract.yaml\\n\")\n+\n+print(digest)\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 2,
+      "diff_included_count": 2
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_fb789094d2de4cda9c50b7feb5ac062e",
+    "input_id": "step-2",
+    "step_id": "step-2",
+    "submission_id": "submission-36750a61b454995fca1b111dd2e6b115",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "contract.sha256",
+        "change_type": "created",
+        "size_bytes": 80,
+        "after_sha256": "77ebe83a516420c85a438719e16663943bcf9bc485d61cf5fb797838668d93c4"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "hash_contract.py",
+        "change_type": "created",
+        "size_bytes": 215,
+        "after_sha256": "111fa6b4ee3a7490134b52fbcdd7e9325e05d4f204f1afa59fe2ba46d6812553"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "1f786df7121b29fd8875640c2e7d65f8c5d4d2239d295a7cc67156f033a65ccf",
+        "size_bytes": 4239,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "e10e945bf72c1ee51c60dde1337eb11b9dc40e52ee05cacbb7519d7510d192f0"
+      }
+    ]
+  }
+}

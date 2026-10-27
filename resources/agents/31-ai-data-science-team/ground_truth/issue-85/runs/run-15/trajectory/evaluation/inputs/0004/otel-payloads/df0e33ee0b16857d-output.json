@@ -1,0 +1,79 @@
+{
+  "generations": [
+    [
+      {
+        "text": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n    \n    # Ensure input is a list\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n    \n    # Use the first dataframe (main dataset)\n    df = data_list[0].copy()\n    \n    # 1. Inspect and standardize column names\n    df.columns = df.columns.str.lower().str.strip().str.replace(' ', '_')\n    \n    # 2. Identify key columns based on naming conventions\n    date_col = next((col for col in df.columns if 'date' in col), None)\n    model_col = next((col for col in df.columns if 'model' in col), None)\n    sales_col = next((col for col in df.columns if 'sales' in col or 'extended_sales' in col), None)\n    price_col = next((col for col in df.columns if 'price' in col), None)\n    quantity_col = next((col for col in df.columns if 'quantity' in col), None)\n    \n    # If sales column not found, try to compute from price and quantity\n    if sales_col is None and price_col and quantity_col:\n        df['extended_sales'] = df[price_col] * df[quantity_col]\n        sales_col = 'extended_sales'\n    \n    # 3. Normalize data types\n    if date_col:\n        df[date_col] = pd.to_datetime(df[date_col], errors='coerce')\n    if sales_col:\n        df[sales_col] = pd.to_numeric(df[sales_col], errors='coerce')\n    if price_col:\n        df[price_col] = pd.to_numeric(df[price_col], errors='coerce')\n    if quantity_col:\n        df[quantity_col] = pd.to_numeric(df[quantity_col], errors='coerce')\n    \n    # 4. Handle missing values\n    if sales_col:\n        # If sales missing, try to impute using price * quantity\n        if price_col and quantity_col:\n            df[sales_col] = df[sales_col].fillna(df[price_col] * df[quantity_col])\n        # Any remaining missing sales fill with 0\n        df[sales_col] = df[sales_col].fillna(0)\n    if model_col:\n        df[model_col] = df[model_col].fillna('Unknown')\n    if date_col:\n        # Drop rows with invalid dates (cannot be used for time series)\n        df = df.dropna(subset=[date_col])\n    \n    # 5. Remove duplicates\n    df = df.drop_duplicates()\n    \n    # 6. Calculate total sales over time for all models\n    # Group by date and model (if available), summing the sales column\n    if date_col and model_col and sales_col:\n        result = df.groupby([date_col, model_col], as_index=False)[sales_col].sum()\n        result = result.rename(columns={sales_col: 'total_sales'})\n        # Sort for time series readability\n        result = result.sort_values([date_col, model_col]).reset_index(drop=True)\n    elif date_col and sales_col:\n        # Fallback: aggregate across all models if no model column\n        result = df.groupby(date_col, as_index=False)[sales_col].sum()\n        result = result.rename(columns={sales_col: 'total_sales'})\n        result = result.sort_values(date_col).reset_index(drop=True)\n    else:\n        # If required columns are missing, return cleaned dataframe\n        result = df\n    \n    return result\n```",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n    \n    # Ensure input is a list\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n    \n    # Use the first dataframe (main dataset)\n    df = data_list[0].copy()\n    \n    # 1. Inspect and standardize column names\n    df.columns = df.columns.str.lower().str.strip().str.replace(' ', '_')\n    \n    # 2. Identify key columns based on naming conventions\n    date_col = next((col for col in df.columns if 'date' in col), None)\n    model_col = next((col for col in df.columns if 'model' in col), None)\n    sales_col = next((col for col in df.columns if 'sales' in col or 'extended_sales' in col), None)\n    price_col = next((col for col in df.columns if 'price' in col), None)\n    quantity_col = next((col for col in df.columns if 'quantity' in col), None)\n    \n    # If sales column not found, try to compute from price and quantity\n    if sales_col is None and price_col and quantity_col:\n        df['extended_sales'] = df[price_col] * df[quantity_col]\n        sales_col = 'extended_sales'\n    \n    # 3. Normalize data types\n    if date_col:\n        df[date_col] = pd.to_datetime(df[date_col], errors='coerce')\n    if sales_col:\n        df[sales_col] = pd.to_numeric(df[sales_col], errors='coerce')\n    if price_col:\n        df[price_col] = pd.to_numeric(df[price_col], errors='coerce')\n    if quantity_col:\n        df[quantity_col] = pd.to_numeric(df[quantity_col], errors='coerce')\n    \n    # 4. Handle missing values\n    if sales_col:\n        # If sales missing, try to impute using price * quantity\n        if price_col and quantity_col:\n            df[sales_col] = df[sales_col].fillna(df[price_col] * df[quantity_col])\n        # Any remaining missing sales fill with 0\n        df[sales_col] = df[sales_col].fillna(0)\n    if model_col:\n        df[model_col] = df[model_col].fillna('Unknown')\n    if date_col:\n        # Drop rows with invalid dates (cannot be used for time series)\n        df = df.dropna(subset=[date_col])\n    \n    # 5. Remove duplicates\n    df = df.drop_duplicates()\n    \n    # 6. Calculate total sales over time for all models\n    # Group by date and model (if available), summing the sales column\n    if date_col and model_col and sales_col:\n        result = df.groupby([date_col, model_col], as_index=False)[sales_col].sum()\n        result = result.rename(columns={sales_col: 'total_sales'})\n        # Sort for time series readability\n        result = result.sort_values([date_col, model_col]).reset_index(drop=True)\n    elif date_col and sales_col:\n        # Fallback: aggregate across all models if no model column\n        result = df.groupby(date_col, as_index=False)[sales_col].sum()\n        result = result.rename(columns={sales_col: 'total_sales'})\n        result = result.sort_values(date_col).reset_index(drop=True)\n    else:\n        # If required columns are missing, return cleaned dataframe\n        result = df\n    \n    return result\n```",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 5756,
+              "prompt_tokens": 739,
+              "total_tokens": 6495,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 4945,
+                "rejected_prediction_tokens": null,
+                "text_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 0,
+                "image_tokens": null,
+                "text_tokens": null
+              }
+            },
+            "model_provider": "openai",
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261011192315381876167c955d568EpWzEFCF",
+            "service_tier": "default",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a12c6b-5a65-7f91-9cd9-ff31f6b0e419-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 5756,
+      "prompt_tokens": 739,
+      "total_tokens": 6495,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 4945,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261011192315381876167c955d568EpWzEFCF",
+    "service_tier": "default"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

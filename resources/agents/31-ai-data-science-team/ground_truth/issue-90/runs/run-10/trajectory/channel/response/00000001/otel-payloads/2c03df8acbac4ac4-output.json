@@ -1,0 +1,77 @@
+{
+  "generations": [
+    [
+      {
+        "text": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # Ensure the incoming data is a list\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # Standardize column names for all dataframes\n    cleaned_dfs = []\n    for df in data_list:\n        if not isinstance(df, pd.DataFrame):\n            continue\n        df = df.copy()\n        # Lowercase and strip column names\n        df.columns = [str(c).strip().lower() for c in df.columns]\n        cleaned_dfs.append(df)\n\n    # If no valid dataframes, return an empty DataFrame\n    if not cleaned_dfs:\n        return pd.DataFrame()\n\n    # Combine all dataframes. If multiple, they are assumed to be row-wise parts of the same dataset.\n    df = pd.concat(cleaned_dfs, ignore_index=True, sort=False)\n\n    # Helper to find a column by likely names or substrings\n    def find_col(candidates):\n        cols = list(df.columns)\n        for name in candidates:\n            if name in cols:\n                return name\n        for col in cols:\n            for name in candidates:\n                if name in col:\n                    return col\n        return None\n\n    # Identify relevant columns dynamically based on the provided data and instructions\n    date_col = find_col(['date', 'order_date', 'sale_date', 'transaction_date'])\n    model_col = find_col(['bike_model', 'model', 'bike', 'product'])\n    sales_col = find_col(['extended_sales', 'extended_sales_amount', 'total_sales', 'sales'])\n\n    # If any required column is missing, return an empty DataFrame with expected column names\n    if date_col is None or model_col is None or sales_col is None:\n        expected_cols = [c for c in [model_col, 'total_extended_sales'] if c is not None]\n        return pd.DataFrame(columns=expected_cols)\n\n    # Normalize data types\n    df[date_col] = pd.to_datetime(df[date_col], errors='coerce')\n    df[sales_col] = pd.to_numeric(df[sales_col], errors='coerce')\n\n    # Handle missing values: fill numeric sales with 0, fill missing bike models with \"Unknown\"\n    df[sales_col] = df[sales_col].fillna(0)\n    df[model_col] = df[model_col].fillna('Unknown')\n\n    # Filter for June 2021\n    mask = (df[date_col].dt.year == 2021) & (df[date_col].dt.month == 6)\n    df_june = df.loc[mask].copy()\n\n    # If no rows match June 2021, return an empty DataFrame with the correct structure\n    if df_june.empty:\n        return pd.DataFrame(columns=[model_col, 'total_extended_sales'])\n\n    # Group by bike_model and calculate total extended_sales\n    result = df_june.groupby(model_col, as_index=False)[sales_col].sum()\n\n    # Rename the summed column to total_extended_sales\n    result = result.rename(columns={sales_col: 'total_extended_sales'})\n\n    # Ensure column order and sort by total extended sales descending\n    result = result[[model_col, 'total_extended_sales']]\n    result = result.sort_values('total_extended_sales', ascending=False).reset_index(drop=True)\n\n    return result\n```",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # Ensure the incoming data is a list\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # Standardize column names for all dataframes\n    cleaned_dfs = []\n    for df in data_list:\n        if not isinstance(df, pd.DataFrame):\n            continue\n        df = df.copy()\n        # Lowercase and strip column names\n        df.columns = [str(c).strip().lower() for c in df.columns]\n        cleaned_dfs.append(df)\n\n    # If no valid dataframes, return an empty DataFrame\n    if not cleaned_dfs:\n        return pd.DataFrame()\n\n    # Combine all dataframes. If multiple, they are assumed to be row-wise parts of the same dataset.\n    df = pd.concat(cleaned_dfs, ignore_index=True, sort=False)\n\n    # Helper to find a column by likely names or substrings\n    def find_col(candidates):\n        cols = list(df.columns)\n        for name in candidates:\n            if name in cols:\n                return name\n        for col in cols:\n            for name in candidates:\n                if name in col:\n                    return col\n        return None\n\n    # Identify relevant columns dynamically based on the provided data and instructions\n    date_col = find_col(['date', 'order_date', 'sale_date', 'transaction_date'])\n    model_col = find_col(['bike_model', 'model', 'bike', 'product'])\n    sales_col = find_col(['extended_sales', 'extended_sales_amount', 'total_sales', 'sales'])\n\n    # If any required column is missing, return an empty DataFrame with expected column names\n    if date_col is None or model_col is None or sales_col is None:\n        expected_cols = [c for c in [model_col, 'total_extended_sales'] if c is not None]\n        return pd.DataFrame(columns=expected_cols)\n\n    # Normalize data types\n    df[date_col] = pd.to_datetime(df[date_col], errors='coerce')\n    df[sales_col] = pd.to_numeric(df[sales_col], errors='coerce')\n\n    # Handle missing values: fill numeric sales with 0, fill missing bike models with \"Unknown\"\n    df[sales_col] = df[sales_col].fillna(0)\n    df[model_col] = df[model_col].fillna('Unknown')\n\n    # Filter for June 2021\n    mask = (df[date_col].dt.year == 2021) & (df[date_col].dt.month == 6)\n    df_june = df.loc[mask].copy()\n\n    # If no rows match June 2021, return an empty DataFrame with the correct structure\n    if df_june.empty:\n        return pd.DataFrame(columns=[model_col, 'total_extended_sales'])\n\n    # Group by bike_model and calculate total extended_sales\n    result = df_june.groupby(model_col, as_index=False)[sales_col].sum()\n\n    # Rename the summed column to total_extended_sales\n    result = result.rename(columns={sales_col: 'total_extended_sales'})\n\n    # Ensure column order and sort by total extended sales descending\n    result = result[[model_col, 'total_extended_sales']]\n    result = result.sort_values('total_extended_sales', ascending=False).reset_index(drop=True)\n\n    return result\n```",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 2796,
+              "prompt_tokens": 749,
+              "total_tokens": 3545,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 2016,
+                "rejected_prediction_tokens": null,
+                "text_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 0,
+                "image_tokens": null,
+                "text_tokens": null
+              }
+            },
+            "model_provider": "openai",
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261017215704280128794c955d568UgqBWSvI",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a14bde-4fa7-7c60-8494-62bc953dd002-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 2796,
+      "prompt_tokens": 749,
+      "total_tokens": 3545,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 2016,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261017215704280128794c955d568UgqBWSvI"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

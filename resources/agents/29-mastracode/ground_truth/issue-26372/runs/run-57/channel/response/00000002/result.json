@@ -1,0 +1,69 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "2fbcb841e53d42649412647fd40170b5",
+  "case_id": "case_085836fc24df49a6b546cd1ae1bd1bb5",
+  "input_id": "step-3",
+  "invocation_id": "2fbcb841e53d42649412647fd40170b5",
+  "agent_id": "mastracode",
+  "status": "succeeded",
+  "output": "Generate proof obligations for the property. List the obligations that must be discharged to establish the property.The experiments confirm the subtleties. Writing the obligations file:**Completed**: Generated `arith.obligations.md` listing the proof obligations needed to establish `∀ x ∈ ℤ : add_one(x) == x + 1`.\n\n**Changes**: `arith.obligations.md` (created) — five obligation groups with status:\n- **OB1** well-formedness — unary signature, `x + 1` well-typed on ℤ (discharged by inspection)\n- **OB2** domain coverage — the quantifier is infinite; the 2014-value test cannot close it; needs a proof assistant (Lean/Coq/Dafny), an SMT encoding over `Int` (`forall x. f(x) = x + 1`), or a validated closed-form argument — **open**\n- **OB3** semantics agreement — `x + 1` computes the true successor on arbitrary-precision ints, no overflow, and no `int`-subclass interference (sub-obligations OB3.1–OB3.3, discharged)\n- **OB4** purity/termination — side-effect-free, always terminates (discharged)\n- **OB5** checker fidelity — `verify_arith.py` asserts the exact stated relation (discharged)\n\n**Verification**: The nontrivial claims in OB3.3 were substantiated empirically before writing: a `Bad(int)` subclass overriding `__add__` returns `0` (breaking the naive property), `bool` inputs return `2` via inherited `int.__add__`, and CPython blocks monkeypatching `int.__add__` (immutable type).\n\n**Notes**: Bottom line captured in the summary table: the property is established modulo OB2, which requires a real proof artifact — testing alone can never discharge it. Say the word if you want a Dafny/Lean/SMT-LIB rendition of OB2 added.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": false,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": false
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {},
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "mastracode",
+        "title": "Mastra Code",
+        "version": "0.1.0"
+      }
+    },
+    "pid": 10,
+    "session": {
+      "sessionId": "fdab4b91-8373-42b1-aade-9f073f69fefd",
+      "modes": {
+        "currentModeId": "build",
+        "availableModes": [
+          {
+            "id": "build",
+            "name": "Build"
+          },
+          {
+            "id": "plan",
+            "name": "Plan"
+          },
+          {
+            "id": "fast",
+            "name": "Fast"
+          }
+        ]
+      }
+    },
+    "session_id": "fdab4b91-8373-42b1-aade-9f073f69fefd",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn",
+      "usage": {
+        "totalTokens": 64149,
+        "inputTokens": 59218,
+        "outputTokens": 4931,
+        "thoughtTokens": 2971,
+        "cachedReadTokens": 53760
+      }
+    }
+  }
+}

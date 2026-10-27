@@ -1,0 +1,61 @@
+# Hand-written from the pinned Portable Hermes Agent release's native ACP adapter
+# (`hermes acp` -> acp_adapter.entry:main) and its OpenAI-compatible provider contract.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "portable-hermes-agent"
+display_name = "Portable Hermes Agent (ACP, shared model provider)"
+framework = "acp"
+
+[evaluation]
+replay_safe = false
+
+[evaluation.workspace]
+path = "/home/agent/workspace"
+initial_state = "empty"
+
+[evaluation.file_evidence]
+track_files = true
+upload_diff = true
+export_changed_files = true
+
+[source]
+method = "install"
+repository = "https://github.com/aivrar/portable-hermes-agent"
+revision = "26462e29b8f9c0d92a970b91bf7ab8da4ff727dc"
+downloaded_on = "2026-10-27"
+
+# metadata_paths admits GET <selected-base>/models for the ACP session model picker
+# and per-turn cost estimation (acp_adapter/server.py:100, agent/model_metadata.py:1350).
+[model]
+metadata_paths = ["/models"]
+
+[runtime]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 900
+env_keys = []
+secret_env_keys = []
+# Optional: Tavily backend for the web_search / web_extract tools (see network/rules.toml).
+optional_secret_env_keys = ["TAVILY_API_KEY"]
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-m", "agentbench.runtime.agentcontainer.worker"]
+workdir = "/opt/agent"
+
+[adapter]
+type = "acp"
+transport = "stdio"
+command = ["python", "/opt/agent/bootstrap/launch.py"]
+handshake_timeout = 120
+cwd = "/home/agent/workspace"
+permission_policy = "allow_once"
+
+[llm_interception]
+trust_plugin = "pem-env"
+network_config = "network/rules.toml"
+tool_routes = []
+
+# Model credentials and exact routes use the shared runtime default.

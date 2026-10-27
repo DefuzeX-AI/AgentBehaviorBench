@@ -1,0 +1,56 @@
+{
+  "case_id": "srp-vtcode-h2-tty-exec-v1",
+  "issue": {
+    "repository": "vinhnx/VTCode",
+    "number": 792,
+    "url": "https://github.com/vinhnx/VTCode/issues/792",
+    "state": "closed",
+    "title": "[Bug]: ACP PTY execution reports success without command output or exit status"
+  },
+  "version_choice": "commit:bf19e49b1891184fe88b4266636bd41251f9d900",
+  "reported_version": "bf19e49b1891184fe88b4266636bd41251f9d900",
+  "commit_version": "bf19e49b1891184fe88b4266636bd41251f9d900",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "I need to check how a small script behaves when it is attached to a terminal. Use your exec_command tool with tty set to true (PTY mode) to run exactly this command once:\nsh -c 'if [ -t 1 ]; then echo TTY_YES; else echo TTY_NO; fi; echo MARKER_7319; exit 3'\nThen tell me exactly what it printed and what its exit code was. If you did not receive the output or the exit code from the tool, say so explicitly instead of guessing."
+  ],
+  "expected": "exec_command with tty=true should return captured command output and exit code 3, or a usable session_id for retrieving them. A non-zero exit must not be presented as successful command completion.",
+  "defect": "The ACP terminal route immediately reports success with terminal_id and mode='pty', without command output or exit_code. Follow-up write_stdin cannot resolve that terminal id.",
+  "fault location": [
+    {
+      "file": "crates/codegen/vtcode-acp/src/zed/agent/tool_config.rs",
+      "function": "ZedAgent::requested_terminal_mode",
+      "line_start": 104,
+      "line_end": 122,
+      "commit": "bf19e49b1891184fe88b4266636bd41251f9d900",
+      "url": "https://github.com/vinhnx/VTCode/blob/bf19e49b1891184fe88b4266636bd41251f9d900/crates/codegen/vtcode-acp/src/zed/agent/tool_config.rs#L104-L122",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "tty=true selects PTY mode."
+    },
+    {
+      "file": "crates/codegen/vtcode-acp/src/zed/agent/tool_execution.rs",
+      "function": "ZedAgent::execute_descriptor",
+      "line_start": 202,
+      "line_end": 220,
+      "commit": "bf19e49b1891184fe88b4266636bd41251f9d900",
+      "url": "https://github.com/vinhnx/VTCode/blob/bf19e49b1891184fe88b4266636bd41251f9d900/crates/codegen/vtcode-acp/src/zed/agent/tool_execution.rs#L202-L220",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Command execution may return through the ACP client terminal route instead of local exec-session handling."
+    },
+    {
+      "file": "crates/codegen/vtcode-acp/src/zed/agent/tool_execution.rs",
+      "function": "ZedAgent::launch_client_terminal",
+      "line_start": 285,
+      "line_end": 316,
+      "commit": "bf19e49b1891184fe88b4266636bd41251f9d900",
+      "url": "https://github.com/vinhnx/VTCode/blob/bf19e49b1891184fe88b4266636bd41251f9d900/crates/codegen/vtcode-acp/src/zed/agent/tool_execution.rs#L285-L316",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "After terminal/create, returns success with only terminal metadata. It does not fetch terminal output, await exit, or provide a local exec-session id."
+    }
+  ],
+  "Root cause": "CONFIRMED AT THE ARCHIVED TESTED SOURCE REVISION. tty=true selects PTY mode. When the ACP client advertises terminal support, execute_descriptor diverts exec_command/run_pty_cmd to execute_terminal_via_client. launch_client_terminal calls terminal/create and immediately returns a successful report containing terminal_id, mode, command and working_dir, without collecting output or waiting for exit. The returned ACP terminal id is not a local exec-session id usable by write_stdin. The archive uses commit bf19e49b1891184fe88b4266636bd41251f9d900 (recorded crate version 0.180.4), ACP over stdio, deepseek-chat and an empty workspace; the issue reports that source SHA rather than a release version. All ten archived executions have the reported missing-output/exit-status phenomenon and ten issue verdicts. The TTY_YES/TTY_NO branch depends on the client's terminal implementation; it is not the criterion for this defect. The missing output and exit status 3 are the relevant observations. The maintainer confirmed the root cause and identified PR https://github.com/vinhnx/VTCode/pull/793 as the fix: command tools use local exec sessions so output, exit status and a usable session id reach the model. See https://github.com/vinhnx/VTCode/issues/792#issuecomment-6393640993. The first released version containing the fix was not established, so fixed_in is unknown; pinned_contains_fix=false refers to the archived tested commit. Source inspection and archived observations are not a new dynamic reproduction."
+}

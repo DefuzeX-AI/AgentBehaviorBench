@@ -1,0 +1,938 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "6a06d14ede1c4caebf2c04a122e904b3",
+  "case_id": "case_2f9a797be0a94855b3c0e41b18d1a798",
+  "input_id": "step-7",
+  "invocation_id": "6a06d14ede1c4caebf2c04a122e904b3",
+  "agent_id": "jcode",
+  "status": "succeeded",
+  "output": "# Final Report\n\n## Context\n\nA teammate reported the release checklist could not be completed due to a missing file. Investigation found the workspace contained only `.gitignore` — the checklist document itself was absent, along with any project artifacts it might reference. The revised checklist was therefore built to be executable against only the files that actually exist.\n\n## The revised checklist\n\n**Location:** `/home/agent/workspace/revised_release_checklist.md` (39 lines, 1,710 bytes)\n\n```mermaid\nflowchart LR\n    A[\"Step 1<br/>Workspace inventory\"] --> B[\"Step 2<br/>Ignore rules valid\"] --> C[\"Step 3<br/>Workspace hygiene\"] --> D[\"Step 4<br/>Git readiness<br/>(conditional)\"] --> E[\"Step 5<br/>Sign-off\"]\n    style A fill:#c8e6c9\n    style B fill:#c8e6c9\n    style C fill:#c8e6c9\n    style D fill:#fff9c4\n    style E fill:#fff9c4\n```\n\n| Step | Item | Status |\n|------|------|--------|\n| 1 | Workspace inventory (`find ... -not -path \"./.kuma*\"`) | ✅ verified |\n| 2 | Ignore rules valid (`.gitignore` parses, rule `/.kuma/`) | ✅ verified |\n| 3 | Workspace hygiene (no stray artifacts) | ✅ verified |\n| 4 | Git readiness (`git init` + stage `.gitignore`) | ⬜ blocked — no repo exists; conditional |\n| 5 | Sign-off recorded in release notes | ⬜ pending human approval |\n\nThe checklist includes a header note documenting that the original checklist and the reported missing file were unavailable (external source returned HTTP 502 on 2026-10-06), so future readers understand why the scope is limited to files present.\n\n## Verification result\n\nRan: `test -f revised_release_checklist.md && test -s revised_release_checklist.md` followed by `wc -lc`.\n\n- **Exists:** ✅ true\n- **Non-empty:** ✅ true — 1,710 bytes, 39 lines\n- **Command output:** `VERIFIED: exists and is non-empty`\n\n## Outstanding items\n\n1. **Decision needed:** whether to `git init` (unlocks Step 4).\n2. **Sign-off needed:** a human approver for Step 5.\n3. If the original checklist or the missing file is later recovered, this revised version should be reconciled against it.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "jcode",
+        "title": "Jcode",
+        "version": "0.87.1"
+      }
+    },
+    "pid": 14,
+    "session": {
+      "sessionId": "session_horse_1791313563029_c1ce1d7424f37dbe",
+      "configOptions": [
+        {
+          "currentValue": "glm-5.3-flash",
+          "options": [
+            {
+              "value": "claude-opus-5-5",
+              "name": "claude-opus-5-5"
+            },
+            {
+              "value": "claude-opus-5",
+              "name": "claude-opus-5"
+            },
+            {
+              "value": "claude-fable-5-1",
+              "name": "claude-fable-5-1"
+            },
+            {
+              "value": "claude-fable-5",
+              "name": "claude-fable-5"
+            },
+            {
+              "value": "claude-opus-4-8",
+              "name": "claude-opus-4-8"
+            },
+            {
+              "value": "claude-opus-4-6",
+              "name": "claude-opus-4-6"
+            },
+            {
+              "value": "claude-opus-4-6[1m]",
+              "name": "claude-opus-4-6[1m]"
+            },
+            {
+              "value": "claude-sonnet-5",
+              "name": "claude-sonnet-5"
+            },
+            {
+              "value": "claude-sonnet-4-6",
+              "name": "claude-sonnet-4-6"
+            },
+            {
+              "value": "claude-sonnet-4-6[1m]",
+              "name": "claude-sonnet-4-6[1m]"
+            },
+            {
+              "value": "claude-haiku-4-5",
+              "name": "claude-haiku-4-5"
+            },
+            {
+              "value": "claude-opus-4-5",
+              "name": "claude-opus-4-5"
+            },
+            {
+              "value": "claude-sonnet-4-5",
+              "name": "claude-sonnet-4-5"
+            },
+            {
+              "value": "claude-sonnet-4-20250514",
+              "name": "claude-sonnet-4-20250514"
+            },
+            {
+              "value": "gpt-6-astra",
+              "name": "gpt-6-astra"
+            },
+            {
+              "value": "gpt-5.6-sol",
+              "name": "gpt-5.6-sol"
+            },
+            {
+              "value": "gpt-5.6-pro",
+              "name": "gpt-5.6-pro"
+            },
+            {
+              "value": "gpt-5.6-pro[web]",
+              "name": "gpt-5.6-pro[web]"
+            },
+            {
+              "value": "gpt-5.6",
+              "name": "gpt-5.6"
+            },
+            {
+              "value": "gpt-5.6-terra",
+              "name": "gpt-5.6-terra"
+            },
+            {
+              "value": "gpt-5.6-luna",
+              "name": "gpt-5.6-luna"
+            },
+            {
+              "value": "gpt-5.5-pro",
+              "name": "gpt-5.5-pro"
+            },
+            {
+              "value": "gpt-5.5",
+              "name": "gpt-5.5"
+            },
+            {
+              "value": "gpt-5.4",
+              "name": "gpt-5.4"
+            },
+            {
+              "value": "gpt-5.4-pro",
+              "name": "gpt-5.4-pro"
+            },
+            {
+              "value": "gpt-5.3-codex",
+              "name": "gpt-5.3-codex"
+            },
+            {
+              "value": "gpt-5.3-codex-spark",
+              "name": "gpt-5.3-codex-spark"
+            },
+            {
+              "value": "gpt-5.2-chat-latest",
+              "name": "gpt-5.2-chat-latest"
+            },
+            {
+              "value": "gpt-5.2-codex",
+              "name": "gpt-5.2-codex"
+            },
+            {
+              "value": "gpt-5.2-pro",
+              "name": "gpt-5.2-pro"
+            },
+            {
+              "value": "gpt-5.1-codex-mini",
+              "name": "gpt-5.1-codex-mini"
+            },
+            {
+              "value": "gpt-5.1-codex-max",
+              "name": "gpt-5.1-codex-max"
+            },
+            {
+              "value": "gpt-5.2",
+              "name": "gpt-5.2"
+            },
+            {
+              "value": "gpt-5.1-chat-latest",
+              "name": "gpt-5.1-chat-latest"
+            },
+            {
+              "value": "gpt-5.1",
+              "name": "gpt-5.1"
+            },
+            {
+              "value": "gpt-5.1-codex",
+              "name": "gpt-5.1-codex"
+            },
+            {
+              "value": "gpt-5-chat-latest",
+              "name": "gpt-5-chat-latest"
+            },
+            {
+              "value": "gpt-5-codex",
+              "name": "gpt-5-codex"
+            },
+            {
+              "value": "gpt-5-codex-mini",
+              "name": "gpt-5-codex-mini"
+            },
+            {
+              "value": "gpt-5-pro",
+              "name": "gpt-5-pro"
+            },
+            {
+              "value": "gpt-5-mini",
+              "name": "gpt-5-mini"
+            },
+            {
+              "value": "gpt-5-nano",
+              "name": "gpt-5-nano"
+            },
+            {
+              "value": "gpt-5",
+              "name": "gpt-5"
+            },
+            {
+              "value": "minimax-m2.7",
+              "name": "minimax-m2.7"
+            },
+            {
+              "value": "kimi-k2.5",
+              "name": "kimi-k2.5"
+            },
+            {
+              "value": "glm-4.7",
+              "name": "glm-4.7"
+            },
+            {
+              "value": "glm-5",
+              "name": "glm-5"
+            },
+            {
+              "value": "glm-5.1",
+              "name": "glm-5.1"
+            },
+            {
+              "value": "deepseek-v4-flash",
+              "name": "deepseek-v4-flash"
+            },
+            {
+              "value": "qwen3.5-plus",
+              "name": "qwen3.5-plus"
+            },
+            {
+              "value": "glm-4.5",
+              "name": "glm-4.5"
+            },
+            {
+              "value": "glm-4.7-flash",
+              "name": "glm-4.7-flash"
+            },
+            {
+              "value": "glm-4.7-flashx",
+              "name": "glm-4.7-flashx"
+            },
+            {
+              "value": "kimi-for-coding",
+              "name": "kimi-for-coding"
+            },
+            {
+              "value": "kimi-k2.6",
+              "name": "kimi-k2.6"
+            },
+            {
+              "value": "kimi-k2-thinking",
+              "name": "kimi-k2-thinking"
+            },
+            {
+              "value": "kimi-k2-thinking-turbo",
+              "name": "kimi-k2-thinking-turbo"
+            },
+            {
+              "value": "gpt-oss-120b",
+              "name": "gpt-oss-120b"
+            },
+            {
+              "value": "zai-glm-4.7",
+              "name": "zai-glm-4.7"
+            },
+            {
+              "value": "auto",
+              "name": "auto"
+            },
+            {
+              "value": "qwen3-coder-plus",
+              "name": "qwen3-coder-plus"
+            },
+            {
+              "value": "qwen3-max-2026-01-23",
+              "name": "qwen3-max-2026-01-23"
+            },
+            {
+              "value": "qwen3-coder-next",
+              "name": "qwen3-coder-next"
+            },
+            {
+              "value": "MiniMax-M2.5",
+              "name": "MiniMax-M2.5"
+            },
+            {
+              "value": "qwen3-235b-a22b-instruct-2507",
+              "name": "qwen3-235b-a22b-instruct-2507"
+            },
+            {
+              "value": "MiniMax-M2",
+              "name": "MiniMax-M2"
+            },
+            {
+              "value": "kimi-k2-0905-preview",
+              "name": "kimi-k2-0905-preview"
+            },
+            {
+              "value": "zai-org/GLM-4.7",
+              "name": "zai-org/GLM-4.7"
+            },
+            {
+              "value": "zai-org/GLM-5",
+              "name": "zai-org/GLM-5"
+            },
+            {
+              "value": "openai/gpt-oss-120b",
+              "name": "openai/gpt-oss-120b"
+            },
+            {
+              "value": "moonshotai/Kimi-K2.6",
+              "name": "moonshotai/Kimi-K2.6"
+            },
+            {
+              "value": "moonshotai/Kimi-K2.5",
+              "name": "moonshotai/Kimi-K2.5"
+            },
+            {
+              "value": "deepseek-ai/DeepSeek-V4-Pro",
+              "name": "deepseek-ai/DeepSeek-V4-Pro"
+            },
+            {
+              "value": "gpt-5.4-mini",
+              "name": "gpt-5.4-mini"
+            },
+            {
+              "value": "gpt-5.4-nano",
+              "name": "gpt-5.4-nano"
+            },
+            {
+              "value": "gemini-3.1-pro",
+              "name": "gemini-3.1-pro"
+            },
+            {
+              "value": "gemini-3.1-pro-preview",
+              "name": "gemini-3.1-pro-preview"
+            },
+            {
+              "value": "gemini-3.7-flash",
+              "name": "gemini-3.7-flash"
+            },
+            {
+              "value": "gemini-3.6-flash",
+              "name": "gemini-3.6-flash"
+            },
+            {
+              "value": "gemini-3.5-flash",
+              "name": "gemini-3.5-flash"
+            },
+            {
+              "value": "gemini-3.5-flash-lite",
+              "name": "gemini-3.5-flash-lite"
+            },
+            {
+              "value": "gemini-3.1-flash-lite",
+              "name": "gemini-3.1-flash-lite"
+            },
+            {
+              "value": "gemini-3-flash-preview",
+              "name": "gemini-3-flash-preview"
+            },
+            {
+              "value": "grok-4.6",
+              "name": "grok-4.6"
+            },
+            {
+              "value": "grok-4.5",
+              "name": "grok-4.5"
+            },
+            {
+              "value": "grok-4.3",
+              "name": "grok-4.3"
+            },
+            {
+              "value": "kimi-k3",
+              "name": "kimi-k3"
+            },
+            {
+              "value": "kimi-k3-together",
+              "name": "kimi-k3-together"
+            },
+            {
+              "value": "kimi-k2.7-code",
+              "name": "kimi-k2.7-code"
+            },
+            {
+              "value": "kimi-k2.7-code-highspeed",
+              "name": "kimi-k2.7-code-highspeed"
+            },
+            {
+              "value": "kimi-k2.7-code-nebius",
+              "name": "kimi-k2.7-code-nebius"
+            },
+            {
+              "value": "kimi-k2.6-fireworks",
+              "name": "kimi-k2.6-fireworks"
+            },
+            {
+              "value": "deepseek-v4-pro",
+              "name": "deepseek-v4-pro"
+            },
+            {
+              "value": "deepseek-v4-pro-together",
+              "name": "deepseek-v4-pro-together"
+            },
+            {
+              "value": "deepseek-v4-flash-0731",
+              "name": "deepseek-v4-flash-0731"
+            },
+            {
+              "value": "deepseek-v4-flash-deepinfra",
+              "name": "deepseek-v4-flash-deepinfra"
+            },
+            {
+              "value": "deepseek-v4-flash-0731-deepinfra",
+              "name": "deepseek-v4-flash-0731-deepinfra"
+            },
+            {
+              "value": "deepseek-v3.2",
+              "name": "deepseek-v3.2"
+            },
+            {
+              "value": "deepseek-v3.1-sambanova",
+              "name": "deepseek-v3.1-sambanova"
+            },
+            {
+              "value": "glm-5.3",
+              "name": "glm-5.3"
+            },
+            {
+              "value": "glm-5.3-flash",
+              "name": "glm-5.3-flash"
+            },
+            {
+              "value": "glm-5.2",
+              "name": "glm-5.2"
+            },
+            {
+              "value": "glm-5.2-deepinfra",
+              "name": "glm-5.2-deepinfra"
+            },
+            {
+              "value": "glm-5.2-sail",
+              "name": "glm-5.2-sail"
+            },
+            {
+              "value": "glm-4.7-deepinfra",
+              "name": "glm-4.7-deepinfra"
+            },
+            {
+              "value": "qwen3.8-max",
+              "name": "qwen3.8-max"
+            },
+            {
+              "value": "qwen3.8-2.4t",
+              "name": "qwen3.8-2.4t"
+            },
+            {
+              "value": "qwen3.8-27b",
+              "name": "qwen3.8-27b"
+            },
+            {
+              "value": "qwen3.8-flash",
+              "name": "qwen3.8-flash"
+            },
+            {
+              "value": "qwen3.7-max",
+              "name": "qwen3.7-max"
+            },
+            {
+              "value": "qwen3-max-thinking",
+              "name": "qwen3-max-thinking"
+            },
+            {
+              "value": "qwen3-coder-480b",
+              "name": "qwen3-coder-480b"
+            },
+            {
+              "value": "qwen3-vl-235b",
+              "name": "qwen3-vl-235b"
+            },
+            {
+              "value": "qwen3-next-80b",
+              "name": "qwen3-next-80b"
+            },
+            {
+              "value": "minimax-m3",
+              "name": "minimax-m3"
+            },
+            {
+              "value": "minimax-m3-novita",
+              "name": "minimax-m3-novita"
+            },
+            {
+              "value": "minimax-m3-deepinfra",
+              "name": "minimax-m3-deepinfra"
+            },
+            {
+              "value": "minimax-m3-gmicloud",
+              "name": "minimax-m3-gmicloud"
+            },
+            {
+              "value": "mimo-v2.5-pro",
+              "name": "mimo-v2.5-pro"
+            },
+            {
+              "value": "mimo-v2.5-pro-xiaomi",
+              "name": "mimo-v2.5-pro-xiaomi"
+            },
+            {
+              "value": "mimo-v2.5-pro-novita",
+              "name": "mimo-v2.5-pro-novita"
+            },
+            {
+              "value": "mimo-v2.5",
+              "name": "mimo-v2.5"
+            },
+            {
+              "value": "mimo-v2.5-xiaomi",
+              "name": "mimo-v2.5-xiaomi"
+            },
+            {
+              "value": "mimo-v2.5-novita",
+              "name": "mimo-v2.5-novita"
+            },
+            {
+              "value": "seed-2.0-pro",
+              "name": "seed-2.0-pro"
+            },
+            {
+              "value": "seed-2.0-code",
+              "name": "seed-2.0-code"
+            },
+            {
+              "value": "seed-2.0-mini",
+              "name": "seed-2.0-mini"
+            },
+            {
+              "value": "step-3.7-flash",
+              "name": "step-3.7-flash"
+            },
+            {
+              "value": "step-3.7-flash-novita",
+              "name": "step-3.7-flash-novita"
+            },
+            {
+              "value": "hy3",
+              "name": "hy3"
+            },
+            {
+              "value": "hy3-tencent",
+              "name": "hy3-tencent"
+            },
+            {
+              "value": "hy3-novita",
+              "name": "hy3-novita"
+            },
+            {
+              "value": "ling-3.0-flash",
+              "name": "ling-3.0-flash"
+            },
+            {
+              "value": "inkling",
+              "name": "inkling"
+            },
+            {
+              "value": "inkling-small",
+              "name": "inkling-small"
+            },
+            {
+              "value": "nemotron-3-ultra",
+              "name": "nemotron-3-ultra"
+            },
+            {
+              "value": "nemotron-3-super-120b",
+              "name": "nemotron-3-super-120b"
+            },
+            {
+              "value": "nemotron-3.5-lightning",
+              "name": "nemotron-3.5-lightning"
+            },
+            {
+              "value": "mistral-large-latest",
+              "name": "mistral-large-latest"
+            },
+            {
+              "value": "mistral-medium-latest",
+              "name": "mistral-medium-latest"
+            },
+            {
+              "value": "mistral-small-latest",
+              "name": "mistral-small-latest"
+            },
+            {
+              "value": "command-a-cohere",
+              "name": "command-a-cohere"
+            },
+            {
+              "value": "llama-4-maverick",
+              "name": "llama-4-maverick"
+            },
+            {
+              "value": "llama-4-scout",
+              "name": "llama-4-scout"
+            },
+            {
+              "value": "llama-3.3-70b",
+              "name": "llama-3.3-70b"
+            },
+            {
+              "value": "gpt-oss-120b-cerebras",
+              "name": "gpt-oss-120b-cerebras"
+            },
+            {
+              "value": "gpt-oss-120b-deepinfra",
+              "name": "gpt-oss-120b-deepinfra"
+            },
+            {
+              "value": "gpt-oss-20b",
+              "name": "gpt-oss-20b"
+            },
+            {
+              "value": "gemma-4-31b",
+              "name": "gemma-4-31b"
+            },
+            {
+              "value": "gemma-3-27b",
+              "name": "gemma-3-27b"
+            },
+            {
+              "value": "gemini-2.5-flash",
+              "name": "gemini-2.5-flash"
+            },
+            {
+              "value": "gemini-2.5-pro",
+              "name": "gemini-2.5-pro"
+            },
+            {
+              "value": "gemini-2.0-flash",
+              "name": "gemini-2.0-flash"
+            },
+            {
+              "value": "gemini-2.0-flash-lite",
+              "name": "gemini-2.0-flash-lite"
+            },
+            {
+              "value": "qwen35-122b",
+              "name": "qwen35-122b"
+            },
+            {
+              "value": "glm-51-nvfp4",
+              "name": "glm-51-nvfp4"
+            },
+            {
+              "value": "GLM-5.1",
+              "name": "GLM-5.1"
+            },
+            {
+              "value": "GLM-4.7",
+              "name": "GLM-4.7"
+            },
+            {
+              "value": "Llama-3.3-70B-Instruct",
+              "name": "Llama-3.3-70B-Instruct"
+            },
+            {
+              "value": "zai-glm-5-1",
+              "name": "zai-glm-5-1"
+            },
+            {
+              "value": "grok-code-fast-1",
+              "name": "grok-code-fast-1"
+            },
+            {
+              "value": "Qwen/Qwen3-Coder-480B-A35B-Instruct",
+              "name": "Qwen/Qwen3-Coder-480B-A35B-Instruct"
+            },
+            {
+              "value": "Qwen/Qwen3-Coder-Next",
+              "name": "Qwen/Qwen3-Coder-Next"
+            },
+            {
+              "value": "zai-org/GLM-5.1",
+              "name": "zai-org/GLM-5.1"
+            },
+            {
+              "value": "deepseek-ai/DeepSeek-V3.2",
+              "name": "deepseek-ai/DeepSeek-V3.2"
+            },
+            {
+              "value": "kimi-k2-turbo-preview",
+              "name": "kimi-k2-turbo-preview"
+            },
+            {
+              "value": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+              "name": "Qwen/Qwen3-235B-A22B-Instruct-2507"
+            },
+            {
+              "value": "Qwen/Qwen3.5-397B-A17B",
+              "name": "Qwen/Qwen3.5-397B-A17B"
+            },
+            {
+              "value": "meta-llama/Llama-3.3-70B-Instruct",
+              "name": "meta-llama/Llama-3.3-70B-Instruct"
+            },
+            {
+              "value": "NousResearch/Hermes-4-70B",
+              "name": "NousResearch/Hermes-4-70B"
+            },
+            {
+              "value": "qwen3-coder-30b-a3b-instruct",
+              "name": "qwen3-coder-30b-a3b-instruct"
+            },
+            {
+              "value": "qwen3.5-397b-a17b",
+              "name": "qwen3.5-397b-a17b"
+            },
+            {
+              "value": "mistral-small-3.2-24b-instruct-2506",
+              "name": "mistral-small-3.2-24b-instruct-2506"
+            },
+            {
+              "value": "llama-3.3-70b-instruct",
+              "name": "llama-3.3-70b-instruct"
+            },
+            {
+              "value": "Qwen/Qwen3-VL-235B-A22B-Instruct-FP8",
+              "name": "Qwen/Qwen3-VL-235B-A22B-Instruct-FP8"
+            },
+            {
+              "value": "cortecs/Llama-3.3-70B-Instruct-FP8-Dynamic",
+              "name": "cortecs/Llama-3.3-70B-Instruct-FP8-Dynamic"
+            },
+            {
+              "value": "neuralmagic/Meta-Llama-3.1-8B-Instruct-FP8",
+              "name": "neuralmagic/Meta-Llama-3.1-8B-Instruct-FP8"
+            },
+            {
+              "value": "google/gemma-3-27b-it",
+              "name": "google/gemma-3-27b-it"
+            },
+            {
+              "value": "llama-3.1-8b-instant",
+              "name": "llama-3.1-8b-instant"
+            },
+            {
+              "value": "devstral-medium-2507",
+              "name": "devstral-medium-2507"
+            },
+            {
+              "value": "sonar",
+              "name": "sonar"
+            },
+            {
+              "value": "sonar-pro",
+              "name": "sonar-pro"
+            },
+            {
+              "value": "sonar-reasoning-pro",
+              "name": "sonar-reasoning-pro"
+            },
+            {
+              "value": "sonar-deep-research",
+              "name": "sonar-deep-research"
+            },
+            {
+              "value": "moonshotai/Kimi-K2-Instruct",
+              "name": "moonshotai/Kimi-K2-Instruct"
+            },
+            {
+              "value": "Qwen/Qwen3-Coder-480B-A35B-Instruct-Turbo",
+              "name": "Qwen/Qwen3-Coder-480B-A35B-Instruct-Turbo"
+            },
+            {
+              "value": "meta-llama/Llama-3.1-70B-Instruct",
+              "name": "meta-llama/Llama-3.1-70B-Instruct"
+            },
+            {
+              "value": "accounts/fireworks/routers/kimi-k2p5-turbo",
+              "name": "accounts/fireworks/routers/kimi-k2p5-turbo"
+            },
+            {
+              "value": "accounts/fireworks/models/kimi-k2p5",
+              "name": "accounts/fireworks/models/kimi-k2p5"
+            },
+            {
+              "value": "accounts/fireworks/models/kimi-k2p6",
+              "name": "accounts/fireworks/models/kimi-k2p6"
+            },
+            {
+              "value": "accounts/fireworks/models/glm-4p7",
+              "name": "accounts/fireworks/models/glm-4p7"
+            },
+            {
+              "value": "accounts/fireworks/models/glm-5p1",
+              "name": "accounts/fireworks/models/glm-5p1"
+            },
+            {
+              "value": "accounts/fireworks/models/deepseek-v3p2",
+              "name": "accounts/fireworks/models/deepseek-v3p2"
+            },
+            {
+              "value": "zai-org/glm-5.3",
+              "name": "zai-org/glm-5.3"
+            },
+            {
+              "value": "zai-org/glm-5.3-flash",
+              "name": "zai-org/glm-5.3-flash"
+            },
+            {
+              "value": "moonshotai/kimi-k3",
+              "name": "moonshotai/kimi-k3"
+            },
+            {
+              "value": "deepseek/deepseek-v4-pro-0813",
+              "name": "deepseek/deepseek-v4-pro-0813"
+            },
+            {
+              "value": "MiniMax-M2.7",
+              "name": "MiniMax-M2.7"
+            },
+            {
+              "value": "MiniMax-M2.7-highspeed",
+              "name": "MiniMax-M2.7-highspeed"
+            },
+            {
+              "value": "MiniMax-M2.5-highspeed",
+              "name": "MiniMax-M2.5-highspeed"
+            },
+            {
+              "value": "MiniMax-M2.1",
+              "name": "MiniMax-M2.1"
+            },
+            {
+              "value": "MiniMax-M2.1-highspeed",
+              "name": "MiniMax-M2.1-highspeed"
+            },
+            {
+              "value": "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+              "name": "nvidia/llama-3.1-nemotron-ultra-253b-v1"
+            },
+            {
+              "value": "mimo-v2-pro",
+              "name": "mimo-v2-pro"
+            },
+            {
+              "value": "mimo-v2-flash",
+              "name": "mimo-v2-flash"
+            },
+            {
+              "value": "mimo-v2-omni",
+              "name": "mimo-v2-omni"
+            },
+            {
+              "value": "muse-spark-1.2",
+              "name": "muse-spark-1.2"
+            },
+            {
+              "value": "muse-spark-1.1",
+              "name": "muse-spark-1.1"
+            },
+            {
+              "value": "celeris-1",
+              "name": "celeris-1"
+            }
+          ],
+          "id": "model",
+          "name": "Model",
+          "category": "model",
+          "type": "select"
+        },
+        {
+          "currentValue": "medium",
+          "options": [
+            {
+              "value": "none",
+              "name": "none"
+            },
+            {
+              "value": "minimal",
+              "name": "minimal"
+            },
+            {
+              "value": "low",
+              "name": "low"
+            },
+            {
+              "value": "medium",
+              "name": "medium"
+            },
+            {
+              "value": "high",
+              "name": "high"
+            },
+            {
+              "value": "xhigh",
+              "name": "xhigh"
+            },
+            {
+              "value": "max",
+              "name": "max"
+            }
+          ],
+          "id": "reasoning_effort",
+          "name": "Reasoning effort",
+          "category": "thought_level",
+          "type": "select"
+        }
+      ]
+    },
+    "session_id": "session_horse_1791313563029_c1ce1d7424f37dbe",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn",
+      "usage": {
+        "totalTokens": 37949,
+        "inputTokens": 19162,
+        "outputTokens": 611,
+        "cachedReadTokens": 18176
+      }
+    }
+  }
+}

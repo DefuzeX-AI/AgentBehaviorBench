@@ -1,0 +1,75 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "189c975b1cf642be80babf66b74a052e",
+  "case_id": "srp-fast-agent-h2-shell-comment-v1",
+  "input_id": "step-1",
+  "invocation_id": "189c975b1cf642be80babf66b74a052e",
+  "agent_id": "fast-agent",
+  "status": "succeeded",
+  "output": "I ran the command verbatim, as requested. One important detail about what actually happened:\n\n**The `# ci-marker` was not treated as a comment.** The command was executed without a shell, so `touch` received three literal arguments: `build.log`, `#`, and `ci-marker`. As a result, three empty files were created rather than the single comment-stripping shell interpretation you might have expected.\n\n**Current directory contents:**\n\n| Name | Type | Size |\n|---|---|---|\n| `.` | directory | — |\n| `..` | directory | — |\n| `#` | regular file | 0 bytes |\n| `build.log` | regular file | 0 bytes |\n| `ci-marker` | regular file | 0 bytes |\n\nSo compared to an empty starting directory, three files now exist: `#`, `build.log`, and `ci-marker`.\n\nIf you intended only `build.log` to be created (with the trailing text being a no-op shell comment), let me know and I can remove the two stray files `#` and `ci-marker`. Alternatively, I can rerun it through a shell (`bash -c \"touch build.log # ci-marker\"`) so the comment is ignored.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "resume": {}
+        },
+        "auth": {},
+        "_meta": {
+          "co.huggingface": {
+            "structuredOutput": true
+          }
+        }
+      },
+      "authMethods": [
+        {
+          "id": "fast-agent-ai-secrets",
+          "name": "Configure fast-agent",
+          "description": "Set provider keys in fast-agent.secrets.yaml or env vars. See docs: [Configuration Reference](https://fast-agent.ai/ref/config_file/)"
+        }
+      ],
+      "agentInfo": {
+        "name": "fast-agent-acp",
+        "version": "0.10.46"
+      }
+    },
+    "pid": 9,
+    "session": {
+      "sessionId": "2610211656-55PazD",
+      "modes": {
+        "currentModeId": "agent",
+        "availableModes": [
+          {
+            "id": "agent",
+            "name": "Agent",
+            "description": "You are a helpful AI Agent."
+          }
+        ]
+      }
+    },
+    "session_id": "2610211656-55PazD",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn",
+      "_meta": {
+        "field_meta": {
+          "openhands.dev/metrics": {
+            "status_line": "2,526 in, 337 out, 2 tools"
+          }
+        }
+      }
+    }
+  }
+}

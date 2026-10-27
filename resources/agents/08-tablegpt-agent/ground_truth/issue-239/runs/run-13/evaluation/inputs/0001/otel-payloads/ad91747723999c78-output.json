@@ -1,0 +1,22 @@
+{
+  "messages": [
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "```pycon\n============================================================\nabb-tablegpt-64awg_bw/profile/startup/98-udfs.py\nfrom __future__ import annotations\n\nimport concurrent.futures\nimport os\nfrom pathlib import Path\nfrom typing import NamedTuple, cast\n\nimport pandas as pd\n\n\nclass FileEncoding(NamedTuple):\n    \"\"\"File encoding as the NamedTuple.\"\"\"\n\n    encoding: str | None\n    \"\"\"The encoding of the file.\"\"\"\n    confidence: float\n    \"\"\"The confidence of the encoding.\"\"\"\n    language: str | None\n    \"\"\"The language of the file.\"\"\"\n\n\ndef detect_file_encodings(\n    file_path: str | Path, timeout: int = 5\n) -> list[FileEncoding]:\n    \"\"\"Try to detect the file encoding.\n\n    Returns a list of `FileEncoding` tuples with the detected encodings ordered\n    by confidence.\n\n    Args:\n        file_path: The path to the file to detect the encoding for.\n        timeout: The timeout in seconds for the encoding detection.\n    \"\"\"\n    import chardet\n\n    file_path = str(file_path)\n\n    def read_and_detect(file_path: str) -> list[dict]:\n        with open(file_path, \"rb\") as f:\n            rawdata = f.read()\n        return cast(list[dict], chardet.detect_all(rawdata))\n\n    with concurrent.futures.ThreadPoolExecutor() as executor:\n        future = executor.submit(read_and_detect, file_path)\n        try:\n            encodings = future.result(timeout=timeout)\n        except concurrent.futures.TimeoutError:\n            raise TimeoutError(\n                f\"Timeout reached while detecting encoding for {file_path}\"\n            )\n\n    if all(encoding[\"encoding\"] is None for encoding in encodings):\n        raise Runt\n============================================================\nabb-tablegpt-64awg_bw/profile/startup/00-pandas.py\nimport pandas as pd\n\npd.set_option(\"display.width\", 2048)\n# 8 is the minimum value to display `df.describe()`. We have other truncation mechanisms so it's OK to flex this a bit.\npd.set_option(\"display.max_rows\", 8)\npd.set_option(\"display.max_columns\", 40)\npd.set_option(\"display.max_colwidth\", 40)\npd.set_option(\"display.precision\", 3)\npd.set_option(\"future.no_silent_downcasting\", True)\n\n\n```"
+        }
+      ],
+      "additional_kwargs": {
+        "parent_id": "0626f77b-02b7-4d23-83d2-cad6a7b8d138"
+      },
+      "response_metadata": {},
+      "type": "tool",
+      "name": "python",
+      "id": "b02cd813-42b6-4cde-a765-a2bf04373c0c",
+      "tool_call_id": "24e99a80-8891-41c0-bd85-8a320d43e860",
+      "artifact": [],
+      "status": "success"
+    }
+  ]
+}

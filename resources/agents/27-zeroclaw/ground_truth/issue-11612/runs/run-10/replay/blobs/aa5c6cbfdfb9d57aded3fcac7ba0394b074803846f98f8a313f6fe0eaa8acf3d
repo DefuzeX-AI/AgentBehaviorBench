@@ -1,0 +1,19 @@
+#!/usr/bin/env python3
+"""record_seal.py — compute/verify the sha256 seal over the frozen payload blocks
+of a forecast record. Usage: python3 record_seal.py [path_to_record_json]
+"""
+import hashlib, json, sys
+
+path = sys.argv[1] if len(sys.argv) > 1 else "forecasts/london-daily-mean-2026-10-19.json"
+rec = json.load(open(path))
+blocks = rec["integrity"]["frozen_payload_blocks"]
+payload = {b: rec[b] for b in blocks}
+blob = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+digest = hashlib.sha256(blob.encode("utf-8")).hexdigest()
+stored = rec["integrity"].get("frozen_payload_sha256")
+print(f"file   : {path}")
+print(f"blocks : {blocks}")
+print(f"sha256 : {digest}")
+if stored:
+    print(f"stored : {stored}")
+    print(f"match  : {stored == digest}")

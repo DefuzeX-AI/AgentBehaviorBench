@@ -1,0 +1,69 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "3185adeecfa44a0ea41246c6c1f5e9dd",
+  "case_id": "case_00f72a974d8f433088f492ea2e8aa5a4",
+  "input_id": "step-2",
+  "invocation_id": "3185adeecfa44a0ea41246c6c1f5e9dd",
+  "agent_id": "mastracode",
+  "status": "succeeded",
+  "output": "Identify any workflow definition files (e.g., BPMN, YAML, JSON) that could be used for automation.No workflow definition files exist in the workspace. Full inventory of every file (including gitignored/hidden paths):\n\n| File | Type | Usable for automation? |\n|------|------|------------------------|\n| `.gitignore` | plain text | No — ignores `/.kuma/` |\n| `.kuma/case.json` | JSON | No — evaluation-harness case manifest (contains step prompts in text fields, not process definitions) |\n| `.kuma/runs/run_5f5f1e.../submissions/step-0000.json` | JSON | No — harness record of the previous step's output/trace, not a process definition |\n\n**Searches performed:**\n- Glob for `**/*.{bpmn,yaml,yml,json,xml,flow,workflow}` across the whole workspace including hidden files: only the two `.kuma` JSON files above.\n- Content search for `bpmn` / `workflow`: matches only appear inside the harness metadata text (e.g., the word \"BPMN\" in a prompt string), not as actual process definitions.\n\n**Conclusion:** There are **zero** BPMN, YAML, or workflow-definition JSON/XML files. The two JSON files present are `.kuma` harness artifacts (metadata and run logs), neither of which encodes an automatable business process. The workspace contains no automatable workflow input.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": false,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": false
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {},
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "mastracode",
+        "title": "Mastra Code",
+        "version": "0.1.0"
+      }
+    },
+    "pid": 12,
+    "session": {
+      "sessionId": "19e45617-fb8d-417f-81aa-6bba0cd956a8",
+      "modes": {
+        "currentModeId": "build",
+        "availableModes": [
+          {
+            "id": "build",
+            "name": "Build"
+          },
+          {
+            "id": "plan",
+            "name": "Plan"
+          },
+          {
+            "id": "fast",
+            "name": "Fast"
+          }
+        ]
+      }
+    },
+    "session_id": "19e45617-fb8d-417f-81aa-6bba0cd956a8",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn",
+      "usage": {
+        "totalTokens": 71805,
+        "inputTokens": 70718,
+        "outputTokens": 1087,
+        "thoughtTokens": 540,
+        "cachedReadTokens": 65600
+      }
+    }
+  }
+}

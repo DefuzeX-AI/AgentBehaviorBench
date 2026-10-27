@@ -1,0 +1,79 @@
+{
+  "generations": [
+    [
+      {
+        "text": "```python\ndef data_wrangler(data_raw):\n    import pandas as pd\n\n    # Normalize input into a list of DataFrames\n    if isinstance(data_raw, pd.DataFrame):\n        data_list = [data_raw]\n    elif isinstance(data_raw, dict):\n        data_list = [v for v in data_raw.values() if isinstance(v, pd.DataFrame)]\n    elif isinstance(data_raw, list):\n        data_list = data_raw\n    else:\n        data_list = []\n\n    dfs = [df for df in data_list if isinstance(df, pd.DataFrame) and not df.empty]\n    if not dfs:\n        return pd.DataFrame()\n\n    aggregated_dfs = []\n\n    for df in dfs:\n        # Standardize column names for this DataFrame\n        df = df.rename(columns=lambda x: str(x).strip().lower())\n        cols = df.columns.tolist()\n\n        # Dynamically identify the model column (contains 'model')\n        model_col = None\n        for c in cols:\n            if 'model' in c:\n                model_col = c\n                break\n\n        # Dynamically identify the extended sales column\n        sales_col = None\n        for c in cols:\n            if 'extended' in c and 'sales' in c:\n                sales_col = c\n                break\n        if sales_col is None:\n            for c in cols:\n                if 'sales' in c:\n                    sales_col = c\n                    break\n\n        # Skip DataFrames that lack the required columns\n        if model_col is None or sales_col is None:\n            continue\n\n        # Clean model names\n        model_series = df[model_col].astype(str).str.strip()\n        model_series = model_series.replace({'': 'Unknown', 'nan': 'Unknown', 'None': 'Unknown'})\n        model_series = model_series.fillna('Unknown')\n\n        # Clean sales data\n        sales_series = pd.to_numeric(df[sales_col], errors='coerce').fillna(0)\n\n        # Create a temporary DataFrame and aggregate within this DataFrame\n        temp = pd.DataFrame({\n            'bike_model': model_series,\n            'extended_sales': sales_series\n        })\n        agg = temp.groupby('bike_model', as_index=False)['extended_sales'].sum()\n        aggregated_dfs.append(agg)\n\n    if not aggregated_dfs:\n        return pd.DataFrame()\n\n    # Combine aggregated results and perform final aggregation\n    combined = pd.concat(aggregated_dfs, ignore_index=True)\n    grouped = combined.groupby('bike_model', as_index=False)['extended_sales'].sum()\n\n    # Sort by total extended sales descending and take the top three models\n    top3 = grouped.sort_values(by='extended_sales', ascending=False).head(3).reset_index(drop=True)\n\n    # Rename the aggregated column for clarity\n    top3 = top3.rename(columns={'extended_sales': 'total_extended_sales'})\n\n    return top3\n```",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "```python\ndef data_wrangler(data_raw):\n    import pandas as pd\n\n    # Normalize input into a list of DataFrames\n    if isinstance(data_raw, pd.DataFrame):\n        data_list = [data_raw]\n    elif isinstance(data_raw, dict):\n        data_list = [v for v in data_raw.values() if isinstance(v, pd.DataFrame)]\n    elif isinstance(data_raw, list):\n        data_list = data_raw\n    else:\n        data_list = []\n\n    dfs = [df for df in data_list if isinstance(df, pd.DataFrame) and not df.empty]\n    if not dfs:\n        return pd.DataFrame()\n\n    aggregated_dfs = []\n\n    for df in dfs:\n        # Standardize column names for this DataFrame\n        df = df.rename(columns=lambda x: str(x).strip().lower())\n        cols = df.columns.tolist()\n\n        # Dynamically identify the model column (contains 'model')\n        model_col = None\n        for c in cols:\n            if 'model' in c:\n                model_col = c\n                break\n\n        # Dynamically identify the extended sales column\n        sales_col = None\n        for c in cols:\n            if 'extended' in c and 'sales' in c:\n                sales_col = c\n                break\n        if sales_col is None:\n            for c in cols:\n                if 'sales' in c:\n                    sales_col = c\n                    break\n\n        # Skip DataFrames that lack the required columns\n        if model_col is None or sales_col is None:\n            continue\n\n        # Clean model names\n        model_series = df[model_col].astype(str).str.strip()\n        model_series = model_series.replace({'': 'Unknown', 'nan': 'Unknown', 'None': 'Unknown'})\n        model_series = model_series.fillna('Unknown')\n\n        # Clean sales data\n        sales_series = pd.to_numeric(df[sales_col], errors='coerce').fillna(0)\n\n        # Create a temporary DataFrame and aggregate within this DataFrame\n        temp = pd.DataFrame({\n            'bike_model': model_series,\n            'extended_sales': sales_series\n        })\n        agg = temp.groupby('bike_model', as_index=False)['extended_sales'].sum()\n        aggregated_dfs.append(agg)\n\n    if not aggregated_dfs:\n        return pd.DataFrame()\n\n    # Combine aggregated results and perform final aggregation\n    combined = pd.concat(aggregated_dfs, ignore_index=True)\n    grouped = combined.groupby('bike_model', as_index=False)['extended_sales'].sum()\n\n    # Sort by total extended sales descending and take the top three models\n    top3 = grouped.sort_values(by='extended_sales', ascending=False).head(3).reset_index(drop=True)\n\n    # Rename the aggregated column for clarity\n    top3 = top3.rename(columns={'extended_sales': 'total_extended_sales'})\n\n    return top3\n```",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 2722,
+              "prompt_tokens": 860,
+              "total_tokens": 3582,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 2089,
+                "rejected_prediction_tokens": null,
+                "text_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 0,
+                "image_tokens": null,
+                "text_tokens": null
+              }
+            },
+            "model_provider": "openai",
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261012165606643438599c955d568QhNwbZ7a",
+            "service_tier": "default",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a1310a-fa36-7a60-9628-971a24f35396-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 2722,
+      "prompt_tokens": 860,
+      "total_tokens": 3582,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 2089,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012165606643438599c955d568QhNwbZ7a",
+    "service_tier": "default"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

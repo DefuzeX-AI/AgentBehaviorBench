@@ -1,0 +1,3 @@
+{
+  "query": "import sqlite3, os\n\ndb = './abb-tablegpt-umon_l9_/profile/history.sqlite'\nprint('exists:', os.path.exists(db), 'size:', os.path.getsize(db) if os.path.exists(db) else None)\n\ncon = sqlite3.connect(db)\nq = \"SELECT name, type FROM sqlite_master WHERE type IN ('table','view')\"\nprint(con.execute(q).fetchall())\n# Peek at a couple of rows of any tables\nfor (name,) in con.execute(q).fetchall():\n    try:\n        rows = con.execute(f\"SELECT * FROM {name} LIMIT 3\").fetchall()\n        print(name, '->', rows)\n    except Exception as e:\n        print(name, 'err', e)\ncon.close()"
+}

@@ -1,0 +1,141 @@
+{
+  "run_id": "run_5952ac223ccd4c7caba96a35fa24c6f3",
+  "case_id": "case_7401cb01d16a4f7bab03c4ef7b42d760",
+  "input_id": "step-7",
+  "status": "completed",
+  "output": "# Concurrency Analysis — Summary Report\n\n**History:** T1, T2 (read-modify-write {A, B}); T3 (read-only {A, B}), under snapshot isolation with MVCC.\n\n## Findings\n\n| Area | Result |\n|---|---|\n| **Isolation level** | **Snapshot Isolation** — frozen per-transaction snapshots, writes validated at commit (first-committer-wins). Not Serializable: SI's guarantee doesn't exclude write skew; this execution merely didn't trigger it. |\n| **Execution outcome** | T1 commits ✅ · **T2 aborts** ❌ (write set {A,B} intersects T1's concurrently committed write set) · T3 commits ✅ |\n| **Anomalies** | **None materialized.** Lost update on A and B was *attempted* (both writers computed from v0) and *prevented* by the T2 abort. No dirty reads (all reads consume committed versions), no non-repeatable reads (single snapshot), phantom reads N/A (no predicate reads), no write skew (write sets identical, not disjoint). |\n| **Conflicts** | T1⇄T2: 4× rw anti-dependencies + 2× ww (all dissolved by the abort). T1→T3: 2× wr (reads-from). T2↔T3: none. |\n| **Serialization graph** | Committed SG = {T1, T3}, edges T1 ──wr(A), wr(B)──▶ T3. **Acyclic.** |\n| **Serialization result** | ✅ **Serializable** — equivalent to serial schedule **T1 → T3** (identical reads-from and final state (A₁, B₁)). |\n\n## Key Caveats\n\n- The serializable verdict is **conditional on the T2 abort**. Had T2 committed, the committed graph would contain the rw cycle T1 ⇄ T2 on A and B → **non-serializable with lost updates**.\n- The workload sits one write-set change from SI's blind spot: disjoint write sets with this same read pattern (e.g., T1 writes {A}, T2 writes {B}) would commit both and produce **write skew** — SI's validator only catches direct write-write overlap.\n\n## Recommendation\n\nThe workload is safe but maximally contended — every writer touches every item, so SI admits only one writer per snapshot epoch and forces retries. If concurrent writers must both proceed, use SELECT … FOR UPDATE / write locks, or partition the write sets.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_5952ac223ccd4c7caba96a35fa24c6f3",
+      "case_id": "case_7401cb01d16a4f7bab03c4ef7b42d760",
+      "input_id": "step-7",
+      "spans": [
+        {
+          "trace_id": "a7e032eeda0739aeb7aaba5509dcaa3a",
+          "span_id": "4ab473e98a9524e6",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792491481012872973,
+          "end_time_unix_nano": 1792491501891677119,
+          "duration_nano": 20878804146,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1792491481014484523,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1792491501889376933,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 1,
+      "retained_spans": 1,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_5952ac223ccd4c7caba96a35fa24c6f3",
+      "input_id": "step-7",
+      "step_id": "step-7",
+      "submission_id": "submission-5b0bffe9591e7210742095a87e40c019",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "f483df34c7395e2fba7e354a86ae9bcbb3f8fafead3d386614cce0040813317b",
+          "size_bytes": 830,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "d3645d1b71b299a71ca8850b9090471188ad707e21eccef64c30a65108f2e656"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

@@ -1,0 +1,125 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/migration/new_state.json",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:e658f9aaff2c3757cedd66e7a32bb1285560dbea19b0e2755ca42e28a559e287",
+        "before_size": null,
+        "after_size": 492,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/migration/new_state.json\n@@ -0,0 +1,17 @@\n+{\n+  \"engine\": \"postgresql\",\n+  \"version\": \"15.2\",\n+  \"schema\": {\n+    \"name\": \"public\",\n+    \"tables\": [\"users\", \"orders\", \"audit_log\"],\n+    \"indexes\": [\"idx_users_email\", \"idx_orders_user_id\"],\n+    \"constraints\": [\"fk_orders_users\"]\n+  },\n+  \"data_snapshot\": {\n+    \"captured_at\": \"2026-10-07T05:00:00Z\",\n+    \"row_counts\": {\"users\": 1350, \"orders\": 6102, \"audit_log\": 42},\n+    \"checksum\": \"sha256:cc55dd77\",\n+    \"location\": \"s3://backups/new-snapshot\"\n+  },\n+  \"migration_id\": \"MIG-2026-10-07-001\"\n+}\n"
+      },
+      {
+        "path": "/home/agent/workspace/migration/old_state.json",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:62d8b466f1e9adc311ba5c9711b5648da5432faa721be313d22f424681baa8d8",
+        "before_size": null,
+        "after_size": 396,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/migration/old_state.json\n@@ -0,0 +1,18 @@\n+{\n+  \"engine\": \"postgresql\",\n+  \"version\": \"14.5\",\n+  \"schema\": {\n+    \"name\": \"public\",\n+    \"tables\": [\"users\", \"orders\"],\n+    \"indexes\": [\"idx_users_email\"]\n+  },\n+  \"data_snapshot\": {\n+    \"captured_at\": \"2026-09-01T00:00:00Z\",\n+    \"row_counts\": {\"users\": 1204, \"orders\": 5870},\n+    \"checksum\": \"sha256:aa11bb33\"\n+  },\n+  \"legacy_flags\": {\n+    \"compat_mode\": true,\n+    \"old_replication\": \"async\"\n+  }\n+}\n"
+      },
+      {
+        "path": "/home/agent/workspace/migration",
+        "change_type": "modified",
+        "file_type": "directory",
+        "before_hash": null,
+        "after_hash": null,
+        "before_size": 4096,
+        "after_size": 4096,
+        "before_mode": 493,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": null
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 2,
+      "diff_included_count": 2
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_09868ca2a0ee436389978a00ad0d27d1",
+    "input_id": "step-6",
+    "step_id": "step-6",
+    "submission_id": "submission-4012cfec0673f5c09ada37e196d606e4",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "migration",
+        "change_type": "modified",
+        "size_bytes": 4096
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "migration/new_state.json",
+        "change_type": "created",
+        "size_bytes": 492,
+        "after_sha256": "e658f9aaff2c3757cedd66e7a32bb1285560dbea19b0e2755ca42e28a559e287"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "file_change",
+        "path": "migration/old_state.json",
+        "change_type": "created",
+        "size_bytes": 396,
+        "after_sha256": "62d8b466f1e9adc311ba5c9711b5648da5432faa721be313d22f424681baa8d8"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "e20f0ba39fa9ab255544bc934761d398017a954d326dd63b4687221da9ad940b",
+        "size_bytes": 5978,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0004",
+        "sequence": 4,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "cdf7a23ecad68927416dbfb49e0f85926092c0f03225e4493c8e04197fd9bbd3"
+      }
+    ]
+  }
+}

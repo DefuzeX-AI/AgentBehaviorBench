@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_raw):\n    import pandas as pd\n    import numpy as np\n    \n    # Ensure data_raw is a list of DataFrames\n    if isinstance(data_raw, pd.DataFrame):\n        data_list = [data_raw]\n    elif isinstance(data_raw, list):\n        data_list = data_raw\n    elif data_raw is not None:\n        data_list = [data_raw]\n    else:\n        data_list = []\n    \n    # Filter to only DataFrame elements and standardize column names\n    dfs = []\n    for item in data_list:\n        if isinstance(item, pd.DataFrame):\n            df_temp = item.copy()\n            df_temp.columns = df_temp.columns.str.strip().str.lower()\n            dfs.append(df_temp)\n    \n    if not dfs:\n        return pd.DataFrame()\n    \n    # Concatenate all DataFrames\n    df = pd.concat(dfs, ignore_index=True, sort=False)\n    \n    # Helper to find column\n    def find_column(columns, substrings):\n        for col in columns:\n            if all(s in col for s in substrings):\n                return col\n        return None\n    \n    # Identify date column\n    date_col = find_column(df.columns, ['date'])\n    if date_col:\n        df[date_col] = pd.to_datetime(df[date_col], errors='coerce')\n        df = df[df[date_col].dt.year == 2021].copy()\n    \n    # Identify bike_model column\n    bike_col = find_column(df.columns, ['bike', 'model'])\n    if bike_col is None:\n        bike_col = find_column(df.columns, ['model'])\n    \n    # Identify price column\n    price_col = find_column(df.columns, ['price'])\n    \n    # Identify quantity_sold column\n    qty_col = find_column(df.columns, ['quantity', 'sold'])\n    if qty_col is None:\n        qty_col = find_column(df.columns, ['quantity'])\n    \n    # Coerce numeric columns\n    for col in [price_col, qty_col]:\n        if col:\n            df[col] = pd.to_numeric(df[col], errors='coerce')\n    \n    # Handle missing values\n    if qty_col:\n        df[qty_col] = df[qty_col].fillna(0)\n    if bike_col:\n        df = df.dropna(subset=[bike_col])\n    \n    # Remove duplicates\n    df = df.drop_duplicates()\n    \n    # Group by bike_model and compute average price and total quantity_sold\n    if bike_col and price_col and qty_col:\n        result = df.groupby(bike_col, as_index=False).agg({\n            price_col: 'mean',\n            qty_col: 'sum'\n        })\n        result = result.rename(columns={\n            bike_col: 'bike_model',\n            price_col: 'average_price',\n            qty_col: 'total_quantity_sold'\n        })\n        result = result[['bike_model', 'average_price', 'total_quantity_sold']]\n    else:\n        result = df\n    \n    return result\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 3345,
+      "prompt_tokens": 1064,
+      "total_tokens": 4409,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 2696,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-2026101721591467985637c955d5687zwwIE4k",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a14be0-49a6-7672-8c8c-8c4c579d4d44-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 1064,
+    "output_tokens": 3345,
+    "total_tokens": 4409,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 2696
+    }
+  }
+}

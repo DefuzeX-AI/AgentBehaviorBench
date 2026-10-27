@@ -1,0 +1,14 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Successfully replaced 1 block(s) in /home/agent/workspace/test_fmtcsv.py."
+    }
+  ],
+  "details": {
+    "changed": true,
+    "diff": "    ...\n 50 \n 51 \n 52 def test_newline_inside_quoted_field(tmp_path):\n 53     path = write_csv(tmp_path, 'a,b\\n\"line1\\nline2\",x\\n')\n-54     total_rows, total_columns, first = summarize(tmp := path)\n+54     total_rows, total_columns, first = summarize(path)\n 55     assert total_rows == 1\n 56     assert total_columns == 2\n 57     assert first == [\"line1\\nline2\", \"x\"]\n 58 \n    ...",
+    "patch": "--- /home/agent/workspace/test_fmtcsv.py\n+++ /home/agent/workspace/test_fmtcsv.py\n@@ -50,9 +50,9 @@\n \n \n def test_newline_inside_quoted_field(tmp_path):\n     path = write_csv(tmp_path, 'a,b\\n\"line1\\nline2\",x\\n')\n-    total_rows, total_columns, first = summarize(tmp := path)\n+    total_rows, total_columns, first = summarize(path)\n     assert total_rows == 1\n     assert total_columns == 2\n     assert first == [\"line1\\nline2\", \"x\"]\n \n",
+    "firstChangedLine": 54
+  }
+}

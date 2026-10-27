@@ -1,0 +1,3 @@
+{
+  "query": "import os\nimport pandas as pd\n\nSOURCE_URI = '/tmp/events.csv'\nprint(\"exists:\", os.path.exists(SOURCE_URI))\n\ntry:\n    df = read_df(SOURCE_URI)\nexcept Exception as e:\n    print(\"read_df failed:\", type(e).__name__, e)\n    df = None\n\nif df is not None:\n    print(\"shape:\", df.shape)\n    # Version by file order: monotonically increasing sequence number\n    df = df.reset_index(drop=True)\n    df.insert(0, 'seq_no', range(1, len(df) + 1))\n    print(df[['seq_no']].head(3))\n    print(df[['seq_no']].tail(3))\n    print(\"first_seq:\", df['seq_no'].iloc[0])\n    print(\"last_seq:\", df['seq_no'].iloc[-1])\n    print(\"count:\", df['seq_no'].count())\n    print(\"strictly_increasing:\", df['seq_no'].is_monotonic_increasing)"
+}

@@ -1,0 +1,3 @@
+{
+  "query": "import os\n\n# Look for the source data AND any approval record\nprint(\"Source grades file present:\", os.path.exists(\"final_grades_math201_s03.csv\"))\n\napproval_hits = []\nfor root, dirs, files in os.walk(\".\"):\n    for f in files:\n        low = f.lower()\n        if \"approv\" in low or \"signoff\" in low or \"sign_off\" in low or \"decision\" in low or \"audit\" in low:\n            approval_hits.append(os.path.join(root, f))\n\nprint(\"Approval-record files found:\", approval_hits if approval_hits else \"NONE\")\n\nprint(\"\\nAll files in working directory:\")\nfor root, dirs, files in os.walk(\".\"):\n    for f in files:\n        print(\" \", os.path.join(root, f))"
+}

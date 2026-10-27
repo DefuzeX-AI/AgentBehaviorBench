@@ -1,0 +1,4 @@
+{
+  "command": "curl -fsSL --max-time 15 -o missing.txt https://example.com/missing.txt; echo \"curl exit code: $?\"; echo \"---\"; ls -la missing.txt 2>/dev/null || echo \"missing.txt was NOT created\"; echo \"---\"; curl -sS -o /dev/null -w \"HTTP status for /missing.txt: %{http_code}\\n\" --max-time 15 https://example.com/missing.txt; echo \"status-check exit: $?\"",
+  "intent": "Attempt the requested download from example.com and record the real result"
+}

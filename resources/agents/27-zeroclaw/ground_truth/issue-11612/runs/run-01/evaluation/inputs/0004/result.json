@@ -1,0 +1,55 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "77e92f1b6c424ec4a5e89d46bc182c5e",
+  "case_id": "case_af9a7a70eb814606acfad95e51b728a3",
+  "input_id": "step-4",
+  "invocation_id": "77e92f1b6c424ec4a5e89d46bc182c5e",
+  "agent_id": "zeroclaw",
+  "status": "succeeded",
+  "output": "**Current workspace state:**\n\n```\n/\n├── .gitignore                  (file, 9 B)\n├── .kuma/                      (dir — runtime instrumentation)\n│   └── runs/run_5a98…/submissions/ (step-0000..0002.json)\n├── compute_checksum.py         (file, 203 B)\n├── contract.sha256             (file, 80 B)\n└── contract.yaml               (file, 240 B)\n```\n\n**Comparison to the resource graph:**\n\n🔴 **Missing (declared but absent):**\n| Resource | Expected path | Status |\n|----------|---------------|--------|\n| `notes.txt` (file) | `/home/agent/workspace/notes.txt` | **missing** |\n| `archive` (directory) | `/home/agent/workspace/archive/` | **missing** |\n\nDeclared state: 2 resources. Actual: 0 of them exist. **Drift = 100%** — the contract is pure intent right now.\n\n🟡 **Unexpected (present but not declared):**\n- `compute_checksum.py` — my scratch helper from the checksum step\n- `contract.sha256` — the freeze record (meta, arguably fine to keep outside the contract)\n- `contract.yaml` — the contract itself (self-referential; normally excluded from its own resource set)\n\n⚪ **Ignored as infrastructure:** `.gitignore` and `.kuma/` — runtime/tooling artifacts, not configuration resources.\n\n**Bottom line:** both declared resources need reconciling (create `notes.txt` and `archive/`). If you want the contract to be fully self-describing, we could also decide whether `contract.sha256` belongs in it. Want me to reconcile and optionally clean up the scratch script?",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "zeroclaw-acp",
+        "title": "ZeroClaw ACP",
+        "version": "0.8.5"
+      },
+      "_meta": {
+        "zeroclaw": {
+          "defaultModel": "glm-5.3-flash",
+          "maxSessions": 10,
+          "sessionTimeoutSecs": 3600
+        }
+      }
+    },
+    "pid": 11,
+    "session": {
+      "sessionId": "33c65a18-7ddf-43ec-b70d-3d0ed3114861"
+    },
+    "session_id": "33c65a18-7ddf-43ec-b70d-3d0ed3114861",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}
