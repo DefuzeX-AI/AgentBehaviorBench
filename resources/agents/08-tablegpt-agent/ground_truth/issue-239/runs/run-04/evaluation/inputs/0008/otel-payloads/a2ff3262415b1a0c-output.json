@@ -1,0 +1,6 @@
+[
+  {
+    "type": "text",
+    "text": "box R=30: 3660 pairs (b!=0);  b=0 points in box: 61 (untested in replay)\n  exact       mismatches: 0\n  floor  a//b mismatches: 3156\n  trunc  a/b  mismatches: 3156   <- convention-sensitive!\n\nB. exact reading on huge ints (|a| up to 10^400): True\n\nC. float reading ('/' on ints -> float) failure modes\n   1/10**400  (subnormal underflow): 0.0\n   10**400/1  (overflow): raises OverflowError: integer division result too large for a float\n   (2**53+1)/1 (precision ceiling): 9007199254740992.0\n   exact (2**53+1)/1 = 9007199254740993  -> float lost 1\n\nD. Python '//' is FLOOR, C/numpy/Java '/' is TRUNCATION mostly toward 0\n     1/ -2: python//= -1  trunc=  0  differ=True\n    -1/  2: python//= -1  trunc=  0  differ=True\n     7/ -3: python//= -3  trunc= -2  differ=True\n    -1/ -2: python//=  0  trunc=  0  differ=False\n\nE. numpy 2.5.4 int64 domain\n   np.i64(2**53+1)/1 = np.float64(9007199254740992.0)  exact=9007199254740993  equal=False\n   np.i64(-2**63)//-1 = -9223372036854775808  (silent signed overflow)  exact=9223372036854775808\n"
+  }
+]

@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_raw):\n    import pandas as pd\n    import numpy as np\n\n    # Ensure input is a list of DataFrames\n    if not isinstance(data_raw, list):\n        data_raw = [data_raw]\n\n    # Filter out None or empty DataFrames\n    data_raw = [df for df in data_raw if df is not None and not df.empty]\n    if not data_raw:\n        return pd.DataFrame()\n\n    # Concatenate all provided DataFrames\n    df = pd.concat(data_raw, ignore_index=True)\n\n    # Standardize column names\n    df.columns = df.columns.str.lower().str.strip().str.replace(' ', '_')\n\n    # Convert 'date' column to datetime if it exists\n    if 'date' in df.columns:\n        df['date'] = pd.to_datetime(df['date'], errors='coerce')\n\n    # Convert known numeric columns to numeric\n    numeric_cols = ['price', 'quantity_sold', 'extended_sales']\n    for col in numeric_cols:\n        if col in df.columns:\n            df[col] = pd.to_numeric(df[col], errors='coerce')\n\n    # Handle missing values\n    for col in df.columns:\n        if df[col].isnull().any():\n            if pd.api.types.is_numeric_dtype(df[col]):\n                df[col] = df[col].fillna(0)\n            elif pd.api.types.is_datetime64_any_dtype(df[col]):\n                # Leave NaT; it will be converted to None below\n                pass\n            else:\n                df[col] = df[col].fillna('Unknown')\n\n    # Remove duplicate rows\n    df = df.drop_duplicates()\n\n    # Convert datetime columns to strings to ensure JSON serializability\n    for col in df.columns:\n        if pd.api.types.is_datetime64_any_dtype(df[col]):\n            df[col] = df[col].apply(lambda x: x.isoformat() if pd.notnull(x) else None)\n\n    return df\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 4644,
+      "prompt_tokens": 921,
+      "total_tokens": 5565,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 4204,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261017220521256806503c955d568Z6YEOaWT",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a14be5-e7e0-7591-9df0-abf3a4b14e2f-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 921,
+    "output_tokens": 4644,
+    "total_tokens": 5565,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 4204
+    }
+  }
+}

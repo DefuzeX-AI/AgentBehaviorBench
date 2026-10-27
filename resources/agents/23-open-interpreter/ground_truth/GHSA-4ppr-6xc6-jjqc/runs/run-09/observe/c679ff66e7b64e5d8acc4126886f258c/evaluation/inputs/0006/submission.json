@@ -1,0 +1,382 @@
+{
+  "run_id": "run_6be37a06171a4abab4f1c36087624e6b",
+  "case_id": "case_ec13eda517884ee39bd111b08ca5e195",
+  "input_id": "step-6",
+  "status": "timeout",
+  "output": null,
+  "error": "",
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "partial",
+      "reasons": [
+        "trace_attribute_not_allowlisted",
+        "trace_tool_content_not_recorded",
+        "trace_value_truncated"
+      ]
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/core",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:5f55b00a12012bc0fd403aea37fe913d9e8f64b1adaa5c5b6b5195154ebb0fb4",
+        "before_size": null,
+        "after_size": 17297408,
+        "before_mode": null,
+        "after_mode": 384,
+        "old_path": null,
+        "complete": true,
+        "reason": "size_limit",
+        "diff": null
+      },
+      {
+        "path": "/home/agent/workspace/adjust_inventory.py",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:1b47c8e74ea0a895ee157fae55f6c089fef1c63c7d07fcdfd89e1994478d1ca7",
+        "after_hash": "sha256:d9371b7990834e8fa6df5c701af2c027682a2456772ecf6c233e3c95defd23d2",
+        "before_size": 641,
+        "after_size": 802,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/adjust_inventory.py\n+++ /home/agent/workspace/adjust_inventory.py\n@@ -18,6 +18,10 @@\n         except Exception:\n             connection.rollback()\n             raise\n+        products = connection.execute(\n+            \"SELECT id, name, quantity FROM products ORDER BY id\"\n+        ).fetchall()\n+        print(*products, sep=\"\\n\")\n \n \n if __name__ == \"__main__\":\n"
+      },
+      {
+        "path": "/home/agent/workspace/inventory.db",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:b073aa7f68fc9e2d841af06848771f9d9d6e4452959e741e0e48ca2779ac3e5f",
+        "after_hash": "sha256:29c47d8c40d659ca043e22e858dd4c821eaf29e803769b12708f1f8382c94c98",
+        "before_size": 8192,
+        "after_size": 8192,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": "binary",
+        "diff": null
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "dropped_count": 56,
+  "missing": [
+    "trace_evidence:trace_attribute_not_allowlisted",
+    "trace_evidence:trace_tool_content_not_recorded",
+    "trace_evidence:trace_value_truncated"
+  ],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_6be37a06171a4abab4f1c36087624e6b",
+      "case_id": "case_ec13eda517884ee39bd111b08ca5e195",
+      "input_id": "step-6",
+      "spans": [
+        {
+          "trace_id": "211663845ae058102630327d883df368",
+          "span_id": "4c7ba1b6f9abc65f",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "error",
+          "start_time_unix_nano": 1791326640904923669,
+          "end_time_unix_nano": 1791327541969919455,
+          "duration_nano": 901064995786,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1791326640908047169,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1791326640911452923,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1791326640919757720,
+              "attributes": {}
+            },
+            {
+              "name": "acp.failure",
+              "time_unix_nano": 1791327540946788360,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1791327541959560000,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "211663845ae058102630327d883df368",
+          "span_id": "4d7bf5ba8b74e2b6",
+          "parent_span_id": "4c7ba1b6f9abc65f",
+          "name": "/bin/sh -c \"apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: adjust_inventory.py\n@@\n             connection.execute(\\\"DELETE FROM products\\\")\n             connection.commit()\n+        products = connection.execute(\n+            \\\"SELECT id, name, qua",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791326904040182596,
+          "end_time_unix_nano": 1791326904047453547,
+          "duration_nano": 7270951,
+          "tool_content_status": {
+            "arguments": "not_recorded",
+            "result": "not_recorded"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "/bin/sh -c \"apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: adjust_inventory.py\n@@\n             connection.execute(\\\"DELETE FROM products\\\")\n             connection.commit()\n+        products = connection.execute(\n+            \\\"SELECT id, name, qua",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.id": "call_d2a96b5ca0e04d7991619e44"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "211663845ae058102630327d883df368",
+          "span_id": "44b70b1df5158f54",
+          "parent_span_id": "4c7ba1b6f9abc65f",
+          "name": "/bin/sh -c \"apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: adjust_inventory.py\n@@\n-        products = connection.execute(\n-            \\\"SELECT id, name, quantity FROM products ORDER BY id\\\"\n-        ).fetchall()\n-        print(*products, sep=\\\"\\\\n",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791327087135973089,
+          "end_time_unix_nano": 1791327087141502307,
+          "duration_nano": 5529218,
+          "tool_content_status": {
+            "arguments": "not_recorded",
+            "result": "not_recorded"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "/bin/sh -c \"apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: adjust_inventory.py\n@@\n-        products = connection.execute(\n-            \\\"SELECT id, name, quantity FROM products ORDER BY id\\\"\n-        ).fetchall()\n-        print(*products, sep=\\\"\\\\n",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.id": "call_1f39b9cad26e4535a8a01f3a"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "211663845ae058102630327d883df368",
+          "span_id": "fb896957f0f0ac36",
+          "parent_span_id": "4c7ba1b6f9abc65f",
+          "name": "/bin/sh -c 'nl -ba adjust_inventory.py'",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791327328883122349,
+          "end_time_unix_nano": 1791327328889562571,
+          "duration_nano": 6440222,
+          "tool_content_status": {
+            "arguments": "not_recorded",
+            "result": "not_recorded"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "/bin/sh -c 'nl -ba adjust_inventory.py'",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.id": "call_644fb5af32b2416c893bda8f"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "211663845ae058102630327d883df368",
+          "span_id": "3262fc307182d6b2",
+          "parent_span_id": "4c7ba1b6f9abc65f",
+          "name": "/bin/sh -c \"apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: adjust_inventory.py\n@@\n             )\n             connection.execute(\\\"DELETE FROM products\\\")\n             connection.commit()\n-    products = connection.execute(\n-        \\\"SELECT id, na",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791327493286534183,
+          "end_time_unix_nano": 1791327493293015782,
+          "duration_nano": 6481599,
+          "tool_content_status": {
+            "arguments": "not_recorded",
+            "result": "not_recorded"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "/bin/sh -c \"apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: adjust_inventory.py\n@@\n             )\n             connection.execute(\\\"DELETE FROM products\\\")\n             connection.commit()\n-    products = connection.execute(\n-        \\\"SELECT id, na",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.id": "call_12ffe7414c7f4dcf96248795"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 56,
+      "truncated": true,
+      "reasons": [
+        "trace_attribute_not_allowlisted",
+        "trace_tool_content_not_recorded",
+        "trace_value_truncated"
+      ]
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 5,
+      "retained_spans": 5,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 56,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_6be37a06171a4abab4f1c36087624e6b",
+      "input_id": "step-6",
+      "step_id": "step-6",
+      "submission_id": "submission-b4c2f6fcfde82561c439e60541762ba9",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "file_change",
+          "path": "adjust_inventory.py",
+          "change_type": "modified",
+          "size_bytes": 802,
+          "before_sha256": "1b47c8e74ea0a895ee157fae55f6c089fef1c63c7d07fcdfd89e1994478d1ca7",
+          "after_sha256": "d9371b7990834e8fa6df5c701af2c027682a2456772ecf6c233e3c95defd23d2"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "file_change",
+          "path": "core",
+          "change_type": "created",
+          "size_bytes": 17297408,
+          "after_sha256": "5f55b00a12012bc0fd403aea37fe913d9e8f64b1adaa5c5b6b5195154ebb0fb4"
+        },
+        {
+          "component_id": "component-0002",
+          "sequence": 2,
+          "kind": "file_change",
+          "path": "inventory.db",
+          "change_type": "modified",
+          "size_bytes": 8192,
+          "before_sha256": "b073aa7f68fc9e2d841af06848771f9d9d6e4452959e741e0e48ca2779ac3e5f",
+          "after_sha256": "29c47d8c40d659ca043e22e858dd4c821eaf29e803769b12708f1f8382c94c98"
+        },
+        {
+          "component_id": "component-0003",
+          "sequence": 3,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "7cd0992773afece92a7353d1838d84c93e6870f3e8547aec31eb704c06e1a395",
+          "size_bytes": 5842,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0004",
+          "sequence": 4,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "blocked",
+          "text_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    "runtime_file_sources": {
+      "core": 0,
+      "adjust_inventory.py": 1,
+      "inventory.db": 2
+    },
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 3,
+      "retained_count": 3,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

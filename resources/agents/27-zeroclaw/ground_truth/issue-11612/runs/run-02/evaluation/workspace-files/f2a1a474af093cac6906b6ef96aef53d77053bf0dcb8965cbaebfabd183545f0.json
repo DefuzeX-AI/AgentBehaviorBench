@@ -1,0 +1,4 @@
+{
+  "content": "import re\n\npath = \"report-preview.html\"\nsrc = open(path, encoding=\"utf-8\").read()\n\ndef fix(m):\n    cls, label = m.group(1), m.group(2)\n    machine = label.strip().lower().replace(\" \", \"-\")\n    return f'<data class=\"rag rag-{cls}\" value=\"{machine}\">{label}</data>'\n\nnew, n = re.subn(\n    r'<data class=\"rag rag-(\\w+)\" value=\"\\w*\">([A-Z][A-Z ]*)</data>',\n    fix, src)\nopen(path, \"w\", encoding=\"utf-8\").write(new)\nprint(f\"badges rewritten: {n}\")\nfor m in re.finditer(r'<data class=\"rag rag-\\w+\" value=\"[^\"]+\">[^<]+</data>', new):\n    print(f\"  {m.group(0)}\")\n",
+  "encoding": "utf-8"
+}

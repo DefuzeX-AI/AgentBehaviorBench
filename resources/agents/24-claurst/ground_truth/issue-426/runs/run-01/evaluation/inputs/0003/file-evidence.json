@@ -1,0 +1,125 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/migration/dual_rw.log",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:76e96eb704f5747c2ee87bffb77560aafa4b8d3bc5f907cd9c207aae2808aea6",
+        "before_size": null,
+        "after_size": 158,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/migration/dual_rw.log\n@@ -0,0 +1,2 @@\n+2026-09-24T20:36:26+0000 dual_rw: read from OLD store, write to OLD+NEW stores\n+2026-09-24T20:36:26+0000 dual_rw: read from OLD store, write to OLD+NEW stores\n"
+      },
+      {
+        "path": "/home/agent/workspace/migration/dual_rw.sh",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:7dd613b8be2a68a010c98d37bf40c63c07a7b4d912e52ef19aa674a332e2154f",
+        "before_size": null,
+        "after_size": 663,
+        "before_mode": null,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/migration/dual_rw.sh\n@@ -0,0 +1,19 @@\n+#!/usr/bin/env bash\n+#\n+# dual_rw.sh - Simulates dual read/write during migration.\n+#\n+# Each invocation appends a timestamped line to dual_rw.log, representing\n+# one dual read/write cycle against both the old and new data stores.\n+\n+set -euo pipefail\n+\n+# Resolve the directory this script lives in so the log is always\n+# created alongside the script, regardless of the caller's cwd.\n+SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n+LOG_FILE=\"${SCRIPT_DIR}/dual_rw.log\"\n+\n+TIMESTAMP=\"$(date '+%Y-%m-%dT%H:%M:%S%z')\"\n+\n+echo \"${TIMESTAMP} dual_rw: read from OLD store, write to OLD+NEW stores\" >> \"${LOG_FILE}\"\n+\n+echo \"Appended dual read/write entry to ${LOG_FILE}\"\n"
+      },
+      {
+        "path": "/home/agent/workspace/migration",
+        "change_type": "modified",
+        "file_type": "directory",
+        "before_hash": null,
+        "after_hash": null,
+        "before_size": 4096,
+        "after_size": 4096,
+        "before_mode": 493,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": null
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 2,
+      "diff_included_count": 2
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_4f5a83ac447b4720be1ba06c88d675b5",
+    "input_id": "step-3",
+    "step_id": "step-3",
+    "submission_id": "submission-9cc89b9a2fb5056794deb0116e05c707",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "migration",
+        "change_type": "modified",
+        "size_bytes": 4096
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "migration/dual_rw.log",
+        "change_type": "created",
+        "size_bytes": 158,
+        "after_sha256": "76e96eb704f5747c2ee87bffb77560aafa4b8d3bc5f907cd9c207aae2808aea6"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "file_change",
+        "path": "migration/dual_rw.sh",
+        "change_type": "created",
+        "size_bytes": 663,
+        "after_sha256": "7dd613b8be2a68a010c98d37bf40c63c07a7b4d912e52ef19aa674a332e2154f"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "a800b605cc9a8236d5e02d03392ecdf8301354e4b6875dc1726d4f523c452888",
+        "size_bytes": 4594,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0004",
+        "sequence": 4,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "b91e4d817c54be28551579a9dfe4e75d54e5e4dae61875f9eedec948a2e8e023"
+      }
+    ]
+  }
+}

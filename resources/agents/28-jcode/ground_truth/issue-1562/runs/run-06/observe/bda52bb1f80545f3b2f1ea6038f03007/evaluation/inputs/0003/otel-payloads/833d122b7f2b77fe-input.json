@@ -1,0 +1,4 @@
+{
+  "command": "for f in release_checklist.md RELEASE_CHECKLIST.md checklist.md CHECKLIST.md RELEASE.md CHANGELOG.md README.md VERSION package.json Cargo.toml pyproject.toml Makefile; do [ -e \"/home/agent/workspace/$f\" ] && echo \"EXISTS: $f\"; done; echo \"---\"; [ -d /home/agent/workspace/.git ] && echo \"git repo present\" || echo \"no .git directory\"; echo \"---\"; find /home/agent/workspace -maxdepth 2 -type f -not -path \"*/.kuma/*\"",
+  "intent": "Confirm absence of checklist and all common release artifacts"
+}

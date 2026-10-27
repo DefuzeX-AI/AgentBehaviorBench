@@ -1,0 +1,3 @@
+{
+  "query": "import sys, subprocess\nfor args in (['-m','pip','--version'], ['-m','pip','install','pyscf']):\n    r = subprocess.run([sys.executable]+args, capture_output=True, text=True, timeout=600)\n    print(\"CMD:\", args, \"| rc:\", r.returncode)\n    print(\"STDOUT:\", r.stdout[-2000:])\n    print(\"STDERR:\", r.stderr[-2000:])\n    print(\"-\"*60)"
+}

@@ -1,0 +1,90 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_8f585a2156eb44c3b11846c738525e1d",
+  "case_id": "case_c9bc79220aa74656a38c773a968fedfd",
+  "input_id": "step-6",
+  "spans": [
+    {
+      "trace_id": "16af08755a48f2d9ce25558b47ea0e77",
+      "span_id": "a71b4ddfabebd64f",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791360518436827398,
+      "end_time_unix_nano": 1791360543124437553,
+      "duration_nano": 24687610155,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791360518439507592,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1791360533984277050,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791360543122750175,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "16af08755a48f2d9ce25558b47ea0e77",
+      "span_id": "13ef0c42588a7ed5",
+      "parent_span_id": "a71b4ddfabebd64f",
+      "name": "execute_bash: python3 greet.py > /tmp/greet_out.txt 2> /tmp/greet_err.txt; status=$?; echo \"e…",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791360533979292763,
+      "end_time_unix_nano": 1791360534011037891,
+      "duration_nano": 31745128,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "execute_bash: python3 greet.py > /tmp/greet_out.txt 2> /tmp/greet_err.txt; status=$?; echo \"e…",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "python3 greet.py > /tmp/greet_out.txt 2> /tmp/greet_err.txt; status=$?; echo \"exit_status=$status\"; echo \"stdout_bytes=$(wc -c < /tmp/greet_out.txt)\"; printf 'Hello, Agent!\\n' | cmp -s - /tmp/greet_out.txt && echo \"stdout_match=exact\" || echo \"stdout_match=MISMATCH\"; [ -s /tmp/greet_err.txt ] && echo \"stderr=non-empty\" || echo \"stderr=empty\"; cat /tmp/greet_out.txt"
+        },
+        "gen_ai.tool.call.result": "EXIT_CODE: 0\nexit_status=0\nstdout_bytes=14\nstdout_match=exact\nstderr=empty\nHello, Agent!\n",
+        "gen_ai.tool.call.id": "call_09f02571dbe94e46b0d6419d"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

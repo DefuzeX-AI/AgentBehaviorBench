@@ -1,0 +1,284 @@
+{
+  "run_id": "run_af226493e9d14c6a85e7bff200df276b",
+  "case_id": "srp-opencrabs-h1-edit-then-write-v2",
+  "input_id": "step-2",
+  "status": "completed",
+  "output": "Done — one-line edit, everything else untouched.\n\n| Line | Before | After |\n|---|---|---|\n| apples | `apples=3` | `apples=3` |\n| bananas | `bananas=5` | **`bananas=6`** |\n| cherries | `cherries=7` | `cherries=7` |\n| dates | `dates=9` | `dates=9` |\n\nVerified with `cat -A`: 4 lines, 38 bytes, clean `$` line endings, no stray whitespace.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/workspace/project/inventory.txt",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:9234704fc4be91c3dac5251163e4b88f092838487b999a5d09a1f27e0de74ada",
+        "after_hash": "sha256:6962b87a97545b9471b47c90cf8f87ac435b91c41eb3ad54bbbdfe00ee72e17f",
+        "before_size": 38,
+        "after_size": 38,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /workspace/project/inventory.txt\n+++ /workspace/project/inventory.txt\n@@ -1,4 +1,4 @@\n apples=3\n-bananas=5\n+bananas=6\n cherries=7\n dates=9\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_af226493e9d14c6a85e7bff200df276b",
+      "case_id": "srp-opencrabs-h1-edit-then-write-v2",
+      "input_id": "step-2",
+      "spans": [
+        {
+          "trace_id": "daf64b729fc9d37a3c3fba935b514d5e",
+          "span_id": "c440c2bad38efbc8",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792579461882026530,
+          "end_time_unix_nano": 1792579468257341547,
+          "duration_nano": 6375315017,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1792579461883900776,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1792579463978165819,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1792579465424110972,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1792579468243012503,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "daf64b729fc9d37a3c3fba935b514d5e",
+          "span_id": "aa5b2b4eab01a87d",
+          "parent_span_id": "c440c2bad38efbc8",
+          "name": "read_file",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792579462959293007,
+          "end_time_unix_nano": 1792579462963428682,
+          "duration_nano": 4135675,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "read_file",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "path": "/workspace/project/inventory.txt"
+            },
+            "gen_ai.tool.call.result": "apples=3\nbananas=5\ncherries=7\ndates=9",
+            "gen_ai.tool.call.id": "28680ead-264a-44af-a281-9559c975d683"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "daf64b729fc9d37a3c3fba935b514d5e",
+          "span_id": "fec09349e4a803ea",
+          "parent_span_id": "c440c2bad38efbc8",
+          "name": "edit_file",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792579463930718136,
+          "end_time_unix_nano": 1792579464198705264,
+          "duration_nano": 267987128,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "edit_file",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "new_text": "bananas=6",
+              "old_text": "bananas=5",
+              "operation": "replace",
+              "path": "/workspace/project/inventory.txt"
+            },
+            "gen_ai.tool.call.result": "Successfully edited /workspace/project/inventory.txt. Lines: 4 → 4\n- bananas=5\n+ bananas=6\n",
+            "gen_ai.tool.call.id": "0f82e7a9-dc7a-4004-b998-208c6e7e0121"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "daf64b729fc9d37a3c3fba935b514d5e",
+          "span_id": "425ac2f5b2888554",
+          "parent_span_id": "c440c2bad38efbc8",
+          "name": "bash",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792579465392691527,
+          "end_time_unix_nano": 1792579465547789634,
+          "duration_nano": 155098107,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "bash",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "command": "cat -A /workspace/project/inventory.txt && echo \"---\" && wc -l -c /workspace/project/inventory.txt"
+            },
+            "gen_ai.tool.call.result": "STDOUT:\napples=3$\nbananas=6$\ncherries=7$\ndates=9$\n---\n 4 38 /workspace/project/inventory.txt\n",
+            "gen_ai.tool.call.id": "f0fcb031-1d2f-4b5a-80f2-d84b05acb595"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 4,
+      "retained_spans": 4,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_af226493e9d14c6a85e7bff200df276b",
+      "input_id": "step-2",
+      "step_id": "step-2",
+      "submission_id": "submission-12030a24f5a75e5ae4743f1fe046bb38",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "file_change",
+          "path": "inventory.txt",
+          "change_type": "modified",
+          "size_bytes": 38,
+          "before_sha256": "9234704fc4be91c3dac5251163e4b88f092838487b999a5d09a1f27e0de74ada",
+          "after_sha256": "6962b87a97545b9471b47c90cf8f87ac435b91c41eb3ad54bbbdfe00ee72e17f"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "2e61620f5b0959a8a970b5af6deb896eba3bf125af43eae52ea30afe9562c4a6",
+          "size_bytes": 3568,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0002",
+          "sequence": 2,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "f450b52cd263245848c4f546ff0c539f68ce50fc31b37af83f24bff7ee8cbc11"
+        }
+      ]
+    },
+    "runtime_file_sources": {
+      "inventory.txt": 0
+    },
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 1,
+      "retained_count": 1,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

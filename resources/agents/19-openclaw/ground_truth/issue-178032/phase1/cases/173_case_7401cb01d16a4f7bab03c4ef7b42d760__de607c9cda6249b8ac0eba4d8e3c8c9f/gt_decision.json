@@ -1,0 +1,34 @@
+{
+ "agent": "openclaw",
+ "defect": "openclaw ACP bridge reports a turn truncated at max_completion_tokens (finish_reason=length, empty content) as a normal end_turn with empty output",
+ "rounds": [
+  {
+   "retest_dir": "openclaw/de607c9c-20261020T041842Z",
+   "round": "round-1",
+   "observe_id": "b48bc12d078143a6b34c7db8625089ae",
+   "source_sha256": "6ab5220ab8e9",
+   "reproduced": null,
+   "judge_detected": null,
+   "evidence": "INVALID (environment): the only LLM call of the whole case (step-1) got HTTP 400 from api.b.ai: 'credit insufficient balance: balance=1286 required=18640' (code insufficient_user_quota). No other llm_request was made; every step (step-1..N) ended immediately with ACP stopReason=end_turn, tool_calls=0 and empty output, which is why the round took ~90s. No model turn ever ran, so the length-truncation path could not be exercised.",
+   "gt_usable": false
+  },
+  {
+   "retest_dir": "openclaw/de607c9c-20261020T041842Z",
+   "round": "round-2",
+   "observe_id": "80d0c3556f2c4fd88422e59e92f6b990",
+   "source_sha256": "6ab5220ab8e9",
+   "reproduced": null,
+   "judge_detected": null,
+   "evidence": "INVALID (environment): the only LLM call of the whole case (step-1) got HTTP 400 from api.b.ai: 'credit insufficient balance: balance=1286 required=18654' (code insufficient_user_quota). No other llm_request was made; every step (step-1..N) ended immediately with ACP stopReason=end_turn, tool_calls=0 and empty output, which is why the round took ~90s. No model turn ever ran, so the length-truncation path could not be exercised.",
+   "gt_usable": false
+  }
+ ],
+ "next": "drop",
+ "summary": "reproduced 0/0 valid on 6ab5220ab8e9 (2 rounds, 2 invalid: b.ai credit exhausted)",
+ "reproduction_rate": "0 of 0 valid rounds on this source (6ab5220ab8e9)",
+ "note": "Batch p318 (2026-10-20): first GT retest (de607c9c-20261020T041842Z, lane bai), run concurrently with 5363a2ec. Both rounds invalid for the same reason: single LLM call -> 400 'credit insufficient balance: balance=1286', then all 7 steps empty end_turn without further model calls (~90s per round). Rerun after b.ai is topped up. | 2026-10-20 p318 复测判定（20261020T091500Z） | 2026-10-20 改走智谱 lane（b.ai 余额不足）重跑 /home/wy/projects/DefuzeX/test/temp/gt_retest/out/p215_gt_retest/openclaw/de607c9c-20261020T093407Z：2/2 有效轮 Judge pass，没有一轮出现 length + 空输出 end_turn；de607c9c round-1 step-3 有一次 length 但带 1024 字部分正文（issue 里说的“部分正文无截断提示”变体），1/4 部分复现。触发依赖推理模型恰好耗尽 8192 预算，GT 难稳定复现 → drop；上游 openclaw#178032 用本地 mock 确定性复现，不依赖 GT。",
+ "reviewed_at": "2026-10-20",
+ "expected_behavior": "When the model turn ends with finish_reason=length and no content, the ACP bridge should surface an error / truncation stop reason (or retry/continue) instead of a normal end_turn with empty output.",
+ "observed_behavior": "Not observed in the retest: no model turn completed in either round. Original run: step-2 response finish_reason=length, content_len=0, reported as end_turn with empty output; step-3 then answered step-2's question.",
+ "package_obs": []
+}

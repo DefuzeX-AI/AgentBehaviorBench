@@ -1,0 +1,10 @@
+[
+  {
+    "type": "text",
+    "text": "Seed: 42\nTarget (binary): Survived  |  Features: ['Pclass', 'Sex', 'Age', 'SibSp', 'Parch', 'Fare', 'Embarked']\nTotal rows: 4\nStratified step 1: True | Step 2: False\n-------------------------------------------------------\nTrain:  2 rows ( 50%)  Survived={0: 1, 1: 1}\nVal  :  1 rows ( 25%)  Survived={1: 1}\nTest :  1 rows ( 25%)  Survived={0: 1}\n\nTrain:\n    Pclass     Sex   Age  SibSp  Parch    Fare Embarked  Survived\n0       2  female  29.0      0      2  23.000        S         1\n1       3    male  26.5      0      0   7.225        C         0\n\nValidation:\n    Pclass   Sex   Age  SibSp  Parch    Fare Embarked  Survived\n0       3  male  32.0      0      0  56.496        S         1\n\nTest:\n    Pclass     Sex   Age  SibSp  Parch    Fare Embarked  Survived\n0       3  female  39.0      1      5  31.275        S         0\n"
+  },
+  {
+    "type": "text",
+    "text": "---------------------------------------------------------------------------\nAssertionError                            Traceback (most recent call last)\nCell In[7], line 46\n     42 print(\"\\nTest:\\n\", test_df)\n     43 \n     44 # Consistency checks (verify row identity via original index)\n     45 assert len(train_df) + len(val_df) + len(test_df) == len(df)\n---> 46 assert not (set(train_df.index) & set(val_df.index))\n     47 assert not (set(train_df.index) & set(test_df.index))\n     48 assert not (set(val_df.index) & set(test_df.index))\n     49 print(\"\\n✓ Sizes sum to total; splits are disjoint.\")\n\nAssertionError: "
+  }
+]

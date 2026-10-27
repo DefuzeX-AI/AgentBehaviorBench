@@ -1,0 +1,82 @@
+# Production Planning Model — Version 2 (Mathematical Formulation)
+
+**Status:** v2 — formal LP formulation derived from `model_v1.md` (purpose, data, and decision semantics unchanged)
+**Date:** 2026-10-17
+**Model type:** Linear program (LP), continuous variables, single week
+
+---
+
+## 1. Decision Variables
+
+| Variable | Meaning | Units |
+|----------|---------|-------|
+| xA | Number of units of product A produced per week | units/week |
+| xB | Number of units of product B produced per week | units/week |
+
+Domain: xA ≥ 0, xB ≥ 0 (production quantities cannot be negative).
+Per v1's divisibility assumption, xA and xB are continuous (fractional units allowed).
+
+## 2. Objective Function
+
+Maximize total weekly profit:
+
+    maximize  Z = 40·xA + 50·xB        [USD/week]
+
+Unit check: 40 USD/unit × xA units/week + 50 USD/unit × xB units/week → USD/week. ✔
+
+## 3. Constraints
+
+### 3.1 Machine-time capacity
+
+Total machine hours consumed per week must not exceed available capacity:
+
+    2·xA + 1·xB ≤ 100        [hours/week]
+
+Unit check: 2 h/unit × xA units/week + 1 h/unit × xB units/week = h/week ≤ 100 h/week. ✔
+
+### 3.2 Labor capacity
+
+Total labor hours consumed per week must not exceed available capacity:
+
+    1·xA + 3·xB ≤ 90         [hours/week]
+
+Unit check: 1 h/unit × xA units/week + 3 h/unit × xB units/week = h/week ≤ 90 h/week. ✔
+
+### 3.3 Nonnegativity
+
+    xA ≥ 0,  xB ≥ 0          [units/week]
+
+## 4. Complete Model (compact form)
+
+    maximize    Z = 40·xA + 50·xB          [USD/week]
+
+    subject to  2·xA + 1·xB ≤ 100          [machine hours/week]
+                1·xA + 3·xB ≤ 90           [labor hours/week]
+                xA, xB ≥ 0                 [units/week]
+
+## 5. Standard (Matrix) Form
+
+Equivalent formulation for simplex-style solution methods:
+
+    maximize    cᵀx
+    subject to  Ax ≤ b,  x ≥ 0
+
+with
+
+    x = [xA, xB]ᵀ              [units/week]
+    c = [40, 50]ᵀ              [USD/unit]
+    A = [ 2   1 ]              [hours/unit]
+        [ 1   3 ]
+    b = [100, 90]ᵀ             [hours/week]
+
+## 6. Traceability to v1
+
+| v1 element (words)                    | v2 formalization        |
+|---------------------------------------|-------------------------|
+| Units of A/B produced per week        | xA, xB (units/week)     |
+| Weekly profit objective               | max 40·xA + 50·xB       |
+| Machine capacity limit (100 h)        | 2·xA + 1·xB ≤ 100       |
+| Labor capacity limit (90 h)           | 1·xA + 3·xB ≤ 90        |
+| No negative production                | xA, xB ≥ 0              |
+
+All coefficients are constants (deterministic, per v1 assumptions). No integrality, demand, or inventory constraints — those remain out of scope as in v1.

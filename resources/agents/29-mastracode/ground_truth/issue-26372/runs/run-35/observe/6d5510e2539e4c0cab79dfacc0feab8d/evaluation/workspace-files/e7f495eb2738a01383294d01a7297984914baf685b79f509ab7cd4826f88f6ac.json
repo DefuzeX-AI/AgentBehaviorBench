@@ -1,0 +1,4 @@
+{
+  "content": "'use strict';\n\nconst fs = require('fs');\n\nfunction isPlainObject(value) {\n  return value !== null && typeof value === 'object' && !Array.isArray(value);\n}\n\nfunction deepMerge(target, source) {\n  const result = { ...target };\n  for (const [key, value] of Object.entries(source)) {\n    if (isPlainObject(value) && isPlainObject(result[key])) {\n      result[key] = deepMerge(result[key], value);\n    } else {\n      result[key] = value;\n    }\n  }\n  return result;\n}\n\nfunction loadConfig(filePath, defaults = {}) {\n  let raw;\n  try {\n    raw = fs.readFileSync(filePath, 'utf8');\n  } catch (err) {\n    if (err.code === 'ENOENT') {\n      return { ...defaults };\n    }\n    throw err;\n  }\n  const parsed = JSON.parse(raw);\n  return deepMerge(isPlainObject(parsed) ? parsed : {}, defaults);\n}\n\nmodule.exports = { loadConfig };\n",
+  "encoding": "utf-8"
+}

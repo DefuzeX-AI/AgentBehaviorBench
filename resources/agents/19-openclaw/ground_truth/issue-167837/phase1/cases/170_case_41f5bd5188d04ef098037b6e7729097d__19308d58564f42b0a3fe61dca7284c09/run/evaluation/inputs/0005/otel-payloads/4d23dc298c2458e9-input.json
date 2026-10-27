@@ -1,0 +1,4 @@
+{
+  "command": "ls -l cleaned.csv && python3 - <<'EOF'\nimport csv\nrows = list(csv.DictReader(open(\"cleaned.csv\", newline=\"\", encoding=\"utf-8\")))\nnames = [r[\"name\"] for r in rows]\nprint(f\"rows: {len(rows)}\")\nprint(f\"names: {', '.join(names)}\")\nassert all(int(r[\"age\"]) >= 25 for r in rows), \"found a row with age < 25\"\nprint(\"rule check passed: every row has age >= 25\")\nEOF",
+  "workdir": "/home/agent/workspace"
+}

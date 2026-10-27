@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n    \n    # Ensure incoming data is a list (if a single DataFrame is passed, wrap it)\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n    \n    # Since only one dataset is provided, use the first (and only) DataFrame\n    df = data_list[0].copy()\n    \n    # 1. Inspect and standardize column names: lowercase and strip whitespace\n    df.columns = df.columns.str.strip().str.lower()\n    \n    # 2. Normalize data types\n    # Convert 'date' column to datetime; coerce errors to NaT\n    if 'date' in df.columns:\n        df['date'] = pd.to_datetime(df['date'], errors='coerce')\n    \n    # Ensure numeric columns are numeric (coerce non-numeric to NaN)\n    numeric_cols = ['price', 'quantity_sold', 'extended_sales']\n    for col in numeric_cols:\n        if col in df.columns:\n            df[col] = pd.to_numeric(df[col], errors='coerce')\n    \n    # 3. Handle missing values\n    # For the specific question, we only need 'date' and 'extended_sales'.\n    # Drop rows where either is missing (simple and safe for this analysis).\n    df = df.dropna(subset=['date', 'extended_sales'])\n    \n    # 4. Merging: only one dataset, so no merge is needed.\n    \n    # 5. Categorical encoding: not required for this numeric aggregation.\n    \n    # 6. Remove duplicate rows to avoid double-counting\n    df = df.drop_duplicates()\n    \n    # 7. Answer the question: total extended_sales for February 2022\n    # Filter for February 2022\n    feb_2022 = df[(df['date'].dt.year == 2022) & (df['date'].dt.month == 2)]\n    total_sales = feb_2022['extended_sales'].sum()\n    \n    # Return a single DataFrame containing the result\n    result_df = pd.DataFrame({'total_extended_sales_feb_2022': [total_sales]})\n    \n    return result_df\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 3973,
+      "prompt_tokens": 746,
+      "total_tokens": 4719,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 3448,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-2026101722082088512062c955d568lLnkifHV",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a14be8-a469-7da3-8b40-8fe468bfd790-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 746,
+    "output_tokens": 3973,
+    "total_tokens": 4719,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 3448
+    }
+  }
+}

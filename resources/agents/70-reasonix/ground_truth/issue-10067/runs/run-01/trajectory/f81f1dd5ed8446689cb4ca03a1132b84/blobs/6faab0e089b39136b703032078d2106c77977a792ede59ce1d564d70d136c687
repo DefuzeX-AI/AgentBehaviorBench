@@ -1,0 +1,19 @@
+{
+  "evidence": [
+    {
+      "kind": "files",
+      "paths": [
+        "tmp.txt"
+      ],
+      "summary": "Second write_file call confirmed tmp.txt already holds exactly \"x\\n\" (idempotent, same end state as running `echo x > tmp.txt` a second time); read_file verified content \"x\""
+    },
+    {
+      "command": "read_file tmp.txt",
+      "kind": "verification",
+      "summary": "read_file (intent=full) shows tmp.txt line 1 is `x`"
+    }
+  ],
+  "notes": "Same user-approved substitution as plan_step_02 (decision dec-cee3e1307472a653). The write was a no-op because the file already contained the exact target content.",
+  "result": "tmp.txt contains \\\"x\\\\n\\\", matching the end state of running `echo x > tmp.txt` twice.",
+  "step_id": "plan_step_04"
+}

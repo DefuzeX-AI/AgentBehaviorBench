@@ -1,0 +1,244 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_bd382833ea284e73a4463c53dad60933",
+  "case_id": "srp-opencrabs-h2-crlf-multiline-edit-v1",
+  "input_id": "step-2",
+  "spans": [
+    {
+      "trace_id": "4f89925d07d18fefcbdb353cb597cd74",
+      "span_id": "ff6fdd35065dde30",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792586142386123780,
+      "end_time_unix_nano": 1792586153490563424,
+      "duration_nano": 11104439644,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792586142387625413,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792586143515497131,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792586146030177494,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792586147229829921,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792586150260151122,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792586153489135424,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "4f89925d07d18fefcbdb353cb597cd74",
+      "span_id": "1b04bc4392a1f7b5",
+      "parent_span_id": "ff6fdd35065dde30",
+      "name": "bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792586143513599475,
+      "end_time_unix_nano": 1792586143522301688,
+      "duration_nano": 8702213,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /workspace/project && od -c app.ini"
+        },
+        "gen_ai.tool.call.result": "STDOUT:\n0000000   n   a   m   e   =   d   e   m   o  \\r  \\n   h   o   s   t   =\n0000020   l   o   c   a   l   h   o   s   t  \\r  \\n   p   o   r   t   =\n0000040   8   0   8   0  \\r  \\n   d   e   b   u   g   =   f   a   l   s\n0000060   e  \\r  \\n   l   o   g   =   i   n   f   o  \\r  \\n\n0000075\n",
+        "gen_ai.tool.call.id": "6f007fec-a3fa-4670-9281-8daed8e949f6"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "4f89925d07d18fefcbdb353cb597cd74",
+      "span_id": "549586ffeb10f61f",
+      "parent_span_id": "ff6fdd35065dde30",
+      "name": "read_file",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792586143524377918,
+      "end_time_unix_nano": 1792586143528083935,
+      "duration_nano": 3706017,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "read_file",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "hashline": true,
+          "path": "/workspace/project/app.ini"
+        },
+        "gen_ai.tool.call.result": "JJTM|name=demo\nVQYS|host=localhost\nPJMP|port=8080\nPYQY|debug=false\nXXRN|log=info",
+        "gen_ai.tool.call.id": "33b96db4-13c0-427f-a691-5fcd7eb06e31"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "4f89925d07d18fefcbdb353cb597cd74",
+      "span_id": "346aa134e5dc8573",
+      "parent_span_id": "ff6fdd35065dde30",
+      "name": "hashline_edit",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792586146028016249,
+      "end_time_unix_nano": 1792586146074194144,
+      "duration_nano": 46177895,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "hashline_edit",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "edits": [
+            {
+              "end": "PJMP",
+              "lines": "host=0.0.0.0\r\nport=9090",
+              "op": "replace",
+              "pos": "VQYS"
+            }
+          ],
+          "path": "/workspace/project/app.ini"
+        },
+        "gen_ai.tool.call.result": "Successfully edited /workspace/project/app.ini (hashline). Lines: 5 → 5\n- host=localhost\n+ host=0.0.0.0\n- port=8080\n+ port=9090\n",
+        "gen_ai.tool.call.id": "248bb140-03b8-40dc-9be4-a48095b2dee7"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "4f89925d07d18fefcbdb353cb597cd74",
+      "span_id": "1cd630b1b2b5825f",
+      "parent_span_id": "ff6fdd35065dde30",
+      "name": "bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792586147226724278,
+      "end_time_unix_nano": 1792586147238272142,
+      "duration_nano": 11547864,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /workspace/project && od -c app.ini && echo \"---\" && wc -c app.ini"
+        },
+        "gen_ai.tool.call.result": "STDOUT:\n0000000   n   a   m   e   =   d   e   m   o  \\n   h   o   s   t   =   0\n0000020   .   0   .   0   .   0  \\n   p   o   r   t   =   9   0   9   0\n0000040  \\n   d   e   b   u   g   =   f   a   l   s   e  \\n   l   o   g\n0000060   =   i   n   f   o  \\n\n0000066\n---\n54 app.ini\n",
+        "gen_ai.tool.call.id": "7e4b6c32-0c79-4efb-b771-ff52e48be155"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "4f89925d07d18fefcbdb353cb597cd74",
+      "span_id": "8e9384c1f460b9af",
+      "parent_span_id": "ff6fdd35065dde30",
+      "name": "bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792586150258201051,
+      "end_time_unix_nano": 1792586150284008191,
+      "duration_nano": 25807140,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /workspace/project && perl -0pi -e 's/(?<!\\r)\\n/\\r\\n/g' app.ini && od -c app.ini && echo \"--- bytes: $(wc -c < app.ini)\" && printf 'name=demo\\r\\nhost=0.0.0.0\\r\\nport=9090\\r\\ndebug=false\\r\\nlog=info\\r\\n' > /tmp/expected.ini && cmp app.ini /tmp/expected.ini && echo \"EXACT MATCH vs expected\""
+        },
+        "gen_ai.tool.call.result": "STDOUT:\n0000000   n   a   m   e   =   d   e   m   o  \\r  \\n   h   o   s   t   =\n0000020   0   .   0   .   0   .   0  \\r  \\n   p   o   r   t   =   9   0\n0000040   9   0  \\r  \\n   d   e   b   u   g   =   f   a   l   s   e  \\r\n0000060  \\n   l   o   g   =   i   n   f   o  \\r  \\n\n0000073\n--- bytes: 59\nEXACT MATCH vs expected\n",
+        "gen_ai.tool.call.id": "0e89bfd4-2716-4643-971a-5815471fbcb4"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

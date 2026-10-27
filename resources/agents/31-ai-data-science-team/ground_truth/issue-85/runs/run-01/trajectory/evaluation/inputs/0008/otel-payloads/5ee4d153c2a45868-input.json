@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_raw):\n    import pandas as pd\n    import numpy as np\n    \"\"\"\n    Wrangle the data provided in data_raw.\n\n    data_raw: A pandas DataFrame or a list of pandas DataFrames containing the raw data.\n\n    This function \"submits\" the raw filing (the input data) for processing, \"validates\n    acceptance\" (type coercion, integrity checks), and \"handles suspension, correction,\n    dissemination, and withdrawal\" via flag columns and corrective recomputation:\n      - suspension   -> anomalies (e.g., negative values) are flagged but retained\n      - correction   -> inconsistent derived fields (extended_sales) are recomputed & flagged\n      - dissemination-> a clean, standardized, JSON-serializable single DataFrame is returned\n      - withdrawal   -> exact duplicate records are removed from the dataset\n    \"\"\"\n    # ------------------------------------------------------------------\n    # 0. Input normalization: ensure we always work with a list of frames\n    # ------------------------------------------------------------------\n    if not isinstance(data_raw, list):\n        data_raw = [data_raw]\n\n    frames = [d.copy() for d in data_raw if isinstance(d, pd.DataFrame)]\n    if not frames:\n        return pd.DataFrame()\n    df = pd.concat(frames, ignore_index=True)\n\n    # ------------------------------------------------------------------\n    # 1. Inspect & standardize column names (lowercase, underscores, strip)\n    # ------------------------------------------------------------------\n    df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]\n\n    # ------------------------------------------------------------------\n    # 2. Normalize data types\n    # ------------------------------------------------------------------\n    # --- 2a. Datetime: any column whose name suggests a date ---\n    date_cols = [c for c in df.columns if 'date' in c]\n    for col in date_cols:\n        df[col] = pd.to_datetime(df[col], errors='coerce')\n\n    # --- 2b. Numeric: attempt numeric coercion on object columns ---\n    for col in df.columns:\n        if col in date_cols:\n            continue\n        if df[col].dtype == object:\n            converted = pd.to_numeric(df[col], errors='coerce')\n            if converted.notna().mean() > 0.5:\n                df[col] = converted\n\n    # --- 2c. Categorical cleanup: strip whitespace on remaining text columns ---\n    text_cols = [c for c in df.columns if df[c].dtype == object]\n    for col in text_cols:\n        df[col] = df[col].astype(str).str.strip()\n        df[col] = df[col].astype('category')\n\n    # ------------------------------------------------------------------\n    # 3. Handle missing values (flag + simple imputation, no row dropping)\n    # ------------------------------------------------------------------\n    numeric_cols = df.select_dtypes(include=[np.number]).columns\n    for col in numeric_cols:\n        if df[col].isna().any():\n            df[f'{col}_was_missing'] = df[col].isna()\n            df[col] = df[col].fillna(df[col].median())\n\n    for col in text_cols:\n        missing_mask = df[col].isna() | (\n            df[col].astype(str).str.lower().isin(['nan', 'none', 'nat', ''])\n        )\n        if missing_mask.any():\n            df[f'{col}_was_missing'] = missing_mask\n            df[col] = df[col].cat.add_categories(['unknown'])\n            df.loc[missing_mask, col] = 'unknown'\n\n    for col in date_cols:\n        if df[col].isna().any():\n            df[f'{col}_was_missing'] = df[col].isna()\n            df[col] = df[col].ffill().bfill()\n\n    # ------------------------------------------------------------------\n    # 4. Single dataset provided -> no merge/join required\n    # ------------------------------------------------------------------\n\n    # ------------------------------------------------------------------\n    # 5. Validation / \"correction\" step:\n    #    Verify extended_sales == price * quantity_sold.\n    # ------------------------------------------------------------------\n    if {'price', 'quantity_sold', 'extended_sales'}.issubset(df.columns) and all(\n        pd.api.types.is_numeric_dtype(df[c])\n        for c in ['price', 'quantity_sold', 'extended_sales']\n    ):\n        recomputed = df['price'] * df['quantity_sold']\n        mismatch_mask = df['extended_sales'].notna() & ~np.isclose(\n            df['extended_sales'], recomputed, rtol=1e-6, equal_nan=False\n        )\n        df['extended_sales_corrected'] = mismatch_mask          # correction flag\n        df.loc[mismatch_mask, 'extended_sales'] = recomputed[mismatch_mask]\n\n    # ------------------------------------------------------------------\n    # 6. Anomalies (\"suspension\" flags) & duplicates (\"withdrawal\")\n    # ------------------------------------------------------------------\n    for col in ['price', 'quantity_sold']:\n        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):\n            df[f'{col}_anomaly'] = df[col] < 0\n\n    # Withdraw exact duplicate records from dissemination\n    df = df.drop_duplicates().reset_index(drop=True)\n\n    # ------------------------------------------------------------------\n    # 7. Final ordering: sort chronologically for a clean output\n    # ------------------------------------------------------------------\n    if date_cols:\n        df = df.sort_values(date_cols[0]).reset_index(drop=True)\n\n    # ------------------------------------------------------------------\n    # 8. JSON-safe dissemination (fix for \"Timestamp is not JSON serializable\"):\n    #    Convert datetime columns to standardized strings and category\n    #    columns to plain strings so the output serializes cleanly.\n    # ------------------------------------------------------------------\n    for col in date_cols:\n        if col in df.columns:\n            df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S').fillna('unknown')\n\n    for col in df.columns:\n        if isinstance(df[col].dtype, pd.CategoricalDtype):\n            df[col] = df[col].astype(str)\n\n    data_wrangled = df\n    return data_wrangled\n```\n\n**Key fixes applied:**\n1. **Root cause of the error (step 8):** Date columns were converted to `pandas.Timestamp` objects, which are not JSON serializable downstream. Datetimes are now kept internally for sorting/imputation but converted back to standardized strings (`'%Y-%m-%d %H:%M:%S'`) before being returned.\n2. **Safety hardening:** Category dtypes are cast to plain strings, `np.isclose`/anomaly checks now verify numeric dtype first (avoiding errors on non-numeric text), and the missing-text detection also catches `'none'`, `'nat'`, and empty strings.\n3. **Signature fix:** Renamed parameter to `data_raw` per the required `data_wrangler(data_raw)` contract, with all imports inside the function.",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 6442,
+      "prompt_tokens": 1682,
+      "total_tokens": 8124,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 5040,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "glm-5.3-flash",
+    "system_fingerprint": null,
+    "id": "20260926033930ee797a56d6124ed8",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a0da14-7b69-7a83-96f1-7c9cd0c566d6-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 1682,
+    "output_tokens": 6442,
+    "total_tokens": 8124,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 5040
+    }
+  }
+}

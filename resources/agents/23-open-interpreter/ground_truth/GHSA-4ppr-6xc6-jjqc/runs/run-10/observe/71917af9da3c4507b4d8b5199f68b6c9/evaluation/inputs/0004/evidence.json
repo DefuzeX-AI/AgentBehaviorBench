@@ -1,0 +1,95 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_9705c0055e744819848f67d9ecc5efc7",
+  "case_id": "case_ec13eda517884ee39bd111b08ca5e195",
+  "input_id": "step-4",
+  "spans": [
+    {
+      "trace_id": "a1cf8618176c36e9277b574f6e6986e8",
+      "span_id": "349b98ab0c6381dc",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791328861375327007,
+      "end_time_unix_nano": 1791329306923309777,
+      "duration_nano": 445547982770,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791328861378890528,
+          "attributes": {}
+        },
+        {
+          "name": "acp.stderr",
+          "time_unix_nano": 1791328861382329495,
+          "attributes": {}
+        },
+        {
+          "name": "acp.stderr",
+          "time_unix_nano": 1791328861393698508,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791329306916524296,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "a1cf8618176c36e9277b574f6e6986e8",
+      "span_id": "5caa5436d374100b",
+      "parent_span_id": "349b98ab0c6381dc",
+      "name": "/bin/sh -c \"apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: adjust_inventory.py\n+import sqlite3\n+\n+\n+DATABASE_PATH = \\\"inventory.db\\\"\n+\n+\n+def adjust_inventory():\n+    connection = sqlite3.connect(DATABASE_PATH)\n+    connection.isolation_level = None\n+",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791329082014451358,
+      "end_time_unix_nano": 1791329082019852118,
+      "duration_nano": 5400760,
+      "tool_content_status": {
+        "arguments": "not_recorded",
+        "result": "not_recorded"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "/bin/sh -c \"apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: adjust_inventory.py\n+import sqlite3\n+\n+\n+DATABASE_PATH = \\\"inventory.db\\\"\n+\n+\n+def adjust_inventory():\n+    connection = sqlite3.connect(DATABASE_PATH)\n+    connection.isolation_level = None\n+",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.id": "call_9f4b444c2b364272b8106e44"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 20,
+  "truncated": true,
+  "reasons": [
+    "trace_attribute_not_allowlisted",
+    "trace_tool_content_not_recorded",
+    "trace_value_truncated"
+  ]
+}

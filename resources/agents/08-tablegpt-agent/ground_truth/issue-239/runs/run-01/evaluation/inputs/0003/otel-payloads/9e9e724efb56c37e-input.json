@@ -1,0 +1,3 @@
+{
+  "query": "import importlib.util, os\nfor name in ('pybox', 'pppybox'):\n    spec = importlib.util.find_spec(name)\n    print(f\"{name}: {'FOUND at ' + str(list(spec.submodule_search_locations)) if spec else 'not found'}\")\n\nimport pybox\nbase = os.path.dirname(pybox.__file__)\nprint(\"\\npybox contents:\", os.path.dirname(pybox.__file__))\nfor root, dirs, files in os.walk(base):\n    dirs[:] = [d for d in dirs if d != '__pycache__']\n    for f in sorted(files):\n        p = os.path.join(root, f)\n        print(\"  \", p.replace(os.path.dirname(base), 'pybox'), os.path.getsize(p), \"B\")"
+}

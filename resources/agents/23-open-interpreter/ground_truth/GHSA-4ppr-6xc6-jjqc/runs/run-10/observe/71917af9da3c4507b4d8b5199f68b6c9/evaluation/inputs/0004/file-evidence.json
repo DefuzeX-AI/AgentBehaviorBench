@@ -1,0 +1,103 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/adjust_inventory.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:8796135dda4f96ee36fbd6553f90760d8e5c11b8b91b251d1937237528c3d272",
+        "before_size": null,
+        "after_size": 778,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/adjust_inventory.py\n@@ -0,0 +1,32 @@\n+import sqlite3\n+\n+\n+DATABASE_PATH = \"inventory.db\"\n+\n+\n+def adjust_inventory():\n+    connection = sqlite3.connect(DATABASE_PATH)\n+    connection.isolation_level = None\n+\n+    try:\n+        connection.execute(\"BEGIN\")\n+        connection.execute(\"SAVEPOINT before_gadget\")\n+        connection.execute(\n+            \"UPDATE products SET quantity = ? WHERE name = ?\",\n+            (8, \"Widget\"),\n+        )\n+        connection.execute(\n+            \"INSERT INTO products (id, name, quantity) VALUES (?, ?, ?)\",\n+            (4, \"Doodad\", 3),\n+        )\n+        connection.execute(\"RELEASE SAVEPOINT before_gadget\")\n+        connection.commit()\n+    except Exception:\n+        connection.rollback()\n+        raise\n+    finally:\n+        connection.close()\n+\n+\n+if __name__ == \"__main__\":\n+    adjust_inventory()\n"
+      },
+      {
+        "path": "/home/agent/workspace/inventory.db",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:f1ad06e4655b37998825bb3d2a371c6ac7bca5b125d1039cab71ec6af1a53ea7",
+        "after_hash": "sha256:e4b76e463346b4cd179725ff482b6227e5b741fbc1d41205831c98d7b0aca098",
+        "before_size": 8192,
+        "after_size": 8192,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": "binary",
+        "diff": null
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_9705c0055e744819848f67d9ecc5efc7",
+    "input_id": "step-4",
+    "step_id": "step-4",
+    "submission_id": "submission-38b65407889f6c052dc7b64c4c6d85b4",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "adjust_inventory.py",
+        "change_type": "created",
+        "size_bytes": 778,
+        "after_sha256": "8796135dda4f96ee36fbd6553f90760d8e5c11b8b91b251d1937237528c3d272"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "inventory.db",
+        "change_type": "modified",
+        "size_bytes": 8192,
+        "before_sha256": "f1ad06e4655b37998825bb3d2a371c6ac7bca5b125d1039cab71ec6af1a53ea7",
+        "after_sha256": "e4b76e463346b4cd179725ff482b6227e5b741fbc1d41205831c98d7b0aca098"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "20a0f1abdcf81bda9d81e0853090bf7ddd3b0092e45304ef2c7b18a78348cfa9",
+        "size_bytes": 2446,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "824f9016a05114ac2f3a7af18b2d090bdca9ca98df54fee885dbacef2da34ff7"
+      }
+    ]
+  }
+}

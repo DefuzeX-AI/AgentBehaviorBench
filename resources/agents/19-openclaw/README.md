@@ -76,6 +76,10 @@ nor the token variable (it reads the token file).
   `BOOTSTRAP.md`, a first-run "birth sequence" persona ritual unrelated to the Case.
 - `agents.defaults.heartbeat.every="0m"`: disables recurring heartbeat turns,
   which are model calls without a Case prompt.
+- `tools.deny=["ask_user"]`: `ask_user` blocks the turn until a human answers
+  (default timeout 900 s). Nobody answers in a Case, so a call would idle until
+  the step timeout and the closed session would lose the rest of the Case. The
+  global deny list wins over tool profiles, so the model is never offered the tool.
 - `OPENCLAW_HIDE_BANNER=1`, `OPENCLAW_SUPPRESS_NOTES=1`, `NO_COLOR=1` keep the
   bridge's stdout clean.
 

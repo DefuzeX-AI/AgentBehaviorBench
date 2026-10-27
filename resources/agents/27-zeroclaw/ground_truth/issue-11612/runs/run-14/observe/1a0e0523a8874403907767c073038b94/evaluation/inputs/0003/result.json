@@ -1,0 +1,55 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "6546d7607a044dd19a1720523cb22574",
+  "case_id": "case_af9a7a70eb814606acfad95e51b728a3",
+  "input_id": "step-3",
+  "invocation_id": "6546d7607a044dd19a1720523cb22574",
+  "agent_id": "zeroclaw",
+  "status": "succeeded",
+  "output": "Resolved. Two resources declared, and here's the honest part: **neither exists on disk yet** — the contract describes intent, not current state.\n\n## Resource Graph\n\n| # | Name | Type | Declared path (relative) | Resolves to | Exists? |\n|---|------|------|--------------------------|-------------|---------|\n| 1 | `notes.txt` | file | `notes.txt` | `/home/agent/workspace/notes.txt` | ❌ missing |\n| 2 | `archive` | directory | `archive` | `/home/agent/workspace/archive` | ❌ missing |\n\n**Graph shape:** flat — two independent nodes, no dependencies or nesting between them.\n\nEverything else in the workspace (`contract.yaml`, `contract.sha256`, `checksum.py`, `.gitignore`, `.kuma/`) is contract *tooling*, not a declared resource.\n\n## Ownership Assumptions\n\n1. **Workspace-root anchoring** — both `path` values are relative, so they resolve against the directory containing `contract.yaml` itself (`/home/agent/workspace`). No absolute paths, no `../` traversal; the contract cannot claim anything outside the workspace.\n2. **Contract is sole authority** — no other file or declaration lays claim to `notes.txt` or `archive`, so no merge conflicts or shadowed definitions.\n3. **Name == path** — both resources use identical `name` and `path`, so there's no aliasing ambiguity.\n4. **OS-level ownership is implicit** — the schema has no `owner`/`permissions` fields, so whoever materializes the resources (the `agent` user) owns them by filesystem default.\n5. **`format: text` on notes.txt is descriptive metadata** — it constrains nothing structurally.\n\nWant me to materialize the missing resources (create the empty file and directory) so reality matches the contract?",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "zeroclaw-acp",
+        "title": "ZeroClaw ACP",
+        "version": "0.8.5"
+      },
+      "_meta": {
+        "zeroclaw": {
+          "defaultModel": "glm-5.3-flash",
+          "maxSessions": 10,
+          "sessionTimeoutSecs": 3600
+        }
+      }
+    },
+    "pid": 12,
+    "session": {
+      "sessionId": "6039b66e-59b8-4708-9f95-f2fbd4054394"
+    },
+    "session_id": "6039b66e-59b8-4708-9f95-f2fbd4054394",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

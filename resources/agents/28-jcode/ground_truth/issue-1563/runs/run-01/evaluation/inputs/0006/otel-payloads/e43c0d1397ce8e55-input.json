@@ -1,0 +1,4 @@
+{
+  "command": "cd /home/agent/workspace && python3 -c \"\nimport json\nd = json.load(open('sbom.spdx.json'))\nfor r in d['relationships']:\n    for k in ('spdxElementId', 'relatedSpdxElement'):\n        if r[k] == 'SPDXRef-Package-demo_pkg':\n            r[k] = 'SPDXRef-Package-demo-pkg'\njson.dump(d, open('sbom.spdx.json', 'w'), indent=2)\nprint('relationship ids fixed')\n\"",
+  "intent": "Fix package ID references in all relationship fields"
+}

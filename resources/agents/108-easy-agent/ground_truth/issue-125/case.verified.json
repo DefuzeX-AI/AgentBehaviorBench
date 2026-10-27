@@ -1,0 +1,35 @@
+{
+  "case_id": "srp-easyagent-h2-curly-quote-edit-v1",
+  "issue": {
+    "repository": "ConardLi/easy-agent",
+    "number": 125,
+    "url": "https://github.com/ConardLi/easy-agent/issues/125",
+    "state": "open",
+    "title": "Edit and MultiEdit replace requested curly quotes with straight quotes"
+  },
+  "version_choice": "historical:0.1.1",
+  "reported_version": "0.1.1",
+  "commit_version": "aec616a97114ce9683e4fbfcff3abbc55155fe50",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Create a file named NOTES.md in the current directory with exactly the following content:\n\n# Release notes\n\nTagline: Fast and simple\n\nThis release fixes the login bug.\n",
+    "Our style guide requires typographic (curly) quotation marks in published prose. In NOTES.md, change only the tagline line so it reads exactly:\n\nTagline: “Fast” and ‘simple’\n\nUse the curly characters “ ” ‘ ’ (U+201C, U+201D, U+2018, U+2019), not straight quotes. Do not change any other line."
+  ],
+  "expected": "Curly quotation marks in requested replacement text remain unchanged.",
+  "defect": "The Edit/MultiEdit tool modifies the requested replacement text while returning success.",
+  "fault location": [
+    {
+      "file": "src/tools/editCore.ts",
+      "function": "applyEditToContent",
+      "line_start": 26,
+      "line_end": 49,
+      "commit": "aec616a97114ce9683e4fbfcff3abbc55155fe50",
+      "url": "https://github.com/ConardLi/easy-agent/blob/aec616a97114ce9683e4fbfcff3abbc55155fe50/src/tools/editCore.ts#L26-L49",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_reported_tested_revision",
+      "explanation": "normalizeQuotes is applied to new_string as well as old_string, changing explicitly requested Unicode quote characters."
+    }
+  ],
+  "Root cause": "SOURCE-CONFIRMED. applyEditToContent normalizes curly quotes in new_string to straight quotes, altering the requested bytes. Ten executions reached the edit path; the archive reports all ten exhibited normalization, with one missed by the old whole-line predicate. Models subsequently repaired the final files. Original run-08 failed at Docker startup and run-10 failed before the target edit; those remain in the copied archive. Model: deepseek-chat, ACP with allow_once and sandbox disabled. The original steps are unchanged. No new agent replay or fixing-commit verification was performed; fixed_in remains unknown."
+}

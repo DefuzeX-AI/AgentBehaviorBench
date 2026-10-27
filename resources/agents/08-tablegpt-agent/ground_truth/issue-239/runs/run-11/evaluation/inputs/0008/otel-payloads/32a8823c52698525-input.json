@@ -1,0 +1,47 @@
+{
+  "content": "## Streamed, Reassembled — Complete ✅\n\nThe response streamed in as incremental delta chunks and has been reassembled into the final summary. No cancellation was requested or triggered.\n\n### Stream Trace\n\n| Chunk | Delta | Cumulative |\n|---|---|---|\n| 0 | `Strong ` | `Strong ` |\n| 1 | `battery ` | `Strong battery ` |\n| 2 | `life ` | `Strong battery life ` |\n| 3 | `and ` | `Strong battery life and ` |\n| 4 | `a ` | `...and a ` |\n| 5 | `bright ` | `...a bright ` |\n| 6 | `screen, ` | `...bright screen, ` |\n| 7 | `but ` | `...screen, but ` |\n| 8 | `the ` | `...but the ` |\n| 9 | `speaker ` | `...the speaker ` |\n| 10 | `is ` | `...speaker is ` |\n| 11 | `weak.` | `...speaker is weak.` |\n| 12 | *(empty)* | *(terminal)* |\n\n### Reassembled Summary (plain text)\n\n> **Strong battery life and a bright screen, but the speaker is weak.**\n\n### Stream Metadata\n\n| Field | Value |\n|---|---|\n| Chunks received | 13 (12 content + 1 terminal) |\n| Finish reason | `eos` |\n| **Cancelled** | ❌ False |\n| Response schema | `text` |\n| Model | `synthetic-review-summarizer-v1` |\n\n### Notes\n- **Ordering:** Chunks arrived in strictly ascending `index` order, so concatenating deltas in sequence reconstructs the text exactly.\n- **Reassembly:** The final content equals the decoded summary from the previous step, confirming stream and non-stream paths agree.\n- **Termination:** The stream closed cleanly on the terminal empty-delta chunk carrying `finish_reason=eos` — a natural end _before_ the `\\n\\n` stop sequence or the 100-token cap.\n- **No cancellation:** The cancel flag was never set, so the full stream was drained to completion.\n\nThe request has now completed the full pipeline end-to-end: **admit → batch → cache → prefill → decode → stream → reassemble**. Would you like to batch additional reviews, adjust sampling, or archive this request/response pair with its fingerprints?",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 514,
+      "prompt_tokens": 11770,
+      "total_tokens": 12284,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 0,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 10240
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012172321988252434c955d5681I07rGBc",
+    "service_tier": "default",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "run--01a13123-f257-7860-8892-1b8161c25fbb-0",
+  "example": false,
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 11770,
+    "output_tokens": 514,
+    "total_tokens": 12284,
+    "input_token_details": {
+      "cache_read": 10240
+    },
+    "output_token_details": {
+      "reasoning": 0
+    }
+  }
+}

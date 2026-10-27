@@ -1,0 +1,4 @@
+{
+  "content": "#!/usr/bin/env python3\n\"\"\"Export all orders to a CSV file.\"\"\"\n\nimport csv\nimport sqlite3\nfrom pathlib import Path\n\nDB_PATH = Path(__file__).resolve().parent / \"app.db\"\nEXPORT_PATH = Path(__file__).resolve().parent / \"output\" / \"orders_export.csv\"\n\n\ndef main() -> None:\n    EXPORT_PATH.parent.mkdir(parents=True, exist_ok=True)\n\n    conn = sqlite3.connect(DB_PATH)\n    try:\n        rows = conn.execute(\n            \"SELECT id, customer_id, amount, created_at FROM orders ORDER BY id\"\n        ).fetchall()\n    finally:\n        conn.close()\n\n    with EXPORT_PATH.open(\"w\", newline=\"\", encoding=\"utf-8\") as f:\n        writer = csv.writer(f)\n        writer.writerow([\"id\", \"customer_id\", \"amount\", \"created_at\"])\n        writer.writerows(rows)\n\n    print(f\"OK: exported {len(rows)} rows to {EXPORT_PATH}\")\n\n\nif __name__ == \"__main__\":\n    main()\n",
+  "encoding": "utf-8"
+}

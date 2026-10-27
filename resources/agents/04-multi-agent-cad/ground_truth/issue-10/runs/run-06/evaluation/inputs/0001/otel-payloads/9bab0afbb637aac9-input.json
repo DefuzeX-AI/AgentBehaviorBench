@@ -1,0 +1,225 @@
+{
+  "architect_plan": {
+    "plan_id": "plan-l-bracket-80x50x8-arm60-hole10-r5-alu-v1",
+    "cad_brief_id": "l-bracket-80x50x8-arm60-hole10-r5-alu",
+    "sketches": [
+      {
+        "sketch_id": "l-profile",
+        "workplane": "XZ",
+        "workplane_offset_mm": -25.0,
+        "entities": [
+          {
+            "entity_type": "polygon",
+            "label": null,
+            "start": null,
+            "end": null,
+            "center": null,
+            "radius": null,
+            "start_angle_deg": null,
+            "end_angle_deg": null,
+            "width": null,
+            "height": null,
+            "corner_radius": null,
+            "num_sides": null,
+            "circumscribed_radius": null,
+            "control_points": [
+              {
+                "x": -40.0,
+                "y": 0.0
+              },
+              {
+                "x": 40.0,
+                "y": 0.0
+              },
+              {
+                "x": 40.0,
+                "y": 60.0
+              },
+              {
+                "x": 32.0,
+                "y": 60.0
+              },
+              {
+                "x": 32.0,
+                "y": 13.0
+              },
+              {
+                "x": 27.0,
+                "y": 8.0
+              },
+              {
+                "x": -40.0,
+                "y": 8.0
+              }
+            ],
+            "text_string": null,
+            "font_size": null
+          }
+        ],
+        "constraints": [],
+        "fully_constrained": false,
+        "notes": "Custom profile: L-bracket cross-section (custom profile, NOT a regular polygon). The sketch lies on the XZ plane, therefore sketch-local x = world X and sketch-local y = world Z. Closed CCW outline built with BuildLine + Polyline/RadiusArc + make_face(): (1) line (-40,0)->(40,0) = base underside at world Z=0, base front free edge at X=-40 (BASE_FRONT_EDGE_X = -40 - BASE_LENGTH_X/2 = -40) and base rear end at X=+40 (BASE_END_X = +40); (2) line (40,0)->(40,60) = arm OUTER face, flush with the base rear end face at X=+40 so OVERALL_X stays 80; (3) line (40,60)->(32,60) = arm top face at Z=60 (ARM_HEIGHT_Z); (4) line (32,60)->(32,13) = arm INNER face at X=ARM_INNER_FACE_X=32, running down to the inner-fillet tangent point, tangent Z = BASE_THICKNESS_Z + INNER_FILLET_RADIUS = 8 + 5 = 13; (5) CONCAVE inner fillet arc of radius R=5 from (32,13) to (27,8) with centre at (27,13) and arc midpoint at (30.5355, 9.4645) - use RadiusArc or ThreePointArc through that midpoint; the arc is tangent to the arm inner face line x=32 at (32,13) and tangent to the base top face line y=8 at (27,8), and it ADDS material into the inner corner at (32,8) (inside fillet, not an outer rounding); fillet tangent on base top X = ARM_INNER_FACE_X - INNER_FILLET_RADIUS = 32 - 5 = 27; (6) line (27,8)->(-40,8) = base top face at Z=8; (7) close (-40,8)->(-40,0) = base front free edge at X=-40. Do NOT use RegularPolygon. All vertices except the arc are sharp 90-degree corners - no other corner may be rounded (no external edge rounding). Extruding this closed profile by 50 mm yields a single continuous solid: base 80 x 50 x 8 and arm 8 x 50 x 60 fused with the R5 concave fillet."
+      }
+    ],
+    "steps": [
+      {
+        "step_id": "step-01-extrude-l-bracket",
+        "step_type": "extrude",
+        "label": "Extrude L-bracket cross-section 50 mm along Y (base + arm + R5 inner fillet as one solid)",
+        "sketch_id": "l-profile",
+        "distance_mm": 50.0,
+        "direction": "positive",
+        "taper_angle_deg": null,
+        "revolve_angle_deg": null,
+        "revolve_axis": null,
+        "revolve_axis_point": null,
+        "radius_mm": null,
+        "chamfer_distance_mm": null,
+        "chamfer_distance1_mm": null,
+        "chamfer_distance2_mm": null,
+        "edge_selector": null,
+        "hole_diameter_mm": null,
+        "hole_depth_mm": null,
+        "hole_position": null,
+        "hole_type": "simple",
+        "counterbore_diameter_mm": null,
+        "counterbore_depth_mm": null,
+        "countersink_angle_deg": null,
+        "target_step_id": null,
+        "tool_step_id": null,
+        "pattern_count": null,
+        "pattern_spacing_mm": null,
+        "pattern_axis": null,
+        "pattern_total_angle_deg": null,
+        "feature_step_ids": null,
+        "mirror_plane": null,
+        "mirror_plane_offset_mm": null,
+        "shell_thickness_mm": null,
+        "shell_open_faces": null,
+        "draft_angle_deg": null,
+        "draft_neutral_plane": null,
+        "draft_face_selectors": null,
+        "rib_thickness_mm": null,
+        "rib_height_mm": null,
+        "rib_face_selectors": null,
+        "reference_type": null,
+        "reference_definition": null,
+        "depends_on": [],
+        "notes": "Sketch plane XZ offset -25.0 places the profile at Y = +25; the positive (plane-normal, -Y) extrusion spans Y = +25 to Y = -25, i.e. the full BASE_WIDTH_Y = 50 mm, symmetric about the XZ plane (Y = 0) - the arm spans the whole width, not a partial strip. Resulting single continuous solid: base block X=-40..+40, Y=-25..+25, Z=0..8; vertical arm X=+32..+40, Y=-25..+25, Z=0..60 (rises from the base bottom Z=0, projecting ARM_HEIGHT_ABOVE_BASE = 60 - 8 = 52 mm above the base top face at Z=8); concave R5 fillet tangent to the base top face at X=27, Z=8 and to the arm inner face at X=32, Z=13, running the full 50 mm in Y. Overall extents = 80 x 50 x 60."
+      },
+      {
+        "step_id": "step-02-mounting-hole",
+        "step_type": "hole",
+        "label": "10 mm dia vertical through-hole in the base, 20 mm from the front edge and on the Y=0 centreline",
+        "sketch_id": null,
+        "distance_mm": null,
+        "direction": null,
+        "taper_angle_deg": null,
+        "revolve_angle_deg": null,
+        "revolve_axis": null,
+        "revolve_axis_point": null,
+        "radius_mm": null,
+        "chamfer_distance_mm": null,
+        "chamfer_distance1_mm": null,
+        "chamfer_distance2_mm": null,
+        "edge_selector": null,
+        "hole_diameter_mm": 10.0,
+        "hole_depth_mm": null,
+        "hole_position": {
+          "x": -20.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "hole_type": "simple",
+        "counterbore_diameter_mm": null,
+        "counterbore_depth_mm": null,
+        "countersink_angle_deg": null,
+        "target_step_id": null,
+        "tool_step_id": null,
+        "pattern_count": null,
+        "pattern_spacing_mm": null,
+        "pattern_axis": null,
+        "pattern_total_angle_deg": null,
+        "feature_step_ids": null,
+        "mirror_plane": null,
+        "mirror_plane_offset_mm": null,
+        "shell_thickness_mm": null,
+        "shell_open_faces": null,
+        "draft_angle_deg": null,
+        "draft_neutral_plane": null,
+        "draft_face_selectors": null,
+        "rib_thickness_mm": null,
+        "rib_height_mm": null,
+        "rib_face_selectors": null,
+        "reference_type": null,
+        "reference_definition": null,
+        "depends_on": [
+          "step-01-extrude-l-bracket"
+        ],
+        "notes": "Through-hole along Z (vertical), penetrating the full BASE_THICKNESS_Z = 8 mm, base Z = 0..8. Use a cylinder with at least 1 mm overshoot past BOTH faces (e.g. Z = -2 to Z = +10, height 12 mm) so the cut is complete and the solid stays water-tight. Centre: X = HOLE_POS_X = -20 (HOLE_FROM_FRONT_EDGE = 20 mm from the free front edge at X = -40), Y = HOLE_POS_Y = 0 (HOLE_FROM_SIDE_EDGE = 25 mm from each side edge, on the symmetry plane). HOLE_RADIUS = 5 mm. The arm inner face is at X = +32, so the hole edge at X = -15 is far away and the drill does NOT intersect the vertical arm. This is the only subtractive feature."
+      }
+    ],
+    "estimated_volume_mm3": null,
+    "key_dimensions": {
+      "BASE_LENGTH_X": 80.0,
+      "BASE_WIDTH_Y": 50.0,
+      "BASE_THICKNESS_Z": 8.0,
+      "BASE_FRONT_EDGE_X": -40.0,
+      "BASE_END_X": 40.0,
+      "ARM_HEIGHT_Z": 60.0,
+      "ARM_HEIGHT_ABOVE_BASE": 52.0,
+      "ARM_THICKNESS_X": 8.0,
+      "ARM_WIDTH_Y": 50.0,
+      "ARM_INNER_FACE_X": 32.0,
+      "INNER_FILLET_RADIUS": 5.0,
+      "FILLET_TANGENT_X": 27.0,
+      "FILLET_TANGENT_Z": 13.0,
+      "FILLET_ARC_CENTER_X": 27.0,
+      "FILLET_ARC_CENTER_Z": 13.0,
+      "HOLE_DIAMETER": 10.0,
+      "HOLE_RADIUS": 5.0,
+      "HOLE_POS_X": -20.0,
+      "HOLE_POS_Y": 0.0,
+      "HOLE_FROM_FRONT_EDGE": 20.0,
+      "HOLE_FROM_SIDE_EDGE": 25.0,
+      "PROFILE_PLANE_OFFSET_Y": -25.0,
+      "EXTRUDE_LENGTH_Y": 50.0,
+      "OVERALL_X": 80.0,
+      "OVERALL_Y": 50.0,
+      "OVERALL_Z": 60.0
+    },
+    "selector_map": {
+      "overall-x": "(skip)",
+      "overall-y": "(skip)",
+      "overall-z": "(skip)",
+      "single-body": "(skip)",
+      "water-tightness": "(skip)"
+    },
+    "tolerances_hint": null,
+    "expected_step_count": null,
+    "plan_version": 1,
+    "revision_history": [
+      {
+        "version": 1,
+        "note": "Initial design. Base+arm+inner R5 fillet are realised as ONE extruded closed L-profile on the XZ plane (sketch 'l-profile', built via TODO_AIDER as a custom profile with a concave RadiusArc R5 at the base/arm junction) so that the inner fillet is a true material-adding solid feature across the full 50 mm width. No 3D fillet/chamfer step is added because Iron Rule/design constraints forbid rounding any external edge (edge_selector keywords such as 'horizontal' would also round the base and arm outer edges). Only subtractive feature is the 10 mm Z through-hole in the base."
+      }
+    ]
+  },
+  "iteration_count": 0,
+  "execution_log": [
+    "node_geometric_architect [iter 0]: SUCCESS",
+    "  Plan ID        : plan-l-bracket-80x50x8-arm60-hole10-r5-alu-v1",
+    "  Sketches       : 1",
+    "  Steps          : 2",
+    "  Key dims       : 26",
+    "  Topology retry : False",
+    "    step-01-extrude-l-bracket (extrude) depends_on=[none]",
+    "    step-02-mounting-hole (hole) depends_on=[step-01-extrude-l-bracket]"
+  ],
+  "node_history": [
+    "planner",
+    "architect"
+  ],
+  "retry_mode": null,
+  "stall_count": 0
+}

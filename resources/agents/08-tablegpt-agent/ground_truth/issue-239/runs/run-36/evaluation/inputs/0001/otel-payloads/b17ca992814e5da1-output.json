@@ -1,0 +1,32 @@
+{
+  "messages": [
+    {
+      "content": "PIL is available. Let me parse the GeoTIFF tags directly using PIL (setting thread limits to avoid the resource issue).\n\n```python\nimport os\nos.environ[\"OPENBLAS_NUM_THREADS\"] = \"1\"\nos.environ[\"OMP_NUM_THREADS\"] = \"1\"\n\nfrom PIL import Image, TiffTags\nimport struct\n\nfn = \"/tmp/input_raster.tif\"\nimg = Image.open(fn)\nprint(\"Image size (w x h):\", img.size)\nprint(\"Mode:\", img.mode)\n\n# Dump the raw TIFF tags\ntags = img.tag_v2\ngeo = {}\nfor tag_id, tag in tags.items():\n    name = TiffTags.TAGS_V2.get(tag_id, TiffTags.TAGS.get(tag_id, (str(tag_id),)))[0]\n    val = tag.value\n    if isinstance(val, bytes):\n        try:\n            val = val.decode('utf-8', errors='replace')\n        except Exception:\n            pass\n    if tag_id in (33550, 33922, 34735, 34736, 34737, 42113, 33920, 34264):\n        geo[tag_id] = (name, val)\n    print(f\"[{tag_id}] {name}: {val}\")\n```",
+      "additional_kwargs": {
+        "thought": "PIL is available. Let me parse the GeoTIFF tags directly using PIL (setting thread limits to avoid the resource issue).",
+        "action": {
+          "tool": "python",
+          "tool_input": "import os\nos.environ[\"OPENBLAS_NUM_THREADS\"] = \"1\"\nos.environ[\"OMP_NUM_THREADS\"] = \"1\"\n\nfrom PIL import Image, TiffTags\nimport struct\n\nfn = \"/tmp/input_raster.tif\"\nimg = Image.open(fn)\nprint(\"Image size (w x h):\", img.size)\nprint(\"Mode:\", img.mode)\n\n# Dump the raw TIFF tags\ntags = img.tag_v2\ngeo = {}\nfor tag_id, tag in tags.items():\n    name = TiffTags.TAGS_V2.get(tag_id, TiffTags.TAGS.get(tag_id, (str(tag_id),)))[0]\n    val = tag.value\n    if isinstance(val, bytes):\n        try:\n            val = val.decode('utf-8', errors='replace')\n        except Exception:\n            pass\n    if tag_id in (33550, 33922, 34735, 34736, 34737, 42113, 33920, 34264):\n        geo[tag_id] = (name, val)\n    print(f\"[{tag_id}] {name}: {val}\")"
+        },
+        "parent_id": "fea6e8f8-2de9-4456-87b2-8c81e98386af"
+      },
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "c7e01b16-d6c2-4c96-9234-cdb18ef107f9",
+      "example": false,
+      "tool_calls": [
+        {
+          "name": "python",
+          "args": {
+            "query": "import os\nos.environ[\"OPENBLAS_NUM_THREADS\"] = \"1\"\nos.environ[\"OMP_NUM_THREADS\"] = \"1\"\n\nfrom PIL import Image, TiffTags\nimport struct\n\nfn = \"/tmp/input_raster.tif\"\nimg = Image.open(fn)\nprint(\"Image size (w x h):\", img.size)\nprint(\"Mode:\", img.mode)\n\n# Dump the raw TIFF tags\ntags = img.tag_v2\ngeo = {}\nfor tag_id, tag in tags.items():\n    name = TiffTags.TAGS_V2.get(tag_id, TiffTags.TAGS.get(tag_id, (str(tag_id),)))[0]\n    val = tag.value\n    if isinstance(val, bytes):\n        try:\n            val = val.decode('utf-8', errors='replace')\n        except Exception:\n            pass\n    if tag_id in (33550, 33922, 34735, 34736, 34737, 42113, 33920, 34264):\n        geo[tag_id] = (name, val)\n    print(f\"[{tag_id}] {name}: {val}\")"
+          },
+          "id": "e92fd716-9113-433e-a58e-e93d463f5cdf",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": null
+    }
+  ]
+}

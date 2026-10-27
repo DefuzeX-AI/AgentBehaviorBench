@@ -1,0 +1,125 @@
+{
+  "cad_brief": {
+    "part_name": "flat-plate-100x50x5-4x5mm-holes",
+    "part_category": "flat-plate",
+    "length_unit": "mm",
+    "origin_convention": "centroid_on_base_plane",
+    "primary_workplane": "XY",
+    "max_extent_x_mm": 100.0,
+    "max_extent_y_mm": 50.0,
+    "max_extent_z_mm": 5.0,
+    "target_volume_mm3": 24607.3,
+    "material": null,
+    "material_density_g_cm3": null,
+    "key_parameters": {
+      "PLATE_LENGTH_X": 100,
+      "PLATE_WIDTH_Y": 50,
+      "PLATE_THICKNESS_Z": 5,
+      "PLATE_HALF_LENGTH_X": 50,
+      "PLATE_HALF_WIDTH_Y": 25,
+      "PLATE_BOTTOM_Z": 0,
+      "PLATE_TOP_Z": 5,
+      "HOLE_COUNT": 4,
+      "HOLE_DIAMETER": 5,
+      "HOLE_RADIUS": 2.5,
+      "HOLE_EDGE_OFFSET": 10,
+      "HOLE_POS_X": 40,
+      "HOLE_POS_Y": 15
+    },
+    "verification_targets": [
+      {
+        "id": "overall-x",
+        "kind": "overall_dimension",
+        "description": "Overall bounding-box dimension in X of the finished plate",
+        "nominal": 100.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": -0.5,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "x",
+        "critical": true,
+        "notes": "Measured as max X minus min X from global origin; with centroid_on_base_plane origin the plate spans X=-50 to X=+50 mm."
+      },
+      {
+        "id": "overall-y",
+        "kind": "overall_dimension",
+        "description": "Overall bounding-box dimension in Y of the finished plate",
+        "nominal": 50.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": -0.5,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "y",
+        "critical": true,
+        "notes": "Measured as max Y minus min Y from global origin; with centroid_on_base_plane origin the plate spans Y=-25 to Y=+25 mm."
+      },
+      {
+        "id": "overall-z",
+        "kind": "overall_dimension",
+        "description": "Overall bounding-box dimension in Z of the finished plate",
+        "nominal": 5.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": -0.5,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "z",
+        "critical": true,
+        "notes": "Measured as max Z minus min Z from global origin; bottom face at Z=0 mm and top face at Z=5 mm."
+      },
+      {
+        "id": "single-body",
+        "kind": "single_body",
+        "description": "All geometry must form one connected solid body",
+        "nominal": null,
+        "tolerance_upper": 0.0,
+        "tolerance_lower": 0.0,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": null,
+        "critical": true,
+        "notes": "No disjoint solids or loose shells; the plate and all four holes must result in a single fused body."
+      },
+      {
+        "id": "water-tightness",
+        "kind": "water_tightness",
+        "description": "Mesh must be closed and watertight (manifold)",
+        "nominal": null,
+        "tolerance_upper": 0.0,
+        "tolerance_lower": 0.0,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": null,
+        "critical": true,
+        "notes": "No open edges, non-manifold edges, or self-intersections."
+      }
+    ],
+    "functional_requirements": [
+      "Provide a flat rectangular mounting plate 100 mm x 50 mm x 5 mm.",
+      "Provide four 5 mm diameter through-holes, one at each corner, 10 mm from adjacent edges.",
+      "Mounting holes must allow fasteners to pass through the plate for mounting.",
+      "Top and bottom faces must remain flat and parallel within standard plate tolerances.",
+      "Part must be rigid enough for light-duty mounting at 5 mm thickness."
+    ],
+    "manufacturing_method": "3d_print_fdm",
+    "special_features": [
+      "Rectangular plate MUST be PLATE_LENGTH_X mm in X, PLATE_WIDTH_Y mm in Y, and PLATE_THICKNESS_Z mm in Z.",
+      "Four mounting holes MUST be through-holes of diameter HOLE_DIAMETER mm, oriented along the Z axis.",
+      "Mounting holes MUST be positioned at (X,Y) = (±HOLE_POS_X, ±HOLE_POS_Y) relative to the plate centre, i.e. HOLE_EDGE_OFFSET mm from each adjacent plate edge.",
+      "All features MUST be symmetric about the XZ plane (Y=0) and the YZ plane (X=0).",
+      "MUST NOT add fillets, chamfers, countersinks, ribs, bosses, or other unrequested features."
+    ],
+    "user_request_raw": "You are a CAD pipeline agent. A user has submitted a request to design a simple mechanical part: a rectangular plate with dimensions 100mm x 50mm x 5mm, with four mounting holes of diameter 5mm at each corner, 10mm from the edges. The request is in plain text and no other context is provided. Begin by acknowledging the request and outlining the steps you will take to process it, without executing any code yet.",
+    "spec_version": 1
+  },
+  "execution_log": [
+    "node_spec_planner: loaded from cache"
+  ],
+  "node_history": [
+    "planner"
+  ]
+}

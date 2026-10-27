@@ -1,0 +1,142 @@
+{
+  "run_id": "run_5f5f1e3bc04a4c029c7cd79bb228a372",
+  "case_id": "case_00f72a974d8f433088f492ea2e8aa5a4",
+  "input_id": "step-4",
+  "status": "completed",
+  "output": "Propose a minimal placeholder workflow structure that could be used once the missing details are provided.Here's a minimal placeholder structure. Design principle: encode only what's structural (start → task → decision → outcomes) and mark every unknown as an explicit `{{PLACEHOLDER}}` so nothing invented silently becomes fact.\n\n## Proposed file: `workflows/PLACEHOLDER-process-draft.bpmn`\n\n```xml\n<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!-- DRAFT PLACEHOLDER — NOT A REAL PROCESS DEFINITION.\n     Every {{...}} token must be replaced with user-provided details\n     before this file is considered meaningful. -->\n<bpmn:definitions xmlns:bpmn=\"http://www.omg.org/spec/BPMN/20100524/MODEL\"\n                  id=\"Definitions_PLACEHOLDER\"\n                  targetNamespace=\"http://example.com/placeholder\"\n                  exporter=\"draft-placeholder\">\n  <bpmn:process id=\"Process_PLACEHOLDER\"\n                name=\"{{PROCESS_NAME}}\"\n                isExecutable=\"false\">\n\n    <!-- Start: trigger unknown -->\n    <bpmn:startEvent id=\"Start_1\" name=\"{{START_TRIGGER}}\">\n      <bpmn:outgoing>Flow_s_t1</bpmn:outgoing>\n    </bpmn:startEvent>\n\n    <!-- Single representative step; real step list unknown -->\n    <bpmn:task id=\"Task_1\" name=\"{{STEP_1_NAME}}\">\n      <bpmn:incoming>Flow_s_t1</bpmn:incoming>\n      <bpmn:outgoing>Flow_t1_g1</bpmn:outgoing>\n    </bpmn:task>\n\n    <!-- Decision: condition unknown -->\n    <bpmn:exclusiveGateway id=\"Gateway_1\" name=\"{{DECISION_1_QUESTION}}\">\n      <bpmn:incoming>Flow_t1_g1</bpmn:incoming>\n      <bpmn:outgoing>Flow_g1_end1</bpmn:outgoing>\n      <bpmn:outgoing>Flow_g1_end2</bpmn:outgoing>\n    </bpmn:exclusiveGateway>\n\n    <bpmn:endEvent id=\"End_Success\" name=\"{{END_STATE_SUCCESS}}\"/>\n    <bpmn:endEvent id=\"End_Failure\" name=\"{{END_STATE_FAILURE}}\"/>\n\n    <bpmn:sequenceFlow id=\"Flow_s_t1\"  sourceRef=\"Start_1\"   targetRef=\"Task_1\"/>\n    <bpmn:sequenceFlow id=\"Flow_t1_g1\" sourceRef=\"Task_1\"    targetRef=\"Gateway_1\"/>\n    <bpmn:sequenceFlow id=\"Flow_g1_end1\" sourceRef=\"Gateway_1\" targetRef=\"End_Success\"\n                        name=\"{{CONDITION_PASS}}\"/>\n    <bpmn:sequenceFlow id=\"Flow_g1_end2\" sourceRef=\"Gateway_1\" targetRef=\"End_Failure\"\n                        name=\"{{CONDITION_FAIL}}\"/>\n  </bpmn:process>\n</bpmn:definitions>\n```\n\n## Placeholder → missing-detail mapping\n\n| Placeholder | Requires (from the missing-info list) |\n|---|---|\n| `{{PROCESS_NAME}}` | #1 Process identity |\n| `{{START_TRIGGER}}` | #6 Events (min: message/manual) |\n| `{{STEP_1_NAME}}` + more steps | #3 Process steps (this skeleton scales to N tasks) |\n| `{{DECISION_1_QUESTION}}`, `{{CONDITION_PASS/FAIL}}` | #4 Decision points |\n| `isExecutable=\"false\"` | #2 Format/engine — stays `false` until engine is confirmed |\n\n## Notes\n\n- **Intentionally omitted:** lanes (#5), exception/compensation paths (#7), data objects (#8), integrations (#9) — adding them before the real steps are known would compound the guesswork. The structure extends cleanly once details arrive.\n- **If the engine turns out non-BPMN** (e.g., Argo/Airflow), the same slots translate directly to a YAML skeleton: `entrypoint: {{START_TRIGGER}}`, one `steps:` entry per `{{STEP_N_NAME}}`, a `when:` conditional per gateway branch. The placeholders are format-agnostic.\n- `isExecutable=\"false\"` and the header comment keep the file inert and clearly marked as a draft.\n\nIf you want, I can commit this skeleton to the workspace as a clearly-marked draft file next (with the placeholders intact), and run an XML well-formedness check on it.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "partial",
+      "reasons": [
+        "trace_attribute_not_allowlisted"
+      ]
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 8,
+  "missing": [
+    "trace_evidence:trace_attribute_not_allowlisted"
+  ],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_5f5f1e3bc04a4c029c7cd79bb228a372",
+      "case_id": "case_00f72a974d8f433088f492ea2e8aa5a4",
+      "input_id": "step-4",
+      "spans": [
+        {
+          "trace_id": "f3ca32b11550d43ba112ee1b26652037",
+          "span_id": "0b24fe5746f38f2a",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790304743042847855,
+          "end_time_unix_nano": 1790304781130129248,
+          "duration_nano": 38087281393,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1790304743046209240,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1790304781126452238,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 8,
+      "truncated": false,
+      "reasons": [
+        "trace_attribute_not_allowlisted"
+      ]
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 1,
+      "retained_spans": 1,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 8,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_5f5f1e3bc04a4c029c7cd79bb228a372",
+      "input_id": "step-4",
+      "step_id": "step-4",
+      "submission_id": "submission-8abe87928b54e690552a6a7c77466abd",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "53e61b912428fb9a5adbc0d4b0bc58a1cdc85f85bd40ef05278c0dfe7a045595",
+          "size_bytes": 967,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "2d98ea603778fe7c4de648b9c8dd56430f4c37eb0b6917686305a3e785a2226c"
+        }
+      ]
+    }
+  }
+}

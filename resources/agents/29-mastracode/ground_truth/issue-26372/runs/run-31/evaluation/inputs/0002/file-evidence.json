@@ -1,0 +1,125 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/config-loader.js",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:eb1bccfaba84057036992a5e8fa5861f7aea9c13a2c75ae2952b987e3b5ac0ad",
+        "before_size": null,
+        "after_size": 757,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/config-loader.js\n@@ -0,0 +1,25 @@\n+import { readFile } from \"node:fs/promises\";\n+\n+function isPlainObject(value) {\n+  return typeof value === \"object\" && value !== null && !Array.isArray(value);\n+}\n+\n+function deepMerge(target, source) {\n+  const result = { ...target };\n+  for (const [key, value] of Object.entries(source)) {\n+    result[key] =\n+      isPlainObject(value) && isPlainObject(result[key])\n+        ? deepMerge(result[key], value)\n+        : value;\n+  }\n+  return result;\n+}\n+\n+export async function loadConfig(filePath, defaults = {}) {\n+  const content = await readFile(filePath, \"utf8\");\n+  const userConfig = JSON.parse(content);\n+  if (!isPlainObject(userConfig)) {\n+    throw new TypeError(`Expected a JSON object in config file: ${filePath}`);\n+  }\n+  return deepMerge(defaults, userConfig);\n+}\n"
+      },
+      {
+        "path": "/home/agent/workspace/test/config-loader.test.js",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:8cbb86c043f17defe14c11d74c2460ee2f908c95bf099fcfabed7a7ddc456b87",
+        "before_size": null,
+        "after_size": 2260,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/test/config-loader.test.js\n@@ -0,0 +1,78 @@\n+import { test, before, after } from \"node:test\";\n+import assert from \"node:assert/strict\";\n+import { mkdtemp, writeFile, rm } from \"node:fs/promises\";\n+import { tmpdir } from \"node:os\";\n+import { join } from \"node:path\";\n+import { loadConfig } from \"../config-loader.js\";\n+\n+let dir;\n+\n+before(async () => {\n+  dir = await mkdtemp(join(tmpdir(), \"config-loader-\"));\n+});\n+\n+after(async () => {\n+  await rm(dir, { recursive: true, force: true });\n+});\n+\n+async function writeConfig(name, content) {\n+  const file = join(dir, name);\n+  await writeFile(file, content);\n+  return file;\n+}\n+\n+test(\"user values take precedence over defaults\", async () => {\n+  const file = await writeConfig(\n+    \"flat.json\",\n+    JSON.stringify({ port: 8080, host: \"example.com\" })\n+  );\n+  const config = await loadConfig(file, { port: 3000, debug: true });\n+  assert.deepEqual(config, { port: 8080, host: \"example.com\", debug: true });\n+});\n+\n+test(\"nested objects are deep merged with user precedence\", async () => {\n+  const file = await writeConfig(\n+    \"nested.json\",\n+    JSON.stringify({ db: { host: \"prod-db\" } })\n+  );\n+  const config = await loadConfig(file, {\n+    db: { host: \"localhost\", port: 5432 },\n+    retries: 3,\n+  });\n+  assert.deepEqual(config, {\n+    db: { host: \"prod-db\", port: 5432 },\n+    retries: 3,\n+  });\n+});\n+\n+test(\"arrays from user config replace defaults\", async () => {\n+  const file = await writeConfig(\n+    \"arrays.json\",\n+    JSON.stringify({ tags: [\"prod\"] })\n+  );\n+  const config = await loadConfig(file, { tags: [\"dev\", \"test\"] });\n+  assert.deepEqual(config, { tags: [\"prod\"] });\n+});\n+\n+test(\"defaults object is not mutated\", async () => {\n+  const file = await writeConfig(\n+    \"nomutate.json\",\n+    JSON.stringify({ port: 9000 })\n+  );\n+  const defaults = { port: 3000, db: { host: \"localhost\" } };\n+  await loadConfig(file, defaults);\n+  assert.deepEqual(defaults, { port: 3000, db: { host: \"localhost\" } });\n+});\n+\n+test(\"invalid JSON is rejected\", async () => {\n+  const file = await writeConfig(\"bad.json\", \"{not json\");\n+  await assert.rejects(() => loadConfig(file, {}));\n+});\n+\n+test(\"non-object config is rejected\", async () => {\n+  const file = await writeConfig(\"nonobject.json\", '\"just a string\"');\n+  await assert.rejects(\n+    () => loadConfig(file, {}),\n+    { name: \"TypeError\" }\n+  );\n+});\n"
+      },
+      {
+        "path": "/home/agent/workspace/test",
+        "change_type": "modified",
+        "file_type": "directory",
+        "before_hash": null,
+        "after_hash": null,
+        "before_size": 4096,
+        "after_size": 4096,
+        "before_mode": 493,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": null
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 2,
+      "diff_included_count": 2
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_1baacd1b42d34caa9fc7c82fd09f5683",
+    "input_id": "step-2",
+    "step_id": "step-2",
+    "submission_id": "submission-ee3a1dc1a3648d99c69b80700d2124a5",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "config-loader.js",
+        "change_type": "created",
+        "size_bytes": 757,
+        "after_sha256": "eb1bccfaba84057036992a5e8fa5861f7aea9c13a2c75ae2952b987e3b5ac0ad"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "test",
+        "change_type": "modified",
+        "size_bytes": 4096
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "file_change",
+        "path": "test/config-loader.test.js",
+        "change_type": "created",
+        "size_bytes": 2260,
+        "after_sha256": "8cbb86c043f17defe14c11d74c2460ee2f908c95bf099fcfabed7a7ddc456b87"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "c7be0696089c7a92c72ad0d607ad0d6a1b0ce39b202f2c78bb18e29cd6ff8108",
+        "size_bytes": 8029,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0004",
+        "sequence": 4,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "3c6535a19e3b2b927a4aabbdb0db3193e395e98b09f4ebc93996d389d098a73b"
+      }
+    ]
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "d7a274e22c4043e780c813ee01cbec0e",
+  "case_id": "srp-opencrabs-h2-crlf-multiline-edit-v1",
+  "input_id": "step-2",
+  "invocation_id": "d7a274e22c4043e780c813ee01cbec0e",
+  "agent_id": "opencrabs",
+  "status": "succeeded",
+  "output": "Done — two lines swapped, nothing else changed.\n\n| | Before | After |\n|---|---|---|\n| host | `localhost` | `0.0.0.0` |\n| port | `8080` | `9090` |\n\nVerified by byte dump and `cmp` against a freshly built expectation: **exact match**, 59 bytes, all five lines still CRLF. (`name=demo`, `debug=false`, `log=info` untouched.)\n\nOne thing worth flagging: `hashline_edit` silently re-wrote the *whole* file's line endings to LF — it stripped the CR off every line, not just mine. I caught it in the byte check and repaired the endings with a `perl` pass that converts lone `\\n` back to `\\r\\n`, so the net diff is only the two lines you asked for. If you edit CRLF files here regularly, prefer a byte-level tool — the line-based editors in this harness normalize endings.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": false
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "delete": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "opencrabs",
+        "version": "0.5.12"
+      },
+      "_meta": {
+        "extensions": [
+          "_opencrabs/set_model",
+          "_opencrabs/compact",
+          "_session/steer"
+        ]
+      }
+    },
+    "pid": 8,
+    "session": {
+      "sessionId": "0c79595f-ff29-41a9-99aa-3e14d5ed0fa6",
+      "modes": {
+        "currentModeId": "supervised",
+        "availableModes": [
+          {
+            "id": "supervised",
+            "name": "Supervised"
+          },
+          {
+            "id": "auto-accept-edits",
+            "name": "Auto-accept edits"
+          },
+          {
+            "id": "auto",
+            "name": "Auto"
+          },
+          {
+            "id": "full-access",
+            "name": "Full access"
+          },
+          {
+            "id": "plan",
+            "name": "Plan (read-only)"
+          }
+        ]
+      },
+      "configOptions": [
+        {
+          "currentValue": "abb/deepseek-chat",
+          "options": [
+            {
+              "group": "abb",
+              "name": "abb",
+              "options": [
+                {
+                  "value": "abb/deepseek-chat",
+                  "name": "deepseek-chat"
+                }
+              ]
+            }
+          ],
+          "id": "model",
+          "name": "Model",
+          "description": "Provider and model used for this session",
+          "category": "model",
+          "type": "select"
+        }
+      ]
+    },
+    "session_id": "0c79595f-ff29-41a9-99aa-3e14d5ed0fa6",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

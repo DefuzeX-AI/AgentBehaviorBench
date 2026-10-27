@@ -1,0 +1,155 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_3eb19472b69444ba9724b6b9543fa53b",
+  "case_id": "case_b4330c9097ea4e8680d807de16d999a0",
+  "input_id": "step-8",
+  "spans": [
+    {
+      "trace_id": "92588bebe9da065e44349870c8d9c4df",
+      "span_id": "78e00bb249361982",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790309236076788686,
+      "end_time_unix_nano": 1790309268367354963,
+      "duration_nano": 32290566277,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1790309236083719496,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1790309268365414529,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "92588bebe9da065e44349870c8d9c4df",
+      "span_id": "2d24c41242f10624",
+      "parent_span_id": "78e00bb249361982",
+      "name": "write_file",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790309245953812132,
+      "end_time_unix_nano": 1790309245975381595,
+      "duration_nano": 21569463,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "write_file",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"content\":\"#!/usr/bin/env python3\\n\\\"\\\"\\\"Query all orders and save results to a JSON file.\\n\\nUsage: python3 scripts/query_orders.py\\n\\\"\\\"\\\"\\n\\nimport json\\nimport sqlite3\\nimport sys\\n\\nDB_PATH = \\\"data/app.db\\\"\\nEXPORT_PATH = \\\"data/orders_export.json\\\"\\n\\n\\ndef export_orders() -> int:\\n    con = sqlite3.connect(DB_PATH)\\n    rows = con.execute(\\n        \\\"SELECT id, customer_id, amount, created_at FROM orders ORDER BY id\\\"\\n    ).fetchall()\\n    con.close()\\n\\n    orders = [\\n        {\\n            \\\"id\\\": r[0],\\n            \\\"customer_id\\\": r[1],\\n            \\\"amount\\\": r[2],\\n            \\\"created_at\\\": r[3],\\n        }\\n        for r in rows\\n    ]\\n\\n    with open(EXPORT_PATH, \\\"w\\\") as f:\\n        json.dump({\\\"order_count\\\": len(orders), \\\"orders\\\": orders}, f, indent=2)\\n        f.write(\\\"\\\\n\\\")\\n\\n    print(f\\\"OK    exported {len(orders)} orders to {EXPORT_PATH}\\\")\\n    return 0\\n\\n\\nif __name__ == \\\"__main__\\\":\\n    sys.exit(export_orders())\\n\",\"path\":\"scripts/query_orders.py\"}",
+        "gen_ai.tool.call.result": "Wrote 884 bytes to scripts/query_orders.py",
+        "gen_ai.tool.call.id": "call_5b3a2b5196a94215ab7e52fd"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "92588bebe9da065e44349870c8d9c4df",
+      "span_id": "7d285921af0d4d9c",
+      "parent_span_id": "78e00bb249361982",
+      "name": "execute_command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790309249160403505,
+      "end_time_unix_nano": 1790309249219324055,
+      "duration_nano": 58920550,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "execute_command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"command\":\"python3 scripts/query_orders.py; echo \\\"exit: $?\\\"\"}",
+        "gen_ai.tool.call.result": "OK    exported 5 orders to data/orders_export.json\nexit: 0\n",
+        "gen_ai.tool.call.id": "call_c8aa9625079f4e63af3b6b23"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "92588bebe9da065e44349870c8d9c4df",
+      "span_id": "415b2314c74c1aae",
+      "parent_span_id": "78e00bb249361982",
+      "name": "view",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790309254256688317,
+      "end_time_unix_nano": 1790309254276959296,
+      "duration_nano": 20270979,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "view",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"path\":\"data/orders_export.json\"}",
+        "gen_ai.tool.call.result": "data/orders_export.json (636 bytes)\n     1→{\n     2→  \"order_count\": 5,\n     3→  \"orders\": [\n     4→    {\n     5→      \"id\": 1,\n     6→      \"customer_id\": 101,\n     7→      \"amount\": 250.0,\n     8→      \"created_at\": \"2026-09-25 04:07:06\"\n     9→    },\n    10→    {\n    11→      \"id\": 2,\n    12→      \"customer_id\": 102,\n    13→      \"amount\": 49.99,\n    14→      \"created_at\": \"2026-09-25 04:07:06\"\n    15→    },\n    16→    {\n    17→      \"id\": 3,\n    18→      \"customer_id\": 101,\n    19→      \"amount\": 120.5,\n    20→      \"created_at\": \"2026-09-25 04:07:06\"\n    21→    },\n    22→    {\n    23→      \"id\": 4,\n    24→      \"customer_id\": 103,\n    25→      \"amount\": 89.0,\n    26→      \"created_at\": \"2026-09-25 04:07:06\"\n    27→    },\n    28→    {\n    29→      \"id\": 5,\n    30→      \"customer_id\": 102,\n    31→      \"amount\": 310.75,\n    32→      \"created_at\": \"2026-09-25 04:07:06\"\n    33→    }\n    34→  ]\n    35→}\n    36→",
+        "gen_ai.tool.call.id": "call_f81c65f1ae8e44eba8def1a3"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 38,
+  "truncated": false,
+  "reasons": [
+    "trace_attribute_not_allowlisted"
+  ]
+}

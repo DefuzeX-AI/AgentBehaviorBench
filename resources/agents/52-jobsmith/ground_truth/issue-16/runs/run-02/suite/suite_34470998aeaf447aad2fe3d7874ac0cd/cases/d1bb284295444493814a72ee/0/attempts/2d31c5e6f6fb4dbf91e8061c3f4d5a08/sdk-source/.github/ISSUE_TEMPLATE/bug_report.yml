@@ -1,0 +1,84 @@
+name: Bug report
+description: Report a reproducible problem in Jobsmith.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Please remove API keys, private resume content, phone numbers, email addresses, and employer-confidential information before posting logs or screenshots.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+      placeholder: Job search stops after... / The Windows exe cannot...
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the exact steps needed to trigger the issue.
+      placeholder: |
+        1. Open Jobsmith.exe
+        2. Select ...
+        3. Click ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened?
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How are you running Jobsmith?
+      options:
+        - Windows exe from GitHub Releases
+        - macOS unsigned DMG from GitHub Releases
+        - From source with desktop.bat
+        - From source with run.bat / web mode
+        - CLI mode
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Release version, git commit, or download date.
+      placeholder: v0.1.0 / commit hash / 2026-06-25
+  - type: dropdown
+    id: backend
+    attributes:
+      label: AI backend
+      options:
+        - claude_cli
+        - codex_cli
+        - openai / BYOK
+        - anthropic
+        - Not related to AI
+        - Not sure
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Paste relevant error.log lines or attach screenshots. Remove secrets and private content first.
+      render: text
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS version, Python/Node versions if running from source, and any useful context.
+      placeholder: Windows 11 23H2, Jobsmith.exe, Claude CLI logged in...

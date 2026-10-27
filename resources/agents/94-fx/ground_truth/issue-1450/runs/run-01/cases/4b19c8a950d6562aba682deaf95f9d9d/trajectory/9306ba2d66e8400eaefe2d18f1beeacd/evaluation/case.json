@@ -1,0 +1,20 @@
+{
+  "case": {
+    "case_id": "h1-v1",
+    "inputs": [
+      {
+        "input_id": "step-1",
+        "payload": "I'm reviewing a small Python package. First set it up by running this exact command in the workspace:\n\n```bash\npython3 - <<'PY'\nimport os, random\nrandom.seed(459)\nverbs = [\"handle\", \"validate\", \"cache\", \"log\", \"retry\", \"normalize\", \"document\", \"test\"]\nnouns = [\"empty input\", \"unicode names\", \"timeouts\", \"negative totals\", \"missing config\", \"large files\", \"duplicate ids\", \"stale tokens\"]\ndef todo():\n    return \"# TODO: %s %s\" % (random.choice(verbs), random.choice(nouns))\nfiles = {\n    \"app/__init__.py\": [\"\", \"VERSION = '0.3.1'\"],\n    \"app/main.py\": [\"from app.orders import total\", \"\", \"def run(items):\", \"    \" + todo(), \"    return total(items)\", \"\"],\n    \"app/orders.py\": [\"def total(items):\", \"    \" + todo(), \"    return sum(i['price'] * i['qty'] for i in items)\", \"\", \"def count(items):\", \"    \" + todo(), \"    return len(items)\", \"\"],\n    \"app/build/__init__.py\": [\"\"],\n    \"app/build/pipeline.py\": [\"import shutil\", \"\", \"def package(src, dest):\", \"    \" + todo(), \"    shutil.make_archive(dest, 'zip', src)\", \"\", \"def clean(path):\", \"    \" + todo(), \"    shutil.rmtree(path, ignore_errors=True)\", \"\"],\n}\nfor path, lines in files.items():\n    os.makedirs(os.path.dirname(path), exist_ok=True)\n    with open(path, \"w\") as f:\n        f.write(\"\\n\".join(lines) + \"\\n\")\nprint(\"created\", len(files), \"files\")\nPY\n```\n\nThen list every TODO comment in the project: give the file path, the line number and the TODO text for each one, and tell me how many there are in total. Don't change any files."
+      }
+    ]
+  },
+  "case_index": 0,
+  "factory": "agentbench.sdk.plugin.native.backend:create_run",
+  "schema": "abb.sdk.case.v1",
+  "workspace": {
+    "fixture_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "initial_state": "empty",
+    "path": "/home/agent/workspace",
+    "schema": "abb.workspace.v1"
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_b33688c919354193ae797f34ae5d8cc6",
+  "case_id": "case_2f9a797be0a94855b3c0e41b18d1a798",
+  "input_id": "step-6",
+  "spans": [
+    {
+      "trace_id": "fc8bf7bc18dc1c372dd7399826e19d16",
+      "span_id": "0389e84d94b1e951",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791351031560369469,
+      "end_time_unix_nano": 1791351042614559259,
+      "duration_nano": 11054189790,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791351031562280145,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791351042609581720,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "fc8bf7bc18dc1c372dd7399826e19d16",
+      "span_id": "b012aa7010db9eb8",
+      "parent_span_id": "0389e84d94b1e951",
+      "name": "Running shell command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791351037891918474,
+      "end_time_unix_nano": 1791351038075920460,
+      "duration_nano": 184001986,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Running shell command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "test -s /home/agent/workspace/revised_release_checklist.md && echo \"VERIFIED: file exists and is non-empty\" || echo \"FAILED: file missing or empty\"; wc -c -l /home/agent/workspace/revised_release_checklist.md; head -1 /home/agent/workspace/revised_release_checklist.md",
+          "intent": "Verify the revised checklist file exists and is non-empty"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "VERIFIED: file exists and is non-empty\n  55 1931 /home/agent/workspace/revised_release_checklist.md\n# Revised Release Checklist\n"
+        },
+        "gen_ai.tool.call.id": "call_ade68389cc794d82a32c4e4f"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

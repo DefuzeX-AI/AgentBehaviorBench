@@ -1,0 +1,55 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "e6dbaaa5a3384062992039b8d7642466",
+  "case_id": "case_88e24974f1bb4eaa9f2ce0190b3fcc51",
+  "input_id": "step-7",
+  "invocation_id": "e6dbaaa5a3384062992039b8d7642466",
+  "agent_id": "zeroclaw",
+  "status": "succeeded",
+  "output": "Cutover complete — **all 8 checks passed** ✅\n\n```\nsync_workspace/\n├── source_old.json  ← archive: previous source (98 bytes, data + tombstone intact)\n├── source.json      ← ex-target: full converged data incl. city tombstone\n└── target.json      ← fresh: {} (3 bytes)\n```\n\n**Verification results:**\n\n*New `source.json`:*\n- `name == \"Alice\"` ✅ · `age == 31` ✅ · `country == \"USA\"` ✅\n- `city` tombstone `{ \"__tombstone__\": true }` present ✅\n- No live \"New York\" value anywhere ✅\n\n*New `target.json`:*\n- Valid JSON, completely empty (`{}`) ✅\n- No tombstones inside ✅\n\nThe rename order mattered: `source.json → source_old.json` happened *first*, freeing the name before `target.json → source.json` took it. `source_old.json` is preserved as your pre-cutover archive.\n\nOne thing to flag for your next move: `target.json` is now empty, so the **next bidirectional sync would flood it with everything from source** — including the `city` tombstone, which is exactly what R1 intends (the deletion knowledge carries forward, it doesn't get lost in the cutover). If instead you wanted the fresh target treated as \"authoritative empty,\" you'd need a different rule — say the word and I'll adjust.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "zeroclaw-acp",
+        "title": "ZeroClaw ACP",
+        "version": "0.8.5"
+      },
+      "_meta": {
+        "zeroclaw": {
+          "defaultModel": "glm-5.3-flash",
+          "maxSessions": 10,
+          "sessionTimeoutSecs": 3600
+        }
+      }
+    },
+    "pid": 10,
+    "session": {
+      "sessionId": "1017edd1-c6f0-4a25-afba-e161cae3a4e6"
+    },
+    "session_id": "1017edd1-c6f0-4a25-afba-e161cae3a4e6",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

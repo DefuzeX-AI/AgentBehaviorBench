@@ -1,0 +1,45 @@
+{
+  "case_id": "h1-v1",
+  "issue": {
+    "repository": "zamalali/langchain-code",
+    "number": 17,
+    "url": "https://github.com/zamalali/langchain-code/issues/17",
+    "state": "unknown",
+    "title": "Deep Agent task delegation fails through the synchronous CLI entry point"
+  },
+  "version_choice": "historical:d75d039ce2b4d1d2bff01d7f8858068209564ecc",
+  "reported_version": "d75d039ce2b4d1d2bff01d7f8858068209564ecc",
+  "commit_version": "d75d039ce2b4d1d2bff01d7f8858068209564ecc",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Please delegate this job to your general-purpose sub-agent rather than doing it yourself: the sub-agent should create the file report/total.txt containing only the sum of 17, 25 and 58. When the sub-agent has finished, read report/total.txt back and tell me what the sub-agent did and what the file contains."
+  ],
+  "expected": "In deep mode, delegate the requested computation to the general-purpose sub-agent and return its file/output.",
+  "defect": "Calling task through synchronous agent.invoke raises StructuredTool does not support sync invocation, preventing delegation.",
+  "fault location": [
+    {
+      "file": "src/langchain_code/agent/subagents.py",
+      "function": "task",
+      "line_start": 107,
+      "line_end": 112,
+      "commit": "d75d039ce2b4d1d2bff01d7f8858068209564ecc",
+      "url": "https://github.com/zamalali/langchain-code/blob/d75d039ce2b4d1d2bff01d7f8858068209564ecc/src/langchain_code/agent/subagents.py#L107-L112",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_reported_tested_revision",
+      "explanation": "The task tool is implemented as async def."
+    },
+    {
+      "file": "src/langchain_code/cli/commands/chat.py",
+      "function": "deep-mode invocation",
+      "line_start": 563,
+      "line_end": 568,
+      "commit": "d75d039ce2b4d1d2bff01d7f8858068209564ecc",
+      "url": "https://github.com/zamalali/langchain-code/blob/d75d039ce2b4d1d2bff01d7f8858068209564ecc/src/langchain_code/cli/commands/chat.py#L563-L568",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_reported_tested_revision",
+      "explanation": "The native CLI invokes the graph synchronously, entering the synchronous tool path."
+    }
+  ],
+  "Root cause": "SOURCE-CONFIRMED ENTRY-POINT MISMATCH. The task tool has an async implementation, but the native deep-mode CLI uses synchronous agent.invoke. The archive contains ten h1-repro runs and an offline scripted-model reproduction reporting NotImplementedError from StructuredTool. This conclusion is specific to the synchronous entry point; ainvoke was not tested here. Archived model: DeepSeek/deepseek-v4-flash, source and ABB binding revisions recorded separately. No new execution or first-fixing-commit verification was performed; fixed_in remains unknown."
+}

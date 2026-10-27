@@ -1,0 +1,9 @@
+[
+  {
+    "content": {
+      "text": "Command: python3 - <<'EOF'\np = '/workspace/project/NOTES.md'\nwith open(p, encoding='utf-8') as f:\n    lines = f.read().split('\\n')\nassert lines[2].startswith('Tagline:'), lines[2]\n# literal backslash-escaped unicode to avoid tool-layer normalization\nlines[2] = 'Tagline: \\u201cFast\\u201d and \\u2018simple\\u2019'\nwith open(p, 'w', encoding='utf-8') as f:\n    f.write('\\n'.join(lines))\nEOF\npython3 -c \"\nfor line in open('/workspace/project/NOTES.md', encoding='utf-8'):\n    print(repr(line), [hex(ord(c)) for c in line if not c.isascii()])\n\"\nRead-only: false\nSandbox: disabled\nExit code: 0\n\nSTDOUT:\n'# Release notes\\n' []\n'\\n' []\n'Tagline: “Fast” and ‘simple’\\n' ['0x201c', '0x201d', '0x2018', '0x2019']\n'\\n' []\n'This release fixes the login bug.\\n' []\n",
+      "type": "text"
+    },
+    "type": "content"
+  }
+]

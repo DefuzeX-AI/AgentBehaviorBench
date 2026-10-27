@@ -1,0 +1,46 @@
+{
+  "case_id": "documented-openharness-140-two-turn-session",
+  "issue": {
+    "repository": "zhijiewong/openharness",
+    "number": 140,
+    "url": "https://github.com/zhijiewong/openharness/issues/140",
+    "state": "open",
+    "title": "The second prompt fails because tool results survive without their assistant tool_calls."
+  },
+  "version_choice": "historical:2.47.0",
+  "reported_version": "2.47.0",
+  "commit_version": "2a7b7b8e1c0b132241d0eebb906dc86863ca19d8",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "In the current workspace, create calculator.py with add(a, b) and subtract(a, b), and a short README.md describing their use. Run Python assertions verifying add(2, 3) == 5 and subtract(7, 4) == 3. Report the actual files and test results; if a tool fails, state the failure.",
+    "Extend the existing calculator.py with multiply(a, b). Preserve add and subtract. Update README.md and run assertions for all three operations, including multiply(6, 7) == 42. Report the actual changes and test results."
+  ],
+  "expected": "A second prompt in the same oh session should retain valid tool-call history.",
+  "defect": "The second prompt fails because tool results survive without their assistant tool_calls.",
+  "fault location": [
+    {
+      "file": "src/query/index.ts",
+      "function": "tool_call_complete event branch",
+      "line_start": 265,
+      "line_end": 274,
+      "commit": "2a7b7b8e1c0b132241d0eebb906dc86863ca19d8",
+      "url": "https://github.com/zhijiewong/openharness/blob/2a7b7b8e1c0b132241d0eebb906dc86863ca19d8/src/query/index.ts#L265-L274",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Completion updates internal state but is not yielded to the session consumer."
+    },
+    {
+      "file": "src/main.tsx",
+      "function": "oh session history reconstruction",
+      "line_start": 804,
+      "line_end": 811,
+      "commit": "2a7b7b8e1c0b132241d0eebb906dc86863ca19d8",
+      "url": "https://github.com/zhijiewong/openharness/blob/2a7b7b8e1c0b132241d0eebb906dc86863ca19d8/src/main.tsx#L804-L811",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Tool results are appended even when the assistant tool-call list was never populated."
+    }
+  ],
+  "Root cause": "Source confirmed: query handles tool_call_complete internally without yielding it. The session consumer only populates turnToolCalls from that missing event, then appends tool results regardless, creating invalid history. Archived discussion reports ten reproductions and a native control outside ABB, but this local collection contains no raw run traces or downloadable evidence archive. Therefore no run directories or independently checked reproduction count are fabricated. Steps below are transcribed from the archived submission; case_id is an organizational identifier. No fresh runtime reproduction was performed during this organization. Exact first fixing commit has not been established. Root steps describe the selected original case; other run-local cases can differ. Retained observations are not automatically independent same-prompt trials."
+}

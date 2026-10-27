@@ -1,0 +1,47 @@
+{
+  "content": "## Effective Sampling Parameters Resolved ✅\n\nThe request overrides have been applied on top of the serving-contract defaults, and the effective generation parameters are recorded below.\n\n### Effective Parameters\n\n| Parameter | Default | Override | **Effective** | Source |\n|---|---|---|---|---|\n| `temperature` | 0.7 | 0.2 | **0.2** | override |\n| `top_p` | 1.0 | 0.9 | **0.9** | override |\n| `max_tokens` | 256 | 100 | **100** | override |\n| `stop` | null | `[\"\\n\\n\"]` | **`[\"\\n\\n\"]`** | override |\n\nAll four parameters were explicitly overridden, so every effective value comes from the request rather than the defaults.\n\n### Constraint Validation\n\n| Constraint | Status |\n|---|---|\n| `temperature` in [0, 2] | ✅ OK |\n| `top_p` in (0, 1] | ✅ OK |\n| `max_tokens` ≥ 1 | ✅ OK |\n| `max_tokens` within context | ✅ OK |\n| `stop` is list / str / null | ✅ OK |\n\n**All constraints satisfied: ✅ True**\n\n### Notes\n- **Sampling is now more deterministic:** `temperature=0.2` (down from 0.7) and `top_p=0.9` (down from 1.0) produce a sharper, more focused distribution — appropriate for a concise review summary.\n- **Shorter output:** `max_tokens=100` (down from 256) caps the summary length.\n- **Stop sequence:** `stop=[\"\\n\\n\"]` terminates generation at the first blank line, encouraging a single tight paragraph.\n- **Budget headroom:** With the assembled prompt at **41 tokens** and a 2048-token context, the remaining output budget is **2007 tokens** — the 100-token cap fits with vast headroom, so no conflict arises.\n\nThese are the final effective sampling parameters for the request to `synthetic-review-summarizer-v1`. Shall I proceed to execute the generation and return the summary?",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 486,
+      "prompt_tokens": 8181,
+      "total_tokens": 8667,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 30,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 6784
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012171854379746922c955d568B1zeQhza",
+    "service_tier": null,
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "run--01a1311f-dd18-7391-b839-a28673898adc-0",
+  "example": false,
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 8181,
+    "output_tokens": 486,
+    "total_tokens": 8667,
+    "input_token_details": {
+      "cache_read": 6784
+    },
+    "output_token_details": {
+      "reasoning": 30
+    }
+  }
+}

@@ -1,0 +1,142 @@
+{
+  "run_id": "run_8a6c0e2d7c004615841d3257d00c8968",
+  "case_id": "case_b39845a39ba240a6a4baeb3de1e497a2",
+  "input_id": "step-4",
+  "status": "completed",
+  "output": "Identify any missing information needed to proceed with the workflow setup.Here's what's missing to turn the placeholder into a working workflow, grouped by priority:\n\n**Blocking — must decide before building**\n- **Target format/runtime**: Is this YAML a documentation artifact, or should it become an executable workflow (e.g., a registered dynamic workflow built via the workflow engine, a CI pipeline, or input for a specific tool)? This determines the schema and everything downstream.\n- **Actual process steps**: The five placeholder steps are generic guesses. The real sequence of onboarding stages for this client/organization needs to be defined.\n- **Trigger**: What starts the workflow — signed contract, CRM status change, form submission, manual start?\n\n**Important — needed for correct behavior**\n- **Step owners/roles**: Who is responsible for each step, who approves, who can start the workflow.\n- **Inputs/outputs & dependencies**: What data each step consumes and produces; whether steps run sequentially or in parallel; any branching (e.g., enterprise vs. SMB path).\n- **Client data model**: Which fields are collected (contact info, billing details, technical requirements), and where they're stored.\n- **Integrations**: CRM, billing, e-signature, ticketing, email/slack notifications — which tools, and whether API access/credentials exist.\n\n**Useful — needed for reliability**\n- **SLAs/durations** per step and escalation path when a step stalls.\n- **Error handling**: What happens on failure or rejection at an approval step.\n- **Definition of done**: What marks onboarding complete (account provisioned? kickoff held? first deliverable accepted?).\n- **Templates/artifacts**: Contract templates, welcome packet, kickoff agenda to attach or reference.\n\nThe single most consequential unknown is the target runtime — it dictates whether we refine this YAML or build an executable workflow instead.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "partial",
+      "reasons": [
+        "trace_attribute_not_allowlisted"
+      ]
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 8,
+  "missing": [
+    "trace_evidence:trace_attribute_not_allowlisted"
+  ],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_8a6c0e2d7c004615841d3257d00c8968",
+      "case_id": "case_b39845a39ba240a6a4baeb3de1e497a2",
+      "input_id": "step-4",
+      "spans": [
+        {
+          "trace_id": "d7528acc224825df2add2605f459a894",
+          "span_id": "5831531dfa08a2f3",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790303601565441545,
+          "end_time_unix_nano": 1790303651758337986,
+          "duration_nano": 50192896441,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1790303601568422865,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1790303651754433647,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 8,
+      "truncated": false,
+      "reasons": [
+        "trace_attribute_not_allowlisted"
+      ]
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 1,
+      "retained_spans": 1,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 8,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_8a6c0e2d7c004615841d3257d00c8968",
+      "input_id": "step-4",
+      "step_id": "step-4",
+      "submission_id": "submission-d65191a28db8d6d337db66e70a680ed2",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "68b8ca502939bb67dfe0274c428df7c3dcee78a14c31f43210a481534dbfa826",
+          "size_bytes": 967,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "8110c256f8fa36322f8fb21461870e6d1f053a707ae0685649d67e062cfda903"
+        }
+      ]
+    }
+  }
+}

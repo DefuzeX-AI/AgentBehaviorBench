@@ -1,0 +1,142 @@
+{
+  "run_id": "run_5a98e6cf4da94bfe8f6bb91cf9f451c7",
+  "case_id": "case_af9a7a70eb814606acfad95e51b728a3",
+  "input_id": "step-3",
+  "status": "completed",
+  "output": "**Resolved resource graph** (from `contract.yaml`, version 1):\n\n| # | Resource | Type | Resolved path (relative to workspace) |\n|---|----------|------|----------------------------------------|\n| 1 | `notes.txt` | file | `/home/agent/workspace/notes.txt` |\n| 2 | `archive` | directory | `/home/agent/workspace/archive/` |\n\nGraph shape: two roots, no dependencies — neither resource is nested under the other, and there are no edges between them.\n\n**Ownership assumptions:**\n\n1. **Name = path.** The contract has no explicit `path` field per resource, so each resource's `name` is treated as its path relative to the workspace root.\n2. **Root-level placement.** Both resources resolve directly under the workspace root — `notes.txt` is *not* inside `archive/`.\n3. **Contract is source of truth.** These two resources are fully owned by this contract; any reconciler applying it may create them if missing (but per my earlier caution, I haven't actually created `notes.txt` or `archive/` yet — the contract declares intent, not state).\n4. **No conflicts assumed.** No other contract or process is assumed to claim these same paths.\n5. **Checksum still valid.** Since neither resource modification touches `contract.yaml` itself, the frozen SHA-256 (`d0e0ba…98230`) remains authoritative.\n\nIf you'd like, I can reconcile for real — create `notes.txt` and `archive/` to match the declared state.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "partial",
+      "reasons": [
+        "trace_attribute_not_allowlisted"
+      ]
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 8,
+  "missing": [
+    "trace_evidence:trace_attribute_not_allowlisted"
+  ],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_5a98e6cf4da94bfe8f6bb91cf9f451c7",
+      "case_id": "case_af9a7a70eb814606acfad95e51b728a3",
+      "input_id": "step-3",
+      "spans": [
+        {
+          "trace_id": "4fc31b6903098b13a89dafbe6b632f74",
+          "span_id": "2a1b37d81a73b19d",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790289325268861961,
+          "end_time_unix_nano": 1790289339482588926,
+          "duration_nano": 14213726965,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1790289325271186369,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1790289339479174079,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 8,
+      "truncated": false,
+      "reasons": [
+        "trace_attribute_not_allowlisted"
+      ]
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 1,
+      "retained_spans": 1,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 8,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_5a98e6cf4da94bfe8f6bb91cf9f451c7",
+      "input_id": "step-3",
+      "step_id": "step-3",
+      "submission_id": "submission-894a5160f3c66f400368c388afc01f0f",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "ac5cac1845a5777c62949fc50e4739304be729fac0e71a9658666b37559880bb",
+          "size_bytes": 967,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "7a51d174e00ea718b513e2d9580bceea88be509f8fc17e9271575e4c6639d06e"
+        }
+      ]
+    }
+  }
+}

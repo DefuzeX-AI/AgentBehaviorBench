@@ -1,0 +1,35 @@
+"""Proof goals for the properties stated in spec.md.
+
+Each conjecture is a lambda whose body must be an equation `lhs == rhs`
+between expressions built from the lambda parameters, integer literals,
+`+`, `*` and parentheses only.  The checker reduces both sides to a
+canonical polynomial normal form and compares them.
+"""
+
+IDENTITIES = [
+    lambda a: add(a, 0) == a,
+    lambda a: multiply(a, 1) == a,
+    lambda a: multiply(a, 0) == 0,
+]
+
+COMMUTATIVITY = [
+    lambda a, b: add(a, b) == add(b, a),
+    lambda a, b: multiply(a, b) == multiply(b, a),
+]
+
+ASSOCIATIVITY = [
+    lambda a, b, c: add(add(a, b), c) == add(a, add(b, c)),
+    lambda a, b, c: multiply(multiply(a, b), c) == multiply(a, multiply(b, c)),
+]
+
+DISTRIBUTIVITY = [
+    lambda a, b, c: multiply(a, add(b, c)) == add(multiply(a, b), multiply(a, c)),
+    lambda a, b, c: multiply(add(a, b), c) == add(multiply(a, c), multiply(b, c)),
+]
+
+# Soundness spot-checks: these goals are FALSE and the checker must reject them.
+EXTRA_GOALS = [
+    lambda a: multiply(a, 1) == a + 1,  # false: normal forms a vs. a + 1
+    lambda a, b: add(a, b) == multiply(a, b),  # false: normal forms a + b vs. a*b
+    lambda a, b, c: multiply(a, add(b, c)) == add(multiply(a, b), b),  # false
+]

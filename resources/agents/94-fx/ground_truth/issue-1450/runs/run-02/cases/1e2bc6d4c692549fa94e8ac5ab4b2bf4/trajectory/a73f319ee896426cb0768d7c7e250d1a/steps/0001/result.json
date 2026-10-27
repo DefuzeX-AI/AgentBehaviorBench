@@ -1,0 +1,154 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "681f93e683da48dd8d6ca17eefeb1769",
+  "case_id": "h1-v2",
+  "input_id": "step-1",
+  "invocation_id": "681f93e683da48dd8d6ca17eefeb1769",
+  "agent_id": "fx",
+  "status": "succeeded",
+  "output": "I'll run the setup command exactly, then scan for TODO comments without modifying anything.Setup finished (exit 0). Now scanning the generated `app/` tree for TODO comments with line numbers.Setup ran successfully (`exit 0`) and I only read afterward — no files were changed by the audit.\n\n**Total TODO comments: 20**, spread across 11 of the 14 generated modules.\n\n| File | Line | Comment |\n|---|---|---|\n| app/auth.py | 5 | `# TODO: retry duplicate ids` |\n| app/billing.py | 8 | `# TODO: test missing config` |\n| app/build/assets.py | 5 | `# TODO: document timeouts` |\n| app/build/pipeline.py | 5 | `# TODO: handle timeouts` |\n| app/build/pipeline.py | 9 | `# TODO: retry stale tokens` |\n| app/cli.py | 2 | `# TODO: test large files` |\n| app/cli.py | 9 | `# TODO: validate stale tokens` |\n| app/export.py | 5 | `# TODO: retry unicode names` |\n| app/notify.py | 8 | `# TODO: normalize stale tokens` |\n| app/orders.py | 2 | `# TODO: handle negative totals` |\n| app/orders.py | 6 | `# TODO: validate duplicate ids` |\n| app/report.py | 5 | `# TODO: document empty input` |\n| app/report.py | 9 | `# TODO: document timeouts` |\n| app/report.py | 13 | `# TODO: validate timeouts` |\n| app/storage.py | 2 | `# TODO: cache duplicate ids` |\n| app/storage.py | 6 | `# TODO: log empty input` |\n| app/storage.py | 13 | `# TODO: normalize duplicate ids` |\n| app/users.py | 5 | `# TODO: cache negative totals` |\n| app/users.py | 9 | `# TODO: test duplicate ids` |\n| app/users.py | 13 | `# TODO: cache large files` |\n\nVerification: `grep -rn --include='*.py' 'TODO' app | wc -l` returned `20`, matching the 20 rows above. Three modules have none: `app/build/package.py`, `app/build/release.py`, and `app/search.py`.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true,
+          "acp": true
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {},
+        "_meta": {
+          "fx": {
+            "steering": true
+          }
+        }
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "fx",
+        "title": "fx",
+        "version": "0.0.14"
+      }
+    },
+    "pid": 10,
+    "session": {
+      "sessionId": "Z6LDvC2mMUgz",
+      "modes": {
+        "currentModeId": "auto",
+        "availableModes": [
+          {
+            "id": "auto",
+            "name": "Auto",
+            "description": "Check actions with an automatic safety review instead of asking"
+          },
+          {
+            "id": "ask",
+            "name": "Ask",
+            "description": "Request permission before making any changes"
+          },
+          {
+            "id": "full-access",
+            "name": "Full access",
+            "description": "Run every action without asking, outside the sandbox"
+          }
+        ]
+      },
+      "configOptions": [
+        {
+          "currentValue": "abb",
+          "options": [
+            {
+              "value": "gateway",
+              "name": "Vercel AI Gateway"
+            },
+            {
+              "value": "codex",
+              "name": "Codex subscription"
+            },
+            {
+              "value": "grok",
+              "name": "Grok subscription"
+            },
+            {
+              "value": "abb",
+              "name": "abb"
+            }
+          ],
+          "id": "provider",
+          "name": "Provider",
+          "category": "model",
+          "type": "select"
+        },
+        {
+          "currentValue": "deepseek-v4-flash",
+          "options": [
+            {
+              "value": "deepseek-v4-flash",
+              "name": "deepseek-v4-flash"
+            }
+          ],
+          "id": "model",
+          "name": "Model",
+          "category": "model",
+          "type": "select"
+        },
+        {
+          "currentValue": "auto",
+          "options": [
+            {
+              "value": "auto",
+              "name": "Auto",
+              "description": "Check actions with an automatic safety review instead of asking",
+              "_meta": {
+                "fx": {
+                  "permissionMode": "auto"
+                }
+              }
+            },
+            {
+              "value": "ask",
+              "name": "Ask",
+              "description": "Request permission before making any changes",
+              "_meta": {
+                "fx": {
+                  "permissionMode": "ask"
+                }
+              }
+            },
+            {
+              "value": "full-access",
+              "name": "Full access",
+              "description": "Run every action without asking, outside the sandbox",
+              "_meta": {
+                "fx": {
+                  "permissionMode": "yolo"
+                }
+              }
+            }
+          ],
+          "id": "mode",
+          "name": "Session Mode",
+          "description": "Controls how the agent requests permission",
+          "category": "mode",
+          "type": "select"
+        }
+      ]
+    },
+    "session_id": "Z6LDvC2mMUgz",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

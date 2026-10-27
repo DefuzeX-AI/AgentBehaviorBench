@@ -1,0 +1,180 @@
+{
+  "run_id": "run_715b4f0c135b4d619d6d9a15172af728",
+  "case_id": "srp-opencrabs-h2-crlf-multiline-edit-v1",
+  "input_id": "step-3",
+  "status": "completed",
+  "output": "Full output, verbatim:\n\n```\n0000000   n   a   m   e   =   d   e   m   o  \\r  \\n   h   o   s   t   =\n0000020   0   .   0   .   0   .   0  \\r  \\n   p   o   r   t   =   9   0\n0000040   9   0  \\r  \\n   d   e   b   u   g   =   f   a   l   s   e  \\r\n0000060  \\n   l   o   g   =   i   n   f   o  \\r  \\n\n0000073\n```\n\n## Decode\n\n| Offset (octal) | Bytes | Meaning |\n|---|---|---|\n| `0000000` | `name=demo \\r \\n` | line 1, CRLF |\n| `0000020` | `host=0.0.0.0 \\r \\n` | line 2, CRLF |\n| `0000040` | `port=9090 \\r \\n` | line 3, CRLF |\n| `0000060` | `debug=false \\r \\n` | line 4, CRLF |\n| `0000060+` | `log=info \\r \\n` | line 5, CRLF |\n| `0000073` | — | total size, 59 bytes |\n\nFile on disk confirms the state from the last turn: exactly 5 lines, every one terminated `\\r\\n` (no bare `\\n` anywhere), the two edited values in place, and the other three lines untouched.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_715b4f0c135b4d619d6d9a15172af728",
+      "case_id": "srp-opencrabs-h2-crlf-multiline-edit-v1",
+      "input_id": "step-3",
+      "spans": [
+        {
+          "trace_id": "3830e7b13ccfc723ea31b006d375c44b",
+          "span_id": "d928f7f0dd121db7",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792585720104281348,
+          "end_time_unix_nano": 1792585726700787407,
+          "duration_nano": 6596506059,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1792585720106687732,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1792585721788856202,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1792585726698274285,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3830e7b13ccfc723ea31b006d375c44b",
+          "span_id": "1a5fc457551407f1",
+          "parent_span_id": "d928f7f0dd121db7",
+          "name": "bash",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792585721786120818,
+          "end_time_unix_nano": 1792585721796259525,
+          "duration_nano": 10138707,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "bash",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "command": "od -c app.ini"
+            },
+            "gen_ai.tool.call.result": "STDOUT:\n0000000   n   a   m   e   =   d   e   m   o  \\r  \\n   h   o   s   t   =\n0000020   0   .   0   .   0   .   0  \\r  \\n   p   o   r   t   =   9   0\n0000040   9   0  \\r  \\n   d   e   b   u   g   =   f   a   l   s   e  \\r\n0000060  \\n   l   o   g   =   i   n   f   o  \\r  \\n\n0000073\n",
+            "gen_ai.tool.call.id": "f83209f7-1d4d-4ca3-8602-670d2a02a58c"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 2,
+      "retained_spans": 2,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_715b4f0c135b4d619d6d9a15172af728",
+      "input_id": "step-3",
+      "step_id": "step-3",
+      "submission_id": "submission-e351adc34c51c1f8b3d28814bd491794",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "1e080b14cfa79efc11392eac75bcf7b038ad4458df99a404c868883be11a320e",
+          "size_bytes": 1922,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "6b4287b27d354b6ef87e0dfb5f241f0a8cb5df0fc699b5d2f731d0637b41c309"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

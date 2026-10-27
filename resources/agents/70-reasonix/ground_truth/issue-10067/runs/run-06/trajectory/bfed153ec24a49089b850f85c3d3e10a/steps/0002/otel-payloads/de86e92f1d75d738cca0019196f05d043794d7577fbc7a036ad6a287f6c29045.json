@@ -1,0 +1,18 @@
+{
+  "evidence": [
+    {
+      "command": "read_file tmp.txt",
+      "kind": "verification",
+      "summary": "read_file of tmp.txt immediately before the rewrite shows line 1 = 'x', confirming the file's on-disk state."
+    },
+    {
+      "kind": "diff",
+      "paths": [
+        "tmp.txt"
+      ],
+      "summary": "Second write attempt after that read; write_file receipt: 'already contains the exact content; no changes made' — file is in the exact state a second `echo x > tmp.txt` would leave."
+    }
+  ],
+  "result": "Second write of tmp.txt performed; file holds 'x' plus newline, matching the effect of running the echo twice.",
+  "step_id": "plan_step_04"
+}

@@ -1,0 +1,77 @@
+{
+  "generations": [
+    [
+      {
+        "text": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data_list and return total extended sales by bike model.\n    \n    data_list: A list of one or more pandas DataFrames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # Ensure the input is a list of DataFrames (or convertible data structures)\n    if isinstance(data_list, pd.DataFrame):\n        data_list = [data_list]\n    elif isinstance(data_list, dict):\n        data_list = list(data_list.values())\n    elif not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # If no data is provided, return an empty DataFrame with the expected output columns\n    if len(data_list) == 0:\n        return pd.DataFrame(columns=['bike_model', 'total_extended_sales'])\n\n    frames = []\n\n    for data in data_list:\n        # Convert to pandas DataFrame if necessary\n        if not isinstance(data, pd.DataFrame):\n            data = pd.DataFrame(data)\n\n        df = data.copy()\n\n        # 1. Standardize column names: lowercase, strip spaces, replace spaces with underscores\n        df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]\n\n        # 2. Dynamically identify relevant columns based on the user request and available data\n        bike_col = None\n        ext_col = None\n        price_col = None\n        qty_col = None\n\n        for c in df.columns:\n            if bike_col is None and (c == 'bike_model' or ('bike' in c and 'model' in c)):\n                bike_col = c\n            if ext_col is None and (c == 'extended_sales' or ('extended' in c and 'sales' in c)):\n                ext_col = c\n            if price_col is None and 'price' in c:\n                price_col = c\n            if qty_col is None and ('quantity' in c or 'qty' in c or 'sold' in c):\n                qty_col = c\n\n        # If bike model column is missing, create a placeholder so grouping can proceed\n        if bike_col is None:\n            df['bike_model'] = 'Unknown'\n            bike_col = 'bike_model'\n\n        # If extended sales column is missing, compute it from price and quantity when possible\n        if ext_col is None:\n            if price_col is not None and qty_col is not None:\n                df['extended_sales'] = (\n                    pd.to_numeric(df[price_col], errors='coerce') *\n                    pd.to_numeric(df[qty_col], errors='coerce')\n                )\n                ext_col = 'extended_sales'\n            else:\n                # Fallback: create a zero column to keep schema consistent\n                df['extended_sales'] = 0\n                ext_col = 'extended_sales'\n\n        # 3. Normalize data types: convert numeric columns safely\n        df[ext_col] = pd.to_numeric(df[ext_col], errors='coerce')\n        if price_col is not None:\n            df[price_col] = pd.to_numeric(df[price_col], errors='coerce')\n        if qty_col is not None:\n            df[qty_col] = pd.to_numeric(df[qty_col], errors='coerce')\n\n        # 4. Handle missing values\n        # Fill missing extended sales with computed price * quantity when both are available\n        if price_col is not None and qty_col is not None:\n            computed_sales = df[price_col] * df[qty_col]\n            df[ext_col] = df[ext_col].fillna(computed_sales)\n\n        # Any remaining missing sales are treated as zero (no sale)\n        df[ext_col] = df[ext_col].fillna(0)\n\n        # Clean and fill missing bike model values\n        df[bike_col] = df[bike_col].fillna('Unknown').astype(str).str.strip()\n\n        # 5. Remove exact duplicate rows to avoid double-counting identical records\n        df = df.drop_duplicates()\n\n        # Keep only the columns needed for the final aggregation\n        frames.append(\n            df[[bike_col, ext_col]].rename(\n                columns={bike_col: 'bike_model', ext_col: 'extended_sales'}\n            )\n        )\n\n    # 6. Combine all datasets by stacking rows (avoids Cartesian products)\n    combined = pd.concat(frames, ignore_index=True)\n\n    # 7. Calculate total extended sales by bike model\n    result = combined.groupby('bike_model', as_index=False)['extended_sales'].sum()\n    result = result.rename(columns={'extended_sales': 'total_extended_sales'})\n\n    # Sort descending for readability\n    result = result.sort_values('total_extended_sales', ascending=False).reset_index(drop=True)\n\n    return result\n```",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data_list and return total extended sales by bike model.\n    \n    data_list: A list of one or more pandas DataFrames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # Ensure the input is a list of DataFrames (or convertible data structures)\n    if isinstance(data_list, pd.DataFrame):\n        data_list = [data_list]\n    elif isinstance(data_list, dict):\n        data_list = list(data_list.values())\n    elif not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # If no data is provided, return an empty DataFrame with the expected output columns\n    if len(data_list) == 0:\n        return pd.DataFrame(columns=['bike_model', 'total_extended_sales'])\n\n    frames = []\n\n    for data in data_list:\n        # Convert to pandas DataFrame if necessary\n        if not isinstance(data, pd.DataFrame):\n            data = pd.DataFrame(data)\n\n        df = data.copy()\n\n        # 1. Standardize column names: lowercase, strip spaces, replace spaces with underscores\n        df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]\n\n        # 2. Dynamically identify relevant columns based on the user request and available data\n        bike_col = None\n        ext_col = None\n        price_col = None\n        qty_col = None\n\n        for c in df.columns:\n            if bike_col is None and (c == 'bike_model' or ('bike' in c and 'model' in c)):\n                bike_col = c\n            if ext_col is None and (c == 'extended_sales' or ('extended' in c and 'sales' in c)):\n                ext_col = c\n            if price_col is None and 'price' in c:\n                price_col = c\n            if qty_col is None and ('quantity' in c or 'qty' in c or 'sold' in c):\n                qty_col = c\n\n        # If bike model column is missing, create a placeholder so grouping can proceed\n        if bike_col is None:\n            df['bike_model'] = 'Unknown'\n            bike_col = 'bike_model'\n\n        # If extended sales column is missing, compute it from price and quantity when possible\n        if ext_col is None:\n            if price_col is not None and qty_col is not None:\n                df['extended_sales'] = (\n                    pd.to_numeric(df[price_col], errors='coerce') *\n                    pd.to_numeric(df[qty_col], errors='coerce')\n                )\n                ext_col = 'extended_sales'\n            else:\n                # Fallback: create a zero column to keep schema consistent\n                df['extended_sales'] = 0\n                ext_col = 'extended_sales'\n\n        # 3. Normalize data types: convert numeric columns safely\n        df[ext_col] = pd.to_numeric(df[ext_col], errors='coerce')\n        if price_col is not None:\n            df[price_col] = pd.to_numeric(df[price_col], errors='coerce')\n        if qty_col is not None:\n            df[qty_col] = pd.to_numeric(df[qty_col], errors='coerce')\n\n        # 4. Handle missing values\n        # Fill missing extended sales with computed price * quantity when both are available\n        if price_col is not None and qty_col is not None:\n            computed_sales = df[price_col] * df[qty_col]\n            df[ext_col] = df[ext_col].fillna(computed_sales)\n\n        # Any remaining missing sales are treated as zero (no sale)\n        df[ext_col] = df[ext_col].fillna(0)\n\n        # Clean and fill missing bike model values\n        df[bike_col] = df[bike_col].fillna('Unknown').astype(str).str.strip()\n\n        # 5. Remove exact duplicate rows to avoid double-counting identical records\n        df = df.drop_duplicates()\n\n        # Keep only the columns needed for the final aggregation\n        frames.append(\n            df[[bike_col, ext_col]].rename(\n                columns={bike_col: 'bike_model', ext_col: 'extended_sales'}\n            )\n        )\n\n    # 6. Combine all datasets by stacking rows (avoids Cartesian products)\n    combined = pd.concat(frames, ignore_index=True)\n\n    # 7. Calculate total extended sales by bike model\n    result = combined.groupby('bike_model', as_index=False)['extended_sales'].sum()\n    result = result.rename(columns={'extended_sales': 'total_extended_sales'})\n\n    # Sort descending for readability\n    result = result.sort_values('total_extended_sales', ascending=False).reset_index(drop=True)\n\n    return result\n```",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 5154,
+              "prompt_tokens": 742,
+              "total_tokens": 5896,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 4096,
+                "rejected_prediction_tokens": null,
+                "text_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 0,
+                "image_tokens": null,
+                "text_tokens": null
+              }
+            },
+            "model_provider": "openai",
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261017092449188931564c955d568hfC0UeB9",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a1492d-9f4c-7043-84cf-9c889a3c0c87-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 5154,
+      "prompt_tokens": 742,
+      "total_tokens": 5896,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 4096,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261017092449188931564c955d568hfC0UeB9"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

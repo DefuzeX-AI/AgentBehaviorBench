@@ -1,0 +1,4 @@
+{
+  "command": "cd /home/agent/workspace && python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('inventory.db')\nconn.execute('UPDATE inventory SET reserved = 0 WHERE item_id = 1')\nconn.commit(); conn.close()\n\" && python3 concurrent_reservation.py && python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('inventory.db')\nconn.execute('UPDATE inventory SET reserved = 0 WHERE item_id = 1')\nconn.commit(); conn.close()\nprint('--- state reset: item_id=1 quantity=10 reserved=0 ---')\n\"",
+  "description": "Reset, run conflict scenario, reset again"
+}

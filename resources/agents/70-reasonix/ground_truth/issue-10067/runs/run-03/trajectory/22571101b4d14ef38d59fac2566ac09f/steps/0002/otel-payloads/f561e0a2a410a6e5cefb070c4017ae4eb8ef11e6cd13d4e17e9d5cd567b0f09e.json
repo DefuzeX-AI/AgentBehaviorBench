@@ -1,0 +1,20 @@
+{
+  "evidence": [
+    {
+      "kind": "verification",
+      "command": "read_file tools/foo.py (intent=full)",
+      "summary": "read_file confirms line 2 is now print('v2') — the v1→v2 replacement landed.",
+      "criterion_id": "plan_step_01"
+    },
+    {
+      "kind": "diff",
+      "paths": [
+        "tools/foo.py"
+      ],
+      "summary": "edit_file receipt: 1 occurrence replaced, -print('v1') +print('v2').",
+      "criterion_id": "plan_step_01"
+    }
+  ],
+  "result": "tools/foo.py line 2 changed from print('v1') to print('v2'); file content is `import sys` + `print('v2')`.",
+  "step_id": "plan_step_01"
+}

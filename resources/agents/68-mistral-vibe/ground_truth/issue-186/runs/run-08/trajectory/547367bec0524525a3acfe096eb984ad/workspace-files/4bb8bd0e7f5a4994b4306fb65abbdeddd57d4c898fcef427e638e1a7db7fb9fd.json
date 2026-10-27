@@ -1,0 +1,4 @@
+{
+  "content": "from __future__ import annotations\n\nfrom pip._internal.utils import _log\n\n# init_logging() must be called before any call to logging.getLogger()\n# which happens at import of most modules.\n_log.init_logging()\n\n\ndef main(args: list[str] | None = None) -> int:\n    \"\"\"This is preserved for old console scripts that may still be referencing\n    it.\n\n    For additional details, see https://github.com/pypa/pip/issues/7498.\n    \"\"\"\n    from pip._internal.utils.entrypoints import _wrapper\n\n    return _wrapper(args)\n",
+  "encoding": "utf-8"
+}

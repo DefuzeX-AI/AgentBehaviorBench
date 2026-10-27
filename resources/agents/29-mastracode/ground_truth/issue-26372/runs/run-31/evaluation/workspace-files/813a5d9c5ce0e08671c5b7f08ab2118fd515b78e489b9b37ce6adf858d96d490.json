@@ -1,0 +1,4 @@
+{
+  "content": "import { readFile } from \"node:fs/promises\";\n\nfunction isPlainObject(value) {\n  return typeof value === \"object\" && value !== null && !Array.isArray(value);\n}\n\nfunction deepMerge(target, source) {\n  const result = { ...source };\n  for (const [key, value] of Object.entries(target)) {\n    result[key] =\n      isPlainObject(value) && isPlainObject(result[key])\n        ? deepMerge(result[key], value)\n        : value;\n  }\n  return result;\n}\n\nexport async function loadConfig(filePath, defaults = {}) {\n  let content;\n  try {\n    content = await readFile(filePath, \"utf8\");\n  } catch (err) {\n    if (err.code === \"ENOENT\") {\n      return deepMerge(defaults, {});\n    }\n    throw err;\n  }\n  const userConfig = JSON.parse(content);\n  if (!isPlainObject(userConfig)) {\n    throw new TypeError(`Expected a JSON object in config file: ${filePath}`);\n  }\n  return deepMerge(defaults, userConfig);\n}\n",
+  "encoding": "utf-8"
+}

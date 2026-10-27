@@ -1,0 +1,103 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "1a0d5f24e0bc427caf1ce94ffb2c929e",
+  "case_id": "srp-opencrabs-h2-crlf-multiline-edit-v1",
+  "input_id": "step-2",
+  "invocation_id": "1a0d5f24e0bc427caf1ce94ffb2c929e",
+  "agent_id": "opencrabs",
+  "status": "succeeded",
+  "output": "Done — but flagging a snag, because it matters: `edit_file` silently normalized the whole file to LF on write (61 → 54 bytes, every `\\r` gone), so I restored CRLF with a byte-level conversion afterward. Net result is the file you asked for.\n\n| Line | Content | Ending |\n|---|---|---|\n| 1 | `name=demo` | CRLF |\n| 2 | `host=0.0.0.0` | CRLF |\n| 3 | `port=9090` | CRLF |\n| 4 | `debug=false` | CRLF |\n| 5 | `log=info` | CRLF |\n\n59 bytes, `od -c` confirms `\\r\\n` on all five lines. Lines 1, 4 and 5 are untouched in content — only their terminator was repaired back to CRLF after the tool stripped it.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": false
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "delete": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "opencrabs",
+        "version": "0.5.12"
+      },
+      "_meta": {
+        "extensions": [
+          "_opencrabs/set_model",
+          "_opencrabs/compact",
+          "_session/steer"
+        ]
+      }
+    },
+    "pid": 9,
+    "session": {
+      "sessionId": "078242e4-510d-4c3a-a436-7094822a69a0",
+      "modes": {
+        "currentModeId": "supervised",
+        "availableModes": [
+          {
+            "id": "supervised",
+            "name": "Supervised"
+          },
+          {
+            "id": "auto-accept-edits",
+            "name": "Auto-accept edits"
+          },
+          {
+            "id": "auto",
+            "name": "Auto"
+          },
+          {
+            "id": "full-access",
+            "name": "Full access"
+          },
+          {
+            "id": "plan",
+            "name": "Plan (read-only)"
+          }
+        ]
+      },
+      "configOptions": [
+        {
+          "currentValue": "abb/deepseek-chat",
+          "options": [
+            {
+              "group": "abb",
+              "name": "abb",
+              "options": [
+                {
+                  "value": "abb/deepseek-chat",
+                  "name": "deepseek-chat"
+                }
+              ]
+            }
+          ],
+          "id": "model",
+          "name": "Model",
+          "description": "Provider and model used for this session",
+          "category": "model",
+          "type": "select"
+        }
+      ]
+    },
+    "session_id": "078242e4-510d-4c3a-a436-7094822a69a0",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

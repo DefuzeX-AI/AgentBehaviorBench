@@ -1,0 +1,89 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_6c47546f61bd4b30a965068f9f67e00f",
+  "case_id": "ir-mistral-vibe-1179-v2",
+  "input_id": "step-2",
+  "spans": [
+    {
+      "trace_id": "7b644b17d806da6c9e7fcdd511322abd",
+      "span_id": "b189efeb55955095",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792901116379870608,
+      "end_time_unix_nano": 1792901129638760128,
+      "duration_nano": 13258889520,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792901116381532366,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792901123291339832,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792901129637040334,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "7b644b17d806da6c9e7fcdd511322abd",
+      "span_id": "c3556707579045b1",
+      "parent_span_id": "b189efeb55955095",
+      "name": "bash: cd /home/agent/workspace/repo && git add a.py && git commit -m 'Add a.py' && git log --oneline",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792901123287380858,
+      "end_time_unix_nano": 1792901123332059587,
+      "duration_nano": 44678729,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash: cd /home/agent/workspace/repo && git add a.py && git commit -m 'Add a.py' && git log --oneline",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /home/agent/workspace/repo && git add a.py && git commit -m 'Add a.py' && git log --oneline"
+        },
+        "gen_ai.tool.call.result": {
+          "stdout": "[master (root-commit) 0c75dfc] Add a.py\n 1 file changed, 1 insertion(+)\n create mode 100644 a.py\n0c75dfc Add a.py\n",
+          "stderr": "",
+          "output": "",
+          "truncated": false
+        },
+        "gen_ai.tool.call.id": "effect-68a0014f-96c5-5c69-af87-87263235b718"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

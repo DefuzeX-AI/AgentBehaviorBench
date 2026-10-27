@@ -1,0 +1,22 @@
+{
+  "messages": [
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "```pycon\nafter dedup: 11 events (dropped 1 replay of evt-001)\n\nrevenue by product:\nproduct_id\nP1    12.00\nP2    51.89\nP3    40.60 \n\nrevenue by event-time minute:\nevent_minute\n2025-01-01 00:00:00    10.00\n2025-01-01 00:01:00    25.50\n2025-01-01 00:02:00     7.25\n2025-01-01 00:03:00    12.00\n2025-01-01 00:04:00     4.99\n2025-01-01 00:05:00     8.75\n2025-01-01 00:06:00     5.00\n2025-01-01 00:07:00     3.50\n2025-01-01 00:08:00    21.10\n2025-01-01 00:09:00     6.40 \n\ngranularity check: sum(by_product) = 104.49, sum(by_minute) = 104.49, raw-total = 114.49 (pre-dedup)\n\nduplicate group (shown as a multiset):\n arrival_order event_id product_id revenue          event_time\n             2  evt-001         P1   10.00 2025-01-01 00:00:30\n             6  evt-001         P1   10.00 2025-01-01 00:00:30\n\ncorrection event(s):\nevent_id product_id revenue          event_time\n evt-007         P1  -10.00 2025-01-01 00:06:00\n\nexposure without the correction: 22.00\nnet P1 revenue with correction:   12.00\n\n```"
+        }
+      ],
+      "additional_kwargs": {
+        "parent_id": "4234ff00-c990-454d-b638-ad1df58b9d74"
+      },
+      "response_metadata": {},
+      "type": "tool",
+      "name": "python",
+      "id": "e7ce2f90-0875-44f2-bc29-2b9f32d5d67b",
+      "tool_call_id": "6786ca3f-8e2a-4678-a667-3b97d0b5f9ea",
+      "artifact": [],
+      "status": "success"
+    }
+  ]
+}

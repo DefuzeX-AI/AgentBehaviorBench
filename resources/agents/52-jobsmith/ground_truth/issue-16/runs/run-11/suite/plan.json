@@ -1,0 +1,75 @@
+{
+  "schema": "abb.suite.plan.v1",
+  "suite_id": "suite_gt_06f03d69b74d980610b6",
+  "origin_suite_id": "suite_recharged_skipped_120_20261019",
+  "created_at": "2026-10-19T10:59:43.989965+00:00",
+  "agents": [
+    {
+      "agent_id": "jobsmith",
+      "path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\59-jobsmith",
+      "enabled": true,
+      "status": "adapting",
+      "framework": "langgraph",
+      "source": "https://github.com/kevin333353/jobsmith",
+      "case_count": 10,
+      "requirement_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\59-jobsmith\\requirement.md",
+      "max_steps": 1,
+      "source_sha256": "732afc6ef5f3d51330657e53dd9149981137a204d27238d597a14ad9cf19eac9",
+      "requirement_sha256": "6f39e02570d95806907f4d4c296e9b09a65905968b598aa74895731cb44913b6"
+    }
+  ],
+  "configuration": {
+    "sdk": "kuma",
+    "sdk_options": {
+      "output": "C:\\Song_startup\\benchmark\\数据\\result\\llm8-20-1019\\artifacts",
+      "timeout": 7200
+    },
+    "model": "openai/gpt-4.1-mini",
+    "model_override": null,
+    "agent_models": {
+      "jobsmith": {
+        "mode": "replace",
+        "routing": {
+          "targets": {
+            "default": {
+              "provider_id": "openrouter",
+              "model": "openai/gpt-4.1-mini",
+              "base_url": "https://openrouter.ai/api/v1",
+              "target_plugin": "openrouter",
+              "endpoint_paths": null,
+              "headers": {}
+            }
+          },
+          "inputs": {
+            "default": [
+              "text",
+              "image"
+            ]
+          },
+          "rules": [],
+          "explicit": false
+        }
+      }
+    },
+    "sdk_configuration": {},
+    "model_provider": "openrouter",
+    "trace_max_bytes": 262144,
+    "workers": 1,
+    "judge_workers": 1,
+    "judge_queue_capacity": 8,
+    "retry_policy": {
+      "max_retries": 2,
+      "initial_delay": 5.0,
+      "multiplier": 3.0,
+      "maximum_delay": 60.0,
+      "jitter": 0.1
+    },
+    "sdk_distributions": {
+      "kuma-defuzex": "0.3.6"
+    },
+    "provider_base_url": "https://openrouter.ai/api/v1",
+    "runtime_source_sha256": "e72551c192dbd802931c1a159d6dee789d16dc5ea4e5fb92085b6d3c44ddd45b"
+  },
+  "provenance_sha256": "f4dde54d7ca2624d4d3d34205176d04f85056b8f478fa3ef341c0dc1307da150",
+  "result_log_path": "C:\\Song_startup\\benchmark\\数据\\result\\llm8-20-1019\\gt-loop\\repetitions\\suite_gt_06f03d69b74d980610b6\\events.json"
+}

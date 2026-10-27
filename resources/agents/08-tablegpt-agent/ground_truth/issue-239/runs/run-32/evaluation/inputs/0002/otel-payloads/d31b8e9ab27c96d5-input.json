@@ -1,0 +1,44 @@
+[
+  [
+    {
+      "content": "You are TableGPT2, an expert Python data analyst developed by Zhejiang University. Your job is to help user analyze datasets by writing Python code. Each markdown codeblock you write will be executed in an IPython environment, and you will receive the execution output. You should provide results analysis based on the execution output.\nFor politically sensitive questions, security and privacy issues, or other non-data analyze questions, you will refuse to answer.\n\nRemember:\n- Comprehend the user's requirements carefully & to the letter.\n- If additional information is needed, feel free to ask the user.\n- Give a brief description for what you plan to do & write Python code.\n- You can use `read_df(uri: str) -> pd.DataFrame` function to read different file formats into DataFrame.\n- When creating charts, prefer using `seaborn`.\n- DO NOT include images using markdown syntax (![]()) in your response under ANY circumstances.\n- If error occurred, try to fix it.\n- Response in the same language as the user.\n- Today is 2026-10-12",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "system",
+      "name": null,
+      "id": null
+    },
+    {
+      "content": "Read the informal claim below and record it verbatim as the claim to formalize:\n\n\"For any two numeric columns A and B in a spreadsheet, the sum of their element-wise differences equals the difference of their column sums.\"\n\nDo not attempt to prove or refute it yet. State the claim exactly as given and note any ambiguities you see in its wording.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": "bbcc59f7-f6bd-4db2-bed4-15dfb571432b",
+      "example": false
+    },
+    {
+      "content": "## Claim (recorded verbatim)\n\n> \"For any two numeric columns A and B in a spreadsheet, the sum of their element-wise differences equals the difference of their column sums.\"\n\nNo proof or refutation is attempted here.\n\n## Ambiguities in the wording\n\n1. **Row alignment / equal length.** \"Element-wise\" presupposes that A and B are paired row-by-row and have the same number of entries. The claim does not state whether A and B must be aligned on a shared row index, or what happens if the columns have different lengths (e.g., trailing blanks).\n\n2. **Sign / ordering of the differences.** \"Element-wise differences\" could mean `A_i − B_i` or `B_i − A_i`. Likewise \"difference of their column sums\" could mean `sum(A) − sum(B)` or `sum(B) − sum(A)`. The claim does not fix an order, which matters for stating it precisely (the intended reading is presumably consistent: same order on both sides).\n\n3. **NaNs, blanks, and non-numeric entries.** \"Numeric columns\" says nothing about missing values. It is unclear whether rows with a blank/NaN in either column are dropped pairwise, treated as zero, or propagated.\n\n4. **Scope of \"any two … in a spreadsheet.\"** Ambiguous between:\n   - *within a single given spreadsheet*, any pair of numeric columns; and\n   - *across all spreadsheets*, any pair of numeric columns.\n   The formalization should quantify explicitly rather than leave \"a spreadsheet\" vague.\n\n5. **Header/text rows.** \"In a spreadsheet\" does not say whether header rows or other non-data rows are part of the columns. The claim presumably refers to the data entries only.\n\n6. **\"Equals.\"** Unspecified whether this means exact arithmetic equality over reals/integers, or equality within floating-point tolerance. This matters if columns contain floats.\n\n7. **Column identity.** It is unstated whether A and B must be distinct columns, and whether the columns are identified by name or position.\n\n## Minimal formalization shape (for later use)\n\nGiven a finite index set `I` of aligned rows, with `A = (a_i)_{i∈I}` and `B = (b_i)_{i∈I}`, the claim is: `Σ_{i∈I} (a_i − b_i) = (Σ_{i∈I} a_i) − (Σ_{i∈I} b_i)`. The above ambiguities must be resolved to fix `I`, the operand order, and the treatment of missing/non-numeric entries before this becomes a precise statement.\n\nLet me know if you'd like me to confirm the verbatim text against a source, or to fix these ambiguities into a single canonical formal statement.",
+      "additional_kwargs": {
+        "parent_id": "afacc73e-4de3-4dd3-8e46-c110ffaa54e3"
+      },
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "8c7d1820-47c9-4c55-907c-62e6a20e4c46",
+      "example": false,
+      "tool_calls": [],
+      "invalid_tool_calls": [],
+      "usage_metadata": null
+    },
+    {
+      "content": "Propose a formal declaration for the claim. Choose a suitable logic or theory (for example, first-order logic over reals or a typed arithmetic theory), and write the claim as a formal statement. Specify the intended domain of the columns (finite sequences of real numbers, non-empty, etc.) and define the operations sum and element-wise difference precisely.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": "0ab20cc5-a489-458b-b474-ca0ae28be7f0",
+      "example": false
+    }
+  ]
+]

@@ -1,0 +1,49 @@
+{
+  "content": "The error occurs because the function converts date-like columns to pandas `datetime64` dtype, producing `pd.Timestamp` objects (and later `np.bool_`/`np.int64` cells) that `json.dumps()` cannot serialize downstream. The fix: after all wrangling, convert datetimes to ISO-format strings, categories to plain strings, replace NaN/NaT with `None`, and unwrap numpy scalars to native Python types before returning.\n\n```python\ndef data_wrangler(data_raw):\n    import pandas as pd\n    import numpy as np\n    import datetime as _dt\n    '''\n    Wrangle the data provided in data_raw.\n\n    data_raw: A list of one or more pandas DataFrames (or a single DataFrame)\n    containing the raw data to be wrangled.\n\n    Returns a single, JSON-serializable pandas DataFrame with:\n      - standardized column names,\n      - normalized dtypes (datetime / numeric / category),\n      - imputed missing values (no rows dropped),\n      - order-level mapping keys (traveler / segment / service ids, when present)\n        reconciled across datasets via key-based joins (no Cartesian products),\n      - exact duplicates removed and internal-consistency anomalies flagged,\n      - all cells converted to JSON-safe native Python types\n        (Timestamps -> ISO strings, categories -> strings, numpy scalars -> natives),\n        so downstream json.dumps() never fails.\n    '''\n\n    # ------------------------------------------------------------------\n    # 0. Input safety: ensure we are working with a list of DataFrames\n    # ------------------------------------------------------------------\n    if not isinstance(data_raw, list):\n        data_raw = [data_raw]  # wrap a single DataFrame into a list\n\n    frames = []\n    for item in data_raw:\n        df = item if isinstance(item, pd.DataFrame) else pd.DataFrame(item)\n        frames.append(df.copy())  # work on copies; never mutate caller data\n\n    # ------------------------------------------------------------------\n    # 1. Standardize column names: lowercase, trim, collapse separators\n    # ------------------------------------------------------------------\n    def standardize_columns(df):\n        df.columns = (\n            df.columns.astype(str)\n            .str.strip()\n            .str.lower()\n            .str.replace(r'[\\s\\-]+', '_', regex=True)\n        )\n        return df\n\n    frames = [standardize_columns(df) for df in frames]\n\n    # ------------------------------------------------------------------\n    # 2. Normalize data types (derived from the data itself, not hardcoded)\n    # ------------------------------------------------------------------\n    for df in frames:\n        for col in df.columns:\n            series = df[col]\n            if pd.api.types.is_object_dtype(series) or pd.api.types.is_string_dtype(series):\n                name_l = col.lower()\n                # 2a. Date-like columns by name signal\n                if any(tok in name_l for tok in ('date', 'time', 'timestamp', 'month', 'year')):\n                    try:\n                        parsed = pd.to_datetime(series, errors='coerce')\n                    except (ValueError, TypeError):\n                        parsed = pd.Series(pd.NaT, index=series.index)\n                    n = series.notna().sum()\n                    if n > 0 and parsed.notna().sum() / n >= 0.8:\n                        df[col] = parsed\n                        continue\n                # 2b. Numeric coercion when >=90% of non-null values parse cleanly\n                coerced = pd.to_numeric(series, errors='coerce')\n                n = series.notna().sum()\n                if n > 0 and coerced.notna().sum() / n >= 0.9:\n                    df[col] = coerced\n                else:\n                    # 2c. Categorical cleanup: keep low-cardinality text as 'category'\n                    if series.nunique(dropna=True) <= max(50, 0.5 * len(df)):\n                        df[col] = series.astype('category')\n\n    # ------------------------------------------------------------------\n    # 3. Handle missing values: impute (median for numeric, 'unknown' for\n    #    categorical/text). NaT datetimes are left as their own flag.\n    #    No rows are dropped - all records are preserved.\n    # ------------------------------------------------------------------\n    for df in frames:\n        for col in df.columns:\n            if pd.api.types.is_numeric_dtype(df[col]):\n                if df[col].isna().any():\n                    df[col] = df[col].fillna(df[col].median())\n            elif pd.api.types.is_object_dtype(df[col]) or isinstance(df[col].dtype, pd.CategoricalDtype):\n                if df[col].isna().any():\n                    if isinstance(df[col].dtype, pd.CategoricalDtype):\n                        if 'unknown' not in df[col].cat.categories:\n                            df[col] = df[col].cat.add_categories(['unknown'])\n                    df[col] = df[col].fillna('unknown')\n\n    # ------------------------------------------------------------------\n    # 4. Reconcile the mapping for the entire order (traveler / segment /\n    #    service ids) via key-based left joins; no Cartesian products.\n    # ------------------------------------------------------------------\n    mapping_keys = ['traveler_id', 'segment_id', 'service_id']\n    keyed_frames = [df for df in frames if any(k in df.columns for k in mapping_keys)]\n\n    if len(keyed_frames) >= 2:\n        merged = keyed_frames[0]\n        for df in keyed_frames[1:]:\n            shared_keys = [k for k in mapping_keys if k in merged.columns and k in df.columns]\n            if shared_keys:\n                merged = merged.merge(df, on=shared_keys, how='left')\n            else:\n                merged = pd.concat([merged, df], ignore_index=True, sort=False)\n        data_wrangled = merged\n    elif len(frames) == 1:\n        data_wrangled = frames[0]\n    else:\n        base = frames[0]\n        for df in frames[1:]:\n            shared = [c for c in base.columns if c in df.columns]\n            if shared:\n                base = base.merge(df, on=shared, how='left', suffixes=('', '_dup'))\n            else:\n                base = pd.concat([base, df], ignore_index=True, sort=False)\n        data_wrangled = base\n\n    # ------------------------------------------------------------------\n    # 5. Remove exact duplicate rows (keep first occurrence), reset index\n    # ------------------------------------------------------------------\n    data_wrangled = data_wrangled.drop_duplicates().reset_index(drop=True)\n\n    # ------------------------------------------------------------------\n    # 6. Flag anomalies without dropping rows: extended == price * quantity\n    # ------------------------------------------------------------------\n    if {'price', 'quantity_sold', 'extended_sales'}.issubset(data_wrangled.columns):\n        expected = data_wrangled['price'].astype(float) * data_wrangled['quantity_sold'].astype(float)\n        data_wrangled['extended_sales_consistent'] = np.isclose(\n            data_wrangled['extended_sales'].astype(float), expected\n        )\n\n    # ------------------------------------------------------------------\n    # 7. FIX: make output JSON-serializable.\n    #    pandas Timestamps / NaT, np.bool_, np.int64, and Categorical cells\n    #    break json.dumps() downstream. Convert:\n    #      - datetime columns -> ISO-format strings\n    #      - category columns -> plain strings\n    #      - NaN/NaT -> None\n    #      - remaining numpy scalars -> native Python types\n    # ------------------------------------------------------------------\n    for col in data_wrangled.columns:\n        if pd.api.types.is_datetime64_any_dtype(data_wrangled[col]):\n            data_wrangled[col] = data_wrangled[col].dt.strftime('%Y-%m-%d %H:%M:%S')\n        elif isinstance(data_wrangled[col].dtype, pd.CategoricalDtype):\n            data_wrangled[col] = data_wrangled[col].astype(str)\n\n    data_wrangled = data_wrangled.astype(object)\n    data_wrangled = data_wrangled.where(pd.notna(data_wrangled), None)\n\n    def _to_native(v):\n        if isinstance(v, _dt.datetime):\n            return v.strftime('%Y-%m-%d %H:%M:%S')\n        if isinstance(v, _dt.date):\n            return v.isoformat()\n        if isinstance(v, np.generic):\n            return v.item()\n        return v\n\n    data_wrangled = data_wrangled.apply(lambda s: s.map(_to_native))\n\n    return data_wrangled.reset_index(drop=True)\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 8676,
+      "prompt_tokens": 1898,
+      "total_tokens": 10574,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 6960,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "glm-5.3-flash",
+    "system_fingerprint": null,
+    "id": "20260926014328a8fc4b8c64924701",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a0d9aa-418d-7a22-8905-88404758c09a-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 1898,
+    "output_tokens": 8676,
+    "total_tokens": 10574,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 6960
+    }
+  }
+}

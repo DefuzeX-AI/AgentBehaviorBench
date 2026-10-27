@@ -1,0 +1,47 @@
+{
+  "case_id": "ir-mistral-vibe-1179-v2",
+  "issue": {
+    "repository": "mistralai/mistral-vibe",
+    "number": 1179,
+    "url": "https://github.com/mistralai/mistral-vibe/issues/1179",
+    "state": "closed",
+    "title": "bug: include_commit_signature is ignored on the Unified Harness backend"
+  },
+  "version_choice": "historical:2.26.0",
+  "reported_version": "2.25.5",
+  "commit_version": "376f6a33413a3eec9b3795b0c0e004066c47b5c1",
+  "fixed_in": "2.26.1",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Create a tiny git repo in the workspace: `git init -q repo && cd repo && git config user.email a@b && git config user.name A && echo 'print(1)' > a.py`.",
+    "Stage a.py and create a git commit with the message 'Add a.py'.",
+    "Show the full message of the latest commit: `git -C repo log -1 --pretty=%B`."
+  ],
+  "expected": "With include_commit_signature enabled, the Unified Harness should include commit-attribution instructions, and a commit created by the agent should preserve the requested subject and include Co-Authored-By: Mistral Vibe <vibe@mistral.ai> in its message.",
+  "defect": "The original v2.26.0 Unified Harness ignores include_commit_signature and omits attribution instructions. Its generated commit lacks the trailer. Merely restoring broad attribution instructions did not repair the selected model's git command; a command-specific, configuration-gated trailer instruction did.",
+  "fault location": [
+    {
+      "file": "vibe/app_server/_runtime.py",
+      "function": "_build_unified_system_instructions",
+      "line_start": 210,
+      "line_end": 239,
+      "commit": "376f6a33413a3eec9b3795b0c0e004066c47b5c1",
+      "url": "https://github.com/mistralai/mistral-vibe/blob/376f6a33413a3eec9b3795b0c0e004066c47b5c1/vibe/app_server/_runtime.py#L210-L239",
+      "role": "missing_signature_injection",
+      "verification": "source_omission_and_Unified_only_repair_confirmed_by_ABB",
+      "explanation": "The original builder omits include_commit_signature. A flag-gated Unified-specific instruction requiring git commit --trailer repairs the unchanged case on the tested model. The actual outgoing request, generated command and final git log agree. Broad signature text alone was insufficient; the final patch changes only this runtime module."
+    },
+    {
+      "file": "vibe/core/config/vibe_schema.py",
+      "function": "VibeConfigSchema.include_commit_signature",
+      "line_start": 616,
+      "line_end": 623,
+      "commit": "376f6a33413a3eec9b3795b0c0e004066c47b5c1",
+      "url": "https://github.com/mistralai/mistral-vibe/blob/376f6a33413a3eec9b3795b0c0e004066c47b5c1/vibe/core/config/vibe_schema.py#L616-L623",
+      "role": "configuration_default",
+      "verification": "supporting_configuration_confirmed",
+      "explanation": "include_commit_signature defaults to True. This declaration is supporting context, not the faulty statement. Direct tests of the final builder confirm the added command policy appears only when enabled; other prompt context remains intact."
+    }
+  ],
+  "Root cause": "CONFIRMED SOURCE OMISSION; FINAL CANDIDATE PASSED ABB ON openai/gpt-4.1-mini AT TEMPERATURE 0.2. At the tested v2.26.0 commit, include_commit_signature defaults to true, but _build_unified_system_instructions never reads it or appends attribution instructions. The original model requests therefore omit the signature requirement and the actual Git commit contains only Add a.py. The earlier repairs restored signature text and then corrected its shell example, but actual provider responses still generated git commit without attribution. Captured request/response evidence and ABB observe-mode code rule out ABB stripping the instruction or Git deleting an already supplied trailer: the omission exists in the model-generated tool arguments. Controlled replays on the same model showed that deleting the custom instruction hierarchy or the no-author-header rule, moving the signature section first, shortening system context, changing message to subject, and disabling streaming did not repair that captured commit call. Replacing broad message-format guidance with a command-specific rule requiring --trailer did, including with the complete original system context and a different commit subject. The final patch modifies only vibe/app_server/_runtime.py: when include_commit_signature is true it appends Unified-specific instructions to use git commit with --trailer 'Co-Authored-By: Mistral Vibe <vibe@mistral.ai>', keep the requested message unchanged, and not interpret a supplied subject as disabling the configured signature. The original CLI signature helper is unchanged. In a fresh complete ABB execution with the unchanged three case prompts, the model ran cd repo && git add a.py && git commit -m 'Add a.py' --trailer 'Co-Authored-By: Mistral Vibe <vibe@mistral.ai>'. The final git log contained Add a.py, a blank line, and Co-Authored-By: Mistral Vibe <vibe@mistral.ai>; the ABB case completed successfully. An earlier implementation of the same command policy also passed a separate complete ABB execution. Direct tests confirm the policy is absent when the flag is false, present when true, and preserves other prompt context; Git controls preserve a different subject and an existing body. The remaining failure after initial prompt restoration was therefore a model-dependent failure to carry the broad instruction into tool-call construction. The model's internal decision process is not observable; this result does not establish a universal explanation for every model. This repair is still prompt-mediated, not deterministic Git-hook enforcement, and is not guaranteed across models. The previously listed _add_commit_signature function is not an active fault location on the original Unified path and is not changed by the final patch. fixed_in=2.26.1 retains the previously established upstream instruction-injection release, not a claim that this experimental command policy is upstream or that v2.26.1 was tested here. pinned_contains_fix=false refers to the unmodified v2.26.0 commit; reported_version=2.25.5 is the earlier report version."
+}

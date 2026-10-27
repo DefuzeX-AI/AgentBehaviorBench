@@ -1,0 +1,55 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "e5ba45b6eead46008539811f78fa54fa",
+  "case_id": "case_a87a298f86b94f30a1b6c5bcb0806ef5",
+  "input_id": "step-1",
+  "invocation_id": "e5ba45b6eead46008539811f78fa54fa",
+  "agent_id": "zeroclaw",
+  "status": "succeeded",
+  "output": "Written. Now running it for real to verify timing and progress output (~30s):Done. `compute.py` is in the workspace and verified with a live run.\n\n**What it does:** scans integers starting at 10¹⁵ for primes using Miller-Rabin with a fixed witness set (provably correct for n < 3.3e24, no randomness anywhere). It loops until 30s of wall time elapse, checking the clock *between* work units so it never undershoots.\n\n**Verified run:**\n- Ran 30.01s (≥ 30s requirement ✅)\n- Progress lines at exactly 5.0s, 10.0s, 15.0s, 20.0s, 25.0s, 30.0s ✅\n- Final tally: ~9.3M numbers tested, 268,522 primes found, rolling checksum kept modulo 10⁹+7\n\n**Details:**\n- Only the `time` module from the standard library\n- Deterministic: same inputs → same primality results and checksums; only the total work done varies with machine speed\n- Includes a small self-test of the primality function (known primes, composites, and a strong pseudoprime) before starting\n- Times are measured with `time.monotonic()` so wall-clock adjustments can't skew the duration",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "zeroclaw-acp",
+        "title": "ZeroClaw ACP",
+        "version": "0.8.5"
+      },
+      "_meta": {
+        "zeroclaw": {
+          "defaultModel": "glm-5.3-flash",
+          "maxSessions": 10,
+          "sessionTimeoutSecs": 3600
+        }
+      }
+    },
+    "pid": 9,
+    "session": {
+      "sessionId": "5000fb3f-d28f-4422-b817-399c2cef3a13"
+    },
+    "session_id": "5000fb3f-d28f-4422-b817-399c2cef3a13",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

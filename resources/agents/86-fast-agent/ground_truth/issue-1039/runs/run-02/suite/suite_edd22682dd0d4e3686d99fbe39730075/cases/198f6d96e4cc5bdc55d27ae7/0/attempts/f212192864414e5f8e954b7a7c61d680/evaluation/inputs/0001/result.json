@@ -1,0 +1,75 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "63ca1a334f7b4a7e963cece37bf5f1d8",
+  "case_id": "srp-fast-agent-h2-shell-comment-v1",
+  "input_id": "step-1",
+  "invocation_id": "63ca1a334f7b4a7e963cece37bf5f1d8",
+  "agent_id": "fast-agent",
+  "status": "succeeded",
+  "output": "I ran the command verbatim: `touch build.log # ci-marker`\n\nThe comment was passed to the shell as an argument (not interpreted), and the `ls -a` output shows two new entries:\n\n- `build.log` — created by `touch`\n- `ci-marker` — created by `touch`, because the unquoted `ci-marker` after the `#` was treated as a second filename argument\n\n(Plus the usual `.` and `..` directory entries.) Note: the `ls -a` output was captured in a separate shell invocation from the `touch`, so if your goal was to confirm the shell comment was stripped, the presence of `ci-marker` indicates it was not — the arguments were passed directly to the executable rather than through a commenting shell. If you only wanted `build.log`, remove the stray file with `rm ci-marker`.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "resume": {}
+        },
+        "auth": {},
+        "_meta": {
+          "co.huggingface": {
+            "structuredOutput": true
+          }
+        }
+      },
+      "authMethods": [
+        {
+          "id": "fast-agent-ai-secrets",
+          "name": "Configure fast-agent",
+          "description": "Set provider keys in fast-agent.secrets.yaml or env vars. See docs: [Configuration Reference](https://fast-agent.ai/ref/config_file/)"
+        }
+      ],
+      "agentInfo": {
+        "name": "fast-agent-acp",
+        "version": "0.10.46"
+      }
+    },
+    "pid": 9,
+    "session": {
+      "sessionId": "2610211617-nOUPRf",
+      "modes": {
+        "currentModeId": "agent",
+        "availableModes": [
+          {
+            "id": "agent",
+            "name": "Agent",
+            "description": "You are a helpful AI Agent."
+          }
+        ]
+      }
+    },
+    "session_id": "2610211617-nOUPRf",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn",
+      "_meta": {
+        "field_meta": {
+          "openhands.dev/metrics": {
+            "status_line": "1,603 in, 254 out, 2 tools"
+          }
+        }
+      }
+    }
+  }
+}

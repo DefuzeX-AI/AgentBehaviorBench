@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_raw):\n    import pandas as pd\n    import numpy as np\n\n    # Ensure input is a list of DataFrames\n    if isinstance(data_raw, pd.DataFrame):\n        data_list = [data_raw]\n    elif isinstance(data_raw, list):\n        data_list = data_raw\n    else:\n        data_list = [data_raw]\n\n    # Use the first DataFrame, or concatenate if multiple with same schema\n    if len(data_list) == 0:\n        return pd.DataFrame()\n    elif len(data_list) == 1:\n        df = data_list[0].copy()\n    else:\n        first_cols = set(data_list[0].columns)\n        if all(set(d.columns) == first_cols for d in data_list):\n            df = pd.concat(data_list, ignore_index=True, sort=False)\n        else:\n            df = data_list[0].copy()\n\n    # 1. Standardize column names: lowercase, strip, replace spaces with underscores\n    df.columns = (\n        df.columns.astype(str)\n        .str.strip()\n        .str.lower()\n        .str.replace(r'\\s+', '_', regex=True)\n    )\n\n    # 2. Normalize data types\n    # Convert date column to datetime if present\n    date_col = None\n    for col in df.columns:\n        if 'date' in col.lower():\n            date_col = col\n            break\n    if date_col:\n        df[date_col] = pd.to_datetime(df[date_col], errors='coerce')\n\n    # Convert known numeric columns to numeric, coercing errors to NaN\n    numeric_cols = []\n    for col in df.columns:\n        if col in ['price', 'quantity_sold', 'extended_sales']:\n            numeric_cols.append(col)\n    for col in numeric_cols:\n        df[col] = pd.to_numeric(df[col], errors='coerce')\n\n    # 3. Handle missing values and inconsistencies using the known relationship\n    #    extended_sales = price * quantity_sold\n    if all(c in df.columns for c in ['price', 'quantity_sold', 'extended_sales']):\n        # Treat negative values as invalid (set to NaN)\n        for col in ['price', 'quantity_sold', 'extended_sales']:\n            df.loc[df[col] < 0, col] = np.nan\n\n        # Compute extended_sales where possible\n        computed_ext = df['price'] * df['quantity_sold']\n        df['extended_sales'] = df['extended_sales'].fillna(computed_ext)\n\n        # Derive price from extended_sales / quantity_sold\n        mask_price = df['price'].isna() & df['quantity_sold'].notna() & (df['quantity_sold'] != 0)\n        df.loc[mask_price, 'price'] = df.loc[mask_price, 'extended_sales'] / df.loc[mask_price, 'quantity_sold']\n\n        # Derive quantity_sold from extended_sales / price\n        mask_qty = df['quantity_sold'].isna() & df['price'].notna() & (df['price'] != 0)\n        df.loc[mask_qty, 'quantity_sold'] = df.loc[mask_qty, 'extended_sales'] / df.loc[mask_qty, 'price']\n\n        # Recompute extended_sales to ensure consistency where both are present\n        mask_both = df['price'].notna() & df['quantity_sold'].notna()\n        df.loc[mask_both, 'extended_sales'] = df.loc[mask_both, 'price'] * df.loc[mask_both, 'quantity_sold']\n\n        # Fill remaining missing values\n        if df['extended_sales'].isna().any():\n            df['extended_sales'] = df['extended_sales'].fillna(df['extended_sales'].median())\n        if df['price'].isna().any() and 'bike_model' in df.columns:\n            df['price'] = df.groupby('bike_model')['price'].transform(lambda x: x.fillna(x.median()))\n            df['price'] = df['price'].fillna(df['price'].median())\n        if df['quantity_sold'].isna().any():\n            df['quantity_sold'] = df['quantity_sold'].fillna(0)\n        # Final recompute to ensure consistency\n        mask_both = df['price'].notna() & df['quantity_sold'].notna()\n        df.loc[mask_both, 'extended_sales'] = df.loc[mask_both, 'price'] * df.loc[mask_both, 'quantity_sold']\n\n    # Handle missing bike_model values\n    if 'bike_model' in df.columns:\n        if df['bike_model'].isna().any():\n            df['bike_model'] = df['bike_model'].fillna('Unknown')\n        # 5. Categorical encoding: convert to category dtype\n        df['bike_model'] = df['bike_model'].astype('category')\n\n    # 6. Remove duplicates\n    df = df.drop_duplicates().reset_index(drop=True)\n\n    # 7. Sort by date if available\n    if date_col:\n        df = df.sort_values(date_col).reset_index(drop=True)\n\n    # Ensure all datetime columns are JSON serializable (convert to strings)\n    for col in df.columns:\n        if pd.api.types.is_datetime64_any_dtype(df[col]):\n            df[col] = df[col].astype(str)\n\n    data_wrangled = df\n    return data_wrangled\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 2901,
+      "prompt_tokens": 1637,
+      "total_tokens": 4538,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 1679,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261017093215426194597c955d5682z1gqnIr",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a14934-6e55-7751-ae44-474e132933a6-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 1637,
+    "output_tokens": 2901,
+    "total_tokens": 4538,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 1679
+    }
+  }
+}

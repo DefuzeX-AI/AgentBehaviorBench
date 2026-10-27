@@ -1,0 +1,238 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_6d06f1cd92074e8499849fbf2be716b2",
+  "case_id": "ir-reasonix-8406-v1",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "ad52c6a956ba7cee37e536b45106b8c8",
+      "span_id": "4a430ff31743aa25",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792864937571963158,
+      "end_time_unix_nano": 1792864953942577149,
+      "duration_nano": 16370613991,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.stderr",
+          "time_unix_nano": 1792864939185638036,
+          "attributes": {}
+        },
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1792864939384906285,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1792864939811502482,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792864939838584860,
+          "attributes": {}
+        },
+        {
+          "name": "acp.extension",
+          "time_unix_nano": 1792864939846719988,
+          "attributes": {}
+        },
+        {
+          "name": "acp.extension",
+          "time_unix_nano": 1792864945482945232,
+          "attributes": {}
+        },
+        {
+          "name": "acp.extension",
+          "time_unix_nano": 1792864945502183973,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792864945506768160,
+          "attributes": {}
+        },
+        {
+          "name": "acp.extension",
+          "time_unix_nano": 1792864947047064925,
+          "attributes": {}
+        },
+        {
+          "name": "acp.extension",
+          "time_unix_nano": 1792864947077857583,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792864947087325349,
+          "attributes": {}
+        },
+        {
+          "name": "acp.extension",
+          "time_unix_nano": 1792864953905881907,
+          "attributes": {}
+        },
+        {
+          "name": "acp.extension",
+          "time_unix_nano": 1792864953929672495,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792864953933852887,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "ad52c6a956ba7cee37e536b45106b8c8",
+      "span_id": "e48f551434ba5cd8",
+      "parent_span_id": "4a430ff31743aa25",
+      "name": "bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792864945487282037,
+      "end_time_unix_nano": 1792864945677283346,
+      "duration_nano": 190001309,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "git init -q -b main && git config user.email dev@example.com && git config user.name dev && echo hi > README.md && git add README.md && git commit -qm init && git branch feature-a && git branch feature-b && git init -q --bare .remote.git && git remote add origin .remote.git && git push -q origin main feature-a && git fetch -q origin && git log --oneline"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "1e229d3 init\n",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_0d097f3ad10744afa0b7bfeb"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "ad52c6a956ba7cee37e536b45106b8c8",
+      "span_id": "3897ae45f47fd9db",
+      "parent_span_id": "4a430ff31743aa25",
+      "name": "bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792864947056754753,
+      "end_time_unix_nano": 1792864947119294791,
+      "duration_nano": 62540038,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "git branch -a && git remote -v && git branch -r"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "  feature-a\n  feature-b\n* main\n  remotes/origin/feature-a\n  remotes/origin/main\norigin\t.remote.git (fetch)\norigin\t.remote.git (push)\n  origin/feature-a\n  origin/main\n",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_0a26ab1b453f4f45bbcf2993"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "ad52c6a956ba7cee37e536b45106b8c8",
+      "span_id": "e1e742daaa159def",
+      "parent_span_id": "4a430ff31743aa25",
+      "name": "update_goal",
+      "kind": "internal",
+      "status": "error",
+      "start_time_unix_nano": 1792864953911776834,
+      "end_time_unix_nano": 1792864953922218113,
+      "duration_nano": 10441279,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "update_goal",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "completion": {
+            "verified": [
+              "git init -q -b main && git config user.email dev@example.com && git config user.name dev && echo hi > README.md && git add README.md && git commit -qm init && git branch feature-a && git branch feature-b && git init -q --bare .remote.git && git remote add origin .remote.git && git push -q origin main feature-a && git fetch -q origin && git log --oneline",
+              "git branch -a && git remote -v && git branch -r"
+            ]
+          },
+          "reason": "The exact setup command ran successfully and the resulting repo state was verified (branches, remote, refs).",
+          "status": "complete"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "update_goal is only available while an active goal turn is running — no goal state was changed",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_fdfbdf54ef154165a553a7a9"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

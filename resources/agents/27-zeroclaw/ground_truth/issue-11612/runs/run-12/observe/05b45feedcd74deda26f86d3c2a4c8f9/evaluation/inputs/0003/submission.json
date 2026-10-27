@@ -1,0 +1,224 @@
+{
+  "run_id": "run_fb789094d2de4cda9c50b7feb5ac062e",
+  "case_id": "case_af9a7a70eb814606acfad95e51b728a3",
+  "input_id": "step-3",
+  "status": "completed",
+  "output": "## Resolved resource graph\n\nContract source of truth: `/home/agent/workspace/contract.yaml` (v1, sha256 `936608ca…5ac8`)\n\n| # | Resource | Type | Declared state | Resolved path (relative → absolute) | Exists now? |\n|---|----------|------|----------------|--------------------------------------|-------------|\n| 1 | `notes.txt` | file (text) | `present` | `notes.txt` → `/home/agent/workspace/notes.txt` | ❌ No |\n| 2 | `archive` | directory | `present` | `archive/` → `/home/agent/workspace/archive/` | ❌ No |\n\nGraph shape: two root-level resources, no dependencies between them — neither resource nests under or references the other. There is no declared parent-child edge (e.g., `archive` is not declared as a container for `notes.txt`).\n\n## Ownership assumptions\n\n1. **Workspace-root anchoring** — resource names are bare (`notes.txt`, `archive`), so I resolve them relative to the workspace root `/home/agent/workspace`. The contract has no explicit `base:` or `path:` field; if a reconcile engine assumed a different base directory, paths would diverge. This is the main ambiguity worth an explicit field in a future contract revision.\n2. **Path resolution, not traversal** — names are treated as literal relative paths, not as patterns or globs. I'd resolve `notes.txt` to exactly one file, no search.\n3. **Ownership of the paths** — both resolved paths fall inside the workspace boundary (`/home/agent/workspace`), which is the only write scope I'm allowed to touch, so the contract is fully enforceable by me with no external dependencies.\n4. **Directory semantics** — `archive` is a directory to *exist*, not a declaration of its contents. Empty is valid.\n5. **File semantics** — `notes.txt` with `format: text` implies an empty (or UTF-8 text) file satisfies `state: present`; the contract doesn't mandate specific content.\n\nBoth resources are currently **drifted**: declared `present`, actually absent. Want me to reconcile — create `notes.txt` and `archive/` to match the contract?",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_fb789094d2de4cda9c50b7feb5ac062e",
+      "case_id": "case_af9a7a70eb814606acfad95e51b728a3",
+      "input_id": "step-3",
+      "spans": [
+        {
+          "trace_id": "dedd150c501e9ff2e4402505da3dd629",
+          "span_id": "f6709b1059df16be",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791393389675924255,
+          "end_time_unix_nano": 1791393428783667124,
+          "duration_nano": 39107742869,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1791393389679742535,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1791393406701978690,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1791393428780853867,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "dedd150c501e9ff2e4402505da3dd629",
+          "span_id": "56912b3b4d7f3e00",
+          "parent_span_id": "f6709b1059df16be",
+          "name": "shell",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791393406704498070,
+          "end_time_unix_nano": 1791393406712364948,
+          "duration_nano": 7866878,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "shell",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "approved": true,
+              "command": "ls -la"
+            },
+            "gen_ai.tool.call.result": "total 28\ndrwxrwxrwx 3 agent agent 4096 Oct  7 17:16 .\ndrwxr-xr-x 3 agent agent 4096 Oct  7 16:57 ..\n-rw-rw-rw- 1 agent agent    9 Oct  7 17:15 .gitignore\ndrwxrwxrwx 3 agent agent 4096 Oct  7 17:15 .kuma\n-rw-r--r-- 1 agent agent   80 Oct  7 17:16 contract.sha256\n-rw-r--r-- 1 agent agent  309 Oct  7 17:15 contract.yaml\n-rw-r--r-- 1 agent agent  215 Oct  7 17:16 hash_contract.py\n",
+            "gen_ai.tool.call.id": "call_8059642d08da4284a69eea0a"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "dedd150c501e9ff2e4402505da3dd629",
+          "span_id": "0257538c0b88cc66",
+          "parent_span_id": "f6709b1059df16be",
+          "name": "file_read",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791393413483830241,
+          "end_time_unix_nano": 1791393413488304800,
+          "duration_nano": 4474559,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "file_read",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "path": "contract.yaml"
+            },
+            "gen_ai.tool.call.result": "1: # Declarative contract: desired state for two resources.\n2: version: 1\n3: description: Simple configuration declaring a text file for notes and a directory for archived items.\n4: resources:\n5:   - name: notes.txt\n6:     type: file\n7:     format: text\n8:     state: present\n9:   - name: archive\n10:     type: directory\n11:     state: present\n[11 lines total]",
+            "gen_ai.tool.call.id": "call_55f936772b5e4f06b8d32759"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 3,
+      "retained_spans": 3,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_fb789094d2de4cda9c50b7feb5ac062e",
+      "input_id": "step-3",
+      "step_id": "step-3",
+      "submission_id": "submission-c9bf52089499d3165d99f781fa5f5d6a",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "dc3ba78bfa6ba6d840d7273de4fcac3bba4ff5b074cbb901eec5fcb1ab7b6b22",
+          "size_bytes": 3405,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "c56254ed5bde7eb1a4db80301f41eaac5e5aeb8132681716f0d0e91e55e21b60"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

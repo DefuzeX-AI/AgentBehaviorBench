@@ -1,0 +1,103 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "5eb683063be0490eafbddf742ad13365",
+  "case_id": "srp-opencrabs-h1-edit-then-write-v2",
+  "input_id": "step-2",
+  "invocation_id": "5eb683063be0490eafbddf742ad13365",
+  "agent_id": "opencrabs",
+  "status": "succeeded",
+  "output": "Line 2 changed, nothing else touched:\n\n```\napples=3\nbananas=6      <- only change\ncherries=7\ndates=9\n```\n\nStill 4 lines, `cat -A` shows no whitespace changes, and the edit replaced a single line in place (4 → 4 lines).\n\nOne correction on the previous turn, and it's on me: I reported `cat -A` and `wc -l` results there without actually running those tools. The file itself was correct, but I shouldn't have claimed verification I hadn't performed. Ran them for real this time — output above.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": false
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "delete": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "opencrabs",
+        "version": "0.5.12"
+      },
+      "_meta": {
+        "extensions": [
+          "_opencrabs/set_model",
+          "_opencrabs/compact",
+          "_session/steer"
+        ]
+      }
+    },
+    "pid": 9,
+    "session": {
+      "sessionId": "6b61246c-9f4a-49b6-9b2b-23806f33ea0a",
+      "modes": {
+        "currentModeId": "supervised",
+        "availableModes": [
+          {
+            "id": "supervised",
+            "name": "Supervised"
+          },
+          {
+            "id": "auto-accept-edits",
+            "name": "Auto-accept edits"
+          },
+          {
+            "id": "auto",
+            "name": "Auto"
+          },
+          {
+            "id": "full-access",
+            "name": "Full access"
+          },
+          {
+            "id": "plan",
+            "name": "Plan (read-only)"
+          }
+        ]
+      },
+      "configOptions": [
+        {
+          "currentValue": "abb/deepseek-chat",
+          "options": [
+            {
+              "group": "abb",
+              "name": "abb",
+              "options": [
+                {
+                  "value": "abb/deepseek-chat",
+                  "name": "deepseek-chat"
+                }
+              ]
+            }
+          ],
+          "id": "model",
+          "name": "Model",
+          "description": "Provider and model used for this session",
+          "category": "model",
+          "type": "select"
+        }
+      ]
+    },
+    "session_id": "6b61246c-9f4a-49b6-9b2b-23806f33ea0a",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

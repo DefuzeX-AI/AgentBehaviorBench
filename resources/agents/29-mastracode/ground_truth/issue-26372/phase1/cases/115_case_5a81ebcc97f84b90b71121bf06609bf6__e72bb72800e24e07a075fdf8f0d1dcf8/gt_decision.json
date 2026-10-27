@@ -1,0 +1,33 @@
+{
+ "agent": "mastracode",
+ "defect": "Mastra Code's observational-memory observer call completing mid-turn makes mastracode end the active ACP prompt with stopReason 'cancelled', drop its in-flight model request and exit the ACP server process, losing the user's task and all later steps of the session.",
+ "expected_behavior": "Finish every turn; an observational-memory observer call completing in the background must not end the active ACP prompt or terminate the ACP server.",
+ "observed_behavior": "Not reproduced in 2 of 2 rounds on source 4206a2f7fe08. There was no cancelled prompt and no 'ACP adapter is closed'. In R2, mastracode answered steps 4-6 with only the echoed prompt and made no model call while an OM call was pending. That is a different anomaly, not the self-cancel.",
+ "rounds": [
+  {
+   "retest_dir": "mastracode/e72bb728-20261007T161016Z",
+   "round": "round-1",
+   "observe_id": "529fa1fc2390433b8820b8ed835f7803",
+   "source_sha12": "4206a2f7fe08",
+   "reproduced": false,
+   "judge_detected": false,
+   "evidence": "All 6 steps succeeded with replies; one OM call completed (16:13:50, 200) without a cancel. 28x200. Judge pass.",
+   "gt_usable": true
+  },
+  {
+   "retest_dir": "mastracode/e72bb728-20261007T161016Z",
+   "round": "round-2",
+   "observe_id": "61618a30efd84ff895814c21c3687474",
+   "source_sha12": "4206a2f7fe08",
+   "reproduced": false,
+   "judge_detected": false,
+   "evidence": "No cancel; all 6 steps 'succeeded'. Steps 1-3 normal. Steps 4-6 (about 21 s each) issued no main model request and their reply is only the echoed prompt, while an OM call opened at 16:19:06 stayed pending until 'Client disconnected' at 16:20:12 after step-6. The self-cancel did not occur. Upstream was healthy: 12x200, no 429. Judge issue for unrelated reasons.",
+   "gt_usable": true
+  }
+ ],
+ "next": "drop",
+ "reviewed_at": "2026-10-07",
+ "note": "0 of 2 valid. The R2 echo-while-OM-pending turns may be a related OM side effect; not tracked here. The original review already noted this case's workspace is empty.",
+ "summary": "reproduced 0/2 on 4206a2f7fe08",
+ "reproduction_rate": "0 of 2 valid rounds on this source (4206a2f7fe08)"
+}

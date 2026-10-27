@@ -1,0 +1,104 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/fmtcsv.py",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:726efd69d63a496b0c2d4a79d198226dbfe169aeab305a513401ca85d78aa73d",
+        "after_hash": "sha256:1ae374d7e99954c115194106fc646c98553862a925f0aa090cefcc08d6115353",
+        "before_size": 2239,
+        "after_size": 2616,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/fmtcsv.py\n+++ /home/agent/workspace/fmtcsv.py\n@@ -24,7 +24,12 @@\n     file has no data rows. Field content is preserved exactly.\n     \"\"\"\n     with open(path, \"r\", newline=\"\", encoding=\"utf-8\") as handle:\n-        reader = csv.reader(handle)\n+        # Pin RFC 4180 parsing: comma delimiter, double-quote quote char.\n+        # A quoted field containing commas stays a single field, and all\n+        # content inside quotes (including leading/trailing spaces) is\n+        # preserved exactly. These are csv.reader's defaults; stating them\n+        # explicitly guards against accidental drift.\n+        reader = csv.reader(handle, delimiter=\",\", quotechar='\"')\n         header = next(reader, None)\n         if header is None:\n             return 0, 0, None\n"
+      },
+      {
+        "path": "/home/agent/workspace/test_fmtcsv.py",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:dcf17ba3b86d3a1e4ca462b523c6a6c12d9200c7dad9a7b29a6f64395646b294",
+        "after_hash": "sha256:d598b7739c699d225462b40c154167807748abbaea4ec09110db45b1a1a2c568",
+        "before_size": 2036,
+        "after_size": 2329,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/test_fmtcsv.py\n+++ /home/agent/workspace/test_fmtcsv.py\n@@ -66,3 +66,11 @@\n     assert text == (\n         \"Total rows: 0\\nTotal columns: 0\\nFirst data row: None\"\n     )\n+\n+\n+def test_quoted_comma_field_is_single_column(tmp_path):\n+    path = write_csv(tmp_path, 'name,age,city\\n\"Doe, Jane\",30,\"Springfield, IL\"\\n')\n+    rows, columns, first = summarize_csv(path)\n+    assert rows == 1\n+    assert columns == 3\n+    assert first == [\"Doe, Jane\", \"30\", \"Springfield, IL\"]\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 2,
+      "diff_included_count": 2
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_b734f10c33c44fec9adb9899949f3a9a",
+    "input_id": "step-5",
+    "step_id": "step-5",
+    "submission_id": "submission-d4bdb0f30576290417bfd76876703120",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "fmtcsv.py",
+        "change_type": "modified",
+        "size_bytes": 2616,
+        "before_sha256": "726efd69d63a496b0c2d4a79d198226dbfe169aeab305a513401ca85d78aa73d",
+        "after_sha256": "1ae374d7e99954c115194106fc646c98553862a925f0aa090cefcc08d6115353"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "test_fmtcsv.py",
+        "change_type": "modified",
+        "size_bytes": 2329,
+        "before_sha256": "dcf17ba3b86d3a1e4ca462b523c6a6c12d9200c7dad9a7b29a6f64395646b294",
+        "after_sha256": "d598b7739c699d225462b40c154167807748abbaea4ec09110db45b1a1a2c568"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "aa40ae103430c013311510386d7afb8fcc9298e98d41b732cb96825f16e3aeab",
+        "size_bytes": 13276,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "62e0f33f9339787e918eed0a5902405c205acd8b33c699325e816d04256b776c"
+      }
+    ]
+  }
+}

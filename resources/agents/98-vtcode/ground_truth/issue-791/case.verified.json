@@ -1,0 +1,56 @@
+{
+  "case_id": "srp-vtcode-o1-acp-approved-patch-denied-v1",
+  "issue": {
+    "repository": "vinhnx/VTCode",
+    "number": 791,
+    "url": "https://github.com/vinhnx/VTCode/issues/791",
+    "state": "closed",
+    "title": "[Bug]: ACP mode: apply_patch is denied by the internal \"prompt\" tool policy after the client grants permission"
+  },
+  "version_choice": "commit:bf19e49b1891184fe88b4266636bd41251f9d900",
+  "reported_version": "0.180.5",
+  "commit_version": "bf19e49b1891184fe88b4266636bd41251f9d900",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "In trail-notes.md, change the word easy at the end of the Day 4 line to moderate. Use your apply_patch tool for this edit. Then tell me whether apply_patch succeeded on the first attempt, and if it failed, quote the exact error message you received."
+  ],
+  "expected": "After the ACP client approves apply_patch, the patch should execute under the default prompt policy and change Day 4 from easy to moderate in trail-notes.md.",
+  "defect": "The ACP client approves apply_patch, but the local registry denies it under the default prompt policy with '[Blocked by policy] tool denied by policy'. The model may subsequently edit through a shell fallback.",
+  "fault location": [
+    {
+      "file": "crates/codegen/vtcode-acp/src/zed/agent/tool_execution.rs",
+      "function": "ZedAgent::execute_tool_call",
+      "line_start": 92,
+      "line_end": 131,
+      "commit": "bf19e49b1891184fe88b4266636bd41251f9d900",
+      "url": "https://github.com/vinhnx/VTCode/blob/bf19e49b1891184fe88b4266636bd41251f9d900/crates/codegen/vtcode-acp/src/zed/agent/tool_execution.rs#L92-L131",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Client permission is requested and execution continues on approval, without passing that approval to the local registry."
+    },
+    {
+      "file": "crates/codegen/vtcode-acp/src/zed/agent/tool_execution_local.rs",
+      "function": "ZedAgent::execute_local_tool",
+      "line_start": 25,
+      "line_end": 36,
+      "commit": "bf19e49b1891184fe88b4266636bd41251f9d900",
+      "url": "https://github.com/vinhnx/VTCode/blob/bf19e49b1891184fe88b4266636bd41251f9d900/crates/codegen/vtcode-acp/src/zed/agent/tool_execution_local.rs#L25-L36",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Creates a default execution policy snapshot and calls the local registry without preserving the ACP approval."
+    },
+    {
+      "file": "crates/codegen/vtcode-core/src/tool_policy/manager.rs",
+      "function": "should_execute_tool",
+      "line_start": 549,
+      "line_end": 568,
+      "commit": "bf19e49b1891184fe88b4266636bd41251f9d900",
+      "url": "https://github.com/vinhnx/VTCode/blob/bf19e49b1891184fe88b4266636bd41251f9d900/crates/codegen/vtcode-core/src/tool_policy/manager.rs#L549-L568",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Prompt-policy execution is denied if no permission handler is installed; this is the second gate reached after the ACP approval."
+    }
+  ],
+  "Root cause": "CONFIRMED AT THE ARCHIVED TESTED SOURCE REVISION. ACP approval is accepted, but the granted decision is not handed to the local tool registry. execute_local_tool creates a default ExecutionPolicySnapshot; execution_facade checks one-shot preapproval and then should_execute_tool. With apply_patch=prompt and no local permission handler, the registry denies the approved call. The archive uses commit bf19e49b1891184fe88b4266636bd41251f9d900 (recorded crate version 0.180.4), ACP over stdio and deepseek-chat. Reproduction requires the archived trail-notes.md fixture with Day 4 ending in easy, the default apply_patch=prompt policy and client allow_once. The upstream issue separately reports official release 0.180.5; that is reported_version, not the version of these ten archived runs. The archived report records the approval-then-denial phenomenon in 10/10 executions; only nine runs have a judge verdict (seven issue, two pass), and run-02 has a DockerCleanupError and no verdict. Those are different measurements, not ten successful judge verdicts. Shell fallback may still complete the edit. The maintainer confirmed the same root cause and identified PR https://github.com/vinhnx/VTCode/pull/793 as the fix, preserving explicit deny policy while propagating granted approval. See https://github.com/vinhnx/VTCode/issues/791#issuecomment-6393640733. The first released version containing the fix was not established, so fixed_in is unknown; pinned_contains_fix=false refers to the archived tested commit. This verification reads source and existing evidence; it does not represent a new dynamic reproduction."
+}

@@ -1,0 +1,77 @@
+{
+  "generations": [
+    [
+      {
+        "text": "```python\ndef data_visualization(data_raw):\n    import pandas as pd\n    import numpy as np\n    import json\n    import plotly.express as px\n    import plotly.graph_objects as go\n    import plotly.io as pio\n\n    # --- Load dataset (supports dict of datasets or a raw DataFrame) ---\n    if isinstance(data_raw, dict) and 'Dataset_0' in data_raw:\n        df = pd.DataFrame(data_raw['Dataset_0'])\n    else:\n        df = pd.DataFrame(data_raw)\n\n    # --- Sort bars in descending order by total_extended_sales ---\n    df = df.sort_values(by='total_extended_sales', ascending=False).reset_index(drop=True)\n\n    # --- Format bar text labels with thousands separators ---\n    text_labels = df['total_extended_sales'].apply(lambda v: f\"${v:,.0f}\")\n\n    # --- Create vertical bar chart ---\n    fig = px.bar(\n        df,\n        x='bike_model',\n        y='total_extended_sales',\n        title='Total Extended Sales by Bike Model — June 2021'\n    )\n\n    # --- Single consistent color + value labels on top of each bar ---\n    fig.update_traces(\n        marker_color='#2E86AB',\n        text=text_labels,\n        textposition='outside',\n        hovertemplate='<b>%{x}</b><br>Total Extended Sales: %{y:$,.0f}<extra></extra>'\n    )\n\n    # --- Layout styling ---\n    fig.update_layout(\n        xaxis_title='Bike Model',\n        yaxis_title='Total Extended Sales ($)',\n        xaxis=dict(tickangle=30),\n        yaxis=dict(tickformat=','),\n        showlegend=False,\n        template='plotly_white',\n        margin=dict(t=80, b=100)\n    )\n\n    # --- Summary of key takeaways ---\n    highest = df.iloc[0]\n    lowest = df.iloc[-1]\n    total_sales = df['total_extended_sales'].sum()\n    summary = (\n        f\"Key Takeaways:\\n\"\n        f\"- Highest-selling model: '{highest['bike_model']}' with ${highest['total_extended_sales']:,} in extended sales.\\n\"\n        f\"- Lowest-selling model: '{lowest['bike_model']}' with ${lowest['total_extended_sales']:,} in extended sales.\\n\"\n        f\"- Total extended sales across all {len(df)} models: ${total_sales:,}.\\n\"\n        f\"- The top model ({highest['bike_model']}) accounts for \"\n        f\"{highest['total_extended_sales'] / total_sales:.1%} of total sales, showing a clear \"\n        f\"downward spread with sales steadily declining across the remaining models.\"\n    )\n    print(summary)\n\n    # --- Return chart as dictionary ---\n    fig_json = pio.to_json(fig)\n    fig_dict = json.loads(fig_json)\n\n    return fig_dict\n```\n\n**Summary of the generated chart:**\n\n- **Chart**: Vertical bar chart of Total Extended Sales by Bike Model for June 2021, sorted in descending order so the top seller appears first.\n- **Highest seller**: *Speedster Elite* leads with **$1,158,300**, holding a notable lead over the second-place *Titanium Falcon* ($810,000).\n- **Lowest seller**: The bottom of the ranking trails well behind the leader, illustrating a steep drop-off.\n- **Pattern**: Sales decline progressively across the 9 models, with the top model capturing roughly a quarter of total sales — indicating a concentration of revenue in the best-performing bike model.\n- **Styling**: Single blue color scheme (no legend needed), value labels displayed above each bar, and x-axis tick labels rotated 30° to prevent overlap.",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "```python\ndef data_visualization(data_raw):\n    import pandas as pd\n    import numpy as np\n    import json\n    import plotly.express as px\n    import plotly.graph_objects as go\n    import plotly.io as pio\n\n    # --- Load dataset (supports dict of datasets or a raw DataFrame) ---\n    if isinstance(data_raw, dict) and 'Dataset_0' in data_raw:\n        df = pd.DataFrame(data_raw['Dataset_0'])\n    else:\n        df = pd.DataFrame(data_raw)\n\n    # --- Sort bars in descending order by total_extended_sales ---\n    df = df.sort_values(by='total_extended_sales', ascending=False).reset_index(drop=True)\n\n    # --- Format bar text labels with thousands separators ---\n    text_labels = df['total_extended_sales'].apply(lambda v: f\"${v:,.0f}\")\n\n    # --- Create vertical bar chart ---\n    fig = px.bar(\n        df,\n        x='bike_model',\n        y='total_extended_sales',\n        title='Total Extended Sales by Bike Model — June 2021'\n    )\n\n    # --- Single consistent color + value labels on top of each bar ---\n    fig.update_traces(\n        marker_color='#2E86AB',\n        text=text_labels,\n        textposition='outside',\n        hovertemplate='<b>%{x}</b><br>Total Extended Sales: %{y:$,.0f}<extra></extra>'\n    )\n\n    # --- Layout styling ---\n    fig.update_layout(\n        xaxis_title='Bike Model',\n        yaxis_title='Total Extended Sales ($)',\n        xaxis=dict(tickangle=30),\n        yaxis=dict(tickformat=','),\n        showlegend=False,\n        template='plotly_white',\n        margin=dict(t=80, b=100)\n    )\n\n    # --- Summary of key takeaways ---\n    highest = df.iloc[0]\n    lowest = df.iloc[-1]\n    total_sales = df['total_extended_sales'].sum()\n    summary = (\n        f\"Key Takeaways:\\n\"\n        f\"- Highest-selling model: '{highest['bike_model']}' with ${highest['total_extended_sales']:,} in extended sales.\\n\"\n        f\"- Lowest-selling model: '{lowest['bike_model']}' with ${lowest['total_extended_sales']:,} in extended sales.\\n\"\n        f\"- Total extended sales across all {len(df)} models: ${total_sales:,}.\\n\"\n        f\"- The top model ({highest['bike_model']}) accounts for \"\n        f\"{highest['total_extended_sales'] / total_sales:.1%} of total sales, showing a clear \"\n        f\"downward spread with sales steadily declining across the remaining models.\"\n    )\n    print(summary)\n\n    # --- Return chart as dictionary ---\n    fig_json = pio.to_json(fig)\n    fig_dict = json.loads(fig_json)\n\n    return fig_dict\n```\n\n**Summary of the generated chart:**\n\n- **Chart**: Vertical bar chart of Total Extended Sales by Bike Model for June 2021, sorted in descending order so the top seller appears first.\n- **Highest seller**: *Speedster Elite* leads with **$1,158,300**, holding a notable lead over the second-place *Titanium Falcon* ($810,000).\n- **Lowest seller**: The bottom of the ranking trails well behind the leader, illustrating a steep drop-off.\n- **Pattern**: Sales decline progressively across the 9 models, with the top model capturing roughly a quarter of total sales — indicating a concentration of revenue in the best-performing bike model.\n- **Styling**: Single blue color scheme (no legend needed), value labels displayed above each bar, and x-axis tick labels rotated 30° to prevent overlap.",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 2299,
+              "prompt_tokens": 901,
+              "total_tokens": 3200,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 1532,
+                "rejected_prediction_tokens": null,
+                "text_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 0,
+                "image_tokens": null,
+                "text_tokens": null
+              }
+            },
+            "model_provider": "openai",
+            "model_name": "glm-5.3-flash",
+            "system_fingerprint": null,
+            "id": "2026102012364206fc0764c3174dd0",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a15798-ecc2-7ba2-8e6e-f31ef4429ad2-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 2299,
+      "prompt_tokens": 901,
+      "total_tokens": 3200,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 1532,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "glm-5.3-flash",
+    "system_fingerprint": null,
+    "id": "2026102012364206fc0764c3174dd0"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

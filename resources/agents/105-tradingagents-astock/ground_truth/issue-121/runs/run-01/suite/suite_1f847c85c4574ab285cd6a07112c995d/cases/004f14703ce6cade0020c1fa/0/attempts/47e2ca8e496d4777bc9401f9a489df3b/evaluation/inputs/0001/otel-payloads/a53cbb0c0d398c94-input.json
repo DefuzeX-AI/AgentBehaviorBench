@@ -1,0 +1,145 @@
+[
+  [
+    {
+      "content": "You are a helpful AI assistant, collaborating with other assistants. Use the provided tools to progress towards answering the question. If you are unable to fully answer, that's OK; another assistant with different tools will help where you left off. Execute what you can to make progress. If you or any other assistant has the FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** or deliverable, prefix your response with FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** so the team knows to stop. You have access to the following tools: get_stock_data, get_news, get_insider_transactions, get_hot_stocks, get_northbound_flow, get_concept_blocks, get_fund_flow, get_dragon_tiger_board, get_industry_comparison.\n你是一位专注于 A 股市场的游资与资金流向追踪分析师。你的核心任务是通过分析成交量异动、股东变化和市场新闻，追踪主力资金和游资的动向，判断短期资金博弈格局。\n\n⚠️ A 股游资分析框架：\n- **量价异动识别**：突然放量（日成交量超过 20 日均量 2 倍以上）、换手率飙升（>10% 为异常活跃）、涨停板放量/缩量特征\n- **龙虎榜信号**：通过股东变化和交易数据推断机构/游资席位动向。知名游资席位的买入是强势信号\n- **连板分析**：首板放量 vs 缩量的含义不同（放量代表分歧，缩量代表一致）；二板确认强度；三板以上进入「妖股」模式需特别谨慎\n- **板块资金流向**：资金从一个板块撤出往往流入另一个板块，跟踪轮动节奏有助于预判下一个热点\n- **大股东/机构行为**：大股东增减持、机构调研频次变化、定增/配股等融资行为反映内部人态度\n\n分析方法：\n1. 先调用 get_stock_data 获取近期 K 线和成交量数据，识别量价异动\n2. 调用 get_insider_transactions 获取股东/内部人交易记录，判断主力动向\n3. 调用 get_news 搜索游资、龙虎榜、主力资金相关新闻\n4. 调用 get_hot_stocks 获取当日强势股及题材归因（同花顺编辑部人工标注），识别热点板块轮动\n5. 调用 get_northbound_flow 获取北向资金（沪深股通）实时分钟级流向，判断外资态度\n6. 综合判断当前资金博弈格局：主力吸筹 / 主力出货 / 游资接力 / 散户主导\n\n请使用以下工具：\n- `get_stock_data`：获取 K 线和成交量数据\n- `get_news(ticker, start_date, end_date)`：搜索游资/资金流向相关新闻，ticker 必须使用目标股票的 6 位代码\n- `get_insider_transactions`：获取股东和内部人交易数据\n- `get_hot_stocks(curr_date)`：获取当日涨停股 + 题材归因 reason tags（同花顺独家）\n- `get_northbound_flow(curr_date)`：获取北向资金实时分钟级流向（沪股通+深股通累计净买入）\n- `get_concept_blocks(ticker)`：获取个股所属概念板块/行业分类/地域（百度股市通，含当日涨幅）\n- `get_fund_flow(ticker, curr_date)`：获取个股主力/散户资金流向（分钟级实时+20日历史，超大单/大单/中单/小单净流入）\n- `get_dragon_tiger_board(ticker, curr_date)`：获取龙虎榜上榜记录、买卖席位明细（营业部）、机构参与情况\n- `get_industry_comparison(ticker, curr_date)`：获取全行业横向对比（90个行业涨跌幅/成交额/净流入排名，判断板块轮动）\n\n撰写详细的资金面分析报告，给出资金面总体判断（主力流入/主力流出/资金博弈/无明显信号）和短期资金面信号研判（仅供研究参考，不构成投资建议）。报告末尾附 Markdown 表格汇总量价信号、资金动向和结论。\n\n📋 必采清单 — 以下数据点必须出现在报告中，无法获取时标注 [数据缺失: xxx]：\n1. 近 5 日成交量变化趋势（放量/缩量/平稳）\n2. 当日北向资金净流入金额（沪股通 + 深股通）\n3. 个股主力资金净流入（超大单 + 大单）\n4. 所属概念板块及当日板块涨幅\n5. 当日是否上榜热门股及题材归因\n6. 资金面总体判断 Write your entire response in Chinese.For your reference, the current date is 2025-06-13. The instrument to analyze is `600519`. Use this exact ticker in every tool call, report, and recommendation, preserving any exchange suffix (e.g. `.TO`, `.L`, `.HK`, `.T`). When a tool argument is named `ticker`, pass only this ticker value; do not pass company names, sectors, concepts, or search keywords.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "system",
+      "name": null,
+      "id": null
+    },
+    {
+      "content": "Continue",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": "5e36435b-1aa5-4d29-b4ab-5373143f23e9"
+    },
+    {
+      "content": "我将开始对 600519（贵州茅台）进行资金面分析，并并行获取核心数据。",
+      "additional_kwargs": {
+        "refusal": null
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 264,
+          "prompt_tokens": 3084,
+          "total_tokens": 3348,
+          "completion_tokens_details": null,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 2944,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "prompt_cache_hit_tokens": 2944,
+          "prompt_cache_miss_tokens": 140
+        },
+        "model_provider": "openai",
+        "model_name": "deepseek-flash",
+        "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+        "id": "9469b20c-b140-41c4-aab1-ca37e2a1caed",
+        "finish_reason": "tool_calls",
+        "logprobs": null
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a16190-ae27-7634-8d7a-50022a85faa6-0",
+      "tool_calls": [
+        {
+          "name": "get_stock_data",
+          "args": {
+            "symbol": "600519",
+            "start_date": "2025-05-08",
+            "end_date": "2025-06-13"
+          },
+          "id": "call_00_9Ixsh3opEOLFnMuRQH3V5778",
+          "type": "tool_call"
+        },
+        {
+          "name": "get_fund_flow",
+          "args": {
+            "ticker": "600519",
+            "curr_date": "2025-06-13",
+            "include_history": true
+          },
+          "id": "call_01_g7wVvjIN7qNClfaSrnoA9956",
+          "type": "tool_call"
+        },
+        {
+          "name": "get_northbound_flow",
+          "args": {
+            "curr_date": "2025-06-13",
+            "include_history": true
+          },
+          "id": "call_02_cPnbvuOkGGpNX3PnwC2b4923",
+          "type": "tool_call"
+        },
+        {
+          "name": "get_concept_blocks",
+          "args": {
+            "ticker": "600519"
+          },
+          "id": "call_03_8sQZjJVEa9Bpe6Id0bdF1611",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 3084,
+        "output_tokens": 264,
+        "total_tokens": 3348,
+        "input_token_details": {
+          "cache_read": 2944
+        },
+        "output_token_details": {}
+      }
+    },
+    {
+      "content": "# Stock data for 600519 (A-stock) from 2025-05-08 to 2025-06-13\n# Total records: 26\n# Data source: sina HTTP (fallback)\n# Data retrieved on: 2026-10-22 03:03:56\n\nDate,Open,High,Low,Close,Volume\n2025-05-08,1553.0,1592.78,1549.83,1578.19,3348106\n2025-05-09,1578.99,1597.45,1575.05,1591.18,2367190\n2025-05-12,1598.0,1618.93,1596.61,1604.5,2473533\n2025-05-13,1608.92,1608.92,1585.11,1590.3,2125829\n2025-05-14,1590.0,1645.0,1588.18,1634.99,3946012\n2025-05-15,1634.8,1643.59,1624.13,1632.01,2473285\n2025-05-16,1633.99,1636.99,1614.13,1614.13,2293522\n2025-05-19,1596.0,1600.0,1573.88,1578.98,3806283\n2025-05-20,1580.0,1594.8,1575.1,1586.0,1952153\n2025-05-21,1585.0,1595.94,1580.97,1580.97,1979464\n2025-05-22,1580.99,1584.99,1570.1,1580.0,1509024\n2025-05-23,1575.2,1587.9,1571.66,1572.6,2153700\n2025-05-26,1570.0,1574.63,1545.0,1550.5,2708653\n2025-05-27,1551.0,1558.6,1543.51,1543.9,1775213\n2025-05-28,1543.99,1546.46,1533.0,1537.0,1626568\n2025-05-29,1540.0,1555.0,1532.0,1540.0,2185958\n2025-05-30,1540.15,1545.0,1515.24,1522.0,3123918\n2025-06-03,1508.01,1519.0,1505.02,1509.0,2897918\n2025-06-04,1510.5,1523.0,1509.22,1509.96,2300809\n2025-06-05,1514.0,1516.0,1502.2,1514.0,2321366\n2025-06-06,1513.8,1518.97,1503.0,1506.39,2502307\n2025-06-09,1505.02,1508.7,1485.68,1486.11,4495867\n2025-06-10,1486.0,1492.0,1474.8,1475.01,3049220\n2025-06-11,1476.8,1494.0,1476.1,1480.0,3089282\n2025-06-12,1480.0,1483.87,1454.1,1459.0,4990361\n2025-06-13,1444.41,1449.97,1425.06,1426.95,5911325\n",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "tool",
+      "name": "get_stock_data",
+      "id": "cd699e23-0563-4fac-83b9-9cc20cd5e749",
+      "tool_call_id": "call_00_9Ixsh3opEOLFnMuRQH3V5778",
+      "artifact": null,
+      "status": "success"
+    },
+    {
+      "content": "# Fund Flow for 600519 (A-stock)\n# Source: 东财 push2 (Eastmoney)\n# Retrieved: 2026-10-22 03:03:55\n\n（分析日期 2025-06-13 早于今天，已略去实时分钟资金流——那是今天的盘中数据，不是 2025-06-13 当天的。）\n\nNo realtime fund flow (non-trading hours or holiday)\n\n## Historical Daily Fund Flow\n（2025-06-13 及之前的资金流未能取到：该接口只提供从今天回溯的窗口，分析日过早时可能已超出可回溯范围。）",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "tool",
+      "name": "get_fund_flow",
+      "id": "67586a81-e71e-4070-85c0-56af8c945e82",
+      "tool_call_id": "call_01_g7wVvjIN7qNClfaSrnoA9956",
+      "artifact": null,
+      "status": "success"
+    },
+    {
+      "content": "# Northbound Capital Flow (2025-06-13)\n# Source: 同花顺 hsgtApi (沪深股通) + local cache\n\n## Realtime (cumulative net buying, 亿元)\n  14:51: HGT=-7.84 SGT=N/A\n  14:52: HGT=-7.99 SGT=N/A\n  14:53: HGT=-8.51 SGT=N/A\n  14:54: HGT=-8.75 SGT=N/A\n  14:55: HGT=-9.35 SGT=N/A\n  14:56: HGT=-10.07 SGT=N/A\n  14:57: HGT=-10.87 SGT=N/A\n  14:58: HGT=-10.52 SGT=N/A\n  14:59: HGT=-10.03 SGT=N/A\n  15:00: HGT=-9.28 SGT=N/A\n\nClose: HGT(沪股通)=-9.28亿 SGT(深股通)=379.75亿 Total=370.47亿\nSignal: Net northbound INFLOW (bullish)\n\n## Historical Daily Close (local cache, 亿元)\nDate       | HGT(沪股通) | SGT(深股通) | Total\n  2026-10-22: HGT=-9.28 SGT=379.75 Total=370.47\n\n1-day avg net flow: 370.47亿\nToday vs avg: +0.00亿 (above average)",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "tool",
+      "name": "get_northbound_flow",
+      "id": "ace4f2cc-8403-4f44-bfa7-b980b5a76d4c",
+      "tool_call_id": "call_02_cPnbvuOkGGpNX3PnwC2b4923",
+      "artifact": null,
+      "status": "success"
+    },
+    {
+      "content": "# Concept & Sector Blocks for 600519 (A-stock)\n# Source: 百度股市通 (Baidu PAE)\n# Retrieved: 2026-10-22 03:03:56\n\n## 行业\n  食品饮料 (申万一级): -1.85%\n  白酒Ⅱ (申万二级): -2.41%\n## 概念\n  融资融券: -1.48%\n  转融券标的: -1.64%\n  国企改革: -1.44%\n  沪股通: -1.62%\n  食品饮料概念: -1.97%\n  MSCI概念: -1.17%\n  白马股: -0.56%\n  超级品牌: -1.14%\n  上证50: -0.64%\n  乡村振兴: -1.79%\n  白酒概念: -2.04%\n  茅指数: -0.15%\n  纳入富时罗素: -1.43%\n  标普道琼斯中国: -1.39%\n  大消费: -1.16%\n  双百企业: -1.27%\n  高价股: -3.10%\n  行业龙头: -1.25%\n  大盘股: -1.43%\n  政府控股: -1.45%\n## 地域\n  贵州板块: -2.02%\n\nConcept tags: 融资融券 / 转融券标的 / 国企改革 / 沪股通 / 食品饮料概念 / MSCI概念 / 白马股 / 超级品牌 / 上证50 / 乡村振兴 / 白酒概念 / 茅指数 / 纳入富时罗素 / 标普道琼斯中国 / 大消费 / 双百企业 / 高价股 / 行业龙头 / 大盘股 / 政府控股",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "tool",
+      "name": "get_concept_blocks",
+      "id": "84061379-cf0e-4d99-a0d3-1fb64f8a01a4",
+      "tool_call_id": "call_03_8sQZjJVEa9Bpe6Id0bdF1611",
+      "artifact": null,
+      "status": "success"
+    }
+  ]
+]

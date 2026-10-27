@@ -1,0 +1,141 @@
+{
+  "run_id": "run_5952ac223ccd4c7caba96a35fa24c6f3",
+  "case_id": "case_7401cb01d16a4f7bab03c4ef7b42d760",
+  "input_id": "step-5",
+  "status": "completed",
+  "output": "# Anomaly Analysis\n\n## 1. Verdict Summary\n\n| Anomaly | Present? | One-line verdict |\n|---|---|---|\n| **Lost update** | ⚠️ **Attempted → prevented** | T1, T2 read-modify-write the same items from one snapshot; first-committer-wins aborts T2 |\n| **Dirty read** | ✅ None | Every read consumes a committed version |\n| **Non-repeatable read** | ✅ None | No item is read twice — and snapshots would pin it anyway |\n| **Phantom read** | ➖ Not applicable | No predicate/range reads exist to phantom against |\n| **Write skew** | ✅ Not this anomaly | Write sets are **identical** ({A,B}), not disjoint — that's a lost-update collision, not skew |\n\n## 2. Lost Update — the Headline (attempted, prevented)\n\nThe signature of a lost update is **read-modify-write from the same version by two transactions**. Both writers qualify, on both items:\n\n| Item | T1 (snapshot v0) | T2 (snapshot v0) | Collision |\n|---|---|---|---|\n| A | R(A)@t1 → W(A)@t3 | R(A)@t2 → W(A)@t4 | both computed from **A₀** |\n| B | R(B)@t5 → W(B)@t7 | R(B)@t6 → W(B)@t9 | both computed from **B₀** |\n\nNeither transaction's write is a function of the other's — T2's increments ignore A₁/B₁ entirely. If **both committed**, the second writer's version would silently overwrite the first's: one transaction's work vanishes from the database.\n\n**How this execution resolves it:** T1 commits at t8 with no concurrent committed conflict → wins. At t10, T2's validation finds WS(T2) = {A, B} intersects T1's committed write set with newer versions (A₁, B₁ both in T2's write set) → **first-committer-wins aborts T2**. T1's updates survive; nothing is lost. On retry, T2's fresh snapshot reads A₁/B₁ and serializes cleanly after T1.\n\nNote the near-miss: T2.W(B)@t9 happens *after* T1's commit, and T2 proceeds obliviously until validation — under locking, T2 would have blocked at t4 (write lock held by T1); under SI it works privately and pays only at commit.\n\n## 3. Dirty Read — Absent\n\nAudit every read's version source (all 6 reads in the trace):\n\n| Read | Version consumed | Status at read time |\n|---|---|---|\n| T1.R(A)@t1 | A₀ | committed |\n| T2.R(A)@t2 | A₀ | committed — *not* T1's uncommitted A₁ from t3 (later anyway, and invisible regardless) |\n| T1.R(B)@t5 | B₀ | committed |\n| T2.R(B)@t6 | B₀ | committed |\n| T3.R(A)@t11 | A₁ | **committed** @t8 |\n| T3.R(B)@t12 | B₁ | committed @t8 |\n\nThe critical checks pass: T3 reads only versions T1 committed at t8; T2 never sees A₁/B₁ even though T1 wrote them during T2's lifetime — MVCC gives T2 its frozen v0 snapshot. **No transaction ever consumes an uncommitted value.**\n\n## 4. Non-Repeatable Read — Absent\n\nTwo reasons, one incidental, one structural:\n\n1. **Incidental:** no transaction reads any item twice (each of T1, T2, T3 reads A once and B once). The trace contains no repeat-read event to diverge.\n2. **Structural:** even if T1 re-read A after T2's (counterfactual) commit, snapshot isolation pins T1 to v0 for its entire lifetime. Compare Read Committed, where each statement sees the latest committed state — T1's two reads could straddle T2's commit and return A₀ then A₂. That cannot happen here.\n\nThis is also why T1 and T2 compute consistently from (A₀, B₀) throughout — the frozen snapshot is what creates the *coherent* lost-update hazard rather than a messy mixed-version one.\n\n## 5. Phantom Read — Not Applicable\n\nPhantoms require a **predicate/range read** whose matching row set changes between re-evaluations (e.g., `SELECT count(*) WHERE status='open'`). The trace contains only point reads R(A), R(B) — no range scans, no inserts into any scanned range, no predicate re-evaluation. There is nothing in this history that *could* phantom. (Snapshot isolation additionally snapshots the read set, which covers most phantom exposure in practice, though that mechanism is never exercised here.)\n\n## 6. Write Skew — Not Present (but the closest structural cousin)\n\nWrite skew requires:\n- T1 and T2 **read overlapping data** ✅ (both read {A, B})\n- T1 and T2 **write disjoint items** ❌ — WS(T1) = WS(T2) = {A, B}, **identical, maximally overlapping**\n\nEach rw anti-dependency here sits on an item *both* transactions also write — so every pair is a lost-update pattern, fully resolved by WW validation. Write skew is precisely the case where the rw cycle exists but **no WW edge does**, and SI's validator has nothing to catch:\n\n> **Counterfactual:** had T1 written only {A} and T2 only {B} (still both reading {A, B}), both would commit — no write-set intersection → no abort. The rw cycle T1 ⇄ T2 materializes, the history is non-serializable, and a cross-item invariant spanning A and B could break. Same schedule shape, same SI level, opposite outcome.\n\nThe T1 ⇄ T2 rw anti-dependency structure observed in the conflict analysis is exactly what SSI's dangerous-structure detection watches; here it's defused only because the writes collide head-on. **This history is one write-set tweak away from write skew** — worth flagging to the workload owner.\n\n## 7. Two Adjacent Checks (for completeness)\n\n- **Dirty write:** T2.W(A)@t4 lands while T1.W(A)@t3 is uncommitted. In a 2PL system this would be blocked (T1 holds the write lock). In MVCC/SI it's harmless: T2 creates its *own* private version A₂, never overwrites T1's in-flight A₁ in place. The danger is deferred to commit — where it's caught.\n- **Read skew (cross-item inconsistency):** would require a transaction to see A from one point in time and B from another. T3's snapshot opens at t11 and is frozen — A₁ and B₁ come from one consistent version set. None.\n\n## 8. Bottom Line\n\n| | |\n|---|---|\n| **Materialized anomalies** | **None.** The committed state is clean. |\n| **Attempted & stopped** | Lost update ×2 (items A and B) — the T2 abort at t10 is the single enforcement event that keeps the history anomaly-free. |\n| **Latent risk under this level** | Write skew — absent only because the write sets collide; disjoint writes with this same read pattern would commit and break serializability under SI. |\n\nThe takeaway mirrors the earlier isolation-level verdict: snapshot isolation *guarantees* no dirty reads, no non-repeatable reads, no lost updates — and this history exercises exactly the lost-update path, with T2's abort as the receipt. What it does not guarantee (write skew) simply didn't get the chance to appear.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_5952ac223ccd4c7caba96a35fa24c6f3",
+      "case_id": "case_7401cb01d16a4f7bab03c4ef7b42d760",
+      "input_id": "step-5",
+      "spans": [
+        {
+          "trace_id": "667ad76e38d2cdde4e4cf62592a03793",
+          "span_id": "d646b70a5344a8f5",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792491313720415797,
+          "end_time_unix_nano": 1792491426856828816,
+          "duration_nano": 113136413019,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1792491313721988847,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1792491426854905795,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 1,
+      "retained_spans": 1,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_5952ac223ccd4c7caba96a35fa24c6f3",
+      "input_id": "step-5",
+      "step_id": "step-5",
+      "submission_id": "submission-a33b15f7240c0b64efbd7222070ea1e5",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "424f3a073fd22a4fefb81ddaa8ed9e9da6839cf46aaa618bf004087f45f89be4",
+          "size_bytes": 831,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "3f17ed4b32b8720a1d3a2ec187aa419642243ec230aa552bd383e7369a261918"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

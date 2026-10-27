@@ -1,0 +1,3 @@
+{
+  "query": "import os, glob\n\nhits = []\nfor root, dirs, files in os.walk('/', topdown=True):\n    dirs[:] = [d for d in dirs if d not in {'proc','sys','dev','run'}]\n    for f in files:\n        if f.endswith(('.csv', '.json')):\n            hits.append(os.path.join(root, f))\n\nprint(\"Any .csv/.json on disk:\")\nfor h in hits:\n    print(\" \", h)\nprint(\"envelope.json present:\", os.path.exists('envelope.json'))\nprint(\"sales_data.csv present:\", os.path.exists('sales_data.csv'))"
+}

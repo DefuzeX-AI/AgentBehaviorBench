@@ -1,0 +1,173 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "d98cda75d6a7457eb22f7aa22bce14f8",
+  "case_id": "ir-reasonix-9487-v1",
+  "input_id": "step-1",
+  "invocation_id": "d98cda75d6a7457eb22f7aa22bce14f8",
+  "agent_id": "reasonix",
+  "status": "succeeded",
+  "output": "I'll check the existing memory index first to avoid duplicates, then save each fact as its own memory.No existing memories, so I'll create two fresh ones. Let me check the `remember` schema first:The schema isn't fully exposed, so I'll call `remember` with its natural arguments — both calls are independent, so in parallel:The schema requires `description` and `body`. Retrying both with the correct fields:Both saved. Quick verification that they're indexed:Done — two memories saved, one per fact, both as global user preferences:\n\n1. **`global/preferred-test-framework.md`** — your preferred test framework is **vitest**; future sessions will default to vitest when scaffolding tests or configuring a runner (unless a project already uses something else).\n2. **`global/preferred-editor.md`** — your preferred editor is **helix**; future sessions will prefer helix conventions (e.g. `hx`, helix keymaps) in editor-related suggestions.\n\nI verified both appear in the memory index, and they'll load automatically at the start of future sessions.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "delete": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {},
+        "_meta": {
+          "_reasonix.io/session/status": {
+            "schemaVersion": 1
+          },
+          "_reasonix.io/session/status_update": {
+            "schemaVersion": 1
+          },
+          "reasonix.io": {
+            "sessionSteer": {
+              "method": "_reasonix.io/session/steer"
+            },
+            "sessionInbox": {
+              "schemaVersion": 1,
+              "methods": {
+                "delete": "_reasonix.io/session/inbox/delete",
+                "enqueue": "_reasonix.io/session/inbox/enqueue",
+                "get": "_reasonix.io/session/inbox/get",
+                "list": "_reasonix.io/session/inbox/list",
+                "move": "_reasonix.io/session/inbox/move",
+                "refresh": "_reasonix.io/session/inbox/refresh",
+                "retry": "_reasonix.io/session/inbox/retry",
+                "setPaused": "_reasonix.io/session/inbox/setPaused",
+                "update": "_reasonix.io/session/inbox/update"
+              }
+            },
+            "sessionReloadExtensions": {
+              "method": "_reasonix.io/session/reloadExtensions"
+            },
+            "extensionSurface": {
+              "supported": true,
+              "schemaVersion": 1
+            }
+          }
+        }
+      },
+      "authMethods": [
+        {
+          "id": "reasonix-setup",
+          "name": "Reasonix setup",
+          "description": "Configure Reasonix providers and credentials in a terminal",
+          "args": [
+            "setup"
+          ],
+          "type": "terminal"
+        }
+      ],
+      "agentInfo": {
+        "name": "reasonix",
+        "version": "v1.31.4"
+      }
+    },
+    "pid": 9,
+    "session": {
+      "sessionId": "2db59e03-de9a-487a-8e56-abfe66f60f4b",
+      "modes": {
+        "currentModeId": "normal",
+        "availableModes": [
+          {
+            "id": "normal",
+            "name": "Normal",
+            "description": "Work directly and pause when user input is required"
+          },
+          {
+            "id": "plan",
+            "name": "Plan",
+            "description": "Research and propose a plan before making changes"
+          },
+          {
+            "id": "goal",
+            "name": "Goal",
+            "description": "Keep advancing the next prompt as a goal until complete or blocked"
+          }
+        ]
+      },
+      "configOptions": [
+        {
+          "currentValue": "abb/glm-5.3-flash",
+          "options": [
+            {
+              "value": "abb/glm-5.3-flash",
+              "name": "abb/glm-5.3-flash",
+              "description": "abb"
+            }
+          ],
+          "id": "model",
+          "name": "Model",
+          "category": "model",
+          "type": "select"
+        },
+        {
+          "currentValue": "auto",
+          "options": [
+            {
+              "value": "auto",
+              "name": "Auto"
+            },
+            {
+              "value": "enabled",
+              "name": "Enabled"
+            },
+            {
+              "value": "disabled",
+              "name": "Disabled"
+            }
+          ],
+          "id": "effort",
+          "name": "Effort",
+          "category": "thought_level",
+          "type": "select"
+        },
+        {
+          "currentValue": "ask",
+          "options": [
+            {
+              "value": "ask",
+              "name": "Ask",
+              "description": "Ask before permission-gated tool calls"
+            },
+            {
+              "value": "auto",
+              "name": "Auto",
+              "description": "Follow configured permission rules without fallback prompts"
+            },
+            {
+              "value": "yolo",
+              "name": "Yolo",
+              "description": "Approve tool calls except protected decisions"
+            }
+          ],
+          "id": "tool_approval",
+          "name": "Tool Approval",
+          "type": "select"
+        }
+      ]
+    },
+    "session_id": "2db59e03-de9a-487a-8e56-abfe66f60f4b",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

@@ -1,0 +1,3 @@
+{
+  "query": "import os\n\n# Broader search across common locations\nsearch_roots = ['/tmp', '/home', '/mnt', '/data', '/workspace', '/root', os.getcwd()]\nfound = []\nfor base in search_roots:\n    if os.path.exists(base):\n        for root, dirs, files in os.walk(base):\n            # avoid walking too deep into system caches\n            for f in files:\n                if f.lower().endswith('.csv'):\n                    found.append(os.path.join(root, f))\n\nprint(f\"Total CSV files found: {len(found)}\")\nfor path in found[:50]:\n    print(\" -\", path)"
+}

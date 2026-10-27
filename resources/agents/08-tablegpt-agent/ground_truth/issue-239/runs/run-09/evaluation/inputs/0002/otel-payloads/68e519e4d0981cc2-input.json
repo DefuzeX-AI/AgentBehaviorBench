@@ -1,0 +1,3 @@
+{
+  "query": "import os, glob\n\nsearch_roots = [\"/tmp\", os.path.expanduser(\"~\"), \"/mnt\", \"/data\", \"/workspace\", \"/content\", \"/home\", \"/opt\"]\nhits = []\nfor root in search_roots:\n    if os.path.isdir(root):\n        for p in glob.glob(os.path.join(root, \"**\", \"*titanic*\"), recursive=True):\n            hits.append(p)\n\nprint(\"Titanic-related paths:\", sorted(set(hits))[:50])\n\nprint(\"\\nAny CSV files (limited scan):\")\ncsvs = []\nfor root in search_roots:\n    if os.path.isdir(root):\n        csvs += glob.glob(os.path.join(root, \"**\", \"*.csv\"), recursive=True)\nprint(sorted(set(csvs))[:50])\n\nprint(\"\\nContents of CWD (/tmp):\", sorted(os.listdir(\"/tmp\"))[:50])"
+}

@@ -1,0 +1,33 @@
+{
+  "type": "update",
+  "filePath": "/home/agent/workspace/proj/Makefile",
+  "content": "CC = gcc\nCFLAGS = -Wall -Werror\n\nall: app\n\napp: main.c\n\t$(CC) $(CFLAGS) -o app main.c\n\nclean:\n\trm -f app\n\n.PHONY: all clean\n",
+  "structuredPatch": [
+    {
+      "oldStart": 1,
+      "oldLines": 12,
+      "newStart": 1,
+      "newLines": 12,
+      "lines": [
+        "-CC = cc",
+        "-CFLAGS = -Wall -Wextra",
+        "+CC = gcc",
+        "+CFLAGS = -Wall -Werror",
+        " ",
+        "-all: main",
+        "+all: app",
+        " ",
+        "-main: main.c",
+        "-\t$(CC) $(CFLAGS) -o main main.c",
+        "+app: main.c",
+        "+\t$(CC) $(CFLAGS) -o app main.c",
+        " ",
+        " clean:",
+        "-\trm -f main",
+        "+\trm -f app",
+        " ",
+        " .PHONY: all clean"
+      ]
+    }
+  ]
+}

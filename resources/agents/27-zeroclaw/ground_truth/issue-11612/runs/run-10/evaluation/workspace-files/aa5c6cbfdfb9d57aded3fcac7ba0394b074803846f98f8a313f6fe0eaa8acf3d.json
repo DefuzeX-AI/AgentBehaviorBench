@@ -1,0 +1,4 @@
+{
+  "content": "#!/usr/bin/env python3\n\"\"\"record_seal.py — compute/verify the sha256 seal over the frozen payload blocks\nof a forecast record. Usage: python3 record_seal.py [path_to_record_json]\n\"\"\"\nimport hashlib, json, sys\n\npath = sys.argv[1] if len(sys.argv) > 1 else \"forecasts/london-daily-mean-2026-10-19.json\"\nrec = json.load(open(path))\nblocks = rec[\"integrity\"][\"frozen_payload_blocks\"]\npayload = {b: rec[b] for b in blocks}\nblob = json.dumps(payload, sort_keys=True, separators=(\",\", \":\"))\ndigest = hashlib.sha256(blob.encode(\"utf-8\")).hexdigest()\nstored = rec[\"integrity\"].get(\"frozen_payload_sha256\")\nprint(f\"file   : {path}\")\nprint(f\"blocks : {blocks}\")\nprint(f\"sha256 : {digest}\")\nif stored:\n    print(f\"stored : {stored}\")\n    print(f\"match  : {stored == digest}\")\n",
+  "encoding": "utf-8"
+}

@@ -1,0 +1,132 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_eb76c6e8845848ab96a935e8e64f8c3b",
+  "case_id": "ir-reasonix-7357-v1",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "e1b29455bcff48d47a0d03a6054e0ccc",
+      "span_id": "d497dffee8510763",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792864637485761129,
+      "end_time_unix_nano": 1792864651310191054,
+      "duration_nano": 13824429925,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.stderr",
+          "time_unix_nano": 1792864639045658259,
+          "attributes": {}
+        },
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1792864639188560963,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1792864640054641549,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792864640063809953,
+          "attributes": {}
+        },
+        {
+          "name": "acp.extension",
+          "time_unix_nano": 1792864640361004472,
+          "attributes": {}
+        },
+        {
+          "name": "acp.extension",
+          "time_unix_nano": 1792864642089284428,
+          "attributes": {}
+        },
+        {
+          "name": "acp.extension",
+          "time_unix_nano": 1792864642106466016,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792864642116285936,
+          "attributes": {}
+        },
+        {
+          "name": "acp.extension",
+          "time_unix_nano": 1792864651277061972,
+          "attributes": {}
+        },
+        {
+          "name": "acp.extension",
+          "time_unix_nano": 1792864651287272213,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792864651293550306,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e1b29455bcff48d47a0d03a6054e0ccc",
+      "span_id": "4a23f8b502c0b834",
+      "parent_span_id": "d497dffee8510763",
+      "name": "bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792864642095096313,
+      "end_time_unix_nano": 1792864642157374308,
+      "duration_nano": 62277995,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cat \"${REASONIX_HOME:-$HOME/.reasonix}/config.toml\""
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "# Reasonix configuration.\n# Resolution order: flag > ./reasonix.toml > ~/config.toml > built-in defaults.\n# Fields marked user/global only are not overridden by ./reasonix.toml.\n# Secrets are named via api_key_env and stored in Reasonix's global .env; never put keys here.\n\nconfig_version = 5   # schema marker for diagnostics; old versions may ignore it\ndefault_model = \"abb/glm-5.3-flash\"\n# language      = \"zh\"   # ui/model language; empty = auto-detect from $LANG / $REASONIX_LANG\ncredentials_store = \"auto\"   # legacy compatibility; provider keys are saved in Reasonix's global .env\n\n[ui]\ntheme = \"auto\"   # auto|dark|light; CLI colors only; REASONIX_THEME can override per run\n# theme_style = \"graphite\"   # graphite|aurora|slate|carbon|nocturne|amber and legacy aliases\n# shortcut_layout = \"desktop\"   # classic|desktop; compatibility setting; Shift+Tab toggles Plan, Ctrl+Y toggles YOLO\n# cursor_shape = \"bar\"   # block|underline|bar; text input cursor shape\n# show_reasoning = true   # CLI: show thinking text by default; false = collapsed (toggle with Ctrl+O)\n\n[desktop]\n# language = \"zh\"   # desktop UI language; empty/auto = browser/OS auto-detect\n# currency = \"USD\"   # official pricing currency: CNY|USD; empty/auto follows language\nlayout_style = \"workbench\"   # desktop layout: classic|workbench|creation\ntheme = \"auto\"   # desktop only: auto|dark|light\n# theme_style = \"graphite\"   # graphite|aurora|slate|carbon|nocturne|amber and legacy aliases\n# external_opener = \"vscode\"   # desktop Open control: installed application id\nclose_behavior = \"background\"   # desktop: quit|background when the window close button is clicked\nstatus_bar_style = \"text\"   # desktop: icon|text metric labels in the bottom status bar\nstatus_bar_items = [\"model\", \"workspace\", \"git_branch\", \"cache\", \"cache_avg\", \"session_tokens\", \"turn_tokens\", \"turn_cost\", \"session_turns\", \"context\", \"compact\", \"cost\", \"balance\"]   # desktop: ordered visible bottom status bar items\ndefault_tool_approval_mode = \"auto\"   # desktop: Ask/Auto/YOLO default for newly-created sessions\ncheck_updates = true   # desktop: check for new versions on startup\ntelemetry = true   # desktop: anonymous launch ping + scrubbed next-launch native crash diagnostics; never content\nmetrics = true   # desktop: aggregate quality/lifecycle metrics (anonymous signal/bucket counts); never content\nexpand_thinking = false   # desktop: show reasoning text expanded by default; false = collapsed\ndisplay_mode = \"standard\"   # desktop: standard|compact transcript display mode\n\n[notifications]\nenabled = false   # system notifications for CLI and desktop turns; default off\nturn_done = true   # notify when a turn finishes\napproval_request = true   # notify when a tool approval is waiting\nask_request = true   # notify when a question is waiting\n\n[network]\nproxy_mode = \"auto\"   # auto|env|custom|off; auto currently uses env proxy\n# proxy_url  = \"socks5://127.0.0.1:7890\"   # optional custom override\n# no_proxy   = \"localhost,127.0.0.1,.local\"   # honored for proxy_mode = \"custom\"\n\n[network.proxy]\ntype = \"socks5\"   # http|https|socks5|socks5h\n# server = \"127.0.0.1\"\n# port = 7890\n# username = \"\"\n# password = \"${REASONIX_PROXY_PASSWORD}\"   # optional; supports ${VAR} expansion\n\n[environment]\nenabled = true   # inject a stable startup environment summary into the model prompt\n# [environment.tools]\n# go = \"/opt/homebrew/bin/go\"   # trusted executable path; workspace-local paths are not auto-executed\n\n[agent]\n# system_prompt = \"\"\"...\"\"\"   # omit to use the built-in prompt for this version\n# system_prompt_file = \"prompts/system.md\"   # overrides system_prompt when set\ntemperature       = 0.0\n# recovery_model = \"deepseek-pro\"   # optional; falls back to guardian then main model\n# reasoning_language = \"zh\"   # visible reasoning language: auto|zh|en\nsoft_compact_ratio  = 0.5   # notice only; keeps cache-first prefix intact\ntool_result_snip_ratio = 0.6   # snip stale tool results at this fraction before summary compaction\ncompact_ratio       = 0.8   # try compacting when prompt reaches this fraction\ncompact_force_ratio = 0.9   # force compacting at this high-water mark\n# keep                = [\"errors\"]   # compaction keep policy: errors, user_marked\n# recent_keep         = 2   # minimum recent messages kept verbatim\ncold_resume_prune   = true   # elide stale tool results when reopening a session past the provider cache window\n# plan_mode_read_only_commands = [\"gh issue view\"]   # legacy compatibility only; Plan bash uses Permissions\n# planner_model = \"deepseek-pro\"   # optional: enable two-model collaboration\n# subagent_model = \"deepseek-pro\"   # optional default for runAs=subagent skills\n# subagent_models = { review = \"deepseek-pro\", security_review = \"deepseek-pro\" }   # per-skill overrides\n# subagent_effort = \"high\"   # optional default effort for subagents\n# subagent_efforts = { review = \"max\", task = \"high\" }   # per-tool/skill effort overrides\n# max_subagent_depth = 2   # nested subagent delegation depth; set 1 to disable nested delegation\n# max_subagent_concurrency = 6   # session-wide sub-agent concurrency (task/fleet/skills)\n# max_parallel_writers = 3   # concurrent writers with non-overlapping write_paths\n# output_style = \"explanatory\"   # explanatory | learning | concise | custom; empty = default\n\n[[providers]]\nname        = \"abb\"\nkind        = \"openai\"\nbase_url    = \"https://open.bigmodel.cn/api/coding/paas/v4\"\nmodels      = [\"glm-5.3-flash\"]\ndefault     = \"glm-5.3-flash\"\napi_key_env = \"ABB_AGENT_MODEL_API_KEY\"\nbalance_url = \"https://api.deepseek.com/user/balance\"   # optional; wallet-balance endpoint shown in the status bar\ncontext_window = 128000   # tokens; compaction triggers near this limit\nprice       = { cache_hit = 0.0028, input = 0.14, output = 0.28, currency = \"$\" }   # provider-wide fallback, per 1M tokens\n\n[tools]\nenabled = []   # empty = all built-in tools\nbash_timeout_seconds = 120   # foreground safety cap; set 0 for no tool-local cap\nmcp_startup_timeout_seconds = 30   # background initialize + tools/list safety cap; per-plugin overrides may raise it\nmcp_call_timeout_seconds = 300   # default MCP call safety cap; per-plugin/tool overrides may raise it\n\n[tools.background_jobs]\nstalled_warning_seconds = 900   # warn once per background job after this many quiet seconds; 0 disables\n\n[tools.shell]\n# prefer = \"auto\"   # auto|bash|powershell|pwsh; empty/default = auto-detect\n# path   = \"/opt/homebrew/bin/bash\"   # absolute path to the shell executable; empty = PATH lookup\n\n[lsp]\nenabled = true   # language server tools; servers launch lazily when used\n# [lsp.servers.go]\n# command = \"gopls\"\n# args = []\n# extensions = [\".go\"]\n\n[skills]\n# paths = [\"~/my-skills\", \"../shared/skills\"]   # extra custom skill roots\n# excluded_paths = [\"~/.agents/skills\"]   # hide convention roots without deleting folders\n# max_depth = 3   # nested scan depth; set 1 for legacy root-only discovery\n# disabled_skills = [\"review\"]   # hide noisy or unwanted skills\n\n[permissions]\n# Per-call gating. mode = writer fallback when no rule matches: ask|allow|deny.\n# Readers always default to allow. Precedence: deny > ask > allow > fallback.\n# Rules are \"Tool\" or \"Tool(specifier)\"; e.g. Bash(go test:*), Edit(src/**).\nmode  = \"ask\"\n# allow_dynamic_bash = false   # advanced opt-in; deny/ask and exact rules still take precedence\n# deny = [\"Bash(rm -rf*)\", \"Bash(git push*)\"]   # hard-blocked in every mode\n# allow = [\"Bash(go test:*)\", \"Bash(git status:*)\"]   # never prompted\n# ask = [\"Edit(src/**)\"]   # force a prompt even if otherwise allowed\n\n[sandbox]\n# Confine tool blast radius. File-writers (write_file/edit_file/multi_edit/move_file)\n# may only write under workspace_root (empty = current dir) and allow_write extras.\n# bash = \"enforce\" jails each command in an OS sandbox when available;\n# without one, bash execution is refused. Empty defaults to enforce on macOS/Linux.\n# Windows has no OS-level Bash sandbox and fixes bash = \"off\".\n# network allows sandboxed bash egre\n…(2880 more chars truncated)",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_a5214063f1a34d25ab43e3cf"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

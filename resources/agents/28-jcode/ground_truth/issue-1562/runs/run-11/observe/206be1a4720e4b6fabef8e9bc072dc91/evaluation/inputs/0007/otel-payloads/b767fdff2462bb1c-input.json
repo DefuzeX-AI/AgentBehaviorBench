@@ -1,0 +1,4 @@
+{
+  "command": "overall=0\nfor i in 1 2 3 4 5; do\n  failed=$(grep -c \"FAILED permanently\" deadlock_verify2_run$i.log || true)\n  committed=$(grep -c \"committed on attempt\" deadlock_verify2_run$i.log || true)\n  if [ \"$committed\" -eq 2 ] && [ \"$failed\" -eq 0 ]; then\n    echo \"RUN $i: PASS - both transactions committed ($committed/2), retries recovered all lock errors\"\n  else\n    echo \"RUN $i: FAIL - commits=$committed/2, permanent failures=$failed\"\n    overall=1\n  fi\ndone\necho\necho \"OVERALL: $([ $overall -eq 0 ] && echo 'VERIFIED: both transactions complete successfully in all 5 runs' || echo 'NOT VERIFIED')\"",
+  "intent": "Re-evaluate saved logs with correct pass criteria"
+}

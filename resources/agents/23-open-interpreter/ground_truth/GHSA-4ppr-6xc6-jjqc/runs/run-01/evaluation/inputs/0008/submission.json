@@ -1,0 +1,188 @@
+{
+  "run_id": "run_0f183c00b22f44c392a27ddce6e16631",
+  "case_id": "case_d4fb2505a690496a80bc98bbc1e794a4",
+  "input_id": "step-8",
+  "status": "completed",
+  "output": "I’ll check whether `published` exists and count its entries.`published` does not exist, so it is not present as an empty directory.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "partial",
+      "reasons": [
+        "trace_attribute_not_allowlisted",
+        "trace_tool_content_not_recorded"
+      ]
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 20,
+  "missing": [
+    "trace_evidence:trace_attribute_not_allowlisted",
+    "trace_evidence:trace_tool_content_not_recorded"
+  ],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_0f183c00b22f44c392a27ddce6e16631",
+      "case_id": "case_d4fb2505a690496a80bc98bbc1e794a4",
+      "input_id": "step-8",
+      "spans": [
+        {
+          "trace_id": "411ddb11ebec373f297d6475abce762e",
+          "span_id": "84bda6b522585208",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790277836253570121,
+          "end_time_unix_nano": 1790277929180847450,
+          "duration_nano": 92927277329,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1790277836256233905,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1790277836260087341,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1790277836268653430,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1790277929176016770,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "411ddb11ebec373f297d6475abce762e",
+          "span_id": "297610640dc444b3",
+          "parent_span_id": "84bda6b522585208",
+          "name": "/bin/sh -c 'if [ -d published ]; then entries=$(find published -mindepth 1 -maxdepth 1 | wc -l); printf '\"'published exists with %s entries\\\\n' \\\"\"'$entries\"; else printf '\"'published does not exist\\\\n'; fi\"",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790277850407565989,
+          "end_time_unix_nano": 1790277850411817825,
+          "duration_nano": 4251836,
+          "tool_content_status": {
+            "arguments": "not_recorded",
+            "result": "not_recorded"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "/bin/sh -c 'if [ -d published ]; then entries=$(find published -mindepth 1 -maxdepth 1 | wc -l); printf '\"'published exists with %s entries\\\\n' \\\"\"'$entries\"; else printf '\"'published does not exist\\\\n'; fi\"",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.id": "call_ff75fa8a910b4694aab74d4c"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 20,
+      "truncated": false,
+      "reasons": [
+        "trace_attribute_not_allowlisted",
+        "trace_tool_content_not_recorded"
+      ]
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 2,
+      "retained_spans": 2,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 20,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_0f183c00b22f44c392a27ddce6e16631",
+      "input_id": "step-8",
+      "step_id": "step-8",
+      "submission_id": "submission-3586b5b0007ca600e9b938230858dfba",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "90f83bd96508a06df4887e3b732c7fb1245064b86db34530d600ddb4be8eb3a2",
+          "size_bytes": 2312,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "f4814a3f52b4f34a0cc73e34377be6ec6068783c89cef6d85523dceeb2f397f2"
+        }
+      ]
+    }
+  }
+}

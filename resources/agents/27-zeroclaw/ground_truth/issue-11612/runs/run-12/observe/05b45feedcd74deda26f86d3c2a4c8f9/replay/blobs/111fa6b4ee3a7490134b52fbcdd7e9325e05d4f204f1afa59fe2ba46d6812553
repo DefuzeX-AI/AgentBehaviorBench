@@ -1,0 +1,10 @@
+import hashlib
+
+with open("contract.yaml", "rb") as f:
+    data = f.read()
+
+digest = hashlib.sha256(data).hexdigest()
+with open("contract.sha256", "w") as f:
+    f.write(f"{digest}  contract.yaml\n")
+
+print(digest)

@@ -1,0 +1,49 @@
+{
+  "content": "Looking at this task, the user instruction asks about database replication configuration, but the provided dataset is a bike sales transaction table (`date`, `bike_model`, `price`, `quantity_sold`, `extended_sales`) with no connection/configuration metadata. Since no database config exists in the data, I apply the recommended wrangling steps to deliver a clean, analysis-ready DataFrame, deriving all column logic from the data itself.\n\n```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # ------------------------------------------------------------------\n    # NOTE ON USER INSTRUCTIONS:\n    # The user asked to identify source/target database connection details\n    # and confirm replication-user privileges from a configuration. The\n    # provided dataset is a bike sales transaction table (date, bike_model,\n    # price, quantity_sold, extended_sales) and contains NO configuration or\n    # connection metadata, so no replication info can be extracted. We apply\n    # the recommended standard wrangling steps instead, deriving all column\n    # usage from the data structure itself (no hardcoded assumptions beyond\n    # semantic name patterns present in this data).\n    # ------------------------------------------------------------------\n\n    # --- Step 0: Normalize input to a list of DataFrames (error guard) ---\n    if not isinstance(data_list, list):\n        data_list = [data_list]  # wrap a single DataFrame into a list\n    frames = []\n    for d in data_list:\n        if isinstance(d, pd.DataFrame):\n            d = d.copy()\n            # Step 1: Standardize column names -> lowercase, underscores, trimmed\n            d.columns = [str(c).strip().lower().replace(' ', '_') for c in d.columns]\n            frames.append(d)\n    if len(frames) == 0:\n        return pd.DataFrame()  # nothing usable was provided\n\n    # --- Step 2: Combine multiple datasets safely (avoid Cartesian products) ---\n    if len(frames) == 1:\n        df = frames[0]\n    else:\n        # Derive shared columns across all frames to use as join keys\n        common = set(frames[0].columns)\n        for f in frames[1:]:\n            common &= set(f.columns)\n        common = sorted(common)\n        if common:\n            # De-duplicate key columns before joining so row counts cannot explode\n            df = frames[0].drop_duplicates(subset=common)\n            for f in frames[1:]:\n                df = df.merge(f.drop_duplicates(subset=common), on=common, how='left')\n        else:\n            # No shared keys: stack rows rather than force a Cartesian product\n            df = pd.concat(frames, ignore_index=True, sort=False)\n\n    # --- Step 3: Normalize data types (derived from content/name patterns) ---\n    for col in list(df.columns):\n        if df[col].dtype == object:\n            s = df[col].dropna().astype(str)\n            if s.empty:\n                continue\n            # Datetime detection: >=90% of values must look like calendar dates\n            date_like = s.str.match(r'^\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}([ T].*)?$') | \\\n                        s.str.match(r'^\\d{1,2}[-/]\\d{1,2}[-/]\\d{2,4}$')\n            if date_like.mean() >= 0.9:\n                df[col] = pd.to_datetime(df[col], errors='coerce')\n            # Numeric detection only for measure-like column names (sales/price/qty)\n            elif any(t in col for t in ('price', 'quantity', 'qty', 'sales',\n                                        'amount', 'revenue', 'extended')):\n                cleaned = s.str.replace(r'[$,\\s]', '', regex=True)\n                if pd.to_numeric(cleaned, errors='coerce').notna().mean() >= 0.9:\n                    df[col] = pd.to_numeric(\n                        df[col].astype(str).str.replace(r'[$,\\s]', '', regex=True),\n                        errors='coerce'\n                    )\n\n    # --- Step 3b: Clean text values: trim whitespace, unify blanks to NaN ---\n    for col in [c for c in df.columns if df[c].dtype == object]:\n        df[col] = df[col].astype(str).str.strip()\n        df[col] = df[col].replace({'': np.nan, 'nan': np.nan,\n                                   'NaN': np.nan, 'None': np.nan})\n\n    # --- Step 4: Missing values -> flag + simple imputation (no row drops) ---\n    for col in list(df.columns):  # snapshot columns; we may add flag columns\n        na_mask = df[col].isna()\n        if not na_mask.any():\n            continue\n        df[f'{col}_was_missing'] = na_mask.astype(int)  # keep an audit flag\n        if pd.api.types.is_numeric_dtype(df[col]):\n            df[col] = df[col].fillna(df[col].median())       # robust to outliers\n        elif pd.api.types.is_datetime64_any_dtype(df[col]):\n            df[col] = df[col].ffill().bfill()                # preserve time continuity\n        else:\n            modes = df[col].mode(dropna=True)\n            df[col] = df[col].fillna(modes.iloc[0] if len(modes) else 'Unknown')\n\n    # --- Step 5: Categorical handling: low-cardinality text -> category dtype ---\n    for col in df.select_dtypes(include='object').columns:\n        if df[col].nunique(dropna=True) <= max(50, 0.5 * len(df)):\n            df[col] = df[col].astype('category')\n\n    # --- Step 6: Consistency / anomaly check derived from the data ---\n    # Extended sales should equal price x quantity; flag & fix mismatches\n    # rather than dropping rows.\n    price_cols = [c for c in df.columns\n                  if 'price' in c and pd.api.types.is_numeric_dtype(df[c])]\n    qty_cols = [c for c in df.columns\n                if ('quantity' in c or 'qty' in c) and pd.api.types.is_numeric_dtype(df[c])]\n    ext_cols = [c for c in df.columns\n                if 'extended' in c and pd.api.types.is_numeric_dtype(df[c])]\n    if price_cols and qty_cols and ext_cols:\n        ext = ext_cols[0]\n        recomputed = df[price_cols[0]] * df[qty_cols[0]]\n        bad = recomputed.notna() & (df[ext] != recomputed)\n        if bad.any():\n            df[f'{ext}_anomaly_flag'] = bad.astype(int)  # flag the anomalies\n            df.loc[bad, ext] = recomputed[bad].astype(df[ext].dtype)  # correct values\n\n    # --- Step 7: Remove exact duplicate rows (identical rows add no information) ---\n    df = df.drop_duplicates().reset_index(drop=True)\n\n    # Return a single clean pandas DataFrame\n    return df\n```\n\n**Key non-trivial steps explained:**\n- **Instruction mismatch handled**: No database/replication configuration exists in the data, so the standard wrangling pipeline is applied, with the limitation documented in comments.\n- **Type inference is content-driven**: the `date` column is auto-detected as datetime via regex date-pattern matching; numeric keyword patterns guard against coercing text like `bike_model`.\n- **No data loss**: missing values are flagged (`*_was_missing`) and imputed (median/ffill/mode) instead of dropping rows; only exact duplicate rows are removed.\n- **Arithmetic consistency check**: `extended_sales` is validated against `price × quantity_sold`; mismatches are flagged (`*_anomaly_flag`) and corrected rather than discarded.\n- **Merge safety**: if multiple datasets ever arrive, they're joined only on shared de-duplicated keys — never a Cartesian product.",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 6433,
+      "prompt_tokens": 745,
+      "total_tokens": 7178,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 4743,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "glm-5.3-flash",
+    "system_fingerprint": null,
+    "id": "202609252110143bd179d1fb234c65",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a0d8b0-1b96-74c1-ad58-1223dbdcc0ad-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 745,
+    "output_tokens": 6433,
+    "total_tokens": 7178,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 4743
+    }
+  }
+}

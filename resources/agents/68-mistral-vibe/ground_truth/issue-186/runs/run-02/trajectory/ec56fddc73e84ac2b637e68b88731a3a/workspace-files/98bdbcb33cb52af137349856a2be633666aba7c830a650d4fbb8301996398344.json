@@ -1,0 +1,4 @@
+{
+  "content": "from __future__ import annotations\n\nfrom dataclasses import dataclass, field\n\nfrom ..._base_connection import _TYPE_BODY\n\n\n@dataclass\nclass EmscriptenRequest:\n    method: str\n    url: str\n    params: dict[str, str] | None = None\n    body: _TYPE_BODY | None = None\n    headers: dict[str, str] = field(default_factory=dict)\n    timeout: float = 0\n    decode_content: bool = True\n\n    def set_header(self, name: str, value: str) -> None:\n        self.headers[name.capitalize()] = value\n\n    def set_body(self, body: _TYPE_BODY | None) -> None:\n        self.body = body\n",
+  "encoding": "utf-8"
+}

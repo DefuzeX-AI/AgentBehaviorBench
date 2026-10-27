@@ -1,0 +1,24 @@
+import sqlite3
+
+
+def main():
+    with sqlite3.connect("inventory.db") as connection:
+        connection.execute("BEGIN")
+        try:
+            connection.execute(
+                "UPDATE products SET quantity = ? WHERE name = ?",
+                (8, "Widget"),
+            )
+            connection.execute(
+                "INSERT INTO products (id, name, quantity) VALUES (?, ?, ?)",
+                (4, "Doodad", 3),
+            )
+            connection.execute("SAVEPOINT before_gadget")
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+
+
+if __name__ == "__main__":
+    main()

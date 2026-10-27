@@ -1,0 +1,22 @@
+{
+  "messages": [
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "```pycon\n\n--- BASELINE (in-order) ---\n    ev part event_time   pos_wm  glob_wm state\n    e1    1 00:00:00 23:59:30 23:59:30 buffered\n    e2    2 00:01:00 00:00:30 23:59:30 buffered\n    e3    1 00:02:00 00:01:30 00:00:30 buffered\n    e4    0 00:03:00 00:02:30 00:00:30 buffered\n    e5    2 00:04:00 00:03:30 00:01:30 buffered\n    e6    1 00:05:00 00:04:30 00:02:30 buffered\n    e7    0 00:06:00 00:05:30 00:03:30 buffered\n    e8    2 00:07:00 00:06:30 00:04:30 buffered\n    e9    1 00:08:00 00:07:30 00:05:30 FIRE 00:00\n   e10    0 00:09:00 00:08:30 00:06:30 buffered\nfired: {'00:00': '(gwm=00:05:30)'}\n\n--- LATE e11 @00:07 on p0 (arrives last) ---\n    ev part event_time   pos_wm  glob_wm state\n    e1    1 00:00:00 23:59:30 23:59:30 buffered\n    e2    2 00:01:00 00:00:30 23:59:30 buffered\n    e3    1 00:02:00 00:01:30 00:00:30 buffered\n    e4    0 00:03:00 00:02:30 00:00:30 buffered\n    e5    2 00:04:00 00:03:30 00:01:30 buffered\n    e6    1 00:05:00 00:04:30 00:02:30 buffered\n    e7    0 00:06:00 00:05:30 00:03:30 buffered\n    e8    2 00:07:00 00:06:30 00:04:30 buffered\n    e9    1 00:08:00 00:07:30 00:05:30 FIRE 00:00\n   e10    0 00:09:00 00:08:30 00:06:30 buffered\n   e11    0 00:07:00 00:08:30 00:06:30 buffered\nfired: {'00:00': '(gwm=00:05:30)'}\n\n--- VERY LATE e12 @00:02 into fired [00:00,00:05) ---\n    ev part event_time   pos_wm  glob_wm state\n    e1    1 00:00:00 23:59:30 23:59:30 buffered\n    e2    2 00:01:00 00:00:30 23:59:30 buffered\n    e3    1 00:02:00 00:01:30 00:00:30 buffered\n    e4    0 00:03:00 00:02:30 00:00:30 buffered\n    e5    2 00:04:00 00:03:30 00:01:30 buffered\n    e6    1 00:05:00 00:04:30 00:02:30 buffered\n    e7    0 00:06:00 00:05:30 00:03:30 buffered\n    e8    2 00:07:00 00:06:30 00:04:30 buffered\n    e9    1 00:08:00 00:07:30 00:05:30 FIRE 00:00\n   e10    0 00:09:00 00:08:30 00:06:30 buffered\n   e12    1 00:02:30 00:07:30 00:06:30 LATE->00:00(side-out)\nfired: {'00:00': '(gwm=00:05:30)'}\n\n{1: Timestamp('2024-01-01 00:07:30+0000', tz='UTC'),\n 2: Timestamp('2024-01-01 00:06:30+0000', tz='UTC'),\n 0: Timestamp('2024-01-01 00:08:30+0000', tz='UTC')}\n```"
+        }
+      ],
+      "additional_kwargs": {
+        "parent_id": "2016679a-0a70-4bed-8261-8e5ab1371821"
+      },
+      "response_metadata": {},
+      "type": "tool",
+      "name": "python",
+      "id": "6d57ced8-6831-43ba-924b-84e8e0fe3227",
+      "tool_call_id": "c2c78063-62f5-4f8e-b2b5-3b275372c65e",
+      "artifact": [],
+      "status": "success"
+    }
+  ]
+}

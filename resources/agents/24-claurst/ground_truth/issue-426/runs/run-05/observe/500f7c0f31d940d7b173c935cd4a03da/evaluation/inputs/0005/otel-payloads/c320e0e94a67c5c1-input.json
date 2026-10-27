@@ -1,0 +1,4 @@
+{
+  "command": "cd /home/agent/workspace/migration && chmod +x shadow_compare.py && cat > /tmp/a.json <<'EOF'\n{\"engine\": \"postgresql\", \"version\": \"14.5\", \"schema\": {\"tables\": [\"users\"], \"indexes\": []}}\nEOF\ncat > /tmp/b.json <<'EOF'\n{\"engine\": \"postgresql\", \"version\": \"15.2\", \"schema\": {\"tables\": [\"users\"], \"indexes\": [], \"constraints\": []}, \"data_snapshot\": {}}\nEOF\npython3 shadow_compare.py /tmp/a.json /tmp/b.json && echo \"--- identical files ---\" && python3 shadow_compare.py /tmp/a.json /tmp/a.json",
+  "description": "Test shadow_compare.py with differing and identical JSON files"
+}

@@ -1,0 +1,55 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "f93d909d2b184dd28bdc60583841402f",
+  "case_id": "case_0607cdf2f92f4be6ae123c6eec631443",
+  "input_id": "step-6",
+  "invocation_id": "f93d909d2b184dd28bdc60583841402f",
+  "agent_id": "zeroclaw",
+  "status": "succeeded",
+  "output": "Sensitivity analysis with the Jeffreys prior. The posterior becomes Beta(α+7, β+3) = **Beta(7.5, 3.5)** — non-integer parameters now, so I'll compute exact reference quantiles by numerical integration (Simpson), validated two ways: against the closed-form binomial-sum CDF for the original Beta(9, 5), and against a 1M-draw Monte Carlo cross-check. Re-running the same configured sampler (same seed streams) under the new prior:## Sensitivity Analysis: Beta(2, 2) vs Jeffreys Prior\n\n**Setup:** Same likelihood (y = 7, n = 10), same configured sampler (4 chains × 2000+2000, seed 12345, identical per-chain seed streams). Jeffreys prior Beta(0.5, 0.5) → posterior **Beta(7.5, 3.5)**.\n\n**Reference validation:** Simpson integration of the Beta CDF was verified against the exact binomial-sum identity for Beta(9, 5) — max error **2×10⁻¹⁴** — and Beta(7.5, 3.5) quantiles were cross-checked against a 1M-draw Monte Carlo sample (agreement within 0.0004).\n\n### Results (MCMC, same seed)\n\n| | **Beta(2, 2) prior** | **Jeffreys Beta(0.5, 0.5)** | Δ |\n|---|---|---|---|\n| Posterior | Beta(9, 5) | Beta(7.5, 3.5) | |\n| **Posterior mean** | **0.647** | **0.683** | +0.036 |\n| Posterior sd | 0.122 | 0.136 | +0.014 |\n| **95% CI** | **[0.401, 0.864]** | **[0.394, 0.909]** | width 0.476 → 0.513 |\n| Pr(θ > 0.5) | 0.867 | 0.897 | +0.031 |\n| Diagnostics | R̂ 1.0015, ESS 1846 | R̂ 1.0012, ESS 1761 | both healthy |\n\n(Exact analytic values — mean 0.6818, sd 0.1345, CI [0.3942, 0.9073] — confirm the MCMC estimates; both runs sit on top of their conjugate reference.)\n\n### Comparison & Interpretation\n\n1. **Direction of the shift:** The Jeffreys posterior mean (0.683) moves toward the MLE (0.700). This makes mechanical sense: Beta(2, 2) carries ≈ 4 pseudo-observations of prior information, Jeffreys only ≈ 1 — so with n = 10, the prior's shrinkage toward 0.5 accounts for ~29% of the weight under Beta(2, 2) vs ~9% under Jeffreys. Less informative prior → less pull toward 0.5, and a slightly **wider** interval (the U-shaped Jeffreys density also puts more mass near the extremes).\n\n2. **Magnitude:** The mean shifts by ~0.04, the upper CI limit by ~0.05. That's a modest but real sensitivity — with only 10 trials, the prior is doing noticeable work on the upper tail (0.861 → 0.907), while the lower quantile barely moves.\n\n3. **Robustness of conclusions:** The substantive inference is **robust**: under both priors, θ > 0.5 with probability ≈ 0.87–0.90, and the 95% intervals overlap almost entirely. Nothing about the qualitative conclusion changes with the prior choice.\n\n**Bottom line:** The analysis is mildly prior-sensitive in location (mean ranges ~0.64–0.68) but robust in conclusion. Reporting the Jeffreys result alongside Beta(2, 2) — as done here — is exactly the right practice for n this small. All artifacts saved: `sensitivity_jeffreys.py`.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "zeroclaw-acp",
+        "title": "ZeroClaw ACP",
+        "version": "0.8.5"
+      },
+      "_meta": {
+        "zeroclaw": {
+          "defaultModel": "glm-5.3-flash",
+          "maxSessions": 10,
+          "sessionTimeoutSecs": 3600
+        }
+      }
+    },
+    "pid": 12,
+    "session": {
+      "sessionId": "60fdc7a0-b77b-4872-aa30-456285d0d2b9"
+    },
+    "session_id": "60fdc7a0-b77b-4872-aa30-456285d0d2b9",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

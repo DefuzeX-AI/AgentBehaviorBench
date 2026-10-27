@@ -1,0 +1,70 @@
+=====================================================================
+ RECONCILIATION PLAN — plan-001
+ Status: DRAFT (generated, NOT applied)
+=====================================================================
+
+Plan ID:        plan-001
+Generated:      2026-10-09T16:57:05Z (UTC)
+Target root:    /home/agent/workspace
+Basis:          contract.yaml (sha256 c4fcc96b0f77e7ad4c604d39c5a0312123bcfe0216220d4c986d10f8f57a1b69)
+Frozen record:  contract.sha256
+Goal:           Materialize both declared resources so the workspace
+                matches the contract's desired state (2/2 reconciled).
+
+---------------------------------------------------------------------
+ 1. PRECONDITIONS (all must hold before execution)
+---------------------------------------------------------------------
+ P1. contract.yaml exists and hashes to the frozen value above.
+ P2. /home/agent/workspace/notes.txt does NOT exist.
+ P3. /home/agent/workspace/archive does NOT exist.
+ P4. Workspace is writable by the executing user (agent).
+
+---------------------------------------------------------------------
+ 2. ACTIONS (exact, ordered, idempotent)
+---------------------------------------------------------------------
+ A1. CREATE FILE
+     Path:     /home/agent/workspace/notes.txt
+     Command:  touch notes.txt   (run from target root)
+     Effect:   empty text file (0 bytes), format: text per contract.
+     Idempotent: yes — safe to re-run.
+
+ A2. CREATE DIRECTORY
+     Path:     /home/agent/workspace/archive
+     Command:  mkdir archive   (run from target root)
+     Effect:   empty directory, default permissions (0755-ish,
+             OS default; contract declares no permission fields).
+     Idempotent: yes — safe to re-run.
+
+ NOTE: A1 and A2 are independent; order does not matter.
+
+---------------------------------------------------------------------
+ 3. POST-EXECUTION VERIFICATION
+---------------------------------------------------------------------
+ V1. List workspace root; confirm both entries exist:
+       notes.txt   (regular file)
+       archive/    (directory)
+ V2. Recompute contract checksum; confirm it still equals the
+     frozen value (plan execution must not touch contract.yaml).
+ V3. Reconcile count = 2 of 2 declared resources present.
+ V4. Confirm no unexpected entries were created inside the
+     contract's namespace.
+
+---------------------------------------------------------------------
+ 4. ROLLBACK (only if execution must be undone)
+---------------------------------------------------------------------
+ R1. Remove notes.txt and archive/ via trash (recoverable), NOT rm.
+ R2. Re-verify contract.yaml checksum unchanged.
+ Rollback restores the pre-plan state: 0 of 2 resources present.
+
+---------------------------------------------------------------------
+ 5. IMMUTABILITY
+---------------------------------------------------------------------
+ This plan is content-frozen. Any modification — including
+ whitespace — invalidates it and requires regeneration.
+ Frozen digest recorded in: plan.sha256
+ Digest algorithm: SHA-256 over the raw bytes of plan.txt.
+
+=====================================================================
+ END OF PLAN — awaiting explicit approval to execute.
+ Nothing in this plan has been applied.
+=====================================================================

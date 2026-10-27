@@ -1,0 +1,3 @@
+{
+  "command": "cd /workspace/project && perl -0pi -e 's/(?<!\\r)\\n/\\r\\n/g' app.ini && od -c app.ini && echo \"--- bytes: $(wc -c < app.ini)\" && printf 'name=demo\\r\\nhost=0.0.0.0\\r\\nport=9090\\r\\ndebug=false\\r\\nlog=info\\r\\n' > /tmp/expected.ini && cmp app.ini /tmp/expected.ini && echo \"EXACT MATCH vs expected\""
+}

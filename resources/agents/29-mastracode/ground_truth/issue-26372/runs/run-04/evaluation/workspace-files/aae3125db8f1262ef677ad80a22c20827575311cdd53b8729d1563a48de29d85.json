@@ -1,0 +1,4 @@
+{
+  "content": "-- Migration 001: Create initial orders table\n-- Target: SQLite (data/app.db)\n\nBEGIN TRANSACTION;\n\nCREATE TABLE IF NOT EXISTS orders (\n    id          INTEGER PRIMARY KEY AUTOINCREMENT,\n    customer_id INTEGER NOT NULL,\n    amount      REAL    NOT NULL CHECK (amount >= 0),\n    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))\n);\n\nCREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders (customer_id);\nCREATE INDEX IF NOT EXISTS idx_orders_created_at  ON orders (created_at);\n\nCOMMIT;\n",
+  "encoding": "utf-8"
+}

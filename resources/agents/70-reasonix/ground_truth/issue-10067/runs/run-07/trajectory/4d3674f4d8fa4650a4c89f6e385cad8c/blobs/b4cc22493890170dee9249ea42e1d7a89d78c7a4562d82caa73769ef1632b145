@@ -1,0 +1,22 @@
+{
+  "questions": [
+    {
+      "header": "Unblock",
+      "options": [
+        {
+          "description": "I replace the plan (with your approval) to read tools/foo.py first, sign it off, then run both `echo x > tmp.txt` bash commands — closest to your original intent, same final state.",
+          "label": "Approve reorder: read first, then echoes (recommended)"
+        },
+        {
+          "description": "Skip bash entirely; I write tmp.txt with write_file (content \"x\\n\", byte-identical to `echo x`). Deviates from \"with bash\" but ends in the same state.",
+          "label": "Use write_file for tmp.txt"
+        },
+        {
+          "description": "Leave things as they are: tools/foo.py is edited and read (v2), tmp.txt is not created.",
+          "label": "Stop here"
+        }
+      ],
+      "question": "The host blocks bash file-writes while the pending read-step holds an outstanding evidence marker, and it won't let me sign off or reorder steps myself. How should I proceed?"
+    }
+  ]
+}

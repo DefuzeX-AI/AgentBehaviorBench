@@ -1,0 +1,3 @@
+{
+  "query": "import os, glob\ncwd = os.getcwd()\nprint(\"cwd:\", cwd)\nhits = []\nfor pat in (\"**/*.csv\",\"**/*.json\",\"**/*.parquet\",\"**/*.tsv\",\"**/*.jsonl\"):\n    hits += glob.glob(pat, recursive=True)\nhits = [h for h in hits if not h.startswith(\".ipynb\")][:80]\nprint(\"candidate files found:\", len(hits))\nfor h in hits: print(\"  \", h)\nprint(\"\\ntop-level dir:\", sorted(os.listdir(cwd))[:40])"
+}

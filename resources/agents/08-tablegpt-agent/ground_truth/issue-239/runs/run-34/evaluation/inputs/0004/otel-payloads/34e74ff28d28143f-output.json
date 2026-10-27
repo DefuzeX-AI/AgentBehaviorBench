@@ -1,0 +1,6 @@
+[
+  {
+    "type": "text",
+    "text": "=== QTR Field Lineage ===\n               report_field        target_col                         derivation source_entity source_field        transform      group_by currency_split\n   total transaction volume        txn_volume                      COUNT of rows  core_txn_log        count          count()             —             No\n     number of transactions         txn_count        COUNT DISTINCT of record id  core_txn_log    record_id count_distinct()             —             No\naggregate value by currency value_by_currency SUM of amount, grouped by currency  core_txn_log       amount            sum() currency_code            Yes\n\n=== Consistency Checks ===\n1) Count-based fields not split by currency: ['txn_volume', 'txn_count'] (2 fields derived from the SAME source entity core_txn_log)\n2) 'txn_volume' (from 'count') and 'txn_count' (from 'record_id') both measure transaction quantity -> SEMANTIC OVERLAP / possible redundancy.\n3) Only 'value_by_currency' carries a group_by -> only field with a currency dimension.\n"
+  }
+]
