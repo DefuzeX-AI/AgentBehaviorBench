@@ -289,7 +289,7 @@ def fake_agent_runtime(tmp_path, monkeypatch):
                                              identity={"suite_id": "suite-1", "job_id": "job-1"})
     config = SimpleNamespace(build_context=tmp_path, dockerfile=tmp_path / "Dockerfile",
                              agent_id="test-agent", environment={}, workdir="/app",
-                             argv=["echo", "test"], timeout_sec=3, memory=None,
+                             argv=["echo", "test"], timeout_sec=3,
                              model_target=None, model_metadata_paths=(), replacement_model_provider=None)
     monkeypatch.setattr(module.AgentContainerConfig, "from_agent_dir", lambda *args, **kwargs: config)
     monkeypatch.setattr(module.InterceptionConfig, "from_agent_dir", lambda *args, **kwargs: None)

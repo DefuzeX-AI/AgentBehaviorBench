@@ -11,7 +11,6 @@ import subprocess
 import tempfile
 import threading
 from collections.abc import Callable, Mapping
-from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
 
@@ -314,11 +313,6 @@ class DockerRuntime:
                                       deadline=preparation)
                 network_arguments = ["--network", network_name]
 
-            # A manifest override applies only to this Agent, never to a custom
-            # SDK controller policy or a subsequent Agent using this runtime.
-            execution_policy = self._policy
-            if config.memory is not None and isinstance(execution_policy, DockerPolicy):
-                execution_policy = replace(execution_policy, memory=config.memory)
             # Assemble docker-create arguments without starting the Agent yet.
             command = [
                 "create",
@@ -329,7 +323,7 @@ class DockerRuntime:
                 *network_arguments,
                 "--workdir",
                 config.workdir,
-                *execution_policy.run_arguments(),
+                *self._policy.run_arguments(),
             ]
             if interceptor is not None:
                 # Mount the interceptor certificate into the Agent container.

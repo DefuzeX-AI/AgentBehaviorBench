@@ -14,14 +14,8 @@ class ManifestOptions:
     observe: bool = False
     adapter_context: dict | None = None
     evaluation: dict | None = None
-    memory: str | None = None
 
     def __post_init__(self):
-        from agentbench.runtime.agentcontainer.config import validated_memory
-        try:
-            validated_memory(self.memory)
-        except ValueError as exc:
-            raise BuildError(str(exc)) from None
         if self.evaluation is not None:
             from agentbench.sdk.common.workspace import workspace_policy
             workspace_policy({'evaluation': self.evaluation})

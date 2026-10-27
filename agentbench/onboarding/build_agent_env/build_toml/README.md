@@ -76,19 +76,3 @@ a model. The caller can validate it with `validate_manifest` and save it outside
 the Agent directory for review. Facts reused from a manual configuration are not
 equivalent to a fresh model/source audit. Static validation does not prove that
 the complete Agent works; certification and real execution remain separate.
-
-## Per-Agent memory
-
-An operator may supply `ManifestOptions(memory="2g")`, or set `memory = "2g"`
-under `[runtime]` in a manually prepared manifest. The value is an integral byte
-count or an integer with a `b`, `k`, `m` or `g` suffix (case-insensitive), at least
-Docker's 6 MiB minimum and within its signed 64-bit byte count. Invalid values
-fail validation before an Agent or SDK controller is created.
-
-The setting changes only the target Agent's hard memory limit. The SDK controller,
-model interceptor and egress observer keep their existing limits; CPU, process,
-filesystem and network policies are unchanged. Omission preserves the default
-1 GiB Agent limit (or an explicitly supplied runtime policy). The runtime records
-the effective memory argument in execution-environment evidence. Memory is an
-operator-owned deployment choice, not a model-extracted fact. No extra CLI flag
-is required to preserve it in a manual manifest.

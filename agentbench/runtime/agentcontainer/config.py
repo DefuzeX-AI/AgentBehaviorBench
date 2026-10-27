@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import math
-import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,25 +24,6 @@ class ContainerConfigurationError(ValueError):
     """Raised when a Docker agent declaration is invalid."""
 
 
-def validated_memory(value: object) -> str | None:
-    """Validate an explicit Agent-only Docker memory limit; None preserves policy."""
-    if value is None:
-        return None
-    if not isinstance(value, str) or not re.fullmatch(r"[1-9][0-9]*[bkmg]?", value, re.IGNORECASE | re.ASCII):
-        raise ContainerConfigurationError("runtime.memory must be a positive integral Docker size, such as '2g'")
-    normalized = value.lower()
-    suffix = normalized[-1] if normalized[-1].isalpha() else ''
-    digits = normalized[:-1] if suffix else normalized
-    if len(digits) > 19:
-        raise ContainerConfigurationError("runtime.memory must fit Docker's signed 64-bit byte limit")
-    size = int(digits) * {'': 1, 'b': 1, 'k': 1024, 'm': 1024**2, 'g': 1024**3}[suffix]
-    if size > 2**63 - 1:
-        raise ContainerConfigurationError("runtime.memory must fit Docker's signed 64-bit byte limit")
-    if size < 6 * 1024**2:
-        raise ContainerConfigurationError("runtime.memory must be at least Docker's minimum of 6m")
-    return normalized
-
-
 @dataclass(frozen=True, slots=True)
 class AgentContainerConfig:
     agent_root: Path
@@ -57,7 +37,6 @@ class AgentContainerConfig:
     model_target: ModelTargetConfig | None = None
     model_metadata_paths: tuple[str, ...] = ()
     replacement_model_provider: ModelTargetProvider | None = None
-    memory: str | None = None
 
     @classmethod
     def from_agent_dir(
@@ -73,7 +52,6 @@ class AgentContainerConfig:
         with (root / "agent.toml").open("rb") as stream:
             manifest = tomllib.load(stream)
         runtime = _required_table(manifest, "runtime")
-        memory = validated_memory(runtime.get('memory'))
         context, dockerfile, argv_value = docker_structure(root, manifest)
         launch = _required_table(manifest, "launch")
 
@@ -117,7 +95,6 @@ class AgentContainerConfig:
             model_target=target,
             model_metadata_paths=metadata_paths,
             replacement_model_provider=replacement_provider,
-            memory=memory,
         )
 
 

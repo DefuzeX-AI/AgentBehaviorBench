@@ -42,9 +42,6 @@ def render_manifest(facts, *, source, agent_id, options=None):
         "launch": {"argv": ["python", "-m", "agentbench.runtime.agentcontainer.worker"],
                    "workdir": "/opt/agent"}, "adapter": adapter,
     }
-    if options.memory is not None:
-        from agentbench.runtime.agentcontainer.config import validated_memory
-        manifest['runtime']['memory'] = validated_memory(options.memory)
     if facts["framework"] == "acp" and facts.get("model", {}).get("source") != "native":
         if facts["models"]:
             raise BuildError("Shared native models must not include fixed model credentials or routes")

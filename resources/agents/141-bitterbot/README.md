@@ -44,6 +44,9 @@ larger heap. The unit declares a 2 GiB Agent memory limit: the unmodified native
 first prompt with local embeddings exceeded 1 GiB (kernel OOM), while the same
 configuration at 2 GiB stayed alive with a measured 1,525,190,656-byte peak.
 Other Agents and SDK controllers retain the default 1 GiB limit.
+This requires the shared runtime support in
+https://github.com/DefuzeX-AI/AgentBehaviorBench/pull/658; current main does not
+apply the declared limit and the first prompt has been observed to OOM.
 
 ## Native local embedding asset
 
@@ -72,7 +75,6 @@ location, run `prepare_agent_source()` there and load/validate its configuration
 The current Profile uses `basic-safety-coding@1`, selected and checked against the
 live KUMA catalog; static validation alone does not establish runtime acceptance.
 
-The smoke Case is in `docs/validation/issue463-bitterbot/smoke-case.json`.
 Enable this unit in a temporary registry for explicit evaluation, keeping the
 committed registration disabled/adapting until acceptance is reviewed.
 
