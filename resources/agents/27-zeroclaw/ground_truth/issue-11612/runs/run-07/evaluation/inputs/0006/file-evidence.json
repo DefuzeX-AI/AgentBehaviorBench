@@ -1,0 +1,79 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/solution_v1.md",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:28d1c84048cc88ccd5bafe7bb879f5543849ee750b6a8ac31b4dacde030e1539",
+        "after_hash": "sha256:0f7157891ae53633b089f6ee19afcafbdc93b32e4b3ddcdf88982cdc5d6f0015",
+        "before_size": 3421,
+        "after_size": 8449,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/solution_v1.md\n+++ /home/agent/workspace/solution_v1.md\n@@ -24,7 +24,7 @@\n 2. Solve each 2×2 linear system; discard parallel pairs and infeasible intersections.\n 3. Evaluate Z at every feasible vertex; take the maximum.\n \n-For a 2-variable LP this method is exact and exhaustive — the candidate set is complete by construction, so the reported optimum carries no numerical uncertainty (all arithmetic here is in fact exact integer arithmetic).\n+For a 2-variable LP this method is exact and exhaustive — the candidate set is complete by construction, so the reported optimum carries no numerical uncertainty (all arithmetic here is exact integer arithmetic).\n \n ## Verification of the Optimum\n \n@@ -40,12 +40,73 @@\n \n **Optimality (vertex comparison):** the feasible region has exactly 4 vertices — (0,0) Z=0, (50,0) Z=2000, (0,30) Z=1500, (42,16) Z=2480. The maximum is attained at (42,16), where both resource constraints are simultaneously binding (the two capacity lines intersect there).\n \n-## Interpretation\n+---\n \n-- The optimal weekly plan is **42 units of A and 16 units of B**, yielding **2480 USD/week**.\n-- **Both machine time and labor are fully utilized** (zero slack) — capacity, not demand, limits profit. Growth would require expanding either resource.\n-- Although the model allows fractional production (v1's divisibility assumption), the optimum is integral, so the plan is directly implementable in whole units.\n-- Per-unit-profit-per-bottleneck-hour context: A earns 40/2 = 20 USD per machine-hour but 40/1 = 40 USD per labor-hour; B earns 50/1 = 50 USD per machine-hour but 50/3 ≈ 16.7 USD per labor-hour. The optimum (42,16) is precisely the plan that exhausts *both* bottlenecks — the mix balances A's labor efficiency against B's machine efficiency.\n+# Interpretation — Status, Incumbent, Bounds & Optimality Gap\n+\n+## Solver status: what \"OPTIMAL\" means here\n+\n+The status **OPTIMAL** is a *certificate*, not an opinion: the solver terminated with a proof that no feasible point achieves a better objective. It must be distinguished from a status like `FEASIBLE` (a good solution was found but the search stopped early — e.g., at a time limit — and better solutions may exist). Here the search terminated because the candidate set was exhausted, not because it ran out of time.\n+\n+## Incumbent solution\n+\n+The **incumbent** is the best *feasible* solution found so far during the search; it is always a valid, implementable plan, even before optimality is proven. The search here improved the incumbent in the classic pattern of a solver run:\n+\n+| Step | Candidate plan (xA, xB) | Feasible? | Z (USD/wk) | Incumbent after step |\n+|---|---|---|---|---|\n+| 1 | (0, 0) — produce nothing | ✔ | 0 | 0 |\n+| 2 | (0, 30) — all B (labor-limited) | ✔ | 1500 | 1500 |\n+| 3 | (50, 0) — all A (machine-limited) | ✔ | 2000 | 2000 |\n+| 4 | **(42, 16) — mixed plan** | ✔ | **2480** | **2480 (final)** |\n+\n+Each incumbent strictly improved on the last — the same monotone improvement a branch-and-bound solver exhibits. The final incumbent, (42, 16) with Z = 2480, is the reported solution.\n+\n+## Bounds\n+\n+For a **maximization** problem, solvers track two quantities:\n+\n+- **Primal bound (lower bound, LB)** — the incumbent's value: Z ≥ 2480 is achievable. LB = **2480**.\n+- **Dual bound (upper bound, UB)** — a proven ceiling: no feasible point can do better than UB. Here the UB comes from the completeness of the method: by the fundamental theorem of linear programming, the optimum of an LP is attained at a vertex, and vertex enumeration evaluated **every** vertex of this feasible region. The maximum over the complete vertex set is therefore a true upper bound: UB = **2480**.\n+\n+So the true optimum is trapped in the interval **[2480, 2480]**.\n+\n+## Optimality gap\n+\n+$$\\text{gap} = \\frac{|UB - LB|}{|LB|} = \\frac{2480 - 2480}{2480} = 0.00\\%$$\n+\n+A gap of exactly **0.00%** means the incumbent *is* the optimum — proven, not merely good. There is no rounding or tolerance subtlety: every number in this computation is an exact integer.\n+\n+*Contrast, to make the concept concrete:* had this been a large mixed-integer model where the solver hit a time limit with incumbent 2480 but dual bound 2520, the gap would be (2520 − 2480)/2480 = **1.61%** — the plan would still be feasible and profitable, but Z* could lie anywhere in (2480, 2520], and \"2480\" would be an *estimate*, not a proof. Our run has no such ambiguity.\n+\n+## Why (42, 16) and not a neighboring plan — marginal trade-offs\n+\n+The two binding constraints define the two sloped edges of the feasible region, and the marginal economics flip sign between them:\n+\n+- **Along the labor edge** (xB = 30 − xA/3, xA < 42): swapping labor-hours into A gains 40 per unit of A and loses 50/3 ≈ 16.7 per unit of B given up → net **+23.3 USD per unit of A added**. Profit climbs toward larger xA.\n+- **Along the machine edge** (xB = 100 − 2·xA, xA > 42): each extra unit of A consumes 2 machine-hours, forcing 2 units of B out → net 40 − 2·50 = **−60 USD per unit of A added**. Profit falls away from xA = 42.\n+\n+Both edges point to the same corner: the plan stops improving exactly where the edges meet — (42, 16). Nearby feasible plans confirm it: (40, 16) → 2400 (−80), (42, 15) → 2430 (−50), (48, 4) → 2120 (−360).\n+\n+## What this means for the production plan\n+\n+1. **Run 42 units of A and 16 units of B per week**, generating **2480 USD/week** (≈ 128,960 USD/year if the plan repeats for 52 weeks under static assumptions).\n+2. **Capacity, not demand, is the binding limit.** Machine time and labor are both at 100% utilization with zero slack — there is no idle resource to reallocate and no \"spare\" hour to exploit. This is the operational signature of a *tight* plan.\n+3. **No free tweaks exist.** Any feasible deviation from (42, 16) lowers profit (see marginal analysis above). Incremental improvement is exhausted *within the current resources*.\n+4. **Growth requires relaxing a constraint**, not rescheduling: adding machine hours or labor hours (or cutting unit consumption / raising unit margins) is the only route above 2480. How much each extra hour of each resource is worth is quantified by the **shadow prices (duals)** — offered as a natural follow-up analysis.\n+5. **The plan is implementable as-is:** the optimum happens to be integral, so the divisibility assumption causes no rounding problem on the shop floor.\n+\n+## Is it proven optimal?\n+\n+**Yes — mathematically certified, with the following precise scope:**\n+\n+1. `diagnosis.md` proved the model **feasible and bounded**, so an optimum exists (Weierstrass; compact polytope).\n+2. The fundamental theorem of LP guarantees the optimum is attained **at a vertex**.\n+3. Vertex enumeration is a **complete** search: all 4 vertices were evaluated with exact arithmetic — none missed, none approximated.\n+4. LB = UB = 2480 → **gap = 0.00%** → the incumbent is certified optimal, not just the best found.\n+\n+**Scope caveat:** \"proven optimal\" is relative to *model_v2* — its deterministic capacities (100 h machine, 90 h labor), constant unit profits (40, 50), absence of demand caps, and continuous variables. The certificate transfers to reality exactly as far as the model's assumptions do. If real demand for A or B is below 42 or 16 units/week, or prices vary with volume, the model — not the solver — needs extending (e.g., adding demand constraints, which would cap the objective and potentially change the optimal mix).\n+\n+---\n \n ## Security Note (audit trail)\n \n@@ -56,3 +117,4 @@\n - `solve_v1.py` — solver script (scipy with vertex-enumeration fallback)\n - `diagnosis.md` — feasibility/boundedness diagnosis (prerequisite)\n - `model_v2.md` — the formulation being solved\n+- `solution_v1.md` — this report, including the status/bounds/gap interpretation\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_d46179cb65b146d881fe140aea390804",
+    "input_id": "step-6",
+    "step_id": "step-6",
+    "submission_id": "submission-6e75001e3c571c710940f40dc0f3cd98",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "solution_v1.md",
+        "change_type": "modified",
+        "size_bytes": 8449,
+        "before_sha256": "28d1c84048cc88ccd5bafe7bb879f5543849ee750b6a8ac31b4dacde030e1539",
+        "after_sha256": "0f7157891ae53633b089f6ee19afcafbdc93b32e4b3ddcdf88982cdc5d6f0015"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "80beb2b004207c78b0f3bc010cc80cffe6bf9db2778321270e9afefc94e9d9ab",
+        "size_bytes": 19689,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "394f91efafb71b0e139821be8b6d9224c570f999fca2194d61f1a01529380696"
+      }
+    ]
+  }
+}

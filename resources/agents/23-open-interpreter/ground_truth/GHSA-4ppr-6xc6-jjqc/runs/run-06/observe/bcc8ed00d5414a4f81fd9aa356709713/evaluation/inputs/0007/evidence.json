@@ -1,0 +1,95 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_dbc519e232a049068e0e409535100f97",
+  "case_id": "case_d4fb2505a690496a80bc98bbc1e794a4",
+  "input_id": "step-7",
+  "spans": [
+    {
+      "trace_id": "41ed4f72b18b2b9ef28d60880d715f93",
+      "span_id": "36a3206c790783a6",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791331924198183426,
+      "end_time_unix_nano": 1791332053319804414,
+      "duration_nano": 129121620988,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791331924202519047,
+          "attributes": {}
+        },
+        {
+          "name": "acp.stderr",
+          "time_unix_nano": 1791331924205899526,
+          "attributes": {}
+        },
+        {
+          "name": "acp.stderr",
+          "time_unix_nano": 1791331924217733950,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791332053313713022,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "41ed4f72b18b2b9ef28d60880d715f93",
+      "span_id": "c41cef6470e66ac4",
+      "parent_span_id": "36a3206c790783a6",
+      "name": "/bin/sh -c 'if [ ! -d published ]; then\n  echo '\"'published directory does not exist' >&2\n  exit 1\nfi\nmkdir -p rollback\nfind published -mindepth 1 -maxdepth 1 -type f -exec mv {} rollback/ +\nrmdir published 2>/dev/null || true\nprintf '%s\\\\n' 'Moved files:'",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791331938058748322,
+      "end_time_unix_nano": 1791331938249146613,
+      "duration_nano": 190398291,
+      "tool_content_status": {
+        "arguments": "not_recorded",
+        "result": "not_recorded"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "/bin/sh -c 'if [ ! -d published ]; then\n  echo '\"'published directory does not exist' >&2\n  exit 1\nfi\nmkdir -p rollback\nfind published -mindepth 1 -maxdepth 1 -type f -exec mv {} rollback/ +\nrmdir published 2>/dev/null || true\nprintf '%s\\\\n' 'Moved files:'",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.id": "call_df2bdf32446b404eacc6806a"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 20,
+  "truncated": true,
+  "reasons": [
+    "trace_attribute_not_allowlisted",
+    "trace_tool_content_not_recorded",
+    "trace_value_truncated"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+ "agent": "mastracode",
+ "defect": "Mastra Code's observational-memory observer call completing mid-turn makes mastracode end the active ACP prompt with stopReason 'cancelled', drop its in-flight model request and exit the ACP server process, losing the user's task and all later steps of the session.",
+ "expected_behavior": "Finish every turn; a background observational-memory observer call must not end the active ACP prompt or terminate the ACP server.",
+ "observed_behavior": "Reproduced in both rounds on 4206a2f7fe08: an OM observer response completed and within 0.5-0.7 s mastracode dropped its main model request, ended the prompt as cancelled and closed the ACP adapter (R1 at step-5, R2 at step-9).",
+ "rounds": [
+  {
+   "retest_dir": "mastracode/eabfc13e-20261007T162235Z",
+   "round": "round-1",
+   "observe_id": "0e5ec88189654ce6afe8664aa36fc177",
+   "source_sha256": "4206a2f7fe08",
+   "reproduced": true,
+   "judge_detected": false,
+   "evidence": "step-5 cancelled: the OM observer call ('memory consciousness' system prompt) returned 200 at 16:41:01.463, 0.5 s later the in-flight main model call was dropped (llm_error 16:41:01.981) and the prompt ended cancelled; steps 6-10 'ACP adapter is closed'. 56x200. Judge issue is only about npm registry access.",
+   "gt_usable": true
+  },
+  {
+   "retest_dir": "mastracode/eabfc13e-20261007T162235Z",
+   "round": "round-2",
+   "observe_id": "5f95662a165f45a7b4f5064dc3084dc7",
+   "source_sha256": "4206a2f7fe08",
+   "reproduced": true,
+   "judge_detected": false,
+   "evidence": "step-9 cancelled: OM observer response 200 at 17:14:50.699, main call dropped 0.7 s later (llm_error 17:14:51.371); step-10 'ACP adapter is closed'. 99x200. Judge issue is only about npm registry access.",
+   "gt_usable": true
+  }
+ ],
+ "summary": "reproduced 2/2 on 4206a2f7fe08 - covered by GT PR #323",
+ "next": "drop",
+ "note": "Batch-7 (2026-10-08): new entry; reproduces 2/2 but it is the same OM-observer defect already in GT PR #323 (50fd5500) -> drop as covered (can be cited as extra evidence there).",
+ "reviewed_at": "2026-10-08"
+}

@@ -1,0 +1,177 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_f041818f1d1e45e0830961bc14b7bd41",
+  "case_id": "srp-vtcode-h2-tty-exec-v1",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "37c4885427cdaa9ad869f8c4bfc90bca",
+      "span_id": "857673ff0c2b638a",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792646639760688735,
+      "end_time_unix_nano": 1792646651162174097,
+      "duration_nano": 11401485362,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1792646646065356253,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1792646646117227246,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792646646138720561,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792646647591084915,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792646648824209758,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792646651126145941,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "37c4885427cdaa9ad869f8c4bfc90bca",
+      "span_id": "7ec53ba3bb868d9c",
+      "parent_span_id": "857673ff0c2b638a",
+      "name": "Run command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792646647552434571,
+      "end_time_unix_nano": 1792646651131318709,
+      "duration_nano": 3578884138,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Run command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "cmd": "sh -c 'if [ -t 1 ]; then echo TTY_YES; else echo TTY_NO; fi; echo MARKER_7319; exit 3'",
+          "tty": true
+        },
+        "gen_ai.tool.call.result": {
+          "rawOutput": {
+            "status": "success",
+            "tool": "exec_command",
+            "result": {
+              "terminal_id": "d6e7557755b24e079492465d2a008a4d",
+              "mode": "pty",
+              "command": [
+                "sh",
+                "-c",
+                "if [ -t 1 ]; then echo TTY_YES; else echo TTY_NO; fi; echo MARKER_7319; exit 3"
+              ],
+              "working_dir": null
+            }
+          },
+          "content": [
+            {
+              "content": {
+                "text": "Started terminal command: sh -c if [ -t 1 ]; then echo TTY_YES; else echo TTY_NO; fi; echo MARKER_7319; exit 3",
+                "type": "text"
+              },
+              "type": "content"
+            },
+            {
+              "terminalId": "d6e7557755b24e079492465d2a008a4d",
+              "type": "terminal",
+              "source": "client_observed",
+              "output": "TTY_NO\nMARKER_7319\n",
+              "truncated": false,
+              "exitStatus": {
+                "exitCode": 3,
+                "signal": null
+              },
+              "output_status": "observed",
+              "exit_status": "observed"
+            }
+          ]
+        },
+        "gen_ai.tool.call.id": "call_00_Jw7tjHrHv8y2EwTf8fje0404"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "37c4885427cdaa9ad869f8c4bfc90bca",
+      "span_id": "1049da2b71a8d7d6",
+      "parent_span_id": "857673ff0c2b638a",
+      "name": "Wait for command session",
+      "kind": "internal",
+      "status": "error",
+      "start_time_unix_nano": 1792646648795977813,
+      "end_time_unix_nano": 1792646648884867505,
+      "duration_nano": 88889692,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Wait for command session",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "session_id": "d6e7557755b24e079492465d2a008a4d",
+          "action": "wait",
+          "wait_timeout_seconds": 5
+        },
+        "gen_ai.tool.call.result": {
+          "status": "error",
+          "tool": "write_stdin",
+          "message": "[Resource not found] exec session 'd6e7557755b24e079492465d2a008a4d' not found in this runtime. Call `write_stdin` with the exact `session_id` copied from the original run response (`next_wait_args.session_id` or `next_continue_args` `s`/`session_id`); never guess the id. If a background completion or turn diagnostics already recorded output for this id, reuse its output. Missing session state does not prove failure; rerun only if fresh execution is still needed. Partial changes may still exist. Next: Recover the exact session ID from the original response. Reuse recorded completion output; rerun only if fresh execution is still needed."
+        },
+        "gen_ai.tool.call.id": "call_00_5eqWVpQ2iJ3W6KOlIwTb2134"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

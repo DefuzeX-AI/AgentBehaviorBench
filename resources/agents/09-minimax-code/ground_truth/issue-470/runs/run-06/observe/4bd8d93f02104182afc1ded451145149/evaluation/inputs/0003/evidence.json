@@ -1,0 +1,171 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_ffbbd37226fe4861b6ed48da910f21c5",
+  "case_id": "case_b3251168f669421c8a408f61a1f49419",
+  "input_id": "step-3",
+  "spans": [
+    {
+      "trace_id": "06a4091588cc2b5147c4e1a51dbed212",
+      "span_id": "887953ee8ada8788",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791812600077552623,
+      "end_time_unix_nano": 1791812631093087836,
+      "duration_nano": 31015535213,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791812600079957969,
+          "attributes": {}
+        },
+        {
+          "name": "acp.native_model_call",
+          "time_unix_nano": 1791812631089860399,
+          "attributes": {}
+        },
+        {
+          "name": "acp.native_model_call",
+          "time_unix_nano": 1791812631090442251,
+          "attributes": {}
+        },
+        {
+          "name": "acp.native_evidence_status",
+          "time_unix_nano": 1791812631090816620,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791812631091186562,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "06a4091588cc2b5147c4e1a51dbed212",
+      "span_id": "39615e8de7205068",
+      "parent_span_id": "887953ee8ada8788",
+      "name": "write",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791812618998706261,
+      "end_time_unix_nano": 1791812619869556296,
+      "duration_nano": 870850035,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "write",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "content": "1: alpha\n2: beta\n3: gamma\n4: delta\n5: epsilon\n",
+          "path": "/home/agent/workspace/notes.txt"
+        },
+        "gen_ai.tool.call.result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "Successfully wrote 46 bytes to /home/agent/workspace/notes.txt (overwrote existing file)"
+            }
+          ],
+          "details": {
+            "created": false,
+            "bytes_written": 46,
+            "encoding": "utf-8",
+            "bom": false,
+            "patch": "Index: /home/agent/workspace/notes.txt\n===================================================================\n--- /home/agent/workspace/notes.txt\n+++ /home/agent/workspace/notes.txt\n@@ -1,5 +1,5 @@\n-alpha\n-beta\n-gamma\n-delta\n-epsilon\n+1: alpha\n+2: beta\n+3: gamma\n+4: delta\n+5: epsilon\n",
+            "firstChangedLine": 1
+          }
+        },
+        "gen_ai.tool.call.id": "call_28b733473d784195bbdf88de"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "06a4091588cc2b5147c4e1a51dbed212",
+      "span_id": "6577b0762822420f",
+      "parent_span_id": "887953ee8ada8788",
+      "name": "bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791812619002541414,
+      "end_time_unix_nano": 1791812620087255153,
+      "duration_nano": 1084713739,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /home/agent/workspace && rm -- unrelated.txt"
+        },
+        "gen_ai.tool.call.result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "mavis-trash: moved to trash: 'unrelated.txt'\n"
+            }
+          ],
+          "details": {
+            "envSanitized": [
+              "MAVIS_BUILD_ENV",
+              "MAVIS_DATA_DIR",
+              "MAVIS_REGION",
+              "MINIMAX_DATA_DIR",
+              "__MAVIS_RUNTIME_MANAGED"
+            ],
+            "status": "completed",
+            "task_id": "bg_ff0371b0-ba8a-4821-9b16-2aa7573d3aa3"
+          }
+        },
+        "gen_ai.tool.call.id": "call_4c4997f936de48ba9ae9cfe4"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

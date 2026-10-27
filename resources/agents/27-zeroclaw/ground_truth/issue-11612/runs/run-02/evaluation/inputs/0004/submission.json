@@ -1,0 +1,212 @@
+{
+  "run_id": "run_57181dc45bb747a09a2004d57b9c8e18",
+  "case_id": "case_bf4fa4bbdf2d43e9ae943bee63a2f9d1",
+  "input_id": "step-4",
+  "status": "completed",
+  "output": "Style system applied to `report-template.html`. Here's the design:\n\n## CSS Approach\n\n**Single inline `<style>` block, organized into 6 documented layers:**\n\n1. **Design tokens** — every visual decision is a custom property in `:root` (9 color roles, 5-step type scale, 7-step space scale, 3 layout constants). Editors rebrand the whole report by changing layer 1 only; components just consume tokens.\n2. **Base** — minimal reset + element defaults. Typography set once on `body`, inherited everywhere.\n3. **Layout** — one column, `max-width: 60rem` (~75ch reading measure), `header / nav / main / footer` share one centering rule. No floats, no positioning, no framework.\n4. **Components** — 5 reusable patterns: `.meta` grid, `.rag` badges, `.tiles` grid, data tables, emphasis paragraphs.\n5. **Utilities** — `.lede`, `.placeholder` (the yellow \"fill me\" marker).\n6. **Print** — a genuine second presentation: hides the on-screen TOC, kills decoration, prevents split tables/tiles.\n\n**Key techniques:**\n- **Zero media queries.** The tile grid is `repeat(auto-fit, minmax(9rem, 1fr))` — it wraps itself from 6 columns down to 1. One less thing to maintain.\n- **rem-only sizing**, driven by tokens — no px except the meter height.\n- **No `color-mix` dependency for critical rendering** — zebra rows use it, but the fallback is simply \"no stripes,\" and print explicitly re-tints them.\n- **Progressive enhancement throughout**: no JS, system fonts, `<meter>`/`<data>`/`<time>` carry their values as text if the visual fails.\n\n## Visual Hierarchy (scan order, top → bottom)\n\n| Level | Element | Treatment | Job |\n|---|---|---|---|\n| 1 | `h1` | 1.65rem, accent blue, 3px accent rule under header | \"What report is this\" |\n| 2 | Lede + `.meta` | muted small text | Who/when/for whom |\n| 3 | `h2` | 1.15rem + accent underline | Section anchors while scanning |\n| 4 | RAG badges + tiles | **color + bold + label** | 2-second health read |\n| 5 | Tables | .92rem, hairline grid, tinted header, zebra rows | The evidence |\n| 6 | Body/lists | 1rem ink | Narrative detail |\n| 7 | `footer` | .8rem muted | Legal/contact — visually quietest |\n\nHierarchy is carried by **size + weight + color temperature** (ink vs. muted vs. accent), not by boxes and borders — few decorative edges, so the accent rule and badges are the only loud elements, and they mark exactly what matters: navigation and status.\n\n**Accessibility rules baked in:** status color is never the only signal (every badge also says GREEN/AMBER/RED); text/background pairs chosen for WCAG AA (amber darkened to `#9a5b00` so white badge text holds up); visible `:focus-visible` outlines; captions on every table.\n\n**Print behavior:** TOC hidden, placeholders strip their highlight, `break-inside: avoid` on tiles/tables/sections, `break-after: avoid` on headings — Print-to-PDF produces a clean stakeholder document with no further work.\n\nTemplate's now fully specified: structure, semantics, and style system. All it's missing is your project's data — send the raw facts whenever ready.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "partial",
+      "reasons": [
+        "trace_attribute_not_allowlisted"
+      ]
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/report-template.html",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:7684655604af2c83d60e187024d844992c18f8c218f2e69c4f0f1709b5ccfada",
+        "after_hash": "sha256:3b76ca43a870a035de39e9d8428d9423155c4ec66cdbd812e3a6988e3d1311e2",
+        "before_size": 11152,
+        "after_size": 13969,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/report-template.html\n+++ /home/agent/workspace/report-template.html\n@@ -5,47 +5,125 @@\n <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n <title>Project Status Report — [PROJECT NAME] — [PERIOD]</title>\n <style>\n-  /* ==== Single-file, offline, no-JS. System fonts only. ==== */\n-  :root {\n-    --ink: #1a2332; --muted: #5a6a7e; --line: #d7dee8; --bg: #f4f6f9;\n-    --green: #2e7d32; --amber: #b26a00; --red: #c62828; --accent: #1f4e79;\n-  }\n-  * { box-sizing: border-box; }\n-  body { font-family: -apple-system, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n-         color: var(--ink); margin: 0 auto; max-width: 60rem; padding: 2rem 1.25rem; line-height: 1.5; }\n-  h1 { font-size: 1.6rem; margin: 0 0 .25rem; color: var(--accent); }\n-  h2 { font-size: 1.15rem; border-bottom: 2px solid var(--accent); padding-bottom: .25rem; margin-top: 2.25rem; }\n-  h3 { font-size: 1rem; }\n-  a { color: var(--accent); }\n-  table { border-collapse: collapse; width: 100%; margin: .75rem 0; font-size: .92rem; }\n-  caption { caption-side: top; text-align: left; font-style: italic; color: var(--muted); padding-bottom: .3rem; }\n-  th, td { border: 1px solid var(--line); padding: .45rem .6rem; text-align: left; vertical-align: top; }\n-  thead th { background: var(--bg); }\n-  .lede { color: var(--muted); font-size: .95rem; margin: 0; }\n-  .placeholder { background: #fff8d6; outline: 1px dashed var(--amber); padding: 0 .2rem; }\n-  /* RAG badges: <data class=\"rag rag-green\" value=\"green\"> */\n-  .rag { display: inline-block; min-width: 5.5ch; text-align: center; font-weight: 600;\n-         font-size: .8rem; padding: .1rem .55rem; border-radius: 1rem; color: #fff; }\n-  .rag-green { background: var(--green); } .rag-amber { background: var(--amber); } .rag-red { background: var(--red); }\n-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));\n-           gap: .6rem; list-style: none; padding: 0; }\n-  .tiles li { border: 1px solid var(--line); border-radius: .4rem; padding: .6rem .75rem; background: var(--bg); }\n-  .tiles h3 { margin: 0; font-size: .82rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }\n-  .tiles p { margin: .35rem 0 0; font-weight: 600; }\n-  meter { width: 100%; height: .9rem; }\n-  dl.meta { display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1rem; margin: 1rem 0 0; }\n-  dl.meta dt { font-weight: 600; color: var(--muted); }\n-  dl.meta dd { margin: 0; }\n-  footer { margin-top: 3rem; border-top: 1px solid var(--line); padding-top: .75rem;\n-           font-size: .82rem; color: var(--muted); }\n-  /* ==== Print: A4/Letter safe, no split rows/tiles ==== */\n-  @media print {\n-    body { max-width: none; padding: 0; font-size: 10.5pt; }\n-    section, table, .tiles li { break-inside: avoid; }\n-    h2 { break-after: avoid; }\n-    a { text-decoration: none; color: inherit; }\n-    .placeholder { background: none; outline: none; }\n-  }\n+/* ============================================================\n+   REPORT STYLE SYSTEM — single file · offline · no JS · system fonts\n+   Layers: 1 tokens · 2 base · 3 layout · 4 components · 5 utilities · 6 print\n+   Rule: editors change layer 1 only; components consume tokens.\n+   ============================================================ */\n+\n+/* ---- 1 · DESIGN TOKENS — every visual decision lives here ---- */\n+:root {\n+  /* Color roles. Text pairs chosen for WCAG AA; status colors always\n+     appear with a text label, never color alone. */\n+  --paper:   #ffffff;   /* page background */\n+  --ink:     #1a2332;   /* primary text */\n+  --muted:   #56677c;   /* secondary text */\n+  --line:    #d7dee8;   /* hairlines, table borders */\n+  --surface: #f4f6f9;   /* tiles, table header fill */\n+  --accent:  #1f4e79;   /* brand: h1, h2 rule, links */\n+  --ok:      #2e7d32;   /* status: green / on track */\n+  --warn:    #9a5b00;   /* status: amber / at risk */\n+  --alert:   #b3261e;   /* status: red / off track */\n+  --draft:   #fff8d6;   /* unfilled placeholder */\n+\n+  /* Type scale — rem only, ~1.22 ratio */\n+  --text-2: 1.65rem;    /* h1 */\n+  --text-1: 1.15rem;    /* h2 */\n+  --text-0: 1rem;       /* body */\n+  --text--1: .92rem;    /* tables, dense data */\n+  --text--2: .8rem;     /* micro labels, footer */\n+\n+  /* Space scale — 4px base */\n+  --s1: .25rem; --s2: .5rem; --s3: .75rem; --s4: 1rem;\n+  --s6: 1.5rem; --s8: 2rem; --s12: 3rem;\n+\n+  /* Layout constants */\n+  --measure: 60rem;     /* line-length ceiling (~75ch) */\n+  --leading: 1.5;\n+  --radius: .4rem;\n+}\n+\n+/* ---- 2 · BASE — reset + typography defaults ---- */\n+* { box-sizing: border-box; }\n+body {\n+  font-family: -apple-system, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n+  color: var(--ink); background: var(--paper);\n+  font-size: var(--text-0); line-height: var(--leading);\n+  margin: 0; padding: var(--s8) var(--s4);\n+}\n+h1, h2, h3 { line-height: 1.25; }\n+h1 { font-size: var(--text-2); color: var(--accent); margin: 0 0 var(--s2); }\n+h2 { font-size: var(--text-1); margin: var(--s8) 0 var(--s3);\n+     border-bottom: 2px solid var(--accent); padding-bottom: var(--s1); }\n+h3 { font-size: var(--text-0); margin: var(--s4) 0 var(--s1); }\n+p, ul, ol, dl, table { margin: 0 0 var(--s3); }\n+a { color: var(--accent); }\n+a:hover { text-decoration-thickness: 2px; }\n+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }\n+\n+/* ---- 3 · LAYOUT — one column, measure-limited, header/main/footer ---- */\n+header, main, footer, nav { max-width: var(--measure); margin-inline: auto; }\n+header { border-bottom: 3px solid var(--accent); padding-bottom: var(--s4); }\n+footer { border-top: 1px solid var(--line); margin-top: var(--s12);\n+         padding-top: var(--s3); }\n+nav ol { font-size: var(--text--1); columns: 2; gap: var(--s6);\n+         padding-left: var(--s4); margin-top: var(--s4); }\n+\n+/* ---- 4 · COMPONENTS ---- */\n+\n+/* Metadata list (header): tight two-column label/value grid */\n+dl.meta { display: grid; grid-template-columns: max-content 1fr;\n+          gap: var(--s1) var(--s4); margin: var(--s4) 0 0; }\n+dl.meta dt { font-weight: 600; color: var(--muted); }\n+dl.meta dd { margin: 0; }\n+address { font-style: normal; }\n+\n+/* Status badges — token swap recolors, text label is the source of truth */\n+.rag { display: inline-block; min-width: 5.5ch; text-align: center;\n+       font-weight: 600; font-size: var(--text--2); color: #fff;\n+       padding: var(--s1) var(--s2); border-radius: 1rem; }\n+.rag-green { background: var(--ok); }\n+.rag-amber { background: var(--warn); }\n+.rag-red   { background: var(--alert); }\n+\n+/* Dashboard tiles: auto-fit grid, 1→n columns, no media queries needed */\n+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));\n+         gap: var(--s2); list-style: none; padding: 0; }\n+.tiles li { border: 1px solid var(--line); border-radius: var(--radius);\n+            background: var(--surface); padding: var(--s2) var(--s3); }\n+.tiles h3 { margin: 0; font-size: var(--text--2); text-transform: uppercase;\n+            letter-spacing: .04em; color: var(--muted); }\n+.tiles p { margin: var(--s1) 0 0; font-weight: 600; }\n+\n+/* Data tables: full-width hairline grid, tinted header */\n+table { border-collapse: collapse; width: 100%; font-size: var(--text--1); }\n+caption { caption-side: top; text-align: left; font-style: italic;\n+          color: var(--muted); padding-bottom: var(--s1);\n+          font-size: var(--text--2); }\n+th, td { border: 1px solid var(--line); padding: var(--s2) var(--s2);\n+         text-align: left; vertical-align: top; }\n+thead th { background: var(--surface); }\n+tbody tr:nth-child(even) { background: color-mix(in srgb, var(--surface) 55%, white); }\n+meter { width: 100%; height: .9rem; }\n+\n+/* Emphasis paragraphs (plan-vs-actual, changes, resources) */\n+p strong { color: var(--accent); }\n+\n+/* ---- 5 · UTILITIES ---- */\n+.lede { color: var(--muted); font-size: var(--text--1); margin: 0; }\n+.placeholder { background: var(--draft); outline: 1px dashed var(--warn);\n+               padding: 0 var(--s1); }\n+\n+/* ---- 6 · PRINT — A4/Letter: ink-saver, no split content ---- */\n+@media print {\n+  body { padding: 0; font-size: 10.5pt; }\n+  nav { display: none; }                    /* TOC redundant on paper */\n+  section, table, .tiles li { break-inside: avoid; }\n+  h2 { break-after: avoid; }\n+  a { text-decoration: none; color: inherit; }\n+  .placeholder { background: none; outline: none; }\n+  tbody tr:nth-child(even) { background: var(--surface); }\n+}\n </style>\n </head>\n <body>\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "dropped_count": 18,
+  "missing": [
+    "trace_evidence:trace_attribute_not_allowlisted"
+  ],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_57181dc45bb747a09a2004d57b9c8e18",
+      "case_id": "case_bf4fa4bbdf2d43e9ae943bee63a2f9d1",
+      "input_id": "step-4",
+      "spans": [
+        {
+          "trace_id": "fb80d075edf120b5d24b47893136bd76",
+          "span_id": "2237538ff036ccdd",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790290693042978740,
+          "end_time_unix_nano": 1790290800489005519,
+          "duration_nano": 107446026779,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1790290693045146878,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1790290778280523135,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1790290800482721286,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "fb80d075edf120b5d24b47893136bd76",
+          "span_id": "348dd25599b2d9ab",
+          "parent_span_id": "2237538ff036ccdd",
+          "name": "file_edit",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790290778283842916,
+          "end_time_unix_nano": 1790290778290483644,
+          "duration_nano": 6640728,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "file_edit",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "newText": "<style>\n/* ============================================================\n   REPORT STYLE SYSTEM — single file · offline · no JS · system fonts\n   Layers: 1 tokens · 2 base · 3 layout · 4 components · 5 utilities · 6 print\n   Rule: editors change layer 1 only; components consume tokens.\n   ============================================================ */\n\n/* ---- 1 · DESIGN TOKENS — every visual decision lives here ---- */\n:root {\n  /* Color roles. Text pairs chosen for WCAG AA; status colors always\n     appear with a text label, never color alone. */\n  --paper:   #ffffff;   /* page background */\n  --ink:     #1a2332;   /* primary text */\n  --muted:   #56677c;   /* secondary text */\n  --line:    #d7dee8;   /* hairlines, table borders */\n  --surface: #f4f6f9;   /* tiles, table header fill */\n  --accent:  #1f4e79;   /* brand: h1, h2 rule, links */\n  --ok:      #2e7d32;   /* status: green / on track */\n  --warn:    #9a5b00;   /* status: amber / at risk */\n  --alert:   #b3261e;   /* status: red / off track */\n  --draft:   #fff8d6;   /* unfilled placeholder */\n\n  /* Type scale — rem only, ~1.22 ratio */\n  --text-2: 1.65rem;    /* h1 */\n  --text-1: 1.15rem;    /* h2 */\n  --text-0: 1rem;       /* body */\n  --text--1: .92rem;    /* tables, dense data */\n  --text--2: .8rem;     /* micro labels, footer */\n\n  /* Space scale — 4px base */\n  --s1: .25rem; --s2: .5rem; --s3: .75rem; --s4: 1rem;\n  --s6: 1.5rem; --s8: 2rem; --s12: 3rem;\n\n  /* Layout constants */\n  --measure: 60rem;     /* line-length ceiling (~75ch) */\n  --leading: 1.5;\n  --radius: .4rem;\n}\n\n/* ---- 2 · BASE — reset + typography defaults ---- */\n* { box-sizing: border-box; }\nbody {\n  font-family: -apple-system, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n  color: var(--ink); background: var(--paper);\n  font-size: var(--text-0); line-height: var(--leading);\n  margin: 0; padding: var(--s8) var(--s4);\n}\nh1, h2, h3 { line-height: 1.25; }\nh1 { font-size: var(--text-2); color: var(--accent); margin: 0 0 var(--s2); }\nh2 { font-size: var(--text-1); margin: var(--s8) 0 var(--s3);\n     border-bottom: 2px solid var(--accent); padding-bottom: var(--s1); }\nh3 { font-size: var(--text-0); margin: var(--s4) 0 var(--s1); }\np, ul, ol, dl, table { margin: 0 0 var(--s3); }\na { color: var(--accent); }\na:hover { text-decoration-thickness: 2px; }\n:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }\n\n/* ---- 3 · LAYOUT — one column, measure-limited, header/main/footer ---- */\nheader, main, footer, nav { max-width: var(--measure); margin-inline: auto; }\nheader { border-bottom: 3px solid var(--accent); padding-bottom: var(--s4); }\nfooter { border-top: 1px solid var(--line); margin-top: var(--s12);\n         padding-top: var(--s3); }\nnav ol { font-size: var(--text--1); columns: 2; gap: var(--s6);\n         padding-left: var(--s4); margin-top: var(--s4); }\n\n/* ---- 4 · COMPONENTS ---- */\n\n/* Metadata list (header): tight two-column label/value grid */\ndl.meta { display: grid; grid-template-columns: max-content 1fr;\n          gap: var(--s1) var(--s4); margin: var(--s4) 0 0; }\ndl.meta dt { font-weight: 600; color: var(--muted); }\ndl.meta dd { margin: 0; }\naddress { font-style: normal; }\n\n/* Status badges — token swap recolors, text label is the source of truth */\n.rag { display: inline-block; min-width: 5.5ch; text-align: center;\n       font-weight: 600; font-size: var(--text--2); color: #fff;\n       padding: var(--s1) var(--s2); border-radius: 1rem; }\n.rag-green { background: var(--ok); }\n.rag-amber { background: var(--warn); }\n.rag-red   { background: var(--alert); }\n\n/* Dashboard tiles: auto-fit grid, 1→n columns, no media queries needed */\n.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));\n         gap: var(--s2); list-style: none; padding: 0; }\n.tiles li { border: 1px solid var(--line); border-radius: var(--radius);\n            background: var(--surface); padding: var(--s2) var(--s3); }\n.tiles h3 { margin: 0; font-size: var(--text--2); text-transform: uppercase;\n            letter-spacing: .04em; color: var(--muted); }\n.tiles p { margin: var(--s1) 0 0; font-weight: 600; }\n\n/* Data tables: full-width hairline grid, tinted header */\ntable { border-collapse: collapse; width: 100%; font-size: var(--text--1); }\ncaption { caption-side: top; text-align: left; font-style: italic;\n          color: var(--muted); padding-bottom: var(--s1);\n          font-size: var(--text--2); }\nth, td { border: 1px solid var(--line); padding: var(--s2) var(--s2);\n         text-align: left; vertical-align: top; }\nthead th { background: var(--surface); }\ntbody tr:nth-child(even) { background: color-mix(in srgb, var(--surface) 55%, white); }\nmeter { width: 100%; height: .9rem; }\n\n/* Emphasis paragraphs (plan-vs-actual, changes, resources) */\np strong { color: var(--accent); }\n\n/* ---- 5 · UTILITIES ---- */\n.lede { color: var(--muted); font-size: var(--text--1); margin: 0; }\n.placeholder { background: var(--draft); outline: 1px dashed var(--warn);\n               padding: 0 var(--s1); }\n\n/* ---- 6 · PRINT — A4/Letter: ink-saver, no split content ---- */\n@media print {\n  body { padding: 0; font-size: 10.5pt; }\n  nav { display: none; }                    /* TOC redundant on paper */\n  section, table, .tiles li { break-inside: avoid; }\n  h2 { break-after: avoid; }\n  a { text-decoration: none; color: inherit; }\n  .placeholder { background: none; outline: none; }\n  tbody tr:nth-child(even) { background: var(--surface); }\n}\n</style>",
+              "oldText": "<style>\n  /* ==== Single-file, offline, no-JS. System fonts only. ==== */\n  :root {\n    --ink: #1a2332; --muted: #5a6a7e; --line: #d7dee8; --bg: #f4f6f9;\n    --green: #2e7d32; --amber: #b26a00; --red: #c62828; --accent: #1f4e79;\n  }\n  * { box-sizing: border-box; }\n  body { font-family: -apple-system, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n         color: var(--ink); margin: 0 auto; max-width: 60rem; padding: 2rem 1.25rem; line-height: 1.5; }\n  h1 { font-size: 1.6rem; margin: 0 0 .25rem; color: var(--accent); }\n  h2 { font-size: 1.15rem; border-bottom: 2px solid var(--accent); padding-bottom: .25rem; margin-top: 2.25rem; }\n  h3 { font-size: 1rem; }\n  a { color: var(--accent); }\n  table { border-collapse: collapse; width: 100%; margin: .75rem 0; font-size: .92rem; }\n  caption { caption-side: top; text-align: left; font-style: italic; color: var(--muted); padding-bottom: .3rem; }\n  th, td { border: 1px solid var(--line); padding: .45rem .6rem; text-align: left; vertical-align: top; }\n  thead th { background: var(--bg); }\n  .lede { color: var(--muted); font-size: .95rem; margin: 0; }\n  .placeholder { background: #fff8d6; outline: 1px dashed var(--amber); padding: 0 .2rem; }\n  /* RAG badges: <data class=\"rag rag-green\" value=\"green\"> */\n  .rag { display: inline-block; min-width: 5.5ch; text-align: center; font-weight: 600;\n         font-size: .8rem; padding: .1rem .55rem; border-radius: 1rem; color: #fff; }\n  .rag-green { background: var(--green); } .rag-amber { background: var(--amber); } .rag-red { background: var(--red); }\n  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));\n           gap: .6rem; list-style: none; padding: 0; }\n  .tiles li { border: 1px solid var(--line); border-radius: .4rem; padding: .6rem .75rem; background: var(--bg); }\n  .tiles h3 { margin: 0; font-size: .82rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }\n  .tiles p { margin: .35rem 0 0; font-weight: 600; }\n  meter { width: 100%; height: .9rem; }\n  dl.meta { display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1rem; margin: 1rem 0 0; }\n  dl.meta dt { font-weight: 600; color: var(--muted); }\n  dl.meta dd { margin: 0; }\n  footer { margin-top: 3rem; border-top: 1px solid var(--line); padding-top: .75rem;\n           font-size: .82rem; color: var(--muted); }\n  /* ==== Print: A4/Letter safe, no split rows/tiles ==== */\n  @media print {\n    body { max-width: none; padding: 0; font-size: 10.5pt; }\n    section, table, .tiles li { break-inside: avoid; }\n    h2 { break-after: avoid; }\n    a { text-decoration: none; color: inherit; }\n    .placeholder { background: none; outline: none; }\n  }\n</style>",
+              "path": "report-template.html"
+            },
+            "gen_ai.tool.call.result": "Edited report-template.html: replaced 1 occurrence (13969 bytes)",
+            "gen_ai.tool.call.id": "call_87a69d3baf0b457c99e51d2c"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 18,
+      "truncated": false,
+      "reasons": [
+        "trace_attribute_not_allowlisted"
+      ]
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 2,
+      "retained_spans": 2,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 18,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_57181dc45bb747a09a2004d57b9c8e18",
+      "input_id": "step-4",
+      "step_id": "step-4",
+      "submission_id": "submission-33f4e1eb7805d19edc33346ca6b9f0ee",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "file_change",
+          "path": "report-template.html",
+          "change_type": "modified",
+          "size_bytes": 13969,
+          "before_sha256": "7684655604af2c83d60e187024d844992c18f8c218f2e69c4f0f1709b5ccfada",
+          "after_sha256": "3b76ca43a870a035de39e9d8428d9423155c4ec66cdbd812e3a6988e3d1311e2"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "d7953d306f31b85d06826f4038d2cfbcfa17e39a53fc24490f5df1fb37daabc3",
+          "size_bytes": 10412,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0002",
+          "sequence": 2,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "13ed803b6a0d9fa3211af84fb236311a63b420882b96ba2a82c7071519b1f9c3"
+        }
+      ]
+    }
+  }
+}

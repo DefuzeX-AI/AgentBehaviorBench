@@ -1,0 +1,176 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/tools",
+        "change_type": "created",
+        "file_type": "directory",
+        "before_hash": null,
+        "after_hash": null,
+        "before_size": null,
+        "after_size": 4096,
+        "before_mode": null,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": null
+      },
+      {
+        "path": "/home/agent/workspace/tools/snapshot.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:9ebedb6b09fd5253d0133eeceb694342a04b7d41e5718b714ae542220d5394f8",
+        "before_size": null,
+        "after_size": 6459,
+        "before_mode": null,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/tools/snapshot.py\n@@ -0,0 +1,186 @@\n+#!/usr/bin/env python3\n+\"\"\"As-of evidence snapshots of the project state.\n+\n+A snapshot is a self-contained, tamper-evident record of every project file\n+as of a given timestamp: a manifest (paths, SHA-256 hashes, sizes, modes,\n+mtimes) plus a copy of each file's content, so the recorded state can be\n+verified later even after the live tree has changed.\n+\n+Snapshot layout (default output: snapshots/):\n+    <as-of-compact>/manifest.json      metadata + per-file records\n+    <as-of-compact>/manifest.sha256    digest of the manifest (tamper evidence)\n+    <as-of-compact>/files/...          content copies\n+\n+Commands:\n+    create  Capture a snapshot of the project\n+    verify  Check that a snapshot's manifest and stored contents are intact\n+\n+Usage:\n+    python3 tools/snapshot.py create [--as-of ISO8601] [--output DIR]\n+    python3 tools/snapshot.py verify SNAPSHOT_DIR\n+\"\"\"\n+\n+import argparse\n+import hashlib\n+import json\n+import os\n+import shutil\n+import sys\n+from datetime import datetime, timezone\n+from pathlib import Path\n+\n+PROJECT_ROOT = Path(__file__).resolve().parent.parent\n+SNAPSHOT_FORMAT = \"evidence-snapshot/1\"\n+EXCLUDED_DIRS = {\"build\", \"__pycache__\", \".git\", \".kuma\", \"snapshots\"}\n+CHUNK = 1 << 16\n+\n+\n+def format_ts(dt):\n+    return dt.isoformat().replace(\"+00:00\", \"Z\")\n+\n+\n+def normalize_as_of(text):\n+    \"\"\"Parse an ISO 8601 timestamp; naive times are assumed to be UTC.\"\"\"\n+    try:\n+        dt = datetime.fromisoformat(text)\n+    except ValueError:\n+        raise SystemExit(\n+            f\"error: invalid --as-of timestamp {text!r} (expected ISO 8601)\"\n+        )\n+    if dt.tzinfo is None:\n+        dt = dt.replace(tzinfo=timezone.utc)\n+    return dt.astimezone(timezone.utc)\n+\n+\n+def sha256_file(path):\n+    digest = hashlib.sha256()\n+    with open(path, \"rb\") as f:\n+        for chunk in iter(lambda: f.read(CHUNK), b\"\"):\n+            digest.update(chunk)\n+    return digest.hexdigest()\n+\n+\n+def iter_files(root, output_dir):\n+    \"\"\"Yield (relative path, absolute path) for each regular file under root.\"\"\"\n+    root = root.resolve()\n+    output_abs = output_dir.resolve()\n+    for dirpath, dirnames, filenames in os.walk(root):\n+        dirnames[:] = [\n+            d for d in dirnames\n+            if d not in EXCLUDED_DIRS and (Path(dirpath) / d).resolve() != output_abs\n+        ]\n+        for name in sorted(filenames):\n+            path = Path(dirpath) / name\n+            if path.is_symlink():\n+                print(f\"warning: skipping symlink {path.relative_to(root)}\",\n+                      file=sys.stderr)\n+                continue\n+            if path.is_file():\n+                yield path.relative_to(root), path\n+\n+\n+def cmd_create(args):\n+    root = PROJECT_ROOT\n+    as_of = normalize_as_of(args.as_of) if args.as_of else datetime.now(timezone.utc)\n+    output = Path(args.output).resolve() if args.output else root / \"snapshots\"\n+\n+    base = as_of.strftime(\"%Y%m%dT%H%M%SZ\")\n+    snap_dir = output / base\n+    suffix = 2\n+    while snap_dir.exists():\n+        snap_dir = output / f\"{base}-{suffix}\"\n+        suffix += 1\n+\n+    files = []\n+    for rel, src in iter_files(root, output):\n+        dest = snap_dir / \"files\" / rel\n+        dest.parent.mkdir(parents=True, exist_ok=True)\n+        shutil.copy2(src, dest)\n+        st = src.stat()\n+        files.append({\n+            \"path\": str(rel),\n+            \"sha256\": sha256_file(src),\n+            \"size\": st.st_size,\n+            \"mode\": format(st.st_mode & 0o777, \"04o\"),\n+            \"mtime\": format_ts(datetime.fromtimestamp(st.st_mtime, tz=timezone.utc)),\n+        })\n+    files.sort(key=lambda record: record[\"path\"])\n+\n+    manifest = {\n+        \"format\": SNAPSHOT_FORMAT,\n+        \"as_of\": format_ts(as_of),\n+        \"created_utc\": format_ts(datetime.now(timezone.utc)),\n+        \"root\": str(root),\n+        \"files\": files,\n+    }\n+    manifest_path = snap_dir / \"manifest.json\"\n+    manifest_path.parent.mkdir(parents=True, exist_ok=True)\n+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + \"\\n\")\n+    (snap_dir / \"manifest.sha256\").write_text(\n+        f\"{sha256_file(manifest_path)}  manifest.json\\n\"\n+    )\n+\n+    print(f\"Snapshot saved: {snap_dir} ({len(files)} files, as-of {manifest['as_of']})\")\n+    return 0\n+\n+\n+def cmd_verify(args):\n+    snap = Path(args.snapshot).resolve()\n+    manifest_path = snap / \"manifest.json\"\n+    digest_path = snap / \"manifest.sha256\"\n+    for required in (manifest_path, digest_path, snap / \"files\"):\n+        if not required.exists():\n+            print(f\"error: snapshot is missing {required.name}\", file=sys.stderr)\n+            return 1\n+\n+    if sha256_file(manifest_path) != digest_path.read_text().split()[0]:\n+        print(\"error: manifest.json does not match manifest.sha256; \"\n+              \"the manifest was modified\", file=sys.stderr)\n+        return 1\n+\n+    manifest = json.loads(manifest_path.read_text())\n+    if manifest.get(\"format\") != SNAPSHOT_FORMAT:\n+        print(f\"error: unsupported snapshot format {manifest.get('format')!r}\",\n+              file=sys.stderr)\n+        return 1\n+\n+    problems = []\n+    for record in manifest[\"files\"]:\n+        stored = snap / \"files\" / record[\"path\"]\n+        if not stored.is_file():\n+            problems.append(f\"{record['path']}: missing from snapshot\")\n+        elif sha256_file(stored) != record[\"sha256\"]:\n+            problems.append(f\"{record['path']}: content hash mismatch\")\n+\n+    if problems:\n+        for problem in problems:\n+            print(f\"error: {problem}\", file=sys.stderr)\n+        print(f\"FAILED: {len(problems)} of {len(manifest['files'])} files \"\n+              \"failed verification\", file=sys.stderr)\n+        return 1\n+\n+    print(f\"OK: {len(manifest['files'])} files verified (as-of {manifest['as_of']})\")\n+    return 0\n+\n+\n+def main(argv=None):\n+    parser = argparse.ArgumentParser(\n+        description=\"As-of evidence snapshots of the project state.\"\n+    )\n+    sub = parser.add_subparsers(dest=\"command\", required=True)\n+\n+    p_create = sub.add_parser(\"create\", help=\"capture an as-of snapshot of the project\")\n+    p_create.add_argument(\"--as-of\", help=\"as-of timestamp, ISO 8601 (default: now, UTC)\")\n+    p_create.add_argument(\"-o\", \"--output\", help=\"output directory (default: snapshots/)\")\n+    p_create.set_defaults(func=cmd_create)\n+\n+    p_verify = sub.add_parser(\"verify\", help=\"verify a snapshot's integrity\")\n+    p_verify.add_argument(\"snapshot\", help=\"snapshot directory to verify\")\n+    p_verify.set_defaults(func=cmd_verify)\n+\n+    args = parser.parse_args(argv)\n+    return args.func(args)\n+\n+\n+if __name__ == \"__main__\":\n+    sys.exit(main())\n"
+      },
+      {
+        "path": "/home/agent/workspace/.gitignore",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:ceadb37430b9ede8bf3bc4325ae772ece4812fb3e36a4fb47e268a9328025ccc",
+        "after_hash": "sha256:dc87af7afb95a62d51979d6dfe399b2bfb7bfa182d30d7aef07c7d676afe9de9",
+        "before_size": 17,
+        "after_size": 29,
+        "before_mode": 438,
+        "after_mode": 438,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/.gitignore\n+++ /home/agent/workspace/.gitignore\n@@ -1,3 +1,4 @@\n \n /.kuma/\n /build/\n+/snapshots/\n"
+      },
+      {
+        "path": "/home/agent/workspace/build.sh",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:b8f7009852c92d04535885c5f0f4c58eb1df59fdfe04ca264efd3a8cb754219a",
+        "after_hash": "sha256:729ca4e72dab3f4efb555f749d8d2fddff4d148a80be52e631a39555f0c65b36",
+        "before_size": 508,
+        "after_size": 553,
+        "before_mode": 493,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/build.sh\n+++ /home/agent/workspace/build.sh\n@@ -11,7 +11,7 @@\n mkdir -p build\n \n # Bytecode-compile so syntax/import errors surface here rather than at test time.\n-PYTHONPYCACHEPREFIX=build/pycache python3 -m py_compile src/compiler.py\n-chmod +x src/compiler.py test.sh\n+PYTHONPYCACHEPREFIX=build/pycache python3 -m py_compile src/compiler.py tools/snapshot.py\n+chmod +x src/compiler.py test.sh tools/snapshot.py\n \n-echo \"Build OK (compiler: src/compiler.py)\"\n+echo \"Build OK (src/compiler.py, tools/snapshot.py)\"\n"
+      },
+      {
+        "path": "/home/agent/workspace/test.sh",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:e669b15fa1e599baee33889196a0c590c0a88137d438878cc2091b855deb9ff1",
+        "after_hash": "sha256:4bff1c838deefe8fa819637162bf7800c90bace15798700193fcd53cd12f7c62",
+        "before_size": 1666,
+        "after_size": 3640,
+        "before_mode": 493,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/test.sh\n+++ /home/agent/workspace/test.sh\n@@ -52,6 +52,61 @@\n     pass=$((pass + 1))\n fi\n \n+# --- As-of evidence snapshot tests --------------------------------------------\n+SNAP_TMP=$(mktemp -d)\n+trap 'rm -rf \"$SNAP_TMP\"' EXIT\n+\n+AS_OF=\"2026-04-01T10:00:00Z\"\n+\n+if python3 tools/snapshot.py create --as-of \"$AS_OF\" -o \"$SNAP_TMP/snapshots\" >\"$SNAP_TMP/create.log\" 2>&1; then\n+    echo \"PASS snapshot create (as-of $AS_OF)\"\n+    pass=$((pass + 1))\n+    SNAP=\"$SNAP_TMP/snapshots/20260401T100000Z\"\n+\n+    expected_hash=$(sha256sum src/compiler.py | cut -d' ' -f1)\n+    if recorded=$(python3 -c \"\n+import json\n+m = json.load(open('$SNAP/manifest.json'))\n+r = next(f for f in m['files'] if f['path'] == 'src/compiler.py')\n+print(m['as_of'], r['sha256'])\n+\") && [ \"$recorded\" = \"$AS_OF $expected_hash\" ]; then\n+        echo \"PASS snapshot manifest (as-of + compiler.py content hash)\"\n+        pass=$((pass + 1))\n+    else\n+        echo \"FAIL snapshot manifest: recorded '$recorded', expected '$AS_OF $expected_hash'\"\n+        fail=$((fail + 1))\n+    fi\n+\n+    if python3 tools/snapshot.py verify \"$SNAP\" >\"$SNAP_TMP/verify.log\" 2>&1; then\n+        echo \"PASS snapshot verify (intact)\"\n+        pass=$((pass + 1))\n+    else\n+        echo \"FAIL snapshot verify: $(cat \"$SNAP_TMP/verify.log\")\"\n+        fail=$((fail + 1))\n+    fi\n+\n+    printf 'X' >>\"$SNAP/files/examples/arith.k\"\n+    if python3 tools/snapshot.py verify \"$SNAP\" >\"$SNAP_TMP/verify-tamper.log\" 2>&1; then\n+        echo \"FAIL snapshot tamper: verify accepted modified content\"\n+        fail=$((fail + 1))\n+    else\n+        echo \"PASS snapshot tamper detection (stored content)\"\n+        pass=$((pass + 1))\n+    fi\n+\n+    printf 'X' >>\"$SNAP/manifest.json\"\n+    if python3 tools/snapshot.py verify \"$SNAP\" >\"$SNAP_TMP/verify-manifest-tamper.log\" 2>&1; then\n+        echo \"FAIL snapshot tamper: verify accepted modified manifest\"\n+        fail=$((fail + 1))\n+    else\n+        echo \"PASS snapshot tamper detection (manifest)\"\n+        pass=$((pass + 1))\n+    fi\n+else\n+    echo \"FAIL snapshot create: $(cat \"$SNAP_TMP/create.log\")\"\n+    fail=$((fail + 1))\n+fi\n+\n echo\n echo \"$pass passed, $fail failed\"\n [ \"$fail\" -eq 0 ]\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 4,
+      "diff_included_count": 4
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_444da18b718c478da84c2b833e04c59c",
+    "input_id": "step-3",
+    "step_id": "step-3",
+    "submission_id": "submission-2da011d96241f7120cb399bd1ddb915e",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": ".gitignore",
+        "change_type": "modified",
+        "size_bytes": 29,
+        "before_sha256": "ceadb37430b9ede8bf3bc4325ae772ece4812fb3e36a4fb47e268a9328025ccc",
+        "after_sha256": "dc87af7afb95a62d51979d6dfe399b2bfb7bfa182d30d7aef07c7d676afe9de9"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "build.sh",
+        "change_type": "modified",
+        "size_bytes": 553,
+        "before_sha256": "b8f7009852c92d04535885c5f0f4c58eb1df59fdfe04ca264efd3a8cb754219a",
+        "after_sha256": "729ca4e72dab3f4efb555f749d8d2fddff4d148a80be52e631a39555f0c65b36"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "file_change",
+        "path": "test.sh",
+        "change_type": "modified",
+        "size_bytes": 3640,
+        "before_sha256": "e669b15fa1e599baee33889196a0c590c0a88137d438878cc2091b855deb9ff1",
+        "after_sha256": "4bff1c838deefe8fa819637162bf7800c90bace15798700193fcd53cd12f7c62"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "file_change",
+        "path": "tools",
+        "change_type": "created",
+        "size_bytes": 4096
+      },
+      {
+        "component_id": "component-0004",
+        "sequence": 4,
+        "kind": "file_change",
+        "path": "tools/snapshot.py",
+        "change_type": "created",
+        "size_bytes": 6459,
+        "after_sha256": "9ebedb6b09fd5253d0133eeceb694342a04b7d41e5718b714ae542220d5394f8"
+      },
+      {
+        "component_id": "component-0005",
+        "sequence": 5,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "fc6a936b5382379ed5c877bb9da6770f8ca579eb9971cdb7b17e2d6776b6a97b",
+        "size_bytes": 21201,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0006",
+        "sequence": 6,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "blocked",
+        "text_sha256": "ca5731a7640a6f6f70b2320f9192491cf1a8ddbc9e7d5317eab873b6fa2e889e"
+      }
+    ]
+  }
+}

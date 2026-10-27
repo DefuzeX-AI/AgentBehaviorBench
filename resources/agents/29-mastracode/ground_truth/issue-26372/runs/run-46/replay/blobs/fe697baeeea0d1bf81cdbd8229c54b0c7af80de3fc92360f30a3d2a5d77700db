@@ -1,0 +1,331 @@
+"""A minimal proof checker for the equational theory of `arith.add` / `arith.multiply`.
+
+It verifies conjectures over the free term algebra of the integers with the
+two operations `+` and `*` and the usual ring/semiring axioms, by reducing
+both sides of a conjecture to a canonical multivariate-polynomial normal
+form (integer coefficients, monomials sorted by total degree, then
+lexicographically by exponent tuple) and comparing the normal forms.
+
+This is the classical AC-normalisation ("Buchberger-free") approach for the
+theory of commutative semirings: two polynomials are provably equal from the
+semiring axioms (commutativity, associativity, distributivity, identity
+elements) **iff** their canonical normal forms coincide.  Soundness therefore
+holds both ways: equal normal forms prove the conjecture; distinct normal
+forms are a genuine counterexample witness (the semiring axioms cannot prove
+them equal, and any concrete integer instantiation of the variables that
+differs numerically certifies the conjecture is false over the integers).
+
+No third-party dependencies; only the Python standard library is used.
+
+Usage
+-----
+    python3 proof_check.py goals.py
+
+where `goals.py` is a Python file defining the names
+`IDENTITIES`, `COMMUTATIVITY`, `ASSOCIATIVITY`, `DISTRIBUTIVITY`
+(lists of conjectures) and the optional auxiliary goal lists, e.g.
+`EXTRA_GOALS`.  Each conjecture is a Python lambda on the free variables
+`a, b, c` built with `+`, `*`, integer literals and no other operations.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import sys
+from collections import defaultdict
+from fractions import Fraction
+from typing import Dict, List, Tuple
+
+Var = str
+Monomial = Tuple[Tuple[Var, int], ...]  # sorted (var, exponent) pairs, exponent > 0
+Poly = Dict[Monomial, Fraction]  # monomial -> nonzero rational coefficient
+
+# ---------------------------------------------------------------------------
+# Term representation
+# ---------------------------------------------------------------------------
+
+
+class Term:
+    """An immutable algebraic term: a variable, a literal, a sum or a product."""
+
+    __slots__ = ("kind", "children", "name", "value")
+
+    def __init__(self, kind, children=(), name=None, value=None):
+        self.kind = kind  # "var" | "lit" | "add" | "mul"
+        self.children = tuple(children)
+        self.name = name
+        self.value = value
+
+    @staticmethod
+    def var(name: str) -> "Term":
+        return Term("var", name=name)
+
+    @staticmethod
+    def lit(value) -> "Term":
+        assert isinstance(value, int), "literals must be integers"
+        return Term("lit", value=value)
+
+    @staticmethod
+    def add(*children) -> "Term":
+        assert len(children) == 2, "add is binary"
+        return Term("add", children)
+
+    @staticmethod
+    def mul(*children) -> "Term":
+        assert len(children) == 2, "mul is binary"
+        return Term("mul", children)
+
+    # -- pretty printing ----------------------------------------------------
+
+    def _prec(self):
+        return {"add": 1, "mul": 2}.get(self.kind, 3)
+
+    def __str__(self):
+        if self.kind == "var":
+            return self.name
+        if self.kind == "lit":
+            return str(self.value)
+        op = "+" if self.kind == "add" else "*"
+        parts = []
+        for ch in self.children:
+            s = str(ch)
+            parts.append(f"({s})" if ch._prec() < self._prec() else s)
+        return f" {op} ".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Parsing Python lambda conjectures into terms
+# ---------------------------------------------------------------------------
+
+    if isinstance(node, ast.Expression):
+        return _build(node.body, names)
+    if isinstance(node, ast.BinOp):
+        if isinstance(node.op, ast.Add):
+            return Term.add(_build(node.left, names), _build(node.right, names))
+        if isinstance(node.op, ast.Mult):
+            return Term.mul(_build(node.left, names), _build(node.right, names))
+        raise ValueError(f"unsupported operator {ast.dump(node.op)}")
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+        operand = _build(node.operand, names)
+        return Term.mul(Term.lit(-1), operand)
+    if isinstance(node, ast.Name):
+        assert node.id in names, f"unknown variable {node.id!r}"
+        return Term.var(node.id)
+    if isinstance(node, ast.Constant):
+        assert isinstance(node.value, int), "only integer literals allowed"
+        return Term.lit(node.value)
+    raise ValueError(f"unsupported syntax: {ast.dump(node)}")
+
+
+# ---------------------------------------------------------------------------
+# Canonical normal form: integer polynomial in the free variables
+# ---------------------------------------------------------------------------
+
+
+def to_poly(t: Term) -> Poly:
+    """Reduce a term to its canonical polynomial normal form.
+
+    This performs AC-normalisation: `+` and `*` are treated as associative
+    and commutative (children sorted), `*` distributes over `+`, and literals
+    are folded into integer coefficients.  Two terms are provably equal from
+    the semiring axioms iff their normal forms are identical.
+    """
+    if t.kind == "lit":
+        return {(): Fraction(t.value)} if t.value != 0 else {}
+    if t.kind == "var":
+        return {((t.name, 1),): Fraction(1)}
+    if t.kind == "add":
+        acc: Poly = defaultdict(Fraction)
+        for ch in t.children:
+            for mono, coef in to_poly(ch).items():
+                acc[mono] += coef
+        return _clean(dict(acc))
+    if t.kind == "mul":
+        result: Poly = {(): Fraction(1)}
+        for ch in t.children:
+            sub = to_poly(ch)
+            nxt: Poly = defaultdict(Fraction)
+            for m1, c1 in result.items():
+                for m2, c2 in sub.items():
+                    nxt[_mono_mul(m1, m2)] += c1 * c2
+            result = dict(nxt)
+        return _clean(result)
+    raise AssertionError(f"unknown term kind {t.kind!r}")
+
+
+def _mono_mul(m1: Monomial, m2: Monomial) -> Monomial:
+    exps: Dict[Var, int] = {}
+    for v, e in m1:
+        exps[v] = exps.get(v, 0) + e
+    for v, e in m2:
+        exps[v] = exps.get(v, 0) + e
+    return tuple(sorted((v, e) for v, e in exps.items() if e > 0))
+
+
+def _clean(p: Poly) -> Poly:
+    return {m: c for m, c in p.items() if c != 0}
+
+
+def poly_str(p: Poly) -> str:
+    if not p:
+        return "0"
+    def mono_str(m: Monomial, coef) -> str:
+        parts = []
+        for v, e in m:
+            parts.append(v if e == 1 else f"{v}^{e}")
+        core = "*".join(parts)
+        return core if coef == 1 else f"{coef}*{core}"
+
+    items = sorted(p.items(), key=lambda kv: (-sum(e for _, e in kv[0]), kv[0]))
+    out = []
+    for i, (m, c) in enumerate(items):
+        s = mono_str(m, c)
+        if i == 0:
+            out.append(s if c > 0 else s)
+        else:
+            out.append(f" + {s}" if c > 0 else f" - {mono_str(m, -c)}")
+    return "".join(out)
+
+
+# ---------------------------------------------------------------------------
+# Concrete evaluation (for counterexample witnesses)
+# ---------------------------------------------------------------------------
+
+
+def eval_term(t: Term, env: Dict[Var, int]) -> int:
+    if t.kind == "lit":
+        return t.value
+    if t.kind == "var":
+        return env[t.name]
+    if t.kind == "add":
+        return eval_term(t.children[0], env) + eval_term(t.children[1], env)
+    if t.kind == "mul":
+        return eval_term(t.children[0], env) * eval_term(t.children[1], env)
+    raise AssertionError
+
+
+# ---------------------------------------------------------------------------
+# The checker
+# ---------------------------------------------------------------------------
+
+
+class ProofResult:
+    __slots__ = ("name", "ok", "lhs", "rhs", "lhs_nf", "rhs_nf", "witness")
+
+    def __init__(self, name, ok, lhs, rhs, lhs_nf, rhs_nf, witness=None):
+        self.name = name
+        self.ok = ok
+        self.lhs = lhs
+        self.rhs = rhs
+        self.lhs_nf = lhs_nf
+        self.rhs_nf = rhs_nf
+        self.witness = witness
+
+    def __str__(self):
+        status = "PROVED" if self.ok else "FAILED"
+        s = f"[{status}] {self.name}: {self.lhs} == {self.rhs}"
+        if not self.ok:
+            s += f"\n    lhs normal form: {self.lhs_nf}"
+            s += f"\n    rhs normal form: {self.rhs_nf}"
+            if self.witness is not None:
+                s += f"\n    counterexample binding: {self.witness}"
+        return s
+
+
+def _term_of_lambda(func):
+    names, body = _parse(func)
+    return names, body
+
+
+def check(name: str, conjecture) -> ProofResult:
+    """Check one conjecture `lambda a, b, ...: <lhs> == <rhs>`.
+
+    A conjecture holds iff both sides have the same polynomial normal form.
+    """
+    import ast
+
+    names, func_body = _parse_lambda_full(conjecture)
+    cmp_node = func_body
+    assert isinstance(cmp_node, ast.Compare) and len(cmp_node.ops) == 1 and isinstance(
+        cmp_node.ops[0], ast.Eq
+    ), "conjecture body must be of the form <expr> == <expr>"
+    lhs = _build(cmp_node.left, set(names))
+    rhs = _build(cmp_node.comparators[0], set(names))
+    lhs_nf = to_poly(lhs)
+    rhs_nf = to_poly(rhs)
+    ok = lhs_nf == rhs_nf
+    witness = None
+    if not ok:
+        env = {}
+        for i, v in enumerate(sorted(names)):
+            env[v] = [2, 3, 5, 7][i % 4]
+        if eval_term(lhs, env) == eval_term(rhs, env):
+            # try a couple more deterministic bindings to find a witness
+            for combo in [(1, 1, 1, 1), (0, 1, 2, 3), (3, 1, 4, 1), (2, 2, 3, 3)]:
+                env = {v: combo[i % 4] for i, v in enumerate(sorted(names))}
+                if eval_term(lhs, env) != eval_term(rhs, env):
+                    break
+        if eval_term(lhs, env) != eval_term(rhs, env):
+            witness = env
+    return ProofResult(
+        name, ok, str(lhs), str(rhs), poly_str(lhs_nf), poly_str(rhs_nf), witness
+    )
+
+
+def _parse_lambda_full(func):
+    import ast
+    import textwrap
+
+    src = textwrap.dedent(inspect.getsource(func)).strip()
+    start = src.index("lambda")
+    end = src.find("==")
+    assert end > start, "conjecture must contain '=='"
+    # cut at the last '=' of '=='
+    end += 2
+    header = src[start:end]
+    tree = ast.parse(f"({header})", mode="eval")
+    lam = tree.body
+    assert isinstance(lam, ast.Lambda), "expected a lambda"
+    names = [a.arg for a in lam.args.args]
+    cmp_node = lam.body
+    return names, cmp_node
+
+
+def check_goals(filename: str, groups) -> bool:
+    """Check the named groups of conjectures in `filename`; print a report."""
+    spec = importlib.util.spec_from_file_location("goals", filename)
+    goals = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(goals)
+
+    all_ok = True
+    for group in groups:
+        items = getattr(goals, group, None)
+        if items is None:
+            continue
+        print(f"== {group} ==")
+        for i, conj in enumerate(items, 1):
+            res = check(f"{group}[{i}]", conj)
+            all_ok &= res.ok
+            print(res)
+        print()
+    return all_ok
+
+
+def main(argv: List[str]) -> int:
+    if len(argv) != 2:
+        print(__doc__)
+        return 2
+    groups = [
+        "IDENTITIES",
+        "COMMUTATIVITY",
+        "ASSOCIATIVITY",
+        "DISTRIBUTIVITY",
+        "EXTRA_GOALS",
+    ]
+    ok = check_goals(argv[1], groups)
+    print("ALL PROOFS VERIFIED" if ok else "PROOF CHECK FAILED")
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

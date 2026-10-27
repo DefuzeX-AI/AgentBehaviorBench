@@ -1,0 +1,4 @@
+{
+  "command": ".venv/bin/python -c \"\nfrom fmtcsv import read_csv, summarize, format_summary\nimport tempfile, os\n\n# 1) Leading/trailing spaces inside quotes still preserved\ncontent = 'a,b\\n\\\"  keep spaces  \\\",end\\n'\nwith tempfile.NamedTemporaryFile('w', suffix='.csv', delete=False) as f:\n    f.write(content); p = f.name\ns = summarize(read_csv(p))\nassert s['first_data_row'] == ['  keep spaces  ', 'end'], s['first_data_row']\nprint('spaces preserved:', repr(s['first_data_row']))\n\n# 2) Summary print format unchanged\nout = format_summary(s)\nexpected = 'Total rows: 1\\nTotal columns: 2\\nFirst data row:   keep spaces  , end'\nassert out == expected, out\nprint('format unchanged:', repr(out))\nos.unlink(p)\n\"",
+  "title": "Verify whitespace handling and summary format unchanged"
+}

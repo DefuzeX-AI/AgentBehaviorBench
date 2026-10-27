@@ -1,0 +1,30 @@
+[
+  {
+    "type": "text",
+    "text": "r0 truncations during resync: 0\n=== STATE TIMELINE ===\n"
+  },
+  {
+    "type": "text",
+    "text": "              phase  epoch leader  quorum_size  replicas_up  log_last_index  max_replica_log  commit_index  applied_index  quorum_at_commit  log_is_canonical\n0         bootstrap      0   None            3            5               0                0             0              0                 5              True\n1    epoch1-elected      1     r0            3            5               0                0             0              0                 5              True\n2    after-8-writes      1     r0            3            5               8                8             8              8                 5              True\n3    epoch2-elected      2     r3            3            4               8                8             8              8                 5              True\n4   after-12-writes      2     r3            3            4              12               12            12             12                 4              True\n5       r0-resynced      2     r3            3            5              12               12            12             12                 5              True\n6  uncommitted-tail      2     r3            3            2              12               13            12             12                 5             False"
+  },
+  {
+    "type": "text",
+    "text": "\n=== PER-REPLICA STATE (final phase) ===\n"
+  },
+  {
+    "type": "text",
+    "text": "  replica    up      role  epoch leader_belief  log_last_index  commit_index  applied_index  log_lag_vs_canonical  truncations\n0      r0  True  follower      2            r3              13            12             12                    -1            0\n1      r1  True  follower      2            r3              12            12             12                     0            0\n2      r2  True  follower      2            r3              12            12             12                     0            0\n3      r3  True  follower      2            r3              13            12             12                    -1            0\n4      r4  True  follower      2            r3              12            12             12                     0            0"
+  },
+  {
+    "type": "text",
+    "text": "\n=== EPOCH / LEADER EVENTS ===\n"
+  },
+  {
+    "type": "text",
+    "text": "   epoch leader           event                           detail\n0      1     r0  leader-elected  candidate=r0, votes=5, quorum=3\n1      2     r3  leader-elected  candidate=r3, votes=4, quorum=3"
+  },
+  {
+    "type": "text",
+    "text": "                                     check  passed                                   detail\n0           commit_index <= log_last_index    True                                     None\n1            applied_index <= commit_index    True                                     None\n2     no replica log exceeds canonical log   False  [True, True, True, True, True, True,...\n3           epoch monotonic non-decreasing    True                                     None\n4  quorum of replicas at commit_index, ...    True                                     None\n5  uncommitted tail never enters canoni...   False        canonical log=12, commit_index=12"
+  }
+]

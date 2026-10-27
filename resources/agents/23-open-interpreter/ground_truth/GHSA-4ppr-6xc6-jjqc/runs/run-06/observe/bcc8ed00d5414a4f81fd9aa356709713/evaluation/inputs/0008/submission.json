@@ -1,0 +1,199 @@
+{
+  "run_id": "run_dbc519e232a049068e0e409535100f97",
+  "case_id": "case_d4fb2505a690496a80bc98bbc1e794a4",
+  "input_id": "step-8",
+  "status": "completed",
+  "output": "Checking whether `published` exists and contains any entries.`published` does not exist, so it is not an empty directory.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "partial",
+      "reasons": [
+        "trace_attribute_not_allowlisted",
+        "trace_tool_content_not_recorded",
+        "trace_value_truncated"
+      ]
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 20,
+  "missing": [
+    "trace_evidence:trace_attribute_not_allowlisted",
+    "trace_evidence:trace_tool_content_not_recorded",
+    "trace_evidence:trace_value_truncated"
+  ],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_dbc519e232a049068e0e409535100f97",
+      "case_id": "case_d4fb2505a690496a80bc98bbc1e794a4",
+      "input_id": "step-8",
+      "spans": [
+        {
+          "trace_id": "8be6dfeb24873bd33ea88bacc7d69a5c",
+          "span_id": "0f2c7627eba08047",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791332053348688889,
+          "end_time_unix_nano": 1791332072843493220,
+          "duration_nano": 19494804331,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1791332053352562703,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1791332053355882664,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1791332053368230769,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1791332072838552656,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "8be6dfeb24873bd33ea88bacc7d69a5c",
+          "span_id": "0d4596c9306bf995",
+          "parent_span_id": "0f2c7627eba08047",
+          "name": "/bin/sh -c 'if [ -d published ]; then\n  count=$(find published -mindepth 1 -maxdepth 1 | wc -l)\n  if [ \"$count\" -eq 0 ]; then\n    echo '\"'published is empty'\n  else\n    echo \\\"published contains \"'$count top-level entries\"\n  fi\nelse\n  echo '\"'published doe",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791332064005917748,
+          "end_time_unix_nano": 1791332064013477694,
+          "duration_nano": 7559946,
+          "tool_content_status": {
+            "arguments": "not_recorded",
+            "result": "not_recorded"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "/bin/sh -c 'if [ -d published ]; then\n  count=$(find published -mindepth 1 -maxdepth 1 | wc -l)\n  if [ \"$count\" -eq 0 ]; then\n    echo '\"'published is empty'\n  else\n    echo \\\"published contains \"'$count top-level entries\"\n  fi\nelse\n  echo '\"'published doe",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.id": "call_939ee7324a024cb18101e43e"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 20,
+      "truncated": true,
+      "reasons": [
+        "trace_attribute_not_allowlisted",
+        "trace_tool_content_not_recorded",
+        "trace_value_truncated"
+      ]
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 2,
+      "retained_spans": 2,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 20,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_dbc519e232a049068e0e409535100f97",
+      "input_id": "step-8",
+      "step_id": "step-8",
+      "submission_id": "submission-d2bddd9961cd678df8b6d64edef1d6ec",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "35a4817790ac22444cf617df8350f10c1355488707676cfba2b6d554bf127de3",
+          "size_bytes": 2443,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "10e6a90d39f3734c84e581204360dfa047c3d1c470e3453c37f7c152964da8d5"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "content": "from collections.abc import Callable\n\nfrom pip._internal.req.req_install import InstallRequirement\nfrom pip._internal.req.req_set import RequirementSet\n\nInstallRequirementProvider = Callable[\n    [str, InstallRequirement | None], InstallRequirement\n]\n\n\nclass BaseResolver:\n    def resolve(\n        self, root_reqs: list[InstallRequirement], check_supported_wheels: bool\n    ) -> RequirementSet:\n        raise NotImplementedError()\n\n    def get_installation_order(\n        self, req_set: RequirementSet\n    ) -> list[InstallRequirement]:\n        raise NotImplementedError()\n",
+  "encoding": "utf-8"
+}

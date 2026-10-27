@@ -1,0 +1,4 @@
+{
+  "command": "cat /tmp/spdx-schema.json; echo \"---\"; curl -sSL --max-time 10 -o /tmp/spdx-schema.json https://spdx.org/schema/spdx-schema.json && wc -c /tmp/spdx-schema.json && python3 -c \"import json; s=json.load(open('/tmp/spdx-schema.json')); print('title:', s.get('title')); print('defs:', list(s.get('definitions',{}).keys())[:20])\"",
+  "intent": "Fetch full official SPDX 2.3 JSON schema"
+}

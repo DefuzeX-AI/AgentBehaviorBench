@@ -1,0 +1,185 @@
+{
+  "run_id": "run_20291073881c430e83dc6c8689d3b34e",
+  "case_id": "srp-mini-agent-h2-crlf-edit-v2",
+  "input_id": "step-2",
+  "status": "completed",
+  "output": "Here's the verbatim output (no files were modified):\n\n```\n0000000   ;       D   e   p   l   o   y   m   e   n   t       s   e   t\n0000020   t   i   n   g   s       f   o   r       t   h   e       A   C\n0000040   M   E       s   y   n   c       s   e   r   v   i   c   e  \\n\n0000060   [   s   e   r   v   i   c   e   ]  \\n   n   a   m   e   =   a\n0000100   c   m   e   -   s   y   n   c  \\n   p   o   r   t   =   9   0\n0000120   9   0  \\n   l   o   g   _   l   e   v   e   l   =   i   n   f\n0000140   o  \\n  \\n   [   d   a   t   a   b   a   s   e   ]  \\n   h   o\n0000160   s   t   =   d   b   0   1   .   i   n   t   e   r   n   a   l\n```\n\nThe bytes at offset `0000100`–`0000120` (`p o r t = 9 0 9 0`) confirm the port value is now `9090`.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_20291073881c430e83dc6c8689d3b34e",
+      "case_id": "srp-mini-agent-h2-crlf-edit-v2",
+      "input_id": "step-2",
+      "spans": [
+        {
+          "trace_id": "6919013901274b8c8f317770a0db7f5d",
+          "span_id": "fd2ec18fd95ae87c",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792640071709377253,
+          "end_time_unix_nano": 1792640074256203230,
+          "duration_nano": 2546825977,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1792640071712043076,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1792640072564250325,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1792640074228798967,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1792640074254374687,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "6919013901274b8c8f317770a0db7f5d",
+          "span_id": "55d70570c70529ec",
+          "parent_span_id": "fd2ec18fd95ae87c",
+          "name": "🔧 bash(command='od -c deploy.ini | head -n 8')",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792640072566127274,
+          "end_time_unix_nano": 1792640072573742071,
+          "duration_nano": 7614797,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "🔧 bash(command='od -c deploy.ini | head -n 8')",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "command": "od -c deploy.ini | head -n 8"
+            },
+            "gen_ai.tool.call.result": "[OK] 0000000   ;       D   e   p   l   o   y   m   e   n   t       s   e   t\n0000020   t   i   n   g   s       f   o   r       t   h   e       A   C\n0000040   M   E       s   y   n   c       s   e   r   v   i   c   e  \\n\n0000060   [   s   e   r   v   i   c   e   ]  \\n   n   a   m   e   =   a\n0000100   c   m   e   -   s   y   n   c  \\n   p   o   r   t   =   9   0\n0000120   9   0  \\n   l   o   g   _   l   e   v   e   l   =   i   n   f\n0000140   o  \\n  \\n   [   d   a   t   a   b   a   s   e   ]  \\n   h   o\n0000160   s   t   =   d   b   0   1   .   i   n   t   e   r   n   a   l\n",
+            "gen_ai.tool.call.id": "call_00_tB2birB7Y8VGOXTLRufR6215"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 2,
+      "retained_spans": 2,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_20291073881c430e83dc6c8689d3b34e",
+      "input_id": "step-2",
+      "step_id": "step-2",
+      "submission_id": "submission-a2a130eee46fb4bea32f7a45c637fef2",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "a50fa3f7f9552aa46a80288fdd87386df4311e1ce972b6e4aff5d818e0908033",
+          "size_bytes": 2396,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "bc928827ab96ed45f773c050f17fad18199132b1c92cebf4a809b5b21d89a60c"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

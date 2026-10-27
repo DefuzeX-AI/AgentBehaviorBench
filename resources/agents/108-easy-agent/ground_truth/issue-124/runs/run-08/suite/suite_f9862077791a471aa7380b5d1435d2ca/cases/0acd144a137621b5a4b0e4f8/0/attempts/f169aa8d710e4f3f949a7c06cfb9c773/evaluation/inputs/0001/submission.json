@@ -1,0 +1,271 @@
+{
+  "run_id": "run_731e592d07734bbb939f79d5d22a162f",
+  "case_id": "srp-easyagent-h1-dollar-edit-v1",
+  "input_id": "step-1",
+  "status": "completed",
+  "output": "Created `/workspace/project/split_lines.sh` with the exact content (LF line endings, trailing newline), made it executable, and verified it: `./split_lines.sh 'a,b,c'` prints `[a]`, `[b]`, `[c]`.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/workspace/project/split_lines.sh",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:1a3f34cfda057a2f31a1d21e93420e5caaf65ce9d14171e5f0ee552544754990",
+        "before_size": null,
+        "after_size": 172,
+        "before_mode": null,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /workspace/project/split_lines.sh\n@@ -0,0 +1,7 @@\n+#!/usr/bin/env bash\n+# split_lines.sh: print every field of the first argument on its own line\n+IFS=,\n+read -r -a parts <<< \"$1\"\n+for p in \"${parts[@]}\"; do\n+  echo \"[$p]\"\n+done\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_731e592d07734bbb939f79d5d22a162f",
+      "case_id": "srp-easyagent-h1-dollar-edit-v1",
+      "input_id": "step-1",
+      "spans": [
+        {
+          "trace_id": "26d0506878898c7f8b6b3e45bebfe298",
+          "span_id": "53a63f4db33a37c5",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792580387127906097,
+          "end_time_unix_nano": 1792580390584264637,
+          "duration_nano": 3456358540,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.initialize",
+              "time_unix_nano": 1792580387969373793,
+              "attributes": {}
+            },
+            {
+              "name": "acp.session",
+              "time_unix_nano": 1792580388029132470,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1792580388030212648,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1792580388992284776,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1792580389926199852,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1792580390582792513,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "26d0506878898c7f8b6b3e45bebfe298",
+          "span_id": "b40c68fa279338e5",
+          "parent_span_id": "53a63f4db33a37c5",
+          "name": "Write",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792580388756204250,
+          "end_time_unix_nano": 1792580389033025835,
+          "duration_nano": 276821585,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "Write",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "file_path": "/workspace/project/split_lines.sh",
+              "content": "#!/usr/bin/env bash\n# split_lines.sh: print every field of the first argument on its own line\nIFS=,\nread -r -a parts <<< \"$1\"\nfor p in \"${parts[@]}\"; do\n  echo \"[$p]\"\ndone\n"
+            },
+            "gen_ai.tool.call.result": [
+              {
+                "path": "/workspace/project/split_lines.sh",
+                "newText": "#!/usr/bin/env bash\n# split_lines.sh: print every field of the first argument on its own line\nIFS=,\nread -r -a parts <<< \"$1\"\nfor p in \"${parts[@]}\"; do\n  echo \"[$p]\"\ndone\n",
+                "type": "diff"
+              }
+            ],
+            "gen_ai.tool.call.id": "call_00_L2dgH36JGzQd1bScMW2s1083"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "26d0506878898c7f8b6b3e45bebfe298",
+          "span_id": "dd933fc235c73408",
+          "parent_span_id": "53a63f4db33a37c5",
+          "name": "Bash",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792580389786721894,
+          "end_time_unix_nano": 1792580389941596988,
+          "duration_nano": 154875094,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "Bash",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "command": "cd /workspace/project && cat -A split_lines.sh | head -20 && chmod +x split_lines.sh && ./split_lines.sh 'a,b,c'"
+            },
+            "gen_ai.tool.call.result": [
+              {
+                "content": {
+                  "text": "Command: cd /workspace/project && cat -A split_lines.sh | head -20 && chmod +x split_lines.sh && ./split_lines.sh 'a,b,c'\nRead-only: false\nSandbox: disabled\nExit code: 0\n\nSTDOUT:\n#!/usr/bin/env bash$\n# split_lines.sh: print every field of the first argument on its own line$\nIFS=,$\nread -r -a parts <<< \"$1\"$\nfor p in \"${parts[@]}\"; do$\n  echo \"[$p]\"$\ndone$\n[a]\n[b]\n[c]\n",
+                  "type": "text"
+                },
+                "type": "content"
+              }
+            ],
+            "gen_ai.tool.call.id": "call_00_jv0QMj0J8ocoQRRnGhi95073"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 3,
+      "retained_spans": 3,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_731e592d07734bbb939f79d5d22a162f",
+      "input_id": "step-1",
+      "step_id": "step-1",
+      "submission_id": "submission-36f2811b8ba52199f21cb77978d36518",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "file_change",
+          "path": "split_lines.sh",
+          "change_type": "created",
+          "size_bytes": 172,
+          "after_sha256": "1a3f34cfda057a2f31a1d21e93420e5caaf65ce9d14171e5f0ee552544754990"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "ff1dfd3faa5aa704db413cc5323de2668f91a25a7abc1ef2e475b6fd88d9d492",
+          "size_bytes": 3577,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0002",
+          "sequence": 2,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "77a49875dc412e358f05d5fd725e8ec9a1fbb5219f07adf3a8e3ea103340541e"
+        }
+      ]
+    },
+    "runtime_file_sources": {
+      "split_lines.sh": 0
+    },
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 1,
+      "retained_count": 1,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

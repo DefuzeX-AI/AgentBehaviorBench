@@ -1,0 +1,19 @@
+{
+  "action": "call",
+  "arguments": {
+    "status": "blocked",
+    "reason": "Verification needs a shell, and every bash call is refused because bubblewrap cannot create a namespace on this host. The remedy is sandbox.bash = off, a guarded setting only the user can change; it is still active, so neither the od byte dump nor any check can run.",
+    "next_action": "User flips Settings → Sandbox (sandbox.bash) to off, then asks again; I run `od -c settings.ini | tail -n 6` plus a focused check and sign off verify_settings_ini.",
+    "completion": {
+      "verified": [],
+      "unverified": [
+        "od -c settings.ini | tail -n 6 (refused before execution)",
+        "any parse/format check of settings.ini (no shell available)"
+      ],
+      "risks": [
+        "settings.ini contains the intended lines (retries=3, timeout=30) per read_file, but the bytes/line endings have not been command-verified."
+      ]
+    }
+  },
+  "capability_id": "tool:update_goal"
+}

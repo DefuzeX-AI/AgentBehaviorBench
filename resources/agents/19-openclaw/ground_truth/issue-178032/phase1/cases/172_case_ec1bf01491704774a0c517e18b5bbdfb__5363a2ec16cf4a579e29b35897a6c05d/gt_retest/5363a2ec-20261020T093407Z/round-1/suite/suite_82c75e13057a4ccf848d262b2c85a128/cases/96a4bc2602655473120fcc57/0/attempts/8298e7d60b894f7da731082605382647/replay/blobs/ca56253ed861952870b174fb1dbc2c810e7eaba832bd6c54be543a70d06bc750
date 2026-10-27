@@ -1,0 +1,26 @@
+# fmtcsv
+
+A tiny CLI that reads a CSV file and prints a summary: total rows, total
+columns, and the first data row.
+
+- The first line of the file is treated as the header row; "total rows" counts
+  the data rows after the header.
+- Quoted fields may contain commas (and newlines).
+- Field content is preserved exactly, including leading/trailing spaces inside
+  quotes.
+
+## Usage
+
+    python fmtcsv.py data.csv
+
+Example output:
+
+    Total rows: 2
+    Total columns: 3
+    First data row: ['Alice', '30', 'New York']
+
+## Tests
+
+    python -m pytest test_fmtcsv.py -v
+
+Requires Python 3.9+ and pytest.

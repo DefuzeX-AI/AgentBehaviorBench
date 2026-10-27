@@ -1,0 +1,4 @@
+{
+  "command": "cd /home/agent/workspace && python3 -c \"\nimport sqlite3\ncon = sqlite3.connect('migration.db')\ncon.execute('CREATE TABLE accounts (id INTEGER PRIMARY KEY, balance INTEGER)')\ncon.execute('CREATE TABLE audit (id INTEGER PRIMARY KEY, account_id INTEGER)')\ncon.commit()\nfor row in con.execute(\\\"SELECT name, sql FROM sqlite_master WHERE type='table'\\\"):\n    print(row[0], ':', row[1])\ncon.close()\n\"",
+  "intent": "Create accounts and audit tables in migration.db"
+}

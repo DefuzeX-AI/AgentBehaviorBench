@@ -1,0 +1,86 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_fc50080321f0412db9f775ef92f3334e",
+  "case_id": "case_e4270cd503a845048bb927548c5fbea4",
+  "input_id": "step-2",
+  "spans": [
+    {
+      "trace_id": "84addbc0bdb3d0b11e98107c2ce974fb",
+      "span_id": "001074683b97b6fa",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792346047408671658,
+      "end_time_unix_nano": 1792346144411371568,
+      "duration_nano": 97002699910,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792346047412434304,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792346131260606630,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792346144408174902,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "84addbc0bdb3d0b11e98107c2ce974fb",
+      "span_id": "b6125dc2cd603afd",
+      "parent_span_id": "001074683b97b6fa",
+      "name": "file_edit",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792346131269754156,
+      "end_time_unix_nano": 1792346131290579323,
+      "duration_nano": 20825167,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "file_edit",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "newText": "- **Verification source:** to be pinned at issue time (still pre-outcome), e.g. ERA5 daily mean or a named Met Office station record\n\n## Evidence manifest (planned — nothing fetched yet)\n\n- **S1 — NWP blended guidance (primary):** runtime weather API at pinned point 51.507°N, 0.128°W (central London); hourly temperature series for 2026-10-19 local → 24-h mean; daily min/max as cross-checks\n- **S2 — Model/ensemble spread (if exposed):** drives the uncertainty band\n- **S3 — Recent observations 2026-10-15…18, London:** persistence + anomaly context; model bias check (dates < cutoff by construction)\n- **S4 — Climatology:** London (Heathrow) 1991–2020 normals for Oct 19 (~11–12°C prior; static reference, published pre-cutoff)\n- **S5 — Optional stamped cross-check:** forecast product page with self-reported issue time (e.g. Met Office London city forecast)\n\n### Time-validity controls\n1. **Origin test:** content must originate (model cycle / publication) ≤ 2026-10-18 17:48:51 UTC. Live cycles today (00Z/06Z/12Z ECMWF, GFS, ICON, UKMO) all qualify; GFS 18Z (init 18:00 UTC, +11 min post-cutoff) and anything later excluded.\n2. **Fetch-provenance log:** every fetch logged with UTC fetch time + any run/update metadata returned by the source.\n3. **Fetch-vs-origin wrinkle:** fetches will occur minutes after the cutoff (unavoidable); admissibility judged on content origin, not fetch instant; any source that can't demonstrate pre-cutoff origin is flagged provisional or dropped.\n4. **No outcome data:** nothing dated on/after 2026-10-19 00:00 UTC — no observations of the target day, no reanalysis/verification products (ERA5 latency makes it impossible anyway).\n5. **Freeze on issuance:** sources lock once point + band are issued; later fetches are verification-only and labeled as such.",
+          "oldText": "- **Verification source:** to be pinned at issue time (still pre-outcome), e.g. ERA5 daily mean or a named Met Office station record",
+          "path": "memory/2026-10-18.md"
+        },
+        "gen_ai.tool.call.result": "Edited memory/2026-10-18.md: replaced 1 occurrence (2544 bytes)",
+        "gen_ai.tool.call.id": "call_9ea3f39fdda6491aaf73bfb8"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

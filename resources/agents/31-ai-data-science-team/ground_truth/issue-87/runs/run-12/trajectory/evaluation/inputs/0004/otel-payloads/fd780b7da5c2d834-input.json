@@ -1,0 +1,50 @@
+{
+  "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # Ensure input is a list\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # Standardize column names for each dataframe\n    standardized_dfs = []\n    for df in data_list:\n        df_temp = df.copy()\n        df_temp.columns = df_temp.columns.str.strip().str.lower().str.replace(' ', '_', regex=False)\n        standardized_dfs.append(df_temp)\n\n    # If multiple datasets, concatenate those with the same columns\n    if len(standardized_dfs) > 1:\n        first_cols = set(standardized_dfs[0].columns)\n        # Check if all have the same columns\n        if all(set(df.columns) == first_cols for df in standardized_dfs):\n            df = pd.concat(standardized_dfs, ignore_index=True)\n        else:\n            # For this task, we only have one dataset. If multiple with different columns,\n            # we will just use the first one. (In a real scenario, we would merge on keys.)\n            df = standardized_dfs[0]\n    else:\n        df = standardized_dfs[0]\n\n    # Helper to find columns by keywords\n    def find_col(dataframe, keywords):\n        for col in dataframe.columns:\n            if all(kw in col for kw in keywords):\n                return col\n        return None\n\n    # Identify bike model column\n    model_col = find_col(df, ['bike', 'model']) or find_col(df, ['model']) or find_col(df, ['bike'])\n    # Identify extended sales column\n    sales_col = find_col(df, ['extended', 'sales']) or find_col(df, ['sales'])\n    # Identify price and quantity columns for imputation\n    price_col = find_col(df, ['price'])\n    qty_col = find_col(df, ['quantity']) or find_col(df, ['qty'])\n    # Identify date column\n    date_col = find_col(df, ['date'])\n\n    if model_col is None or sales_col is None:\n        raise ValueError(\"Required columns for bike model and extended sales not found.\")\n\n    # Normalize data types\n    if date_col:\n        df[date_col] = pd.to_datetime(df[date_col], errors='coerce')\n    df[sales_col] = pd.to_numeric(df[sales_col], errors='coerce')\n    if price_col:\n        df[price_col] = pd.to_numeric(df[price_col], errors='coerce')\n    if qty_col:\n        df[qty_col] = pd.to_numeric(df[qty_col], errors='coerce')\n\n    # Handle missing values in sales: compute from price * quantity if possible\n    if price_col and qty_col:\n        mask = df[sales_col].isna()\n        df.loc[mask, sales_col] = df.loc[mask, price_col] * df.loc[mask, qty_col]\n    # Fill any remaining missing sales with 0 (safe for summation)\n    df[sales_col] = df[sales_col].fillna(0)\n\n    # Handle missing values in bike model: fill with 'Unknown'\n    df[model_col] = df[model_col].fillna('Unknown')\n\n    # Remove duplicate rows\n    df = df.drop_duplicates()\n\n    # Group by bike model and sum extended sales\n    grouped = df.groupby(model_col, as_index=False)[sales_col].sum()\n\n    # Sort descending and take top 3\n    top3 = grouped.sort_values(by=sales_col, ascending=False).head(3).reset_index(drop=True)\n\n    # Rename columns for clarity\n    top3 = top3.rename(columns={model_col: 'bike_model', sales_col: 'total_extended_sales'})\n\n    return top3\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 5622,
+      "prompt_tokens": 743,
+      "total_tokens": 6365,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 4766,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012151404148516967c955d568jXvfAOB6",
+    "service_tier": "default",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a130ad-9352-7d11-8a7d-9b3e91672f8f-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 743,
+    "output_tokens": 5622,
+    "total_tokens": 6365,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 4766
+    }
+  }
+}

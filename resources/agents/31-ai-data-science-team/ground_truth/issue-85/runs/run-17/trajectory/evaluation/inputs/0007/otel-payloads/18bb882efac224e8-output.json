@@ -1,0 +1,77 @@
+{
+  "generations": [
+    [
+      {
+        "text": "```python\ndef data_wrangler(data_raw):\n    import pandas as pd\n    import numpy as np\n    from functools import reduce\n\n    # ------------------------------------------------------------------\n    # 1. Ensure input is a list of DataFrames\n    # ------------------------------------------------------------------\n    if isinstance(data_raw, pd.DataFrame):\n        data_list = [data_raw]\n    elif not isinstance(data_raw, list):\n        data_list = [pd.DataFrame(data_raw)]\n    else:\n        data_list = data_raw\n\n    # ------------------------------------------------------------------\n    # 2. Standardize column names for each DataFrame\n    # ------------------------------------------------------------------\n    cleaned_dfs = []\n    for df in data_list:\n        if df is None or df.empty:\n            continue\n        df = df.copy()\n        df.columns = [\n            str(c).strip().lower().replace(' ', '_')\n            for c in df.columns\n        ]\n        cleaned_dfs.append(df)\n\n    if not cleaned_dfs:\n        return pd.DataFrame()\n\n    # ------------------------------------------------------------------\n    # 3. Merge or concatenate multiple datasets appropriately\n    # ------------------------------------------------------------------\n    if len(cleaned_dfs) == 1:\n        df = cleaned_dfs[0]\n    else:\n        all_col_sets = [set(df.columns) for df in cleaned_dfs]\n        if all(cols == all_col_sets[0] for cols in all_col_sets):\n            df = pd.concat(cleaned_dfs, ignore_index=True)\n        else:\n            common_cols = set.intersection(*all_col_sets)\n            if common_cols:\n                df = reduce(\n                    lambda left, right: pd.merge(\n                        left, right, on=list(common_cols), how='outer'\n                    ),\n                    cleaned_dfs\n                )\n            else:\n                df = pd.concat(cleaned_dfs, axis=1)\n\n    # ------------------------------------------------------------------\n    # 4. Normalize data types (numeric, datetime, categorical)\n    # ------------------------------------------------------------------\n    for col in df.columns:\n        if any(k in col for k in ('date', 'time', 'dt')):\n            try:\n                df[col] = pd.to_datetime(df[col], errors='coerce')\n                continue\n            except Exception:\n                pass\n\n        if df[col].dtype == 'object':\n            converted = pd.to_numeric(df[col], errors='coerce')\n            if converted.notna().sum() > 0 and converted.notna().sum() >= df[col].notna().sum() * 0.5:\n                df[col] = converted\n            else:\n                if df[col].nunique() < 50:\n                    df[col] = df[col].astype('category')\n                else:\n                    df[col] = df[col].astype(str)\n        elif pd.api.types.is_numeric_dtype(df[col]):\n            df[col] = pd.to_numeric(df[col], errors='coerce')\n\n    # ------------------------------------------------------------------\n    # 5. Handle missing values without dropping rows\n    # ------------------------------------------------------------------\n    for col in df.columns:\n        if df[col].isna().any():\n            if pd.api.types.is_numeric_dtype(df[col]):\n                df[col] = df[col].fillna(df[col].median())\n            elif pd.api.types.is_datetime64_any_dtype(df[col]):\n                df[col] = df[col].ffill().bfill()\n            else:\n                mode_val = df[col].mode()\n                if not mode_val.empty:\n                    df[col] = df[col].fillna(mode_val.iloc[0])\n                else:\n                    df[col] = df[col].fillna('missing')\n\n    # ------------------------------------------------------------------\n    # 6. Remove duplicate rows\n    # ------------------------------------------------------------------\n    df = df.drop_duplicates().reset_index(drop=True)\n\n    # ------------------------------------------------------------------\n    # 7. Flag obvious anomalies (do not drop rows)\n    # ------------------------------------------------------------------\n    for col in df.select_dtypes(include=[np.number]).columns:\n        if (df[col] < 0).any():\n            df[f'{col}_negative_flag'] = (df[col] < 0).astype(int)\n\n    # ------------------------------------------------------------------\n    # 8. Convert datetime columns to strings for JSON serializability\n    # ------------------------------------------------------------------\n    for col in df.columns:\n        if pd.api.types.is_datetime64_any_dtype(df[col]):\n            df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S')\n            df[col] = df[col].where(df[col].notna(), None)\n\n    return df\n```",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "```python\ndef data_wrangler(data_raw):\n    import pandas as pd\n    import numpy as np\n    from functools import reduce\n\n    # ------------------------------------------------------------------\n    # 1. Ensure input is a list of DataFrames\n    # ------------------------------------------------------------------\n    if isinstance(data_raw, pd.DataFrame):\n        data_list = [data_raw]\n    elif not isinstance(data_raw, list):\n        data_list = [pd.DataFrame(data_raw)]\n    else:\n        data_list = data_raw\n\n    # ------------------------------------------------------------------\n    # 2. Standardize column names for each DataFrame\n    # ------------------------------------------------------------------\n    cleaned_dfs = []\n    for df in data_list:\n        if df is None or df.empty:\n            continue\n        df = df.copy()\n        df.columns = [\n            str(c).strip().lower().replace(' ', '_')\n            for c in df.columns\n        ]\n        cleaned_dfs.append(df)\n\n    if not cleaned_dfs:\n        return pd.DataFrame()\n\n    # ------------------------------------------------------------------\n    # 3. Merge or concatenate multiple datasets appropriately\n    # ------------------------------------------------------------------\n    if len(cleaned_dfs) == 1:\n        df = cleaned_dfs[0]\n    else:\n        all_col_sets = [set(df.columns) for df in cleaned_dfs]\n        if all(cols == all_col_sets[0] for cols in all_col_sets):\n            df = pd.concat(cleaned_dfs, ignore_index=True)\n        else:\n            common_cols = set.intersection(*all_col_sets)\n            if common_cols:\n                df = reduce(\n                    lambda left, right: pd.merge(\n                        left, right, on=list(common_cols), how='outer'\n                    ),\n                    cleaned_dfs\n                )\n            else:\n                df = pd.concat(cleaned_dfs, axis=1)\n\n    # ------------------------------------------------------------------\n    # 4. Normalize data types (numeric, datetime, categorical)\n    # ------------------------------------------------------------------\n    for col in df.columns:\n        if any(k in col for k in ('date', 'time', 'dt')):\n            try:\n                df[col] = pd.to_datetime(df[col], errors='coerce')\n                continue\n            except Exception:\n                pass\n\n        if df[col].dtype == 'object':\n            converted = pd.to_numeric(df[col], errors='coerce')\n            if converted.notna().sum() > 0 and converted.notna().sum() >= df[col].notna().sum() * 0.5:\n                df[col] = converted\n            else:\n                if df[col].nunique() < 50:\n                    df[col] = df[col].astype('category')\n                else:\n                    df[col] = df[col].astype(str)\n        elif pd.api.types.is_numeric_dtype(df[col]):\n            df[col] = pd.to_numeric(df[col], errors='coerce')\n\n    # ------------------------------------------------------------------\n    # 5. Handle missing values without dropping rows\n    # ------------------------------------------------------------------\n    for col in df.columns:\n        if df[col].isna().any():\n            if pd.api.types.is_numeric_dtype(df[col]):\n                df[col] = df[col].fillna(df[col].median())\n            elif pd.api.types.is_datetime64_any_dtype(df[col]):\n                df[col] = df[col].ffill().bfill()\n            else:\n                mode_val = df[col].mode()\n                if not mode_val.empty:\n                    df[col] = df[col].fillna(mode_val.iloc[0])\n                else:\n                    df[col] = df[col].fillna('missing')\n\n    # ------------------------------------------------------------------\n    # 6. Remove duplicate rows\n    # ------------------------------------------------------------------\n    df = df.drop_duplicates().reset_index(drop=True)\n\n    # ------------------------------------------------------------------\n    # 7. Flag obvious anomalies (do not drop rows)\n    # ------------------------------------------------------------------\n    for col in df.select_dtypes(include=[np.number]).columns:\n        if (df[col] < 0).any():\n            df[f'{col}_negative_flag'] = (df[col] < 0).astype(int)\n\n    # ------------------------------------------------------------------\n    # 8. Convert datetime columns to strings for JSON serializability\n    # ------------------------------------------------------------------\n    for col in df.columns:\n        if pd.api.types.is_datetime64_any_dtype(df[col]):\n            df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S')\n            df[col] = df[col].where(df[col].notna(), None)\n\n    return df\n```",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 5887,
+              "prompt_tokens": 1622,
+              "total_tokens": 7509,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 4905,
+                "rejected_prediction_tokens": null,
+                "text_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 0,
+                "image_tokens": null,
+                "text_tokens": null
+              }
+            },
+            "model_provider": "openai",
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261018185008700236128c955d568Uvpbmtv4",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a15059-8df5-7ed1-9fc7-41e6999454d9-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 5887,
+      "prompt_tokens": 1622,
+      "total_tokens": 7509,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 4905,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261018185008700236128c955d568Uvpbmtv4"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

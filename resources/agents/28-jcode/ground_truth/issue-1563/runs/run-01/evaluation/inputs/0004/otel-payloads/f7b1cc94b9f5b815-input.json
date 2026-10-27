@@ -1,0 +1,4 @@
+{
+  "command": "cd /home/agent/workspace && python3 -c \"\nimport json\nd = json.load(open('sbom.spdx.json'))\nprint('spdxVersion:', d['spdxVersion'])\nprint('packages:', [p['name'] for p in d['packages']])\nprint('files:', [f['fileName'] for f in d['files']])\nprint('relationships:')\nfor r in d['relationships']:\n    print(' ', r['spdxElementId'], r['relationshipType'], r['relatedSpdxElement'])\n\" && git add sbom.spdx.json && git -c user.name=\"Jcode\" -c user.email=\"jcode@local\" commit -qm \"Add SPDX 2.3 SBOM for demo_pkg\" && git log --oneline -1",
+  "intent": "Verify SBOM structure and commit"
+}

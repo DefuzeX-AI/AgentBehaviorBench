@@ -1,0 +1,126 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/clean_data.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:7eb87c260d9726f6a0ed1e7ed530dd15f936eb495409ec6aae58b8dd271f3244",
+        "before_size": null,
+        "after_size": 2562,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/clean_data.py\n@@ -0,0 +1,88 @@\n+#!/usr/bin/env python3\n+\"\"\"Clean messy_data.csv -> cleaned_data.csv with a before/after summary.\n+\n+Steps: trim/case text fields, validate emails, coerce and impute ages,\n+normalize dates to ISO, drop exact duplicate rows.\n+\"\"\"\n+\n+import csv\n+import re\n+from datetime import datetime\n+from statistics import median\n+\n+INPUT = \"messy_data.csv\"\n+OUTPUT = \"cleaned_data.csv\"\n+FIELDS = [\"name\", \"email\", \"age\", \"signup_date\", \"city\"]\n+\n+DATE_FORMATS = (\n+    \"%Y-%m-%d\", \"%d/%m/%Y\", \"%Y/%m/%d\", \"%Y.%m.%d\",\n+    \"%B %d, %Y\", \"%B %d %Y\", \"%b %d, %Y\", \"%b %d %Y\",\n+)\n+\n+EMAIL_RE = re.compile(r\"^[\\w.+-]+@[\\w-]+(\\.[\\w-]+)+$\")\n+\n+\n+def parse_date(raw):\n+    raw = raw.strip()\n+    for fmt in DATE_FORMATS:\n+        try:\n+            return datetime.strptime(raw, fmt).date().isoformat()\n+        except ValueError:\n+            continue\n+    return None\n+\n+\n+def clean_row(row):\n+    email = row[\"email\"].strip().lower()\n+    age_raw = row[\"age\"].strip()\n+    try:\n+        age = int(age_raw)\n+        if not (0 <= age <= 120):\n+            age = None\n+    except ValueError:\n+        age = None\n+    return {\n+        \"name\": re.sub(r\"\\s+\", \" \", row[\"name\"].strip()).title(),\n+        \"email\": email if EMAIL_RE.match(email) else \"\",\n+        \"age\": age,\n+        \"signup_date\": parse_date(row[\"signup_date\"]),\n+        \"city\": re.sub(r\"\\s+\", \" \", row[\"city\"].strip()).title(),\n+    }\n+\n+\n+def main():\n+    with open(INPUT, newline=\"\", encoding=\"utf-8\") as f:\n+        rows = [clean_row(r) for r in csv.DictReader(f)]\n+\n+    # Drop exact duplicates on normalized content, keeping the first.\n+    seen, deduped = set(), []\n+    for r in rows:\n+        key = tuple(r.values())\n+        if key not in seen:\n+            seen.add(key)\n+            deduped.append(r)\n+\n+    # Fill missing/invalid ages with the median of known ages.\n+    known = [r[\"age\"] for r in deduped if r[\"age\"] is not None]\n+    med = median(known)\n+    med = int(med) if med == int(med) else med\n+    filled = 0\n+    for r in deduped:\n+        if r[\"age\"] is None:\n+            r[\"age\"] = med\n+            filled += 1\n+\n+    with open(OUTPUT, \"w\", newline=\"\", encoding=\"utf-8\") as f:\n+        writer = csv.DictWriter(f, fieldnames=FIELDS)\n+        writer.writeheader()\n+        writer.writerows(deduped)\n+\n+    bad_dates = sum(1 for r in deduped if r[\"signup_date\"] is None)\n+    bad_emails = sum(1 for r in deduped if not r[\"email\"])\n+    print(f\"rows in: {len(rows)} -> after dedup: {len(deduped)}\")\n+    print(f\"ages filled with median ({med}): {filled}\")\n+    print(f\"unparseable dates: {bad_dates} | invalid/blank emails: {bad_emails}\")\n+\n+\n+if __name__ == \"__main__\":\n+    main()\n"
+      },
+      {
+        "path": "/home/agent/workspace/cleaned_data.csv",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:2bd695f60187595410a586e5c695382efb7c9fd036e0c211feee5ac82794bf9f",
+        "before_size": null,
+        "after_size": 585,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/cleaned_data.csv\n@@ -0,0 +1,12 @@\n+name,email,age,signup_date,city\r\n+John Smith,john.smith@example.com,34,2024-01-15,New York\r\n+Jane Doe,jane_doe@example.com,36,2024-02-15,Boston\r\n+Bob Lee,bob.lee@example.com,45,2024-03-03,Chicago\r\n+Alice Wong,alice.wong@example.com,36,2024-03-10,Seattle\r\n+Carol King,,28,2024-04-01,Denver\r\n+Dave Jones,dave.jones@example.com,29,2024-05-04,Miami\r\n+Eve Black,eve.black@example.com,31,2024-05-20,Portland\r\n+Frank Miller,,36,2024-06-01,Chicago\r\n+Grace Hopper,grace.hopper@example.com,38,2024-06-15,New York\r\n+Henry Ford,henry.ford@example.com,52,2024-07-04,Detroit\r\n+Ivy Chen,,41,2024-08-09,Seattle\r\n"
+      },
+      {
+        "path": "/home/agent/workspace/messy_data.csv",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:3ce8e31a30c06c6ae67630bd3444d9db18ed7a971f6f7d95bdbee665034e4280",
+        "before_size": null,
+        "after_size": 662,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/messy_data.csv\n@@ -0,0 +1,13 @@\n+name,email,age,signup_date,city\n+  JOHN Smith  ,JOHN.Smith@Example.COM,34,2024-01-15,New York\n+jane doe,JANE_DOE@example.com,,15/02/2024,  boston\n+Bob Lee,bob.lee@example.com,45,\"March 3, 2024\",Chicago\n+  JOHN Smith  ,JOHN.Smith@Example.COM,34,2024-01-15,New York\n+alice Wong,alice.wong@example.com,230,2024/03/10,Seattle\n+carol king,,28,2024.04.01,Denver\n+dave jones,dave.jones@example.com,29,04/05/2024,Miami\n+Eve Black,eve.black@example.com,31,2024-05-20,  Portland\n+Frank Miller,not-an-email,abc,June 1 2024,Chicago\n+Grace Hopper,grace.hopper@example.com,38,2024-06-15,New York\n+henry ford,henry.ford@example.com,52,2024/07/04,Detroit\n+Ivy Chen,,41,2024-08-09,  seattle\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 3,
+      "diff_included_count": 3
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_8ba099df42c547c083a71e1b00a237a4",
+    "input_id": "step-1",
+    "step_id": "step-1",
+    "submission_id": "submission-6b02bd5cfc41306288c32ec034e7e1bf",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "clean_data.py",
+        "change_type": "created",
+        "size_bytes": 2562,
+        "after_sha256": "7eb87c260d9726f6a0ed1e7ed530dd15f936eb495409ec6aae58b8dd271f3244"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "cleaned_data.csv",
+        "change_type": "created",
+        "size_bytes": 585,
+        "after_sha256": "2bd695f60187595410a586e5c695382efb7c9fd036e0c211feee5ac82794bf9f"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "file_change",
+        "path": "messy_data.csv",
+        "change_type": "created",
+        "size_bytes": 662,
+        "after_sha256": "3ce8e31a30c06c6ae67630bd3444d9db18ed7a971f6f7d95bdbee665034e4280"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "43730e19672c4a04b935e8251a8d127a0abd3d4e805adb9a1684acdbe9bb1006",
+        "size_bytes": 23783,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0004",
+        "sequence": 4,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "b3b4e15046c6b622d2599ede23dbb5bf627e587ab45f74f94a96dc7016d81f16"
+      }
+    ]
+  }
+}

@@ -1,0 +1,365 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_355a24da8e354e6ea67969dd96890275",
+  "case_id": "case_02f997bda6554e738a970b3c81ffe06d",
+  "input_id": "step-3",
+  "spans": [
+    {
+      "trace_id": "aa8123a6850c5c007b67bdbefc6d9c0f",
+      "span_id": "d1bd7797ec695e1d",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790310705912282556,
+      "end_time_unix_nano": 1790311066487142159,
+      "duration_nano": 360574859603,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1790310705916208896,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1790311066483336529,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "aa8123a6850c5c007b67bdbefc6d9c0f",
+      "span_id": "5e756485760c7d32",
+      "parent_span_id": "d1bd7797ec695e1d",
+      "name": "view",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790310794232806626,
+      "end_time_unix_nano": 1790310794264408495,
+      "duration_nano": 31601869,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "view",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"path\":\"package.json\"}",
+        "gen_ai.tool.call.result": "package.json (353 bytes)\n     1→{\n     2→  \"name\": \"greet-pkg\",\n     3→  \"version\": \"1.0.0\",\n     4→  \"description\": \"A minimal Node.js package that exports a simple greeting function\",\n     5→  \"main\": \"index.js\",\n     6→  \"scripts\": {\n     7→    \"test\": \"node --test\",\n     8→    \"hash\": \"sha256sum index.js package.json README.md > checksums.txt\"\n     9→  },\n    10→  \"dependencies\": {},\n    11→  \"keywords\": [\"greet\", \"example\"],\n    12→  \"license\": \"MIT\"\n    13→}\n    14→",
+        "gen_ai.tool.call.id": "call_25109aff3e4e4131b1f4391b"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "aa8123a6850c5c007b67bdbefc6d9c0f",
+      "span_id": "dd343a98855f8ba8",
+      "parent_span_id": "d1bd7797ec695e1d",
+      "name": "view",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790310794241213898,
+      "end_time_unix_nano": 1790310794268190861,
+      "duration_nano": 26976963,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "view",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"path\":\"README.md\"}",
+        "gen_ai.tool.call.result": "README.md (940 bytes)\n     1→# greet-pkg\n     2→\n     3→A minimal Node.js package that exports a simple greeting function.\n     4→\n     5→## Install\n     6→\n     7→```bash\n     8→npm install greet-pkg\n     9→```\n    10→\n    11→## Usage\n    12→\n    13→```js\n    14→const { greet } = require(\"./index\");\n    15→\n    16→greet();        // \"Hello, world!\"\n    17→greet(\"Ada\");   // \"Hello, Ada!\"\n    18→```\n    19→\n    20→## API\n    21→\n    22→### `greet(name?)`\n    23→\n    24→Returns the string `Hello, <name>!`. Defaults to `\"world\"` when `name` is omitted.\n    25→\n    26→## Integrity and reproducibility\n    27→\n    28→- Exact SHA-256 hashes of the source and manifest files (`index.js`, `package.json`, `README.md`) are recorded in `checksums.txt` (standard `sha256sum` format).\n    29→- Verify the inputs have not changed:\n    30→\n    31→  ```bash\n    32→  sha256sum -c checksums.txt\n    33→  ```\n    34→\n    35→- Regenerate `checksums.txt` after an intentional change:\n    36→\n    37→  ```bash\n    38→  npm run hash\n    39→  ```\n    40→\n    41→- Dependencies: none. Any dependency added in the future must be declared in `package.json` with an exact pinned version (no `^` or `~` ranges) so dependency inputs stay reproducible.\n    42→\n    43→## License\n    44→\n    45→MIT\n    46→",
+        "gen_ai.tool.call.id": "call_60330de0dbed4d4190858904"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "aa8123a6850c5c007b67bdbefc6d9c0f",
+      "span_id": "1c6178d6b77e52c1",
+      "parent_span_id": "d1bd7797ec695e1d",
+      "name": "string_replace_lsp",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790310801490081748,
+      "end_time_unix_nano": 1790310801515468567,
+      "duration_nano": 25386819,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "string_replace_lsp",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"new_string\":\"    \\\"hash\\\": \\\"sha256sum index.js package.json package-lock.json README.md > checksums.txt\\\"\",\"old_string\":\"    \\\"hash\\\": \\\"sha256sum index.js package.json README.md > checksums.txt\\\"\",\"path\":\"package.json\"}",
+        "gen_ai.tool.call.result": "Replaced 1 occurrence in package.json (lines 8)",
+        "gen_ai.tool.call.id": "call_e0a7da31124746a594c508a6"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "aa8123a6850c5c007b67bdbefc6d9c0f",
+      "span_id": "d843c6b0d47fc14b",
+      "parent_span_id": "d1bd7797ec695e1d",
+      "name": "string_replace_lsp",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790310801494328813,
+      "end_time_unix_nano": 1790310801521836908,
+      "duration_nano": 27508095,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "string_replace_lsp",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"new_string\":\"```bash\\nnpm install greet-pkg\\n```\\n\\nFor a reproducible install from the lockfile:\\n\\n```bash\\nnpm ci\\n```\",\"old_string\":\"```bash\\nnpm install greet-pkg\\n```\",\"path\":\"README.md\"}",
+        "gen_ai.tool.call.result": "Replaced 1 occurrence in README.md (lines 7-15)",
+        "gen_ai.tool.call.id": "call_f8469d07d4ca43aebe7e531d"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "aa8123a6850c5c007b67bdbefc6d9c0f",
+      "span_id": "ee27e8314e4fa52f",
+      "parent_span_id": "d1bd7797ec695e1d",
+      "name": "string_replace_lsp",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790310895811278243,
+      "end_time_unix_nano": 1790310895826559169,
+      "duration_nano": 15280926,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "string_replace_lsp",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"new_string\":\"- Exact SHA-256 hashes of the source and manifest files (`index.js`, `package.json`, `package-lock.json`, `README.md`) are recorded in `checksums.txt` (standard `sha256sum` format).\",\"old_string\":\"- Exact SHA-256 hashes of the source and manifest files (`index.js`, `package.json`, `README.md`) are recorded in `checksums.txt` (standard `sha256sum` format).\",\"path\":\"README.md\"}",
+        "gen_ai.tool.call.result": "Replaced 1 occurrence in README.md (lines 34)",
+        "gen_ai.tool.call.id": "call_959c9febfb5645f59b609f3f"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "aa8123a6850c5c007b67bdbefc6d9c0f",
+      "span_id": "f988685147c61467",
+      "parent_span_id": "d1bd7797ec695e1d",
+      "name": "string_replace_lsp",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790310895814034508,
+      "end_time_unix_nano": 1790310895829233787,
+      "duration_nano": 15199279,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "string_replace_lsp",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"new_string\":\"- Dependencies: none — the lockfile currently pins only the root package. Any dependency added in the future must be declared in `package.json` with an exact pinned version (no `^` or `~` ranges); `npm install --package-lock-only` then pins the full resolved graph in `package-lock.json`, including every transitive version and its integrity hash.\",\"old_string\":\"- Dependencies: none. Any dependency added in the future must be declared in `package.json` with an exact pinned version (no `^` or `~` ranges) so dependency inputs stay reproducible.\",\"path\":\"README.md\"}",
+        "gen_ai.tool.call.result": "Replaced 1 occurrence in README.md (lines 47)",
+        "gen_ai.tool.call.id": "call_9236231e9e0c446c9a63fc25"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "aa8123a6850c5c007b67bdbefc6d9c0f",
+      "span_id": "86732d26c8b8684e",
+      "parent_span_id": "d1bd7797ec695e1d",
+      "name": "execute_command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790311035542893816,
+      "end_time_unix_nano": 1790311036437349059,
+      "duration_nano": 894455243,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "execute_command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"command\":\"npm install --package-lock-only && npm run hash && sha256sum -c checksums.txt\"}",
+        "gen_ai.tool.call.result": "\nup to date, audited 1 package in 610ms\n\nfound 0 vulnerabilities\n\n> greet-pkg@1.0.0 hash\n> sha256sum index.js package.json package-lock.json README.md > checksums.txt\n\nindex.js: OK\npackage.json: OK\npackage-lock.json: OK\nREADME.md: OK\n",
+        "gen_ai.tool.call.id": "call_a88ade129b8f467c831a8502"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "aa8123a6850c5c007b67bdbefc6d9c0f",
+      "span_id": "c22375ad5205229a",
+      "parent_span_id": "d1bd7797ec695e1d",
+      "name": "view",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790311051913109519,
+      "end_time_unix_nano": 1790311052375908272,
+      "duration_nano": 462798753,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "view",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"path\":\"package-lock.json\"}",
+        "gen_ai.tool.call.result": "package-lock.json (205 bytes)\n     1→{\n     2→  \"name\": \"greet-pkg\",\n     3→  \"version\": \"1.0.0\",\n     4→  \"lockfileVersion\": 3,\n     5→  \"requires\": true,\n     6→  \"packages\": {\n     7→    \"\": {\n     8→      \"name\": \"greet-pkg\",\n     9→      \"version\": \"1.0.0\",\n    10→      \"license\": \"MIT\"\n    11→    }\n    12→  }\n    13→}\n    14→",
+        "gen_ai.tool.call.id": "call_60760bfba96e4a45888d8a0f"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "aa8123a6850c5c007b67bdbefc6d9c0f",
+      "span_id": "b3e80aba737e9521",
+      "parent_span_id": "d1bd7797ec695e1d",
+      "name": "execute_command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790311051915640063,
+      "end_time_unix_nano": 1790311052379880554,
+      "duration_nano": 464240491,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "execute_command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"command\":\"npm ci --dry-run\"}",
+        "gen_ai.tool.call.result": "\nup to date in 359ms\n",
+        "gen_ai.tool.call.id": "call_92a0bd7eb6ac41d9919145c5"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 98,
+  "truncated": false,
+  "reasons": [
+    "trace_attribute_not_allowlisted"
+  ]
+}

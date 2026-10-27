@@ -1,0 +1,671 @@
+{
+  "run_id": "run_158acaca248d456b9aca0ef8ff532333",
+  "case_id": "case_88b925f21b324b68bac0a51190271671",
+  "input_id": "step-10",
+  "status": "completed",
+  "output": "Status: HALTED (ErrorType.FATAL)\nIterations: 0\nCAD brief: {\"part_name\":\"generic-mounting-bracket-50x40x4-M4\",\"part_category\":\"flat-plate\",\"length_unit\":\"mm\",\"origin_convention\":\"centroid_on_base_plane\",\"primary_workplane\":\"XY\",\"max_extent_x_mm\":50.0,\"max_extent_y_mm\":40.0,\"max_extent_z_mm\":4.0,\"target_volume_mm3\":7778.0,\"material\":\"PLA\",\"material_density_g_cm3\":1.24,\"key_parameters\":{\"PLATE_LENGTH_X\":50.0,\"PLATE_WIDTH_Y\":40.0,\"PLATE_THICKNESS_Z\":4.0,\"PLATE_HALF_LENGTH_X\":25.0,\"PLATE_HALF_WIDTH_Y\":20.0,\"HOLE_COUNT\":4.0,\"HOLE_DIAMETER\":4.2,\"HOLE_RADIUS\":2.1,\"HOLE_INSET_X\":8.0,\"HOLE_INSET_Y\":8.0,\"HOLE_POS_X\":17.0,\"HOLE_POS_Y\":12.0,\"CORNER_FILLET_RADIUS\":3.0},\"verification_targets\":[{\"id\":\"overall-x\",\"kind\":\"overall_dimension\",\"description\":\"Overall bounding box extent along the X axis of the finished bracket (plate length).\",\"nominal\":50.0,\"tolerance_upper\":0.5,\"tolerance_lower\":0.5,\"face_selector_expression\":null,\"edge_selector_expression\":null,\"reference_feature_id\":null,\"measurement_axis\":\"x\",\"critical\":true,\"notes\":\"Measured as max X minus min X of the final solid bounding box in global coordinates.\"},{\"id\":\"overall-y\",\"kind\":\"overall_dimension\",\"description\":\"Overall bounding box extent along the Y axis of the finished bracket (plate width).\",\"nominal\":40.0,\"tolerance_upper\":0.5,\"tolerance_lower\":0.5,\"face_selector_expression\":null,\"edge_selector_expression\":null,\"reference_feature_id\":null,\"measurement_axis\":\"y\",\"critical\":true,\"notes\":\"Measured as max Y minus min Y of the final solid bounding box in global coordinates.\"},{\"id\":\"overall-z\",\"kind\":\"overall_dimension\",\"description\":\"Overall bounding box extent along the Z axis of the finished bracket (plate thickness).\",\"nominal\":4.0,\"tolerance_upper\":0.5,\"tolerance_lower\":0.5,\"face_selector_expression\":null,\"edge_selector_expression\":null,\"reference_feature_id\":null,\"measurement_axis\":\"z\",\"critical\":true,\"notes\":\"Measured as max Z minus min Z of the final solid bounding box; bottom face defines Z=0 plane.\"},{\"id\":\"single-body\",\"kind\":\"single_body\",\"description\":\"The finished bracket MUST be a single connected solid body with no disjoint fragments after boolean subtraction of the mounting holes.\",\"nominal\":null,\"tolerance_upper\":0.0,\"tolerance_lower\":0.0,\"face_selector_expression\":null,\"edge_selector_expression\":null,\"reference_feature_id\":null,\"measurement_axis\":null,\"critical\":true,\"notes\":\"Solid count of the final part MUST equal 1.\"},{\"id\":\"water-tightness\",\"kind\":\"water_tightness\",\"description\":\"The finished bracket MUST be a closed manifold mesh with zero free/boundary edges and no self-intersections.\",\"nominal\":null,\"tolerance_upper\":0.0,\"tolerance_lower\":0.0,\"face_selector_expression\":null,\"edge_selector_expression\":null,\"reference_feature_id\":null,\"measurement_axis\":null,\"critical\":true,\"notes\":\"Verify mesh.is_watertight() and every edge is shared by exactly two faces.\"}],\"functional_requirements\":[\"Accept four M4 fasteners (clearance diameter 4.2 mm) for through-bolting to a mounting surface.\",\"Flat bottom face MUST sit flush on the mating surface; no protrusions below Z=0.\",\"Bracket MUST be load-bearing in the plate plane (XY) and resist in-plane shear through the fastener holes.\",\"All mounting holes MUST be perpendicular to the plate faces (drilled along the Z axis) so fasteners seat squarely.\",\"Part MUST be producible by 3D printing (FDM) without support material for the through-holes.\",\"Formal semantics: entities are Bracket(plate), Hole(h_i), Diameter(d), Material(m); the script MUST realise the typed specification where Bracket has exactly HOLE_COUNT holes, each Hole has diameter HOLE_DIAMETER and axis parallel to Z, and all holes lie strictly inside the plate boundary.\"],\"manufacturing_method\":\"3d_print_fdm\",\"special_features\":[\"All features MUST be symmetric about the YZ plane (X coordinates mirror about X=0) — hole pair pattern is mirrored left/right.\",\"All features MUST be symmetric about the XZ plane (Y coordinates mirror about Y=0) — hole pair pattern is mirrored front/back.\",\"The four mounting holes MUST be placed at (±HOLE_POS_X, ±HOLE_POS_Y), i.e. X = ±17 and Y = ±12 from the centroid, NOT at arbitrary positions.\",\"Every mounting hole MUST penetrate the FULL plate thickness along the Z axis (Cylinder aligned to Z, height >= PLATE_THICKNESS_Z), forming a through-hole, NOT a blind pocket.\",\"The mounting holes MUST NOT intersect each other or break the plate outer boundary — hole edge must be at least HOLE_INSET_X/HOLE_INSET_Y away from the plate edges.\",\"The bottom face at Z=0 MUST remain a single flat planar face — no chamfers, countersinks or fillets are allowed to cross the Z=0 plane.\",\"The four vertical corner edges of the plate MUST carry a CORNER_FILLET_RADIUS rounded corner, NOT sharp prismatic corners.\",\"Hole count MUST be exactly HOLE_COUNT = 4; adding or omitting a hole violates the formal entity cardinality constraint.\"],\"user_request_raw\":\"Formalize the semantics of the requirement and the script. Define the relevant entities (bracket, hole, diameter) and their relationships in a formal notation (e.g., first-order logic or a typed specification).\",\"spec_version\":1}\nQA report: {\"cad_brief_id\":\"(coder-failure)\",\"engine_a\":{\"engine_name\":\"cadpy_analysis\",\"results\":[],\"summary\":\"\",\"warnings\":[],\"errors\":[],\"raw_json\":null},\"engine_b\":{\"engine_name\":\"check_mesh\",\"results\":[],\"summary\":\"\",\"warnings\":[],\"errors\":[\"Deterministic coder execution failed: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\\n\\nTraceback:\\nTraceback (most recent call last):\\n  File \\\"/opt/agent/agent/multi_agent_cad/nodes.py\\\", line 552, in _node_python_coder_deterministic\\n    from cadpy.generation import EntrySpec, run_script_generator\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/generation.py\\\", line 40, in <module>\\n    from cadpy.glb import (\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/glb.py\\\", line 32, in <module>\\n    from cadpy.step_scene import ColorRGBA, LoadedStepScene, OccurrenceNode, SelectorBundle, occurrence_selector_id\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/step_scene.py\\\", line 32, in <module>\\n    from OCP.TDF import TDF_ChildIterator, TDF_Label, TDF_LabelSequence\\nImportError: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\\n\"],\"raw_json\":null},\"all_passed\":false,\"passed_count\":0,\"failed_count\":0,\"noise_only_fail_count\":0,\"error_type\":\"dimension\",\"error_details\":[\"Deterministic coder execution failed: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\\n\\nTraceback:\\nTraceback (most recent call last):\\n  File \\\"/opt/agent/agent/multi_agent_cad/nodes.py\\\", line 552, in _node_python_coder_deterministic\\n    from cadpy.generation import EntrySpec, run_script_generator\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/generation.py\\\", line 40, in <module>\\n    from cadpy.glb import (\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/glb.py\\\", line 32, in <module>\\n    from cadpy.step_scene import ColorRGBA, LoadedStepScene, OccurrenceNode, SelectorBundle, occurrence_selector_id\\n  File \\\"/opt/agent/agent/packages/cadpy/src/cadpy/step_scene.py\\\", line 32, in <module>\\n    from OCP.TDF import TDF_ChildIterator, TDF_Label, TDF_LabelSequence\\nImportError: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\\n\"],\"improvement_suggestions\":[],\"connectivity_warning\":null,\"strength_score\":null,\"manufacturability_warnings\":[],\"topology_changed\":false,\"topology_delta\":{},\"iteration\":0}",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": null,
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_158acaca248d456b9aca0ef8ff532333",
+      "case_id": "case_88b925f21b324b68bac0a51190271671",
+      "input_id": "step-10",
+      "spans": [
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "a8e1690503e160e6",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402181026008,
+          "end_time_unix_nano": 1791808402510522018,
+          "duration_nano": 329496010,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "7bac936f00f31a5c",
+          "parent_span_id": "a8e1690503e160e6",
+          "name": "LangGraph",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402184212568,
+          "end_time_unix_nano": 1791808402507156148,
+          "duration_nano": 322943580,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "41e6b5c9db5e8adb",
+          "parent_span_id": "7bac936f00f31a5c",
+          "name": "__start__",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402187401409,
+          "end_time_unix_nano": 1791808402198259500,
+          "duration_nano": 10858091,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "5f990d5078974475",
+          "parent_span_id": "41e6b5c9db5e8adb",
+          "name": "ChannelWrite<...>",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402189556872,
+          "end_time_unix_nano": 1791808402192403465,
+          "duration_nano": 2846593,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "4f79d50c6aa00f09",
+          "parent_span_id": "41e6b5c9db5e8adb",
+          "name": "ChannelWrite<start:planner>",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402193765428,
+          "end_time_unix_nano": 1791808402196607445,
+          "duration_nano": 2842017,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "b69683384ab85bcb",
+          "parent_span_id": "7bac936f00f31a5c",
+          "name": "planner",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402200172095,
+          "end_time_unix_nano": 1791808402221396953,
+          "duration_nano": 21224858,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "0fb0444c4b0e46d5",
+          "parent_span_id": "b69683384ab85bcb",
+          "name": "ChannelWrite<...,planner>",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402204573164,
+          "end_time_unix_nano": 1791808402210205005,
+          "duration_nano": 5631841,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "05ed8dd218936609",
+          "parent_span_id": "b69683384ab85bcb",
+          "name": "route_after_planner",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402212355358,
+          "end_time_unix_nano": 1791808402216329121,
+          "duration_nano": 3973763,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "673df869ad605a19",
+          "parent_span_id": "7bac936f00f31a5c",
+          "name": "architect",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402223844876,
+          "end_time_unix_nano": 1791808402253783620,
+          "duration_nano": 29938744,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "0307e88573968bdd",
+          "parent_span_id": "673df869ad605a19",
+          "name": "ChannelWrite<...,architect>",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402229294113,
+          "end_time_unix_nano": 1791808402238479943,
+          "duration_nano": 9185830,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "84e00685a8d70539",
+          "parent_span_id": "673df869ad605a19",
+          "name": "route_after_architect",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402242018338,
+          "end_time_unix_nano": 1791808402247907239,
+          "duration_nano": 5888901,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "48270e053940b8d1",
+          "parent_span_id": "7bac936f00f31a5c",
+          "name": "coder",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402257978986,
+          "end_time_unix_nano": 1791808402336285933,
+          "duration_nano": 78306947,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "d1e7c414c93e8f76",
+          "parent_span_id": "48270e053940b8d1",
+          "name": "ChannelWrite<...,coder>",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402319223634,
+          "end_time_unix_nano": 1791808402323964122,
+          "duration_nano": 4740488,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "c312a71f7b85a00c",
+          "parent_span_id": "48270e053940b8d1",
+          "name": "route_after_coder",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402327794738,
+          "end_time_unix_nano": 1791808402333706041,
+          "duration_nano": 5911303,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "cfaa7c7cb5b39021",
+          "parent_span_id": "7bac936f00f31a5c",
+          "name": "coder",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402340467014,
+          "end_time_unix_nano": 1791808402412330381,
+          "duration_nano": 71863367,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "fbb73956de62a990",
+          "parent_span_id": "cfaa7c7cb5b39021",
+          "name": "ChannelWrite<...,coder>",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402397288260,
+          "end_time_unix_nano": 1791808402400993599,
+          "duration_nano": 3705339,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "6662b02350f4f007",
+          "parent_span_id": "cfaa7c7cb5b39021",
+          "name": "route_after_coder",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402404617363,
+          "end_time_unix_nano": 1791808402410012584,
+          "duration_nano": 5395221,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "a50965b2abe70c98",
+          "parent_span_id": "7bac936f00f31a5c",
+          "name": "coder",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402416172519,
+          "end_time_unix_nano": 1791808402486277148,
+          "duration_nano": 70104629,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "5aa212a533aed821",
+          "parent_span_id": "a50965b2abe70c98",
+          "name": "ChannelWrite<...,coder>",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402471415815,
+          "end_time_unix_nano": 1791808402475080540,
+          "duration_nano": 3664725,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "74eabf6ef87427b2",
+          "parent_span_id": "a50965b2abe70c98",
+          "name": "route_after_coder",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402478630052,
+          "end_time_unix_nano": 1791808402483918033,
+          "duration_nano": 5287981,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "049f24d98a7c2d30",
+          "parent_span_id": "7bac936f00f31a5c",
+          "name": "autonomous_skill_loop",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402490045460,
+          "end_time_unix_nano": 1791808402499465933,
+          "duration_nano": 9420473,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "0314a9bdfe6091fc20ea953783a43eea",
+          "span_id": "6fde86a594b7d2c1",
+          "parent_span_id": "049f24d98a7c2d30",
+          "name": "ChannelWrite<...,autonomous_skill_loop>",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791808402494977326,
+          "end_time_unix_nano": 1791808402497648958,
+          "duration_nano": 2671632,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 22,
+      "retained_spans": 22,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_158acaca248d456b9aca0ef8ff532333",
+      "input_id": "step-10",
+      "step_id": "step-10",
+      "submission_id": "submission-22f4c436d8ae3053f47ebc12757fd9b6",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "1abf4dedd71e2bd878c3d9da9b78745784ca63676664a991541b80e78f51ab9d",
+          "size_bytes": 12542,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "58bcfc98ce9522cb9d744d417a1db14e65a41ef5793e0d77d531f3f98e536eb3"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "not_captured",
+      "observed_count": null,
+      "retained_count": 0,
+      "omitted_count": null,
+      "reasons": [
+        "not_enabled"
+      ]
+    }
+  }
+}

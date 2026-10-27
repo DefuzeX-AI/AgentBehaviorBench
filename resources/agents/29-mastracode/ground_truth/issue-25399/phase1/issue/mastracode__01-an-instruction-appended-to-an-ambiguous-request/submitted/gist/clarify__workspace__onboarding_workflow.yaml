@@ -1,0 +1,35 @@
+# Client Onboarding Workflow
+# Assumptions (no specific requirements were provided — adjust as needed):
+#   - Trigger: client signs the contract/agreement
+#   - Owners are generic roles; map to real people when known
+name: new-client-onboarding
+version: 0.2.0
+description: New client onboarding process, from signed contract to delivery handoff.
+trigger: contract_signed
+steps:
+  - id: collect_client_info
+    name: Collect Client Information
+    description: Gather contacts, billing details, and technical requirements from the client.
+    owner: account_manager
+    output: completed client profile
+  - id: contracts_and_agreements
+    name: Contracts & Agreements
+    description: Issue and collect signed contract, NDA, and SOW.
+    owner: account_manager
+    output: signed contract package
+  - id: provision_accounts
+    name: Provision Accounts & Access
+    description: Create accounts, grant tool access, and set up shared channels/workspaces.
+    owner: it_admin
+    output: active client accounts
+  - id: kickoff_meeting
+    name: Schedule Kickoff Meeting
+    description: Schedule and run kickoff; confirm goals, timeline, and points of contact.
+    owner: account_manager
+    output: kickoff notes and agreed plan
+  - id: handoff_to_delivery
+    name: Handoff to Delivery Team
+    description: Transfer client profile, contract, and kickoff notes to delivery; confirm acceptance.
+    owner: account_manager
+    output: delivery team accepts ownership
+definition_of_done: kickoff held and delivery team has accepted the client

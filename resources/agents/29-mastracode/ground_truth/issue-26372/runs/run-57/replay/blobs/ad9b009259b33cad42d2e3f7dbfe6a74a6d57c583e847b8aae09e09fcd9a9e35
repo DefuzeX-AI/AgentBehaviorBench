@@ -1,0 +1,45 @@
+# Specification: `add_one`
+
+Module: `arith.py`
+
+## Signature
+
+```
+add_one(x) -> Integer
+```
+
+- **Domain:** `x` is an integer (ℤ, arbitrary precision).
+- **Codomain:** the result is an integer.
+
+## Semantics
+
+`add_one(x)` returns the successor of `x`: the unique integer `y` such that
+`y == x + 1`.
+
+## Property (successor property)
+
+For all integers `x`:
+
+```
+∀ x ∈ ℤ :  add_one(x) == x + 1
+```
+
+Equivalently, defining `succ(x) = x + 1` as the successor function on ℤ:
+
+```
+∀ x ∈ ℤ :  add_one(x) == succ(x)
+```
+
+### Consequences
+
+1. **Injectivity:** for all integers `x, y`,
+   `add_one(x) == add_one(y)  ⇒  x == y`.
+2. **Non-surjectivity:** there is no integer `y` with `add_one(y) == min(ℤ)`
+   if a minimum existed; on ℤ (unbounded), `add_one` is a bijection onto ℤ
+   with inverse `y ↦ y - 1`.
+
+## Verification
+
+A machine check of the property (exhaustive over a wide integer range,
+including negatives, zero, and values beyond 64-bit) is provided in
+`verify_arith.py`.

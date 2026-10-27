@@ -1,0 +1,81 @@
+"""
+Feasibility / boundedness diagnosis for model_v2 LP:
+
+    maximize    Z = 40*xA + 50*xB          [USD/week]
+    subject to  2*xA + 1*xB <= 100         [machine hours/week]
+                1*xA + 3*xB <= 90          [labor hours/week]
+                xA, xB >= 0
+"""
+
+from itertools import combinations
+
+c = [40.0, 50.0]                      # objective coefficients [USD/unit]
+A = [[2.0, 1.0], [1.0, 3.0]]          # constraint coefficients [hours/unit]
+b = [100.0, 90.0]                     # capacities [hours/week]
+
+TOL = 1e-9
+
+def feasible(p):
+    xA, xB = p
+    if xA < -TOL or xB < -TOL:
+        return False
+    for row, rhs in zip(A, b):
+        if row[0]*xA + row[1]*xB > rhs + TOL:
+            return False
+    return True
+
+# ---- 1. Feasibility: exhibit a feasible point ----
+origin = (0.0, 0.0)
+print("FEASIBILITY CHECK")
+print(f"  candidate point {origin}: feasible = {feasible(origin)}")
+print(f"    machine usage = {A[0][0]*0 + A[0][1]*0} <= {b[0]} hours/week")
+print(f"    labor   usage = {A[1][0]*0 + A[1][1]*0} <= {b[1]} hours/week")
+
+# ---- 2. Vertex enumeration (all pairs of active constraints) ----
+cons = [(A[0], b[0], "machine"), (A[1], b[1], "labor"),
+        ((-1.0, 0.0), 0.0, "xA >= 0"), ((0.0, -1.0), 0.0, "xB >= 0")]
+
+vertices = []
+for (a1, b1, n1), (a2, b2, n2) in combinations(cons, 2):
+    det = a1[0]*a2[1] - a1[1]*a2[0]
+    if abs(det) < TOL:
+        continue  # parallel constraints, no unique intersection
+    x = ((b1*a2[1] - a1[1]*b2)/det, (a1[0]*b2 - b1*a2[0])/det)
+    if feasible(x):
+        vertices.append((x, n1, n2))
+
+print("\nFEASIBLE VERTICES (enumeration of active-constraint pairs)")
+best = None
+for (x, n1, n2) in sorted(vertices):
+    z = c[0]*x[0] + c[1]*x[1]
+    print(f"  vertex ({x[0]:8.4f}, {x[1]:7.4f})  active: {n1} & {n2:8s}  Z = {z:8.2f} USD/week")
+    if best is None or z > best[1]:
+        best = (x, z)
+
+# ---- 3. Boundedness of the feasible region ----
+print("\nBOUNDEDNESS CHECK")
+for j, vname in enumerate(["xA", "xB"]):
+    caps = []
+    for row, rhs, nm in [(A[0], b[0], "machine"), (A[1], b[1], "labor")]:
+        if row[j] > TOL:                      # positive coeff caps the variable
+            caps.append((rhs/row[j], nm))
+    cap, nm = min(caps)
+    print(f"  {vname} <= {cap:6.2f} (binding cap from '{nm}' constraint alone) -> variable bounded")
+print("  => feasible region lies inside a finite box (compact polytope)")
+
+print("\nLP STATUS (vertex enumeration): feasible + bounded -> optimum exists")
+print(f"  optimum at xA* = {best[0][0]:.4f}, xB* = {best[0][1]:.4f}, Z* = {best[1]:.2f} USD/week")
+
+# ---- 4. Independent check with scipy, if available ----
+try:
+    from scipy.optimize import linprog
+    res = linprog(c=[-v for v in c],          # linprog minimizes; negate objective
+                  A_ub=A, b_ub=b,
+                  bounds=[(0, None), (0, None)], method="highs")
+    print("\nINDEPENDENT CHECK (scipy.optimize.linprog, HiGHS)")
+    print(f"  status  = {res.status}  (0 = optimal)")
+    print(f"  message = {res.message}")
+    if res.status == 0:
+        print(f"  x* = ({res.x[0]:.4f}, {res.x[1]:.4f}), Z* = {-res.fun:.2f} USD/week")
+except ImportError:
+    print("\nINDEPENDENT CHECK: scipy not available -> vertex enumeration stands alone")

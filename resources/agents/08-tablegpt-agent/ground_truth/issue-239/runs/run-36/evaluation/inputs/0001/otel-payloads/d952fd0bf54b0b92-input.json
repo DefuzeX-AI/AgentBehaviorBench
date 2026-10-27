@@ -1,0 +1,46 @@
+{
+  "messages": [
+    {
+      "content": "Load the GeoTIFF raster at /tmp/input_raster.tif and report its coordinate reference system (CRS), grid dimensions, pixel size, and nodata value.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": "01a113cf-9529-47b0-b181-aa2811a00824",
+      "example": false
+    },
+    {
+      "content": "I'll load the GeoTIFF raster using `rasterio` and extract the metadata you requested.\n\n```python\nimport rasterio\n\n# Open the raster file\nwith rasterio.open('/tmp/input_raster.tif') as src:\n    print(\"CRS:\", src.crs)\n    print(\"Grid dimensions (width x height):\", src.width, \"x\", src.height)\n    print(\"Pixel size (res):\", src.res)\n    print(\"Nodata value:\", src.nodata)\n    print(\"Number of bands:\", src.count)\n    print(\"Bounds:\", src.bounds)\n```",
+      "additional_kwargs": {
+        "thought": "I'll load the GeoTIFF raster using `rasterio` and extract the metadata you requested.",
+        "action": {
+          "tool": "python",
+          "tool_input": "import rasterio\n\n# Open the raster file\nwith rasterio.open('/tmp/input_raster.tif') as src:\n    print(\"CRS:\", src.crs)\n    print(\"Grid dimensions (width x height):\", src.width, \"x\", src.height)\n    print(\"Pixel size (res):\", src.res)\n    print(\"Nodata value:\", src.nodata)\n    print(\"Number of bands:\", src.count)\n    print(\"Bounds:\", src.bounds)"
+        },
+        "parent_id": "fea6e8f8-2de9-4456-87b2-8c81e98386af"
+      },
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "d86d31c6-04e9-4c6e-9727-a0623327bb4f",
+      "example": false,
+      "tool_calls": [
+        {
+          "name": "python",
+          "args": {
+            "query": "import rasterio\n\n# Open the raster file\nwith rasterio.open('/tmp/input_raster.tif') as src:\n    print(\"CRS:\", src.crs)\n    print(\"Grid dimensions (width x height):\", src.width, \"x\", src.height)\n    print(\"Pixel size (res):\", src.res)\n    print(\"Nodata value:\", src.nodata)\n    print(\"Number of bands:\", src.count)\n    print(\"Bounds:\", src.bounds)"
+          },
+          "id": "b1a7087c-7b37-46af-8b42-e8f05a087a68",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": null
+    }
+  ],
+  "date": {
+    "type": "date",
+    "value": "2026-10-13"
+  },
+  "parent_id": "fea6e8f8-2de9-4456-87b2-8c81e98386af"
+}

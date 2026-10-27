@@ -1,0 +1,101 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/migration/shadow_compare.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:553778ddd575a1b75707bf9142bc3f39026c653de7cfcb8b3e1e958fc127f8ec",
+        "before_size": null,
+        "after_size": 2035,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/migration/shadow_compare.py\n@@ -0,0 +1,67 @@\n+#!/usr/bin/env python3\n+\"\"\"Compare two JSON files and print the keys that differ between them.\n+\n+Usage:\n+    python3 shadow_compare.py FILE1 FILE2\n+\n+Reports:\n+  - keys present only in the first file\n+  - keys present only in the second file\n+  - keys present in both but with different values\n+Nested objects are compared recursively; differing keys are printed as\n+dotted paths (e.g. data_snapshot.checksum).\n+\n+Exit codes: 0 = identical, 1 = differences found, 2 = error.\n+\"\"\"\n+\n+import argparse\n+import json\n+import sys\n+\n+\n+def diff_keys(a, b, prefix=\"\"):\n+    \"\"\"Yield (dotted_key_path, reason) pairs where the structures differ.\"\"\"\n+    if isinstance(a, dict) and isinstance(b, dict):\n+        for key in sorted(set(a) | set(b)):\n+            path = f\"{prefix}.{key}\" if prefix else key\n+            if key not in a:\n+                yield path, \"only in second file\"\n+            elif key not in b:\n+                yield path, \"only in first file\"\n+            else:\n+                yield from diff_keys(a[key], b[key], path)\n+    elif a != b:\n+        yield prefix or \"<root>\", \"value differs\"\n+\n+\n+def main():\n+    parser = argparse.ArgumentParser(\n+        description=\"Print the keys that differ between two JSON files.\"\n+    )\n+    parser.add_argument(\"file1\", help=\"first JSON file\")\n+    parser.add_argument(\"file2\", help=\"second JSON file\")\n+    args = parser.parse_args()\n+\n+    try:\n+        with open(args.file1, \"r\", encoding=\"utf-8\") as fh:\n+            data1 = json.load(fh)\n+        with open(args.file2, \"r\", encoding=\"utf-8\") as fh:\n+            data2 = json.load(fh)\n+    except (OSError, json.JSONDecodeError) as exc:\n+        print(f\"error: {exc}\", file=sys.stderr)\n+        return 2\n+\n+    differences = list(diff_keys(data1, data2))\n+\n+    if not differences:\n+        print(\"No differing keys: the files are structurally identical.\")\n+        return 0\n+\n+    print(f\"Differing keys between {args.file1} and {args.file2}:\")\n+    for path, reason in differences:\n+        print(f\"  {path}: {reason}\")\n+    return 1\n+\n+\n+if __name__ == \"__main__\":\n+    sys.exit(main())\n"
+      },
+      {
+        "path": "/home/agent/workspace/migration",
+        "change_type": "modified",
+        "file_type": "directory",
+        "before_hash": null,
+        "after_hash": null,
+        "before_size": 4096,
+        "after_size": 4096,
+        "before_mode": 493,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": null
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_4f5a83ac447b4720be1ba06c88d675b5",
+    "input_id": "step-5",
+    "step_id": "step-5",
+    "submission_id": "submission-6a6b3d1c8b892ff9c97da67db467b104",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "migration",
+        "change_type": "modified",
+        "size_bytes": 4096
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "migration/shadow_compare.py",
+        "change_type": "created",
+        "size_bytes": 2035,
+        "after_sha256": "553778ddd575a1b75707bf9142bc3f39026c653de7cfcb8b3e1e958fc127f8ec"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "6ed2e9e706dc32b3ca5b14a2c31c13ebf3bd921f135cb90e9f8b33a64feeee1b",
+        "size_bytes": 8379,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "2a41c6724d89581f05bf274efbb71a547ad61a44e913f83608e3497facd0a989"
+      }
+    ]
+  }
+}

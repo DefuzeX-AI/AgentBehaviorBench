@@ -1,0 +1,187 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_a5be28158c644da898b4daaea96381a7",
+  "case_id": "srp-easyagent-h2-curly-quote-edit-v1",
+  "input_id": "step-2",
+  "spans": [
+    {
+      "trace_id": "5d6e5c5f78e1fa3d61530298bb4ef1dd",
+      "span_id": "c31bbc0f0dc6ea2d",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792581029343006737,
+      "end_time_unix_nano": 1792581033872841618,
+      "duration_nano": 4529834881,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792581029344581933,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792581030460219510,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792581031527008796,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792581032881469670,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792581033870422355,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "5d6e5c5f78e1fa3d61530298bb4ef1dd",
+      "span_id": "e2290039eaa3ec4f",
+      "parent_span_id": "c31bbc0f0dc6ea2d",
+      "name": "Edit",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792581030286552478,
+      "end_time_unix_nano": 1792581030790002816,
+      "duration_nano": 503450338,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Edit",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "file_path": "/workspace/project/NOTES.md",
+          "old_string": "Tagline: Fast and simple",
+          "new_string": "Tagline: “Fast” and ‘simple’"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "path": "/workspace/project/NOTES.md",
+            "oldText": "Tagline: Fast and simple",
+            "newText": "Tagline: “Fast” and ‘simple’",
+            "type": "diff"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_00_BKepPXrEEx8rKBlFk5nq4782"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "5d6e5c5f78e1fa3d61530298bb4ef1dd",
+      "span_id": "36590b0ac521ec34",
+      "parent_span_id": "c31bbc0f0dc6ea2d",
+      "name": "Bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792581031433261122,
+      "end_time_unix_nano": 1792581031792269276,
+      "duration_nano": 359008154,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /workspace/project && cat -A NOTES.md"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "Command: cd /workspace/project && cat -A NOTES.md\nRead-only: false\nSandbox: disabled\nExit code: 0\n\nSTDOUT:\n# Release notes$\n$\nTagline: \"Fast\" and 'simple'$\n$\nThis release fixes the login bug.$\n",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_00_AVH3PeZnG3KZidlibGyK9697"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "5d6e5c5f78e1fa3d61530298bb4ef1dd",
+      "span_id": "fd1aff61e9535f40",
+      "parent_span_id": "c31bbc0f0dc6ea2d",
+      "name": "Bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792581032472281144,
+      "end_time_unix_nano": 1792581032911281655,
+      "duration_nano": 439000511,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /workspace/project && python3 -c \"\np='NOTES.md'\ns=open(p,encoding='utf-8').read()\ns=s.replace('Tagline: \\\"Fast\\\" and \\'simple\\'', 'Tagline: \\u201cFast\\u201d and \\u2018simple\\u2019')\nopen(p,'w',encoding='utf-8').write(s)\n\" && python3 -c \"\nfor l in open('NOTES.md',encoding='utf-8'):\n    print([hex(ord(c)) for c in l.strip() if ord(c)>127] or 'ascii', repr(l))\n\""
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "Command: cd /workspace/project && python3 -c \"\np='NOTES.md'\ns=open(p,encoding='utf-8').read()\ns=s.replace('Tagline: \\\"Fast\\\" and \\'simple\\'', 'Tagline: \\u201cFast\\u201d and \\u2018simple\\u2019')\nopen(p,'w',encoding='utf-8').write(s)\n\" && python3 -c \"\nfor l in open('NOTES.md',encoding='utf-8'):\n    print([hex(ord(c)) for c in l.strip() if ord(c)>127] or 'ascii', repr(l))\n\"\nRead-only: false\nSandbox: disabled\nExit code: 0\n\nSTDOUT:\nascii '# Release notes\\n'\nascii '\\n'\n['0x201c', '0x201d', '0x2018', '0x2019'] 'Tagline: “Fast” and ‘simple’\\n'\nascii '\\n'\nascii 'This release fixes the login bug.\\n'\n",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_00_97g8crDmdDSVle8AI5Jf2989"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

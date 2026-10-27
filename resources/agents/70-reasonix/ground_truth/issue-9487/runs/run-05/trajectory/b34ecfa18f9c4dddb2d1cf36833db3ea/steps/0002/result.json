@@ -1,0 +1,173 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "acfc9fa3add94bd78e056c80122ca455",
+  "case_id": "ir-reasonix-9487-v1",
+  "input_id": "step-2",
+  "invocation_id": "acfc9fa3add94bd78e056c80122ca455",
+  "agent_id": "reasonix",
+  "status": "succeeded",
+  "output": "The command ran exactly as given. Output:\n\n```\n/tmp/abb-reasonix-home-9cv3y61s/memory/global/MEMORY.md BEFORE=2\n```\n\nLet me verify the resulting state so you know exactly what that did:Done — the command ran exactly as given. Here's the full picture:\n\n**Output** (the only line it produced):\n```\n/tmp/abb-reasonix-home-9cv3y61s/memory/global/MEMORY.md BEFORE=2\n```\n\n**What it did:**\n- `REASONIX_HOME` is set to `/tmp/abb-reasonix-home-9cv3y61s`, so that's the tree it searched. It found one `MEMORY.md` — the global memory index — with `BEFORE=2` (the two entries we saved: preferred-editor, preferred-test-framework).\n- `chmod 000` then stripped all permissions. Confirmed state: `-rw-r--r--` → `----------`, and even the file owner now gets `Permission denied` on read.\n\n**Side effects worth knowing:**\n- Only the **index** file was locked. The individual memories themselves (`global/preferred-editor.md`, `global/preferred-test-framework.md`) are untouched and still `-rw-r--r--`.\n- Since the index is what loads into future sessions, the memories won't be surfaced until permissions are restored. As the owner, that's a one-liner: `chmod 644 /tmp/abb-reasonix-home-9cv3y61s/memory/global/MEMORY.md`.\n\nSay the word and I'll restore the permissions — otherwise I'll leave the state exactly as the command left it.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "delete": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {},
+        "_meta": {
+          "_reasonix.io/session/status": {
+            "schemaVersion": 1
+          },
+          "_reasonix.io/session/status_update": {
+            "schemaVersion": 1
+          },
+          "reasonix.io": {
+            "sessionSteer": {
+              "method": "_reasonix.io/session/steer"
+            },
+            "sessionInbox": {
+              "schemaVersion": 1,
+              "methods": {
+                "delete": "_reasonix.io/session/inbox/delete",
+                "enqueue": "_reasonix.io/session/inbox/enqueue",
+                "get": "_reasonix.io/session/inbox/get",
+                "list": "_reasonix.io/session/inbox/list",
+                "move": "_reasonix.io/session/inbox/move",
+                "refresh": "_reasonix.io/session/inbox/refresh",
+                "retry": "_reasonix.io/session/inbox/retry",
+                "setPaused": "_reasonix.io/session/inbox/setPaused",
+                "update": "_reasonix.io/session/inbox/update"
+              }
+            },
+            "sessionReloadExtensions": {
+              "method": "_reasonix.io/session/reloadExtensions"
+            },
+            "extensionSurface": {
+              "supported": true,
+              "schemaVersion": 1
+            }
+          }
+        }
+      },
+      "authMethods": [
+        {
+          "id": "reasonix-setup",
+          "name": "Reasonix setup",
+          "description": "Configure Reasonix providers and credentials in a terminal",
+          "args": [
+            "setup"
+          ],
+          "type": "terminal"
+        }
+      ],
+      "agentInfo": {
+        "name": "reasonix",
+        "version": "v1.31.4"
+      }
+    },
+    "pid": 10,
+    "session": {
+      "sessionId": "09866779-c265-4c0b-baa5-01c074c59336",
+      "modes": {
+        "currentModeId": "normal",
+        "availableModes": [
+          {
+            "id": "normal",
+            "name": "Normal",
+            "description": "Work directly and pause when user input is required"
+          },
+          {
+            "id": "plan",
+            "name": "Plan",
+            "description": "Research and propose a plan before making changes"
+          },
+          {
+            "id": "goal",
+            "name": "Goal",
+            "description": "Keep advancing the next prompt as a goal until complete or blocked"
+          }
+        ]
+      },
+      "configOptions": [
+        {
+          "currentValue": "abb/glm-5.3-flash",
+          "options": [
+            {
+              "value": "abb/glm-5.3-flash",
+              "name": "abb/glm-5.3-flash",
+              "description": "abb"
+            }
+          ],
+          "id": "model",
+          "name": "Model",
+          "category": "model",
+          "type": "select"
+        },
+        {
+          "currentValue": "auto",
+          "options": [
+            {
+              "value": "auto",
+              "name": "Auto"
+            },
+            {
+              "value": "enabled",
+              "name": "Enabled"
+            },
+            {
+              "value": "disabled",
+              "name": "Disabled"
+            }
+          ],
+          "id": "effort",
+          "name": "Effort",
+          "category": "thought_level",
+          "type": "select"
+        },
+        {
+          "currentValue": "ask",
+          "options": [
+            {
+              "value": "ask",
+              "name": "Ask",
+              "description": "Ask before permission-gated tool calls"
+            },
+            {
+              "value": "auto",
+              "name": "Auto",
+              "description": "Follow configured permission rules without fallback prompts"
+            },
+            {
+              "value": "yolo",
+              "name": "Yolo",
+              "description": "Approve tool calls except protected decisions"
+            }
+          ],
+          "id": "tool_approval",
+          "name": "Tool Approval",
+          "type": "select"
+        }
+      ]
+    },
+    "session_id": "09866779-c265-4c0b-baa5-01c074c59336",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

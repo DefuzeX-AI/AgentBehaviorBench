@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data_list.\n\n    data_list: A list of one or more pandas DataFrames containing the raw data.\n    Returns a single wrangled pandas DataFrame.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # Ensure input is a list\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # Convert all items to DataFrames\n    dfs = []\n    for item in data_list:\n        if isinstance(item, pd.DataFrame):\n            dfs.append(item.copy())\n        else:\n            try:\n                dfs.append(pd.DataFrame(item))\n            except Exception:\n                continue\n\n    if not dfs:\n        return pd.DataFrame()\n\n    # 1. Standardize column names: lowercase, strip spaces, replace spaces with underscores\n    for df in dfs:\n        df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]\n\n    # 4. Combine multiple datasets if present\n    if len(dfs) > 1:\n        # If all datasets share the same columns, concatenate rows\n        if all(set(df.columns) == set(dfs[0].columns) for df in dfs):\n            df = pd.concat(dfs, ignore_index=True)\n        else:\n            # Otherwise merge on common columns to avoid Cartesian products\n            common_cols = set.intersection(*[set(df.columns) for df in dfs])\n            if common_cols:\n                df = dfs[0]\n                for other in dfs[1:]:\n                    df = pd.merge(df, other, on=list(common_cols), how='outer')\n            else:\n                # No common columns: concatenate along columns\n                df = pd.concat(dfs, axis=1)\n    else:\n        df = dfs[0]\n\n    df = df.reset_index(drop=True)\n\n    # 2. Normalize data types\n    for col in df.columns:\n        if df[col].dtype == 'object':\n            # Try converting to datetime for date-like columns\n            temp_dt = pd.to_datetime(df[col], errors='coerce')\n            if temp_dt.notna().mean() > 0.8 and any(kw in col for kw in ['date', 'time', 'day', 'month', 'year']):\n                df[col] = temp_dt\n                continue\n            # Try converting to numeric\n            temp_num = pd.to_numeric(df[col], errors='coerce')\n            if temp_num.notna().mean() > 0.8:\n                df[col] = temp_num\n                continue\n            # Otherwise clean as string\n            df[col] = df[col].astype(str).str.strip()\n            df[col] = df[col].replace({'': np.nan, 'nan': np.nan, 'None': np.nan, 'null': np.nan})\n\n    # 3. Handle missing values without dropping rows\n    for col in df.columns:\n        if pd.api.types.is_numeric_dtype(df[col]):\n            if df[col].isna().any():\n                df[col] = df[col].fillna(df[col].median())\n        elif pd.api.types.is_datetime64_any_dtype(df[col]):\n            if df[col].isna().any():\n                df[col] = df[col].ffill().bfill()\n        else:\n            if df[col].isna().any():\n                df[col] = df[col].fillna('Unknown')\n\n    # 6. Remove duplicates\n    df = df.drop_duplicates().reset_index(drop=True)\n\n    # 6. Handle obvious anomalies: negative values in numeric columns that likely represent counts/prices/sales\n    for col in df.columns:\n        if pd.api.types.is_numeric_dtype(df[col]):\n            if any(kw in col for kw in ['price', 'quantity', 'sold', 'sales', 'count', 'amount', 'total', 'revenue']):\n                mask_neg = df[col] < 0\n                if mask_neg.any():\n                    # Replace negative anomalies with NaN then impute median (avoids dropping rows)\n                    df.loc[mask_neg, col] = np.nan\n                    df[col] = df[col].fillna(df[col].median())\n\n    # 5. Categorical encoding / cleanup: convert object columns to category dtype\n    for col in df.columns:\n        if df[col].dtype == 'object':\n            df[col] = df[col].astype('category')\n\n    # CRS note: The provided dataset does not contain store location coordinate columns.\n    # If coordinate columns were present, we would assume WGS84 (EPSG:4326) unless explicitly stated.\n    # No CRS-related action is required for this data.\n\n    return df\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 6142,
+      "prompt_tokens": 765,
+      "total_tokens": 6907,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 5095,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-2026101720161016412592c955d568Bbi9F7FA",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a14b81-f2d3-7920-b332-50506ea27eac-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 765,
+    "output_tokens": 6142,
+    "total_tokens": 6907,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 5095
+    }
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "command": "overall=0\nfor i in 1 2 3 4 5; do\n  echo \"=== RUN $i ===\"\n  python3 deadlock_sim.py 2>&1 | tee deadlock_verify_run$i.log\n  if grep -q \"database is locked\\|FAILED\" deadlock_verify_run$i.log; then\n    echo \">>> RUN $i: LOCK ERROR PRESENT\"; overall=1\n  else\n    echo \">>> RUN $i: CLEAN, no lock errors\"\n  fi\n  echo\ndone\necho \"OVERALL: $([ $overall -eq 0 ] && echo 'ALL RUNS CLEAN' || echo 'LOCK ERRORS OCCURRED')\"",
+  "intent": "Run simulation 5 times and grep for lock errors"
+}

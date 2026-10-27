@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data_list.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # Ensure input is a list\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # If no data, return empty DataFrame\n    if len(data_list) == 0:\n        return pd.DataFrame()\n\n    # For this task, we have a single main dataset. \n    # If multiple datasets were provided, we would normally merge on keys. \n    # Here we process the first dataset as the main one.\n    df = data_list[0].copy()\n\n    # 1. Standardize column names: lowercase, strip spaces, replace spaces with underscores\n    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')\n\n    # 2. Normalize data types\n    # Identify date columns (any column name containing 'date')\n    date_cols = [c for c in df.columns if 'date' in c]\n    for col in date_cols:\n        df[col] = pd.to_datetime(df[col], errors='coerce')\n\n    # Identify numeric columns: try converting to numeric, keep if >95% values are numeric\n    numeric_cols = []\n    for col in df.columns:\n        if col in date_cols:\n            continue\n        # Attempt conversion\n        converted = pd.to_numeric(df[col], errors='coerce')\n        # If conversion doesn't lose more than 5% of data, consider it numeric\n        if converted.notna().mean() > 0.95:\n            df[col] = converted\n            numeric_cols.append(col)\n\n    # 3. Handle missing values\n    # Numeric: fill with median\n    for col in numeric_cols:\n        if df[col].isna().any():\n            median_val = df[col].median()\n            df[col] = df[col].fillna(median_val)\n\n    # Categorical/text: fill with mode or 'Unknown'\n    cat_cols = df.select_dtypes(include=['object', 'category']).columns\n    for col in cat_cols:\n        if df[col].isna().any():\n            mode_val = df[col].mode()\n            if not mode_val.empty:\n                df[col] = df[col].fillna(mode_val[0])\n            else:\n                df[col] = df[col].fillna('Unknown')\n\n    # Date: forward fill then backward fill\n    for col in date_cols:\n        if df[col].isna().any():\n            df[col] = df[col].ffill().bfill()\n\n    # 4. Multiple datasets: not applicable here, but if there were more, we would merge.\n    # Since only one, we skip.\n\n    # 5. Categorical encoding / cleanup\n    # For object columns, strip whitespace and convert to category if low cardinality\n    for col in df.select_dtypes(include=['object']).columns:\n        df[col] = df[col].astype(str).str.strip()\n        # Convert to category if unique values are less than 50% of rows or less than 20\n        if df[col].nunique() < 20 or df[col].nunique() / len(df) < 0.5:\n            df[col] = df[col].astype('category')\n\n    # 6. Remove duplicates\n    df = df.drop_duplicates().reset_index(drop=True)\n\n    # 7. Flag anomalies without dropping rows\n    # Flag negative values in numeric columns\n    for col in numeric_cols:\n        if (df[col] < 0).any():\n            df[f'{col}_negative_flag'] = df[col] < 0\n\n    # Return the wrangled DataFrame\n    return df\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 6213,
+      "prompt_tokens": 760,
+      "total_tokens": 6973,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 5361,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012170016229214098c955d568UfMk19Mf",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a1310e-c7e2-76d3-b500-d9e136948c3b-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 760,
+    "output_tokens": 6213,
+    "total_tokens": 6973,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 5361
+    }
+  }
+}

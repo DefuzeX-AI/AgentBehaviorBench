@@ -1,0 +1,77 @@
+{
+  "generations": [
+    [
+      {
+        "text": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n    \n    # Ensure data_list is a list\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n    \n    # Concatenate all provided data frames (handles single or multiple datasets)\n    df = pd.concat(data_list, ignore_index=True, sort=False)\n    \n    # Standardize column names: lowercase, strip whitespace, replace spaces with underscores\n    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')\n    \n    # Dynamically identify column names based on patterns from the data\n    date_col = [c for c in df.columns if 'date' in c][0]\n    bike_model_col = [c for c in df.columns if 'bike' in c and 'model' in c][0]\n    price_col = [c for c in df.columns if 'price' in c][0]\n    quantity_col = [c for c in df.columns if 'quantity' in c][0]\n    extended_col = [c for c in df.columns if 'extended' in c and 'sales' in c][0]\n    \n    # Convert date column to datetime\n    df[date_col] = pd.to_datetime(df[date_col], errors='coerce')\n    \n    # Convert numeric columns to proper numeric types\n    for col in [price_col, quantity_col, extended_col]:\n        df[col] = pd.to_numeric(df[col], errors='coerce')\n    \n    # Handle missing values in categorical column\n    df[bike_model_col] = df[bike_model_col].fillna('Unknown')\n    \n    # Treat negative price/quantity as anomalies: replace with NaN before imputation\n    df.loc[df[price_col] < 0, price_col] = np.nan\n    df.loc[df[quantity_col] < 0, quantity_col] = np.nan\n    \n    # Impute missing price using bike_model median, then overall median as fallback\n    df[price_col] = df.groupby(bike_model_col)[price_col].transform(lambda x: x.fillna(x.median()))\n    df[price_col] = df[price_col].fillna(df[price_col].median())\n    \n    # Impute missing quantity_sold with overall median\n    df[quantity_col] = df[quantity_col].fillna(df[quantity_col].median())\n    \n    # Repair extended_sales: it should equal price * quantity_sold\n    df[extended_col] = df[price_col] * df[quantity_col]\n    \n    # Remove exact duplicate rows\n    df = df.drop_duplicates().reset_index(drop=True)\n    \n    # Ensure no negative extended_sales (safety check after repair)\n    df = df[df[extended_col] >= 0].copy()\n    \n    # Validation of the repaired dataset\n    missing_ext = int(df[extended_col].isna().sum())\n    negative_ext = int((df[extended_col] < 0).sum())\n    expected_ext = df[price_col] * df[quantity_col]\n    inconsistent_ext = int((np.abs(df[extended_col] - expected_ext) > 1e-6).sum())\n    \n    # Downstream aggregation: total extended_sales by bike_model\n    agg_by_model = df.groupby(bike_model_col)[extended_col].sum().reset_index()\n    \n    # Store validation results in DataFrame attributes for reporting\n    df.attrs['validation_results'] = {\n        'missing_extended_sales': missing_ext,\n        'negative_extended_sales': negative_ext,\n        'inconsistent_extended_sales': inconsistent_ext,\n        'total_extended_sales_by_bike_model': agg_by_model.to_dict('records')\n    }\n    \n    return df\n```",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n    \n    # Ensure data_list is a list\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n    \n    # Concatenate all provided data frames (handles single or multiple datasets)\n    df = pd.concat(data_list, ignore_index=True, sort=False)\n    \n    # Standardize column names: lowercase, strip whitespace, replace spaces with underscores\n    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')\n    \n    # Dynamically identify column names based on patterns from the data\n    date_col = [c for c in df.columns if 'date' in c][0]\n    bike_model_col = [c for c in df.columns if 'bike' in c and 'model' in c][0]\n    price_col = [c for c in df.columns if 'price' in c][0]\n    quantity_col = [c for c in df.columns if 'quantity' in c][0]\n    extended_col = [c for c in df.columns if 'extended' in c and 'sales' in c][0]\n    \n    # Convert date column to datetime\n    df[date_col] = pd.to_datetime(df[date_col], errors='coerce')\n    \n    # Convert numeric columns to proper numeric types\n    for col in [price_col, quantity_col, extended_col]:\n        df[col] = pd.to_numeric(df[col], errors='coerce')\n    \n    # Handle missing values in categorical column\n    df[bike_model_col] = df[bike_model_col].fillna('Unknown')\n    \n    # Treat negative price/quantity as anomalies: replace with NaN before imputation\n    df.loc[df[price_col] < 0, price_col] = np.nan\n    df.loc[df[quantity_col] < 0, quantity_col] = np.nan\n    \n    # Impute missing price using bike_model median, then overall median as fallback\n    df[price_col] = df.groupby(bike_model_col)[price_col].transform(lambda x: x.fillna(x.median()))\n    df[price_col] = df[price_col].fillna(df[price_col].median())\n    \n    # Impute missing quantity_sold with overall median\n    df[quantity_col] = df[quantity_col].fillna(df[quantity_col].median())\n    \n    # Repair extended_sales: it should equal price * quantity_sold\n    df[extended_col] = df[price_col] * df[quantity_col]\n    \n    # Remove exact duplicate rows\n    df = df.drop_duplicates().reset_index(drop=True)\n    \n    # Ensure no negative extended_sales (safety check after repair)\n    df = df[df[extended_col] >= 0].copy()\n    \n    # Validation of the repaired dataset\n    missing_ext = int(df[extended_col].isna().sum())\n    negative_ext = int((df[extended_col] < 0).sum())\n    expected_ext = df[price_col] * df[quantity_col]\n    inconsistent_ext = int((np.abs(df[extended_col] - expected_ext) > 1e-6).sum())\n    \n    # Downstream aggregation: total extended_sales by bike_model\n    agg_by_model = df.groupby(bike_model_col)[extended_col].sum().reset_index()\n    \n    # Store validation results in DataFrame attributes for reporting\n    df.attrs['validation_results'] = {\n        'missing_extended_sales': missing_ext,\n        'negative_extended_sales': negative_ext,\n        'inconsistent_extended_sales': inconsistent_ext,\n        'total_extended_sales_by_bike_model': agg_by_model.to_dict('records')\n    }\n    \n    return df\n```",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 4543,
+              "prompt_tokens": 781,
+              "total_tokens": 5324,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 3694,
+                "rejected_prediction_tokens": null,
+                "text_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 0,
+                "image_tokens": null,
+                "text_tokens": null
+              }
+            },
+            "model_provider": "openai",
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-2026101722043399625907c955d568NmUZg3vt",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a14be5-2dcc-7442-8bbf-3591f6b93e01-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 4543,
+      "prompt_tokens": 781,
+      "total_tokens": 5324,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 3694,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-2026101722043399625907c955d568NmUZg3vt"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

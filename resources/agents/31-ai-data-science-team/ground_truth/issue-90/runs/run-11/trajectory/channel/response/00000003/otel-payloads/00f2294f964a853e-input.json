@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_visualization(data_raw):\n    import pandas as pd\n    import numpy as np\n    import json\n    import plotly.graph_objects as go\n    import plotly.express as px\n    import plotly.io as pio\n\n    # --- Data preparation ---\n    df = data_raw.copy()\n\n    # Convert date column to datetime and sort chronologically\n    df['date'] = pd.to_datetime(df['date'])\n    df = df.sort_values('date').reset_index(drop=True)\n\n    # --- Summary statistics for chart reporting ---\n    max_row = df.loc[df['total_extended_sales'].idxmax()]\n    min_row = df.loc[df['total_extended_sales'].idxmin()]\n    summary = {\n        'total_annual_sales': float(df['total_extended_sales'].sum()),\n        'avg_daily_sales': float(df['total_extended_sales'].mean()),\n        'highest_sales_day': {\n            'date': str(max_row['date'].date()),\n            'total_extended_sales': float(max_row['total_extended_sales'])\n        },\n        'lowest_sales_day': {\n            'date': str(min_row['date'].date()),\n            'total_extended_sales': float(min_row['total_extended_sales'])\n        }\n    }\n    print(json.dumps(summary, indent=2))\n\n    # --- Build the line chart ---\n    fig = px.line(\n        df,\n        x='date',\n        y='total_extended_sales',\n        title='Daily Total Extended Sales – Full Year 2021'\n    )\n\n    fig.update_layout(\n        title=dict(text='Daily Total Extended Sales – Full Year 2021', x=0.5),\n        xaxis_title='Date',\n        yaxis_title='Total Extended Sales',\n        template='plotly_white',\n        hovermode='x unified',\n        width=1000,\n        height=500\n    )\n\n    # Monthly tick labels across Jan–Dec 2021, cleanly formatted\n    fig.update_xaxes(\n        dtick='M1',\n        tickformat='%b %Y',\n        tickangle=-45,\n        showgrid=True,\n        gridcolor='lightgrey'\n    )\n\n    # Thousands separators on the Y-axis\n    fig.update_yaxes(\n        tickformat=',',\n        showgrid=True,\n        gridcolor='lightgrey',\n        separatethousands=True\n    )\n\n    # Continuous line, markers disabled\n    fig.update_traces(\n        mode='lines',\n        line=dict(width=1.8, color='#1f77b4'),\n        hovertemplate='%{x|%Y-%m-%d}<br>Total Extended Sales: %{y:,.0f}<extra></extra>'\n    )\n\n    # --- Convert to dictionary and return ---\n    fig_json = pio.to_json(fig)\n    fig_dict = json.loads(fig_json)\n\n    return fig_dict\n```\n\n**Chart Summary:**\n- **Chart Type:** Line chart of daily total extended sales across all 365 days of 2021, plotted chronologically with monthly tick labels (Jan–Dec 2021) and thousands-separated Y-axis labels.\n- **Overall Trend:** Based on the opening days of the year, daily sales fluctuate in the ~$148K–$197K range, suggesting daily variation of roughly ±15% around a baseline near $175K. The full-year pattern (trend, peaks, and seasonality) is computed and printed by the code via the `summary` dictionary, which reports the exact highest and lowest sales days, total annual sales, and average daily sales.\n- **Notable Extremes:** The function programmatically identifies the single highest-sales day (peak) and lowest-sales day (dip) and prints them with their dates and values, so precise peaks/dips are surfaced even if they occur outside the preview rows.\n- **Pattern Expectations:** With daily granularity over a full year, the chart will reveal any weekly cycles (e.g., weekday/weekend effects appearing as fine-grained oscillations) and monthly/seasonal swings (e.g., holiday-season lifts in November–December or dips in quieter months) directly from the plotted line.",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 2078,
+      "prompt_tokens": 866,
+      "total_tokens": 2944,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 1237,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "glm-5.3-flash",
+    "system_fingerprint": null,
+    "id": "202610201213028b1f1f66100d41b3",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a15783-4469-71d3-bf39-21df85467826-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 866,
+    "output_tokens": 2078,
+    "total_tokens": 2944,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 1237
+    }
+  }
+}

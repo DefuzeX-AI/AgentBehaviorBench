@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_raw):\n    import pandas as pd\n    import numpy as np\n\n    '''\n    Wrangle the data provided in data_raw.\n    \n    data_raw: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    \n    # Ensure input is a list\n    if not isinstance(data_raw, list):\n        data_list = [data_raw]\n    else:\n        data_list = data_raw\n    \n    # Filter out None or empty dataframes\n    dfs = [df for df in data_list if df is not None and not df.empty]\n    \n    if not dfs:\n        return pd.DataFrame()\n    \n    # Combine multiple dataframes if provided\n    if len(dfs) == 1:\n        df = dfs[0].copy()\n    else:\n        # Check if all dataframes have the same columns\n        all_cols = [set(df.columns) for df in dfs]\n        if all(cols == all_cols[0] for cols in all_cols):\n            # Concatenate vertically if columns match\n            df = pd.concat(dfs, ignore_index=True, sort=False)\n        else:\n            # Merge on common columns to avoid Cartesian products\n            common_cols = set.intersection(*all_cols)\n            if common_cols:\n                df = dfs[0].copy()\n                for next_df in dfs[1:]:\n                    df = pd.merge(df, next_df, on=list(common_cols), how='outer', suffixes=('', '_dup'))\n                    df = df.loc[:, ~df.columns.duplicated()]\n            else:\n                # No common columns: concatenate horizontally (index-aligned)\n                df = pd.concat(dfs, axis=1, ignore_index=False)\n    \n    # 1. Standardize column names: lowercase, strip spaces, replace spaces with underscores\n    df.columns = (df.columns.astype(str).str.strip()\n                  .str.lower()\n                  .str.replace(' ', '_')\n                  .str.replace(r'[^\\w]', '', regex=True))\n    \n    # 2. Normalize data types\n    for col in df.columns:\n        # Try to convert date/time columns to datetime\n        if 'date' in col or 'time' in col:\n            df[col] = pd.to_datetime(df[col], errors='coerce')\n        # Try to convert object columns to numeric if mostly numeric\n        elif df[col].dtype == 'object':\n            converted = pd.to_numeric(df[col], errors='coerce')\n            if converted.notna().sum() > 0.5 * len(df):\n                df[col] = converted\n    \n    # 3. Handle missing values without dropping rows\n    for col in df.columns:\n        if df[col].isna().any():\n            if pd.api.types.is_numeric_dtype(df[col]):\n                median_val = df[col].median()\n                fill_val = median_val if not pd.isna(median_val) else 0\n                df[col] = df[col].fillna(fill_val)\n            elif pd.api.types.is_datetime64_any_dtype(df[col]):\n                df[col] = df[col].ffill().bfill()\n            else:\n                mode_val = df[col].mode()\n                fill_val = mode_val[0] if not mode_val.empty else 'Unknown'\n                df[col] = df[col].fillna(fill_val)\n    \n    # Helper function to find the first column matching any keyword\n    def find_first_column(columns, keywords):\n        for c in columns:\n            lc = str(c).lower()\n            for kw in keywords:\n                if kw in lc:\n                    return c\n        return None\n    \n    # 4. Verify artifact hashes: extended_sales should equal price * quantity_sold\n    price_col = find_first_column(df.columns, ['price'])\n    qty_col = find_first_column(df.columns, ['quantity', 'qty'])\n    ext_col = find_first_column(df.columns, ['extended', 'total'])\n    if price_col and qty_col and ext_col:\n        # Create a boolean flag indicating whether the computed hash matches the stored artifact\n        df['artifact_hash_match'] = np.isclose(\n            df[ext_col], \n            df[price_col] * df[qty_col], \n            rtol=1e-5, \n            atol=1e-8\n        )\n    \n    # 5. Handle categorical encoding: convert low-cardinality object columns to category\n    for col in df.columns:\n        if df[col].dtype == 'object':\n            if df[col].nunique() < 0.5 * len(df):\n                df[col] = df[col].astype('category')\n    \n    # 6. Remove duplicates (keep first occurrence)\n    df = df.drop_duplicates().reset_index(drop=True)\n    \n    # 7. Ensure JSON serializability\n    for col in df.columns:\n        if pd.api.types.is_datetime64_any_dtype(df[col]):\n            df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S')\n        elif pd.api.types.is_categorical_dtype(df[col]):\n            df[col] = df[col].astype(str)\n    df = df.astype(object).where(pd.notnull(df), None)\n    \n    # Return the wrangled DataFrame (serves as the consumer readback)\n    return df\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 3844,
+      "prompt_tokens": 1466,
+      "total_tokens": 5310,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 2671,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261018185347798390036c955d5684EOkhtUS",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a1505c-e5d0-7602-ba8e-97b9d3c66ae1-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 1466,
+    "output_tokens": 3844,
+    "total_tokens": 5310,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 2671
+    }
+  }
+}

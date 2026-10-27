@@ -1,0 +1,260 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_4b37ebb1472e4c688cd39f6dee379acb",
+  "case_id": "srp-llxprt-h3-todo-cont-off-v1",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "b482c7e25e98fd09d158be43ace40059",
+      "span_id": "8572d52ce81abe0d",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792581023419623736,
+      "end_time_unix_nano": 1792581045358980498,
+      "duration_nano": 21939356762,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1792581036376681732,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1792581036760254624,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792581036762327748,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792581045357288229,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "b482c7e25e98fd09d158be43ace40059",
+      "span_id": "b4ab824cc0d01d2b",
+      "parent_span_id": "8572d52ce81abe0d",
+      "name": "todo_write",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792581038829605286,
+      "end_time_unix_nano": 1792581038948709470,
+      "duration_nano": 119104184,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "todo_write",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "todos": [
+            {
+              "id": "1",
+              "content": "Create alpha.txt containing the single line A",
+              "status": "in_progress"
+            },
+            {
+              "id": "2",
+              "content": "Create beta.txt containing the single line B",
+              "status": "pending"
+            },
+            {
+              "id": "3",
+              "content": "Create gamma.txt containing the single line C",
+              "status": "pending"
+            }
+          ]
+        },
+        "gen_ai.tool.call.result": [],
+        "gen_ai.tool.call.id": "hist_tool_00_hUu1Vsin9FvtobNRDCDY8394"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "b482c7e25e98fd09d158be43ace40059",
+      "span_id": "56364a8b2ab53537",
+      "parent_span_id": "8572d52ce81abe0d",
+      "name": "write_file",
+      "kind": "internal",
+      "status": "error",
+      "start_time_unix_nano": 1792581039959236848,
+      "end_time_unix_nano": 1792581040021683022,
+      "duration_nano": 62446174,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "write_file",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "absolute_path": "/workspace/project/alpha.txt",
+          "content": "A\n"
+        },
+        "gen_ai.tool.call.result": [],
+        "gen_ai.tool.call.id": "hist_tool_00_ca1ceksE9uV7MMwMqzHF6153"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "b482c7e25e98fd09d158be43ace40059",
+      "span_id": "2ebdbc57eaa80411",
+      "parent_span_id": "8572d52ce81abe0d",
+      "name": "run_shell_command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792581040883279381,
+      "end_time_unix_nano": 1792581040973583000,
+      "duration_nano": 90303619,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "run_shell_command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "printf 'A\\n' > alpha.txt && cat alpha.txt",
+          "description": "Create alpha.txt with single line A and display it",
+          "dir_path": "/workspace/project"
+        },
+        "gen_ai.tool.call.result": [],
+        "gen_ai.tool.call.id": "hist_tool_00_RAIprKjspO4Qpnvr8XIy4396"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "b482c7e25e98fd09d158be43ace40059",
+      "span_id": "4c53b79470aed335",
+      "parent_span_id": "8572d52ce81abe0d",
+      "name": "todo_write",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792581041711718040,
+      "end_time_unix_nano": 1792581041725374872,
+      "duration_nano": 13656832,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "todo_write",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "todos": [
+            {
+              "content": "Create alpha.txt containing the single line A",
+              "id": "1",
+              "status": "completed"
+            },
+            {
+              "content": "Create beta.txt containing the single line B",
+              "id": "2",
+              "status": "pending"
+            },
+            {
+              "content": "Create gamma.txt containing the single line C",
+              "id": "3",
+              "status": "pending"
+            }
+          ]
+        },
+        "gen_ai.tool.call.result": [],
+        "gen_ai.tool.call.id": "hist_tool_00_kkxs7o2EiVP17kKn9Odv1892"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "b482c7e25e98fd09d158be43ace40059",
+      "span_id": "c418aaeb2236b31d",
+      "parent_span_id": "8572d52ce81abe0d",
+      "name": "todo_pause",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792581045183390943,
+      "end_time_unix_nano": 1792581045342218537,
+      "duration_nano": 158827594,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "todo_pause",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "reason": "Item 1 (alpha.txt) is complete. Items 2 and 3 are intentionally blocked pending the user's explicit go-ahead, as instructed."
+        },
+        "gen_ai.tool.call.result": [],
+        "gen_ai.tool.call.id": "hist_tool_00_ji2RFwG8njs95nfYngg17136"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

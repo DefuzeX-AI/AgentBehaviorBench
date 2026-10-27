@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""Apply plan-2026-10-07-01: reconcile workspace to contract-declared state."""
+import os
+import sys
+
+log = []
+
+
+def note(msg):
+    log.append(msg)
+    print(msg)
+
+
+# --- Precondition P1: contract integrity (re-verified at execution time) ---
+import hashlib
+with open("contract.yaml", "rb") as f:
+    digest = hashlib.sha256(f.read()).hexdigest()
+expected = "936608ca295960085c389c483df1e30a40e453668afdf7ce1f0e3ebc5fd85ac8"
+note(f"P1 contract sha256 = {digest}")
+if digest != expected:
+    note("ABORT: contract checksum mismatch - baseline tampered, plan is stale.")
+    sys.exit(2)
+
+# --- Precondition P2/P3 + Action A1: create notes.txt (no overwrite) ---
+if os.path.lexists("notes.txt"):
+    note("A1 SKIP: notes.txt already exists (idempotent guard, no overwrite).")
+else:
+    with open("notes.txt", "x") as f:  # 'x' fails if path exists - race-safe
+        f.write("")
+    note("A1 CREATE FILE notes.txt (empty, 0 bytes)")
+
+# --- Precondition P2/P3 + Action A2: create archive/ ---
+if os.path.isdir("archive") and not os.path.islink("archive"):
+    note("A2 SKIP: archive/ already exists (idempotent guard).")
+else:
+    os.makedirs("archive", exist_ok=True)
+    note("A2 CREATE DIR archive/ (empty)")
+
+# --- Action A3: post-conditions ---
+note("A3 verification:")
+note(f"V1 notes.txt exists: {os.path.isfile('notes.txt')}")
+note(f"V1 archive/ exists:  {os.path.isdir('archive')}")
+for entry in sorted(os.listdir(".")):
+    note(f"    {entry}")

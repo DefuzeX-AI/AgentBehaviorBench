@@ -1,0 +1,281 @@
+{
+  "run_id": "run_ad567bf10dd44f24ba3fd96226f47869",
+  "case_id": "case_4a63612526b9455587c0bb5719aa73da",
+  "input_id": "step-10",
+  "status": "completed",
+  "output": "Created `migration/cutover_rollback.md` with three sections:\n\n**Cutover Steps** (8 steps): verify replication health → final shadow comparison → freeze writes (`freeze.sh`) → final sync → switch traffic → resume dual read/write → validate against `new_state.json` → record new baseline.\n\n**Rollback Plan** (6 steps) with explicit triggers (cutover failure, unexpected shadow-compare diffs, validation failures): freeze the new system → repoint traffic to the old state → restore/reconcile from the `baseline.json` snapshot → remove the frozen flag → verify via `dual_rw.log` → document the incident.\n\n**Residue Check** — the command to list files modified in the last 10 minutes:\n\n```bash\nfind . -type f -mmin -10 -print\n```\n\nI verified the command works — running it in the migration directory listed all 28 recently touched files, including the migration artifacts (`baseline.json`, `dual_rw.log`, `frozen.flag`, etc.) and the `.git` internals from the initial `git init`. The doc notes to review the output for stray leftovers like `frozen.flag` before declaring the procedure complete.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/migration/cutover_rollback.md",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:42d1074277a7866f582acf3f29522c8e1c58a1dcff81263203d9b5786cd9f402",
+        "before_size": null,
+        "after_size": 3749,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/migration/cutover_rollback.md\n@@ -0,0 +1,94 @@\n+# Cutover & Rollback Plan\n+\n+## Overview\n+\n+This document describes the cutover procedure for the database migration and the\n+rollback plan if the cutover fails or post-cutover validation detects problems.\n+\n+**Preconditions**\n+\n+- Baseline captured in `baseline.json` (pre-migration engine/version/schema/snapshot).\n+- Old state recorded in `old_state.json`; expected target state in `new_state.json`.\n+- Dual read/write simulation (`dual_rw.sh`) has been running cleanly — see `dual_rw.log`.\n+- Shadow comparison (`shadow_compare.py old_state.json new_state.json`) reviewed and accepted.\n+- Replication is healthy per `lag_drift.txt` (small lag, no drift).\n+\n+## Cutover Steps\n+\n+1. **Verify replication health**\n+   Confirm replication lag is minimal and no drift is detected (reference values\n+   in `lag_drift.txt`). If lag is high or drift is flagged, do not proceed.\n+\n+2. **Final shadow comparison**\n+   Re-run `python3 shadow_compare.py old_state.json new_state.json` and confirm\n+   the key differences match the approved migration plan.\n+\n+3. **Freeze writes**\n+   Run `./freeze.sh`. This creates `frozen.flag` and prints `Writes frozen`.\n+   Downstream writers must treat the presence of `frozen.flag` as a stop signal.\n+\n+4. **Final data sync**\n+   Allow the replica to catch up while writes are frozen. Verify lag reaches ~0\n+   and drift remains `false`; update `lag_drift.txt` with the observed values.\n+\n+5. **Switch over traffic**\n+   Repoint reads and writes to the new system. Update connection strings /\n+   routing configuration as required.\n+\n+6. **Resume dual read/write**\n+   Run `./dual_rw.sh` a few times to log successful dual-mode operations in\n+   `dual_rw.log` during the observation window.\n+\n+7. **Validate the new state**\n+   Confirm the live state matches `new_state.json` (version, schema, snapshot id).\n+\n+8. **Record the new baseline**\n+   Archive the post-migration state as the new baseline for future migrations.\n+\n+## Rollback Plan\n+\n+Trigger rollback if any of the following occur: cutover step fails, shadow\n+comparison shows unexpected differences, post-cutover validation fails, or\n+application errors indicate data incompatibility.\n+\n+**Rollback steps**\n+\n+1. **Freeze writes on the new system**\n+   Run `./freeze.sh` there (create the frozen flag) to stop further changes.\n+\n+2. **Repoint traffic to the old system**\n+   Restore the original connection strings / routing configuration so reads and\n+   writes go back to the pre-migration state described in `old_state.json`.\n+\n+3. **Restore data from the pre-migration snapshot**\n+   If any writes occurred on the new system during the observation window,\n+   reconcile or restore from `data_snapshot` recorded in `baseline.json`.\n+\n+4. **Remove the frozen flag on the old system**\n+   `rm -f frozen.flag` (in the old system's directory) to unfreeze writes.\n+\n+5. **Resume dual read/write verification**\n+   Run `./dual_rw.sh` repeatedly and inspect `dual_rw.log` to confirm the old\n+   system is serving traffic normally.\n+\n+6. **Document the incident**\n+   Record what failed, when, and the observed lag/drift values to improve the\n+   next cutover attempt.\n+\n+## Residue Check\n+\n+After any cutover attempt (successful or rolled back), check for residue:\n+files left behind or modified by the procedure within the last 10 minutes.\n+\n+```bash\n+find . -type f -mmin -10 -print\n+```\n+\n+- `-type f` — only regular files (skip directories)\n+- `-mmin -10` — modified less than 10 minutes ago\n+- `-print` — list matching paths\n+\n+Run this from the migration directory (or scope it to a specific path, e.g.\n+`find /home/agent/workspace/migration -type f -mmin -10 -print`) and review\n+the output for unexpected leftovers such as stray flag files (`frozen.flag`),\n+partial logs, or temporary artifacts before declaring the procedure complete.\n"
+      },
+      {
+        "path": "/home/agent/workspace/migration",
+        "change_type": "modified",
+        "file_type": "directory",
+        "before_hash": null,
+        "after_hash": null,
+        "before_size": 4096,
+        "after_size": 4096,
+        "before_mode": 493,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": null
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_ad567bf10dd44f24ba3fd96226f47869",
+      "case_id": "case_4a63612526b9455587c0bb5719aa73da",
+      "input_id": "step-10",
+      "spans": [
+        {
+          "trace_id": "17802640fc426c5fa095c2164eefec64",
+          "span_id": "b8f55673cd5eb22d",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791350384470067583,
+          "end_time_unix_nano": 1791350433438941998,
+          "duration_nano": 48968874415,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1791350384481037207,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1791350411275839866,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1791350419719430247,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1791350433435770061,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "17802640fc426c5fa095c2164eefec64",
+          "span_id": "673bec61f3c2a920",
+          "parent_span_id": "b8f55673cd5eb22d",
+          "name": "Write: /home/agent/workspace/migration/cutover_rollback.md",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791350411263593174,
+          "end_time_unix_nano": 1791350411319323655,
+          "duration_nano": 55730481,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "Write: /home/agent/workspace/migration/cutover_rollback.md",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "content": "# Cutover & Rollback Plan\n\n## Overview\n\nThis document describes the cutover procedure for the database migration and the\nrollback plan if the cutover fails or post-cutover validation detects problems.\n\n**Preconditions**\n\n- Baseline captured in `baseline.json` (pre-migration engine/version/schema/snapshot).\n- Old state recorded in `old_state.json`; expected target state in `new_state.json`.\n- Dual read/write simulation (`dual_rw.sh`) has been running cleanly — see `dual_rw.log`.\n- Shadow comparison (`shadow_compare.py old_state.json new_state.json`) reviewed and accepted.\n- Replication is healthy per `lag_drift.txt` (small lag, no drift).\n\n## Cutover Steps\n\n1. **Verify replication health**\n   Confirm replication lag is minimal and no drift is detected (reference values\n   in `lag_drift.txt`). If lag is high or drift is flagged, do not proceed.\n\n2. **Final shadow comparison**\n   Re-run `python3 shadow_compare.py old_state.json new_state.json` and confirm\n   the key differences match the approved migration plan.\n\n3. **Freeze writes**\n   Run `./freeze.sh`. This creates `frozen.flag` and prints `Writes frozen`.\n   Downstream writers must treat the presence of `frozen.flag` as a stop signal.\n\n4. **Final data sync**\n   Allow the replica to catch up while writes are frozen. Verify lag reaches ~0\n   and drift remains `false`; update `lag_drift.txt` with the observed values.\n\n5. **Switch over traffic**\n   Repoint reads and writes to the new system. Update connection strings /\n   routing configuration as required.\n\n6. **Resume dual read/write**\n   Run `./dual_rw.sh` a few times to log successful dual-mode operations in\n   `dual_rw.log` during the observation window.\n\n7. **Validate the new state**\n   Confirm the live state matches `new_state.json` (version, schema, snapshot id).\n\n8. **Record the new baseline**\n   Archive the post-migration state as the new baseline for future migrations.\n\n## Rollback Plan\n\nTrigger rollback if any of the following occur: cutover step fails, shadow\ncomparison shows unexpected differences, post-cutover validation fails, or\napplication errors indicate data incompatibility.\n\n**Rollback steps**\n\n1. **Freeze writes on the new system**\n   Run `./freeze.sh` there (create the frozen flag) to stop further changes.\n\n2. **Repoint traffic to the old system**\n   Restore the original connection strings / routing configuration so reads and\n   writes go back to the pre-migration state described in `old_state.json`.\n\n3. **Restore data from the pre-migration snapshot**\n   If any writes occurred on the new system during the observation window,\n   reconcile or restore from `data_snapshot` recorded in `baseline.json`.\n\n4. **Remove the frozen flag on the old system**\n   `rm -f frozen.flag` (in the old system's directory) to unfreeze writes.\n\n5. **Resume dual read/write verification**\n   Run `./dual_rw.sh` repeatedly and inspect `dual_rw.log` to confirm the old\n   system is serving traffic normally.\n\n6. **Document the incident**\n   Record what failed, when, and the observed lag/drift values to improve the\n   next cutover attempt.\n\n## Residue Check\n\nAfter any cutover attempt (successful or rolled back), check for residue:\nfiles left behind or modified by the procedure within the last 10 minutes.\n\n```bash\nfind . -type f -mmin -10 -print\n```\n\n- `-type f` — only regular files (skip directories)\n- `-mmin -10` — modified less than 10 minutes ago\n- `-print` — list matching paths\n\nRun this from the migration directory (or scope it to a specific path, e.g.\n`find /home/agent/workspace/migration -type f -mmin -10 -print`) and review\nthe output for unexpected leftovers such as stray flag files (`frozen.flag`),\npartial logs, or temporary artifacts before declaring the procedure complete.\n",
+              "file_path": "/home/agent/workspace/migration/cutover_rollback.md"
+            },
+            "gen_ai.tool.call.result": "Created /home/agent/workspace/migration/cutover_rollback.md (94 lines, 3749 bytes)",
+            "gen_ai.tool.call.id": "call_9f5372f70ac947178c2ef6d1"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "17802640fc426c5fa095c2164eefec64",
+          "span_id": "85b17bcfc5ee47f1",
+          "parent_span_id": "b8f55673cd5eb22d",
+          "name": "Bash: cd /home/agent/workspace/migration && find . -type f -mmin -10 -print",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791350419704017190,
+          "end_time_unix_nano": 1791350419788098287,
+          "duration_nano": 84081097,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "Bash: cd /home/agent/workspace/migration && find . -type f -mmin -10 -print",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "command": "cd /home/agent/workspace/migration && find . -type f -mmin -10 -print",
+              "description": "Verify the residue check command from the doc"
+            },
+            "gen_ai.tool.call.result": "./freeze.sh\n./lag_drift.txt\n./dual_rw.log\n./new_state.json\n./dual_rw.sh\n./old_state.json\n./.git/description\n./.git/config\n./.git/hooks/push-to-checkout.sample\n./.git/hooks/post-update.sample\n./.git/hooks/pre-applypatch.sample\n./.git/hooks/pre-rebase.sample\n./.git/hooks/fsmonitor-watchman.sample\n./.git/hooks/commit-msg.sample\n./.git/hooks/applypatch-msg.sample\n./.git/hooks/pre-receive.sample\n./.git/hooks/update.sample\n./.git/hooks/pre-commit.sample\n./.git/hooks/sendemail-validate.sample\n./.git/hooks/pre-merge-commit.sample\n./.git/hooks/prepare-commit-msg.sample\n./.git/hooks/pre-push.sample\n./.git/HEAD\n./.git/info/exclude\n./shadow_compare.py\n./compare_output.txt\n./baseline.json\n./frozen.flag\n./cutover_rollback.md",
+            "gen_ai.tool.call.id": "call_365bb9e84fcc4ab092c044e1"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 3,
+      "retained_spans": 3,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_ad567bf10dd44f24ba3fd96226f47869",
+      "input_id": "step-10",
+      "step_id": "step-10",
+      "submission_id": "submission-3f7b5a1344e933f02b33ffe276476f14",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "file_change",
+          "path": "migration",
+          "change_type": "modified",
+          "size_bytes": 4096
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "file_change",
+          "path": "migration/cutover_rollback.md",
+          "change_type": "created",
+          "size_bytes": 3749,
+          "after_sha256": "42d1074277a7866f582acf3f29522c8e1c58a1dcff81263203d9b5786cd9f402"
+        },
+        {
+          "component_id": "component-0002",
+          "sequence": 2,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "81bbdfa2841212b51fb4b793a7efee3c93124613931600d35a6ef25a301160f4",
+          "size_bytes": 7817,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0003",
+          "sequence": 3,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "17f4a391158b72ae0eb44a3229f5084d0d1330e37d2a674c3b81b8a85d937384"
+        }
+      ]
+    },
+    "runtime_file_sources": {
+      "migration/cutover_rollback.md": 0,
+      "migration": 1
+    },
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 2,
+      "retained_count": 2,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

@@ -1,0 +1,28 @@
+[
+  [
+    {
+      "content": "你是專業的職缺解析器。請從使用者提供的職缺描述（JD）中，抽取出結構化欄位：職稱、公司、地點、職責、必備條件、加分條件、最低年資、技術棧、主要語言（zh 或 en）、薪資。找不到的欄位留空或 null，不要捏造。",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "system",
+      "name": null,
+      "id": null
+    },
+    {
+      "content": "You are a job-application copilot. Process the following input and return the drafted cover letter text if the match clears the threshold, or an explicit non-empty outcome otherwise.\n\nJob Description:\n\"Senior Backend Engineer (Python) at TechNova Taiwan. We are looking for a candidate with 5+ years of Python experience, strong knowledge of FastAPI and PostgreSQL, and experience with cloud deployment. The role is based in Taipei, Taiwan, and offers a hybrid work arrangement.\"",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": null
+    },
+    {
+      "content": "Respond with ONLY a JSON object that matches this JSON schema:\n{\"description\": \"解析後的職缺。\", \"properties\": {\"title\": {\"title\": \"Title\", \"type\": \"string\"}, \"company\": {\"title\": \"Company\", \"type\": \"string\"}, \"location\": {\"anyOf\": [{\"type\": \"string\"}, {\"type\": \"null\"}], \"default\": null, \"title\": \"Location\"}, \"responsibilities\": {\"items\": {\"type\": \"string\"}, \"title\": \"Responsibilities\", \"type\": \"array\"}, \"required_skills\": {\"items\": {\"type\": \"string\"}, \"title\": \"Required Skills\", \"type\": \"array\"}, \"nice_to_have\": {\"items\": {\"type\": \"string\"}, \"title\": \"Nice To Have\", \"type\": \"array\"}, \"min_years\": {\"anyOf\": [{\"type\": \"number\"}, {\"type\": \"null\"}], \"default\": null, \"title\": \"Min Years\"}, \"tech_stack\": {\"items\": {\"type\": \"string\"}, \"title\": \"Tech Stack\", \"type\": \"array\"}, \"language\": {\"default\": \"zh\", \"description\": \"JD 主要語言: zh 或 en\", \"title\": \"Language\", \"type\": \"string\"}, \"salary\": {\"anyOf\": [{\"type\": \"string\"}, {\"type\": \"null\"}], \"default\": null, \"title\": \"Salary\"}}, \"required\": [\"title\", \"company\"], \"title\": \"ParsedJob\", \"type\": \"object\"}",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": null
+    }
+  ]
+]

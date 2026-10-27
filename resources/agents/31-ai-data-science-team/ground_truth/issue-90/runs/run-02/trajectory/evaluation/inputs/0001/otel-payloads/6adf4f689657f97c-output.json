@@ -1,0 +1,79 @@
+{
+  "generations": [
+    [
+      {
+        "text": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n    \n    # Ensure data_list is a list\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n    \n    # If no data, return empty DataFrame\n    if len(data_list) == 0:\n        return pd.DataFrame()\n    \n    # If multiple dataframes are provided, concatenate them if they share the same columns.\n    # If schemas differ, we cannot safely merge without join keys, so fall back to the first dataframe.\n    if len(data_list) > 1:\n        first_cols = set(data_list[0].columns)\n        all_same = all(set(df.columns) == first_cols for df in data_list)\n        if all_same:\n            df = pd.concat(data_list, ignore_index=True, sort=False)\n        else:\n            df = data_list[0].copy()\n    else:\n        df = data_list[0].copy()\n    \n    # 1. Standardize column names: lowercase, strip spaces, replace internal spaces with underscores\n    df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]\n    \n    # 2. Normalize data types\n    # Identify date columns by name and convert to datetime\n    date_cols = [c for c in df.columns if 'date' in c]\n    for col in date_cols:\n        df[col] = pd.to_datetime(df[col], errors='coerce')\n    \n    # Identify numeric columns by common business keywords in their names\n    numeric_keywords = ['price', 'quantity', 'sales', 'amount', 'cost', 'revenue']\n    numeric_cols = [c for c in df.columns if any(k in c for k in numeric_keywords)]\n    for col in numeric_cols:\n        df[col] = pd.to_numeric(df[col], errors='coerce')\n    \n    # 3. Handle missing values without dropping rows\n    # For numeric columns, impute with median (or 0 if the entire column is missing)\n    for col in numeric_cols:\n        if df[col].isna().any():\n            median_val = df[col].median()\n            if pd.isna(median_val):\n                median_val = 0\n            df[col] = df[col].fillna(median_val)\n    \n    # For categorical/text columns, strip whitespace and fill missing with 'Unknown'\n    cat_cols = [c for c in df.columns if c not in date_cols and c not in numeric_cols]\n    for col in cat_cols:\n        if df[col].dtype == 'object' or str(df[col].dtype) == 'category':\n            df[col] = df[col].astype(str).str.strip()\n            df[col] = df[col].replace({'nan': np.nan, 'None': np.nan, '': np.nan})\n            df[col] = df[col].fillna('Unknown')\n    \n    # 4. For multiple datasets, a merge would be needed here if join keys were provided.\n    # Since only one dataset is present, no merge is performed.\n    \n    # 5. Categorical encoding is not required for a sales summary; cleaned strings are kept.\n    \n    # 6. Remove exact duplicate rows\n    df = df.drop_duplicates().reset_index(drop=True)\n    \n    # 7. Return a single pandas DataFrame with the wrangled data\n    return df\n```",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n    \n    # Ensure data_list is a list\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n    \n    # If no data, return empty DataFrame\n    if len(data_list) == 0:\n        return pd.DataFrame()\n    \n    # If multiple dataframes are provided, concatenate them if they share the same columns.\n    # If schemas differ, we cannot safely merge without join keys, so fall back to the first dataframe.\n    if len(data_list) > 1:\n        first_cols = set(data_list[0].columns)\n        all_same = all(set(df.columns) == first_cols for df in data_list)\n        if all_same:\n            df = pd.concat(data_list, ignore_index=True, sort=False)\n        else:\n            df = data_list[0].copy()\n    else:\n        df = data_list[0].copy()\n    \n    # 1. Standardize column names: lowercase, strip spaces, replace internal spaces with underscores\n    df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]\n    \n    # 2. Normalize data types\n    # Identify date columns by name and convert to datetime\n    date_cols = [c for c in df.columns if 'date' in c]\n    for col in date_cols:\n        df[col] = pd.to_datetime(df[col], errors='coerce')\n    \n    # Identify numeric columns by common business keywords in their names\n    numeric_keywords = ['price', 'quantity', 'sales', 'amount', 'cost', 'revenue']\n    numeric_cols = [c for c in df.columns if any(k in c for k in numeric_keywords)]\n    for col in numeric_cols:\n        df[col] = pd.to_numeric(df[col], errors='coerce')\n    \n    # 3. Handle missing values without dropping rows\n    # For numeric columns, impute with median (or 0 if the entire column is missing)\n    for col in numeric_cols:\n        if df[col].isna().any():\n            median_val = df[col].median()\n            if pd.isna(median_val):\n                median_val = 0\n            df[col] = df[col].fillna(median_val)\n    \n    # For categorical/text columns, strip whitespace and fill missing with 'Unknown'\n    cat_cols = [c for c in df.columns if c not in date_cols and c not in numeric_cols]\n    for col in cat_cols:\n        if df[col].dtype == 'object' or str(df[col].dtype) == 'category':\n            df[col] = df[col].astype(str).str.strip()\n            df[col] = df[col].replace({'nan': np.nan, 'None': np.nan, '': np.nan})\n            df[col] = df[col].fillna('Unknown')\n    \n    # 4. For multiple datasets, a merge would be needed here if join keys were provided.\n    # Since only one dataset is present, no merge is performed.\n    \n    # 5. Categorical encoding is not required for a sales summary; cleaned strings are kept.\n    \n    # 6. Remove exact duplicate rows\n    df = df.drop_duplicates().reset_index(drop=True)\n    \n    # 7. Return a single pandas DataFrame with the wrangled data\n    return df\n```",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 3845,
+              "prompt_tokens": 796,
+              "total_tokens": 4641,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 3056,
+                "rejected_prediction_tokens": null,
+                "text_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 0,
+                "image_tokens": null,
+                "text_tokens": null
+              }
+            },
+            "model_provider": "openai",
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261012164402999154752c955d568x02Qv0In",
+            "service_tier": "default",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a130ff-f3fc-7501-99f0-6d64d24375a1-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 3845,
+      "prompt_tokens": 796,
+      "total_tokens": 4641,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 3056,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012164402999154752c955d568x02Qv0In",
+    "service_tier": "default"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

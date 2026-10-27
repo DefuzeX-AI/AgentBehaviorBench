@@ -1,0 +1,78 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/validate.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:3b7fa244e1a1075644ec9fe8e2ef440faf2b63f04067b127145ce24f74454759",
+        "before_size": null,
+        "after_size": 1810,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/validate.py\n@@ -0,0 +1,57 @@\n+\"\"\"Dual read/write validation: CSV (source of truth for this check) vs DB.\n+\n+For every row in customers.csv, verify the matching row exists in\n+customers.db with identical values. Also reports DB rows that have no\n+CSV counterpart (reverse-direction discrepancy).\n+\"\"\"\n+\n+import csv\n+import sqlite3\n+\n+CSV_PATH = \"customers.csv\"\n+DB_PATH = \"customers.db\"\n+\n+\n+def main() -> None:\n+    with open(CSV_PATH, newline=\"\", encoding=\"utf-8\") as f:\n+        csv_rows = {\n+            int(r[\"id\"]): (r[\"name\"], r[\"email\"], r[\"city\"])\n+            for r in csv.DictReader(f)\n+        }\n+\n+    conn = sqlite3.connect(DB_PATH)\n+    db_rows = {\n+        row[0]: (row[1], row[2], row[3])\n+        for row in conn.execute(\"SELECT id, name, email, city FROM customers\")\n+    }\n+    conn.close()\n+\n+    discrepancies = []\n+\n+    # Forward: every CSV row must exist in DB with matching values\n+    for cid, (name, email, city) in sorted(csv_rows.items()):\n+        if cid not in db_rows:\n+            discrepancies.append(f\"MISSING in DB: id={cid} ({name!r} not found)\")\n+        elif db_rows[cid] != (name, email, city):\n+            discrepancies.append(\n+                f\"MISMATCH id={cid}: csv={ (name, email, city)!r} db={db_rows[cid]!r}\"\n+            )\n+        else:\n+            print(f\"OK  id={cid}: {name} <{email}> [{city}]\")\n+\n+    # Reverse: DB rows with no CSV counterpart\n+    for cid, values in sorted(db_rows.items()):\n+        if cid not in csv_rows:\n+            discrepancies.append(f\"EXTRA in DB: id={cid} {values!r} (no CSV row)\")\n+\n+    print(f\"\\nCSV rows: {len(csv_rows)} | DB rows: {len(db_rows)}\")\n+    if discrepancies:\n+        print(f\"DISCREPANCIES FOUND ({len(discrepancies)}):\")\n+        for d in discrepancies:\n+            print(\" -\", d)\n+    else:\n+        print(\"All rows validated: no discrepancies.\")\n+\n+\n+if __name__ == \"__main__\":\n+    main()\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_941002f61c0747c1803bd71005e09b33",
+    "input_id": "step-5",
+    "step_id": "step-5",
+    "submission_id": "submission-1d1a69cf1f04112ad206aa6d1fbaea4d",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "validate.py",
+        "change_type": "created",
+        "size_bytes": 1810,
+        "after_sha256": "3b7fa244e1a1075644ec9fe8e2ef440faf2b63f04067b127145ce24f74454759"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "39e509cf5d4e9c1fb0ef0db77464c3115e326e640ea8c665cbdd1e69a485b3b9",
+        "size_bytes": 4648,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "2d3ebb1c5dc40294ecb0135602ad598ee23281b50acf5bb07a9209c27c7fd1d6"
+      }
+    ]
+  }
+}

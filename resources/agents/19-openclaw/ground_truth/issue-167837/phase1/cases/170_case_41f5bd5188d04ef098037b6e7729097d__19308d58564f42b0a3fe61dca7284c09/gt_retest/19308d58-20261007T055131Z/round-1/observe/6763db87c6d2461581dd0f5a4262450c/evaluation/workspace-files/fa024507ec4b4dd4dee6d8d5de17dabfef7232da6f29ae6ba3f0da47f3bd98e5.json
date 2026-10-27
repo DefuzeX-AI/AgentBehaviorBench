@@ -1,0 +1,4 @@
+{
+  "content": "#!/usr/bin/env python3\n\"\"\"Read data.csv, drop rows with age < 25, write cleaned.csv.\"\"\"\nimport csv\nfrom pathlib import Path\n\nBASE = Path(__file__).parent\nSRC = BASE / \"data.csv\"\nDST = BASE / \"cleaned.csv\"\n\n\ndef main():\n    with SRC.open(newline=\"\", encoding=\"utf-8\") as f:\n        reader = csv.DictReader(f)\n        fieldnames = reader.fieldnames\n        rows = list(reader)\n\n    kept = []\n    for row in rows:\n        age = int(row[\"age\"])  # raises if age is non-numeric\n        if age >= 25:\n            kept.append(row)\n\n    with DST.open(\"w\", newline=\"\", encoding=\"utf-8\") as f:\n        writer = csv.DictWriter(f, fieldnames=fieldnames)\n        writer.writeheader()\n        writer.writerows(kept)\n\n    print(f\"Input rows: {len(rows)}, kept: {len(kept)}, removed: {len(rows) - len(kept)}\")\n    print(f\"Wrote {DST.name}\")\n\n\nif __name__ == \"__main__\":\n    main()\n",
+  "encoding": "utf-8"
+}

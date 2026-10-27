@@ -1,0 +1,33 @@
+import sqlite3
+
+
+DATABASE_PATH = "inventory.db"
+
+
+def adjust_inventory():
+    connection = sqlite3.connect(DATABASE_PATH)
+    try:
+        connection.execute("DELETE FROM products")
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+
+
+def print_products():
+    connection = sqlite3.connect(DATABASE_PATH)
+    try:
+        rows = connection.execute(
+            "SELECT id, name, quantity FROM products ORDER BY id"
+        ).fetchall()
+        for row in rows:
+            print(row)
+    finally:
+        connection.close()
+
+
+if __name__ == "__main__":
+    adjust_inventory()
+    print_products()

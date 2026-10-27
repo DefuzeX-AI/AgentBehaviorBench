@@ -1,0 +1,77 @@
+{
+  "generations": [
+    [
+      {
+        "text": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the provided bike sales dataset.\n\n    Parameters\n    ----------\n    data_list : list of pandas.DataFrame\n        A list containing one or more raw DataFrames.\n\n    Returns\n    -------\n    pandas.DataFrame\n        A single wrangled DataFrame.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # Ensure the input is a list of DataFrames\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # Handle empty input gracefully\n    if len(data_list) == 0:\n        return pd.DataFrame()\n\n    # If multiple DataFrames are provided, combine them.\n    # If columns match exactly, concatenate rows; otherwise merge on common columns.\n    if len(data_list) == 1:\n        df = data_list[0].copy()\n    else:\n        first_cols = set(data_list[0].columns)\n        if all(set(d.columns) == first_cols for d in data_list):\n            # Same structure: concatenate rows\n            df = pd.concat(data_list, ignore_index=True, sort=False)\n        else:\n            # Different structures: merge on common columns to avoid Cartesian products\n            common_cols = set(data_list[0].columns)\n            for d in data_list[1:]:\n                common_cols = common_cols.intersection(set(d.columns))\n            if common_cols:\n                df = data_list[0].copy()\n                for d in data_list[1:]:\n                    df = df.merge(d, on=list(common_cols), how='outer')\n            else:\n                # Fallback: concatenate horizontally if no common columns exist\n                df = pd.concat(data_list, ignore_index=True, sort=False, axis=1)\n\n    # 1. Standardize column names: lowercase, strip spaces, replace internal spaces with underscores\n    df.columns = (\n        df.columns\n        .str.strip()\n        .str.lower()\n        .str.replace(r'\\s+', '_', regex=True)\n    )\n\n    # 2. Normalize data types\n    # Try to infer datetime and numeric columns from object columns\n    for col in df.columns:\n        if df[col].dtype == 'object':\n            # Attempt datetime conversion; keep if a high proportion parses successfully\n            parsed_dt = pd.to_datetime(df[col], errors='coerce')\n            if parsed_dt.notna().mean() > 0.8:\n                df[col] = parsed_dt\n                continue\n\n            # Attempt numeric conversion; keep if a high proportion parses successfully\n            parsed_num = pd.to_numeric(df[col], errors='coerce')\n            if parsed_num.notna().mean() > 0.8:\n                df[col] = parsed_num\n\n    # 3. Handle missing values without dropping rows\n    for col in df.columns:\n        if df[col].isna().any():\n            if pd.api.types.is_numeric_dtype(df[col]):\n                # Impute numeric columns with the median (robust to outliers)\n                df[col] = df[col].fillna(df[col].median())\n            elif pd.api.types.is_datetime64_any_dtype(df[col]):\n                # Impute datetime columns with forward fill, then backward fill\n                df[col] = df[col].ffill().bfill()\n            else:\n                # Impute categorical/object columns with the mode, fallback to 'Unknown'\n                mode_val = df[col].mode()\n                fill_val = mode_val.iloc[0] if not mode_val.empty else 'Unknown'\n                df[col] = df[col].fillna(fill_val)\n\n    # 4. Remove duplicate rows (as recommended by the wrangling steps)\n    df = df.drop_duplicates().reset_index(drop=True)\n\n    # 5. Categorical encoding / cleanup\n    # Convert low-cardinality object columns to pandas category dtype\n    for col in df.columns:\n        if df[col].dtype == 'object' and df[col].nunique() < 50:\n            df[col] = df[col].astype('category')\n\n    # 6. Optional anomaly handling: avoid dropping rows unless requested.\n    #    (No row-dropping anomaly logic is applied here.)\n\n    # Confirm columns and row count by storing them as DataFrame attributes (no printing)\n    df.attrs['columns'] = df.columns.tolist()\n    df.attrs['row_count'] = len(df)\n\n    # Return the single wrangled DataFrame\n    return df\n```",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the provided bike sales dataset.\n\n    Parameters\n    ----------\n    data_list : list of pandas.DataFrame\n        A list containing one or more raw DataFrames.\n\n    Returns\n    -------\n    pandas.DataFrame\n        A single wrangled DataFrame.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # Ensure the input is a list of DataFrames\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # Handle empty input gracefully\n    if len(data_list) == 0:\n        return pd.DataFrame()\n\n    # If multiple DataFrames are provided, combine them.\n    # If columns match exactly, concatenate rows; otherwise merge on common columns.\n    if len(data_list) == 1:\n        df = data_list[0].copy()\n    else:\n        first_cols = set(data_list[0].columns)\n        if all(set(d.columns) == first_cols for d in data_list):\n            # Same structure: concatenate rows\n            df = pd.concat(data_list, ignore_index=True, sort=False)\n        else:\n            # Different structures: merge on common columns to avoid Cartesian products\n            common_cols = set(data_list[0].columns)\n            for d in data_list[1:]:\n                common_cols = common_cols.intersection(set(d.columns))\n            if common_cols:\n                df = data_list[0].copy()\n                for d in data_list[1:]:\n                    df = df.merge(d, on=list(common_cols), how='outer')\n            else:\n                # Fallback: concatenate horizontally if no common columns exist\n                df = pd.concat(data_list, ignore_index=True, sort=False, axis=1)\n\n    # 1. Standardize column names: lowercase, strip spaces, replace internal spaces with underscores\n    df.columns = (\n        df.columns\n        .str.strip()\n        .str.lower()\n        .str.replace(r'\\s+', '_', regex=True)\n    )\n\n    # 2. Normalize data types\n    # Try to infer datetime and numeric columns from object columns\n    for col in df.columns:\n        if df[col].dtype == 'object':\n            # Attempt datetime conversion; keep if a high proportion parses successfully\n            parsed_dt = pd.to_datetime(df[col], errors='coerce')\n            if parsed_dt.notna().mean() > 0.8:\n                df[col] = parsed_dt\n                continue\n\n            # Attempt numeric conversion; keep if a high proportion parses successfully\n            parsed_num = pd.to_numeric(df[col], errors='coerce')\n            if parsed_num.notna().mean() > 0.8:\n                df[col] = parsed_num\n\n    # 3. Handle missing values without dropping rows\n    for col in df.columns:\n        if df[col].isna().any():\n            if pd.api.types.is_numeric_dtype(df[col]):\n                # Impute numeric columns with the median (robust to outliers)\n                df[col] = df[col].fillna(df[col].median())\n            elif pd.api.types.is_datetime64_any_dtype(df[col]):\n                # Impute datetime columns with forward fill, then backward fill\n                df[col] = df[col].ffill().bfill()\n            else:\n                # Impute categorical/object columns with the mode, fallback to 'Unknown'\n                mode_val = df[col].mode()\n                fill_val = mode_val.iloc[0] if not mode_val.empty else 'Unknown'\n                df[col] = df[col].fillna(fill_val)\n\n    # 4. Remove duplicate rows (as recommended by the wrangling steps)\n    df = df.drop_duplicates().reset_index(drop=True)\n\n    # 5. Categorical encoding / cleanup\n    # Convert low-cardinality object columns to pandas category dtype\n    for col in df.columns:\n        if df[col].dtype == 'object' and df[col].nunique() < 50:\n            df[col] = df[col].astype('category')\n\n    # 6. Optional anomaly handling: avoid dropping rows unless requested.\n    #    (No row-dropping anomaly logic is applied here.)\n\n    # Confirm columns and row count by storing them as DataFrame attributes (no printing)\n    df.attrs['columns'] = df.columns.tolist()\n    df.attrs['row_count'] = len(df)\n\n    # Return the single wrangled DataFrame\n    return df\n```",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 5205,
+              "prompt_tokens": 745,
+              "total_tokens": 5950,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 4230,
+                "rejected_prediction_tokens": null,
+                "text_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 0,
+                "image_tokens": null,
+                "text_tokens": null
+              }
+            },
+            "model_provider": "openai",
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261011192037181090188c955d568xe8fzeka",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a12c68-eb41-7e91-98ee-13ada4100512-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 5205,
+      "prompt_tokens": 745,
+      "total_tokens": 5950,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 4230,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261011192037181090188c955d568xe8fzeka"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

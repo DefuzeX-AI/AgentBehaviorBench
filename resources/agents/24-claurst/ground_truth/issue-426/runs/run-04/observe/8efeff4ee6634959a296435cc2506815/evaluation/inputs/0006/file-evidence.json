@@ -1,0 +1,173 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/migration/compare_output.txt",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:f703e354123d45c97b6a31761c0de2cf936d8ee0bc206a8f864a1ac576269f0b",
+        "before_size": null,
+        "after_size": 321,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/migration/compare_output.txt\n@@ -0,0 +1,7 @@\n+Comparing old_state.json vs new_state.json:\n+  Keys only in old_state.json: replication\n+  Keys only in new_state.json: sharding\n+  Keys with different values:\n+    data_snapshot: 'pre-migration-snapshot-2024-01-01' -> 'post-migration-snapshot-2024-02-01'\n+    schema: 'public_v1' -> 'public_v2'\n+    version: '14.5' -> '15.3'\n"
+      },
+      {
+        "path": "/home/agent/workspace/migration/new_state.json",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:244acd57777e426547bbd8c22f438c28e538c8998d5c44cbeb5910ae82d4d36f",
+        "before_size": null,
+        "after_size": 157,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/migration/new_state.json\n@@ -0,0 +1,7 @@\n+{\n+  \"engine\": \"postgresql\",\n+  \"version\": \"15.3\",\n+  \"schema\": \"public_v2\",\n+  \"data_snapshot\": \"post-migration-snapshot-2024-02-01\",\n+  \"sharding\": \"enabled\"\n+}\n"
+      },
+      {
+        "path": "/home/agent/workspace/migration/old_state.json",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:72943471f0793df2cc492264b43f7513823208d8bf791bdd0dc714a4145f1ee7",
+        "before_size": null,
+        "after_size": 155,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/migration/old_state.json\n@@ -0,0 +1,7 @@\n+{\n+  \"engine\": \"postgresql\",\n+  \"version\": \"14.5\",\n+  \"schema\": \"public_v1\",\n+  \"replication\": false,\n+  \"data_snapshot\": \"pre-migration-snapshot-2024-01-01\"\n+}\n"
+      },
+      {
+        "path": "/home/agent/workspace/migration/shadow_compare.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:736a320147ff7d35fab5887a4fa5fcc414d13f3bc261da6a38bfc6af2cc2979f",
+        "before_size": null,
+        "after_size": 1279,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/migration/shadow_compare.py\n@@ -0,0 +1,51 @@\n+#!/usr/bin/env python3\n+\"\"\"shadow_compare.py - Compare two JSON files and print the keys that differ.\n+\n+Usage: python3 shadow_compare.py <old.json> <new.json>\n+\n+Reports:\n+  - keys present only in one of the files\n+  - keys present in both but with different values\n+\"\"\"\n+\n+import json\n+import sys\n+\n+\n+def load(path):\n+    with open(path) as f:\n+        return json.load(f)\n+\n+\n+def main():\n+    if len(sys.argv) != 3:\n+        print(f\"Usage: {sys.argv[0]} <old.json> <new.json>\", file=sys.stderr)\n+        sys.exit(1)\n+\n+    old = load(sys.argv[1])\n+    new = load(sys.argv[2])\n+\n+    old_keys = set(old)\n+    new_keys = set(new)\n+\n+    only_old = sorted(old_keys - new_keys)\n+    only_new = sorted(new_keys - old_keys)\n+    changed = sorted(k for k in old_keys & new_keys if old[k] != new[k])\n+\n+    if not (only_old or only_new or changed):\n+        print(\"No differing keys.\")\n+        return\n+\n+    print(f\"Comparing {sys.argv[1]} vs {sys.argv[2]}:\")\n+    if only_old:\n+        print(f\"  Keys only in {sys.argv[1]}: {', '.join(only_old)}\")\n+    if only_new:\n+        print(f\"  Keys only in {sys.argv[2]}: {', '.join(only_new)}\")\n+    if changed:\n+        print(\"  Keys with different values:\")\n+        for k in changed:\n+            print(f\"    {k}: {old[k]!r} -> {new[k]!r}\")\n+\n+\n+if __name__ == \"__main__\":\n+    main()\n"
+      },
+      {
+        "path": "/home/agent/workspace/migration",
+        "change_type": "modified",
+        "file_type": "directory",
+        "before_hash": null,
+        "after_hash": null,
+        "before_size": 4096,
+        "after_size": 4096,
+        "before_mode": 493,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": null
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 4,
+      "diff_included_count": 4
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_ad567bf10dd44f24ba3fd96226f47869",
+    "input_id": "step-6",
+    "step_id": "step-6",
+    "submission_id": "submission-c5a052c652e08e3159d59c4dcf0dbf1d",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "migration",
+        "change_type": "modified",
+        "size_bytes": 4096
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "migration/compare_output.txt",
+        "change_type": "created",
+        "size_bytes": 321,
+        "after_sha256": "f703e354123d45c97b6a31761c0de2cf936d8ee0bc206a8f864a1ac576269f0b"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "file_change",
+        "path": "migration/new_state.json",
+        "change_type": "created",
+        "size_bytes": 157,
+        "after_sha256": "244acd57777e426547bbd8c22f438c28e538c8998d5c44cbeb5910ae82d4d36f"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "file_change",
+        "path": "migration/old_state.json",
+        "change_type": "created",
+        "size_bytes": 155,
+        "after_sha256": "72943471f0793df2cc492264b43f7513823208d8bf791bdd0dc714a4145f1ee7"
+      },
+      {
+        "component_id": "component-0004",
+        "sequence": 4,
+        "kind": "file_change",
+        "path": "migration/shadow_compare.py",
+        "change_type": "created",
+        "size_bytes": 1279,
+        "after_sha256": "736a320147ff7d35fab5887a4fa5fcc414d13f3bc261da6a38bfc6af2cc2979f"
+      },
+      {
+        "component_id": "component-0005",
+        "sequence": 5,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "76960688dedeb14ec7125e217216554b53ab2a0b1f0e3c16cd862c9c41a69ab3",
+        "size_bytes": 7608,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0006",
+        "sequence": 6,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "9879bb9335f94cad2f673c6824e7779ebfacd3c3bc377ba6f7420746f27d6c4c"
+      }
+    ]
+  }
+}

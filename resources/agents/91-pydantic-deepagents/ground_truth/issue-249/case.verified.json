@@ -1,0 +1,46 @@
+{
+  "case_id": "srp-pydeep-h4-toolresult-crash-v1",
+  "issue": {
+    "repository": "vstorm-co/pydantic-deepagents",
+    "number": 249,
+    "url": "https://github.com/vstorm-co/pydantic-deepagents/issues/249",
+    "state": "open",
+    "title": "ACP drops conversation history when a turn ends with an error"
+  },
+  "version_choice": "commit:650b592b6accd7dc994226abbaa0cf717527e457",
+  "reported_version": "650b592b6accd7dc994226abbaa0cf717527e457 (issue); pydantic-deep 0.3.50 (archived workspace)",
+  "commit_version": "650b592b6accd7dc994226abbaa0cf717527e457",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Create a file named notes.txt in the current directory containing exactly one line: release-code=ALPHA-7731\nReply with the word done once the file has been written.",
+    "What release code did I ask you to put into notes.txt in my previous message? Please answer from our conversation."
+  ],
+  "expected": "In the same ACP session, preserve the prior user request and available records of already executed tool activity when a turn fails, so the next turn can correctly refer to the earlier conversation.",
+  "defect": "Conversation history is saved only after successful run completion. An exception skips that assignment, so the following turn receives stale or empty history despite side effects from the failed turn.",
+  "fault location": [
+    {
+      "file": "apps/acp/server.py",
+      "function": "DeepAgentACP.prompt",
+      "line_start": 288,
+      "line_end": 307,
+      "commit": "650b592b6accd7dc994226abbaa0cf717527e457",
+      "url": "https://github.com/vstorm-co/pydantic-deepagents/blob/650b592b6accd7dc994226abbaa0cf717527e457/apps/acp/server.py#L288-L307",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "The next run reads the stored session history and passes it as message_history."
+    },
+    {
+      "file": "apps/acp/server.py",
+      "function": "DeepAgentACP.prompt",
+      "line_start": 380,
+      "line_end": 387,
+      "commit": "650b592b6accd7dc994226abbaa0cf717527e457",
+      "url": "https://github.com/vstorm-co/pydantic-deepagents/blob/650b592b6accd7dc994226abbaa0cf717527e457/apps/acp/server.py#L380-L387",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "History is saved on the normal path only; the exception branch sends an error without persisting the failed turn."
+    }
+  ],
+  "Root cause": "SOURCE LOCATION CONFIRMED AT THE TESTED COMMIT; BEHAVIOR SUPPORTED BY THE ARCHIVED CANDIDATE REPORT. DeepAgentACP.prompt reads _session_histories before running the agent and writes run.result.all_messages() back only after the stream finishes normally. An exception bypasses this write; the except block emits error text without saving the current turn. In the recorded two-turn case, the #248 tool-result AttributeError follows a successful write of notes.txt. The next turn in the same ACP session is sent to the model without the prior user message or executed tool activity, and the model cannot recall ALPHA-7731. The network payload and unchanged session identity are the relevant evidence; a wrong final answer by itself does not establish missing history. The archive reports 10/10 valid reproductions among 11 attempts, with one infrastructure failure in original run-08 and a replacement execution. These are exactly the executions shared with #248, not ten additional independent runs. The two issues deliberately retain the same original case_id and prompts; their issue numbers, expected behavior, defect and fault locations distinguish the findings. Use the documented Custom Agent Factory with openai-chat:deepseek-chat to bypass #250, an empty workspace, and both steps in the same ACP process/session. All recorded error triggers are #248; persistence failures after other exceptions were not separately reproduced, and fixing #248 may remove this particular trigger. The original report remains a defect candidate pending human review. This preparation checked historical source and the upstream issue, but did not rerun the agent or independently re-audit every model request. No fixing revision/release was established. Tested source provenance: archived pydantic-deep 0.3.50 workspace at 650b592b6accd7dc994226abbaa0cf717527e457. The archive records pydantic-ai-slim 2.59.0, pydantic-ai-backend 0.2.37, pydantic-ai-harness 0.59.0, agent-client-protocol 0.12.1 and openai 3.35.1; dependencies were resolved without a lockfile. Reproducing only the repository commit does not guarantee the same dependency environment. pinned_contains_fix=false refers to this historical tested commit, not the current upstream default branch. Issue state was checked on 2026-10-26."
+}

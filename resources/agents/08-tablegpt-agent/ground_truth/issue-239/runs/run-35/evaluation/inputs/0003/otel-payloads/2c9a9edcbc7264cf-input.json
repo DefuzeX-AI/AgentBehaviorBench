@@ -1,0 +1,3 @@
+{
+  "query": "# what I'll run once the envelope exists (schema-agnostic stub)\nfrom datetime import datetime, timezone\n\nnow = datetime.now(timezone.utc)          # system clock\nissued  = datetime.fromisoformat(envelope['issued_at'].replace('Z', '+00:00'))\nexpires = datetime.fromisoformat(envelope['expires_at'].replace('Z', '+00:00'))\n\nfresh = issued <= now <= expires\nprint(\"now:\", now, \"| issued:\", issued, \"| expires:\", expires)\nprint(\"FRESH\" if fresh else \"NOT FRESH\",\n      \"\" if fresh else (\"(expired)\" if now > expires else \"(not yet valid)\"))"
+}

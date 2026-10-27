@@ -1,0 +1,37 @@
+{
+ "agent": "mastracode",
+ "defect": "Mastra Code's observational-memory observer call completing mid-turn makes mastracode end the active ACP prompt with stopReason 'cancelled', drop its in-flight model request and exit the ACP server process, losing the user's task and all later steps of the session.",
+ "expected_behavior": "Finish every turn; an observational-memory observer call completing in the background must not end the active ACP prompt or terminate the ACP server.",
+ "observed_behavior": "Reproduced in 2 of 2 rounds on source 4206a2f7fe08. In both rounds, in step-3 (the same step as the original run), 0.35-0.61 s after an OM observer call returned 200, mastracode ended the prompt with stopReason cancelled ('ACP Agent cancelled the prompt'). Steps 4-9 (six steps) then failed with 'ACP adapter is closed'. No upstream error.",
+ "rounds": [
+  {
+   "retest_dir": "mastracode/8f066f51-20261007T160441Z",
+   "round": "round-1",
+   "observe_id": "0c756624283c4586aef86dde3917dd24",
+   "source_sha12": "4206a2f7fe08",
+   "reproduced": true,
+   "judge_detected": true,
+   "evidence": "step-3: after 5 tool calls (view test.sh 16:17:58.341) the main call 16:17:58.377 returned 200 at 16:18:16.119; OM call (16:17:44.248, 32 s) returned 200 at 16:18:15.754; 16:18:16.363 stopReason=cancelled + 'ACP Agent cancelled the prompt' (0.61 s after OM); steps 4-9 'ACP adapter is closed'. Judge issue: steps 4-9 not executed / 'ended in blocked/error states' (it flags the loss, not the cause).",
+   "gt_usable": true
+  },
+  {
+   "retest_dir": "mastracode/8f066f51-20261007T160441Z",
+   "round": "round-2",
+   "observe_id": "b2b07e59c8554a1684d0076553c27684",
+   "source_sha12": "4206a2f7fe08",
+   "reproduced": true,
+   "judge_detected": true,
+   "evidence": "step-3: after 11 tool calls (execute_command tests PASS 16:28:49.313) the main call opened at 16:28:49.345; OM call (16:28:20.503, 40 s) returned 200 at 16:29:00.232; 0.35 s later, 16:29:00.579, stopReason=cancelled + 'ACP Agent cancelled the prompt'; main call 'Client disconnected.' 16:29:00.577. Steps 4-9 'ACP adapter is closed'. Judge issue: steps 4-5 produced no implementation (it flags the loss, not the cause).",
+   "gt_usable": true
+  }
+ ],
+ "next": "package",
+ "reviewed_at": "2026-10-07",
+ "note": "Same root defect as 50fd5500; package together. The Judge flags the missing steps but not the agent self-cancel, so judge_detected is true only in a weak sense. | 2026-10-13: added to GT PR #323 as defect mastracode-8f066f51.",
+ "summary": "reproduced 2/2 on 4206a2f7fe08",
+ "reproduction_rate": "2 of 2 valid rounds on this source (4206a2f7fe08)",
+ "package_obs": [
+  "/home/wy/projects/DefuzeX/test/temp/gt_retest/out/p215_gt_retest/mastracode/8f066f51-20261007T160441Z:1",
+  "/home/wy/projects/DefuzeX/test/temp/gt_retest/out/p215_gt_retest/mastracode/8f066f51-20261007T160441Z:2"
+ ]
+}

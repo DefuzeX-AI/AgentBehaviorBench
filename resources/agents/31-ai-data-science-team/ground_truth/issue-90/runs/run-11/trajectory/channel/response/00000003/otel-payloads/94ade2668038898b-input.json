@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n\n    Goal: Aggregate daily total extended_sales over time for the full year 2021.\n\n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # ------------------------------------------------------------------\n    # Step 0: If incoming data is not a list, convert it to a list first\n    # ------------------------------------------------------------------\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # ------------------------------------------------------------------\n    # Step 1: Inspect and standardize column names (lowercase, strip spaces)\n    # ------------------------------------------------------------------\n    cleaned_frames = []\n    for df in data_list:\n        temp = df.copy()\n        temp.columns = [str(col).strip().lower() for col in temp.columns]\n        cleaned_frames.append(temp)\n\n    # ------------------------------------------------------------------\n    # Step 2: Combine multiple datasets (same schema) via concat.\n    #         Concatenation avoids Cartesian products that a blind merge\n    #         would produce on non-keyed data.\n    # ------------------------------------------------------------------\n    data = pd.concat(cleaned_frames, ignore_index=True)\n\n    # ------------------------------------------------------------------\n    # Identify key columns dynamically from the data structure and the\n    # user's instruction (aggregate 'extended_sales' by 'date').\n    # ------------------------------------------------------------------\n    date_col = next((c for c in data.columns if 'date' in c), None)\n\n    if 'extended_sales' in data.columns:\n        sales_col = 'extended_sales'\n    else:\n        # Fallback: find a column whose name contains both 'extended' and 'sales'\n        sales_col = next(\n            (c for c in data.columns if 'extended' in c and 'sales' in c),\n            None,\n        )\n\n    # ------------------------------------------------------------------\n    # Step 2 (cont.): Normalize data types\n    # ------------------------------------------------------------------\n    # Convert the date column from string to datetime\n    if date_col is not None:\n        data[date_col] = pd.to_datetime(data[date_col], errors='coerce')\n\n    # Coerce object (string) columns into numeric dtype when they are\n    # overwhelmingly numeric (e.g., price-like columns stored as text)\n    for col in data.columns:\n        if col in (date_col, sales_col):\n            continue\n        if data[col].dtype == object:\n            coerced = pd.to_numeric(data[col], errors='coerce')\n            # Only convert if at least 90% of values parse as numbers,\n            # otherwise leave as categorical/text\n            if coerced.notna().sum() > 0 and coerced.notna().mean() >= 0.9:\n                data[col] = coerced\n            else:\n                # Clean up categorical text (strip whitespace)\n                data[col] = data[col].astype(str).str.strip()\n\n    # Ensure the sales measure is numeric (coerce bad values to NaN)\n    if sales_col is not None:\n        data[sales_col] = pd.to_numeric(data[sales_col], errors='coerce')\n\n    # ------------------------------------------------------------------\n    # Step 3: Handle missing values by flagging (no row dropping)\n    # ------------------------------------------------------------------\n    # Flag rows with missing sales values; the sum aggregation naturally\n    # ignores NaN, so no data rows need to be dropped.\n    if sales_col is not None:\n        data['missing_sales_flag'] = data[sales_col].isna().astype(int)\n\n    # ------------------------------------------------------------------\n    # Step 4: Remove exact duplicate records (identical across all columns)\n    #         This removes obvious anomalies without dropping legitimate rows.\n    # ------------------------------------------------------------------\n    data = data.drop_duplicates().reset_index(drop=True)\n\n    # ------------------------------------------------------------------\n    # Core task: filter to the full year 2021 and aggregate daily totals\n    # ------------------------------------------------------------------\n    if date_col is not None and sales_col is not None:\n        # Keep only records within 2021\n        yearly = data[data[date_col].dt.year == 2021]\n\n        # Group by date and sum extended_sales to get daily totals\n        daily_sales = (\n            yearly\n            .groupby(date_col, as_index=False)[sales_col]\n            .sum()\n            .sort_values(date_col)\n            .rename(columns={date_col: 'date', sales_col: 'total_extended_sales'})\n        )\n\n        # ------------------------------------------------------------------\n        # Ensure a continuous daily calendar spanning the full year 2021.\n        # Days with no recorded sales are filled with 0 so the output series\n        # covers every day of the year (365 rows).\n        # ------------------------------------------------------------------\n        full_calendar = pd.DataFrame({\n            'date': pd.date_range(start='2021-01-01', end='2021-12-31', freq='D')\n        })\n        daily_sales = full_calendar.merge(daily_sales, on='date', how='left')\n        daily_sales['total_extended_sales'] = (\n            daily_sales['total_extended_sales'].fillna(0)\n        )\n\n        # Ensure a clean, sorted daily time series\n        daily_sales = daily_sales.sort_values('date').reset_index(drop=True)\n\n        data_wrangled = daily_sales\n    else:\n        # Fallback: if key columns cannot be identified, return the cleaned data\n        data_wrangled = data\n\n    # Return a single pandas DataFrame\n    return data_wrangled\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 3398,
+      "prompt_tokens": 737,
+      "total_tokens": 4135,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 2279,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "glm-5.3-flash",
+    "system_fingerprint": null,
+    "id": "20261020120734b3ff0f786bb44189",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a1577e-42c2-71c1-9023-7a03f3448036-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 737,
+    "output_tokens": 3398,
+    "total_tokens": 4135,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 2279
+    }
+  }
+}

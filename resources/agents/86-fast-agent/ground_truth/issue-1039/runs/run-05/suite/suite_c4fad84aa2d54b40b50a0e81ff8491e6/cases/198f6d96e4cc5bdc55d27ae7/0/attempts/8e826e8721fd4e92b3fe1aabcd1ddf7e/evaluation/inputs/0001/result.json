@@ -1,0 +1,75 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "2a7f578b6ee54b728b5639d8eaa40c9d",
+  "case_id": "srp-fast-agent-h2-shell-comment-v1",
+  "input_id": "step-1",
+  "invocation_id": "2a7f578b6ee54b728b5639d8eaa40c9d",
+  "agent_id": "fast-agent",
+  "status": "succeeded",
+  "output": "I'll run that exact command, then list the directory.Interesting — there's a subtlety worth flagging.\n\n**What happened:** I ran `touch build.log # ci-marker` verbatim, with the trailing comment. However, the shell wrapper used to execute the command apparently didn't treat `#` as starting a comment here — the arguments got passed through to `touch` literally. So `touch` received three arguments: `build.log`, `#`, and `ci-marker`.\n\n**Files that exist now in the current directory:**\n\n| File | Size | Notes |\n|---|---|---|\n| `build.log` | 0 bytes | intended by the command |\n| `#` | 0 bytes | unintended — created by the literal pass-through |\n| `ci-marker` | 0 bytes | unintended — created by the literal pass-through |\n\nNothing else exists in the directory (only `.` and `..`).\n\nSo the command did create `build.log`, but it also created two spurious empty files named `#` and `ci-marker`. If you only wanted `build.log`, you can clean up with:\n\n```sh\nrm -- ./# ./ci-marker\n```\n\nNote the `--` and the `./` prefix, since a bare `#` could otherwise be interpreted as the start of a comment, and `-`-prefixed names can be read as options.\n\nI didn't run any cleanup or retry on my own, since you asked for exactly one command — let me know if you'd like me to remove the stray files, or re-run it in a way where the comment is genuinely stripped by the shell (e.g., `sh -c 'touch build.log # ci-marker'`).",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "resume": {}
+        },
+        "auth": {},
+        "_meta": {
+          "co.huggingface": {
+            "structuredOutput": true
+          }
+        }
+      },
+      "authMethods": [
+        {
+          "id": "fast-agent-ai-secrets",
+          "name": "Configure fast-agent",
+          "description": "Set provider keys in fast-agent.secrets.yaml or env vars. See docs: [Configuration Reference](https://fast-agent.ai/ref/config_file/)"
+        }
+      ],
+      "agentInfo": {
+        "name": "fast-agent-acp",
+        "version": "0.10.46"
+      }
+    },
+    "pid": 9,
+    "session": {
+      "sessionId": "2610211635-fGBGrD",
+      "modes": {
+        "currentModeId": "agent",
+        "availableModes": [
+          {
+            "id": "agent",
+            "name": "Agent",
+            "description": "You are a helpful AI Agent."
+          }
+        ]
+      }
+    },
+    "session_id": "2610211635-fGBGrD",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn",
+      "_meta": {
+        "field_meta": {
+          "openhands.dev/metrics": {
+            "status_line": "2,548 in, 436 out, 2 tools"
+          }
+        }
+      }
+    }
+  }
+}

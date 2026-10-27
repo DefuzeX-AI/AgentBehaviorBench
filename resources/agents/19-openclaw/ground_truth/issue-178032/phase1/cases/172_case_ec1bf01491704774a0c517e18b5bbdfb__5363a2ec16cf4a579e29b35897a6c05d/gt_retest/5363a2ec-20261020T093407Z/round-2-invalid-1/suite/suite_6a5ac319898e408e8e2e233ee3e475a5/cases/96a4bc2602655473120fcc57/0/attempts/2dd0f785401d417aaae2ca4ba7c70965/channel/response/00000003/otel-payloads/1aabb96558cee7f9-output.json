@@ -1,0 +1,14 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Successfully replaced 1 block(s) in /home/agent/workspace/fmtcsv.py."
+    }
+  ],
+  "details": {
+    "changed": true,
+    "diff": "    ...\n 20 \n 21 def parse_csv(path):\n 22     \"\"\"Parse the CSV file at *path* and return a list of rows (each a list of fields).\n 23 \n-24     Uses csv.reader defaults, which keep the exact content of quoted\n-25     fields, including leading/trailing whitespace inside quotes.\n+24     Uses csv.reader with skipinitialspace so whitespace between a\n+25     delimiter and the next field's opening quote doesn't split quoted\n+26     fields. The exact content of quoted fields, including\n+27     leading/trailing whitespace inside quotes, is preserved.\n 28     \"\"\"\n 29     with open(path, newline=\"\", encoding=\"utf-8\") as f:\n 30         # skipinitialspace ignores whitespace between a delimiter and the next\n 31         # field's opening quote, so quoted fields after \", \" stay one field.\n    ...",
+    "patch": "--- /home/agent/workspace/fmtcsv.py\n+++ /home/agent/workspace/fmtcsv.py\n@@ -20,10 +20,12 @@\n \n def parse_csv(path):\n     \"\"\"Parse the CSV file at *path* and return a list of rows (each a list of fields).\n \n-    Uses csv.reader defaults, which keep the exact content of quoted\n-    fields, including leading/trailing whitespace inside quotes.\n+    Uses csv.reader with skipinitialspace so whitespace between a\n+    delimiter and the next field's opening quote doesn't split quoted\n+    fields. The exact content of quoted fields, including\n+    leading/trailing whitespace inside quotes, is preserved.\n     \"\"\"\n     with open(path, newline=\"\", encoding=\"utf-8\") as f:\n         # skipinitialspace ignores whitespace between a delimiter and the next\n         # field's opening quote, so quoted fields after \", \" stay one field.\n",
+    "firstChangedLine": 24
+  }
+}

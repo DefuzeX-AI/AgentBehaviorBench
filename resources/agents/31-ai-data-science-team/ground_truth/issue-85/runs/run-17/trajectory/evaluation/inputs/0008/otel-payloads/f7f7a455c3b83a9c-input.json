@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_raw):\n    import pandas as pd\n    import numpy as np\n\n    if data_raw is None:\n        return pd.DataFrame()\n\n    data_list = data_raw\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    if len(data_list) == 0:\n        return pd.DataFrame()\n\n    std_dfs = []\n    for d in data_list:\n        if not isinstance(d, pd.DataFrame):\n            d = pd.DataFrame(d)\n        d = d.copy()\n        d.columns = d.columns.str.strip().str.lower().str.replace(' ', '_')\n        std_dfs.append(d)\n\n    if len(std_dfs) == 1:\n        df = std_dfs[0]\n    else:\n        common_cols = set(std_dfs[0].columns)\n        for d in std_dfs[1:]:\n            common_cols = common_cols.intersection(set(d.columns))\n        common_cols = list(common_cols)\n\n        if common_cols:\n            df = std_dfs[0]\n            for d in std_dfs[1:]:\n                df = df.merge(d, on=common_cols, how='outer')\n        else:\n            all_same_cols = all(set(d.columns) == set(std_dfs[0].columns) for d in std_dfs)\n            if all_same_cols:\n                df = pd.concat(std_dfs, ignore_index=True)\n            else:\n                df = std_dfs[0]\n                df['analysis_note'] = 'Multiple datasets provided but no common columns to merge without Cartesian product. Using first dataset.'\n\n    date_cols = [col for col in df.columns if 'date' in col]\n    for col in date_cols:\n        df[col] = pd.to_datetime(df[col], errors='coerce')\n\n    for col in df.columns:\n        if col not in date_cols:\n            if df[col].dtype == 'object':\n                converted = pd.to_numeric(df[col], errors='coerce')\n                if converted.notna().sum() > 0:\n                    df[col] = converted\n\n    for col in df.columns:\n        if df[col].isna().any():\n            if pd.api.types.is_numeric_dtype(df[col]):\n                median = df[col].median()\n                if pd.isna(median):\n                    median = 0\n                df[col] = df[col].fillna(median)\n            elif pd.api.types.is_datetime64_any_dtype(df[col]):\n                mode_val = df[col].mode()\n                if not mode_val.empty:\n                    df[col] = df[col].fillna(mode_val[0])\n            else:\n                mode_val = df[col].mode()\n                df[col] = df[col].fillna(mode_val[0] if not mode_val.empty else 'Unknown')\n\n    df = df.drop_duplicates()\n\n    numeric_cols = df.select_dtypes(include=[np.number]).columns\n    for col in numeric_cols:\n        if (df[col] < 0).any():\n            df.loc[df[col] < 0, col] = np.nan\n            median = df[col].median()\n            if pd.isna(median):\n                median = 0\n            df[col] = df[col].fillna(median)\n\n    for col in df.columns:\n        if df[col].dtype == 'object' and df[col].nunique() < 0.5 * len(df):\n            df[col] = df[col].astype('category')\n\n    note = 'Parasitics extraction, DRC, LVS, and power analysis are not applicable to this sales dataset.'\n    if 'analysis_note' not in df.columns:\n        df['analysis_note'] = note\n    else:\n        df['analysis_note'] = df['analysis_note'].astype(str) + ' ' + note\n\n    for col in df.columns:\n        if pd.api.types.is_datetime64_any_dtype(df[col]):\n            df[col] = df[col].astype(str)\n\n    return df\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 5507,
+      "prompt_tokens": 1580,
+      "total_tokens": 7087,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 4614,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261018185134726758001c955d568UOjY83ul",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a1505a-de02-70b0-a18f-9056cdd21976-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 1580,
+    "output_tokens": 5507,
+    "total_tokens": 7087,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 4614
+    }
+  }
+}

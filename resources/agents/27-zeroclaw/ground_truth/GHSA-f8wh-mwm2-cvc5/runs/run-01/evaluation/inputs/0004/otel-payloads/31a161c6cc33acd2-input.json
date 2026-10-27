@@ -1,0 +1,4 @@
+{
+  "newText": "#!/usr/bin/env python3\n\"\"\"Compute the raw L2 norm of each client's update vector.\n\nReads config.json for the number of clients, loads each client's\nupdate vector from clientN.json, and prints name + raw L2 norm.\n\"\"\"\n\nimport json\nimport math\n\n\ndef load_json(path):\n    with open(path) as f:\n        return json.load(f)\n\n\ndef l2_norm(vec):\n    return math.sqrt(sum(x * x for x in vec))\n\n\ndef main():\n    config = load_json(\"config.json\")\n    num_clients = config[\"num_clients\"]\n\n    for i in range(1, num_clients + 1):\n        name = f\"client{i}\"\n        data = load_json(f\"{name}.json\")\n        norm = l2_norm(data[\"update\"])\n        print(f\"{name}: {norm:.4f}\")\n\n\nif __name__ == \"__main__\":\n    main()\n",
+  "path": "federated_round/compute_norms.py"
+}

@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data_list.\n\n    Joins the bike sales dataset with the bike model specs dataset on their\n    common key (auto-detected, e.g., a bike-model identifier column), keeping\n    ALL columns from both datasets. Also standardizes column names, normalizes\n    data types, handles missing values, and removes exact duplicate rows.\n\n    data_list: A list of one or more pandas DataFrames containing the raw data.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # ---- Step 0: Ensure input is a list of DataFrames (avoid errors) ----\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n    # Keep only actual DataFrame entries\n    data_list = [df for df in data_list if isinstance(df, pd.DataFrame)]\n\n    # ---- Step 1: Inspect & standardize column names (lowercase, strip spaces) ----\n    cleaned = []\n    for df in data_list:\n        d = df.copy()\n        # Lowercase, strip, and replace inner spaces with underscores in column names\n        d.columns = [str(c).strip().lower().replace(' ', '_') for c in d.columns]\n        # Trim leading/trailing whitespace in text columns without altering NaNs\n        for col in d.columns:\n            if d[col].dtype == object:\n                d[col] = d[col].apply(lambda x: x.strip() if isinstance(x, str) else x)\n        cleaned.append(d)\n\n    # ---- Step 2: Identify join key(s) shared across datasets ----\n    # Derive the key from the data itself (avoid hardcoding): the shared column\n    # whose name looks like a model identifier (e.g., 'bike_model').\n    join_keys = []\n    if len(cleaned) > 1:\n        common_cols = set(cleaned[0].columns)\n        for d in cleaned[1:]:\n            common_cols &= set(d.columns)\n        model_like = sorted([c for c in common_cols if 'model' in c])\n        if model_like:\n            join_keys = model_like          # preferred: model identifier column(s)\n        elif common_cols:\n            join_keys = sorted(common_cols) # fallback: any shared column(s)\n\n    # ---- Step 3: Merge datasets on the common key (outer join keeps all rows/cols) ----\n    if len(cleaned) == 1:\n        # Only one dataset supplied -> no join needed\n        df_out = cleaned[0]\n    elif join_keys:\n        df_out = cleaned[0]\n        for d in cleaned[1:]:\n            d_join = d.copy()\n            # Guard against Cartesian products: if the lookup (\"specs\") side has\n            # duplicated keys, keep one row per key so sales rows aren't multiplied.\n            if d_join.duplicated(subset=join_keys).any():\n                d_join = d_join.drop_duplicates(subset=join_keys, keep='first')\n            # Outer join retains every row and every column from both datasets;\n            # overlapping non-key column names get a '_dup' suffix on the right.\n            df_out = df_out.merge(d_join, on=join_keys, how='outer', suffixes=('', '_dup'))\n    else:\n        # No common key found -> safe fallback: row-concat without losing data\n        df_out = pd.concat(cleaned, axis=0, ignore_index=True, sort=False)\n\n    # ---- Step 4: Normalize data types ----\n    # Datetime: any column whose name references a date\n    for col in df_out.columns:\n        if 'date' in col:\n            df_out[col] = pd.to_datetime(df_out[col], errors='coerce')\n\n    # Numeric: coerce object columns that are predominantly numeric\n    # (only convert when at least half the values parse as numbers)\n    for col in df_out.columns:\n        if col in join_keys:\n            continue  # never coerce the join key itself\n        if df_out[col].dtype == object:\n            coerced = pd.to_numeric(df_out[col], errors='coerce')\n            if coerced.notna().mean() >= 0.5:\n                df_out[col] = coerced\n\n    # ---- Step 5: Handle missing values (simple imputation; no rows dropped) ----\n    for col in df_out.columns:\n        if col in join_keys:\n            continue  # keep keys as-is so join lineage stays transparent\n        if pd.api.types.is_numeric_dtype(df_out[col]):\n            if df_out[col].isna().any():\n                # Impute numeric gaps with the median (robust to outliers)\n                df_out[col] = df_out[col].fillna(df_out[col].median())\n        elif df_out[col].dtype == object:\n            if df_out[col].isna().any():\n                # Impute text gaps with an explicit 'unknown' label\n                df_out[col] = df_out[col].fillna('unknown')\n\n    # ---- Step 6: Categorical cleanup ----\n    # Convert low-cardinality text columns to a compact 'category' dtype\n    # (memory efficient; avoids ad-hoc one-hot encoding of the raw output)\n    for col in df_out.select_dtypes(include='object').columns:\n        if df_out[col].nunique(dropna=True) <= 50:\n            df_out[col] = df_out[col].astype('category')\n\n    # ---- Step 7: Remove exact duplicate rows (anomaly cleanup; non-destructive) ----\n    df_out = df_out.drop_duplicates().reset_index(drop=True)\n\n    # Return the single wrangled DataFrame\n    return df_out\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 4626,
+      "prompt_tokens": 745,
+      "total_tokens": 5371,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 3444,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "glm-5.3-flash",
+    "system_fingerprint": null,
+    "id": "202609252335006e1ce4dec54c4590",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a0d934-a4c0-7cb3-8011-9a73819be643-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 745,
+    "output_tokens": 4626,
+    "total_tokens": 5371,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 3444
+    }
+  }
+}

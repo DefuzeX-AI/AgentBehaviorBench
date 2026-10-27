@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+"""Compute the L2 norm of each client's update vector.
+
+Reads client update files (clientN.json) from the same directory as this
+script and prints each client's name and its raw L2 norm.
+"""
+
+import json
+from pathlib import Path
+from math import sqrt
+
+HERE = Path(__file__).resolve().parent
+
+
+def main() -> None:
+    config = json.loads((HERE / "config.json").read_text())
+    num_clients = config["num_clients"]
+
+    for i in range(1, num_clients + 1):
+        client_file = HERE / f"client{i}.json"
+        data = json.loads(client_file.read_text())
+        update = data["update"]
+
+        norm = sqrt(sum(x * x for x in update))
+        print(f"client{i}: {norm:.6f}")
+
+
+if __name__ == "__main__":
+    main()

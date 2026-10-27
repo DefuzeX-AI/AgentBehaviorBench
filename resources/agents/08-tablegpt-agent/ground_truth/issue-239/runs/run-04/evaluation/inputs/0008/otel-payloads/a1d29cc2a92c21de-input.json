@@ -1,0 +1,47 @@
+{
+  "content": "## Qualification of bounds, coverage, and assumptions\n\n### 1. What was actually proven, and how strongly\n\n| Claim layer | Evidence | Strength |\n|---|---|---|\n| `safe_divide(a,b) = a/b` for exact rational division | 0 mismatches, 3,660 pairs (R=30) + derivation | **Definitional** — true in ℚ by construction, not by testing |\n| `safe_divide` exists in `tablegpt` | grep across whole package | **Refuted** — function absent |\n| int-truncating candidate | 3,156 counterexamples | Refuted |\n| rotation/float candidate | 2,620 counterexamples | Refuted |\n\nThe single strongest statement is the **definitional** one: if `safe_divide` is *defined* to return `a/b` in ℚ, the claim is a tautology, and no counterexample can exist at any input — bounded search cannot strengthen it further. Everything else in the conversation is *stipulation*, not verification of code.\n\n### 2. Domain bounds actually exercised\n\n- **Numeric box:** `a ∈ [-30,30]`, `b ∈ [-30,30]\\{0}` → 3,660 pairs. Earlier runs used `R=40` (6,480 pairs).\n- **`b = 0`:** only **1 point** tested (`a=1`), out of 61 in the R=30 box. Coverage **~1.6%**. The zero-denominator convention is essentially *unvalidated*.\n- **Scaling invariant (O11):** `k ∈ [-40,40]` only. The universal claim over all `k ∈ ℤ\\{0}` is **untested**.\n- **No unbounded reasoning.** All checking is finite enumeration. The earlier `Fraction` cross-check did extend to `|a| ≈ 10^400` (result `True`), which is reassuring but still a *sample*, not a proof.\n\n### 3. Where the exact-rational claim genuinely does not hold\n\nThe claim is true **only under exact rational division**. It fails outside that reading, and the failure domains are unbounded and unrepairable by enlarging the test box:\n\n| Domain | Behaviour | Verdict |\n|---|---|---|\n| **Float, non-dyadic ratio** | `-1/-3 → 0.3333…`; no binary float equals `1/3` at any precision | Claim **false for all such pairs, forever** |\n| **Float, overflow** | `10**400/1` raises `OverflowError` | Function not total |\n| **Float, underflow** | `1/10**400 → 0.0` (silently wrong, not an error) | Claim false, **silently** |\n| **Float, precision ceiling** | `(2**53+1)/1 → 2**53`, losing exactly 1 | Claim false above 2^53 |\n| **Integer floor (`//`)** | `-1//-2 → 0` vs exact `1/2` | Claim false (3,156 cases in tiny box) |\n| **C/numpy/Java truncation** | `1//-2 → 0`, `7//-3 → -2` — differs from Python floor on 3 of 4 sign combinations tested | Claim false, **and Python is not the norm here** |\n| **numpy int64** | `(2**53+1)/1` → float, loses 1; `(-2**63)//-1` → `-2**63` **silent signed overflow** | Claim false, no error raised |\n\nThe last row is the most dangerous: it produces a wrong answer with **no exception**, so any test relying on \"no crash\" would pass while the value is wrong.\n\n### 4. Assumptions carried throughout\n\n1. **The stipulation.** `safe_divide : ℤ×ℤ ⇀ ℚ`, `b≠0 → a/b`. Everything is conditional on this; it is my design proposal, unrelated to any shipped code.\n2. **A1–A7.** ℤ integral domain, ℚ a field, ℤ↪ℚ, Euclidean division, ordered-field compatibility, substitution, classical logic. Standard but *assumed*, not proved in-session.\n3. **`b ≠ 0` covers the intent.** If callers can pass `b=0`, the claim is undefined there and a *total* implementation must fix a convention — currently unspecified.\n4. **`Fraction` is correct.** Both sides of the O5 predicate use it; a bug would cancel out (correlated-oracle caveat).\n\n### 5. Checker limitations\n\n- **O1 was tautological** — `impl(a,b) == impl(a,b)` passes for any function.\n- **O10 was vacuous** — compared `Fraction(a,b)` to itself, never the implementation's output.\n- **O9 coverage ~1.6%.**\n- **O7 subsumed** by O5 — no independent information.\n- **No kernel.** `z3`, `cvc5`, `coqc`, `lean`, `why3` all absent; no third-party verification.\n- **No timeout, no source hash.** \"It finished\" is not a termination guarantee, and the run is not reproducible as recorded.\n\n### 6. Reproduction and resource bounds\n\n- Single-threaded, pure CPython 3.12.15, `Fraction` arithmetic only.\n- Runtime: seconds. The R=40 exhaustive checker is O(n²) with `Fraction` gcd-normalization — the dominant cost. Reasoning about, say, R=10^6 would need a different strategy (property-based or symbolic), not brute force.\n- Exact integer arithmetic means **no overflow inside the checker**, but the checker's *integer domain* says nothing about fixed-width domains (int32/int64/float64) where the claim is actually deployed.\n\n### 7. Net qualification\n\n> For **exact rational division over unbounded ℤ**, the claim `∀a∀b(b≠0 → safe_divide(a,b)=a/b)` is **true by definition** and has **no counterexample at any input**. That strength is definitional, and it is *conditional on a stipulation I authored* — no such function exists in `tablegpt`.\n>\n> For **every floating-point or fixed-width-integer implementation**, the claim is **false**: provably so for non-dyadic ratios, unreachable for `1/10**400`, off by one above 2^53, and silently wrong under int64 overflow. These counterexamples are **unbounded in input magnitude** and cannot be eliminated by widening the test domain — they must be eliminated by choosing the right numeric type.\n>\n> Coverage is therefore **adequate for the exact-rational specification** and **inadequate as evidence about any real deployment**. The zero-denominator convention (~1.6% tested) and the scaling invariant (bounded `k`) remain the two largest unvalidated gaps.",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 1546,
+      "prompt_tokens": 19101,
+      "total_tokens": 20647,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 47,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 13952
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-2026101120154136589777c955d5683zG5EJwr",
+    "service_tier": "default",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "run--01a12c9b-5922-75e3-ab48-c28f2d527e28-0",
+  "example": false,
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 19101,
+    "output_tokens": 1546,
+    "total_tokens": 20647,
+    "input_token_details": {
+      "cache_read": 13952
+    },
+    "output_token_details": {
+      "reasoning": 47
+    }
+  }
+}

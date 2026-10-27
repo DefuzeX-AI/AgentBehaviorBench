@@ -1,0 +1,13 @@
+#!/usr/bin/env python3
+"""Check which probabilistic programming engines are available."""
+import importlib
+import sys
+
+print("python", sys.version.split()[0])
+for m in ["pymc", "pymc3", "stan", "cmdstanpy", "numpyro", "pyro",
+          "tensorflow_probability", "jax", "numpy", "scipy", "arviz"]:
+    try:
+        mod = importlib.import_module(m)
+        print(f"{m:24s} OK  {getattr(mod, '__version__', '?')}")
+    except Exception:
+        print(f"{m:24s} --")

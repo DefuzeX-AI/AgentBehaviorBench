@@ -1,0 +1,3 @@
+{
+  "query": "import os, shutil, subprocess\n\n# Look for likely CLI entrypoints in the working directory and common bin paths\nprint(\"CWD:\", os.getcwd())\nprint(\"CWD contents:\", os.listdir(\".\")[:50])\n\nfor name in [\"counter\", \"counter-cli\", \"replicated-counter\", \"rc\", \"counterctl\", \"serve\"]:\n    p = shutil.which(name)\n    if p:\n        print(\"FOUND:\", name, \"->\", p)\n\nprint(\"PATH:\", os.environ.get(\"PATH\"))"
+}

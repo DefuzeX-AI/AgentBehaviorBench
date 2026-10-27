@@ -1,0 +1,245 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "cfc042ef49e9495ba0c811d06e49e18b",
+  "case_id": "case_7401cb01d16a4f7bab03c4ef7b42d760",
+  "input_id": "step-5",
+  "invocation_id": "cfc042ef49e9495ba0c811d06e49e18b",
+  "agent_id": "openclaw",
+  "status": "succeeded",
+  "output": "# Anomaly Analysis — Operation-by-Operation\n\nWorking assumptions (consistent with prior turns): T1 and T2 run **concurrently** off the same T0 snapshot; T3 is read-only; the engine is Snapshot Isolation with first-committer-wins. The anomaly scan covers every candidate, then explains each verdict against the actual operations.\n\n## Scorecard\n\n| Anomaly | Present? | Root operation pattern |\n|---|---|---|\n| Dirty read | **No** | T2.R(A) never sees T1's uncommitted W(A) |\n| Non-repeatable read | **No** | T1.R(A)/T1.R(B) come from one snapshot |\n| Phantom read | **N/A** | No predicate scans, no inserts/deletes |\n| Write skew | **No** | Write sets of concurrent writers *intersect* |\n| Lost update | **Attempted → prevented by abort** | T1.W(A) vs T2.W(A) on the same snapshot version |\n| Read skew / fuzzy read | **No** | T3's R(A),R(B) share one snapshot |\n\n## Explanations\n\n### 1. Dirty read — absent\nThe dangerous pair is **T1.W(A) → T2.R(A)**: if T2 read A *after* T1 wrote it but *before* T1 committed, that's a dirty read, and a later T1 abort would leave T2 corrupted. Under MVCC, T2's snapshot read of A resolves to the **latest committed version A0**, so T1's uncommitted A1 is invisible to it. No transaction ever consumes another's uncommitted data.\n\n### 2. Non-repeatable read — absent\nThe candidate is T1 reading A twice and seeing different values. Here each transaction reads each item at most once, and all reads in a transaction come from a **single snapshot**. Even if T1 did `R(A), R(A)` bracketing T2's commit, SI would return the same version both times. Compare Read Committed, where each read sees the freshest committed value — this history's behavior rules that level out.\n\n### 3. Phantom read — not applicable\nPhantoms require a **predicate/range operation**: a query re-executed and returning a different row set because another transaction inserted/deleted in the range. This history touches only existing items A and B by point lookup — there is nothing to \"appear.\" Listed for completeness; no evidence either way.\n\n### 4. Write skew — absent (structurally impossible here)\nWrite skew requires two concurrent transactions reading the same data and writing **disjoint** items — each write passes FCW, yet the combination violates an invariant (the classic doctors-on-call case: T1 sets A=false, T2 sets B=false, each reading the other's still-true value). Here T1 and T2 both write **A and B**: the write sets intersect ({A,B} ∩ {A,B} ≠ ∅), so the conflict manifests as an ordinary write-write conflict, caught by FCW — no skew-shaped hole remains. This is exactly why *this workload* doesn't demonstrate SI's most famous weakness.\n\n### 5. Lost update — attempted, prevented by abort\nThis is the **decisive event** of the history. The pattern is the classic read-modify-write race:\n\n```\nT1: R(A)=0 ──▶ W(A)=0+1     T2: R(A)=0 ──▶ W(A)=0+1\n```\n\nBoth compute over the same A0, so whichever writes **last** silently overwrites the other's effect — one increment vanishes. The conflict chain in the MVCC graph:\n\n- `T1 →ww(A,B)→ T2` — both version orders A0 < A1(T1) < A2(T2), B0 < B1 < B2\n- `T2 →rw(A,B)→ T1` — T2's reads of A0/B0 are invalidated by T1's next-version installs\n\nTogether: cycle **T1 ⇄ T2** ⇒ if both committed, the history is non-serializable via lost updates on A and B. Snapshot isolation's **first-committer-wins** rule breaks the cycle at commit: when the second writer (say T2) attempts to commit, its write set {A,B} intersects T1's already-committed write set {A,B} → **T2 aborts** and must retry. One increment survives; nothing is lost.\n\n### 6. Read skew / fuzzy read — absent\nThe candidate is **T3.R(A), T3.R(B)** observing a torn state — e.g., an invariant A + B = 100 where T1 updates both items between T3's two reads. Under SI, T3's two reads come from **one snapshot**, so it sees either (A_old, B_old) or (A_new, B_new) — never (A_new, B_old). Note the subtlety: in the graph this still shows up as anti-dependency edges `T3 →rw→ T1` (T3 read the old versions that T1 then overwrote) — legal under SI, and exactly the edge type that would combine into a cycle under write skew. Here it forms no cycle, so T3's view is consistent.\n\n## Bottom Line\n\nThe history contains **one live anomaly event: the T1–T2 write-write conflict (a lost-update attempt) on both A and B**, which snapshot isolation converts into a single abort via FCW. Every read-side anomaly (dirty read, non-repeatable read, read skew) is prevented by snapshot reads; phantom reads don't apply; write skew is impossible because the concurrent write sets intersect. Committed result: T3 plus exactly one of T1/T2 — a serializable outcome (equivalent order T3 → T1), at the cost of one retry.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "openclaw-acp",
+        "title": "OpenClaw ACP Gateway",
+        "version": "2026.9.5"
+      }
+    },
+    "pid": 10,
+    "session": {
+      "sessionId": "0b8d919e-55c8-45a9-8f6a-9522ecd6737f",
+      "modes": {
+        "currentModeId": "adaptive",
+        "availableModes": [
+          {
+            "id": "off",
+            "name": "Off"
+          },
+          {
+            "id": "minimal",
+            "name": "Minimal"
+          },
+          {
+            "id": "low",
+            "name": "Low"
+          },
+          {
+            "id": "medium",
+            "name": "Medium"
+          },
+          {
+            "id": "high",
+            "name": "High"
+          },
+          {
+            "id": "adaptive",
+            "name": "Adaptive",
+            "description": "Use the Gateway session default thought level."
+          }
+        ]
+      },
+      "configOptions": [
+        {
+          "currentValue": "adaptive",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "minimal",
+              "name": "Minimal"
+            },
+            {
+              "value": "low",
+              "name": "Low"
+            },
+            {
+              "value": "medium",
+              "name": "Medium"
+            },
+            {
+              "value": "high",
+              "name": "High"
+            },
+            {
+              "value": "adaptive",
+              "name": "Adaptive"
+            }
+          ],
+          "id": "thought_level",
+          "name": "Thought level",
+          "description": "Controls how much deliberate reasoning OpenClaw requests from the Gateway model.",
+          "category": "thought_level",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "auto",
+              "name": "Auto"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            }
+          ],
+          "id": "fast_mode",
+          "name": "Fast mode",
+          "description": "Controls whether OpenAI sessions use the Gateway fast-mode profile.",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            },
+            {
+              "value": "full",
+              "name": "Full"
+            }
+          ],
+          "id": "verbose_level",
+          "name": "Tool verbosity",
+          "description": "Controls how much tool progress and output detail OpenClaw keeps enabled for the session.",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            }
+          ],
+          "id": "trace_level",
+          "name": "Plugin trace",
+          "description": "Controls whether plugin-owned trace lines are shown for the session.",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            },
+            {
+              "value": "stream",
+              "name": "Stream"
+            }
+          ],
+          "id": "reasoning_level",
+          "name": "Reasoning stream",
+          "description": "Controls whether reasoning-capable models emit reasoning text for the session.",
+          "type": "select"
+        },
+        {
+          "currentValue": "inherit",
+          "options": [
+            {
+              "value": "inherit",
+              "name": "Inherit"
+            },
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "tokens",
+              "name": "Tokens"
+            },
+            {
+              "value": "full",
+              "name": "Full"
+            }
+          ],
+          "id": "response_usage",
+          "name": "Usage detail",
+          "description": "Controls how much usage information OpenClaw attaches to responses for the session. 'inherit' follows the configured default; 'off' explicitly disables it for this session.",
+          "type": "select"
+        },
+        {
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "off",
+              "name": "Off"
+            },
+            {
+              "value": "on",
+              "name": "On"
+            },
+            {
+              "value": "ask",
+              "name": "Ask"
+            },
+            {
+              "value": "full",
+              "name": "Full"
+            }
+          ],
+          "id": "elevated_level",
+          "name": "Elevated actions",
+          "description": "Controls how aggressively the session allows elevated execution behavior.",
+          "type": "select"
+        }
+      ]
+    },
+    "session_id": "0b8d919e-55c8-45a9-8f6a-9522ecd6737f",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "e20169972a0d412d843ddf91b8011cff",
+  "case_id": "case_d196ad98549a4d6288287068c12ac837",
+  "input_id": "step-4",
+  "invocation_id": "e20169972a0d412d843ddf91b8011cff",
+  "agent_id": "zeroclaw",
+  "status": "succeeded",
+  "output": "Delta simulation complete and verified ✅\n\n**1. Simulated the source change**\n- Appended `4,Dan,dan@example.com,Ogdenville` to `customers.csv` (now 4 data rows)\n- Note: the snapshot `customers_snapshot.csv` still has the original 3 rows — it's holding the pre-delta baseline as intended\n\n**2. Captured the delta** (`delta_sync.py`)\n- Logic: read all CSV rows, query existing ids from the `customers` table, keep only ids not yet in the DB\n- Result: `Captured delta: 1 row(s): [(4, 'Dan')]`\n\n**3. Applied the delta**\n- Inserted Dan's row and committed → `Applied 1 row(s)`, table now has 4 rows\n\n**Verification** (`verify.py`): CSV ↔ DB row-for-row match is `True`:\n\n| id | name | email | city |\n|----|------|-------|------|\n| 1 | Alice | alice@example.com | Springfield |\n| 2 | Bob | bob@example.com | Shelbyville |\n| 3 | Carol | carol@example.com | Capital City |\n| 4 | Dan | dan@example.com | Ogdenville |\n\nThe delta script is idempotent by design — running it again with no new rows would capture 0 rows and change nothing. Current workspace assets: `customers.csv` (live source), `customers_snapshot.csv` (baseline), `customers.db` (target), plus `load_customers.py` (backfill), `delta_sync.py` (incremental sync), and `verify.py`.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "zeroclaw-acp",
+        "title": "ZeroClaw ACP",
+        "version": "0.8.5"
+      },
+      "_meta": {
+        "zeroclaw": {
+          "defaultModel": "glm-5.3-flash",
+          "maxSessions": 10,
+          "sessionTimeoutSecs": 3600
+        }
+      }
+    },
+    "pid": 9,
+    "session": {
+      "sessionId": "7a740a33-f598-426f-b1bf-9d5a1e0cec01"
+    },
+    "session_id": "7a740a33-f598-426f-b1bf-9d5a1e0cec01",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

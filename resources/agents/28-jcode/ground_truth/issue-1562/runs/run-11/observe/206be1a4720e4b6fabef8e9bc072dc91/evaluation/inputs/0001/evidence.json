@@ -1,0 +1,186 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_e09950017515413da09a729abc2187f6",
+  "case_id": "case_b41db6220fbc40c68a0465507a61d328",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "752d41e016014acff70ace1534e4727f",
+      "span_id": "e7bc23d8dd9604a1",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791351010207350892,
+      "end_time_unix_nano": 1791351044659301445,
+      "duration_nano": 34451950553,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1791351010564897576,
+          "attributes": {}
+        },
+        {
+          "name": "acp.stderr",
+          "time_unix_nano": 1791351010565835976,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1791351010587435596,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791351010591422516,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791351044652293747,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "752d41e016014acff70ace1534e4727f",
+      "span_id": "5dce2d7a60fde548",
+      "parent_span_id": "e7bc23d8dd9604a1",
+      "name": "Running shell command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791351024314624322,
+      "end_time_unix_nano": 1791351024333327667,
+      "duration_nano": 18703345,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Running shell command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "which sqlite3 && sqlite3 --version",
+          "intent": "Check sqlite3 availability"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "\n\nExit code: 1"
+        },
+        "gen_ai.tool.call.id": "call_06a9df40871e4aa498713cfe"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "752d41e016014acff70ace1534e4727f",
+      "span_id": "2a8e7e77b3e5cd0e",
+      "parent_span_id": "e7bc23d8dd9604a1",
+      "name": "Running shell command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791351028011258609,
+      "end_time_unix_nano": 1791351028106099438,
+      "duration_nano": 94840829,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Running shell command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('migration.db')\nconn.close()\nprint('created')\n\" && ls -la migration.db && file migration.db",
+          "intent": "Create empty SQLite database migration.db"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "created\n-rw-r--r-- 1 agent agent 0 Oct  7 05:30 migration.db\nmigration.db: empty\n"
+        },
+        "gen_ai.tool.call.id": "call_5705ef47f3b94722af05a3be"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "752d41e016014acff70ace1534e4727f",
+      "span_id": "fb97f05922cfc4ca",
+      "parent_span_id": "e7bc23d8dd9604a1",
+      "name": "Running shell command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791351036327337108,
+      "end_time_unix_nano": 1791351036345918089,
+      "duration_nano": 18580981,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Running shell command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('migration.db')\ncur = conn.execute('PRAGMA user_version = 0;')\nconn.commit()\nconn.close()\n\" && ls -la migration.db && file migration.db && python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('migration.db')\nprint('SQLite header:', open('migration.db','rb').read(16))\nprint('Tables:', conn.execute(\\\"SELECT name FROM sqlite_master WHERE type='table'\\\").fetchall())\nconn.close()\n\"",
+          "intent": "Initialize database header and verify it is valid SQLite"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "-rw-r--r-- 1 agent agent 4096 Oct  7 05:30 migration.db\nmigration.db: SQLite 3.x database, last written using SQLite version 3040001, file counter 1, database pages 1, cookie 0, schema 0, unknown 0 encoding, version-valid-for 1\nSQLite header: b'SQLite format 3\\x00'\nTables: []\n"
+        },
+        "gen_ai.tool.call.id": "call_df37f5d1a67749f68389d638"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

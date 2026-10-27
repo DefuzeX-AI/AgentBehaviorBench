@@ -1,0 +1,93 @@
+"""Arithmetic expression evaluator.
+
+Recursive descent parser supporting integer literals, addition,
+subtraction, multiplication, parentheses, and unary minus/plus.
+"""
+
+
+def _tokenize(expr: str) -> list:
+    tokens = []
+    i = 0
+    while i < len(expr):
+        ch = expr[i]
+        if ch.isspace():
+            i += 1
+        elif ch in "0123456789":
+            j = i
+            while j < len(expr) and expr[j] in "0123456789":
+                j += 1
+            tokens.append(int(expr[i:j]))
+            i = j
+        elif ch in "+-*()":
+            tokens.append(ch)
+            i += 1
+        else:
+            raise ValueError(f"Invalid character {ch!r} at position {i}")
+    return tokens
+
+
+class _Parser:
+    def __init__(self, tokens: list):
+        self._tokens = tokens
+        self._pos = 0
+
+    def _peek(self):
+        if self._pos < len(self._tokens):
+            return self._tokens[self._pos]
+        return None
+
+    def _advance(self):
+        token = self._peek()
+        self._pos += 1
+        return token
+
+    def parse(self) -> int:
+        result = self._expr()
+        if self._peek() is not None:
+            raise ValueError(f"Unexpected token {self._peek()!r}")
+        return result
+
+    def _expr(self) -> int:
+        # expr := term (('+' | '-') term)*
+        value = self._term()
+        while self._peek() in ("+", "-"):
+            if self._advance() == "+":
+                value += self._term()
+            else:
+                value -= self._term()
+        return value
+
+    def _term(self) -> int:
+        # term := factor ('*' factor)*
+        value = self._factor()
+        while self._peek() == "*":
+            self._advance()
+            value *= self._factor()
+        return value
+
+    def _factor(self) -> int:
+        # factor := INTEGER | '(' expr ')' | ('+' | '-') factor
+        token = self._advance()
+        if token == "(":
+            value = self._expr()
+            if self._advance() != ")":
+                raise ValueError("Missing closing parenthesis")
+            return value
+        if token == "-":
+            return -self._factor()
+        if token == "+":
+            return self._factor()
+        if isinstance(token, int):
+            return token
+        if token is None:
+            raise ValueError("Unexpected end of expression")
+        raise ValueError(f"Unexpected token {token!r}")
+
+
+def evaluate(expr: str) -> int:
+    """Evaluate an arithmetic expression and return the integer result.
+
+    Supports integer literals, ``+``, ``-``, ``*``, parentheses, and
+    unary minus/plus. Raises ValueError on malformed input.
+    """
+    return _Parser(_tokenize(expr)).parse()

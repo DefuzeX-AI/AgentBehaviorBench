@@ -1,0 +1,141 @@
+{
+  "run_id": "run_6c019b0378a044918045b9d2c28ae05b",
+  "case_id": "case_7401cb01d16a4f7bab03c4ef7b42d760",
+  "input_id": "step-6",
+  "status": "completed",
+  "output": "# Serialization Result\n\n## Verdict\n\n| Question | Answer |\n|---|---|\n| Serializable? | ✅ **Yes** — for the history as it actually executes under SI (T2 aborted) |\n| Equivalent serial schedule | **T3 → T1** (or **T1 → T3**, depending on T3's snapshot — both verified below) |\n| Caveat | Serializable *for this history*; the isolation level remains Snapshot Isolation, which does not guarantee serializability in general |\n\n## Why T2 is excluded\n\nUnder snapshot isolation with first-committer-wins, T2's commit validation finds its write set {A, B} changed since its snapshot (`v0 → v1` by T1) → **T2 aborts**. An aborted transaction performs no committed reads or writes, so it imposes **no equivalence requirements** — it appears in no serial schedule and carries no edges in the committed serialization graph. Only **T1 and T3** (plus hypothetical initial writer T0) must be ordered.\n\n## Equivalent Serial Schedule — primary form: `T3 → T1`\n\nWith T3's snapshot at `v0` (T3 reads before T1 commits):\n\n```\n-- T0: initial state A=v0, B=v0 --\n\nT3: R(A)→v0, R(B)→v0, Commit\nT1: R(A)→v0, W(A):=v1, R(B)→v0, W(B):=v1, Commit\n\n-- Final state: A=v1 (by T1), B=v1 (by T1) --\n```\n\n**Verification — read-from match:**\n\n| Read in original history | Source | Read in serial schedule | Source | Match |\n|---|---|---|---|---|\n| T3.R(A), T3.R(B) | v0 from T0 | T3.R(A), T3.R(B) | v0 from T0 | ✓ |\n| T1.R(A), T1.R(B) | v0 from T0 | T1.R(A), T1.R(B) | v0 from T0 (T3 wrote nothing) | ✓ |\n\n**Final-state match:** both histories end with A=v1, B=v1, last writer T1. ✓\n\nEvery read reads the same version from the same transaction in both schedules, and the final write of every item has the same author → **conflict- and view-equivalent to the serial schedule T3 → T1**.\n\n## Alternative form: `T1 → T3`\n\nIf T3's snapshot is taken *after* T1 commits, T3 reads `v1`:\n\n```\nT1: R(A)→v0, W(A):=v1, R(B)→v0, W(B):=v1, Commit\nT3: R(A)→v1, R(B)→v1, Commit\n```\n\nRead-froms again preserved (T3 reads v1 from T1 in both), final state identical → **T1 → T3 is equally valid**. This is the general property noted earlier: T3 is read-only, so it can always be placed at its snapshot point without creating a cycle.\n\n<details><summary>Why no serial order exists in the counterfactual (T2 commits)</summary>\n\nIf FCW were absent and T2 committed, the history would require preserving these read-froms simultaneously:\n\n- T1 reads **v0** of A and B → T1 must precede any writer of v1/v2\n- T2 reads **v0** of A and B → T2 must precede any writer of v1/v2\n- Both T1 and T2 write A and B → each must precede the other\n\nDirect argument: in **any** serial order of T1 and T2, one runs second — and its R(A) would read the first's `v1`, not the `v0` it reads in the actual history. The read-from relation cannot be preserved, so the history is **not conflict-equivalent to any serial schedule**. This is the same verdict the graph gives: mutual `rw` edges `T1 ⇄ T2` form a 2-cycle, and a cyclic serialization graph proves non-serializability. That cycle is the lost-update anomaly in graph form — and it is precisely what FCW prevents by aborting T2 before it ever enters the committed history.\n</details>\n\n## Conclusion\n\n**The history is serializable.** Snapshot isolation's first-committer-wins check aborts T2, removing the only potential cycle from the graph. The committed projection {T1, T3} yields an acyclic MVSG — `T0 --wr--> T3, T0 --wr--> T1, T1 --rw--> T3` — and is equivalent to the serial schedule **T3 → T1** (final state A=v1, B=v1; all read-froms preserved), with **T1 → T3** as an equally valid alternative if T3 snapshots after T1 commits. Serializable outcome achieved by abort, not by guarantee: a differently-shaped workload (e.g., write skew with disjoint write sets) could break serializability under this same isolation level.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_6c019b0378a044918045b9d2c28ae05b",
+      "case_id": "case_7401cb01d16a4f7bab03c4ef7b42d760",
+      "input_id": "step-6",
+      "spans": [
+        {
+          "trace_id": "ede78e220c55436876e87bad6057e3de",
+          "span_id": "2d4ca796bbe344dc",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792353860667503717,
+          "end_time_unix_nano": 1792353898428853069,
+          "duration_nano": 37761349352,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1792353860670837388,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1792353898425309521,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 1,
+      "retained_spans": 1,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_6c019b0378a044918045b9d2c28ae05b",
+      "input_id": "step-6",
+      "step_id": "step-6",
+      "submission_id": "submission-5236f54d0d06616f6e210963b34f2b96",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "7fa7f520fd1539673a5416b3e6586d4ef22d0df5b675a5e6ae28cab963dfdaf6",
+          "size_bytes": 830,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "5dfd043cae2a97ed3d73daca54a31c5549a7fbc8007802c79f85b0692bac43dc"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

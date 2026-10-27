@@ -1,0 +1,87 @@
+{
+  "messages": [
+    {
+      "content": "我会先并行获取资金流向、股价数据、当日强势股和新闻，然后再撰写报告。",
+      "additional_kwargs": {
+        "refusal": null
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 287,
+          "prompt_tokens": 2082,
+          "total_tokens": 2369,
+          "completion_tokens_details": null,
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 1920,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "prompt_cache_hit_tokens": 1920,
+          "prompt_cache_miss_tokens": 162
+        },
+        "model_provider": "openai",
+        "model_name": "deepseek-flash",
+        "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+        "id": "86a399f6-6958-485e-a166-6d959f8e3d58",
+        "finish_reason": "tool_calls",
+        "logprobs": null
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a161ed-184a-77a8-8348-2d660c37bd27-0",
+      "tool_calls": [
+        {
+          "name": "get_fund_flow",
+          "args": {
+            "ticker": "600519",
+            "curr_date": "2025-06-13",
+            "include_history": true
+          },
+          "id": "call_00_gIJAnNxFmIqA42J86Qw76904",
+          "type": "tool_call"
+        },
+        {
+          "name": "get_stock_data",
+          "args": {
+            "symbol": "600519",
+            "start_date": "2025-05-01",
+            "end_date": "2025-06-13"
+          },
+          "id": "call_01_b2o5fhPRWyMEEj9MqFlj8332",
+          "type": "tool_call"
+        },
+        {
+          "name": "get_hot_stocks",
+          "args": {
+            "curr_date": "2025-06-13"
+          },
+          "id": "call_02_N5DiLRYmiP9BTLHs8HAH3991",
+          "type": "tool_call"
+        },
+        {
+          "name": "get_news",
+          "args": {
+            "ticker": "600519",
+            "start_date": "2025-05-20",
+            "end_date": "2025-06-13"
+          },
+          "id": "call_03_JOKXY4ijqXws9y446zNU9962",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 2082,
+        "output_tokens": 287,
+        "total_tokens": 2369,
+        "input_token_details": {
+          "cache_read": 1920
+        },
+        "output_token_details": {}
+      }
+    }
+  ],
+  "sentiment_report": ""
+}

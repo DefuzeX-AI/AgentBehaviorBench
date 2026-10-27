@@ -1,0 +1,50 @@
+{
+  "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # ------------------------------------------------------------------\n    # 0. Ensure input is a list and contains at least one DataFrame\n    # ------------------------------------------------------------------\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # Keep only pandas DataFrames that are not empty\n    dfs = [df.copy() for df in data_list if isinstance(df, pd.DataFrame) and not df.empty]\n    if not dfs:\n        return pd.DataFrame()\n\n    # ------------------------------------------------------------------\n    # 1. Combine multiple datasets if present (avoid Cartesian products)\n    # ------------------------------------------------------------------\n    if len(dfs) == 1:\n        df = dfs[0]\n    else:\n        # If all datasets share exactly the same columns, concatenate vertically\n        all_same = all(set(df.columns) == set(dfs[0].columns) for df in dfs)\n        if all_same:\n            df = pd.concat(dfs, ignore_index=True)\n        else:\n            # Otherwise, merge on common columns that are likely join keys.\n            # This is a safe merge only if the common columns uniquely identify rows.\n            # To avoid a Cartesian product, we merge sequentially on the intersection\n            # of column names, dropping duplicate columns from the right.\n            df = dfs[0]\n            for other in dfs[1:]:\n                common = list(set(df.columns) & set(other.columns))\n                if common:\n                    # Ensure common columns are unique in the right dataframe to avoid explosion\n                    if other.duplicated(subset=common).any():\n                        # If duplicates exist, we cannot safely merge; skip this dataset\n                        continue\n                    df = pd.merge(df, other, on=common, how='outer', suffixes=('', '_dup'))\n                    # Drop any duplicate columns created by the merge\n                    dup_cols = [c for c in df.columns if c.endswith('_dup')]\n                    if dup_cols:\n                        df = df.drop(columns=dup_cols)\n                else:\n                    # No common columns – merging would create a Cartesian product.\n                    # We choose to keep the first dataframe only.\n                    pass\n\n    # ------------------------------------------------------------------\n    # 2. Standardize column names\n    # ------------------------------------------------------------------\n    df.columns = (\n        df.columns.astype(str)\n        .str.strip()\n        .str.lower()\n        .str.replace(r'\\s+', '_', regex=True)\n    )\n\n    # ------------------------------------------------------------------\n    # 3. Normalize data types\n    # ------------------------------------------------------------------\n    # Identify date-like columns by name (contains 'date' or 'time')\n    date_cols = [col for col in df.columns if 'date' in col or 'time' in col]\n    for col in date_cols:\n        df[col] = pd.to_datetime(df[col], errors='coerce')\n\n    # Convert object columns that are mostly numeric to numeric type\n    for col in df.columns:\n        if col in date_cols:\n            continue\n        if df[col].dtype == 'object':\n            # Try conversion; keep if more than 50% of values become non-null\n            converted = pd.to_numeric(df[col], errors='coerce')\n            if converted.notna().sum() > 0.5 * len(df):\n                df[col] = converted\n        # Replace infinities with NaN for numeric columns\n        if pd.api.types.is_numeric_dtype(df[col]):\n            df[col] = df[col].replace([np.inf, -np.inf], np.nan)\n\n    # ------------------------------------------------------------------\n    # 4. Handle missing values\n    # ------------------------------------------------------------------\n    for col in df.columns:\n        if df[col].isna().any():\n            if pd.api.types.is_numeric_dtype(df[col]):\n                # Impute numeric columns with the median (or 0 if median is NaN)\n                median_val = df[col].median()\n                if pd.isna(median_val):\n                    median_val = 0\n                df[col] = df[col].fillna(median_val)\n            elif pd.api.types.is_datetime64_any_dtype(df[col]):\n                # Forward-fill then backward-fill for dates\n                df[col] = df[col].ffill().bfill()\n            else:\n                # Impute categorical/object columns with 'Unknown'\n                df[col] = df[col].fillna('Unknown')\n\n    # ------------------------------------------------------------------\n    # 5. Remove exact duplicates\n    # ------------------------------------------------------------------\n    df = df.drop_duplicates().reset_index(drop=True)\n\n    # ------------------------------------------------------------------\n    # 6. Handle obvious anomalies (e.g., negative values in price/quantity/sales)\n    # ------------------------------------------------------------------\n    for col in df.columns:\n        if pd.api.types.is_numeric_dtype(df[col]):\n            # Check for columns that should not be negative based on common keywords\n            if any(keyword in col for keyword in ['price', 'quantity', 'sales', 'amount', 'count', 'total']):\n                neg_mask = df[col] < 0\n                if neg_mask.any():\n                    # Replace negative values with the median of positive values\n                    positive_median = df.loc[df[col] >= 0, col].median()\n                    if pd.isna(positive_median):\n                        positive_median = 0\n                    df.loc[neg_mask, col] = positive_median\n\n    # ------------------------------------------------------------------\n    # 7. Categorical cleanup (strip whitespace, ensure string type)\n    # ------------------------------------------------------------------\n    for col in df.columns:\n        if df[col].dtype == 'object':\n            df[col] = df[col].astype(str).str.strip()\n\n    # ------------------------------------------------------------------\n    # 8. Return the single wrangled DataFrame\n    # ------------------------------------------------------------------\n    return df\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 4386,
+      "prompt_tokens": 765,
+      "total_tokens": 5151,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 3114,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261017235319476432994c955d568iavgVNqc",
+    "service_tier": "default",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a14c48-bdfc-7fe3-8cc1-24d7d3ddcd17-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 765,
+    "output_tokens": 4386,
+    "total_tokens": 5151,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 3114
+    }
+  }
+}

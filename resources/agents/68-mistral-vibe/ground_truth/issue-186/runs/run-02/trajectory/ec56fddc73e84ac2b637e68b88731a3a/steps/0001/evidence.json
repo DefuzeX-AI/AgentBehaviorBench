@@ -1,0 +1,241 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_4d292b67f6284430b8553b4f010a593b",
+  "case_id": "ir-mistral-vibe-186-v1",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "f8180c0ca72418fb3bae2aebbaae1565",
+      "span_id": "42e42863c0b2dce7",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792837121093612412,
+      "end_time_unix_nano": 1792837136613240209,
+      "duration_nano": 15519627797,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1792837124332869560,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1792837124431230086,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792837124432274083,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792837125591288265,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792837126503101912,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792837131178346354,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792837136576333442,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "f8180c0ca72418fb3bae2aebbaae1565",
+      "span_id": "8caef8e506b1a74d",
+      "parent_span_id": "42e42863c0b2dce7",
+      "name": "cd /home/agent/workspace && python3 -m venv .venv 2>&1; echo \"exit: $?\"",
+      "kind": "internal",
+      "status": "error",
+      "start_time_unix_nano": 1792837125587788897,
+      "end_time_unix_nano": 1792837125627255838,
+      "duration_nano": 39466941,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "not_recorded"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "cd /home/agent/workspace && python3 -m venv .venv 2>&1; echo \"exit: $?\"",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"command\":\"cd /home/agent/workspace && python3 -m venv .venv 2>&1; echo \\\"exit: $?\\\"\",\"timeout\":null}",
+        "gen_ai.tool.call.id": "call_00_pwpxRIMYoelagCWbjkcr1289"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "f8180c0ca72418fb3bae2aebbaae1565",
+      "span_id": "5a775d44ba3b6380",
+      "parent_span_id": "42e42863c0b2dce7",
+      "name": "python3 -m venv .venv; echo \"exit: $?\"",
+      "kind": "internal",
+      "status": "error",
+      "start_time_unix_nano": 1792837126501298330,
+      "end_time_unix_nano": 1792837136576951630,
+      "duration_nano": 10075653300,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "python3 -m venv .venv; echo \"exit: $?\"",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"command\":\"python3 -m venv .venv; echo \\\"exit: $?\\\"\",\"timeout\":null}",
+        "gen_ai.tool.call.result": [
+          {
+            "terminalId": "a83ddb6c19fe4677af52f1a40ae6f71d",
+            "type": "terminal",
+            "source": "client_observed",
+            "exitStatus": {
+              "exitCode": 1,
+              "signal": null
+            },
+            "output": "Error: Refusing to create a venv in /home/agent/workspace/exit: $? because it contains the PATH separator :.\n",
+            "truncated": false,
+            "output_status": "observed",
+            "exit_status": "observed"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_00_7GL3jipR36fcyYf6nqFQ5793"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "f8180c0ca72418fb3bae2aebbaae1565",
+      "span_id": "dfd2b492a7aa1334",
+      "parent_span_id": "42e42863c0b2dce7",
+      "name": "python3 -m venv .venv",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792837131167960266,
+      "end_time_unix_nano": 1792837136577861895,
+      "duration_nano": 5409901629,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "python3 -m venv .venv",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"command\":\"python3 -m venv .venv\",\"timeout\":null}",
+        "gen_ai.tool.call.result": [
+          {
+            "terminalId": "1f2903fc90734730937c74cb0131eaee",
+            "type": "terminal",
+            "source": "client_observed",
+            "exitStatus": {
+              "exitCode": 0,
+              "signal": null
+            },
+            "output": "",
+            "truncated": false,
+            "output_status": "observed",
+            "exit_status": "observed"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_00_40U450um4fn6NKkWyGin4035"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "f8180c0ca72418fb3bae2aebbaae1565",
+      "span_id": "fa18f77756ae406c",
+      "parent_span_id": "42e42863c0b2dce7",
+      "name": "ls -l .venv/bin/activate",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792837134695850426,
+      "end_time_unix_nano": 1792837136578676224,
+      "duration_nano": 1882825798,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "ls -l .venv/bin/activate",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"command\":\"ls -l .venv/bin/activate\",\"timeout\":null}",
+        "gen_ai.tool.call.result": [
+          {
+            "terminalId": "d8756b2ed4b84b17ac6ecd8c8e7b7869",
+            "type": "terminal",
+            "source": "client_observed",
+            "exitStatus": {
+              "exitCode": 0,
+              "signal": null
+            },
+            "output": "-rw-r--r-- 1 agent agent 2182 Oct 24 10:18 .venv/bin/activate\n",
+            "truncated": false,
+            "output_status": "observed",
+            "exit_status": "observed"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_00_i88iVX89zePaZi6x6aPG6463"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": [
+    "trace_tool_content_not_recorded"
+  ]
+}

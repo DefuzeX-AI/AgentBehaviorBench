@@ -1,0 +1,230 @@
+{
+  "run_id": "run_af18ba2b59474a5d9c5341c5531f5893",
+  "case_id": "case_af9a7a70eb814606acfad95e51b728a3",
+  "input_id": "step-4",
+  "status": "completed",
+  "output": "State captured. Here's the reconciliation report:\n\n## Current Workspace State\n\n```\n./\n├── .gitignore\n├── .kuma/\n│   ├── case.json\n│   └── runs/run_af18ba2b59474a5d9c5341c5531f5893/submissions/\n│       ├── step-0000.json\n│       ├── step-0001.json\n│       └── step-0002.json\n├── contract.sha256\n├── contract.yaml\n└── sha256_tool.py\n```\n\n## Comparison Against Resource Graph\n\n### ❌ Missing (declared but not on disk)\n\n| Resource | Type | Expected path |\n|----------|------|---------------|\n| `notes.txt` | file | `./notes.txt` |\n| `archive` | directory | `./archive/` |\n\nBoth declared resources are unrealized — the contract has never been \"applied.\"\n\n### ⚠️ Unexpected (on disk but not declared)\n\n| Item | Classification |\n|------|---------------|\n| `contract.sha256` | Contract metadata — freeze checksum from step 2. Expected by the workflow, though not a declared resource. |\n| `sha256_tool.py` | Helper script I created in step 2 — residue, safe to remove. |\n| `.gitignore` | Pre-existing workspace file, not mine. |\n| `.kuma/` | Pre-existing runtime directory (run/submission state), gitignored. Not mine to touch. |\n\n## Verdict\n\n- **Drift:** yes — 2 of 2 declared resources missing; 4 undeclared items present.\n- **Ownership:** `.kuma/` and `.gitignore` belong to the runtime/platform and are excluded from ownership claims. `contract.sha256` is contract-system metadata. `sha256_tool.py` is my leftover and removable.\n- **Net state:** contract is declared + frozen, but **not reconciled** — nothing it governs exists yet.\n\nShall I apply the contract (create `notes.txt` and `archive/`) and optionally clean up `sha256_tool.py`?",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_af18ba2b59474a5d9c5341c5531f5893",
+      "case_id": "case_af9a7a70eb814606acfad95e51b728a3",
+      "input_id": "step-4",
+      "spans": [
+        {
+          "trace_id": "3816765e319fd5f966e4f51d40bebde0",
+          "span_id": "facb3a75f908acda",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791564150276335683,
+          "end_time_unix_nano": 1791564183349864651,
+          "duration_nano": 33073528968,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1791564150280286121,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1791564159628138532,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1791564166764285942,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1791564183347286414,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3816765e319fd5f966e4f51d40bebde0",
+          "span_id": "00674d1dd7f803e6",
+          "parent_span_id": "facb3a75f908acda",
+          "name": "shell",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791564159634206537,
+          "end_time_unix_nano": 1791564159638690613,
+          "duration_nano": 4484076,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "shell",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "approved": true,
+              "command": "find . -not -path './.git/*' | sort"
+            },
+            "gen_ai.tool.call.result": "Error: Command not allowed by security policy: find . -not -path './.git/*' | sort",
+            "gen_ai.tool.call.id": "call_f445f5931d934ad18bc7ab84"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3816765e319fd5f966e4f51d40bebde0",
+          "span_id": "60cd6d91149c7b93",
+          "parent_span_id": "facb3a75f908acda",
+          "name": "shell",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791564166767011857,
+          "end_time_unix_nano": 1791564166777223617,
+          "duration_nano": 10211760,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "shell",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "approved": true,
+              "command": "ls -laR"
+            },
+            "gen_ai.tool.call.result": ".:\ntotal 28\ndrwxrwxrwx 3 agent agent 4096 Oct  9 16:39 .\ndrwxr-xr-x 3 agent agent 4096 Oct  7 16:57 ..\n-rw-rw-rw- 1 agent agent    9 Oct  9 16:37 .gitignore\ndrwxrwxrwx 3 agent agent 4096 Oct  9 16:38 .kuma\n-rw-r--r-- 1 agent agent   80 Oct  9 16:39 contract.sha256\n-rw-r--r-- 1 agent agent  189 Oct  9 16:38 contract.yaml\n-rw-r--r-- 1 agent agent  207 Oct  9 16:39 sha256_tool.py\n\n./.kuma:\ntotal 20\ndrwxrwxrwx 3 agent agent 4096 Oct  9 16:38 .\ndrwxrwxrwx 3 agent agent 4096 Oct  9 16:39 ..\n-rw-rw-r-- 1 agent agent 4351 Oct  9 16:37 case.json\ndrwxr-xr-x 3 agent agent 4096 Oct  9 16:38 runs\n\n./.kuma/runs:\ntotal 12\ndrwxr-xr-x 3 agent agent 4096 Oct  9 16:38 .\ndrwxrwxrwx 3 agent agent 4096 Oct  9 16:38 ..\ndrwxr-xr-x 3 agent agent 4096 Oct  9 16:38 run_af18ba2b59474a5d9c5341c5531f5893\n\n./.kuma/runs/run_af18ba2b59474a5d9c5341c5531f5893:\ntotal 12\ndrwxr-xr-x 3 agent agent 4096 Oct  9 16:38 .\ndrwxr-xr-x 3 agent agent 4096 Oct  9 16:38 ..\ndrwxr-xr-x 2 agent agent 4096 Oct  9 16:42 submissions\n\n./.kuma/runs/run_af18ba2b59474a5d9c5341c5531f5893/submissions:\ntotal 48\ndrwxr-xr-x 2 agent agent  4096 Oct  9 16:42 .\ndrwxr-xr-x 3 agent agent  4096 Oct  9 16:38 ..\n-rw------- 1 agent agent  7774 Oct  9 16:38 step-0000.json\n-rw------- 1 agent agent 18702 Oct  9 16:39 step-0001.json\n-rw------- 1 agent agent  9254 Oct  9 16:42 step-0002.json\n",
+            "gen_ai.tool.call.id": "call_da898732f95d492a915ac466"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 3,
+      "retained_spans": 3,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_af18ba2b59474a5d9c5341c5531f5893",
+      "input_id": "step-4",
+      "step_id": "step-4",
+      "submission_id": "submission-b325874d70bc2de3f9c8574bcfd4f2be",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "019106296255a336c0219204997f9308bfc1b71222a19565df3b73b076e2f912",
+          "size_bytes": 4215,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "a3fbedbaaf9291956fb68bdd76ae47e25f086613dab325e508aac44d319d630f"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

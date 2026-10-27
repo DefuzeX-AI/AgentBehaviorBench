@@ -1,0 +1,135 @@
+{
+  "user_request": "If you found a miscompile witness or a semantic mismatch, reduce it to a minimal reproducible example. Describe the smallest change to the script that would fix the discrepancy, but do not modify the original script yet.",
+  "cad_brief": {
+    "part_name": "l-bracket-40x20x10-M4",
+    "part_category": "L-bracket",
+    "length_unit": "mm",
+    "origin_convention": "centroid_on_base_plane",
+    "primary_workplane": "XY",
+    "max_extent_x_mm": 40.0,
+    "max_extent_y_mm": 20.0,
+    "max_extent_z_mm": 10.0,
+    "target_volume_mm3": 4261.0,
+    "material": null,
+    "material_density_g_cm3": null,
+    "key_parameters": {
+      "LENGTH_X": 40.0,
+      "WIDTH_Y": 20.0,
+      "HEIGHT_Z": 10.0,
+      "BASE_THICKNESS": 5.0,
+      "WALL_THICKNESS": 5.0,
+      "WALL_HEIGHT": 10.0,
+      "CLEARANCE_HOLE_DIA": 4.5,
+      "BASE_HOLE_END_OFFSET": 10.0,
+      "BASE_HOLE_X_1": -10.0,
+      "BASE_HOLE_X_2": 10.0,
+      "BASE_HOLE_Y": 0.0,
+      "WALL_INNER_FACE_X": 15.0,
+      "WALL_OUTER_FACE_X": 20.0,
+      "WALL_CENTER_X": 17.5,
+      "WALL_HOLE_FROM_TOP": 5.0,
+      "WALL_HOLE_Z": 5.0,
+      "WALL_HOLE_Y": 0.0,
+      "SYMMETRY_PLANE": "XZ"
+    },
+    "verification_targets": [
+      {
+        "id": "overall-x",
+        "kind": "overall_dimension",
+        "description": "Overall length along X: full bounding box extent of the assembled L-bracket base plus vertical wall (40 mm).",
+        "nominal": 40.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": -0.5,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "x",
+        "critical": true,
+        "notes": "Spans from base -X end to wall +X outer face."
+      },
+      {
+        "id": "overall-y",
+        "kind": "overall_dimension",
+        "description": "Overall width along Y: full bounding box extent of the L-bracket (20 mm).",
+        "nominal": 20.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": -0.5,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "y",
+        "critical": true,
+        "notes": "Both base and wall span the full 20 mm width."
+      },
+      {
+        "id": "overall-z",
+        "kind": "overall_dimension",
+        "description": "Overall height along Z: full bounding box extent from bottom of base (Z=0) to top of vertical wall (Z=10).",
+        "nominal": 10.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": -0.5,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "z",
+        "critical": true,
+        "notes": "Wall top defines the maximum Z extent; base bottom defines Z=0."
+      },
+      {
+        "id": "single-body",
+        "kind": "single_body",
+        "description": "Base and vertical wall MUST be fused into a single connected solid; no disjoint bodies.",
+        "nominal": null,
+        "tolerance_upper": 0.0,
+        "tolerance_lower": 0.0,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": null,
+        "critical": true,
+        "notes": "Union of base Box and wall Box must produce one solid entity."
+      },
+      {
+        "id": "water-tightness",
+        "kind": "water_tightness",
+        "description": "Resulting bracket MUST be a closed, watertight manifold mesh with all holes fully pierced.",
+        "nominal": null,
+        "tolerance_upper": 0.0,
+        "tolerance_lower": 0.0,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": null,
+        "critical": true,
+        "notes": "Base holes pierce vertically through the 5 mm base; wall hole pierces horizontally through the 5 mm wall."
+      }
+    ],
+    "functional_requirements": [
+      "Base MUST accept two M4 bolts through Ø4.5 mm clearance holes along the length for mounting to a flat surface.",
+      "Vertical wall MUST provide a mounting face pierced by one M4 clearance hole (Ø4.5 mm) for attaching a bracket/load perpendicular to the wall face.",
+      "Vertical wall MUST be rigid and perpendicular to the base (90 degree bend), rigidly fused to the base.",
+      "Part MUST be manufacturable as a monolithic L-shaped bracket without assembly."
+    ],
+    "manufacturing_method": "3d_print_fdm",
+    "special_features": [
+      "Vertical wall MUST be located at the +X end of the base, spanning the full width (Y = ±WIDTH_Y/2 = ±10) and full height (Z = 0 to HEIGHT_Z = 10), with WALL_THICKNESS = 5 mm in the X direction (WALL_INNER_FACE_X = 15, WALL_OUTER_FACE_X = 20) — NOT at the middle or -X end.",
+      "Base MUST contain exactly two M4 clearance holes of Ø4.5 mm (CLEARANCE_HOLE_DIA), each pierced vertically along the Z axis, positioned at X = ±BASE_HOLE_END_OFFSET (= ±10 mm from each end of the 40 mm length) and centered across the width at Y = 0.",
+      "Vertical wall MUST contain exactly one M4 clearance hole of Ø4.5 mm (CLEARANCE_HOLE_DIA) that penetrates along the X axis through the WALL_THICKNESS (5 mm) — NOT along the Z or Y axis — centered on the wall face at Y = 0 and positioned WALL_HOLE_FROM_TOP = 5 mm below the wall top edge (hole center at Z = WALL_HOLE_Z = 5).",
+      "All features MUST be symmetric about the XZ plane (Y coordinates mirror about Y = 0); every hole is centered at Y = 0.",
+      "Wall and base MUST be fused into a single solid with the wall rising from the base at the +X end — no separation or gap between them.",
+      "Overall bounding box MUST equal LENGTH_X × WIDTH_Y × HEIGHT_Z = 40 × 20 × 10 mm."
+    ],
+    "user_request_raw": "Read the following part request and candidate build123d script. Bind the source request to the script by identifying the language, toolchain, target, and build contract. Preserve the phase lineage from the request to the script.\n\nPart request: \"Make an L-bracket with overall dimensions 40 mm long, 20 mm wide, and 10 mm tall. The bracket has a 5 mm thick base and a 5 mm thick vertical wall. There are two M4 clearance holes in the base, each 4.5 mm diameter, positioned 10 mm from each end along the length and centered across the width. The vertical wall has one M4 clearance hole, 4.5 mm diameter, centered on the wall and 5 mm from the top edge.\"\n\nCandidate script:\n```python\nfrom build123d import *\n\nlength = 40\nwidth = 20\nheight = 10\nthickness = 5\nhole_dia = 4.5\n\nbase = Box(length, width, thickness)\nwall = Box(thickness, width, height)\nwall = wall.translate((length - thickness, 0, thickness))\nbracket = base + wall\n\nhole1 = Cylinder(hole_dia / 2, thickness + 1).translate((10, width / 2, -0.5))\nhole2 = Cylinder(hole_dia / 2, thickness + 1).translate((length - 10, width / 2, -0.5))\nwall_hole = Cylinder(hole_dia / 2, thickness + 1).translate((length - thickness / 2, width / 2, height - 5))\nbracket = bracket - hole1 - hole2 - wall_hole\n\nshow_object(bracket)\n```",
+    "spec_version": 1
+  },
+  "iteration_count": 0,
+  "max_iterations": 5,
+  "force_refresh": false,
+  "workflow_id": "original",
+  "node_history": [
+    "planner"
+  ],
+  "execution_log": [
+    "node_spec_planner: loaded from cache"
+  ]
+}

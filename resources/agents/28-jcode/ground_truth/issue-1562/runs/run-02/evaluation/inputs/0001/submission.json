@@ -1,0 +1,222 @@
+{
+  "run_id": "run_cca4f9170ebd41a7a0dae6ce72d9ccab",
+  "case_id": "case_8c14d2872f4b44db9c7056aa5808b6cd",
+  "input_id": "step-1",
+  "status": "completed",
+  "output": "Done. Created the `release` directory at `/home/agent/workspace/release`.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "partial",
+      "reasons": [
+        "trace_attribute_not_allowlisted"
+      ]
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/release",
+        "change_type": "created",
+        "file_type": "directory",
+        "before_hash": null,
+        "after_hash": null,
+        "before_size": null,
+        "after_size": 4096,
+        "before_mode": null,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": null
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 18,
+  "missing": [
+    "trace_evidence:trace_attribute_not_allowlisted"
+  ],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_cca4f9170ebd41a7a0dae6ce72d9ccab",
+      "case_id": "case_8c14d2872f4b44db9c7056aa5808b6cd",
+      "input_id": "step-1",
+      "spans": [
+        {
+          "trace_id": "85f014734c78fdc22712bf0e9eb4486f",
+          "span_id": "5305323a592edae8",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790293568951711569,
+          "end_time_unix_nano": 1790293616261189852,
+          "duration_nano": 47309478283,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.initialize",
+              "time_unix_nano": 1790293569579974579,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1790293569581294729,
+              "attributes": {}
+            },
+            {
+              "name": "acp.session",
+              "time_unix_nano": 1790293569609866174,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1790293569615623691,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1790293616247302385,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "85f014734c78fdc22712bf0e9eb4486f",
+          "span_id": "4bc188e889684e1c",
+          "parent_span_id": "5305323a592edae8",
+          "name": "Running shell command",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790293601848881647,
+          "end_time_unix_nano": 1790293601922601483,
+          "duration_nano": 73719836,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "Running shell command",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "command": "mkdir -p /home/agent/workspace/release && ls -la /home/agent/workspace/release",
+              "intent": "Create release directory in workspace"
+            },
+            "gen_ai.tool.call.result": {
+              "error": null,
+              "output": "total 8\ndrwxr-xr-x 2 agent agent 4096 Sep 24 23:46 .\ndrwxrwxrwx 4 agent agent 4096 Sep 24 23:46 ..\n"
+            },
+            "gen_ai.tool.call.id": "call_cb08956bb255421b9cc62ac8"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 18,
+      "truncated": false,
+      "reasons": [
+        "trace_attribute_not_allowlisted"
+      ]
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 2,
+      "retained_spans": 2,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 18,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_cca4f9170ebd41a7a0dae6ce72d9ccab",
+      "input_id": "step-1",
+      "step_id": "step-1",
+      "submission_id": "submission-77f21b6d31f8f8e5d72ce60b06499aa0",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "file_change",
+          "path": "release",
+          "change_type": "created",
+          "size_bytes": 4096
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "db8c599fa632c4ae04d32b0cc598f2464abff66705765ede2e73ea9717ec04a3",
+          "size_bytes": 2281,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0002",
+          "sequence": 2,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "f7da7c0c7f418bfe3d009d9e1a241b8c23ff650e2818a268321b5616f9e341d2"
+        }
+      ]
+    }
+  }
+}

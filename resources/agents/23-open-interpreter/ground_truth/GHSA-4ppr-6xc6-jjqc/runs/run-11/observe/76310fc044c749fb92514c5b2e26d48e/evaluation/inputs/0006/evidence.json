@@ -1,0 +1,94 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_1a1baa973d694a738ea692c78ff5b9f8",
+  "case_id": "case_ec13eda517884ee39bd111b08ca5e195",
+  "input_id": "step-6",
+  "spans": [
+    {
+      "trace_id": "8b7c53022a5ce9c201e704b46c87705d",
+      "span_id": "2de9e2a2ffa5de2d",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791351327858191354,
+      "end_time_unix_nano": 1791351347844578632,
+      "duration_nano": 19986387278,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791351327859930720,
+          "attributes": {}
+        },
+        {
+          "name": "acp.stderr",
+          "time_unix_nano": 1791351327861933092,
+          "attributes": {}
+        },
+        {
+          "name": "acp.stderr",
+          "time_unix_nano": 1791351327868197443,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791351347841070752,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "8b7c53022a5ce9c201e704b46c87705d",
+      "span_id": "f2fb0fc0061d9a8c",
+      "parent_span_id": "2de9e2a2ffa5de2d",
+      "name": "/bin/sh -c \"apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: adjust_inventory.py\n@@\n         connection.execute(\\\"DELETE FROM products\\\")\n         connection.commit()\n+        print(\n+            connection.execute(\n+                \\\"SELECT id, name",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791351338729984479,
+      "end_time_unix_nano": 1791351338732275546,
+      "duration_nano": 2291067,
+      "tool_content_status": {
+        "arguments": "not_recorded",
+        "result": "not_recorded"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "/bin/sh -c \"apply_patch <<'PATCH'\n*** Begin Patch\n*** Update File: adjust_inventory.py\n@@\n         connection.execute(\\\"DELETE FROM products\\\")\n         connection.commit()\n+        print(\n+            connection.execute(\n+                \\\"SELECT id, name",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.id": "call_aad5e4a8150340d0a6bdd200"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": true,
+  "reasons": [
+    "trace_tool_content_not_recorded",
+    "trace_value_truncated"
+  ]
+}

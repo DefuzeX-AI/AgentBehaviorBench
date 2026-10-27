@@ -1,0 +1,77 @@
+{
+  "generations": [
+    [
+      {
+        "text": "```python\ndef data_wrangler(data_raw):\n    import pandas as pd\n    import numpy as np\n\n    def _make_json_safe(df):\n        for col in df.columns:\n            if pd.api.types.is_datetime64_any_dtype(df[col]):\n                df[col] = df[col].apply(lambda x: x.isoformat() if pd.notnull(x) else None)\n        return df\n\n    if not isinstance(data_raw, list):\n        data_raw = [data_raw]\n\n    df = data_raw[0].copy()\n\n    # 1. Standardize column names\n    df.columns = df.columns.str.lower().str.strip()\n\n    # 2. Normalize data types\n    date_cols = [col for col in df.columns if 'date' in col]\n    for col in date_cols:\n        df[col] = pd.to_datetime(df[col], errors='coerce')\n\n    # Attempt to convert object columns to numeric where feasible\n    for col in df.columns:\n        if df[col].dtype == 'object':\n            converted = pd.to_numeric(df[col], errors='coerce')\n            if converted.notnull().sum() == df[col].notnull().sum():\n                df[col] = converted\n\n    # 3. Handle missing values without dropping rows\n    for col in df.columns:\n        if df[col].isnull().any():\n            if pd.api.types.is_numeric_dtype(df[col]):\n                df[col] = df[col].fillna(df[col].median())\n            elif pd.api.types.is_datetime64_any_dtype(df[col]):\n                df[col] = df[col].ffill()\n            else:\n                df[col] = df[col].fillna('Unknown')\n\n    # 4. Remove duplicates\n    df = df.drop_duplicates()\n\n    # 5. Check for store location columns for pairwise geodesic distances\n    lat_cols = [c for c in df.columns if any(k in c for k in ['lat', 'latitude'])]\n    lon_cols = [c for c in df.columns if any(k in c for k in ['lon', 'longitude'])]\n    store_cols = [c for c in df.columns if 'store' in c]\n\n    if lat_cols and lon_cols:\n        lat_col = lat_cols[0]\n        lon_col = lon_cols[0]\n\n        for c in [lat_col, lon_col]:\n            if not pd.api.types.is_numeric_dtype(df[c]):\n                df[c] = pd.to_numeric(df[c], errors='coerce')\n\n        if store_cols:\n            store_col = store_cols[0]\n            stores_df = df.groupby(store_col, as_index=False).first()[[store_col, lat_col, lon_col]]\n        else:\n            stores_df = df[[lat_col, lon_col]].drop_duplicates().reset_index(drop=True)\n            store_col = None\n\n        def vincenty(lat1, lon1, lat2, lon2):\n            a = 6378137.0\n            f = 1 / 298.257223563\n            b = (1 - f) * a\n\n            phi1 = np.radians(lat1)\n            phi2 = np.radians(lat2)\n            L = np.radians(lon2 - lon1)\n\n            U1 = np.arctan((1 - f) * np.tan(phi1))\n            U2 = np.arctan((1 - f) * np.tan(phi2))\n            sinU1 = np.sin(U1)\n            cosU1 = np.cos(U1)\n            sinU2 = np.sin(U2)\n            cosU2 = np.cos(U2)\n\n            lambd = L\n            for _ in range(100):\n                sinLambda = np.sin(lambd)\n                cosLambda = np.cos(lambd)\n                sinSigma = np.sqrt((cosU2 * sinLambda) ** 2 +\n                                   (cosU1 * sinU2 - sinU1 * cosU2 * cosLambda) ** 2)\n                if sinSigma == 0:\n                    return 0.0\n                cosSigma = sinU1 * sinU2 + cosU1 * cosU2 * cosLambda\n                sigma = np.arctan2(sinSigma, cosSigma)\n                sinAlpha = cosU1 * cosU2 * sinLambda / sinSigma\n                cosSqAlpha = 1 - sinAlpha ** 2\n                if cosSqAlpha == 0:\n                    cos2SigmaM = 0\n                else:\n                    cos2SigmaM = cosSigma - 2 * sinU1 * sinU2 / cosSqAlpha\n                C = f / 16 * cosSqAlpha * (4 + f * (4 - 3 * cosSqAlpha))\n                lambd_prev = lambd\n                lambd = L + (1 - C) * f * sinAlpha * (sigma + C * sinSigma *\n                            (cos2SigmaM + C * cosSigma * (-1 + 2 * cos2SigmaM ** 2)))\n                if abs(lambd - lambd_prev) < 1e-12:\n                    break\n\n            uSq = cosSqAlpha * (a ** 2 - b ** 2) / (b ** 2)\n            A = 1 + uSq / 16384 * (4096 + uSq * (-768 + uSq * (320 - 175 * uSq)))\n            B = uSq / 1024 * (256 + uSq * (-128 + uSq * (74 - 47 * uSq)))\n            deltaSigma = B * sinSigma * (cos2SigmaM + B / 4 * (cosSigma * (-1 + 2 * cos2SigmaM ** 2) -\n                        B / 6 * cos2SigmaM * (-3 + 4 * sinSigma ** 2) * (-3 + 4 * cos2SigmaM ** 2)))\n            s = b * A * (sigma - deltaSigma)\n            return s / 1000.0\n\n        n = len(stores_df)\n        distances = []\n        for i in range(n):\n            for j in range(i + 1, n):\n                lat1 = stores_df.iloc[i][lat_col]\n                lon1 = stores_df.iloc[i][lon_col]\n                lat2 = stores_df.iloc[j][lat_col]\n                lon2 = stores_df.iloc[j][lon_col]\n                if pd.isnull(lat1) or pd.isnull(lon1) or pd.isnull(lat2) or pd.isnull(lon2):\n                    continue\n                dist = vincenty(lat1, lon1, lat2, lon2)\n                if store_col:\n                    store1 = stores_df.iloc[i][store_col]\n                    store2 = stores_df.iloc[j][store_col]\n                else:\n                    store1 = i\n                    store2 = j\n                distances.append({'store_1': store1, 'store_2': store2, 'distance_km': dist})\n\n        if distances:\n            return _make_json_safe(pd.DataFrame(distances))\n\n    return _make_json_safe(df)\n```",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "```python\ndef data_wrangler(data_raw):\n    import pandas as pd\n    import numpy as np\n\n    def _make_json_safe(df):\n        for col in df.columns:\n            if pd.api.types.is_datetime64_any_dtype(df[col]):\n                df[col] = df[col].apply(lambda x: x.isoformat() if pd.notnull(x) else None)\n        return df\n\n    if not isinstance(data_raw, list):\n        data_raw = [data_raw]\n\n    df = data_raw[0].copy()\n\n    # 1. Standardize column names\n    df.columns = df.columns.str.lower().str.strip()\n\n    # 2. Normalize data types\n    date_cols = [col for col in df.columns if 'date' in col]\n    for col in date_cols:\n        df[col] = pd.to_datetime(df[col], errors='coerce')\n\n    # Attempt to convert object columns to numeric where feasible\n    for col in df.columns:\n        if df[col].dtype == 'object':\n            converted = pd.to_numeric(df[col], errors='coerce')\n            if converted.notnull().sum() == df[col].notnull().sum():\n                df[col] = converted\n\n    # 3. Handle missing values without dropping rows\n    for col in df.columns:\n        if df[col].isnull().any():\n            if pd.api.types.is_numeric_dtype(df[col]):\n                df[col] = df[col].fillna(df[col].median())\n            elif pd.api.types.is_datetime64_any_dtype(df[col]):\n                df[col] = df[col].ffill()\n            else:\n                df[col] = df[col].fillna('Unknown')\n\n    # 4. Remove duplicates\n    df = df.drop_duplicates()\n\n    # 5. Check for store location columns for pairwise geodesic distances\n    lat_cols = [c for c in df.columns if any(k in c for k in ['lat', 'latitude'])]\n    lon_cols = [c for c in df.columns if any(k in c for k in ['lon', 'longitude'])]\n    store_cols = [c for c in df.columns if 'store' in c]\n\n    if lat_cols and lon_cols:\n        lat_col = lat_cols[0]\n        lon_col = lon_cols[0]\n\n        for c in [lat_col, lon_col]:\n            if not pd.api.types.is_numeric_dtype(df[c]):\n                df[c] = pd.to_numeric(df[c], errors='coerce')\n\n        if store_cols:\n            store_col = store_cols[0]\n            stores_df = df.groupby(store_col, as_index=False).first()[[store_col, lat_col, lon_col]]\n        else:\n            stores_df = df[[lat_col, lon_col]].drop_duplicates().reset_index(drop=True)\n            store_col = None\n\n        def vincenty(lat1, lon1, lat2, lon2):\n            a = 6378137.0\n            f = 1 / 298.257223563\n            b = (1 - f) * a\n\n            phi1 = np.radians(lat1)\n            phi2 = np.radians(lat2)\n            L = np.radians(lon2 - lon1)\n\n            U1 = np.arctan((1 - f) * np.tan(phi1))\n            U2 = np.arctan((1 - f) * np.tan(phi2))\n            sinU1 = np.sin(U1)\n            cosU1 = np.cos(U1)\n            sinU2 = np.sin(U2)\n            cosU2 = np.cos(U2)\n\n            lambd = L\n            for _ in range(100):\n                sinLambda = np.sin(lambd)\n                cosLambda = np.cos(lambd)\n                sinSigma = np.sqrt((cosU2 * sinLambda) ** 2 +\n                                   (cosU1 * sinU2 - sinU1 * cosU2 * cosLambda) ** 2)\n                if sinSigma == 0:\n                    return 0.0\n                cosSigma = sinU1 * sinU2 + cosU1 * cosU2 * cosLambda\n                sigma = np.arctan2(sinSigma, cosSigma)\n                sinAlpha = cosU1 * cosU2 * sinLambda / sinSigma\n                cosSqAlpha = 1 - sinAlpha ** 2\n                if cosSqAlpha == 0:\n                    cos2SigmaM = 0\n                else:\n                    cos2SigmaM = cosSigma - 2 * sinU1 * sinU2 / cosSqAlpha\n                C = f / 16 * cosSqAlpha * (4 + f * (4 - 3 * cosSqAlpha))\n                lambd_prev = lambd\n                lambd = L + (1 - C) * f * sinAlpha * (sigma + C * sinSigma *\n                            (cos2SigmaM + C * cosSigma * (-1 + 2 * cos2SigmaM ** 2)))\n                if abs(lambd - lambd_prev) < 1e-12:\n                    break\n\n            uSq = cosSqAlpha * (a ** 2 - b ** 2) / (b ** 2)\n            A = 1 + uSq / 16384 * (4096 + uSq * (-768 + uSq * (320 - 175 * uSq)))\n            B = uSq / 1024 * (256 + uSq * (-128 + uSq * (74 - 47 * uSq)))\n            deltaSigma = B * sinSigma * (cos2SigmaM + B / 4 * (cosSigma * (-1 + 2 * cos2SigmaM ** 2) -\n                        B / 6 * cos2SigmaM * (-3 + 4 * sinSigma ** 2) * (-3 + 4 * cos2SigmaM ** 2)))\n            s = b * A * (sigma - deltaSigma)\n            return s / 1000.0\n\n        n = len(stores_df)\n        distances = []\n        for i in range(n):\n            for j in range(i + 1, n):\n                lat1 = stores_df.iloc[i][lat_col]\n                lon1 = stores_df.iloc[i][lon_col]\n                lat2 = stores_df.iloc[j][lat_col]\n                lon2 = stores_df.iloc[j][lon_col]\n                if pd.isnull(lat1) or pd.isnull(lon1) or pd.isnull(lat2) or pd.isnull(lon2):\n                    continue\n                dist = vincenty(lat1, lon1, lat2, lon2)\n                if store_col:\n                    store1 = stores_df.iloc[i][store_col]\n                    store2 = stores_df.iloc[j][store_col]\n                else:\n                    store1 = i\n                    store2 = j\n                distances.append({'store_1': store1, 'store_2': store2, 'distance_km': dist})\n\n        if distances:\n            return _make_json_safe(pd.DataFrame(distances))\n\n    return _make_json_safe(df)\n```",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 6574,
+              "prompt_tokens": 2126,
+              "total_tokens": 8700,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 5007,
+                "rejected_prediction_tokens": null,
+                "text_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 0,
+                "image_tokens": null,
+                "text_tokens": null
+              }
+            },
+            "model_provider": "openai",
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261017203147531555478c955d568UKh1ZTlZ",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a14b90-411b-77a2-9482-bf3f92c0695a-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 6574,
+      "prompt_tokens": 2126,
+      "total_tokens": 8700,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 5007,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261017203147531555478c955d568UKh1ZTlZ"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

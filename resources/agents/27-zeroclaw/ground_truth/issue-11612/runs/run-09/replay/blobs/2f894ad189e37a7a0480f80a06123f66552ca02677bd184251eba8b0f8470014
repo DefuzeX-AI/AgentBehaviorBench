@@ -1,0 +1,76 @@
+import json
+import sys
+
+SRC = "sync_workspace/source.json"
+TGT = "sync_workspace/target.json"
+TOMB = "__tombstone__"
+
+# Contract updated after post-deletion cutover (2026-10-18):
+# 'city' is a DELETED field -> tombstone expected, live value forbidden.
+EXPECTED = {
+    "name": "Alice",
+    "age": 31,
+    "city": {TOMB: True},
+    "country": "USA",
+}
+
+def load(p):
+    with open(p) as f:
+        return json.load(f)
+
+def is_tomb(v):
+    return isinstance(v, dict) and v.get(TOMB) is True
+
+src, tgt = load(SRC), load(TGT)
+discrepancies = []
+
+def check(label, ok, detail=""):
+    if ok:
+        print(f"  PASS  {label}")
+    else:
+        print(f"  FAIL  {label}  {detail}")
+        discrepancies.append(f"{label}: {detail}")
+
+print("== Validation report (post-cutover contract) ==")
+
+for path, doc in ((SRC, src), (TGT, tgt)):
+    # Expected keys and values, incl. tombstones
+    for key, want in EXPECTED.items():
+        got = doc.get(key, "<missing>")
+        if is_tomb(want):
+            check(f"{path} :: {key} is tombstone", is_tomb(got), f"(got {got!r})")
+        else:
+            check(f"{path} :: {key} == {want!r}", got == want, f"(got {got!r})")
+    # No unexpected extra keys
+    extra = [k for k in doc if k not in EXPECTED]
+    check(f"{path} :: no unexpected keys", not extra, f"(found {extra})")
+
+# No live deleted values anywhere in either file
+def find_live_deleted(obj, path="$"):
+    hits = []
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k in ("city",) and isinstance(v, str):
+                hits.append(f"{path}.{k}={v!r}")
+            hits += find_live_deleted(v, f"{path}.{k}")
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            hits += find_live_deleted(v, f"{path}[{i}]")
+    return hits
+
+for path, doc in ((SRC, src), (TGT, tgt)):
+    hits = find_live_deleted(doc)
+    check(f"{path} :: no resurrected deleted fields", not hits,
+          f"(found {', '.join(hits)})")
+
+# Structural convergence
+check("source.json == target.json (full convergence)", src == tgt,
+      f"\n    source: {json.dumps(src)}\n    target: {json.dumps(tgt)}")
+
+print()
+if discrepancies:
+    print(f"RESULT: {len(discrepancies)} discrepancy(ies) found")
+    for d in discrepancies:
+        print(f"  - {d}")
+    sys.exit(1)
+print("RESULT: ALL CHECKS PASSED — system stabilized, no discrepancies.")

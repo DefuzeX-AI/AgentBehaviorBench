@@ -1,0 +1,149 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_09868ca2a0ee436389978a00ad0d27d1",
+  "case_id": "case_4a63612526b9455587c0bb5719aa73da",
+  "input_id": "step-2",
+  "spans": [
+    {
+      "trace_id": "06f2e4de4966ded445eb277376da7e96",
+      "span_id": "66d4866f4ef2df02",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791350525921495300,
+      "end_time_unix_nano": 1791350551268672250,
+      "duration_nano": 25347176950,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791350525926008684,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1791350535291357688,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1791350544491701414,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791350551267122656,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "06f2e4de4966ded445eb277376da7e96",
+      "span_id": "20bc343252efdba2",
+      "parent_span_id": "66d4866f4ef2df02",
+      "name": "Write: /home/agent/workspace/migration/baseline.json",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791350535271141373,
+      "end_time_unix_nano": 1791350535298360079,
+      "duration_nano": 27218706,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Write: /home/agent/workspace/migration/baseline.json",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "content": "{\n  \"engine\": \"postgresql\",\n  \"version\": \"14.5\",\n  \"schema\": {\n    \"name\": \"public\",\n    \"tables\": [],\n    \"indexes\": [],\n    \"constraints\": []\n  },\n  \"data_snapshot\": {\n    \"captured_at\": null,\n    \"row_counts\": {},\n    \"checksum\": null,\n    \"location\": null\n  }\n}\n",
+          "file_path": "/home/agent/workspace/migration/baseline.json"
+        },
+        "gen_ai.tool.call.result": "Created /home/agent/workspace/migration/baseline.json (16 lines, 266 bytes)",
+        "gen_ai.tool.call.id": "call_60b5997d88e24d7e9ee650b9"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "06f2e4de4966ded445eb277376da7e96",
+      "span_id": "6922b1a6607b273f",
+      "parent_span_id": "66d4866f4ef2df02",
+      "name": "Bash: python3 -m json.tool /home/agent/workspace/migration/baseline.json",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791350544478495512,
+      "end_time_unix_nano": 1791350544535704693,
+      "duration_nano": 57209181,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Bash: python3 -m json.tool /home/agent/workspace/migration/baseline.json",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "python3 -m json.tool /home/agent/workspace/migration/baseline.json",
+          "description": "Validate JSON syntax of baseline.json"
+        },
+        "gen_ai.tool.call.result": {
+          "data_snapshot": {
+            "captured_at": null,
+            "checksum": null,
+            "location": null,
+            "row_counts": {}
+          },
+          "engine": "postgresql",
+          "schema": {
+            "constraints": [],
+            "indexes": [],
+            "name": "public",
+            "tables": []
+          },
+          "version": "14.5"
+        },
+        "gen_ai.tool.call.id": "call_e678b2059b7843378788ed7b"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

@@ -1,0 +1,91 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_727e28f7eafc4d6bbb68425332af42e6",
+  "case_id": "case_b41db6220fbc40c68a0465507a61d328",
+  "input_id": "step-6",
+  "spans": [
+    {
+      "trace_id": "d506cbf816671e033d136a28e10809ae",
+      "span_id": "5b7fc921e782001d",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790296130967671480,
+      "end_time_unix_nano": 1790296158690402989,
+      "duration_nano": 27722731509,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1790296130971654588,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1790296158681700660,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "d506cbf816671e033d136a28e10809ae",
+      "span_id": "3136f767face5b03",
+      "parent_span_id": "5b7fc921e782001d",
+      "name": "Running shell command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790296149364389504,
+      "end_time_unix_nano": 1790296149575050662,
+      "duration_nano": 210661158,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Running shell command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /home/agent/workspace && ls -la migration.db && rm -f migration.db && echo \"--- after delete ---\" && ls -la | grep -c \"migration.db\" || echo \"migration.db is gone\"",
+          "intent": "Delete migration.db per user instruction to resolve the deadlock"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "-rw-r--r-- 1 agent agent 12288 Sep 25 00:28 migration.db\n--- after delete ---\n0\nmigration.db is gone\n"
+        },
+        "gen_ai.tool.call.id": "call_3c526f00cc944f6b95c1f6f3"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 18,
+  "truncated": false,
+  "reasons": [
+    "trace_attribute_not_allowlisted"
+  ]
+}

@@ -1,0 +1,401 @@
+# Formal Specification — `expr_eval`
+
+**Spec version:** 1.0
+**Specifies:** module `expr_eval.py`, public function `evaluate(expr: str) -> int`
+**Status:** Normative. “Must” states a requirement; “may” states an allowance;
+paragraphs marked **[N]** are non-normative commentary.
+
+---
+
+## 1. Purpose, scope, interface
+
+`evaluate(expr: str) -> int` parses an arithmetic expression given as a Python
+string and returns its integer value, or raises `ValueError` if the input is
+not a well-formed expression.
+
+Supported constructs (complete list — anything else is out of scope):
+
+- non-negative integer literals (decimal, ASCII digits),
+- binary operators `+` (addition), `-` (subtraction), `*` (multiplication),
+- unary operators `+` and `-`,
+- parentheses for grouping,
+- whitespace between tokens (ignored).
+
+Explicitly **out of scope** (their absence is normative): division, modulo,
+exponentiation, floating-point or other numeral systems, variables, function
+calls, comparisons, logical operators, and any other punctuation.
+
+**[N]** `_tokenize` and `_Parser` are internal helpers; only the observable
+behaviour of `evaluate` is contractual. `evaluate` is a pure function: it must
+not mutate its argument, perform I/O, or depend on global mutable state.
+Behaviour for non-`str` inputs is outside this specification.
+
+## 2. Notation
+
+- `Σ` — the set of Unicode code points (Python `str` characters); `String = Σ*`.
+- `ℤ` — the mathematical integers, with the standard operations `+`, `−`, `×`.
+- Token lists are finite sequences; `ε` is the empty list, `·` is list
+  concatenation, `head(t)` the first element.
+- `{ x }` in EBNF means zero or more repetitions of `x`.
+- `⇓` is the token-coverage relation defined in §7.
+- All defining equations below are definitional axioms of the semantics.
+
+## 3. Lexical structure
+
+### 3.1 Character classes
+
+- **Digit** `D = { '0', '1', …, '9' }` — ASCII digits only.
+  **[N]** Non-ASCII Unicode digits (e.g. `٣`) are *invalid characters*, not digits.
+- **Symbol** `S = { '+', '-', '*', '(', ')' }`.
+- **Whitespace** `W = { c ∈ Σ : c.isspace() }`, i.e. exactly the characters for
+  which Python's `str.isspace()` holds.
+
+### 3.2 Tokens
+
+| Token    | Shape                  | Payload                    |
+|----------|------------------------|----------------------------|
+| `INT`    | one or more digits `D` | integer value `val(…)` (§3.4) |
+| `PLUS`   | `+`                    | —                          |
+| `MINUS`  | `-`                    | —                          |
+| `STAR`   | `*`                    | —                          |
+| `LPAREN` | `(`                    | —                          |
+| `RPAREN` | `)`                    | —                          |
+
+An `INT` token is identified by its **value**; its source spelling (e.g.
+leading zeros) is not preserved. Hence `007` and `5` yield the same token.
+
+### 3.3 Lexer
+
+`lex : String → Token* ⊎ { LexError(c, i) }` is defined by a single strictly
+left-to-right scan with index `i`:
+
+1. If `i = |s|`, the scan ends and returns the tokens accumulated so far.
+2. If `s[i] ∈ W`: skip it (`i ← i+1`) and continue.
+3. If `s[i] ∈ D`: let `j` be the smallest index `> i` with `s[j] ∉ D`
+   (or `|s|`). Emit **one** `INT` token for the digit run `s[i..j)` (**maximal
+   munch**), set `i ← j`, and continue.
+4. If `s[i] ∈ S`: emit the corresponding single-character token, `i ← i+1`.
+5. Otherwise: fail with `LexError(s[i], i)` where `i` is the index of the
+   first character that is in none of `W`, `D`, `S`.
+
+Consequences (normative): whitespace may occur between any two tokens, before
+the first, and after the last, without changing the token list; a digit run is
+never split, so `12` is one `INT` and `1 2` is two; no token other than `INT`
+spans more than one character. The lexer fails **only** via rule 5.
+
+### 3.4 Numeral value
+
+Let `digitval('0') = 0, …, digitval('9') = 9`. For a digit string
+`d = d₁d₂…d_k` (`k ≥ 1`):
+
+```
+val(d) = Σ_{i=1..k} digitval(dᵢ) · 10^(k−i)
+```
+
+Leading zeros are permitted and carry no significance: `val("007") = 7`.
+Values are unbounded (no overflow at lexing).
+
+## 4. Concrete grammar
+
+Start symbol `expr`; terminals are the tokens of §3.2.
+
+```ebnf
+expr   ::= term { ( PLUS | MINUS ) term } ;
+term   ::= factor { STAR factor } ;
+factor ::= INT
+         | LPAREN expr RPAREN
+         | PLUS factor
+         | MINUS factor ;
+```
+
+Derived binding rules (normative):
+
+| Level (tightest first) | Operators                  | Associativity        |
+|------------------------|----------------------------|----------------------|
+| 1                      | unary `+`, unary `-`       | prefix, right-chaining |
+| 2                      | binary `*`                 | left                 |
+| 3                      | binary `+`, binary `-`     | left                 |
+
+- Parentheses group explicitly and override the table.
+- Binary repetition is left-associative: `a ⊕ b ⊕ c` parses as
+  `(a ⊕ b) ⊕ c` for `⊕ ∈ {+, -, *}`.
+- Unary operators chain rightward: `MINUS MINUS x` is `−(−x)`.
+- A unary operator may follow any opening position: start of input, after
+  `(`, and after a binary operator (e.g. `2 * -3`, `1 - -2`).
+
+**[N]** The grammar is LL(1): `FIRST(factor) = {INT, LPAREN, PLUS, MINUS}`
+(pairwise disjoint) and the continuation decisions in `expr`/`term` are each
+determined by a single lookahead token. Determinism is stated as Theorem U
+(§8).
+
+## 5. Abstract syntax
+
+Abstract syntax trees (ASTs) are generated by:
+
+```
+E ::= Int(n) | Neg(e) | Add(e₁, e₂) | Sub(e₁, e₂) | Mul(e₁, e₂)      n ∈ ℤ
+```
+
+- `Int(n)` carries the payload value `n` of an `INT` token.
+- Unary plus is semantically the identity and **contributes no AST node**;
+  its only trace is the consumed `PLUS` token (see rule C-Plus, §7).
+- Parentheses contribute no AST node; they influence only the tree shape.
+- Each `Neg`/`Add`/`Sub`/`Mul` node corresponds to one operator application.
+
+## 6. Evaluation semantics
+
+`eval : E → ℤ` is defined by structural recursion:
+
+```
+(E-Lit)  eval(Int n)       = n
+(E-Neg)  eval(Neg e)       = − eval(e)
+(E-Add)  eval(Add e₁ e₂)   = eval(e₁) + eval(e₂)
+(E-Sub)  eval(Sub e₁ e₂)   = eval(e₁) − eval(e₂)
+(E-Mul)  eval(Mul e₁ e₂)   = eval(e₁) × eval(e₂)
+```
+
+Semantics per concrete construct:
+
+| Construct        | Semantics                                   |
+|------------------|---------------------------------------------|
+| integer literal  | its numeral value `val(d)` (§3.4)           |
+| unary `+e`       | identity: the value of `e`                  |
+| unary `-e`       | additive inverse of the value of `e` in ℤ   |
+| binary `e₁ + e₂` | sum of the operands' values in ℤ            |
+| binary `e₁ - e₂` | difference of the operands' values in ℤ     |
+| binary `e₁ * e₂` | product of the operands' values in ℤ        |
+| `( e )`          | the value of `e` (grouping only)            |
+
+**Totality.** Every recursive call of `eval` is on an immediate subexpression,
+so `eval` is total by structural induction. Since ℤ is closed under `+`, `−`,
+`×`, evaluation of a well-formed expression terminates, raises no exceptions,
+and has no undefined cases (no overflow, no division).
+
+**[N]** Python's `int` is an arbitrary-precision integer type and thereby
+realizes ℤ; the implementation inherits totality from the semantics above.
+
+## 7. Token coverage and the language
+
+The inductive relation `e ⇓ t` (“AST `e` covers token list `t`”) links syntax
+to tokens:
+
+```
+(C-Int)   Int(n) ⇓ [INT n]
+
+(C-Neg)   e ⇓ t                    ⟹ Neg(e) ⇓ MINUS · t
+(C-Plus)  e ⇓ t                    ⟹ e      ⇓ PLUS  · t
+
+(C-Add)   e₁ ⇓ t₁  and  e₂ ⇓ t₂    ⟹ Add(e₁, e₂) ⇓ t₁ · PLUS  · t₂
+(C-Sub)   e₁ ⇓ t₁  and  e₂ ⇓ t₂    ⟹ Sub(e₁, e₂) ⇓ t₁ · MINUS · t₂
+(C-Mul)   e₁ ⇓ t₁  and  e₂ ⇓ t₂    ⟹ Mul(e₁, e₂) ⇓ t₁ · STAR  · t₂
+
+(C-Par)   e ⇓ t                    ⟹ e      ⇓ LPAREN · t · RPAREN
+```
+
+**Definition (language).** `t ∈ L(G)`  ⟺  `∃ e. e ⇓ t`.
+
+The EBNF grammar of §4 denotes exactly `L(G)`: every coverage derivation
+replays as a grammar derivation and vice versa (structural induction; the
+paren rule corresponds to the `LPAREN expr RPAREN` production, C-Plus to
+`PLUS factor`).
+
+## 8. Parsing
+
+### 8.1 Operational reference algorithm
+
+`parse : Token* → E ⊎ ParseError` — recursive descent with a cursor over the
+token list; each function returns the built (sub)tree and the unconsumed
+remainder:
+
+```
+parse(t) = let (e, rest) = expr(t) in
+           if rest = ε then e else error UnexpectedToken(head(rest))
+
+expr(t) = let (e, rest) = term(t) in loop where
+  rest = PLUS · rest′  → (e′, rest) ← term(rest′); e ← Add(e, e′); repeat
+  rest = MINUS · rest′ → (e′, rest) ← term(rest′); e ← Sub(e, e′); repeat
+  otherwise            → return (e, rest)
+
+term(t) = let (f, rest) = factor(t) in loop where
+  rest = STAR · rest′  → (f′, rest) ← factor(rest′); f ← Mul(f, f′); repeat
+  otherwise            → return (f, rest)
+
+factor(t) =
+  t = INT(n) · rest  → (Int n, rest)
+  t = LPAREN · rest  → (e, rest′) ← expr(rest)
+                       if rest′ = RPAREN · rest″ then (e, rest″)
+                       else error MissingRPAREN
+  t = PLUS · rest    → factor(rest)                (PLUS consumed, no node)
+  t = MINUS · rest   → (e, rest′) ← factor(rest); (Neg e, rest′)
+  otherwise          → error (UnexpectedEnd if t = ε,
+                              UnexpectedToken(head(t)) otherwise)
+```
+
+**Termination (T0).** `parse` halts on every input: each recursive call and
+each loop iteration strictly advances the cursor (a token is consumed before
+every descent), so the unconsumed remainder shrinks; `parse` is therefore a
+total function `Token* → E ⊎ ParseError`.
+
+**Soundness (T1).** If `parse(t) = e` then `e ⇓ t`.
+*(Induction on `|t|`; each construction step mirrors one coverage rule.)*
+
+**Completeness (T2).** If some `e ⇓ t` then `parse(t) = e`.
+*(Induction on `|t|` using the LL(1) disjointness of `FIRST(factor)` and the
+forced continuations of `expr`/`term`; the algorithm's choices are the only
+ones compatible with a covering derivation.)*
+
+**Uniqueness (T3, corollary of T1 + T2).** If `e ⇓ t` and `e′ ⇓ t` then
+`e = e′`; the grammar is unambiguous and `parse` computes *the* covering AST.
+
+Consequently `L(G) = { t : parse(t) succeeds }`, and `parse` fails exactly on
+`t ∉ L(G)`. Parse failures are precisely: end of input where an operand was
+required; a token that cannot begin a `factor` (`STAR`, `RPAREN`); a missing
+`RPAREN` for an opened group; leftover tokens after the top-level `expr`.
+
+**[N]** Any conforming parser must be observationally equivalent to the
+algorithm above (same accept/reject decision and same AST on acceptance) or,
+more weakly, satisfy §9–§10 directly.
+
+## 9. Top-level semantics of `evaluate`
+
+For `s ∈ String`, with `lex` (§3.3), `parse` (§8.1), `eval` (§6):
+
+```
+evaluate(s) = eval(parse(t))    if lex(s) = t  and  t ∈ L(G)
+evaluate(s) = ↯ ValueError      if lex(s) fails (LexError)
+evaluate(s) = ↯ ValueError      if lex(s) = t and t ∉ L(G)
+```
+
+The value case is well-defined because the covering AST is unique (T3).
+
+Normative contract:
+
+- **C1 (Termination).** `evaluate(s)` halts for every `s ∈ String`.
+- **C2 (Result type).** `evaluate(s)` returns a Python `int` (equivalently, a
+  value of ℤ) iff `lex(s)` succeeds and `lex(s) ∈ L(G)`; the value equals
+  `eval(e)` for the unique `e` covering `lex(s)`.
+- **C3 (Error exactness).** `evaluate(s)` raises `ValueError` iff `lex(s)`
+  fails or `lex(s) ∉ L(G)`. No other exception may escape for `str` inputs
+  within the resource envelope of §12.
+- **C4 (Messages).** Exception *messages* are not contractual. Indicative
+  strings of the reference implementation:
+
+  | Condition                                   | Indicative message                     |
+  |---------------------------------------------|----------------------------------------|
+  | invalid character `c` at 0-based index `i`  | `Invalid character {c!r} at position {i}` |
+  | operand expected at end of input            | `Unexpected end of expression`         |
+  | token where an operand was expected         | `Unexpected token {tok!r}`             |
+  | group not closed                            | `Missing closing parenthesis`          |
+  | leftover tokens after the top-level `expr`  | `Unexpected token {tok!r}`             |
+
+  **[N]** The reference implementation lexes the whole string before parsing,
+  so a lex error anywhere in `s` is reported even where a parse error would
+  occur earlier positionally. Since both surface as `ValueError`, this
+  precedence is unobservable at the level of C2/C3.
+
+## 10. Verification obligations
+
+An implementation conforms to this specification iff it satisfies C1–C4 and
+properties P1–P9 below. Each property is stated so it can be discharged
+directly (e.g. by proof or mechanized testing against the oracle of §11).
+
+- **P1 (Totality & outcome type).** For every `s ∈ String`, evaluating
+  `evaluate(s)` halts and either yields an integer or raises `ValueError`;
+  no other exception escapes.
+- **P2 (Purity & determinism).** The outcome (value or exception) is a
+  function of `s` alone; evaluation has no side effects.
+- **P3 (Semantic agreement — main theorem).** If `lex(s) = t` and
+  `parse(t) = e`, then `evaluate(s) = eval(e)`. Conversely, if
+  `evaluate(s) = n`, then `t = lex(s)` exists and `n = eval(e)` for the
+  unique `e` with `e ⇓ t`.
+- **P4 (Parser correctness).** T1, T2, T3 of §8.1.
+- **P5 (Error exactness).** `evaluate(s)` raises `ValueError` ⟺ `lex(s)`
+  fails ∨ `¬∃e. e ⇓ lex(s)`.
+- **P6 (Whitespace insensitivity).** If `lex(s) = lex(s′)` then
+  `evaluate(s)` and `evaluate(s′)` agree as outcomes (same value, or both
+  raise `ValueError`).
+- **P7 (Arithmetic laws).** For all `e, e₁, e₂, e₃ ∈ E` (immediate
+  consequences of the E-rules and ℤ; useful when verifying at string level):
+  1. `eval(Add e₁ e₂) = eval(Add e₂ e₁)`
+  2. `eval(Add (Add e₁ e₂) e₃) = eval(Add e₁ (Add e₂ e₃))`
+  3. `eval(Add e (Int 0)) = eval(e)`
+  4. `eval(Mul e₁ e₂) = eval(Mul e₂ e₁)`
+  5. `eval(Mul (Mul e₁ e₂) e₃) = eval(Mul e₁ (Mul e₂ e₃))`
+  6. `eval(Mul e₁ (Add e₂ e₃)) = eval(Add (Mul e₁ e₂) (Mul e₁ e₃))`
+  7. `eval(Neg (Neg e)) = eval(e)`
+  8. `eval(Neg (Add e₁ e₂)) = eval(Add (Neg e₁) (Neg e₂))`
+  9. `eval(Sub e₁ e₂) = eval(Add e₁ (Neg e₂))`
+  10. `eval(Mul e (Int 1)) = eval(e)` and `eval(Mul e (Int 0)) = 0`
+- **P8 (Precedence & associativity, string level).** For any well-formed
+  sub-expressions `a, b, c` with values `α = evaluate(a)`, `β = evaluate(b)`,
+  `γ = evaluate(c)`:
+  | Source text      | Required value        |
+  |------------------|-----------------------|
+  | `a + b * c`      | `α + β·γ`             |
+  | `(a + b) * c`    | `(α + β)·γ`           |
+  | `a - b - c`      | `(α − β) − γ`         |
+  | `a * b * c`      | `(α·β)·γ`             |
+  | `a + b + c`      | `(α + β) + γ`         |
+  | `-a * b`         | `(−α)·β`              |
+  | `a * -b`         | `α·(−β)`              |
+  | `--a`            | `α`                   |
+  | `-(a + b)`       | `−(α + β)`            |
+- **P9 (Lexical corner cases).** For every digit string `d`:
+  `evaluate(d) = val(d)` (including leading zeros). `12` is a single `INT`
+  (hence `evaluate("1 2")` is a `ValueError`), non-ASCII digits are invalid
+  characters, and every operator/parenthesis token is exactly one character.
+
+## 11. Examples — normative test oracle
+
+Valid inputs (left column is input **as written**, including whitespace):
+
+| Input                        | Result | Rationale                        |
+|------------------------------|-------:|----------------------------------|
+| `1 + 2 * 3`                  | 7      | precedence of `*`                |
+| `(1 + 2) * 3`                | 9      | grouping                         |
+| `10 - 4 - 3`                 | 3      | left associativity               |
+| `2 * (3 + 4) - 5`            | 9      |                                  |
+| `100`                        | 100    | bare literal                     |
+| `0`                          | 0      |                                  |
+| `007`                        | 7      | leading zeros (§3.4)             |
+| ` 42 `                       | 42     | surrounding whitespace           |
+| `-3 + 5`                     | 2      | unary minus                      |
+| `1 - -2`                     | 3      | binary `-` then unary `-`        |
+| `--5`                        | 5      | chained unary                    |
+| `-+5`                        | −5     | chained unary                    |
+| `2 * -3`                     | −6     | unary after binary operator      |
+| `-(2 + 3)`                   | −5     | unary on a group                 |
+| `((2))`                      | 2      | nested parentheses               |
+| `2*3+4*5`                    | 26     | no whitespace                    |
+| `( 1 + 2 ) * ( 3 - 4 )`      | −3     | whitespace inside parentheses    |
+| `(((1+2)*(3+4)))`            | 21     |                                  |
+
+Invalid inputs (each must raise `ValueError`):
+
+| Input       | Reason                                        |
+|-------------|-----------------------------------------------|
+| `""`        | no tokens; operand expected                   |
+| `"   "`     | whitespace only; operand expected             |
+| `"1 +"`     | operand expected at end of input              |
+| `"*"`       | `STAR` cannot begin a factor                  |
+| `"()"`      | `RPAREN` cannot begin a factor inside a group |
+| `"(1+2"`    | missing `RPAREN`                              |
+| `"1)"`      | leftover `RPAREN` after top-level `expr`      |
+| `"1 2"`     | leftover `INT` after top-level `expr`         |
+| `"1 + * 2"` | `STAR` where an operand was expected          |
+| `"1 & 2"`   | invalid character `&`                         |
+| `"a+b"`     | invalid character `a`                         |
+| `"٣ + 1"`   | non-ASCII digit is an invalid character       |
+
+## 12. Non-normative implementation notes
+
+- **Recursion depth.** The reference parser is recursive descent, so stack
+  depth grows linearly with nesting depth (parentheses, unary chains).
+  Inputs nested beyond CPython's recursion limit (~10³) may raise
+  `RecursionError`. This is a resource limit of the runtime, not part of the
+  semantics; P1/C1 apply within this envelope.
+- **Integers.** Python `int` is arbitrary precision; the implementation
+  realizes the unbounded semantics of §6 without extra machinery.
+- **Error precedence.** See the **[N]** note in §9 (lex-before-parse).
+- **Internal names.** `_tokenize` / `_Parser` may be refactored freely;
+  conformance is judged solely by §9–§11.

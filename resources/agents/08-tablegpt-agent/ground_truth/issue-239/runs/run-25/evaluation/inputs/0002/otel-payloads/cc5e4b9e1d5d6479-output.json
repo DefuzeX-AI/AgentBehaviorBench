@@ -1,0 +1,18 @@
+{
+  "messages": [
+    {
+      "content": "<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\">import sqlite3, os, json\n\np = \"./abb-tablegpt-0bueqplp/profile/history.sqlite\"\nprint(\"size:\", os.path.getsize(p))\ncon = sqlite3.connect(p)\ntabs = con.execute(\"SELECT name FROM sqlite_master WHERE type='table'\").fetchall()\nprint(\"tables:\", tabs)\nfor (t,) in tabs:\n    try:\n        rows = con.execute(f\"SELECT * FROM {t} LIMIT 3\").fetchall()\n        cols = [d[0] for d in con.execute(f\"SELECT * FROM {t} LIMIT 1\").description]\n        print(f\"\\n{t} cols: {cols}\\n sample: {str(rows)[:600]}\")\n    except Exception as e:\n        print(t, \"err\", e)\n</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+      "additional_kwargs": {
+        "parent_id": "3a482243-cbbc-4bb4-94de-c6c43ab550cb"
+      },
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "1289b43e-6382-48b3-b960-add37fa10ead",
+      "example": false,
+      "tool_calls": [],
+      "invalid_tool_calls": [],
+      "usage_metadata": null
+    }
+  ]
+}

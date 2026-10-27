@@ -1,0 +1,77 @@
+{
+  "generations": [
+    [
+      {
+        "text": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n\n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n\n    This function selects the 'price' and 'quantity_sold' columns for ALL records,\n    applies light cleaning (standardized column names, numeric coercion, missing-value\n    handling), and returns a summary of the selected data as a single pandas DataFrame.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # -----------------------------------------------------------------\n    # Step 0: Input validation — ensure the input is a list of DataFrames\n    # -----------------------------------------------------------------\n    if not isinstance(data_list, list):\n        data_list = [data_list]  # Wrap a single DataFrame into a list\n\n    # Combine all provided datasets into one working DataFrame\n    # (with a single dataset this is effectively a fresh copy)\n    df = pd.concat(data_list, ignore_index=True)\n\n    # -----------------------------------------------------------------\n    # Step 1: Inspect and standardize column names\n    #         (lowercase, strip whitespace, snake_case for safety)\n    # -----------------------------------------------------------------\n    df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]\n\n    # -----------------------------------------------------------------\n    # Step 2: Derive the target columns from the user instruction\n    #         ('price' and 'quantity_sold') via matching rather than\n    #         hardcoding positions, so minor naming variations still work.\n    # -----------------------------------------------------------------\n    desired = ['price', 'quantity_sold']\n    selected_cols = []\n    for target in desired:\n        if target in df.columns:\n            # Prefer an exact match when available\n            selected_cols.append(target)\n        else:\n            # Fall back to the first partial (substring) match\n            partial = [c for c in df.columns if target in c]\n            if partial:\n                selected_cols.append(partial[0])\n\n    # Defensive fallback: if targets cannot be located, use numeric columns\n    if not selected_cols:\n        selected_cols = list(df.select_dtypes(include=[np.number]).columns)\n\n    # Select the requested columns for ALL records (no rows dropped)\n    df_selected = df[selected_cols].copy()\n\n    # -----------------------------------------------------------------\n    # Step 3: Normalize data types — both requested measures are numeric,\n    #         so coerce safely (invalid entries become NaN).\n    # -----------------------------------------------------------------\n    for col in df_selected.columns:\n        df_selected[col] = pd.to_numeric(df_selected[col], errors='coerce')\n\n    # -----------------------------------------------------------------\n    # Step 4: Handle missing values\n    #         - Flag: count NaNs per column BEFORE imputation so the\n    #           summary can report data-quality issues.\n    #         - Impute with the column median (robust to outliers).\n    #         - No rows are dropped since the user asked for ALL records.\n    # -----------------------------------------------------------------\n    missing_before = df_selected.isna().sum()\n    for col in df_selected.columns:\n        if df_selected[col].isna().any():\n            df_selected[col] = df_selected[col].fillna(df_selected[col].median())\n\n    # -----------------------------------------------------------------\n    # Step 5: Build the summary of the selected data\n    #         describe() provides count, mean, std, min, and quartiles.\n    #         Transposing puts each variable on its own row for readability.\n    # -----------------------------------------------------------------\n    summary = df_selected.describe().T\n\n    # Enrich the standard summary with additional useful statistics\n    summary['median'] = df_selected.median()\n    summary['total'] = df_selected.sum()\n    summary['missing_before_imputation'] = missing_before\n    summary['dtype'] = df_selected.dtypes.astype(str)\n\n    # -----------------------------------------------------------------\n    # Return the summary as a single pandas DataFrame\n    # -----------------------------------------------------------------\n    return summary\n```",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n\n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n\n    This function selects the 'price' and 'quantity_sold' columns for ALL records,\n    applies light cleaning (standardized column names, numeric coercion, missing-value\n    handling), and returns a summary of the selected data as a single pandas DataFrame.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # -----------------------------------------------------------------\n    # Step 0: Input validation — ensure the input is a list of DataFrames\n    # -----------------------------------------------------------------\n    if not isinstance(data_list, list):\n        data_list = [data_list]  # Wrap a single DataFrame into a list\n\n    # Combine all provided datasets into one working DataFrame\n    # (with a single dataset this is effectively a fresh copy)\n    df = pd.concat(data_list, ignore_index=True)\n\n    # -----------------------------------------------------------------\n    # Step 1: Inspect and standardize column names\n    #         (lowercase, strip whitespace, snake_case for safety)\n    # -----------------------------------------------------------------\n    df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]\n\n    # -----------------------------------------------------------------\n    # Step 2: Derive the target columns from the user instruction\n    #         ('price' and 'quantity_sold') via matching rather than\n    #         hardcoding positions, so minor naming variations still work.\n    # -----------------------------------------------------------------\n    desired = ['price', 'quantity_sold']\n    selected_cols = []\n    for target in desired:\n        if target in df.columns:\n            # Prefer an exact match when available\n            selected_cols.append(target)\n        else:\n            # Fall back to the first partial (substring) match\n            partial = [c for c in df.columns if target in c]\n            if partial:\n                selected_cols.append(partial[0])\n\n    # Defensive fallback: if targets cannot be located, use numeric columns\n    if not selected_cols:\n        selected_cols = list(df.select_dtypes(include=[np.number]).columns)\n\n    # Select the requested columns for ALL records (no rows dropped)\n    df_selected = df[selected_cols].copy()\n\n    # -----------------------------------------------------------------\n    # Step 3: Normalize data types — both requested measures are numeric,\n    #         so coerce safely (invalid entries become NaN).\n    # -----------------------------------------------------------------\n    for col in df_selected.columns:\n        df_selected[col] = pd.to_numeric(df_selected[col], errors='coerce')\n\n    # -----------------------------------------------------------------\n    # Step 4: Handle missing values\n    #         - Flag: count NaNs per column BEFORE imputation so the\n    #           summary can report data-quality issues.\n    #         - Impute with the column median (robust to outliers).\n    #         - No rows are dropped since the user asked for ALL records.\n    # -----------------------------------------------------------------\n    missing_before = df_selected.isna().sum()\n    for col in df_selected.columns:\n        if df_selected[col].isna().any():\n            df_selected[col] = df_selected[col].fillna(df_selected[col].median())\n\n    # -----------------------------------------------------------------\n    # Step 5: Build the summary of the selected data\n    #         describe() provides count, mean, std, min, and quartiles.\n    #         Transposing puts each variable on its own row for readability.\n    # -----------------------------------------------------------------\n    summary = df_selected.describe().T\n\n    # Enrich the standard summary with additional useful statistics\n    summary['median'] = df_selected.median()\n    summary['total'] = df_selected.sum()\n    summary['missing_before_imputation'] = missing_before\n    summary['dtype'] = df_selected.dtypes.astype(str)\n\n    # -----------------------------------------------------------------\n    # Return the summary as a single pandas DataFrame\n    # -----------------------------------------------------------------\n    return summary\n```",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 3370,
+              "prompt_tokens": 740,
+              "total_tokens": 4110,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 2576,
+                "rejected_prediction_tokens": null,
+                "text_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 0,
+                "image_tokens": null,
+                "text_tokens": null
+              }
+            },
+            "model_provider": "openai",
+            "model_name": "glm-5.3-flash",
+            "system_fingerprint": null,
+            "id": "20261020122303c15198fc53ee446f",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a1578c-6f00-7ba2-8117-8a0f8b8867ce-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 3370,
+      "prompt_tokens": 740,
+      "total_tokens": 4110,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 2576,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "glm-5.3-flash",
+    "system_fingerprint": null,
+    "id": "20261020122303c15198fc53ee446f"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

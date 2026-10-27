@@ -1,0 +1,188 @@
+{
+  "run_id": "run_895f3c9910774b8f9bda18b0534b89ef",
+  "case_id": "case_f7366d7c24ba41e8afb9c233f6038354",
+  "input_id": "step-6",
+  "status": "completed",
+  "output": "Output:\n```\nHello, World!\n```\n\nExit status: `0`. The program printed `Hello, World!` (with the trailing newline from `\\n`) and terminated cleanly.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_895f3c9910774b8f9bda18b0534b89ef",
+      "case_id": "case_f7366d7c24ba41e8afb9c233f6038354",
+      "input_id": "step-6",
+      "spans": [
+        {
+          "trace_id": "4c5ecafccfc50398da840f2e7cbc08ad",
+          "span_id": "bb0b88f1cc6e6653",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791919290293495575,
+          "end_time_unix_nano": 1791919305377671168,
+          "duration_nano": 15084175593,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1791919290296024031,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1791919297503252316,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1791919305373258973,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "4c5ecafccfc50398da840f2e7cbc08ad",
+          "span_id": "ed7cf087d1110f58",
+          "parent_span_id": "bb0b88f1cc6e6653",
+          "name": "cd /home/agent/workspace && ./broken; echo \"--- exit code: $?\"",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791919297487758403,
+          "end_time_unix_nano": 1791919297522488621,
+          "duration_nano": 34730218,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "cd /home/agent/workspace && ./broken; echo \"--- exit code: $?\"",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "command": "cd /home/agent/workspace && ./broken; echo \"--- exit code: $?\""
+            },
+            "gen_ai.tool.call.result": [
+              {
+                "content": {
+                  "text": "**Command:**\n```bash\ncd /home/agent/workspace && ./broken; echo \"--- exit code: $?\"\n```\n\n**Output:**\n```\nHello, World!\n--- exit code: 0\n```\n\n**Status:** Command succeeded with exit code 0",
+                  "type": "text"
+                },
+                "type": "content"
+              }
+            ],
+            "gen_ai.tool.call.id": "call_084ec643cae245bc8e67f271"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 2,
+      "retained_spans": 2,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_895f3c9910774b8f9bda18b0534b89ef",
+      "input_id": "step-6",
+      "step_id": "step-6",
+      "submission_id": "submission-d3d63550026cc4b613fef3a933086dc8",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "365a5e87743565b59d770aa64e7b6ff2414a75878211c036c3a0a8a1d7eeca9b",
+          "size_bytes": 2039,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "c6093fb13c445495cd086d9209afb7e2c641ee0fe49e5ced4b5790c6dbd69b90"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

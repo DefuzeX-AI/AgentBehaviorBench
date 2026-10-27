@@ -1,0 +1,105 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_8ba099df42c547c083a71e1b00a237a4",
+  "case_id": "case_41f5bd5188d04ef098037b6e7729097d",
+  "input_id": "step-4",
+  "spans": [
+    {
+      "trace_id": "fe5b3a399fb23e74807f67551440e270",
+      "span_id": "9890937b4d003ab7",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790878711107618184,
+      "end_time_unix_nano": 1790878736609407280,
+      "duration_nano": 25501789096,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1790878711109595997,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1790878736602680648,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "fe5b3a399fb23e74807f67551440e270",
+      "span_id": "88931d791a8e252e",
+      "parent_span_id": "9890937b4d003ab7",
+      "name": "exec: command: python3 clean.py && echo \"--- cleaned.csv ---\" && cat cleaned.csv, workdir: /home/agent/workspace",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790878722156376053,
+      "end_time_unix_nano": 1790878722182927636,
+      "duration_nano": 26551583,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "exec: command: python3 clean.py && echo \"--- cleaned.csv ---\" && cat cleaned.csv, workdir: /home/agent/workspace",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "python3 clean.py && echo \"--- cleaned.csv ---\" && cat cleaned.csv",
+          "workdir": "/home/agent/workspace"
+        },
+        "gen_ai.tool.call.result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "rows in: 5 | kept (age >= 25): 4 | removed: 1\n--- cleaned.csv ---\nname,age,city\r\nAlice,30,New York\r\nBob,25,Los Angeles\r\nCharlie,35,Chicago\r\nDiana,28,Houston"
+            }
+          ],
+          "details": {
+            "status": "completed",
+            "exitCode": 0,
+            "exitSignal": null,
+            "exitReason": "exit",
+            "durationMs": 18,
+            "aggregated": "rows in: 5 | kept (age >= 25): 4 | removed: 1\n--- cleaned.csv ---\nname,age,city\r\nAlice,30,New York\r\nBob,25,Los Angeles\r\nCharlie,35,Chicago\r\nDiana,28,Houston",
+            "noOutputTimedOut": false,
+            "cwd": "/home/agent/workspace"
+          }
+        },
+        "gen_ai.tool.call.id": "call_4641a9a22937451d89fa53a2"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 18,
+  "truncated": false,
+  "reasons": [
+    "trace_attribute_not_allowlisted"
+  ]
+}

@@ -1,0 +1,133 @@
+{
+  "cad_brief": {
+    "part_name": "l-bracket-80x80x60x8-m6",
+    "part_category": "L-bracket",
+    "length_unit": "mm",
+    "origin_convention": "centroid_on_base_plane",
+    "primary_workplane": "XZ",
+    "max_extent_x_mm": 80.0,
+    "max_extent_y_mm": 80.0,
+    "max_extent_z_mm": 60.0,
+    "target_volume_mm3": 84027.6,
+    "material": "PLA",
+    "material_density_g_cm3": 1.24,
+    "key_parameters": {
+      "OVERALL_WIDTH_X": 80.0,
+      "OVERALL_DEPTH_Y": 80.0,
+      "OVERALL_HEIGHT_Z": 60.0,
+      "MATERIAL_THICKNESS": 8.0,
+      "BASE_LENGTH_X": 80.0,
+      "BASE_WIDTH_Y": 80.0,
+      "BASE_THICKNESS_Z": 8.0,
+      "VERTICAL_LEG_HEIGHT_Z": 60.0,
+      "VERTICAL_LEG_THICKNESS_X": 8.0,
+      "VERTICAL_LEG_OUTER_FACE_X": 40.0,
+      "VERTICAL_LEG_INNER_FACE_X": 32.0,
+      "HOLE_DIAMETER": 6.0,
+      "HOLE_RADIUS": 3.0,
+      "HOLE_EDGE_OFFSET_X": 15.0,
+      "HOLE_CENTER_X_1": -25.0,
+      "HOLE_CENTER_X_2": 25.0,
+      "HOLE_CENTER_Y": 0.0,
+      "BASE_TOP_Z": 8.0,
+      "SYMMETRY_PLANE": "XZ"
+    },
+    "verification_targets": [
+      {
+        "id": "overall-x",
+        "kind": "overall_dimension",
+        "description": "Overall X extent of the bracket",
+        "nominal": 80.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": -0.5,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "x",
+        "critical": true,
+        "notes": "From X=-40 to X=+40"
+      },
+      {
+        "id": "overall-y",
+        "kind": "overall_dimension",
+        "description": "Overall Y extent of the bracket",
+        "nominal": 80.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": -0.5,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "y",
+        "critical": true,
+        "notes": "From Y=-40 to Y=+40"
+      },
+      {
+        "id": "overall-z",
+        "kind": "overall_dimension",
+        "description": "Overall Z extent of the bracket",
+        "nominal": 60.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": -0.5,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "z",
+        "critical": true,
+        "notes": "From Z=0 to Z=60"
+      },
+      {
+        "id": "single-body",
+        "kind": "single_body",
+        "description": "All features connected into one solid",
+        "nominal": null,
+        "tolerance_upper": 0.0,
+        "tolerance_lower": 0.0,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": null,
+        "critical": true,
+        "notes": "Bracket must be a single connected solid"
+      },
+      {
+        "id": "water-tightness",
+        "kind": "water_tightness",
+        "description": "Closed manifold mesh",
+        "nominal": null,
+        "tolerance_upper": 0.0,
+        "tolerance_lower": 0.0,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": null,
+        "critical": true,
+        "notes": "Mesh must be watertight"
+      }
+    ],
+    "functional_requirements": [
+      "Mounting bracket for securing components at 90 degrees",
+      "Two through-holes for M6 fasteners",
+      "Load-bearing in vertical direction",
+      "Manufactured by 3D printing (FDM) with PLA material"
+    ],
+    "manufacturing_method": "3d_print_fdm",
+    "special_features": [
+      "MUST create a horizontal base plate of dimensions OVERALL_WIDTH_X × OVERALL_DEPTH_Y × MATERIAL_THICKNESS, with bottom face at Z=0 and centered at X=0, Y=0.",
+      "MUST create a vertical leg of dimensions VERTICAL_LEG_THICKNESS_X × OVERALL_DEPTH_Y × OVERALL_HEIGHT_Z at the +X end of the base, with outer face at X=VERTICAL_LEG_OUTER_FACE_X and inner face at X=VERTICAL_LEG_INNER_FACE_X.",
+      "MUST extend the vertical leg from Z=0 to Z=OVERALL_HEIGHT_Z, sharing the corner with the horizontal base.",
+      "MUST make all features symmetric about the SYMMETRY_PLANE (XZ plane, Y=0).",
+      "MUST create two cylindrical through-holes of diameter HOLE_DIAMETER centered at (X=HOLE_CENTER_X_1, Y=HOLE_CENTER_Y) and (X=HOLE_CENTER_X_2, Y=HOLE_CENTER_Y), penetrating the horizontal base along the Z axis from Z=0 to Z=MATERIAL_THICKNESS.",
+      "MUST NOT allow the holes to intersect the vertical leg; the hole edge at X=HOLE_CENTER_X_2 + HOLE_RADIUS MUST be less than VERTICAL_LEG_INNER_FACE_X.",
+      "MUST orient the long arm (horizontal base) along the X axis, with hole centers at HOLE_EDGE_OFFSET_X=15 mm from each end (X=-40 and X=+40).",
+      "MUST ensure the final part is a single connected solid with no disconnected components."
+    ],
+    "user_request_raw": "Process this part request: 'Make an L-bracket with overall width 80 mm, height 60 mm, thickness 8 mm, and two through holes of diameter 6 mm centered 15 mm from each end along the long arm.' Run the CAD pipeline and monitor its progress. If the pipeline stalls or QA fails repeatedly, detect the stagnation and decide whether to replan or stop. Do not exceed 10 pipeline repair iterations. Report the final pipeline status, QA report, and build123d script.",
+    "spec_version": 1
+  },
+  "execution_log": [
+    "node_spec_planner: loaded from cache"
+  ],
+  "node_history": [
+    "planner"
+  ]
+}

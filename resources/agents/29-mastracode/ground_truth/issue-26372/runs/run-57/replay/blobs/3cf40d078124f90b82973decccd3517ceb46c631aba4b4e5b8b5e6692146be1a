@@ -1,0 +1,117 @@
+# Proof Obligations: `add_one`
+
+Property under proof (from `arith.spec.md`):
+
+```
+∀ x ∈ ℤ :  add_one(x) == x + 1
+```
+
+To establish this property as a theorem about the implementation in
+`arith.py`, the following obligations must be discharged.
+
+---
+
+## OB1 — Well-formedness (signature)
+
+**Statement.** `add_one` is a unary function accepting one positional
+argument, and its defining expression `x + 1` is well-typed for the declared
+domain.
+
+**Discharge.** By inspection of `arith.py`: the definition is
+`def add_one(x): return x + 1`, which is a unary function. In Python, `+`
+between any object and the `int` literal `1` resolves via `x.__add__(1)`
+and, on `TypeError`, via reflected `(1).__radd__(x)`; `int.__radd__`
+restricts operands to `int` instances, so for `x` an `int` the expression
+always evaluates to an `int`.
+
+**Status:** discharged by inspection.
+
+## OB2 — Domain coverage (the quantifier is over ℤ, not the tested sample)
+
+**Statement.** The universal quantifier ranges over *all* integers, an
+infinite set. The check in `verify_arith.py` (`python verify_arith.py`)
+covers 2014 sample values and therefore does not by itself establish the
+property.
+
+**Discharge options (any one):**
+- (a) A mechanized proof in a proof assistant (Lean, Coq/ Rocq, Isabelle,
+  Dafny) after re-expressing the function in that system.
+- (b) A closed-form argument (see OB3) that is itself formally validated.
+- (c) SMT encoding: model `add_one` as `λx. x + 1` and assert
+  `∀x. add_one(x) = x + 1` over the SMT `Int` sort; discharged by the
+  theory of linear integer arithmetic (Z3/CVC5: `forall x. f(x) == x + 1`).
+
+**Status:** open. Any "proof" resting solely on `verify_arith.py` fails
+this obligation.
+
+## OB3 — Semantics agreement (implementation = specification)
+
+**Statement.** The Python expression `x + 1`, for `x` bound to an `int`,
+computes the mathematical successor `succ(x)` — i.e., the CPython semantics
+of `+` on arbitrary-precision `int` coincides with the Peano successor
+operation modulo the binary representation.
+
+**Sub-obligations.**
+- **OB3.1 — Correctness:** for `x ∈ ℤ`, `x + 1` evaluates to
+  `succ(x)` as a value of type `int`.
+- **OB3.2 — Absence of overflow:** the result stays in-range. Discharged by
+  CPython's `int` being arbitrary precision (no fixed-width wraparound), so
+  `OB3.2` holds trivially. (Contrast: NumPy `int64` or C `int` would make
+  this obligation substantive — `INT_MAX + 1` wraps and the property would
+  be false on finite-width types.)
+- **OB3.3 — No subclass interference:** an `int` subclass overriding
+  `__add__` would break the property even though `isinstance(x, int)` holds
+  (demonstrated: a `Bad(int)` with `__add__ → 0` returns `0`, not `6`). Two
+  defences, either of which discharges the obligation:
+  - restrict the domain to exactly `type(x) is int`, or
+  - appeal to `int` being an immutable type: its arithmetic slots cannot be
+    monkeypatched at runtime (`type 'int'` rejects attribute assignment).
+
+**Status:** OB3.1 discharged by CPython semantics; OB3.2 discharged
+(arbitrary precision); OB3.3 discharged under the "exactly `int`" domain
+restriction.
+
+## OB4 — Purity / referential transparency
+
+**Statement.** `add_one` has no observable side effects: it performs no I/O,
+mutates no state, raises no exception on the declared domain, and always
+terminates.
+
+**Discharge.** The body is a single pure expression on a local parameter.
+Termination: one constant-time arithmetic operation. `bool` inputs
+(`bool ⊂ int`) flow through the inherited `int.__add__` and return `int`
+(`True + 1 == 2`), so no exception arises on any `int`-domain input.
+
+**Status:** discharged by inspection.
+
+## OB5 — Equivalence with the tested property (verification soundness)
+
+**Statement.** The runtime check in `verify_arith.py` tests the same
+relation the spec states — no transcription drift between the formal
+property, the spec prose, and the checked assertion — and the checker itself
+is sound (asserts, no exception swallowing).
+
+**Discharge.** By inspection: the checker asserts `add_one(x) == x + 1`
+verbatim, over `INTERESTING` (0, ±1, 8/16/32/64-bit boundaries, 10^30
+arbitrary-precision values) plus a dense sweep `range(-1000, 1001)`, and
+fails loudly via `assert` on any counterexample.
+
+**Status:** discharged by inspection (soundness of the check, not coverage —
+coverage is OB2's concern).
+
+---
+
+## Summary
+
+| ID    | Obligation                        | Status                          |
+|-------|-----------------------------------|---------------------------------|
+| OB1   | Well-formedness                   | discharged (inspection)         |
+| OB2   | Domain coverage / true proof      | **open** (needs OB3-based proof, proof assistant, or SMT) |
+| OB3.1 | Semantics: `+` = successor on ℤ   | discharged (CPython semantics)  |
+| OB3.2 | No overflow                       | discharged (arbitrary precision)|
+| OB3.3 | No subclass interference          | discharged (domain: exactly `int`) |
+| OB4   | Purity, termination               | discharged (inspection)         |
+| OB5   | Checker tests the stated property | discharged (inspection)         |
+
+The property is established modulo OB2, which requires a real proof artifact
+(proof assistant or SMT certificate); testing alone cannot close it.

@@ -1,0 +1,3 @@
+{
+  "query": "import json\nimport pandas as pd\nimport hashlib, os\n\nwith open('envelope.json') as f:\n    envelope = json.load(f)\n\nprint(\"Envelope fields:\")\nfor k, v in envelope.items():\n    if k == 'public_key':\n        print(f\"  {k}: <{len(v)} chars>\")\n    else:\n        print(f\"  {k}: {v}\")\n\nprint(\"\\nFiles in cwd:\", [f for f in os.listdir('.') if f.endswith(('.csv','.json'))])"
+}

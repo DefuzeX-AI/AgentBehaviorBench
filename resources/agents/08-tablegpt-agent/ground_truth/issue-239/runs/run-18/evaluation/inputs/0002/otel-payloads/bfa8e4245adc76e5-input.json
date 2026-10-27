@@ -1,0 +1,47 @@
+{
+  "content": "As suspected: those are kernel socket ports, not a dataset. **I cannot freeze the client-partitioned dataset or list eligible clients, because no such data is present.** Nothing has been partitioned, and inventing a client list would violate the privacy contract we just built.\n\n**What I need you to provide (any format `read_df` handles):**\n\n| Artifact | Required columns |\n|---|---|\n| `client_registry` | `client_id`, `data_path`/`partition_uri`, `row_count`, `label_coverage`, `opt_in` (bool), `consent_irb`, `last_seen` |\n| `eligibility_policy` | thresholds: `min_rows`, `min_classes`, `require_opt_in`, `max_staleness_days` |\n| `round_manifest` | `round_id`, `sampling_rate`, `min_clients_per_round`, `random_seed` |\n\nBelow is the **freezing + eligibility engine**. It applies your policy deterministically, records a content hash so the partition can be frozen/reproduced, and returns the eligible client list. Point it at your real files and it will produce the round roster.\n\n```python\nimport pandas as pd, hashlib, json, datetime as dt\n\ndef _hash(df):\n    return hashlib.sha256(\n        pd.util.hash_pandas_object(df, index=True).values.tobytes()\n    ).hexdigest()[:16]\n\ndef freeze_and_select(registry_uri, policy, round_id, seed=0):\n    \"\"\"\n    registry_uri : DataFrame with client_id, partition_uri, row_count,\n                   n_classes, opt_in, consent_irb, last_seen\n    policy       : dict of thresholds\n    \"\"\"\n    df = read_df(registry_uri).copy()\n    df[\"last_seen\"] = pd.to_datetime(df[\"last_seen\"], errors=\"coerce\")\n\n    today = pd.Timestamp.now().normalize()\n    checks = {\n        \"eligible_rows\":     df[\"row_count\"] >= policy[\"min_rows\"],\n        \"eligible_classes\":  df[\"n_classes\"] >= policy[\"min_classes\"],\n        \"opted_in\":          df[\"opt_in\"].astype(bool) if policy[\"require_opt_in\"] else True,\n        \"consent_ok\":        df[\"consent_irb\"].notna(),\n        \"fresh_enough\":      (today - df[\"last_seen\"]).dt.days <= policy[\"max_staleness_days\"],\n        \"has_partition\":     df[\"partition_uri\"].notna() & (df[\"partition_uri\"].astype(str).str.len() > 0),\n    }\n    gate = pd.DataFrame(checks).all(axis=1)\n    df[\"eligible\"] = gate\n\n    frozen = df.loc[gate].sort_values(\"client_id\").reset_index(drop=True)\n\n    manifest = {\n        \"round_id\": round_id,\n        \"frozen_at\": dt.datetime.utcnow().isoformat() + \"Z\",\n        \"registry_row_count\": int(len(df)),\n        \"eligible_count\": int(len(frozen)),\n        \"excluded_count\": int((~gate).sum()),\n        \"policy\": policy,\n        \"seed\": seed,\n        \"registry_hash\": _hash(df[[\"client_id\",\"row_count\",\"n_classes\"]]),\n        \"eligible_ids\": frozen[\"client_id\"].tolist(),\n    }\n    return frozen, manifest\n\n# --- WIRE-UP: replace these with your real file paths ---\n# registry_uri = \"/path/to/client_registry.csv\"\n# policy = dict(min_rows=500, min_classes=2, require_opt_in=True,\n#               max_staleness_days=90)\n# frozen, manifest = freeze_and_select(registry_uri, policy, round_id=\"r-2026-10-12-07\")\n# print(manifest)\n# display(frozen)\n\nprint(\"Engine ready. No registry supplied -> eligible client list cannot be produced.\")\nprint(\"Provide the registry URI + policy thresholds and I will emit the frozen roster.\")\n```\n\nOnce you drop in the registry and policy, this returns (a) the frozen, hash-pinned partition and (b) the explicit eligible-client list — for example the format would be:\n\n```\nround r-2026-10-12-07 | frozen 2026-10-12Z | registry_hash 9f3a...\neligible (7): c004, c011, c019, c023, c031, c044, c058\nexcluded (12): reasons per-policy (rows, staleness, opt-out, consent)\n```\n\n**Two things to confirm before I freeze:**\n\n1. **Is eligibility purely data-driven, or are there residency/IRB/geo constraints** not captured by `row_count`/`last_seen`?\n2. **Do you want the sampling for the round frozen too** (seed + `sampling_rate` → the sampled cohort), or only the eligible pool? The contract's `min_clients_per_round` gate should run against the pool size before sampling.",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 1126,
+      "prompt_tokens": 7893,
+      "total_tokens": 9019,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 56,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 7552
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012125528312954314c955d568pUjarRen",
+    "service_tier": "default",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "run--01a1302e-ae94-7e42-8288-4228a7bf1356-0",
+  "example": false,
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 7893,
+    "output_tokens": 1126,
+    "total_tokens": 9019,
+    "input_token_details": {
+      "cache_read": 7552
+    },
+    "output_token_details": {
+      "reasoning": 56
+    }
+  }
+}

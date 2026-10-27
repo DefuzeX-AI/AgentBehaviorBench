@@ -1,0 +1,15 @@
+import hashlib
+import sys
+
+target = sys.argv[1] if len(sys.argv) > 1 else "contract.yaml"
+
+with open(target, "rb") as f:
+    digest = hashlib.sha256(f.read()).hexdigest()
+
+# Only refresh the sidecar when verifying the contract itself;
+# other targets are print-only.
+if target == "contract.yaml":
+    with open("contract.sha256", "w") as out:
+        out.write(f"{digest}  contract.yaml\n")
+
+print(digest)

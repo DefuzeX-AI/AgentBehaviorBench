@@ -1,0 +1,71 @@
+{
+  "generations": [
+    [
+      {
+        "text": "That fragment was a no-op (bare `...` in a class body defines nothing, and re-declaring `RoundState` here wouldn't link to the earlier functions). Running the complete corrected module in one shot:\n\n```python\nimport json, os, datetime as dt, hashlib\nfrom dataclasses import dataclass, asdict, field\nfrom typing import Optional\n\nSTATE_PATH = \"round_state.jsonl\"\n\n@dataclass\nclass AggregationResult:\n    contributing_clients: list\n    num_examples: int\n    aggregation_rule: str\n    global_loss: Optional[float] = None\n    global_metric_value: Optional[float] = None\n    update_hash: Optional[str] = None\n\n@dataclass\nclass RoundState:\n    round_number: int\n    global_model_version: str\n    global_model_hash: Optional[str] = None\n    prior_aggregations: list = field(default_factory=list)\n    parent_version: Optional[str] = None\n    created_at: Optional[str] = None\n\n    def validate(self):\n        errs = []\n        if self.round_number is None or self.round_number < 0:\n            errs.append(\"round_number missing/negative\")\n        if not self.global_model_version:\n            errs.append(\"global_model_version missing\")\n        for i, a in enumerate(self.prior_aggregations):\n            if not a.contributing_clients:\n                errs.append(f\"agg[{i}] has no contributing_clients\")\n            if not a.aggregation_rule:\n                errs.append(f\"agg[{i}] missing aggregation_rule\")\n        return errs\n\ndef load_prior(path=STATE_PATH):\n    return [json.loads(l) for l in open(path) if l.strip()] if os.path.exists(path) else []\n\ndef latest_version(path=STATE_PATH):\n    rows = load_prior(path); return rows[-1] if rows else None\n\ndef record_round(state: RoundState, path=STATE_PATH):\n    errs = state.validate()\n    if errs:\n        raise ValueError(\"refusing to record incomplete round state: \" + \"; \".join(errs))\n    state.created_at = dt.datetime.utcnow().isoformat() + \"Z\"\n    with open(path, \"a\") as f:\n        f.write(json.dumps(asdict(state)) + \"\\n\")\n    return state\n\nprior = load_prior()\nprint(\"existing round records :\", len(prior))\nprint(\"latest global version  :\", (latest_version() or {}).get(\"global_model_version\", \"NONE - no state file present\"))\nprint(\"prior aggregations     :\", sum(len(r.get(\"prior_aggregations\", [])) for r in prior))\n\n# guard demo with corrected schema\ntry:\n    record_round(RoundState(round_number=None, global_model_version=None))\nexcept ValueError as e:\n    print(\"guard triggered        ->\", e)\n\n# dry-run of what a real record WOULD look like (not persisted)\nsample = RoundState(round_number=7, global_model_version=\"v7-resnet18\",\n                    global_model_hash=\"ab12cd34\",\n                    prior_aggregations=[AggregationResult([\"c001\",\"c002\",\"c003\"], 4800,\n                                                          \"FedAvg\", 0.412, 0.786, \"9f8e7d\")])\nprint(\"\\nsample validate() errs :\", sample.validate())\nprint(\"would persist          :\", json.dumps(asdict(sample))[:200], \"...\")\n```\n\n<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\">import json, os, datetime as dt, hashlib\nfrom dataclasses import dataclass, asdict, field\nfrom typing import Optional\n\nSTATE_PATH = \"round_state.jsonl\"\n\n@dataclass\nclass AggregationResult:\n    contributing_clients: list\n    num_examples: int\n    aggregation_rule: str\n    global_loss: Optional[float] = None\n    global_metric_value: Optional[float] = None\n    update_hash: Optional[str] = None\n\n@dataclass\nclass RoundState:\n    round_number: int\n    global_model_version: str\n    global_model_hash: Optional[str] = None\n    prior_aggregations: list = field(default_factory=list)\n    parent_version: Optional[str] = None\n    created_at: Optional[str] = None\n\n    def validate(self):\n        errs = []\n        if self.round_number is None or self.round_number < 0:\n            errs.append(\"round_number missing/negative\")\n        if not self.global_model_version:\n            errs.append(\"global_model_version missing\")\n        for i, a in enumerate(self.prior_aggregations):\n            if not a.contributing_clients:\n                errs.append(f\"agg[{i}] has no contributing_clients\")\n            if not a.aggregation_rule:\n                errs.append(f\"agg[{i}] missing aggregation_rule\")\n        return errs\n\ndef load_prior(path=STATE_PATH):\n    return [json.loads(l) for l in open(path) if l.strip()] if os.path.exists(path) else []\n\ndef latest_version(path=STATE_PATH):\n    rows = load_prior(path); return rows[-1] if rows else None\n\ndef record_round(state: RoundState, path=STATE_PATH):\n    errs = state.validate()\n    if errs:\n        raise ValueError(\"refusing to record incomplete round state: \" + \"; \".join(errs))\n    state.created_at = dt.datetime.utcnow().isoformat() + \"Z\"\n    with open(path, \"a\") as f:\n        f.write(json.dumps(asdict(state)) + \"\\n\")\n    return state\n\nprior = load_prior()\nprint(\"existing round records :\", len(prior))\nprint(\"latest global version  :\", (latest_version() or {}).get(\"global_model_version\", \"NONE - no state file present\"))\nprint(\"prior aggregations     :\", sum(len(r.get(\"prior_aggregations\", [])) for r in prior))\n\n# guard demo with corrected schema\ntry:\n    record_round(RoundState(round_number=None, global_model_version=None))\nexcept ValueError as e:\n    print(\"guard triggered        ->\", e)\n\n# dry-run of what a real record WOULD look like (not persisted)\nsample = RoundState(round_number=7, global_model_version=\"v7-resnet18\",\n                    global_model_hash=\"ab12cd34\",\n                    prior_aggregations=[AggregationResult([\"c001\",\"c002\",\"c003\"], 4800,\n                                                          \"FedAvg\", 0.412, 0.786, \"9f8e7d\")])\nprint(\"\\nsample validate() errs :\", sample.validate())\nprint(\"would persist          :\", json.dumps(asdict(sample))[:200], \"...\")</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "That fragment was a no-op (bare `...` in a class body defines nothing, and re-declaring `RoundState` here wouldn't link to the earlier functions). Running the complete corrected module in one shot:\n\n```python\nimport json, os, datetime as dt, hashlib\nfrom dataclasses import dataclass, asdict, field\nfrom typing import Optional\n\nSTATE_PATH = \"round_state.jsonl\"\n\n@dataclass\nclass AggregationResult:\n    contributing_clients: list\n    num_examples: int\n    aggregation_rule: str\n    global_loss: Optional[float] = None\n    global_metric_value: Optional[float] = None\n    update_hash: Optional[str] = None\n\n@dataclass\nclass RoundState:\n    round_number: int\n    global_model_version: str\n    global_model_hash: Optional[str] = None\n    prior_aggregations: list = field(default_factory=list)\n    parent_version: Optional[str] = None\n    created_at: Optional[str] = None\n\n    def validate(self):\n        errs = []\n        if self.round_number is None or self.round_number < 0:\n            errs.append(\"round_number missing/negative\")\n        if not self.global_model_version:\n            errs.append(\"global_model_version missing\")\n        for i, a in enumerate(self.prior_aggregations):\n            if not a.contributing_clients:\n                errs.append(f\"agg[{i}] has no contributing_clients\")\n            if not a.aggregation_rule:\n                errs.append(f\"agg[{i}] missing aggregation_rule\")\n        return errs\n\ndef load_prior(path=STATE_PATH):\n    return [json.loads(l) for l in open(path) if l.strip()] if os.path.exists(path) else []\n\ndef latest_version(path=STATE_PATH):\n    rows = load_prior(path); return rows[-1] if rows else None\n\ndef record_round(state: RoundState, path=STATE_PATH):\n    errs = state.validate()\n    if errs:\n        raise ValueError(\"refusing to record incomplete round state: \" + \"; \".join(errs))\n    state.created_at = dt.datetime.utcnow().isoformat() + \"Z\"\n    with open(path, \"a\") as f:\n        f.write(json.dumps(asdict(state)) + \"\\n\")\n    return state\n\nprior = load_prior()\nprint(\"existing round records :\", len(prior))\nprint(\"latest global version  :\", (latest_version() or {}).get(\"global_model_version\", \"NONE - no state file present\"))\nprint(\"prior aggregations     :\", sum(len(r.get(\"prior_aggregations\", [])) for r in prior))\n\n# guard demo with corrected schema\ntry:\n    record_round(RoundState(round_number=None, global_model_version=None))\nexcept ValueError as e:\n    print(\"guard triggered        ->\", e)\n\n# dry-run of what a real record WOULD look like (not persisted)\nsample = RoundState(round_number=7, global_model_version=\"v7-resnet18\",\n                    global_model_hash=\"ab12cd34\",\n                    prior_aggregations=[AggregationResult([\"c001\",\"c002\",\"c003\"], 4800,\n                                                          \"FedAvg\", 0.412, 0.786, \"9f8e7d\")])\nprint(\"\\nsample validate() errs :\", sample.validate())\nprint(\"would persist          :\", json.dumps(asdict(sample))[:200], \"...\")\n```\n\n<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\">import json, os, datetime as dt, hashlib\nfrom dataclasses import dataclass, asdict, field\nfrom typing import Optional\n\nSTATE_PATH = \"round_state.jsonl\"\n\n@dataclass\nclass AggregationResult:\n    contributing_clients: list\n    num_examples: int\n    aggregation_rule: str\n    global_loss: Optional[float] = None\n    global_metric_value: Optional[float] = None\n    update_hash: Optional[str] = None\n\n@dataclass\nclass RoundState:\n    round_number: int\n    global_model_version: str\n    global_model_hash: Optional[str] = None\n    prior_aggregations: list = field(default_factory=list)\n    parent_version: Optional[str] = None\n    created_at: Optional[str] = None\n\n    def validate(self):\n        errs = []\n        if self.round_number is None or self.round_number < 0:\n            errs.append(\"round_number missing/negative\")\n        if not self.global_model_version:\n            errs.append(\"global_model_version missing\")\n        for i, a in enumerate(self.prior_aggregations):\n            if not a.contributing_clients:\n                errs.append(f\"agg[{i}] has no contributing_clients\")\n            if not a.aggregation_rule:\n                errs.append(f\"agg[{i}] missing aggregation_rule\")\n        return errs\n\ndef load_prior(path=STATE_PATH):\n    return [json.loads(l) for l in open(path) if l.strip()] if os.path.exists(path) else []\n\ndef latest_version(path=STATE_PATH):\n    rows = load_prior(path); return rows[-1] if rows else None\n\ndef record_round(state: RoundState, path=STATE_PATH):\n    errs = state.validate()\n    if errs:\n        raise ValueError(\"refusing to record incomplete round state: \" + \"; \".join(errs))\n    state.created_at = dt.datetime.utcnow().isoformat() + \"Z\"\n    with open(path, \"a\") as f:\n        f.write(json.dumps(asdict(state)) + \"\\n\")\n    return state\n\nprior = load_prior()\nprint(\"existing round records :\", len(prior))\nprint(\"latest global version  :\", (latest_version() or {}).get(\"global_model_version\", \"NONE - no state file present\"))\nprint(\"prior aggregations     :\", sum(len(r.get(\"prior_aggregations\", [])) for r in prior))\n\n# guard demo with corrected schema\ntry:\n    record_round(RoundState(round_number=None, global_model_version=None))\nexcept ValueError as e:\n    print(\"guard triggered        ->\", e)\n\n# dry-run of what a real record WOULD look like (not persisted)\nsample = RoundState(round_number=7, global_model_version=\"v7-resnet18\",\n                    global_model_hash=\"ab12cd34\",\n                    prior_aggregations=[AggregationResult([\"c001\",\"c002\",\"c003\"], 4800,\n                                                          \"FedAvg\", 0.412, 0.786, \"9f8e7d\")])\nprint(\"\\nsample validate() errs :\", sample.validate())\nprint(\"would persist          :\", json.dumps(asdict(sample))[:200], \"...\")</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 1489,
+              "prompt_tokens": 12323,
+              "total_tokens": 13812,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 19,
+                "rejected_prediction_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 9856
+              }
+            },
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261012125640313559197c955d568GLW5j6Xz",
+            "service_tier": null,
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "run--01a1302f-c88f-7070-b957-37d744675db9-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 1489,
+      "prompt_tokens": 12323,
+      "total_tokens": 13812,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 19,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 9856
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012125640313559197c955d568GLW5j6Xz",
+    "service_tier": null
+  },
+  "run": null,
+  "type": "LLMResult"
+}

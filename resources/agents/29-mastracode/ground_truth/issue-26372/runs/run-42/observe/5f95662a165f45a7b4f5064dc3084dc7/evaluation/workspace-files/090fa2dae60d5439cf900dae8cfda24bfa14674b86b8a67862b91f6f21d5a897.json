@@ -1,0 +1,4 @@
+{
+  "content": "#!/bin/sh\n# Deterministic release: stages the shipped files and packs a tarball whose\n# bytes depend only on file contents (sorted paths, fixed mtime, no uid/gid,\n# gzip -n strips the gzip header timestamp).\nset -eu\n\nNAME=$(node -p \"require('./package.json').name\")\nVERSION=$(node -p \"require('./package.json').version\")\nOUT=\"${NAME}-${VERSION}.tgz\"\n\nnpm run build\n\nSTAGE=$(mktemp -d)\ntrap 'rm -rf \"$STAGE\"' EXIT\nmkdir -p \"$STAGE/package/dist\"\ncp package.json index.js build.js sbom.js release.sh README.md package-lock.json \"$STAGE/package/\"\ncp dist/my-package.js \"$STAGE/package/dist/my-package.js\"\n\nLC_ALL=C tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner --format=gnu \\\n  -cf - -C \"$STAGE\" package | gzip -n > \"$OUT\"\nsha256sum \"$OUT\" > \"$OUT.sha256\"\necho \"release artifact: $OUT\"\n",
+  "encoding": "utf-8"
+}

@@ -1,0 +1,18 @@
+{
+  "messages": [
+    {
+      "content": "## Result: no dataset is present — the contract cannot be bound yet\n\nI searched the whole environment exhaustively and found **no uploaded dataset**. Here is what actually exists on disk:\n\n| Path | What it is |\n|---|---|\n| `kernel-b7516334-…json` | Jupyter kernel connection file (ports + HMAC key) |\n| `abb-tablegpt-64awg_bw/profile/*` | IPython startup profile (`00-pandas.py`, `98-udfs.py`, `99-cfont.py`) |\n| `kuma/run_93ee57a7…` | Runtime run directory, no data file |\n| `.cache/matplotlib/…` | Matplotlib font cache |\n\nVerified facts:\n- **No** `.csv / .tsv / .json / .parquet / .xlsx / .feather / .orc / .txt` data files anywhere under `.`, `/tmp`, `/mnt/data`, `/content`, `data`, `/home`.\n- **No** DataFrame exists in the session namespace (`globals()` scan → `none`).\n- No environment variable points to an input/upload path.\n- The only `.json` files found are Jupyter kernel specs, not data.\n\nI won't guess at a producer/consumer/dialect/profile/version from an empty environment — that would be fabrication, not analysis.\n\n### Please provide the dataset\n\nAttach or point me to the file (or variable name, e.g. `df`). Then I'll run the contract-binding pass and report all five fields.\n\n### Fields I will bind, and the evidence for each\n\n| Contract field | How I'll determine it | Fallback if not derivable |\n|---|---|---|\n| **Producer** | `_producer`/`provenance`/`source`/`origin` columns or attrs; file owner, path/source system, header comments, `df.attrs` | Report \"unknown — inferred from <path>\" |\n| **Consumer** | Stated `consumer`/`audience` metadata; else the downstream role implied by schema (e.g. BI mart vs. ML training set) | Report \"unknown — schema suggests X\" |\n| **Dialect** | File extension + real parse behavior: delimiter for CSV/TSV, JSON lines vs. nested, Parquet/Excel, encoding via `detect_file_encodings` | Concretely observed parse settings |\n| **Profile** | Row/column counts, dtypes, null rates, uniqueness, min/max/quantiles, sentinel values | Empirical summary of the loaded frame |\n| **Version** | `_version`/`schema_version` columns, embedded metadata, filename date/semver tags, git/ETL run IDs | Report \"unknown — no version marker found\" |\n\n### Assumptions I'll apply unless you say otherwise\n1. **Exactly one** uploaded dataset is the target; if several, I'll ask which is canonical and treat the rest as lineage.\n2. Fields absent from the data are recorded as **unknown**, never invented — I'll flag inferred values as inference.\n3. **Dialect** is determined empirically (what `read_df` actually had to assume), not from the extension alone.\n4. **Consumer** is taken from explicit metadata if present; otherwise inferred from schema shape and labeled as a hypothesis.\n5. Comparisons/versioning use **semantic versioning** if a version string is parseable.\n6. Profile statistics are computed on the data **as loaded** (no type coercion, no imputation) so the contract reflects the raw artifact.\n\nUpload the file and I'll produce the completed contract table.",
+      "additional_kwargs": {
+        "parent_id": "0626f77b-02b7-4d23-83d2-cad6a7b8d138"
+      },
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "6622a023-5b99-4d5a-8ad7-e0a6b7a59404",
+      "example": false,
+      "tool_calls": [],
+      "invalid_tool_calls": [],
+      "usage_metadata": null
+    }
+  ]
+}

@@ -1,0 +1,187 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_623f0499e2ef40ac8584b20a64022493",
+  "case_id": "srp-easyagent-h2-curly-quote-edit-v1",
+  "input_id": "step-2",
+  "spans": [
+    {
+      "trace_id": "29edc1bce511b342a21242e040495bdc",
+      "span_id": "eb375b7736520c19",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792581475360571587,
+      "end_time_unix_nano": 1792581478831387486,
+      "duration_nano": 3470815899,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792581475362145186,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792581476237646393,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792581477016115101,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792581477954989334,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792581478830007300,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "29edc1bce511b342a21242e040495bdc",
+      "span_id": "c9781992a1672af7",
+      "parent_span_id": "eb375b7736520c19",
+      "name": "Edit",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792581476042780898,
+      "end_time_unix_nano": 1792581476251456831,
+      "duration_nano": 208675933,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Edit",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "file_path": "/workspace/project/NOTES.md",
+          "old_string": "Tagline: Fast and simple",
+          "new_string": "Tagline: “Fast” and ‘simple’"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "path": "/workspace/project/NOTES.md",
+            "oldText": "Tagline: Fast and simple",
+            "newText": "Tagline: “Fast” and ‘simple’",
+            "type": "diff"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_00_o4yMw7Qs9jtz1BRIUZQk2506"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "29edc1bce511b342a21242e040495bdc",
+      "span_id": "81a62fa845664358",
+      "parent_span_id": "eb375b7736520c19",
+      "name": "Bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792581476888031609,
+      "end_time_unix_nano": 1792581477038033700,
+      "duration_nano": 150002091,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "sed -n '3p' NOTES.md | od -c | head -5"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "Command: sed -n '3p' NOTES.md | od -c | head -5\nRead-only: false\nSandbox: disabled\nExit code: 0\n\nSTDOUT:\n0000000   T   a   g   l   i   n   e   :       \"   F   a   s   t   \"    \n0000020   a   n   d       '   s   i   m   p   l   e   '  \\n\n0000035\n",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_00_blPSgeyEXT5VbZTIvXHB3216"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "29edc1bce511b342a21242e040495bdc",
+      "span_id": "c5eee1b065cbff12",
+      "parent_span_id": "eb375b7736520c19",
+      "name": "Bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792581477635120947,
+      "end_time_unix_nano": 1792581477974071932,
+      "duration_nano": 338950985,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "python3 - <<'EOF'\np = 'NOTES.md'\nlines = open(p, encoding='utf-8').read().split('\\n')\nlines[2] = 'Tagline: \\u201cFast\\u201d and \\u2018simple\\u2019'\nopen(p, 'w', encoding='utf-8').write('\\n'.join(lines))\nEOF\ncat -A NOTES.md; echo '---'; sed -n '3p' NOTES.md | od -c"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "Command: python3 - <<'EOF'\np = 'NOTES.md'\nlines = open(p, encoding='utf-8').read().split('\\n')\nlines[2] = 'Tagline: \\u201cFast\\u201d and \\u2018simple\\u2019'\nopen(p, 'w', encoding='utf-8').write('\\n'.join(lines))\nEOF\ncat -A NOTES.md; echo '---'; sed -n '3p' NOTES.md | od -c\nRead-only: false\nSandbox: disabled\nExit code: 0\n\nSTDOUT:\n# Release notes$\n$\nTagline: M-bM-^@M-^\\FastM-bM-^@M-^] and M-bM-^@M-^XsimpleM-bM-^@M-^Y$\n$\nThis release fixes the login bug.$\n---\n0000000   T   a   g   l   i   n   e   :     342 200 234   F   a   s   t\n0000020 342 200 235       a   n   d     342 200 230   s   i   m   p   l\n0000040   e 342 200 231  \\n\n0000045\n",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_00_VfOEdizTi5LdOPbu2QFT0103"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

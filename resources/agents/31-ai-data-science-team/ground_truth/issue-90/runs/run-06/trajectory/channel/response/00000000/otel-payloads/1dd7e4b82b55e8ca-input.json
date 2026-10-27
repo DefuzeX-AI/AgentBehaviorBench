@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the Bikes sales dataset.\n    \n    data_list: A list of one or more pandas DataFrames containing the raw data.\n    '''\n    import pandas as pd\n    import numpy as np\n    \n    # Ensure data_list is a list\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n    \n    # Only the main dataset is provided. If multiple datasets were provided, we would\n    # merge or join them on common keys (e.g., date, bike_model) to avoid Cartesian products.\n    df = data_list[0].copy()\n    \n    # 1. Inspect and standardize column names (lowercase, strip spaces)\n    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')\n    \n    # 2. Normalize data types\n    # Convert date to datetime if present\n    if 'date' in df.columns:\n        df['date'] = pd.to_datetime(df['date'], errors='coerce')\n    \n    # Convert numeric columns to numeric, coercing errors to NaN\n    numeric_cols = ['price', 'quantity_sold', 'extended_sales']\n    for col in numeric_cols:\n        if col in df.columns:\n            df[col] = pd.to_numeric(df[col], errors='coerce')\n    \n    # 3. Preserve original lineage: add original row index and original extended_sales\n    df['original_row_index'] = df.index\n    df['original_extended_sales'] = df['extended_sales'].copy()\n    \n    # 4. Compute expected extended_sales from price * quantity_sold\n    df['expected_extended_sales'] = df['price'] * df['quantity_sold']\n    \n    # 5. Identify anomalies in extended_sales\n    # Missing: NaN\n    missing_mask = df['extended_sales'].isna()\n    # Negative: < 0\n    negative_mask = df['extended_sales'] < 0\n    # Inconsistent: not missing, not negative, and does not equal expected\n    inconsistent_mask = (~missing_mask) & (~negative_mask) & (df['extended_sales'] != df['expected_extended_sales'])\n    \n    # Combine all anomaly masks\n    anomaly_mask = missing_mask | negative_mask | inconsistent_mask\n    \n    # 6. Record anomaly reason for each row\n    df['extended_sales_anomaly_reason'] = ''\n    df.loc[missing_mask, 'extended_sales_anomaly_reason'] += 'missing; '\n    df.loc[negative_mask, 'extended_sales_anomaly_reason'] += 'negative; '\n    df.loc[inconsistent_mask, 'extended_sales_anomaly_reason'] += 'inconsistent; '\n    df['extended_sales_anomaly_reason'] = df['extended_sales_anomaly_reason'].str.rstrip('; ')\n    \n    # 7. Repair goal: Preserve original data lineage and ensure repaired extended_sales is\n    # internally consistent by replacing anomalous values with expected_extended_sales\n    # (price * quantity_sold) where expected is available.\n    df['extended_sales'] = df['extended_sales'].copy()\n    repair_mask = anomaly_mask & df['expected_extended_sales'].notna()\n    df.loc[repair_mask, 'extended_sales'] = df.loc[repair_mask, 'expected_extended_sales']\n    \n    # 8. Clean up and return the single DataFrame\n    # Reorder columns for clarity: original columns first, then lineage/anomaly columns\n    base_cols = ['date', 'bike_model', 'price', 'quantity_sold', 'extended_sales']\n    lineage_cols = ['original_row_index', 'original_extended_sales', 'expected_extended_sales', 'extended_sales_anomaly_reason']\n    # Include any other columns that may exist\n    other_cols = [c for c in df.columns if c not in base_cols + lineage_cols]\n    final_cols = base_cols + other_cols + lineage_cols\n    # Filter to only existing columns (in case some are missing)\n    final_cols = [c for c in final_cols if c in df.columns]\n    df = df[final_cols]\n    \n    # No rows are dropped; all anomalies are repaired and recorded.\n    return df\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 6720,
+      "prompt_tokens": 804,
+      "total_tokens": 7524,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 5756,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261017215603153126387c955d5682nIAQQSt",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a14bdd-611c-7d23-80d7-8c7ed4b98f89-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 804,
+    "output_tokens": 6720,
+    "total_tokens": 7524,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 5756
+    }
+  }
+}

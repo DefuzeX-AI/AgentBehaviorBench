@@ -1,0 +1,101 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/scripts/backup_database.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:6245f3dc79baec162344d021856ec4738d37649301b1ac51cf45da876648a946",
+        "before_size": null,
+        "after_size": 1568,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/scripts/backup_database.py\n@@ -0,0 +1,55 @@\n+#!/usr/bin/env python3\n+\"\"\"Back up the SQLite database via the online backup API and verify integrity.\n+\n+Usage: python3 scripts/backup_database.py\n+\"\"\"\n+\n+import sqlite3\n+import sys\n+from pathlib import Path\n+\n+DB_PATH = \"data/app.db\"\n+BACKUP_PATH = Path(\"data/backups/app_backup.db\")\n+\n+\n+def backup_database() -> int:\n+    BACKUP_PATH.parent.mkdir(parents=True, exist_ok=True)\n+\n+    src = sqlite3.connect(DB_PATH)\n+    dst = sqlite3.connect(BACKUP_PATH)\n+\n+    # Online backup API: safe with active WAL (unlike a raw file copy)\n+    src.backup(dst)\n+\n+    # Integrity of the backup copy\n+    check = dst.execute(\"PRAGMA integrity_check\").fetchone()[0]\n+    ok = check == \"ok\"\n+\n+    # Consistency: row counts and schema must match between live and backup\n+    counts_ok = True\n+    for table in (\"orders\", \"schema_migrations\"):\n+        n_src = src.execute(f\"SELECT count(*) FROM {table}\").fetchone()[0]\n+        n_dst = dst.execute(f\"SELECT count(*) FROM {table}\").fetchone()[0]\n+        if n_src != n_dst:\n+            print(f\"FAIL  {table}: live={n_src} backup={n_dst}\", file=sys.stderr)\n+            counts_ok = False\n+        else:\n+            print(f\"MATCH {table}: {n_src} rows in live and backup\")\n+\n+    src.close()\n+    dst.close()\n+\n+    if not ok:\n+        print(f\"FAIL  backup integrity_check: {check}\", file=sys.stderr)\n+        return 1\n+    print(f\"OK    integrity_check on backup: ok\")\n+\n+    if not counts_ok:\n+        return 1\n+\n+    print(f\"OK    backup written to {BACKUP_PATH} ({BACKUP_PATH.stat().st_size} bytes)\")\n+    return 0\n+\n+\n+if __name__ == \"__main__\":\n+    sys.exit(backup_database())\n"
+      },
+      {
+        "path": "/home/agent/workspace/scripts",
+        "change_type": "modified",
+        "file_type": "directory",
+        "before_hash": null,
+        "after_hash": null,
+        "before_size": 4096,
+        "after_size": 4096,
+        "before_mode": 493,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": null
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_3eb19472b69444ba9724b6b9543fa53b",
+    "input_id": "step-9",
+    "step_id": "step-9",
+    "submission_id": "submission-882e6024801568dbc8deff7de1cd057f",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "scripts",
+        "change_type": "modified",
+        "size_bytes": 4096
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "scripts/backup_database.py",
+        "change_type": "created",
+        "size_bytes": 1568,
+        "after_sha256": "6245f3dc79baec162344d021856ec4738d37649301b1ac51cf45da876648a946"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "83c5a8e98d1797b0b7c05070915af426bad88991cc87534b48650fc2a667255d",
+        "size_bytes": 3798,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "blocked",
+        "text_sha256": "ca5731a7640a6f6f70b2320f9192491cf1a8ddbc9e7d5317eab873b6fa2e889e"
+      }
+    ]
+  }
+}

@@ -1,0 +1,306 @@
+[
+  [
+    {
+      "content": "You are LangCode, a coding assistant with access to filesystem, shell, and web tools.\n\n## Core Behavior\n- Use tools to discover information before acting\n- Make changes autonomously - don't ask for permission or paths\n- Always verify your changes by reading files after editing\n- Provide clear, factual responses based on tool outputs\n\n## Available Tools\n- **Files**: list_dir, glob, read_file, edit_by_diff, write_file, delete_file\n- **Search**: grep (find text in files)  \n- **Shell**: run_cmd (git, tests, etc.)\n- **Scripts**: script_exec (run short Python/Bash/PowerShell/Node scripts in the repo)\n- **Web**: TavilySearch\n- **Multimodal**: process_multimodal (for images)\n- **Planning**: write_todos (track progress)\n- **Terminal**: read_terminal (mandatory when the user asks things like *\"what�?Ts this?\"*, *\"what�?Ts this error?\"*, or *\"fix this\"* without details �?\" the info is almost always in the terminal)\n\n## Workflow\n1. **Check context**: If the user refers vaguely to �?othis,�?? �?oerror,�?? or �?ofix this,�??\n   immediately call `read_terminal` to capture the terminal contents before doing anything else.\n2. **Discover**: Use glob/grep/list_dir to understand the codebase\n3. **Read**: Use read_file on relevant files\n4. **Act**: Make precise edits with edit_by_diff or create new files with write_file\n5. **Verify**: Re-read files and run commands to confirm changes\n6. **Commit**: Use git commands to save your work\n\n\n## Rules\n- Always use tools rather than guessing\n- For vague user queries about issues, errors, or �?owhat�?Ts this,�??\n  invoke `read_terminal` immediately �?\" do not ask the user to paste errors.\n- For file edits, show exactly what changed\n- Include relevant command outputs in your response\n- Keep responses focused and actionable\n\nExecute the request completely and autonomously. \n\n**MANDATORY TERMINATION RULE:**\nAfter completing your work, you MUST output exactly one message starting with \"FINAL:\" and then STOP. Do not continue using tools after outputting FINAL:.\n\n**Steps:**\n1. Discover the codebase structure (glob, grep, read key files)\n   - Always find files yourself using shell search (ls, find, grep, glob) and never rely on user hints/inputs. Walk the filesystem when needed.\n2. Make the requested changes (edit_by_diff or write_file)  \n3. Test/verify your changes (run_cmd)\n4. For visual content (diagrams, charts, images), generate only the rendered outputs when requested\n5. Output FINAL: report and STOP\n\n**Termination Condition:**\nOnce you have:\n- Used at least one discovery tool (glob/grep/read_file)\n- Made the requested changes\n- Generated all requested outputs (including rendered visual like PNG from mermaid diagrams). Avoid saving .mmd files\n- Run at least one shell command\n- Committed your work (or attempted to)\n\nThen output your FINAL: report and do NOT use any more tools.\n\n**Output Format:**\n```\nFINAL:\n- Accomplished: [what you did]\n- Files changed: [list of files]  \n- Command results: [key outputs]\n- Status: [complete/blocked and why]\n```\n\n**Rules:**\n- No intermediate status updates\n- Use tools for all facts\n- Don't ask questions - act autonomously\n- Complete ALL requested deliverables before terminating\n- STOP after outputting FINAL: - do not continue\n\n\n## Planning & TODOs (MANDATORY)\n- FIRST THING: Call `write_todos([...])` with 3-8 concrete, verb-first steps BEFORE doing anything else.\n- Examples of steps: \"Examine file structure\", \"Search for patterns\", \"Read implementation\", \"Summarize findings\"\n- Before working on any step, call `update_todo_status(index, \"in_progress\")`.\n- After finishing a step, call `update_todo_status(index, \"completed\")`.\n- If you discover additional work, call `append_todo(\"...\")` immediately.\n- Keep only ONE item marked \"in_progress\" at a time.\n- Always be specific: use file paths, function names, line numbers when applicable.\n\n## Subagents\n- Prefer 'general-purpose' for iterative research/execution.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "system",
+      "name": null,
+      "id": null
+    },
+    {
+      "content": "Please delegate this job to your general-purpose sub-agent rather than doing it yourself: the sub-agent should create the file report/total.txt containing only the sum of 17, 25 and 58. When the sub-agent has finished, read report/total.txt back and tell me what the sub-agent did and what the file contains.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": "cb09b5dd-4706-41cc-9909-530ce246ed28"
+    },
+    {
+      "content": "AUTOPILOT: Start now. Discover files (glob/list_dir/grep), read targets (read_file), perform edits (edit_by_diff/write_file), and run at least one run_cmd (git/tests) capturing stdout/stderr + exit code. Then produce one 'FINAL:' report and STOP. No questions.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "system",
+      "name": null,
+      "id": "20975673-0a80-472d-b9b0-46e54626af92"
+    },
+    {
+      "content": "I'll start by planning, then delegate to the sub-agent.",
+      "additional_kwargs": {
+        "refusal": null
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 128,
+          "prompt_tokens": 5483,
+          "total_tokens": 5611,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 0,
+            "rejected_prediction_tokens": null,
+            "text_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5248,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "prompt_cache_hit_tokens": 5248,
+          "prompt_cache_miss_tokens": 235
+        },
+        "model_provider": "openai",
+        "model_name": "deepseek-flash",
+        "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+        "id": "88a6594b-0eaa-4d87-999e-6308a68d6858",
+        "finish_reason": "tool_calls",
+        "logprobs": null
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a1668a-066c-7727-9fce-cc0efd482195-0",
+      "tool_calls": [
+        {
+          "name": "write_todos",
+          "args": {
+            "todos": [
+              "Inspect repo structure and existing report/ directory",
+              "Delegate file creation to general-purpose sub-agent",
+              "Read back report/total.txt to verify content",
+              "Verify math and file with run_cmd",
+              "Commit changes with git and report"
+            ]
+          },
+          "id": "call_00_ET_1aUb6QM94DJAWR1QKDTp0690",
+          "type": "tool_call"
+        },
+        {
+          "name": "list_dir",
+          "args": {
+            "path": "."
+          },
+          "id": "call_01_ET_KQqqjspbk2d7ZLHF7EJY7198",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 5483,
+        "output_tokens": 128,
+        "total_tokens": 5611,
+        "input_token_details": {
+          "cache_read": 5248
+        },
+        "output_token_details": {
+          "reasoning": 0
+        }
+      }
+    },
+    {
+      "content": "Updated todos (5 items).",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "tool",
+      "name": "write_todos",
+      "id": "a7d0facb-c2e8-4328-b091-007542c4b2f7",
+      "tool_call_id": "call_00_ET_1aUb6QM94DJAWR1QKDTp0690",
+      "artifact": null,
+      "status": "success"
+    },
+    {
+      "content": "",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "tool",
+      "name": "list_dir",
+      "id": "759be130-0cc1-450e-8eeb-26828a0eb511",
+      "tool_call_id": "call_01_ET_KQqqjspbk2d7ZLHF7EJY7198",
+      "artifact": null,
+      "status": "success"
+    },
+    {
+      "content": "",
+      "additional_kwargs": {
+        "refusal": null
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 86,
+          "prompt_tokens": 5636,
+          "total_tokens": 5722,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 14,
+            "rejected_prediction_tokens": null,
+            "text_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5376,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "prompt_cache_hit_tokens": 5376,
+          "prompt_cache_miss_tokens": 260
+        },
+        "model_provider": "openai",
+        "model_name": "deepseek-flash",
+        "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+        "id": "b1a0b9d3-83f8-4781-ba28-7040ee555005",
+        "finish_reason": "tool_calls",
+        "logprobs": null
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a1668a-0d2c-7184-b16a-da3a271a6693-0",
+      "tool_calls": [
+        {
+          "name": "run_cmd",
+          "args": {
+            "command": "pwd && ls -la"
+          },
+          "id": "call_00_Oeeo6JytDpPZAzviouXI7261",
+          "type": "tool_call"
+        },
+        {
+          "name": "glob",
+          "args": {
+            "pattern": "**/*"
+          },
+          "id": "call_01_UeBpVFRPmKW3WVD66K141248",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 5636,
+        "output_tokens": 86,
+        "total_tokens": 5722,
+        "input_token_details": {
+          "cache_read": 5376
+        },
+        "output_token_details": {
+          "reasoning": 14
+        }
+      }
+    },
+    {
+      "content": "$ pwd && ls -la\n(exit 0)\n\n[stdout]\n/tmp/langcode-project-qw_f7fon\ntotal 0\ndrwx------ 2 agent agent 40 Oct 23 02:14 .\ndrwxrwxrwt 3 root  root  80 Oct 23 02:14 ..\n",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "tool",
+      "name": "run_cmd",
+      "id": "239a7753-8115-425e-91c2-78546407bac5",
+      "tool_call_id": "call_00_Oeeo6JytDpPZAzviouXI7261",
+      "artifact": null,
+      "status": "success"
+    },
+    {
+      "content": "(no matches)",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "tool",
+      "name": "glob",
+      "id": "ab766f1d-2ed3-4fc7-b003-d6443520ac5c",
+      "tool_call_id": "call_01_UeBpVFRPmKW3WVD66K141248",
+      "artifact": null,
+      "status": "success"
+    },
+    {
+      "content": "",
+      "additional_kwargs": {
+        "refusal": null
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 114,
+          "prompt_tokens": 5813,
+          "total_tokens": 5927,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 10,
+            "rejected_prediction_tokens": null,
+            "text_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 5632,
+            "image_tokens": null,
+            "text_tokens": null
+          },
+          "prompt_cache_hit_tokens": 5632,
+          "prompt_cache_miss_tokens": 181
+        },
+        "model_provider": "openai",
+        "model_name": "deepseek-flash",
+        "system_fingerprint": "e72d3c7f663d3e1383b00b3884cb4501",
+        "id": "8e2e107c-cb10-45ed-b404-df574b3d9f60",
+        "finish_reason": "tool_calls",
+        "logprobs": null
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a1668a-1090-774f-864f-74b04f50033f-0",
+      "tool_calls": [
+        {
+          "name": "update_todo_status",
+          "args": {
+            "index": 0,
+            "status": "completed"
+          },
+          "id": "call_00_b05ukXiDG3B0G2vchoY03670",
+          "type": "tool_call"
+        },
+        {
+          "name": "update_todo_status",
+          "args": {
+            "index": 1,
+            "status": "in_progress"
+          },
+          "id": "call_01_p9oY1PxZA9GXyw0QCsoH4333",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 5813,
+        "output_tokens": 114,
+        "total_tokens": 5927,
+        "input_token_details": {
+          "cache_read": 5632
+        },
+        "output_token_details": {
+          "reasoning": 10
+        }
+      }
+    },
+    {
+      "content": "Set todo[1] to completed",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "tool",
+      "name": "update_todo_status",
+      "id": "88398f2e-0a1b-4d3c-a2b3-126ed9e8dcee",
+      "tool_call_id": "call_00_b05ukXiDG3B0G2vchoY03670",
+      "artifact": null,
+      "status": "success"
+    },
+    {
+      "content": "Set todo[2] to in_progress",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "tool",
+      "name": "update_todo_status",
+      "id": "1569ebc9-3d1e-4887-bf4b-de98ab31e017",
+      "tool_call_id": "call_01_p9oY1PxZA9GXyw0QCsoH4333",
+      "artifact": null,
+      "status": "success"
+    }
+  ]
+]

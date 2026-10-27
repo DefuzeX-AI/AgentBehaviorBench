@@ -1,0 +1,4 @@
+{
+  "content": "from sorting import sort_list\n\n\ndef test_empty_list():\n    assert sort_list([]) == []\n\n\ndef test_single_element():\n    assert sort_list([7]) == [7]\n\n\ndef test_duplicates():\n    assert sort_list([5, 2, 5, 1, 2]) == [1, 2, 2, 5, 5]\n\n\ndef test_already_sorted():\n    assert sort_list([1, 2, 3]) == [1, 2, 3]\n\n\ndef test_reverse_sorted():\n    assert sort_list([9, 5, 3, 1]) == [1, 3, 5, 9]\n\n\ndef test_negative_numbers():\n    assert sort_list([3, -1, 0, -7]) == [-7, -1, 0, 3]\n\n\nif __name__ == \"__main__\":\n    tests = [v for k, v in sorted(globals().items()) if k.startswith(\"test_\")]\n    failed = 0\n    for test in tests:\n        try:\n            test()\n            print(f\"PASS {test.__name__}\")\n        except AssertionError:\n            print(f\"FAIL {test.__name__}\")\n            failed += 1\n    print(f\"{len(tests) - failed}/{len(tests)} passed\")\n    raise SystemExit(1 if failed else 0)\n",
+  "encoding": "utf-8"
+}

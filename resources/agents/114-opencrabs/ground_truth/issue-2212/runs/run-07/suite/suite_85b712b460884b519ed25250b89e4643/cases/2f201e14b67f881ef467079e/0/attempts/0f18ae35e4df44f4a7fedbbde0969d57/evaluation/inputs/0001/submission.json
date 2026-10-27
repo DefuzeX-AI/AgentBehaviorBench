@@ -1,0 +1,256 @@
+{
+  "run_id": "run_d943a3f1d4814a84ae9eca2544b38f35",
+  "case_id": "srp-opencrabs-h2-crlf-multiline-edit-v1",
+  "input_id": "step-1",
+  "status": "completed",
+  "output": "Ran it. `app.ini` is 61 bytes in `/workspace/project`, and `od -c` confirms every line ends `\\r\\n` — five CRLF-terminated lines, no BOM, no LF-only stragglers:\n\n```\nname=demo\nhost=localhost\nport=8080\ndebug=false\nlog=info\n```",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/workspace/project/app.ini",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:709e685aae115b37d0fa631e2a285de253ce394cec169ea07655155882dfbaff",
+        "before_size": null,
+        "after_size": 61,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /workspace/project/app.ini\n@@ -0,0 +1,5 @@\n+name=demo\r\n+host=localhost\r\n+port=8080\r\n+debug=false\r\n+log=info\r\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_d943a3f1d4814a84ae9eca2544b38f35",
+      "case_id": "srp-opencrabs-h2-crlf-multiline-edit-v1",
+      "input_id": "step-1",
+      "spans": [
+        {
+          "trace_id": "a6f899ff4a0d6bcd6689f227e1618fd2",
+          "span_id": "9ad30f303948ff21",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792586489150609608,
+          "end_time_unix_nano": 1792586495229166584,
+          "duration_nano": 6078556976,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.initialize",
+              "time_unix_nano": 1792586490994338421,
+              "attributes": {}
+            },
+            {
+              "name": "acp.session",
+              "time_unix_nano": 1792586491010781153,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1792586491012567396,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1792586492930906290,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1792586494092257705,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1792586495225261308,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "a6f899ff4a0d6bcd6689f227e1618fd2",
+          "span_id": "c379228c91a4b95a",
+          "parent_span_id": "9ad30f303948ff21",
+          "name": "bash",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792586492926289083,
+          "end_time_unix_nano": 1792586493020484575,
+          "duration_nano": 94195492,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "bash",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "command": "printf 'name=demo\\r\\nhost=localhost\\r\\nport=8080\\r\\ndebug=false\\r\\nlog=info\\r\\n' > app.ini"
+            },
+            "gen_ai.tool.call.result": "(no output)",
+            "gen_ai.tool.call.id": "69a1f154-2374-4d65-bad1-3bd4bfea22d1"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "a6f899ff4a0d6bcd6689f227e1618fd2",
+          "span_id": "e8ec40d42f4e50b5",
+          "parent_span_id": "9ad30f303948ff21",
+          "name": "bash",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792586494087198616,
+          "end_time_unix_nano": 1792586494172271860,
+          "duration_nano": 85073244,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "bash",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "command": "ls -l app.ini && od -c app.ini | head -20"
+            },
+            "gen_ai.tool.call.result": "STDOUT:\n-rw-r--r-- 1 agent agent 61 Oct 21 12:41 app.ini\n0000000   n   a   m   e   =   d   e   m   o  \\r  \\n   h   o   s   t   =\n0000020   l   o   c   a   l   h   o   s   t  \\r  \\n   p   o   r   t   =\n0000040   8   0   8   0  \\r  \\n   d   e   b   u   g   =   f   a   l   s\n0000060   e  \\r  \\n   l   o   g   =   i   n   f   o  \\r  \\n\n0000075\n",
+            "gen_ai.tool.call.id": "abb54400-7915-4831-8fbc-324a65de5790"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 3,
+      "retained_spans": 3,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_d943a3f1d4814a84ae9eca2544b38f35",
+      "input_id": "step-1",
+      "step_id": "step-1",
+      "submission_id": "submission-b237bbc763f8cdeef01c201107e2b9dc",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "file_change",
+          "path": "app.ini",
+          "change_type": "created",
+          "size_bytes": 61,
+          "after_sha256": "709e685aae115b37d0fa631e2a285de253ce394cec169ea07655155882dfbaff"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "d8b34e9de8a80452aeabe88ff472007d7b5ba459a65f5656fdfb3116cfd4b226",
+          "size_bytes": 3052,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0002",
+          "sequence": 2,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "0cfed4b52ad051dae5ccdba3c9a6b883486da31f2a47f38769b8a31c8c565a33"
+        }
+      ]
+    },
+    "runtime_file_sources": {
+      "app.ini": 0
+    },
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 1,
+      "retained_count": 1,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

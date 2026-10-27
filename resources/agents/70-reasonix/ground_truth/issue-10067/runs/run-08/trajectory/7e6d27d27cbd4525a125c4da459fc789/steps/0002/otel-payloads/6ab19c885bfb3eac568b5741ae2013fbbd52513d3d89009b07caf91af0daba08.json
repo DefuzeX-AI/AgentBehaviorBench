@@ -1,0 +1,23 @@
+{
+  "questions": [
+    {
+      "header": "Deadlock",
+      "multiSelect": false,
+      "options": [
+        {
+          "description": "Approve replacing the plan so the already-performed read is signed off first; then both `echo x > tmp.txt` runs execute via bash. End state identical to your original order.",
+          "label": "Approve plan replacement"
+        },
+        {
+          "description": "Use the host's other escape hatch: mark the first echo 'completed' in the tracker before it runs, sign the read, then run both echoes. Same end state; tracker entry slightly precedes execution.",
+          "label": "Mark echo completed first"
+        },
+        {
+          "description": "Leave tmp.txt uncreated and report the environment constraint without further changes.",
+          "label": "Stop here"
+        }
+      ],
+      "question": "The host's evidence system deadlocks on your step order: it blocks the first `echo` until the foo.py read is signed off, but won't sign the read until the echo runs. How should I proceed?"
+    }
+  ]
+}

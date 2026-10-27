@@ -1,0 +1,333 @@
+{
+  "user_request": "You are given the following plain-text part request: 'Create a simple L-shaped bracket with a base of 50mm x 30mm x 5mm and a vertical arm of 30mm x 30mm x 5mm, with a 5mm fillet on the inside corner.' Translate this request into a build123d script that produces the bracket. Do not execute the script yet.",
+  "cad_brief": {
+    "part_name": "l-bracket-50x30x30x5-r5",
+    "part_category": "L-bracket",
+    "length_unit": "mm",
+    "origin_convention": "corner_min",
+    "primary_workplane": "XZ",
+    "max_extent_x_mm": 50.0,
+    "max_extent_y_mm": 30.0,
+    "max_extent_z_mm": 30.0,
+    "target_volume_mm3": 11410.95,
+    "material": "PLA",
+    "material_density_g_cm3": 1.24,
+    "key_parameters": {
+      "BASE_LENGTH_X": 50.0,
+      "BASE_WIDTH_Y": 30.0,
+      "BASE_THICKNESS_Z": 5.0,
+      "ARM_HEIGHT_Z": 30.0,
+      "ARM_WIDTH_Y": 30.0,
+      "ARM_THICKNESS_X": 5.0,
+      "INSIDE_FILLET_RADIUS": 5.0,
+      "OVERALL_X": 50.0,
+      "OVERALL_Y": 30.0,
+      "OVERALL_Z": 30.0,
+      "BASE_START_X": 0.0,
+      "BASE_END_X": 50.0,
+      "BASE_BOTTOM_Z": 0.0,
+      "BASE_TOP_Z": 5.0,
+      "ARM_START_X": 0.0,
+      "ARM_INNER_FACE_X": 5.0,
+      "ARM_BOTTOM_Z": 0.0,
+      "ARM_TOP_Z": 30.0,
+      "INSIDE_CORNER_X": 5.0,
+      "INSIDE_CORNER_Z": 5.0,
+      "FILLET_CENTER_X": 10.0,
+      "FILLET_CENTER_Z": 10.0
+    },
+    "verification_targets": [
+      {
+        "id": "overall-x",
+        "kind": "overall_dimension",
+        "description": "Overall X bounding-box extent of the finished L-bracket, from the X-min vertical-arm face to the X-max base end.",
+        "nominal": 50.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": -0.5,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "x",
+        "critical": true,
+        "notes": "Equals BASE_LENGTH_X = 50 mm. The vertical arm is at the X-min end and does not extend beyond the base length."
+      },
+      {
+        "id": "overall-y",
+        "kind": "overall_dimension",
+        "description": "Overall Y bounding-box extent of the finished L-bracket, i.e. the common extruded width of the base and vertical arm.",
+        "nominal": 30.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": -0.5,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "y",
+        "critical": true,
+        "notes": "Equals BASE_WIDTH_Y = ARM_WIDTH_Y = 30 mm."
+      },
+      {
+        "id": "overall-z",
+        "kind": "overall_dimension",
+        "description": "Overall Z bounding-box extent of the finished L-bracket, from the base bottom face to the vertical-arm top face.",
+        "nominal": 30.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": -0.5,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "z",
+        "critical": true,
+        "notes": "ARM_HEIGHT_Z = 30 mm is the total overall height from Z=0, not 30 mm above the base top."
+      },
+      {
+        "id": "single-body",
+        "kind": "single_body",
+        "description": "All geometric features (base, vertical arm, and inside fillet) form one connected solid.",
+        "nominal": null,
+        "tolerance_upper": 0.0,
+        "tolerance_lower": 0.0,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": null,
+        "critical": true,
+        "notes": "Fuse overlapping base and vertical-arm geometry and apply the fillet to the fused solid."
+      },
+      {
+        "id": "water-tightness",
+        "kind": "water_tightness",
+        "description": "The finished bracket is a closed manifold mesh with no open shells or non-manifold edges.",
+        "nominal": null,
+        "tolerance_upper": 0.0,
+        "tolerance_lower": 0.0,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": null,
+        "critical": true,
+        "notes": "Check the final solid after the L-profile extrusion and inside-corner fillet."
+      }
+    ],
+    "functional_requirements": [
+      "The bottom face of the base MUST remain flat and planar for mounting.",
+      "The vertical arm MUST remain perpendicular to the base at 90 degrees.",
+      "The R5 inside fillet MUST reduce stress concentration at the reentrant corner where the arm meets the base.",
+      "No mounting holes, fastener patterns, or counterbores are specified; the bracket is a plain L-bracket.",
+      "The part MUST be a single connected solid suitable for 3D printing as one fused body.",
+      "Load direction and magnitude are unspecified; the uniform 5 mm leg thickness is the requested structural section."
+    ],
+    "manufacturing_method": "3d_print_fdm",
+    "special_features": [
+      "MUST construct the bracket as one L-shaped prism: sketch the L profile in the XZ plane and extrude it along +Y for BASE_WIDTH_Y = 30 mm.",
+      "MUST locate the vertical arm at the X-min end of the base with ARM_THICKNESS_X = 5 mm; the base extends from X=0 to BASE_LENGTH_X=50 and the arm inner face is at X=ARM_THICKNESS_X=5.",
+      "MUST treat ARM_HEIGHT_Z = 30 mm as total overall height from Z=0; the vertical arm shares the lower BASE_THICKNESS_Z = 5 mm with the base and extends ARM_HEIGHT_Z - BASE_THICKNESS_Z = 25 mm above BASE_TOP_Z, not 30 mm above the base top.",
+      "MUST apply a concave fillet of INSIDE_FILLET_RADIUS = 5 mm at the inside reentrant corner located at (INSIDE_CORNER_X, INSIDE_CORNER_Z) = (5,5); the corresponding fillet center is (FILLET_CENTER_X, FILLET_CENTER_Z) = (10,10).",
+      "MUST keep the base top face and vertical-arm inner face at exactly 90 degrees, with the R5 fillet tangent to both faces.",
+      "MUST NOT add mounting holes, slots, lightening cutouts, chamfers, or any other features not explicitly requested.",
+      "MUST ensure the fillet is concave/additive at the inside corner and does not round or alter the outside edges of the base or arm."
+    ],
+    "user_request_raw": "You are given the following plain-text part request: 'Create a simple L-shaped bracket with a base of 50mm x 30mm x 5mm and a vertical arm of 30mm x 30mm x 5mm, with a 5mm fillet on the inside corner.' Translate this request into a build123d script that produces the bracket. Do not execute the script yet.",
+    "spec_version": 1
+  },
+  "architect_plan": {
+    "plan_id": "plan-l-bracket-50x30x30x5-r5-v1",
+    "cad_brief_id": "l-bracket-50x30x30x5-r5",
+    "sketches": [
+      {
+        "sketch_id": "l-profile",
+        "workplane": "XZ",
+        "workplane_offset_mm": 0.0,
+        "entities": [
+          {
+            "entity_type": "polygon",
+            "label": null,
+            "start": null,
+            "end": null,
+            "center": null,
+            "radius": null,
+            "start_angle_deg": null,
+            "end_angle_deg": null,
+            "width": null,
+            "height": null,
+            "corner_radius": null,
+            "num_sides": null,
+            "circumscribed_radius": null,
+            "control_points": [
+              {
+                "x": 0.0,
+                "y": 0.0
+              },
+              {
+                "x": 50.0,
+                "y": 0.0
+              },
+              {
+                "x": 50.0,
+                "y": 5.0
+              },
+              {
+                "x": 10.0,
+                "y": 5.0
+              },
+              {
+                "x": 5.0,
+                "y": 10.0
+              },
+              {
+                "x": 5.0,
+                "y": 30.0
+              },
+              {
+                "x": 0.0,
+                "y": 30.0
+              }
+            ],
+            "text_string": null,
+            "font_size": null
+          }
+        ],
+        "constraints": [],
+        "fully_constrained": false,
+        "notes": "Custom profile: L-shaped prism with concave inside fillet R5. Sketch local x = world X, local y = world Z. Profile includes the R5 fillet at the reentrant corner (5,5), center (10,10)."
+      }
+    ],
+    "steps": [
+      {
+        "step_id": "step-01-extrude-l-profile",
+        "step_type": "extrude",
+        "label": "Extrude L-shaped profile along +Y to form the bracket",
+        "sketch_id": "l-profile",
+        "distance_mm": 30.0,
+        "direction": "positive",
+        "taper_angle_deg": null,
+        "revolve_angle_deg": null,
+        "revolve_axis": null,
+        "revolve_axis_point": null,
+        "radius_mm": null,
+        "chamfer_distance_mm": null,
+        "chamfer_distance1_mm": null,
+        "chamfer_distance2_mm": null,
+        "edge_selector": null,
+        "hole_diameter_mm": null,
+        "hole_depth_mm": null,
+        "hole_position": null,
+        "hole_type": "simple",
+        "counterbore_diameter_mm": null,
+        "counterbore_depth_mm": null,
+        "countersink_angle_deg": null,
+        "target_step_id": null,
+        "tool_step_id": null,
+        "pattern_count": null,
+        "pattern_spacing_mm": null,
+        "pattern_axis": null,
+        "pattern_total_angle_deg": null,
+        "feature_step_ids": null,
+        "mirror_plane": null,
+        "mirror_plane_offset_mm": null,
+        "shell_thickness_mm": null,
+        "shell_open_faces": null,
+        "draft_angle_deg": null,
+        "draft_neutral_plane": null,
+        "draft_face_selectors": null,
+        "rib_thickness_mm": null,
+        "rib_height_mm": null,
+        "rib_face_selectors": null,
+        "reference_type": null,
+        "reference_definition": null,
+        "depends_on": [],
+        "notes": "Extrude the L profile from Y=0 to Y=30 (BASE_WIDTH_Y). The profile already includes the concave R5 inside fillet at the reentrant corner, so no separate fillet operation is needed."
+      }
+    ],
+    "estimated_volume_mm3": null,
+    "key_dimensions": {
+      "BASE_LENGTH_X": 50.0,
+      "BASE_WIDTH_Y": 30.0,
+      "BASE_THICKNESS_Z": 5.0,
+      "ARM_HEIGHT_Z": 30.0,
+      "ARM_WIDTH_Y": 30.0,
+      "ARM_THICKNESS_X": 5.0,
+      "INSIDE_FILLET_RADIUS": 5.0,
+      "OVERALL_X": 50.0,
+      "OVERALL_Y": 30.0,
+      "OVERALL_Z": 30.0,
+      "BASE_START_X": 0.0,
+      "BASE_END_X": 50.0,
+      "BASE_BOTTOM_Z": 0.0,
+      "BASE_TOP_Z": 5.0,
+      "ARM_START_X": 0.0,
+      "ARM_INNER_FACE_X": 5.0,
+      "ARM_BOTTOM_Z": 0.0,
+      "ARM_TOP_Z": 30.0,
+      "INSIDE_CORNER_X": 5.0,
+      "INSIDE_CORNER_Z": 5.0,
+      "FILLET_CENTER_X": 10.0,
+      "FILLET_CENTER_Z": 10.0,
+      "EXTRUDE_DISTANCE_Y": 30.0
+    },
+    "selector_map": {
+      "overall-x": "(skip)",
+      "overall-y": "(skip)",
+      "overall-z": "(skip)",
+      "single-body": "(skip)",
+      "water-tightness": "(skip)"
+    },
+    "tolerances_hint": null,
+    "expected_step_count": null,
+    "plan_version": 1,
+    "revision_history": []
+  },
+  "qa_report": {
+    "cad_brief_id": "(coder-failure)",
+    "engine_a": {
+      "engine_name": "cadpy_analysis",
+      "results": [],
+      "summary": "",
+      "warnings": [],
+      "errors": [],
+      "raw_json": null
+    },
+    "engine_b": {
+      "engine_name": "check_mesh",
+      "results": [],
+      "summary": "",
+      "warnings": [],
+      "errors": [
+        "Deterministic coder execution failed: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\n\nTraceback:\nTraceback (most recent call last):\n  File \"/opt/agent/agent/multi_agent_cad/nodes.py\", line 552, in _node_python_coder_deterministic\n    from cadpy.generation import EntrySpec, run_script_generator\n  File \"/opt/agent/agent/packages/cadpy/src/cadpy/generation.py\", line 40, in <module>\n    from cadpy.glb import (\n  File \"/opt/agent/agent/packages/cadpy/src/cadpy/glb.py\", line 32, in <module>\n    from cadpy.step_scene import ColorRGBA, LoadedStepScene, OccurrenceNode, SelectorBundle, occurrence_selector_id\n  File \"/opt/agent/agent/packages/cadpy/src/cadpy/step_scene.py\", line 32, in <module>\n    from OCP.TDF import TDF_ChildIterator, TDF_Label, TDF_LabelSequence\nImportError: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\n"
+      ],
+      "raw_json": null
+    },
+    "all_passed": false,
+    "passed_count": 0,
+    "failed_count": 0,
+    "noise_only_fail_count": 0,
+    "error_type": "dimension",
+    "error_details": [
+      "Deterministic coder execution failed: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\n\nTraceback:\nTraceback (most recent call last):\n  File \"/opt/agent/agent/multi_agent_cad/nodes.py\", line 552, in _node_python_coder_deterministic\n    from cadpy.generation import EntrySpec, run_script_generator\n  File \"/opt/agent/agent/packages/cadpy/src/cadpy/generation.py\", line 40, in <module>\n    from cadpy.glb import (\n  File \"/opt/agent/agent/packages/cadpy/src/cadpy/glb.py\", line 32, in <module>\n    from cadpy.step_scene import ColorRGBA, LoadedStepScene, OccurrenceNode, SelectorBundle, occurrence_selector_id\n  File \"/opt/agent/agent/packages/cadpy/src/cadpy/step_scene.py\", line 32, in <module>\n    from OCP.TDF import TDF_ChildIterator, TDF_Label, TDF_LabelSequence\nImportError: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\n"
+    ],
+    "improvement_suggestions": [],
+    "connectivity_warning": null,
+    "strength_score": null,
+    "manufacturability_warnings": [],
+    "topology_changed": false,
+    "topology_delta": {},
+    "iteration": 0
+  },
+  "iteration_count": 0,
+  "error_type": "dimension",
+  "max_iterations": 5,
+  "retry_mode": null,
+  "stall_count": 0,
+  "force_refresh": false,
+  "workflow_id": "original",
+  "node_history": [
+    "planner",
+    "architect",
+    "architect",
+    "coder"
+  ],
+  "execution_log": [
+    "node_python_coder [iter 0]: FAILED",
+    "  Script: /tmp/temp_design_0.py",
+    "  Error : Deterministic coder execution failed: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\n\nTraceback:\nTraceback (most recent call last):\n  File \"/opt/agent/agent/multi_agent_cad/nodes.py\", line 552, in _node_python_coder_deterministic\n "
+  ]
+}

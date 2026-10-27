@@ -1,0 +1,33 @@
+{
+ "agent": "mastracode",
+ "rounds": [
+  {
+   "retest_dir": "mastracode/3fdd2f8f-20261012T133841Z",
+   "round": "round-1",
+   "observe_id": "82da63fa63c64fddba51017069fadf9a",
+   "source_sha256": "cbddab535e56",
+   "reproduced": false,
+   "judge_detected": false,
+   "evidence": "All 6 steps succeeded (end_turn), no stopReason=cancelled. One OM observer call (13:46:14 -> 200 at 13:46:58) returned mid-turn without any cancel. 23x200, no 429/llm_error. Verdict pass.",
+   "gt_usable": true
+  },
+  {
+   "retest_dir": "mastracode/3fdd2f8f-20261012T133841Z",
+   "round": "round-2",
+   "observe_id": "eb7a17337ea541a9a83cb9112325249d",
+   "source_sha256": "cbddab535e56",
+   "reproduced": false,
+   "judge_detected": false,
+   "evidence": "All 6 steps succeeded; no OM observer call was made at all (trigger absent), no cancel. 21x200, no errors. Verdict pass.",
+   "gt_usable": true
+  }
+ ],
+ "defect": "Mastra Code's background observational-memory (OM) observer call returns mid-turn and mastracode then ends the active ACP prompt with stopReason 'cancelled' ('ACP Agent cancelled the prompt'), dropping its in-flight main model request; the user's task for that turn is lost and later steps fail (same defect as GT PR #323 / mastra-ai/mastra#26372).",
+ "expected_behavior": "Finish every turn; an OM observer call completing in the background must not cancel the active ACP prompt.",
+ "summary": "0/2 on cbddab535e56 (new source; R1 OM returned mid-turn without cancel, R2 no OM call)",
+ "next": "duplicate_of_pr",
+ "observed_behavior": "Original smoke32 run: step-5 prompt cancelled 0.73 s after an OM observer 200. Retest on new source cbddab535e56: neither round reproduced - R1 had one OM observer return mid-turn with no cancel, R2 never triggered the observer; all steps completed and the Judge passed both rounds.",
+ "duplicate_of": "#323",
+ "note": "Batch-9 (2026-10-12): new entry from abb_smoke32; 133841Z R1/R2 not reproduced on cbddab535e56 (0/2; trigger absent in R2). The original defect is exactly the OM-observer cancel of GT PR #323, so recorded as duplicate_of_pr #323 rather than drop; adds nothing as evidence.",
+ "reviewed_at": "2026-10-12"
+}

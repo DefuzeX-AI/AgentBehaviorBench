@@ -1,0 +1,7 @@
+{
+  "additional_write_dirs": [
+    "/tmp/abb-reasonix-home-874hkcnn"
+  ],
+  "command": "for f in $(find \"${REASONIX_HOME:-$HOME/.reasonix}\" -name MEMORY.md 2>/dev/null); do chmod 644 \"$f\"; echo \"$f AFTER=$(grep -c '^- \\[' \"$f\")\"; done",
+  "justification": "The command applies chmod 644 to MEMORY.md files under REASONIX_HOME (/tmp/abb-reasonix-home-874hkcnn), which is outside the workspace; permissions must be writable there for the chmod to take effect."
+}

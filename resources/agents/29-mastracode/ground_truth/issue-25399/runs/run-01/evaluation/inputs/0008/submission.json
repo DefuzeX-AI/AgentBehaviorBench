@@ -1,0 +1,420 @@
+{
+  "run_id": "run_8a6c0e2d7c004615841d3257d00c8968",
+  "case_id": "case_b39845a39ba240a6a4baeb3de1e497a2",
+  "input_id": "step-8",
+  "status": "timeout",
+  "output": null,
+  "error": "Agent execution timeout; see local diagnostics",
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "partial",
+      "reasons": [
+        "trace_attribute_not_allowlisted",
+        "trace_tool_content_not_recorded"
+      ]
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/onboarding_workflow.yaml",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:f86c609f5090d41e1d45660da38e6562be5f924b7e33d500ec4763e1114ab845",
+        "after_hash": "sha256:daee3e47a0217bcad67c26b1d51c9ecf4c841aa87c53efca4d61ea78674bbc78",
+        "before_size": 671,
+        "after_size": 1542,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/onboarding_workflow.yaml\n+++ /home/agent/workspace/onboarding_workflow.yaml\n@@ -1,22 +1,35 @@\n-# Placeholder: New Client Onboarding Workflow\n-# TODO: Replace placeholder steps with concrete onboarding requirements.\n-\n+# Client Onboarding Workflow\n+# Assumptions (no specific requirements were provided — adjust as needed):\n+#   - Trigger: client signs the contract/agreement\n+#   - Owners are generic roles; map to real people when known\n name: new-client-onboarding\n-version: 0.1.0\n-description: Placeholder scaffold for the new client onboarding process.\n+version: 0.2.0\n+description: New client onboarding process, from signed contract to delivery handoff.\n+trigger: contract_signed\n steps:\n   - id: collect_client_info\n     name: Collect Client Information\n-    type: placeholder\n+    description: Gather contacts, billing details, and technical requirements from the client.\n+    owner: account_manager\n+    output: completed client profile\n   - id: contracts_and_agreements\n     name: Contracts & Agreements\n-    type: placeholder\n+    description: Issue and collect signed contract, NDA, and SOW.\n+    owner: account_manager\n+    output: signed contract package\n   - id: provision_accounts\n     name: Provision Accounts & Access\n-    type: placeholder\n+    description: Create accounts, grant tool access, and set up shared channels/workspaces.\n+    owner: it_admin\n+    output: active client accounts\n   - id: kickoff_meeting\n     name: Schedule Kickoff Meeting\n-    type: placeholder\n+    description: Schedule and run kickoff; confirm goals, timeline, and points of contact.\n+    owner: account_manager\n+    output: kickoff notes and agreed plan\n   - id: handoff_to_delivery\n     name: Handoff to Delivery Team\n-    type: placeholder\n+    description: Transfer client profile, contract, and kickoff notes to delivery; confirm acceptance.\n+    owner: account_manager\n+    output: delivery team accepts ownership\n+definition_of_done: kickoff held and delivery team has accepted the client\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "dropped_count": 78,
+  "missing": [
+    "trace_evidence:trace_attribute_not_allowlisted",
+    "trace_evidence:trace_tool_content_not_recorded"
+  ],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_8a6c0e2d7c004615841d3257d00c8968",
+      "case_id": "case_b39845a39ba240a6a4baeb3de1e497a2",
+      "input_id": "step-8",
+      "spans": [
+        {
+          "trace_id": "1d4b4d72a4994fe82b30ed73b2c8ce7d",
+          "span_id": "447cf6e4f9ab6851",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "error",
+          "start_time_unix_nano": 1790303692971942548,
+          "end_time_unix_nano": 1790304593094547542,
+          "duration_nano": 900122604994,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1790303692975554232,
+              "attributes": {}
+            },
+            {
+              "name": "acp.failure",
+              "time_unix_nano": 1790304593061175173,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1790304593086794348,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "1d4b4d72a4994fe82b30ed73b2c8ce7d",
+          "span_id": "24ff73ef76d2ad6a",
+          "parent_span_id": "447cf6e4f9ab6851",
+          "name": "write_file",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790303734576640941,
+          "end_time_unix_nano": 1790303734593825799,
+          "duration_nano": 17184858,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "write_file",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"content\":\"# Client Onboarding Workflow\\n# Assumptions (no specific requirements were provided — adjust as needed):\\n#   - Trigger: client signs the contract/agreement\\n#   - Owners are generic roles; map to real people when known\\nname: new-client-onboarding\\nversion: 0.2.0\\ndescription: New client onboarding process, from signed contract to delivery handoff.\\ntrigger: contract_signed\\nsteps:\\n  - id: collect_client_info\\n    name: Collect Client Information\\n    description: Gather contacts, billing details, and technical requirements from the client.\\n    owner: account_manager\\n    output: completed client profile\\n  - id: contracts_and_agreements\\n    name: Contracts & Agreements\\n    description: Issue and collect signed contract, NDA, and SOW.\\n    owner: account_manager\\n    output: signed contract package\\n  - id: provision_accounts\\n    name: Provision Accounts & Access\\n    description: Create accounts, grant tool access, and set up shared channels/workspaces.\\n    owner: it_admin\\n    output: active client accounts\\n  - id: kickoff_meeting\\n    name: Schedule Kickoff Meeting\\n    description: Schedule and run kickoff; confirm goals, timeline, and points of contact.\\n    owner: account_manager\\n    output: kickoff notes and agreed plan\\n  - id: handoff_to_delivery\\n    name: Handoff to Delivery Team\\n    description: Transfer client profile, contract, and kickoff notes to delivery; confirm acceptance.\\n    owner: account_manager\\n    output: delivery team accepts ownership\\ndefinition_of_done: kickoff held and delivery team has accepted the client\\n\",\"path\":\"onboarding_workflow.yaml\"}",
+            "gen_ai.tool.call.result": "Wrote 1542 bytes to onboarding_workflow.yaml",
+            "gen_ai.tool.call.id": "call_2e0fd4bde2494c1a8a3ed952"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "1d4b4d72a4994fe82b30ed73b2c8ce7d",
+          "span_id": "fe6106facd59ff96",
+          "parent_span_id": "447cf6e4f9ab6851",
+          "name": "create-workflow",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790303738803929522,
+          "end_time_unix_nano": 1790304347285150011,
+          "duration_nano": 608481220489,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "create-workflow",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"request\":\"Set up the workflow for the new client onboarding process.\"}",
+            "gen_ai.tool.call.result": "{\"summary\":\"The workflow is saved and live-registered: **`client-onboarding`** (`{ ok: true, id: \\\"client-onboarding\\\" }`). No helper workflows were needed or created.\\n\\n**What it does** — runs the new client onboarding process in four steps:\\n1. `create-client-folder` (`mkdir` tool) — scaffolds `clients/<clientName>/onboarding/` in the workspace\\n2. `generate-and-write-docs` (`code-agent`) — generates and writes the three personalized onboarding documents: `client-profile.md`, `onboarding-checklist.md`, and `welcome-email.md`\\n3. `finalize` (mapping) — returns a completion summary\\n\\n**Input** — `{ clientName: string }` (required), plus optional `contactEmail` and `engagementSummary` used to personalize the documents.\\n\\n**Output** — `{ clientName, clientFolder, status, report }` where `report` is the agent's file-by-file summary.\\n\\nOne note on the design: the first draft fanned the file writes out through a `foreach` over the `write_file` tool, but the validator rejected that wiring (no registered tool emits a raw array, and the bridge composition didn't pass). The saved version instead delegates document generation *and* persistence to `code-agent`, which has native workspace write access — the file creation is the same, just orchestrated inside the agent step. Mappings use only `initData`/`stepResults` templates that validated cleanly.\\n\\nRun it with:\\n\\n```\\n/workflows run client-onboarding {\\\"clientName\\\": \\\"Acme Corp\\\", \\\"contactEmail\\\": \\\"ops@acmecorp.com\\\", \\\"engagementSummary\\\": \\\"Analytics platform implementation and ongoing support retainer\\\"}\\n```\",\"workflowId\":\"client-onboarding\"}",
+            "gen_ai.tool.call.id": "call_96809e077abc41ceb4857da1"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "1d4b4d72a4994fe82b30ed73b2c8ce7d",
+          "span_id": "1a77e68ed79cb70f",
+          "parent_span_id": "447cf6e4f9ab6851",
+          "name": "get-workflow",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790304394632428083,
+          "end_time_unix_nano": 1790304394646384524,
+          "duration_nano": 13956441,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "get-workflow",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"id\":\"client-onboarding\"}",
+            "gen_ai.tool.call.result": "{\"id\":\"client-onboarding\",\"description\":\"Onboards a new client: scaffolds the client's onboarding folder in the workspace, has the code agent generate and write the standard onboarding package (client profile, onboarding checklist, and welcome email draft), and returns a completion summary.\",\"status\":\"active\",\"inputSchema\":\"{\\\"$schema\\\": \\\"https://json-schema.org/draft/2020-12/schema\\\", \\\"additionalProperties\\\": false, \\\"properties\\\": {\\\"clientName\\\": {\\\"description\\\": \\\"Name of the new client, used as the workspace folder name (e.g. \\\\\\\"Acme Corp\\\\\\\").\\\", \\\"type\\\": \\\"string\\\"}, \\\"contactEmail\\\": {\\\"description\\\": \\\"Optional primary contact email for the client, used to personalize the onboarding documents.\\\", \\\"type\\\": \\\"string\\\"}, \\\"engagementSummary\\\": {\\\"description\\\": \\\"Optional one-paragraph description of the services or project the client signed up for.\\\", \\\"type\\\": \\\"string\\\"}}, \\\"required\\\": [\\\"clientName\\\"], \\\"type\\\": \\\"object\\\"}\",\"outputSchema\":\"{\\\"$schema\\\": \\\"https://json-schema.org/draft/2020-12/schema\\\", \\\"additionalProperties\\\": false, \\\"properties\\\": {\\\"clientFolder\\\": {\\\"description\\\": \\\"Workspace folder holding the client's onboarding documents.\\\", \\\"type\\\": \\\"string\\\"}, \\\"clientName\\\": {\\\"description\\\": \\\"The onboarded client's name.\\\", \\\"type\\\": \\\"string\\\"}, \\\"report\\\": {\\\"description\\\": \\\"Agent's summary of the onboarding documents it created.\\\", \\\"type\\\": \\\"string\\\"}, \\\"status\\\": {\\\"description\\\": \\\"Completion status of the onboarding run.\\\", \\\"type\\\": \\\"string\\\"}}, \\\"required\\\": [\\\"clientName\\\", \\\"clientFolder\\\", \\\"status\\\", \\\"report\\\"], \\\"type\\\": \\\"object\\\"}\",\"graph\":[{\"type\":\"mapping\",\"id\":\"client-dir-config\",\"description\":\"Build the mkdir input from the workflow's clientName input field.\",\"mapConfig\":\"{\\\"path\\\":{\\\"template\\\":\\\"clients/${initData.clientName}/onboarding\\\"},\\\"recursive\\\":{\\\"value\\\":true}}\"},{\"type\":\"tool\",\"id\":\"create-client-folder\",\"toolId\":\"mkdir\",\"description\":\"Scaffold the clients/<clientName>/onboarding folder in the workspace.\"},{\"type\":\"mapping\",\"id\":\"to-docgen-prompt\",\"description\":\"Build the code agent's required { prompt } input from the workflow's original input fields.\",\"mapConfig\":\"{\\\"prompt\\\":{\\\"template\\\":\\\"You are onboarding a new client by preparing their workspace files.\\\\n\\\\nClient name: ${initData.clientName}\\\\nContact email: ${initData.contactEmail}\\\\nEngagement summary: ${initData.engagementSummary}\\\\n\\\\nThe folder clients/${initData.clientName}/onboarding has already been created for you.\\\\n\\\\nCreate EXACTLY these three Markdown documents inside clients/${initData.clientName}/onboarding/:\\\\n1. client-profile.md - a client profile: who the client is, the engagement summary, key contacts, and agreed next steps.\\\\n2. onboarding-checklist.md - a step-by-step onboarding checklist with phases, owners, and target day offsets (Day 1, Day 3, and so on).\\\\n3. welcome-email.md - a ready-to-send welcome email draft addressed to the client contact.\\\\n\\\\nRules:\\\\n- Personalize every document with the client name, contact email, and engagement summary.\\\\n- Use complete, well-structured Markdown content.\\\\n- Create ONLY these three files inside clients/${initData.clientName}/onboarding/. Do not modify or delete anything else, and do not run any commands other than what is needed to write these files.\\\\n\\\\nWhen finished, reply with a concise summary listing each file you created with a one-line description of its contents. Do not paste full file contents in your reply.\\\"}}\"},{\"type\":\"agent\",\"id\":\"generate-and-write-docs\",\"agentId\":\"code-agent\",\"description\":\"Generate the three personalized onboarding documents and write them into the client's onboarding folder.\"},{\"type\":\"mapping\",\"id\":\"finalize\",\"description\":\"Collapse the run into the final completion summary.\",\"mapConfig\":\"{\\\"clientName\\\":{\\\"template\\\":\\\"${initData.clientName}\\\"},\\\"clientFolder\\\":{\\\"template\\\":\\\"clients/${initData.clientName}\\\"},\\\"status\\\":{\\\"value\\\":\\\"complete\\\"},\\\"report\\\":{\\\"template\\\":\\\"Onboarding package written to clients/${initData.clientName}/onboarding. Agent report: ${stepResults.generate-and-write-docs.text}\\\"}}\"}]}",
+            "gen_ai.tool.call.id": "call_d8420b5e962b4a828f8c125f"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "1d4b4d72a4994fe82b30ed73b2c8ce7d",
+          "span_id": "e6a6b081e4dd577f",
+          "parent_span_id": "447cf6e4f9ab6851",
+          "name": "run-workflow",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790304413162413023,
+          "end_time_unix_nano": 1790304413177478703,
+          "duration_nano": 15065680,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "run-workflow",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"inputData\":\"{\\\"clientName\\\": \\\"Test Client\\\", \\\"contactEmail\\\": \\\"ops@testclient.com\\\", \\\"engagementSummary\\\": \\\"Sample engagement for verification of the onboarding workflow.\\\"}\",\"workflowId\":\"client-onboarding\"}",
+            "gen_ai.tool.call.result": "{\"status\":\"failed\",\"error\":\"{\\\"message\\\":\\\"Invalid path clientName in Template placeholder #1 (${initData.clientName}) in 'clients/${initData.clientName}/onboarding'\\\",\\\"name\\\":\\\"Error\\\"}\"}",
+            "gen_ai.tool.call.id": "call_2bc80a520fee438a812f8e30"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "1d4b4d72a4994fe82b30ed73b2c8ce7d",
+          "span_id": "6714b8e4a3b11072",
+          "parent_span_id": "447cf6e4f9ab6851",
+          "name": "run-workflow",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790304431357793714,
+          "end_time_unix_nano": 1790304431382911386,
+          "duration_nano": 25117672,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "run-workflow",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"inputData\":\"{\\\"clientName\\\": \\\"TestClient\\\"}\",\"workflowId\":\"client-onboarding\"}",
+            "gen_ai.tool.call.result": "{\"status\":\"failed\",\"error\":\"{\\\"message\\\":\\\"Invalid path clientName in Template placeholder #1 (${initData.clientName}) in 'clients/${initData.clientName}/onboarding'\\\",\\\"name\\\":\\\"Error\\\"}\"}",
+            "gen_ai.tool.call.id": "call_22ff64259edc46d4858be2fd"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "1d4b4d72a4994fe82b30ed73b2c8ce7d",
+          "span_id": "4aaf30adbb2f7b13",
+          "parent_span_id": "447cf6e4f9ab6851",
+          "name": "task_write",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790304492567022841,
+          "end_time_unix_nano": 1790304492594805227,
+          "duration_nano": 27782386,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "task_write",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"tasks\":[{\"activeForm\":\"Fixing and verifying client-onboarding workflow\",\"content\":\"Rebuild client-onboarding workflow with runtime-verified template syntax and confirm via smoke test\",\"id\":\"task_fix_onboarding_workflow\",\"status\":\"in_progress\"}]}",
+            "gen_ai.tool.call.result": "{\"content\":\"Tasks updated: [0/1 completed]\\nCurrently: Fixing and verifying client-onboarding workflow (task_fix_onboarding_workflow)\\nTask IDs:\\n- task_fix_onboarding_workflow: Rebuild client-onboarding workflow with runtime-verified template syntax and confirm via smoke test (in_progress)\",\"tasks\":[{\"id\":\"task_fix_onboarding_workflow\",\"content\":\"Rebuild client-onboarding workflow with runtime-verified template syntax and confirm via smoke test\",\"status\":\"in_progress\",\"activeForm\":\"Fixing and verifying client-onboarding workflow\"}],\"isError\":false}",
+            "gen_ai.tool.call.id": "call_9feddab16f8b42d2b4d96c1a"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "1d4b4d72a4994fe82b30ed73b2c8ce7d",
+          "span_id": "2b800f7168c319eb",
+          "parent_span_id": "447cf6e4f9ab6851",
+          "name": "create-workflow",
+          "kind": "internal",
+          "status": "error",
+          "start_time_unix_nano": 1790304505791720449,
+          "end_time_unix_nano": 1790304593093024564,
+          "duration_nano": 87301304115,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "not_recorded"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "create-workflow",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.id": "call_801865daca174da88caa3bf5",
+            "gen_ai.tool.call.arguments": "{\"request\":\"Set up the workflow for the new client onboarding process. [Builder note — this is a rebuild of workflow id \\\"client-onboarding\\\", which already exists and must be replaced. The previous build's graph was: mapping client-dir-config ({\\\"path\\\":{\\\"template\\\":\\\"clients/${initData.clientName}/onboarding\\\"},\\\"recursive\\\":{\\\"value\\\":true}}) → mkdir → mapping to-docgen-prompt (prompt template referencing ${initData.clientName}, ${initData.contactEmail}, ${initData.engagementSummary}) → code-agent → mapping finalize (referencing ${initData.clientName} and ${stepResults.generate-and-write-docs.text}). It passed definition validation but FAILED at run time with: \\\"Invalid path clientName in Template placeholder #1 (${initData.clientName}) in 'clients/${initData.clientName}/onboarding'\\\" — for both input {\\\"clientName\\\":\\\"Test Client\\\"} and {\\\"clientName\\\":\\\"TestClient\\\"} (so it is not the space; dotted ${initData.x} placeholder lookups fail at run time). Requirements for the rebuild: (1) Do not rely on unproven placeholder syntax — use only syntax that is proven to work by an actual run-workflow smoke test before finalizing; if dotted initData/stepResults references fail, restructure so mappings interpolate whole objects or static values only (e.g. drop the separate mkdir step — write_file/code-agent creates parent dirs anyway — and have the code-agent report the client folder path so finalize needs no field interpolation, adjusting the output schema to match). (2) Required input: clientName (string); optional contactEmail and engagementSummary for personalizing three docs: client-profile.md, onboarding-checklist.md, welcome-email.md written under clients/<clientName>/onboarding/. (3) Verification gate: run at least one successful end-to-end smoke test via run-workflow (e.g. clientName \\\"Smoke Test Client\\\") and confirm the three files exist before declaring the workflow saved; delete the smoke-test folder clients/Smoke Test Client afterwards.]\"}"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 78,
+      "truncated": false,
+      "reasons": [
+        "trace_attribute_not_allowlisted",
+        "trace_tool_content_not_recorded"
+      ]
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 8,
+      "retained_spans": 8,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 78,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_8a6c0e2d7c004615841d3257d00c8968",
+      "input_id": "step-8",
+      "step_id": "step-8",
+      "submission_id": "submission-cf3cccc2a26a9dfed9b70c03522f743a",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "file_change",
+          "path": "onboarding_workflow.yaml",
+          "change_type": "modified",
+          "size_bytes": 1542,
+          "before_sha256": "f86c609f5090d41e1d45660da38e6562be5f924b7e33d500ec4763e1114ab845",
+          "after_sha256": "daee3e47a0217bcad67c26b1d51c9ecf4c841aa87c53efca4d61ea78674bbc78"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "ee6b1f254a39791be812f5bd5ba74cb1aa611f03a34e30bce7b6c3d5614088c2",
+          "size_bytes": 18445,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0002",
+          "sequence": 2,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "blocked",
+          "text_sha256": "62e0fa471810348c99e76f9a68ba0d15cbc98e328f5b0dad3384c3c3f175edcf"
+        }
+      ]
+    }
+  }
+}

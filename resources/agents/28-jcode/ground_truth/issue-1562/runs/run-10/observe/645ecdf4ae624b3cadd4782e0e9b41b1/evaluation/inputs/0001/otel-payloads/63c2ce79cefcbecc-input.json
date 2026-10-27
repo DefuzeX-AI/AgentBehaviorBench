@@ -1,0 +1,4 @@
+{
+  "command": "python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('/home/agent/workspace/migration.db')\nconn.execute('PRAGMA user_version = 0;')\nconn.commit()\nprint('integrity:', conn.execute('PRAGMA integrity_check;').fetchone()[0])\nconn.close()\n\" && file /home/agent/workspace/migration.db && ls -la /home/agent/workspace/migration.db",
+  "intent": "Initialize SQLite header and verify migration.db is valid"
+}

@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_raw):\n    import pandas as pd\n    import numpy as np\n\n    '''\n    Wrangle the data provided in data_raw.\n\n    Goal: Aggregate daily total extended_sales over time for the full year 2021.\n\n    data_raw: A pandas DataFrame or a list of pandas DataFrames containing the raw data to be wrangled.\n    '''\n\n    # ------------------------------------------------------------------\n    # Step 0: If incoming data is not a list, convert it to a list first\n    # ------------------------------------------------------------------\n    if not isinstance(data_raw, list):\n        data_raw = [data_raw]\n\n    # ------------------------------------------------------------------\n    # Step 1: Inspect and standardize column names (lowercase, strip spaces)\n    # FIX: hasattr() is not available in this execution environment, so the\n    # .empty attribute is now checked with a try/except AttributeError block.\n    # ------------------------------------------------------------------\n    cleaned_frames = []\n    for df in data_raw:\n        if df is None:\n            continue\n        try:\n            is_empty = df.empty\n        except AttributeError:\n            is_empty = False\n        if is_empty:\n            continue\n        temp = df.copy()\n        temp.columns = [str(col).strip().lower() for col in temp.columns]\n        cleaned_frames.append(temp)\n\n    if len(cleaned_frames) == 0:\n        # Nothing to process: return an empty (but correctly shaped) 2021 calendar\n        data_wrangled = pd.DataFrame({\n            'date': [d.strftime('%Y-%m-%d') for d in pd.date_range('2021-01-01', '2021-12-31', freq='D')],\n            'total_extended_sales': [0.0] * 365\n        })\n        return data_wrangled\n\n    # ------------------------------------------------------------------\n    # Step 2: Combine multiple datasets (same schema) via concat.\n    #         Concatenation avoids Cartesian products that a blind merge\n    #         would produce on non-keyed data.\n    # ------------------------------------------------------------------\n    data = pd.concat(cleaned_frames, ignore_index=True)\n\n    # ------------------------------------------------------------------\n    # Identify key columns dynamically\n    # ------------------------------------------------------------------\n    date_col = None\n    for c in data.columns:\n        if 'date' in c:\n            date_col = c\n            break\n\n    sales_col = None\n    if 'extended_sales' in data.columns:\n        sales_col = 'extended_sales'\n    else:\n        for c in data.columns:\n            if 'extended' in c and 'sales' in c:\n                sales_col = c\n                break\n\n    # ------------------------------------------------------------------\n    # Normalize data types\n    # FIX: datetime parsing and timezone handling are fully guarded so that\n    # unexpected dtypes (e.g., mixed timezones producing object dtype) cannot\n    # crash the function.\n    # ------------------------------------------------------------------\n    if date_col is not None:\n        parsed = pd.to_datetime(data[date_col], errors='coerce')\n        try:\n            if parsed.dt.tz is not None:\n                parsed = parsed.dt.tz_localize(None)\n            parsed = parsed.dt.normalize()\n            data[date_col] = parsed\n        except (TypeError, AttributeError, ValueError):\n            # Leave the column untouched if it cannot be treated as datetime\n            pass\n\n    for col in data.columns:\n        if sales_col is not None and col == sales_col:\n            continue\n        if date_col is not None and col == date_col:\n            continue\n        if data[col].dtype == object:\n            coerced = pd.to_numeric(data[col], errors='coerce')\n            # Only convert if at least 90% of values parse as numbers\n            if coerced.notna().sum() > 0 and coerced.notna().mean() >= 0.9:\n                data[col] = coerced\n            else:\n                data[col] = data[col].astype(str).str.strip()\n\n    # Ensure the sales measure is numeric (coerce bad values to NaN)\n    if sales_col is not None:\n        data[sales_col] = pd.to_numeric(data[sales_col], errors='coerce')\n\n    # ------------------------------------------------------------------\n    # Step 3: Handle missing values by flagging (no row dropping)\n    # ------------------------------------------------------------------\n    if sales_col is not None:\n        data['missing_sales_flag'] = data[sales_col].isna().astype(int)\n\n    # ------------------------------------------------------------------\n    # Step 4: Remove exact duplicate records\n    # ------------------------------------------------------------------\n    data = data.drop_duplicates().reset_index(drop=True)\n\n    # ------------------------------------------------------------------\n    # Core task: filter to the full year 2021 and aggregate daily totals\n    # FIX: verify the date column is actually datetime dtype before using\n    # the .dt accessor; otherwise fall back to returning the cleaned data.\n    # ------------------------------------------------------------------\n    date_is_datetime = (\n        date_col is not None\n        and pd.api.types.is_datetime64_any_dtype(data[date_col])\n    )\n\n    if date_is_datetime and sales_col is not None:\n        yearly = data[data[date_col].dt.year == 2021]\n\n        daily_sales = (\n            yearly\n            .groupby(date_col, as_index=False)[sales_col]\n            .sum()\n            .sort_values(date_col)\n            .rename(columns={date_col: 'date', sales_col: 'total_extended_sales'})\n        )\n\n        # Ensure a continuous daily calendar spanning the full year 2021\n        full_calendar = pd.DataFrame({\n            'date': pd.date_range(start='2021-01-01', end='2021-12-31', freq='D')\n        })\n        daily_sales = full_calendar.merge(daily_sales, on='date', how='left')\n        daily_sales['total_extended_sales'] = daily_sales['total_extended_sales'].fillna(0)\n        daily_sales = daily_sales.sort_values('date').reset_index(drop=True)\n\n        # ------------------------------------------------------------------\n        # Convert Timestamp objects to ISO date strings so the result is\n        # JSON serializable (Timestamps caused the original serialization error).\n        # Also convert numpy floats to native Python floats for the same reason.\n        # ------------------------------------------------------------------\n        daily_sales['date'] = pd.to_datetime(daily_sales['date']).dt.strftime('%Y-%m-%d')\n        daily_sales['total_extended_sales'] = [\n            float(v) for v in daily_sales['total_extended_sales']\n        ]\n\n        data_wrangled = daily_sales\n    else:\n        # Fallback: if key columns cannot be identified, return the cleaned data.\n        # Convert any datetime columns to strings for JSON serializability.\n        data_wrangled = data.copy()\n        for col in data_wrangled.columns:\n            if pd.api.types.is_datetime64_any_dtype(data_wrangled[col]):\n                data_wrangled[col] = data_wrangled[col].dt.strftime('%Y-%m-%d')\n\n    # Return a single pandas DataFrame\n    return data_wrangled\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 8556,
+      "prompt_tokens": 1515,
+      "total_tokens": 10071,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 7141,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 128,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "glm-5.3-flash",
+    "system_fingerprint": null,
+    "id": "2026102012101228223cb489cc4102",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a15780-ad23-7ee1-8161-ca900daf2dd3-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 1515,
+    "output_tokens": 8556,
+    "total_tokens": 10071,
+    "input_token_details": {
+      "cache_read": 128
+    },
+    "output_token_details": {
+      "reasoning": 7141
+    }
+  }
+}

@@ -1,0 +1,3 @@
+{
+  "command": "cd /workspace/project && python3 - <<'EOF'\np = 'NOTES.md'\nlines = open(p, encoding='utf-8').read().split('\\n')\nline = 'Tagline: \\u201cFast\\u201d and \\u2018simple\\u2019'\nassert lines[2].startswith('Tagline:'), lines[2]\nlines[2] = line\nopen(p, 'w', encoding='utf-8').write('\\n'.join(lines))\nEOF\nsed -n '3p' NOTES.md | od -An -tx1"
+}

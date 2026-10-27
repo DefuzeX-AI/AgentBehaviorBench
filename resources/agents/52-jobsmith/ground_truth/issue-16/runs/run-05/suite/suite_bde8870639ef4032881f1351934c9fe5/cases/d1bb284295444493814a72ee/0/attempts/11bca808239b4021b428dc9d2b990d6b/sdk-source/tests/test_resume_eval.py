@@ -1,0 +1,229 @@
+from app.agents import resume_eval as mod
+from app.models import Profile, ResumeAssessment, ResumeIssue
+from tests.conftest import FakeLLM
+
+
+def test_structure_profile_returns_profile(monkeypatch):
+    canned = Profile(name="王小明", summary="後端工程師", skills=["Python"], raw_text="原文")
+    monkeypatch.setattr(mod, "get_llm", lambda tier, **kw: FakeLLM(canned))
+    result = mod.structure_profile("（履歷全文）")
+    assert isinstance(result, Profile)
+    assert result.name == "王小明"
+
+
+def test_structure_profile_uses_standard_tier(monkeypatch):
+    # 履歷解析改用 sonnet（standard）：是後續匹配/排序/技能缺口的共同上游，要抽得準。
+    seen = {}
+    canned = Profile(name="x", summary="y", raw_text="z")
+
+    def fake(tier, **kw):
+        seen["tier"] = tier
+        seen["kw"] = kw
+        return FakeLLM(canned)
+
+    monkeypatch.setattr(mod, "get_llm", fake)
+    mod.structure_profile("text")
+    assert seen["tier"] == "standard"
+    # 重點功能的上游：給足冷啟動 timeout 並允許一次重試，盡量讓 AI 解析成功而非太快退到備援。
+    assert seen["kw"]["timeout"] == 120
+    assert seen["kw"]["structured_retries"] == 2
+
+
+def test_fallback_profile_uses_title_role_for_non_software():
+    # 非軟體履歷（產品經理）：AI 降級時角色/關鍵字要讀履歷職稱行，而非一律塌成「工程師」。
+    resume = "王小明\n產品經理 / Product Manager\n負責樣品開發與 DFM 分析、BOM 管理。\n年資：2 年"
+    p = mod._fallback_profile_from_text(resume)
+    assert p.preferred_roles == ["產品經理"]
+    assert p.summary.startswith("產品經理")
+    assert p.parse_degraded is True  # 本機備援要標記降級，供前端提示檢查 AI 後端
+
+
+def test_first_class_local_profile_is_not_marked_as_degraded_and_reads_years():
+    resume = (
+        "王小明\n產品經理 / Product Manager\n"
+        "工作經驗：4 年\n負責 roadmap、使用者研究與需求分析。"
+    )
+
+    p = mod.structure_profile_local(resume)
+
+    assert p.preferred_roles == ["產品經理"]
+    assert p.years_experience == 4
+    assert p.parse_degraded is False
+    assert "user research" in p.skills
+
+
+def test_fallback_profile_keeps_software_role_rules():
+    resume = "陳小安\nPython / FastAPI 後端工程師，三年 LLM/RAG 經驗。"
+    p = mod._fallback_profile_from_text(resume)
+    assert "後端工程師" in p.preferred_roles
+
+
+def test_infer_title_role_handles_separators_and_misses():
+    assert mod._infer_title_role(["王小明", "資深行銷企劃 ｜ Marketing Lead"]) == "資深行銷企劃"
+    assert mod._infer_title_role(["王小明", "純粹一段沒有職稱的描述文字"]) == ""
+
+
+def test_structure_profile_llm_success_not_degraded(monkeypatch):
+    # AI 解析成功 → 不可標記降級（降級只在落回本機備援時）。
+    canned = Profile(name="王", summary="產品經理", preferred_roles=["產品經理"], raw_text="r")
+    monkeypatch.setattr(mod, "get_llm", lambda tier, **kw: FakeLLM(canned))
+    out = mod.structure_profile("產品經理履歷")
+    assert out.parse_degraded is False
+
+
+def test_structure_profile_fills_raw_text_when_empty(monkeypatch):
+    canned = Profile(name="王", summary="s", raw_text="")
+    monkeypatch.setattr(mod, "get_llm", lambda tier, **kw: FakeLLM(canned))
+    result = mod.structure_profile("完整履歷文字")
+    assert result.raw_text == "完整履歷文字"
+
+
+def test_structure_profile_fills_required_fields_when_llm_omits_them(monkeypatch):
+    canned = Profile(name="", summary="", skills=[], raw_text="")
+    monkeypatch.setattr(mod, "get_llm", lambda tier, **kw: FakeLLM(canned))
+    result = mod.structure_profile(
+        "Alex Chen\nFull Stack Engineer\nPython FastAPI React PostgreSQL\n"
+        "Built internal APIs and reduced processing time by 30%."
+    )
+
+    assert result.name
+    assert result.summary
+    assert result.skills
+    assert result.raw_text
+
+
+def test_structure_profile_replaces_name_not_present_in_resume(monkeypatch):
+    canned = Profile(name="狀在中", summary="AI 工程師", skills=["Python"], raw_text="")
+    monkeypatch.setattr(mod, "get_llm", lambda tier, **kw: FakeLLM(canned))
+
+    result = mod.structure_profile("王予\nAI Engineer\nPython FastAPI React")
+
+    assert result.name == "王予"
+
+
+def test_structure_profile_ignores_pdf_status_fragment_before_name(monkeypatch):
+    canned = Profile(name="狀在中", summary="AI 工程師", skills=["Python"], raw_text="")
+    monkeypatch.setattr(mod, "get_llm", lambda tier, **kw: FakeLLM(canned))
+    resume_text = "\n".join([
+        "個人資料（合成測試）",
+        "狀在中",
+        "手機 000-000-0000",
+        "E-mail candidate@example.invalid",
+        "地址 範例市範例區",
+        "學歷",
+        "範例大學 資訊工程學系",
+        "工作經歷",
+        "範例科技股份有限公司",
+        "AI 工程師",
+        "2024/1~在職",
+        "Python FastAPI",
+        "王小明",
+    ])
+
+    result = mod.structure_profile(resume_text)
+
+    assert result.name == "王小明"
+
+
+def test_structure_profile_falls_back_when_llm_parse_fails(monkeypatch):
+    def fail(_tier):
+        raise RuntimeError("Claude Code CLI 回覆不是合法 JSON")
+
+    monkeypatch.setattr(mod, "get_llm", fail)
+    result = mod.structure_profile(
+        "Full Stack Engineer\nTypeScript React Node.js AWS\n"
+        "Developed dashboard and REST API for business users."
+    )
+
+    assert result.name
+    assert result.summary
+    assert result.skills
+    assert result.raw_text
+
+
+def test_evaluate_resume_returns_assessment(monkeypatch):
+    canned = ResumeAssessment(
+        overall_score=78, clarity_score=80, impact_score=70,
+        ats_keyword_score=75, localization_score=85, completeness_score=80,
+        summary="整體不錯", strengths=["技能清楚"],
+        issues=[ResumeIssue(severity="medium", area="工作經歷", problem="缺量化", fix="加數字")],
+    )
+    monkeypatch.setattr(mod, "get_llm", lambda tier, **kw: FakeLLM(canned))
+    result = mod.evaluate_resume("履歷全文", Profile(name="王", summary="s", raw_text="r"))
+    assert isinstance(result, ResumeAssessment)
+    assert result.overall_score == 78
+    assert result.issues[0].severity == "medium"
+
+
+def test_evaluate_resume_uses_deep_tier_with_larger_max_tokens(monkeypatch):
+    seen = {}
+    canned = ResumeAssessment(
+        overall_score=1, clarity_score=1, impact_score=1, ats_keyword_score=1,
+        localization_score=1, completeness_score=1, summary="x",
+    )
+
+    def fake(tier, **kw):
+        seen["tier"] = tier
+        seen["kw"] = kw
+        return FakeLLM(canned)
+
+    monkeypatch.setattr(mod, "get_llm", fake)
+    mod.evaluate_resume("t", Profile(name="a", summary="b", raw_text="c"))
+    assert seen["tier"] == "deep"
+    # 健檢輸出大且 deep 為推理模型，max_tokens 必須高於預設 2000，避免截斷
+    assert seen["kw"].get("max_tokens", 0) > 2000
+    assert seen["kw"]["structured_retries"] == 1
+
+
+def test_fallback_resume_assessment_is_usable_when_llm_format_breaks():
+    profile = Profile(
+        name="王小明",
+        summary="後端工程師",
+        skills=["Python", "FastAPI", "PostgreSQL"],
+        raw_text="",
+    )
+    assessment = mod.fallback_resume_assessment(
+        "Python FastAPI 後端工程師\n負責 API 開發，將處理時間降低 30%。",
+        profile,
+        reason="API key 回覆不是合法 JSON",
+    )
+
+    assert isinstance(assessment, ResumeAssessment)
+    assert 0 <= assessment.overall_score <= 100
+    assert "保守備援" in assessment.summary
+    assert assessment.strengths
+    assert assessment.issues
+
+
+def test_fallback_resume_assessment_uses_resume_specific_evidence():
+    profile = Profile(
+        name="Alex Chen",
+        summary="Backend engineer",
+        skills=["FastAPI", "PostgreSQL", "AWS", "Redis"],
+        experiences=[
+            "Built payment API with FastAPI PostgreSQL AWS and reduced latency by 42% for 120k users.",
+        ],
+        preferred_roles=["Backend Engineer"],
+        raw_text="",
+    )
+    assessment = mod.fallback_resume_assessment(
+        "\n".join([
+            "Alex Chen",
+            "Backend Engineer",
+            "Built payment API with FastAPI PostgreSQL AWS and reduced latency by 42% for 120k users.",
+            "Led Redis cache migration and cut cloud cost by 18%.",
+        ]),
+        profile,
+        reason="Codex CLI returned invalid JSON",
+    )
+
+    combined = " ".join(
+        [assessment.summary, *assessment.strengths]
+        + [issue.problem + " " + issue.fix for issue in assessment.issues]
+        + [rw.original + " " + rw.improved + " " + rw.why for rw in assessment.rewrite_examples]
+    )
+    assert "42%" in combined
+    assert "FastAPI" in combined
+    assert "Backend Engineer" in combined
+    assert len(assessment.issues) >= 3
+    assert len(assessment.rewrite_examples) >= 2

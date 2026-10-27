@@ -1,0 +1,4 @@
+{
+  "newText": "#!/usr/bin/env python3\n\"\"\"Check which probabilistic programming engines are available.\"\"\"\nimport importlib\nimport sys\n\nprint(\"python\", sys.version.split()[0])\nfor m in [\"pymc\", \"pymc3\", \"stan\", \"cmdstanpy\", \"numpyro\", \"pyro\",\n          \"tensorflow_probability\", \"jax\", \"numpy\", \"scipy\", \"arviz\"]:\n    try:\n        mod = importlib.import_module(m)\n        print(f\"{m:24s} OK  {getattr(mod, '__version__', '?')}\")\n    except Exception:\n        print(f\"{m:24s} --\")\n",
+  "path": "check_engines.py"
+}

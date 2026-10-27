@@ -1,0 +1,4 @@
+{
+  "content": "-- Migration 001: Create the 'orders' table\n-- Target: SQLite\n-- Fails with an error if the table already exists (prevents accidental data loss).\n\nCREATE TABLE orders (\n    id          INTEGER PRIMARY KEY AUTOINCREMENT,\n    customer_id INTEGER NOT NULL,\n    amount      REAL    NOT NULL,\n    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))\n);\n\nCREATE INDEX idx_orders_customer_id ON orders (customer_id);\n",
+  "encoding": "utf-8"
+}

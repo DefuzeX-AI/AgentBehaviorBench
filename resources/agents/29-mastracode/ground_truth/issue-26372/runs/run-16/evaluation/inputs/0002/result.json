@@ -1,0 +1,69 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "b735ccce736e464a8400350c55eabeb4",
+  "case_id": "case_90c928a941124e3b98ed1392fe77f89d",
+  "input_id": "step-2",
+  "invocation_id": "b735ccce736e464a8400350c55eabeb4",
+  "agent_id": "mastracode",
+  "status": "succeeded",
+  "output": "Write a Python script 'model.py' that defines a finite state machine with at least 4 states, a set of initial states, a next-state relation, and a safety property expressed as a set of bad states.**Completed**: `model.py` defines a finite state machine modeling a two-process mutual-exclusion protocol, ready to be consumed by a BMC engine.\n\n**Model structure** (all immutable sets, in `bmc/model.py`):\n- **States** (`STATES`): 9 states — each state is a `(Phase, Phase)` pair with phases `IDLE`, `WAITING`, `CRITICAL`\n- **Initial states** (`INITIAL`): both processes idle, `(IDLE, IDLE)`\n- **Next-state relation** (`NEXT`): dict mapping each state to its one-step successors; one process advances per step (stuttering allowed), and a process may enter its critical section only while the other isn't in its critical section\n- **Safety property** (`BAD`): the set of bad states — here `{(CRITICAL, CRITICAL)}`, the states where mutual exclusion is violated\n\n**Verification**: ran `python model.py` — built-in sanity checks assert the relation is total and only references real states, then a BFS from `INITIAL` confirms no bad state is reachable (8 of 9 states reachable, the one unreachable state being the bad state), so the property holds.\n\n**Notes**: `reachable()` is exposed as a reusable primitive for the checker you'll likely build next. The model is deterministic-free (nondeterministic interleaving + stuttering), which gives BMC something meaningful to explore.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": false,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": false
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {},
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "mastracode",
+        "title": "Mastra Code",
+        "version": "0.1.0"
+      }
+    },
+    "pid": 12,
+    "session": {
+      "sessionId": "794eb22b-0d23-4466-abe9-84cc97df7203",
+      "modes": {
+        "currentModeId": "build",
+        "availableModes": [
+          {
+            "id": "build",
+            "name": "Build"
+          },
+          {
+            "id": "plan",
+            "name": "Plan"
+          },
+          {
+            "id": "fast",
+            "name": "Fast"
+          }
+        ]
+      }
+    },
+    "session_id": "794eb22b-0d23-4466-abe9-84cc97df7203",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn",
+      "usage": {
+        "totalTokens": 60605,
+        "inputTokens": 54847,
+        "outputTokens": 5758,
+        "thoughtTokens": 4620,
+        "cachedReadTokens": 49216
+      }
+    }
+  }
+}

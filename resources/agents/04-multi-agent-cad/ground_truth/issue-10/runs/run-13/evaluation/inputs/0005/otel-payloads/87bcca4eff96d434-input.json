@@ -1,0 +1,364 @@
+{
+  "user_request": "Run the mesh-check script on the generated mesh and report the results. If any checks fail, diagnose the cause and repair the build123d script, then rerun both the script and the mesh check.",
+  "cad_brief": {
+    "part_name": "l-bracket-50x30x5-6mm-hole",
+    "part_category": "L-bracket",
+    "length_unit": "mm",
+    "origin_convention": "centroid_on_base_plane",
+    "primary_workplane": "XZ",
+    "max_extent_x_mm": 50.0,
+    "max_extent_y_mm": 30.0,
+    "max_extent_z_mm": 30.0,
+    "target_volume_mm3": 11108.6,
+    "material": null,
+    "material_density_g_cm3": null,
+    "key_parameters": {
+      "BASE_LENGTH_X": 50.0,
+      "BASE_WIDTH_Y": 30.0,
+      "THICKNESS_Z": 5.0,
+      "LEG_TOTAL_HEIGHT_Z": 30.0,
+      "LEG_HEIGHT_ABOVE_BASE_Z": 25.0,
+      "LEG_THICKNESS_X": 5.0,
+      "HOLE_DIAMETER": 6.0,
+      "HOLE_RADIUS": 3.0,
+      "HOLE_CENTER_X": 0.0,
+      "HOLE_CENTER_Y": 0.0,
+      "BASE_OUTER_FACE_X": 25.0,
+      "BASE_INNER_FACE_X": -25.0,
+      "LEG_OUTER_FACE_X": 25.0,
+      "LEG_INNER_FACE_X": 20.0
+    },
+    "verification_targets": [
+      {
+        "id": "overall-x",
+        "kind": "overall_dimension",
+        "description": "Overall bounding-box extent along the X axis (base length of the L-bracket).",
+        "nominal": 50.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": 0.5,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "x",
+        "critical": true,
+        "notes": "Base runs 50 mm in X; with centroid_on_base_plane origin the faces sit at X = -25 and X = +25."
+      },
+      {
+        "id": "overall-y",
+        "kind": "overall_dimension",
+        "description": "Overall bounding-box extent along the Y axis (base width / extrusion depth of the L-profile).",
+        "nominal": 30.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": 0.5,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "y",
+        "critical": true,
+        "notes": "Base is 30 mm wide; the L-profile is extruded the full 30 mm along Y so Y faces sit at -15 and +15."
+      },
+      {
+        "id": "overall-z",
+        "kind": "overall_dimension",
+        "description": "Overall bounding-box extent along the Z axis (base thickness plus vertical leg rise).",
+        "nominal": 30.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": 0.5,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "z",
+        "critical": true,
+        "notes": "ABSOLUTE value from Z=0 bottom face. Base occupies Z = 0..5; vertical leg rises to Z = 30 (LEG_TOTAL_HEIGHT_Z). Leg height above the base is inferred as LEG_HEIGHT_ABOVE_BASE_Z = 25 mm since the request did not state it."
+      },
+      {
+        "id": "single-body",
+        "kind": "single_body",
+        "description": "The finished bracket must be one connected solid (base plate and vertical leg fused into a single body, no free-floating shells).",
+        "nominal": null,
+        "tolerance_upper": 0.0,
+        "tolerance_lower": 0.0,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": null,
+        "critical": true,
+        "notes": "L-profile must be a single continuous extrusion, not two joined plates."
+      },
+      {
+        "id": "water-tightness",
+        "kind": "water_tightness",
+        "description": "The finished solid must be a closed, watertight manifold mesh suitable for printing or machining.",
+        "nominal": null,
+        "tolerance_upper": 0.0,
+        "tolerance_lower": 0.0,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": null,
+        "critical": true,
+        "notes": "All faces closed; the 6 mm through-hole must break both base surfaces cleanly."
+      }
+    ],
+    "functional_requirements": [
+      "Base plate 50 mm x 30 mm providing a flat mounting/resting surface.",
+      "Single 6 mm diameter hole centered on the base footprint for fastening/clearance.",
+      "Vertical leg at one end giving the part its 90-degree L-profile.",
+      "Uniform 5 mm material thickness across base and leg."
+    ],
+    "manufacturing_method": "3d_print_fdm",
+    "special_features": [
+      "The part MUST be a single solid formed by extruding an L-shaped profile defined in the XZ plane along the Y axis for BASE_WIDTH_Y (30 mm), not two separate perpendicular plates.",
+      "The 6 mm hole MUST be a single through-hole penetrating the base vertically along the Z axis.",
+      "The 6 mm hole MUST be centered on the base footprint at (HOLE_CENTER_X = 0, HOLE_CENTER_Y = 0), i.e. at the centroid of the 50 x 30 base, not offset toward an edge.",
+      "The 6 mm hole MUST NOT intersect the vertical leg (hole radius HOLE_RADIUS = 3 mm must stay clear of the leg inner face at LEG_INNER_FACE_X = 20 mm).",
+      "The vertical leg MUST rise from the +X edge of the base, occupying X from LEG_INNER_FACE_X (20 mm) to LEG_OUTER_FACE_X (25 mm) and spanning the full BASE_WIDTH_Y (30 mm) in Y.",
+      "The vertical leg MUST extend from the bottom face Z=0 up to LEG_TOTAL_HEIGHT_Z = 30 mm, giving LEG_HEIGHT_ABOVE_BASE_Z = 25 mm above the top of the 5 mm base.",
+      "Base and leg MUST share the uniform THICKNESS_Z = 5 mm wall thickness."
+    ],
+    "user_request_raw": "Read the following part request and identify all stated dimensions, features, and constraints. Do not modify any files yet.\n\nPart request: \"Make an L-shaped bracket with a base 50 mm by 30 mm, thickness 5 mm, and a single 6 mm diameter hole centered on the base.\"",
+    "spec_version": 1
+  },
+  "architect_plan": {
+    "plan_id": "plan-l-bracket-50x30x5-6mm-hole-v1",
+    "cad_brief_id": "l-bracket-50x30x5-6mm-hole",
+    "sketches": [
+      {
+        "sketch_id": "l-profile-xz",
+        "workplane": "XZ",
+        "workplane_offset_mm": -15.0,
+        "entities": [
+          {
+            "entity_type": "polygon",
+            "label": null,
+            "start": null,
+            "end": null,
+            "center": null,
+            "radius": null,
+            "start_angle_deg": null,
+            "end_angle_deg": null,
+            "width": null,
+            "height": null,
+            "corner_radius": null,
+            "num_sides": null,
+            "circumscribed_radius": null,
+            "control_points": [
+              {
+                "x": -25.0,
+                "y": 0.0
+              },
+              {
+                "x": 25.0,
+                "y": 0.0
+              },
+              {
+                "x": 25.0,
+                "y": 30.0
+              },
+              {
+                "x": 20.0,
+                "y": 30.0
+              },
+              {
+                "x": 20.0,
+                "y": 5.0
+              },
+              {
+                "x": -25.0,
+                "y": 5.0
+              }
+            ],
+            "text_string": null,
+            "font_size": null
+          }
+        ],
+        "constraints": [],
+        "fully_constrained": false,
+        "notes": "Custom profile L-shape in the XZ plane. IRON RULE 1: sketch local x = world X, sketch local y = world Z. Closed vertex loop: (-25,0) -> (25,0) -> (25,30) -> (20,30) -> (20,5) -> (-25,5) -> back to (-25,0). This is the union of the base arm (world X = -25..+25, Z = 0..5, i.e. BASE_LENGTH_X 50 x THICKNESS_Z 5) and the vertical leg arm (world X = +20..+25, Z = 0..30, i.e. LEG_THICKNESS_X 5 x LEG_TOTAL_HEIGHT_Z 30). Area check: 50*5 + 5*25 = 250 + 125 = 375 mm^2. The single profile is extruded once along Y, so base and leg are one continuous solid (special feature [1], [5], [6], [7]). Plane offset -15 mm along the XZ-plane normal places the section so that the positive extrusion spans world Y = -15..+15 (BASE_WIDTH_Y = 30), centered on the origin."
+      }
+    ],
+    "steps": [
+      {
+        "step_id": "step-01-extrude-l-profile",
+        "step_type": "extrude",
+        "label": "Extrude single L-shaped XZ profile 30 mm along Y",
+        "sketch_id": "l-profile-xz",
+        "distance_mm": 30.0,
+        "direction": "positive",
+        "taper_angle_deg": null,
+        "revolve_angle_deg": null,
+        "revolve_axis": null,
+        "revolve_axis_point": null,
+        "radius_mm": null,
+        "chamfer_distance_mm": null,
+        "chamfer_distance1_mm": null,
+        "chamfer_distance2_mm": null,
+        "edge_selector": null,
+        "hole_diameter_mm": null,
+        "hole_depth_mm": null,
+        "hole_position": null,
+        "hole_type": "simple",
+        "counterbore_diameter_mm": null,
+        "counterbore_depth_mm": null,
+        "countersink_angle_deg": null,
+        "target_step_id": null,
+        "tool_step_id": null,
+        "pattern_count": null,
+        "pattern_spacing_mm": null,
+        "pattern_axis": null,
+        "pattern_total_angle_deg": null,
+        "feature_step_ids": null,
+        "mirror_plane": null,
+        "mirror_plane_offset_mm": null,
+        "shell_thickness_mm": null,
+        "shell_open_faces": null,
+        "draft_angle_deg": null,
+        "draft_neutral_plane": null,
+        "draft_face_selectors": null,
+        "rib_thickness_mm": null,
+        "rib_height_mm": null,
+        "rib_face_selectors": null,
+        "reference_type": null,
+        "reference_definition": null,
+        "depends_on": [],
+        "notes": "Single continuous extrusion of the closed L-profile along Y. Sketch plane offset -15.0 mm, positive extrusion 30.0 mm => solid spans world Y = -15 to +15 (BASE_WIDTH_Y = 30, centered at Y = 0). Result: base slab occupies X = -25..+25, Y = -15..+15, Z = 0..5; vertical leg occupies X = +20..+25, Y = -15..+15, Z = 0..30 (LEG_OUTER_FACE_X = 25, LEG_INNER_FACE_X = 20, LEG_TOTAL_HEIGHT_Z = 30, LEG_HEIGHT_ABOVE_BASE_Z = 25). One L-shaped solid, not two stacked plates."
+      },
+      {
+        "step_id": "step-02-hole-6mm-base",
+        "step_type": "hole",
+        "label": "6 mm through-hole centered on base footprint",
+        "sketch_id": null,
+        "distance_mm": null,
+        "direction": null,
+        "taper_angle_deg": null,
+        "revolve_angle_deg": null,
+        "revolve_axis": null,
+        "revolve_axis_point": null,
+        "radius_mm": null,
+        "chamfer_distance_mm": null,
+        "chamfer_distance1_mm": null,
+        "chamfer_distance2_mm": null,
+        "edge_selector": null,
+        "hole_diameter_mm": 6.0,
+        "hole_depth_mm": null,
+        "hole_position": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "hole_type": "simple",
+        "counterbore_diameter_mm": null,
+        "counterbore_depth_mm": null,
+        "countersink_angle_deg": null,
+        "target_step_id": null,
+        "tool_step_id": null,
+        "pattern_count": null,
+        "pattern_spacing_mm": null,
+        "pattern_axis": null,
+        "pattern_total_angle_deg": null,
+        "feature_step_ids": null,
+        "mirror_plane": null,
+        "mirror_plane_offset_mm": null,
+        "shell_thickness_mm": null,
+        "shell_open_faces": null,
+        "draft_angle_deg": null,
+        "draft_neutral_plane": null,
+        "draft_face_selectors": null,
+        "rib_thickness_mm": null,
+        "rib_height_mm": null,
+        "rib_face_selectors": null,
+        "reference_type": null,
+        "reference_definition": null,
+        "depends_on": [
+          "step-01-extrude-l-profile"
+        ],
+        "notes": "Through-hole along Z, base plate spans Z = 0..5. Hole axis at world (X = 0, Y = 0) = centroid of the 50 x 30 base footprint (HOLE_CENTER_X = 0, HOLE_CENTER_Y = 0). Drill with overshoot on both sides (enter below Z = 0, exit above Z = 5). Clearance check: hole edge at X = HOLE_CENTER_X + HOLE_RADIUS = 0 + 3 = 3 mm, leg inner face at LEG_INNER_FACE_X = 20 mm -> 17 mm clear, hole does NOT intersect the leg (special feature [4]). The leg sits at X = 20..25 so the +Y/-Y leg faces are untouched by the hole."
+      }
+    ],
+    "estimated_volume_mm3": null,
+    "key_dimensions": {
+      "BASE_LENGTH_X": 50.0,
+      "BASE_WIDTH_Y": 30.0,
+      "THICKNESS_Z": 5.0,
+      "LEG_TOTAL_HEIGHT_Z": 30.0,
+      "LEG_HEIGHT_ABOVE_BASE_Z": 25.0,
+      "LEG_THICKNESS_X": 5.0,
+      "HOLE_DIAMETER": 6.0,
+      "HOLE_RADIUS": 3.0,
+      "HOLE_CENTER_X": 0.0,
+      "HOLE_CENTER_Y": 0.0,
+      "BASE_OUTER_FACE_X": 25.0,
+      "BASE_INNER_FACE_X": -25.0,
+      "LEG_OUTER_FACE_X": 25.0,
+      "LEG_INNER_FACE_X": 20.0,
+      "PROFILE_EXTRUDE_Y": 30.0,
+      "PROFILE_SKETCH_OFFSET_Y": -15.0
+    },
+    "selector_map": {
+      "overall-x": "(skip)",
+      "overall-y": "(skip)",
+      "overall-z": "(skip)",
+      "single-body": "(skip)",
+      "water-tightness": "(skip)"
+    },
+    "tolerances_hint": null,
+    "expected_step_count": null,
+    "plan_version": 1,
+    "revision_history": [
+      "v1 — initial design: single L-shaped XZ profile extruded 30 mm along Y, plus one centered 6 mm Z through-hole in the base."
+    ]
+  },
+  "qa_report": {
+    "cad_brief_id": "(coder-failure)",
+    "engine_a": {
+      "engine_name": "cadpy_analysis",
+      "results": [],
+      "summary": "",
+      "warnings": [],
+      "errors": [],
+      "raw_json": null
+    },
+    "engine_b": {
+      "engine_name": "check_mesh",
+      "results": [],
+      "summary": "",
+      "warnings": [],
+      "errors": [
+        "Deterministic coder execution failed: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\n\nTraceback:\nTraceback (most recent call last):\n  File \"/opt/agent/agent/multi_agent_cad/nodes.py\", line 552, in _node_python_coder_deterministic\n    from cadpy.generation import EntrySpec, run_script_generator\n  File \"/opt/agent/agent/packages/cadpy/src/cadpy/generation.py\", line 40, in <module>\n    from cadpy.glb import (\n  File \"/opt/agent/agent/packages/cadpy/src/cadpy/glb.py\", line 32, in <module>\n    from cadpy.step_scene import ColorRGBA, LoadedStepScene, OccurrenceNode, SelectorBundle, occurrence_selector_id\n  File \"/opt/agent/agent/packages/cadpy/src/cadpy/step_scene.py\", line 32, in <module>\n    from OCP.TDF import TDF_ChildIterator, TDF_Label, TDF_LabelSequence\nImportError: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\n"
+      ],
+      "raw_json": null
+    },
+    "all_passed": false,
+    "passed_count": 0,
+    "failed_count": 0,
+    "noise_only_fail_count": 0,
+    "error_type": "dimension",
+    "error_details": [
+      "Deterministic coder execution failed: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\n\nTraceback:\nTraceback (most recent call last):\n  File \"/opt/agent/agent/multi_agent_cad/nodes.py\", line 552, in _node_python_coder_deterministic\n    from cadpy.generation import EntrySpec, run_script_generator\n  File \"/opt/agent/agent/packages/cadpy/src/cadpy/generation.py\", line 40, in <module>\n    from cadpy.glb import (\n  File \"/opt/agent/agent/packages/cadpy/src/cadpy/glb.py\", line 32, in <module>\n    from cadpy.step_scene import ColorRGBA, LoadedStepScene, OccurrenceNode, SelectorBundle, occurrence_selector_id\n  File \"/opt/agent/agent/packages/cadpy/src/cadpy/step_scene.py\", line 32, in <module>\n    from OCP.TDF import TDF_ChildIterator, TDF_Label, TDF_LabelSequence\nImportError: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\n"
+    ],
+    "improvement_suggestions": [],
+    "connectivity_warning": null,
+    "strength_score": null,
+    "manufacturability_warnings": [],
+    "topology_changed": false,
+    "topology_delta": {},
+    "iteration": 0
+  },
+  "iteration_count": 0,
+  "error_type": "dimension",
+  "max_iterations": 5,
+  "force_refresh": false,
+  "workflow_id": "original",
+  "node_history": [
+    "planner",
+    "architect",
+    "coder",
+    "coder",
+    "coder"
+  ],
+  "execution_log": [
+    "node_python_coder [iter 0]: FAILED",
+    "  Script: /tmp/temp_design_0.py",
+    "  Error : Deterministic coder execution failed: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\n\nTraceback:\nTraceback (most recent call last):\n  File \"/opt/agent/agent/multi_agent_cad/nodes.py\", line 552, in _node_python_coder_deterministic\n "
+  ]
+}

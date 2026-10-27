@@ -1,0 +1,448 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "603a123da8da4e9d96fbbaaa486b7018",
+  "case_id": "srp-vtcode-h2-tty-exec-v1",
+  "input_id": "step-1",
+  "invocation_id": "603a123da8da4e9d96fbbaaa486b7018",
+  "agent_id": "vtcode",
+  "status": "succeeded",
+  "output": "I ran the command once, but I did not receive its output or exit code. Here is exactly what happened.\n\nCommand run (tty: true, one invocation):\nsh -c 'if [ -t 1 ]; then echo TTY_YES; else echo TTY_NO; fi; echo MARKER_7319; exit 3'\n\nWhat the tool returned:\n- status: success, mode: pty, terminal_id 502732304867482a9aff2eaad7604ef6\n- No stdout/stderr text and no exit code were included in that response, so the output is currently unknown to me.\n\nFollow-up attempt: I tried to wait on the same terminal id to collect output and exit status, but the tool reported Resource not found (session id not present in this runtime). So I have no recorded output or exit code.\n\nExplicitly: I cannot tell you whether it printed TTY_YES or TTY_NO, nor whether MARKER_7319 appeared, nor the exit code. I am not guessing.\n\nPer your instruction to run the command exactly once, I have not re-run it. If you want, I can re-run it a single additional time (with a longer yield window so the tool captures output and exit code in the initial response), or inspect whether the run left any captured output elsewhere.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": true,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "delete": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {
+          "logout": {}
+        }
+      },
+      "authMethods": [
+        {
+          "id": "oauth-openai",
+          "name": "OpenAI OAuth",
+          "description": "Authenticate with OpenAI via OAuth 2.0 with PKCE"
+        },
+        {
+          "id": "oauth-openrouter",
+          "name": "OpenRouter OAuth",
+          "description": "Authenticate with OpenRouter via OAuth 2.0 with PKCE"
+        },
+        {
+          "id": "terminal-login",
+          "name": "Terminal Login",
+          "description": "Interactive terminal-based authentication via vtcode login command",
+          "args": [
+            "login"
+          ],
+          "type": "terminal"
+        },
+        {
+          "id": "env-api-keys",
+          "name": "API Key",
+          "vars": [
+            {
+              "name": "OPENAI_API_KEY",
+              "label": "OpenAI",
+              "secret": "[REDACTED]",
+              "optional": false
+            },
+            {
+              "name": "ANTHROPIC_API_KEY",
+              "label": "Anthropic",
+              "secret": "[REDACTED]",
+              "optional": false
+            },
+            {
+              "name": "GEMINI_API_KEY",
+              "label": "Google Gemini",
+              "secret": "[REDACTED]",
+              "optional": false
+            },
+            {
+              "name": "OPENROUTER_API_KEY",
+              "label": "OpenRouter",
+              "secret": "[REDACTED]",
+              "optional": false
+            },
+            {
+              "name": "DEEPSEEK_API_KEY",
+              "label": "DeepSeek",
+              "secret": "[REDACTED]",
+              "optional": false
+            },
+            {
+              "name": "META_API_KEY",
+              "label": "Meta AI",
+              "secret": "[REDACTED]",
+              "optional": false
+            },
+            {
+              "name": "MODEL_API_KEY",
+              "label": "Meta AI (documented)",
+              "secret": "[REDACTED]",
+              "optional": false
+            },
+            {
+              "name": "ZAI_API_KEY",
+              "label": "Z.AI",
+              "secret": "[REDACTED]",
+              "optional": false
+            },
+            {
+              "name": "MOONSHOT_API_KEY",
+              "label": "Moonshot",
+              "secret": "[REDACTED]",
+              "optional": false
+            },
+            {
+              "name": "MINIMAX_API_KEY",
+              "label": "MiniMax",
+              "secret": "[REDACTED]",
+              "optional": false
+            },
+            {
+              "name": "GROQ_API_KEY",
+              "label": "Groq",
+              "secret": "[REDACTED]",
+              "optional": false
+            },
+            {
+              "name": "XAI_API_KEY",
+              "label": "xAI",
+              "secret": "[REDACTED]",
+              "optional": false
+            },
+            {
+              "name": "COHERE_API_KEY",
+              "label": "Cohere",
+              "secret": "[REDACTED]",
+              "optional": false
+            },
+            {
+              "name": "HF_TOKEN",
+              "label": "Hugging Face",
+              "secret": "[REDACTED]",
+              "optional": false
+            },
+            {
+              "name": "MISTRAL_API_KEY",
+              "label": "Mistral",
+              "secret": "[REDACTED]",
+              "optional": false
+            },
+            {
+              "name": "GOOGLE_API_KEY",
+              "label": "Google (alt)",
+              "secret": "[REDACTED]",
+              "optional": true
+            },
+            {
+              "name": "OLLAMA_API_KEY",
+              "label": "Ollama",
+              "secret": "[REDACTED]",
+              "optional": true
+            },
+            {
+              "name": "OLLAMA_API_KEY",
+              "label": "Ollama Cloud",
+              "secret": "[REDACTED]",
+              "optional": false
+            },
+            {
+              "name": "LMSTUDIO_API_KEY",
+              "label": "LM Studio",
+              "secret": "[REDACTED]",
+              "optional": true
+            }
+          ],
+          "type": "env_var"
+        },
+        {
+          "id": "env-base-urls",
+          "name": "API Base URL",
+          "vars": [
+            {
+              "name": "OPENAI_BASE_URL",
+              "label": "OpenAI",
+              "secret": "[REDACTED]",
+              "optional": true
+            },
+            {
+              "name": "ANTHROPIC_BASE_URL",
+              "label": "Anthropic",
+              "secret": "[REDACTED]",
+              "optional": true
+            },
+            {
+              "name": "GEMINI_BASE_URL",
+              "label": "Gemini",
+              "secret": "[REDACTED]",
+              "optional": true
+            },
+            {
+              "name": "OPENROUTER_BASE_URL",
+              "label": "OpenRouter",
+              "secret": "[REDACTED]",
+              "optional": true
+            },
+            {
+              "name": "DEEPSEEK_BASE_URL",
+              "label": "DeepSeek",
+              "secret": "[REDACTED]",
+              "optional": true
+            },
+            {
+              "name": "META_BASE_URL",
+              "label": "Meta AI",
+              "secret": "[REDACTED]",
+              "optional": true
+            },
+            {
+              "name": "ZAI_BASE_URL",
+              "label": "Z.AI",
+              "secret": "[REDACTED]",
+              "optional": true
+            },
+            {
+              "name": "MOONSHOT_BASE_URL",
+              "label": "Moonshot",
+              "secret": "[REDACTED]",
+              "optional": true
+            },
+            {
+              "name": "MINIMAX_BASE_URL",
+              "label": "MiniMax",
+              "secret": "[REDACTED]",
+              "optional": true
+            },
+            {
+              "name": "XAI_BASE_URL",
+              "label": "xAI",
+              "secret": "[REDACTED]",
+              "optional": true
+            },
+            {
+              "name": "HUGGINGFACE_BASE_URL",
+              "label": "Hugging Face",
+              "secret": "[REDACTED]",
+              "optional": true
+            },
+            {
+              "name": "OLLAMA_BASE_URL",
+              "label": "Ollama",
+              "secret": "[REDACTED]",
+              "optional": true
+            },
+            {
+              "name": "LMSTUDIO_BASE_URL",
+              "label": "LM Studio",
+              "secret": "[REDACTED]",
+              "optional": true
+            }
+          ],
+          "type": "env_var"
+        }
+      ],
+      "agentInfo": {
+        "name": "vtcode",
+        "title": "Zed",
+        "version": "0.180.4"
+      }
+    },
+    "pid": 9,
+    "session": {
+      "sessionId": "vtcode-zed-session-0",
+      "configOptions": [
+        {
+          "currentValue": "build",
+          "options": [
+            {
+              "value": "duck",
+              "name": "Duck"
+            },
+            {
+              "value": "plan",
+              "name": "Plan"
+            },
+            {
+              "value": "build",
+              "name": "Build"
+            },
+            {
+              "value": "auto",
+              "name": "Auto"
+            },
+            {
+              "value": "coordinator",
+              "name": "Coordinator"
+            }
+          ],
+          "id": "primary_agent",
+          "name": "Primary agent",
+          "description": "Controls which VT Code primary agent handles this ACP session.",
+          "type": "select"
+        },
+        {
+          "currentValue": "abb",
+          "options": [
+            {
+              "value": "abb",
+              "name": "abb"
+            },
+            {
+              "value": "anthropic",
+              "name": "Anthropic"
+            },
+            {
+              "value": "copilot",
+              "name": "GitHub Copilot"
+            },
+            {
+              "value": "deepseek",
+              "name": "DeepSeek"
+            },
+            {
+              "value": "evolink",
+              "name": "Evolink"
+            },
+            {
+              "value": "gemini",
+              "name": "Gemini"
+            },
+            {
+              "value": "huggingface",
+              "name": "Hugging Face"
+            },
+            {
+              "value": "llamacpp",
+              "name": "llama.cpp"
+            },
+            {
+              "value": "lmstudio",
+              "name": "LM Studio"
+            },
+            {
+              "value": "merge-gateway",
+              "name": "Merge Gateway"
+            },
+            {
+              "value": "meta",
+              "name": "Meta AI"
+            },
+            {
+              "value": "mimo",
+              "name": "Xiaomi MiMo"
+            },
+            {
+              "value": "minimax",
+              "name": "MiniMax"
+            },
+            {
+              "value": "mistral",
+              "name": "Mistral"
+            },
+            {
+              "value": "moonshot",
+              "name": "Moonshot"
+            },
+            {
+              "value": "nvidia",
+              "name": "NVIDIA"
+            },
+            {
+              "value": "ollama",
+              "name": "Ollama"
+            },
+            {
+              "value": "ollama-cloud",
+              "name": "Ollama Cloud"
+            },
+            {
+              "value": "openai",
+              "name": "OpenAI"
+            },
+            {
+              "value": "opencode-go",
+              "name": "OpenCode Go"
+            },
+            {
+              "value": "opencode-zen",
+              "name": "OpenCode Zen"
+            },
+            {
+              "value": "openresponses",
+              "name": "openresponses"
+            },
+            {
+              "value": "openrouter",
+              "name": "OpenRouter"
+            },
+            {
+              "value": "poolside",
+              "name": "Poolside"
+            },
+            {
+              "value": "qwen",
+              "name": "Qwen"
+            },
+            {
+              "value": "stepfun",
+              "name": "StepFun"
+            },
+            {
+              "value": "vercel",
+              "name": "Vercel AI Gateway"
+            },
+            {
+              "value": "xai",
+              "name": "xAI"
+            },
+            {
+              "value": "zai",
+              "name": "Z.AI"
+            }
+          ],
+          "id": "provider",
+          "name": "Provider",
+          "description": "Controls which LLM provider VT Code uses for this ACP session.",
+          "type": "select"
+        },
+        {
+          "currentValue": "deepseek-chat",
+          "options": [
+            {
+              "value": "deepseek-chat",
+              "name": "deepseek-chat"
+            }
+          ],
+          "id": "model",
+          "name": "Model",
+          "description": "Controls which model VT Code uses for this ACP session.",
+          "category": "model",
+          "type": "select"
+        }
+      ]
+    },
+    "session_id": "vtcode-zed-session-0",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

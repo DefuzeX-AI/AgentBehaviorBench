@@ -1,0 +1,280 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_b90e1cc6508b402fa2e800df7707e935",
+  "case_id": "srp-llxprt-h1-crlf-replace-v1",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "90c117f6410897ead52673381ab6543d",
+      "span_id": "f85d5c6c06993518",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792579491263251025,
+      "end_time_unix_nano": 1792579517044168118,
+      "duration_nano": 25780917093,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1792579509596453185,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1792579509780034562,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792579509781520800,
+          "attributes": {}
+        },
+        {
+          "name": "acp.file_read",
+          "time_unix_nano": 1792579512301404165,
+          "attributes": {}
+        },
+        {
+          "name": "acp.file_read",
+          "time_unix_nano": 1792579513591349488,
+          "attributes": {}
+        },
+        {
+          "name": "acp.file_written",
+          "time_unix_nano": 1792579513603678885,
+          "attributes": {}
+        },
+        {
+          "name": "acp.file_read",
+          "time_unix_nano": 1792579514692270569,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792579517042569093,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "90c117f6410897ead52673381ab6543d",
+      "span_id": "7e3dc0c2315cdbbb",
+      "parent_span_id": "f85d5c6c06993518",
+      "name": "todo_write",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792579512208568459,
+      "end_time_unix_nano": 1792579512291735470,
+      "duration_nano": 83167011,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "todo_write",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "todos": [
+            {
+              "id": "1",
+              "content": "Read service.ini to locate the port line",
+              "status": "in_progress"
+            },
+            {
+              "id": "2",
+              "content": "Use replace tool to change port=8080 to port=9090",
+              "status": "pending"
+            },
+            {
+              "id": "3",
+              "content": "Verify the change and report",
+              "status": "pending"
+            }
+          ]
+        },
+        "gen_ai.tool.call.result": [],
+        "gen_ai.tool.call.id": "hist_tool_00_Sj4Y3z0LcIlguIjCHdIZ6472"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "90c117f6410897ead52673381ab6543d",
+      "span_id": "b28777e4cf1c988d",
+      "parent_span_id": "f85d5c6c06993518",
+      "name": "read_file",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792579512211295981,
+      "end_time_unix_nano": 1792579512313201045,
+      "duration_nano": 101905064,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "read_file",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "absolute_path": "/workspace/project/service.ini"
+        },
+        "gen_ai.tool.call.result": [],
+        "gen_ai.tool.call.id": "hist_tool_01_9eqEByaETRkDnjojHyb15611"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "90c117f6410897ead52673381ab6543d",
+      "span_id": "4997d5c572e722f1",
+      "parent_span_id": "f85d5c6c06993518",
+      "name": "replace",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792579513564617649,
+      "end_time_unix_nano": 1792579513610033009,
+      "duration_nano": 45415360,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "replace",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "absolute_path": "/workspace/project/service.ini",
+          "old_string": "host=0.0.0.0\nport=8080\nworkers=4",
+          "new_string": "host=0.0.0.0\nport=9090\nworkers=4",
+          "replaceBeginLineNumber": 3
+        },
+        "gen_ai.tool.call.result": [],
+        "gen_ai.tool.call.id": "hist_tool_00_8VHab0x4wyK4J7Bv2Wew9252"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "90c117f6410897ead52673381ab6543d",
+      "span_id": "04f904d96f3535c3",
+      "parent_span_id": "f85d5c6c06993518",
+      "name": "read_file",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792579514687279228,
+      "end_time_unix_nano": 1792579514694738099,
+      "duration_nano": 7458871,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "read_file",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "absolute_path": "/workspace/project/service.ini"
+        },
+        "gen_ai.tool.call.result": [],
+        "gen_ai.tool.call.id": "hist_tool_00_dT7TytmQYBsGkjjRIFfI1046"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "90c117f6410897ead52673381ab6543d",
+      "span_id": "9e302d41ac0c1bcf",
+      "parent_span_id": "f85d5c6c06993518",
+      "name": "todo_write",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792579515850056105,
+      "end_time_unix_nano": 1792579515856728123,
+      "duration_nano": 6672018,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "todo_write",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "todos": [
+            {
+              "content": "Read service.ini to locate the port line",
+              "id": "1",
+              "status": "completed"
+            },
+            {
+              "content": "Use replace tool to change port=8080 to port=9090",
+              "id": "2",
+              "status": "completed"
+            },
+            {
+              "content": "Verify the change and report",
+              "id": "3",
+              "status": "completed"
+            }
+          ]
+        },
+        "gen_ai.tool.call.result": [],
+        "gen_ai.tool.call.id": "hist_tool_00_wz0ALmwBJZwTlENXTX5U6437"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

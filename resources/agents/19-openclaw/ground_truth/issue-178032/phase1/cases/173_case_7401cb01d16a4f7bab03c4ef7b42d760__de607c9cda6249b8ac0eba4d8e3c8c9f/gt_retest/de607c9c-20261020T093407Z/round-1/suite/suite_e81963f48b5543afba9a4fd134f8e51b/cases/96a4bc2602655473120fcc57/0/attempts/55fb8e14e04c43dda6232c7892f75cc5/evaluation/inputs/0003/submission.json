@@ -1,0 +1,141 @@
+{
+  "run_id": "run_1779a278af584be4aa60ced09daa6535",
+  "case_id": "case_7401cb01d16a4f7bab03c4ef7b42d760",
+  "input_id": "step-3",
+  "status": "completed",
+  "output": "# Serialization Graph Construction\n\n## 1. History Instantiation\n\nThe history fixes per-transaction order only, so I instantiate the canonical concurrent interleaving (same as the conflict analysis), then show the verdict is interleaving-invariant:\n\n```\nR2(A)₀, R2(B)₀, R1(A)₀, W1(A)₁, R1(B)₀, W1(B)₁, C1,\nW2(A)₂, W2(B)₂, C2, R3(A)₂, R3(B)₂, C3\n```\n\nDerived structures (MVCC formalization):\n\n| Structure | Value |\n|---|---|\n| Version order A | A₀ < A₁(T1) < A₂(T2) |\n| Version order B | B₀ < B₁(T1) < B₂(T2) |\n| Reads-from | RF1 = {A₀, B₀}, RF2 = {A₀, B₀}, RF3 = {A₂, B₂} |\n\n## 2. Graph: SG = (V, E)\n\n**Nodes:** V = {T0, T1, T2, T3} — T0 is the initial-version source (no reads of it as data; it only emits wr edges).\n\n**Edges (10):**\n\n| # | Edge | Label | Justification |\n|---|---|---|---|\n| E1 | T0 → T1 | wr(A) | R1(A) reads A₀ |\n| E2 | T0 → T1 | wr(B) | R1(B) reads B₀ |\n| E3 | T0 → T2 | wr(A) | R2(A) reads A₀ |\n| E4 | T0 → T2 | wr(B) | R2(B) reads B₀ |\n| E5 | T1 → T2 | ww(A) | A₁ < A₂ in version order |\n| E6 | T1 → T2",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_1779a278af584be4aa60ced09daa6535",
+      "case_id": "case_7401cb01d16a4f7bab03c4ef7b42d760",
+      "input_id": "step-3",
+      "spans": [
+        {
+          "trace_id": "e743db2de0710d7f232ecb340c934556",
+          "span_id": "46672f4fe1ae9f3b",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792490175913948521,
+          "end_time_unix_nano": 1792490385077064997,
+          "duration_nano": 209163116476,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1792490175915623594,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1792490385042003256,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 1,
+      "retained_spans": 1,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_1779a278af584be4aa60ced09daa6535",
+      "input_id": "step-3",
+      "step_id": "step-3",
+      "submission_id": "submission-809d4e3c0d67e2ddb46ccb3260cda923",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "c0b4f23093280cb8b4f9629d7c692081afdcd2c39461372d324c340e4d8887b8",
+          "size_bytes": 831,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "a4df620ef6c1596e77f93b99aaa7765c7e30c431fca06daf87257e6a0e38438f"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

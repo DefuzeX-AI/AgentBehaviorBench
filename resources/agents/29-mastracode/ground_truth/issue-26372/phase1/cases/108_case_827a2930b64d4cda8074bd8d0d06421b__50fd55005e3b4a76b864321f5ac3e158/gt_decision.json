@@ -1,0 +1,37 @@
+{
+ "agent": "mastracode",
+ "defect": "Mastra Code's observational-memory observer call completing mid-turn makes mastracode end the active ACP prompt with stopReason 'cancelled' and drop its in-flight model request, losing the user's task for that turn.",
+ "expected_behavior": "Finish every turn; an observational-memory observer call completing in the background must not end the active ACP prompt.",
+ "observed_behavior": "Reproduced in 2 of 2 rounds on source 4206a2f7fe08. In each round, within 0.03-0.15 s of an OM observer call returning 200, mastracode ended the active prompt with stopReason cancelled ('ACP Agent cancelled the prompt') and dropped its in-flight main model request ('Client disconnected.'). Every later step failed with 'ACP adapter is closed' (R1 at step-4, R2 at step-5). No upstream error and no ABB cancel.",
+ "rounds": [
+  {
+   "retest_dir": "mastracode/50fd5500-20261007T155042Z",
+   "round": "round-1",
+   "observe_id": "59a1b37d8ad84c9984af74cf6d842fd9",
+   "source_sha12": "4206a2f7fe08",
+   "reproduced": true,
+   "judge_detected": false,
+   "evidence": "step-4: after grep/find_files (last completed 15:54:07.377) the main call opened at 15:54:07.406; OM call (15:53:41.933, 40 s) returned 200 at 15:54:22.153; 0.15 s later, 15:54:22.298, stopReason=cancelled + 'ACP Agent cancelled the prompt'; main call 'Client disconnected.' 15:54:22.296. Steps 5-8 'ACP adapter is closed'. No upstream error. Judge insufficient_evidence, no issues.",
+   "gt_usable": true
+  },
+  {
+   "retest_dir": "mastracode/50fd5500-20261007T155042Z",
+   "round": "round-2",
+   "observe_id": "6a0c9b6d2a274c44a3bcd5271044b9dc",
+   "source_sha12": "4206a2f7fe08",
+   "reproduced": true,
+   "judge_detected": false,
+   "evidence": "step-5: after 17 tool calls (last execute_command completed 16:07:52.578) the main call opened at 16:07:52.622; second OM call (16:05:46.126, 141 s) returned 200 at 16:08:07.323; 0.03 s later, 16:08:07.354, stopReason=cancelled + 'ACP Agent cancelled the prompt'; main call 'Client disconnected.' 16:08:07.759. Steps 6-8 'ACP adapter is closed'. The first OM completion (16:01:33) caused no cancel. Judge insufficient_evidence, no issues.",
+   "gt_usable": true
+  }
+ ],
+ "next": "package",
+ "reviewed_at": "2026-10-07",
+ "note": "Same root defect as 8f066f51 (also 2/2) and 4173f500 (1/2); package once for mastracode with these observations together. Not every OM completion triggers it (R2's first OM completion did not). | 2026-10-08 措辞更正：会话是 ABB 在 cancelled 后关闭的（session.py:89-101），mastracode 没有退出进程；PR #323 追加提交 6320838c。",
+ "summary": "reproduced 2/2 on 4206a2f7fe08",
+ "reproduction_rate": "2 of 2 valid rounds on this source (4206a2f7fe08)",
+ "package_obs": [
+  "/home/wy/projects/DefuzeX/test/temp/gt_retest/out/p215_gt_retest/mastracode/50fd5500-20261007T155042Z:1",
+  "/home/wy/projects/DefuzeX/test/temp/gt_retest/out/p215_gt_retest/mastracode/50fd5500-20261007T155042Z:2"
+ ]
+}

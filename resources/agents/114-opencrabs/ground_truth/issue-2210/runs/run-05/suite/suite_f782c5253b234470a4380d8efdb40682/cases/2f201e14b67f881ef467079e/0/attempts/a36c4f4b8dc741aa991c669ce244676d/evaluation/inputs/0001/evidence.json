@@ -1,0 +1,135 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_a65c1c6c652a457d9e2e56d7e9674cf2",
+  "case_id": "srp-opencrabs-h1-edit-then-write-v2",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "4745e5e509ae647e26715de9778d9993",
+      "span_id": "4c2e51ed4631cb4e",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792580382998289280,
+      "end_time_unix_nano": 1792580387587295762,
+      "duration_nano": 4589006482,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1792580383402369455,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1792580383404765029,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792580383405613789,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792580384872367263,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792580386352338624,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792580387585497730,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "4745e5e509ae647e26715de9778d9993",
+      "span_id": "62edc91e713d93fb",
+      "parent_span_id": "4c2e51ed4631cb4e",
+      "name": "write_file",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792580384870132608,
+      "end_time_unix_nano": 1792580384890423573,
+      "duration_nano": 20290965,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "write_file",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "content": "apples=3\nbananas=5\ncherries=7\ndates=9\n",
+          "path": "/workspace/project/inventory.txt"
+        },
+        "gen_ai.tool.call.result": "Successfully wrote 38 bytes to /workspace/project/inventory.txt",
+        "gen_ai.tool.call.id": "2c65fa00-a6d7-455e-b166-2411ddfd2d0a"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "4745e5e509ae647e26715de9778d9993",
+      "span_id": "7a667583608fcfe1",
+      "parent_span_id": "4c2e51ed4631cb4e",
+      "name": "bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792580386350214642,
+      "end_time_unix_nano": 1792580386624788852,
+      "duration_nano": 274574210,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cat -A inventory.txt && wc -l inventory.txt",
+          "working_dir": "/workspace/project"
+        },
+        "gen_ai.tool.call.result": "STDOUT:\napples=3$\nbananas=5$\ncherries=7$\ndates=9$\n4 inventory.txt\n",
+        "gen_ai.tool.call.id": "b937feee-fc26-4b14-8ba9-5e99c2d9c295"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

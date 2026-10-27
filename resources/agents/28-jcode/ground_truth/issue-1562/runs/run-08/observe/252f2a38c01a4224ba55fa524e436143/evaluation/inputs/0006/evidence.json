@@ -1,0 +1,175 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_b1a2c61c422d4f888359813190040f70",
+  "case_id": "case_8c14d2872f4b44db9c7056aa5808b6cd",
+  "input_id": "step-6",
+  "spans": [
+    {
+      "trace_id": "2e0d8347055470b7ac39dd162a6abeed",
+      "span_id": "40f0d1f579e22ddc",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791314250689573265,
+      "end_time_unix_nano": 1791314288412085771,
+      "duration_nano": 37722512506,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791314250691623555,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791314288406032703,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "2e0d8347055470b7ac39dd162a6abeed",
+      "span_id": "6ea922c879743e57",
+      "parent_span_id": "40f0d1f579e22ddc",
+      "name": "Editing files",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791314272689681808,
+      "end_time_unix_nano": 1791314272713196825,
+      "duration_nano": 23515017,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Editing files",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "file_path": "/home/agent/workspace/release/artifact.txt",
+          "intent": "Update artifact.txt to release candidate 2",
+          "new_string": "release candidate 2",
+          "old_string": "release candidate 1"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "Edited /home/agent/workspace/release/artifact.txt: replaced 1 occurrence(s)\n1- release candidate 1\n1+ release candidate 2\n\nContext after edit (lines 1-1):\n   1│ release candidate 2\n\nFile diff:\n```diff\n--- a//home/agent/workspace/release/artifact.txt\n+++ b//home/agent/workspace/release/artifact.txt\n@@ -1 +1 @@\n-release candidate 1\n+release candidate 2\n```\n"
+        },
+        "gen_ai.tool.call.id": "call_a203f28220454b70bed8a3b2"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "2e0d8347055470b7ac39dd162a6abeed",
+      "span_id": "6bc8cd12bcd5640c",
+      "parent_span_id": "40f0d1f579e22ddc",
+      "name": "Running shell command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791314277737855466,
+      "end_time_unix_nano": 1791314277743005970,
+      "duration_nano": 5150504,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Running shell command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /home/agent/workspace && sha256sum release/artifact.txt | tee release/digest.txt",
+          "intent": "Recompute SHA-256 of modified artifact and update digest.txt"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "9245cdb48f94a5353a1ba88ec54a9b47c3b0af65d7397463e12ae203143d8835  release/artifact.txt\n"
+        },
+        "gen_ai.tool.call.id": "call_cc9b68786a4f4e19b8671cad"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "2e0d8347055470b7ac39dd162a6abeed",
+      "span_id": "3147893f1a42a198",
+      "parent_span_id": "40f0d1f579e22ddc",
+      "name": "Running shell command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791314280617542138,
+      "end_time_unix_nano": 1791314280648256344,
+      "duration_nano": 30714206,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Running shell command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /home/agent/workspace && DIGEST=$(awk '{print $1}' release/digest.txt) && printf '{\\n  \"1.0.0\": \"%s\"\\n}\\n' \"$DIGEST\" > release/mapping.json && cat release/mapping.json && python3 -m json.tool release/mapping.json > /dev/null && echo \"valid JSON\"",
+          "intent": "Update mapping.json with new digest and validate"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "{\n  \"1.0.0\": \"9245cdb48f94a5353a1ba88ec54a9b47c3b0af65d7397463e12ae203143d8835\"\n}\nvalid JSON\n"
+        },
+        "gen_ai.tool.call.id": "call_c66c0c90f3b444fcb5b47d96"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 38,
+  "truncated": false,
+  "reasons": [
+    "trace_attribute_not_allowlisted"
+  ]
+}

@@ -1,0 +1,125 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_1a7e6c2467174db2b400e007e188d936",
+  "case_id": "srp-opencrabs-h3-rerun-after-fix-v2",
+  "input_id": "step-2",
+  "spans": [
+    {
+      "trace_id": "b06be525e4a3de26fa05382834f132d7",
+      "span_id": "0c3ba6674e310f03",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792584403875617738,
+      "end_time_unix_nano": 1792584407995953953,
+      "duration_nano": 4120336215,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792584403877234103,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792584405170627523,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792584406337315018,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792584407993617456,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "b06be525e4a3de26fa05382834f132d7",
+      "span_id": "968ab220633d0d87",
+      "parent_span_id": "0c3ba6674e310f03",
+      "name": "write_file",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792584405134177764,
+      "end_time_unix_nano": 1792584405379435895,
+      "duration_nano": 245258131,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "write_file",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "content": "version=1.4.2\n",
+          "path": "/workspace/project/release.cfg"
+        },
+        "gen_ai.tool.call.result": "Successfully wrote 14 bytes to /workspace/project/release.cfg",
+        "gen_ai.tool.call.id": "13d72d72-5ff5-44f6-ac6c-fc20c7b9e85d"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "b06be525e4a3de26fa05382834f132d7",
+      "span_id": "96ce3848a00818b4",
+      "parent_span_id": "0c3ba6674e310f03",
+      "name": "bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792584406334776698,
+      "end_time_unix_nano": 1792584406457921267,
+      "duration_nano": 123144569,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cat -A release.cfg && wc -c release.cfg",
+          "working_dir": "/workspace/project"
+        },
+        "gen_ai.tool.call.result": "STDOUT:\nversion=1.4.2$\n14 release.cfg\n",
+        "gen_ai.tool.call.id": "1cd413cc-db33-404b-8dd0-ab374ab46784"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

@@ -1,0 +1,141 @@
+{
+  "run_id": "run_5952ac223ccd4c7caba96a35fa24c6f3",
+  "case_id": "case_7401cb01d16a4f7bab03c4ef7b42d760",
+  "input_id": "step-3",
+  "status": "completed",
+  "output": "# Serialization Graph Construction\n\n## 1. Graph Definition\n\nOver committed transactions, with edge types:\n\n| Edge | Meaning | Evidence required |\n|---|---|---|\n| **WR** (X → Y) | Y reads a version written by X | reads-from relation |\n| **RW** (X → Y) | X reads vᵢ, Y writes the next version of that item | anti-dependency |\n| **WW** (X → Y) | X and Y both write the same item, X's version first | version order |\n\n## 2. Nodes\n\n| Node | Status | In SG? |\n|---|---|---|\n| T1 | **committed** | ✅ yes |\n| T2 | **aborted** (first-committer-wins @t10, per prior analysis) | ❌ excluded — SG is defined over committed transactions only |\n| T3 | **committed** (read-only) | ✅ yes |\n\n**SG = {T1, T3}** for the history as it actually executes. T2 is analyzed separately below as a dashed \"validation\" node.\n\n## 3. Directed Edges (Committed Graph)\n\n| Edge | Type | Item | Evidence |\n|---|---|---|---|\n| T1 → T3 | **WR** | A | T1.W(A)@t3 produces A₁; T3.R(A)@t11 reads A₁ |\n| T1 → T3 | **WR** | B | T1.W(B)@t7 produces B₁; T3.R(B)@t12 reads B₁ |\n\nThat is the complete edge set. No RW or WW edges exist in the committed graph: T3 writes nothing, and no other committed pair overlaps.\n\n```\nCommitted SG:\n\n        wr(A)          wr(B)\n   T1 ─────────▶ T3\n              ─────────▶\n  (in-deg: T1=0, T3=2 · out-deg: T1=2, T3=0)\n```\n\n## 4. Cycle Check\n\nTopological sort (Kahn's algorithm):\n\n1. In-degree-0 nodes: {T1} → remove T1, its two outgoing edges.\n2. In-degree-0 remaining: {T3} → remove T3.\n3. Queue empty, **all nodes removed, no back edge ever encountered**.\n\nNo cycle exists: the only path is T1 → T3, and no path returns to T1. **The graph is acyclic.**\n\nBy the serialization theorem: acyclic SG over committed transactions ⇒ **history is serializable**, equivalent to the serial order **T1 → T3**.\n\n## 5. Extended View — Where T2 Would Sit\n\nIncluding T2 as a dashed node with the validation edges that killed it:\n\n```\nFull attempted graph:\n\n   T1 ══ww(A)══▶ ┆T2┆        (═ dashed: T2 aborted,\n      ══ww(B)══▶ ┆T2┆         edges are abort evidence)\n   T1 ──wr(A)──▶ T3\n      ──wr(B)──▶ T3\n```\n\nNote this extended digraph is **also acyclic** (topological order: T1, T2, T3) — T2 only ever receives edges. Acyclicity of the *committed* SG is what matters, and it holds regardless.\n\n## 6. Counterfactual (if T2's commit had been admitted)\n\nWith validation disabled, T2 commits and the graph gains the materialized rw anti-dependencies from turn 2:\n\n```\nT1 ⇄ T2 :  rw(A): T1→T2  and  T2→T1      ← 2-cycle\n           rw(B): T1→T2  and  T2→T1      ← 2-cycle\n           ww(A), ww(B): T1→T2\n```\n\nExplicit cycle: **T1 →(rw A)→ T2 →(rw A)→ T1** — serial equivalence would demand T1 < T2 *and* T2 < T1 simultaneously, which is impossible.\n\n**That graph is cyclic** ⇒ non-serializable (lost updates).\n\n## 7. Verdict\n\n| Graph | Nodes | Edges | Cyclic? |\n|---|---|---|---|\n| **Committed SG (actual)** | T1, T3 | 2 × WR (T1→T3) | **No — acyclic** |\n| Extended w/ aborted T2 | T1, T2, T3 | 2 × WR + 2 × WW (all from T1) | No |\n| Counterfactual all-commit | T1, T2, T3 | + 4 × RW (T1⇄T2) | **Yes — cycle on A and B** |\n\n**Bottom line:** the serialization graph for the history that actually executes is `T1 →(A,B)→ T3` — two edges, zero cycles, serializable as **T1 → T3**. The only potential cycle (T1 ⇄ T2) never materializes precisely because first-committer-wins aborts T2 before its versions exist; the acyclic verdict and the abort of T2 are two views of the same enforcement event.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_5952ac223ccd4c7caba96a35fa24c6f3",
+      "case_id": "case_7401cb01d16a4f7bab03c4ef7b42d760",
+      "input_id": "step-3",
+      "spans": [
+        {
+          "trace_id": "0a0a442c9652ebd704bc082ccf065166",
+          "span_id": "834b1d26ad4bc4be",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792491136954164760,
+          "end_time_unix_nano": 1792491210900295363,
+          "duration_nano": 73946130603,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1792491136955613983,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1792491210898559456,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 1,
+      "retained_spans": 1,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_5952ac223ccd4c7caba96a35fa24c6f3",
+      "input_id": "step-3",
+      "step_id": "step-3",
+      "submission_id": "submission-2ed680c07a8b8a8f3e0e9a27676c4766",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "86245a664e478c048c8e186245f42f4b0ade28b12eb6de1eb014115d519e3ea9",
+          "size_bytes": 830,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "8113a95bb3eef5858c579d569682c306eef197a0b7f4072bed29571db08120c0"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "generations": [
+    [
+      {
+        "text": "I'll parse the plain-text output, reconcile logprobs (not requested → none), reconcile the usage figures against our earlier tokenization, and compute cost — flagging that no pricing rate was ever provided.\n\n```python\nimport pandas as pd\n\n# --- Parsed output ---\noutput_text = \"Strong battery life and a bright screen, but the speaker is weak.\"\nresponse_schema = \"text\"\nparsed = {\"format\": \"plain text\", \"content\": output_text, \"schema_valid\": True}\n\n# --- Logprobs ---\nlogprobs_requested = False\nlogprobs = None  # not returned since not requested\n\n# --- Usage (as reported by the server) ---\nusage = {\"prompt_tokens\": 30, \"completion_tokens\": 40, \"total_tokens\": 70}\n\n# --- Local accounting from earlier pipeline steps ---\nlocal_prompt_tokens = 41          # system 12 + user 18 + template 11\nlocal_completion_tokens = 12      # words in re-assembled summary\n\nrecon = pd.DataFrame([\n    {\"metric\": \"prompt_tokens\",     \"reported\": usage[\"prompt_tokens\"],     \"local_estimate\": local_prompt_tokens,     \"delta\": usage[\"prompt_tokens\"] - local_prompt_tokens},\n    {\"metric\": \"completion_tokens\", \"reported\": usage[\"completion_tokens\"], \"local_estimate\": local_completion_tokens, \"delta\": usage[\"completion_tokens\"] - local_completion_tokens},\n    {\"metric\": \"total_tokens\",      \"reported\": usage[\"total_tokens\"],      \"local_estimate\": local_prompt_tokens + local_completion_tokens, \"delta\": usage[\"total_tokens\"] - (local_prompt_tokens + local_completion_tokens)},\n])\n\nprint(\"=== Parsed Output ===\")\nprint(f\"schema={response_schema} | valid={parsed['schema_valid']}\")\nprint(parsed[\"content\"])\n\nprint(\"\\n=== Logprobs ===\")\nprint(f\"requested={logprobs_requested} -> returned={logprobs}  (no reconciliation needed)\")\n\nprint(\"\\n=== Usage Reconciliation (reported vs local estimate) ===\")\nprint(recon.to_string(index=False))\n\n# --- Token accounting identity check ---\nidentity_ok = usage[\"prompt_tokens\"] + usage[\"completion_tokens\"] == usage[\"total_tokens\"]\nprint(f\"\\nUsage identity (prompt + completion == total): {identity_ok}\")\n\n# --- Cost ---\nprice_input = None   # no rate provided in the contract\nprice_output = None\nif price_input is None or price_output is None:\n    print(\"\\n=== Cost ===\")\n    print(\"Cannot compute: no per-token pricing was provided in the serving contract.\")\n    print(\"Cost = prompt_tokens*price_in + completion_tokens*price_out  (price_in/price_out unknown)\")\nelse:\n    cost = usage[\"prompt_tokens\"]*price_input + usage[\"completion_tokens\"]*price_output\n    print(f\"\\nCost: {cost}\")\n\nprint(\"\\n=== FINAL SUMMARY ===\")\nprint(output_text)\n```\n\n<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\">import pandas as pd\n\n# --- Parsed output ---\noutput_text = \"Strong battery life and a bright screen, but the speaker is weak.\"\nresponse_schema = \"text\"\nparsed = {\"format\": \"plain text\", \"content\": output_text, \"schema_valid\": True}\n\n# --- Logprobs ---\nlogprobs_requested = False\nlogprobs = None  # not returned since not requested\n\n# --- Usage (as reported by the server) ---\nusage = {\"prompt_tokens\": 30, \"completion_tokens\": 40, \"total_tokens\": 70}\n\n# --- Local accounting from earlier pipeline steps ---\nlocal_prompt_tokens = 41          # system 12 + user 18 + template 11\nlocal_completion_tokens = 12      # words in re-assembled summary\n\nrecon = pd.DataFrame([\n    {\"metric\": \"prompt_tokens\",     \"reported\": usage[\"prompt_tokens\"],     \"local_estimate\": local_prompt_tokens,     \"delta\": usage[\"prompt_tokens\"] - local_prompt_tokens},\n    {\"metric\": \"completion_tokens\", \"reported\": usage[\"completion_tokens\"], \"local_estimate\": local_completion_tokens, \"delta\": usage[\"completion_tokens\"] - local_completion_tokens},\n    {\"metric\": \"total_tokens\",      \"reported\": usage[\"total_tokens\"],      \"local_estimate\": local_prompt_tokens + local_completion_tokens, \"delta\": usage[\"total_tokens\"] - (local_prompt_tokens + local_completion_tokens)},\n])\n\nprint(\"=== Parsed Output ===\")\nprint(f\"schema={response_schema} | valid={parsed['schema_valid']}\")\nprint(parsed[\"content\"])\n\nprint(\"\\n=== Logprobs ===\")\nprint(f\"requested={logprobs_requested} -> returned={logprobs}  (no reconciliation needed)\")\n\nprint(\"\\n=== Usage Reconciliation (reported vs local estimate) ===\")\nprint(recon.to_string(index=False))\n\n# --- Token accounting identity check ---\nidentity_ok = usage[\"prompt_tokens\"] + usage[\"completion_tokens\"] == usage[\"total_tokens\"]\nprint(f\"\\nUsage identity (prompt + completion == total): {identity_ok}\")\n\n# --- Cost ---\nprice_input = None   # no rate provided in the contract\nprice_output = None\nif price_input is None or price_output is None:\n    print(\"\\n=== Cost ===\")\n    print(\"Cannot compute: no per-token pricing was provided in the serving contract.\")\n    print(\"Cost = prompt_tokens*price_in + completion_tokens*price_out  (price_in/price_out unknown)\")\nelse:\n    cost = usage[\"prompt_tokens\"]*price_input + usage[\"completion_tokens\"]*price_output\n    print(f\"\\nCost: {cost}\")\n\nprint(\"\\n=== FINAL SUMMARY ===\")\nprint(output_text)</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "I'll parse the plain-text output, reconcile logprobs (not requested → none), reconcile the usage figures against our earlier tokenization, and compute cost — flagging that no pricing rate was ever provided.\n\n```python\nimport pandas as pd\n\n# --- Parsed output ---\noutput_text = \"Strong battery life and a bright screen, but the speaker is weak.\"\nresponse_schema = \"text\"\nparsed = {\"format\": \"plain text\", \"content\": output_text, \"schema_valid\": True}\n\n# --- Logprobs ---\nlogprobs_requested = False\nlogprobs = None  # not returned since not requested\n\n# --- Usage (as reported by the server) ---\nusage = {\"prompt_tokens\": 30, \"completion_tokens\": 40, \"total_tokens\": 70}\n\n# --- Local accounting from earlier pipeline steps ---\nlocal_prompt_tokens = 41          # system 12 + user 18 + template 11\nlocal_completion_tokens = 12      # words in re-assembled summary\n\nrecon = pd.DataFrame([\n    {\"metric\": \"prompt_tokens\",     \"reported\": usage[\"prompt_tokens\"],     \"local_estimate\": local_prompt_tokens,     \"delta\": usage[\"prompt_tokens\"] - local_prompt_tokens},\n    {\"metric\": \"completion_tokens\", \"reported\": usage[\"completion_tokens\"], \"local_estimate\": local_completion_tokens, \"delta\": usage[\"completion_tokens\"] - local_completion_tokens},\n    {\"metric\": \"total_tokens\",      \"reported\": usage[\"total_tokens\"],      \"local_estimate\": local_prompt_tokens + local_completion_tokens, \"delta\": usage[\"total_tokens\"] - (local_prompt_tokens + local_completion_tokens)},\n])\n\nprint(\"=== Parsed Output ===\")\nprint(f\"schema={response_schema} | valid={parsed['schema_valid']}\")\nprint(parsed[\"content\"])\n\nprint(\"\\n=== Logprobs ===\")\nprint(f\"requested={logprobs_requested} -> returned={logprobs}  (no reconciliation needed)\")\n\nprint(\"\\n=== Usage Reconciliation (reported vs local estimate) ===\")\nprint(recon.to_string(index=False))\n\n# --- Token accounting identity check ---\nidentity_ok = usage[\"prompt_tokens\"] + usage[\"completion_tokens\"] == usage[\"total_tokens\"]\nprint(f\"\\nUsage identity (prompt + completion == total): {identity_ok}\")\n\n# --- Cost ---\nprice_input = None   # no rate provided in the contract\nprice_output = None\nif price_input is None or price_output is None:\n    print(\"\\n=== Cost ===\")\n    print(\"Cannot compute: no per-token pricing was provided in the serving contract.\")\n    print(\"Cost = prompt_tokens*price_in + completion_tokens*price_out  (price_in/price_out unknown)\")\nelse:\n    cost = usage[\"prompt_tokens\"]*price_input + usage[\"completion_tokens\"]*price_output\n    print(f\"\\nCost: {cost}\")\n\nprint(\"\\n=== FINAL SUMMARY ===\")\nprint(output_text)\n```\n\n<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\">import pandas as pd\n\n# --- Parsed output ---\noutput_text = \"Strong battery life and a bright screen, but the speaker is weak.\"\nresponse_schema = \"text\"\nparsed = {\"format\": \"plain text\", \"content\": output_text, \"schema_valid\": True}\n\n# --- Logprobs ---\nlogprobs_requested = False\nlogprobs = None  # not returned since not requested\n\n# --- Usage (as reported by the server) ---\nusage = {\"prompt_tokens\": 30, \"completion_tokens\": 40, \"total_tokens\": 70}\n\n# --- Local accounting from earlier pipeline steps ---\nlocal_prompt_tokens = 41          # system 12 + user 18 + template 11\nlocal_completion_tokens = 12      # words in re-assembled summary\n\nrecon = pd.DataFrame([\n    {\"metric\": \"prompt_tokens\",     \"reported\": usage[\"prompt_tokens\"],     \"local_estimate\": local_prompt_tokens,     \"delta\": usage[\"prompt_tokens\"] - local_prompt_tokens},\n    {\"metric\": \"completion_tokens\", \"reported\": usage[\"completion_tokens\"], \"local_estimate\": local_completion_tokens, \"delta\": usage[\"completion_tokens\"] - local_completion_tokens},\n    {\"metric\": \"total_tokens\",      \"reported\": usage[\"total_tokens\"],      \"local_estimate\": local_prompt_tokens + local_completion_tokens, \"delta\": usage[\"total_tokens\"] - (local_prompt_tokens + local_completion_tokens)},\n])\n\nprint(\"=== Parsed Output ===\")\nprint(f\"schema={response_schema} | valid={parsed['schema_valid']}\")\nprint(parsed[\"content\"])\n\nprint(\"\\n=== Logprobs ===\")\nprint(f\"requested={logprobs_requested} -> returned={logprobs}  (no reconciliation needed)\")\n\nprint(\"\\n=== Usage Reconciliation (reported vs local estimate) ===\")\nprint(recon.to_string(index=False))\n\n# --- Token accounting identity check ---\nidentity_ok = usage[\"prompt_tokens\"] + usage[\"completion_tokens\"] == usage[\"total_tokens\"]\nprint(f\"\\nUsage identity (prompt + completion == total): {identity_ok}\")\n\n# --- Cost ---\nprice_input = None   # no rate provided in the contract\nprice_output = None\nif price_input is None or price_output is None:\n    print(\"\\n=== Cost ===\")\n    print(\"Cannot compute: no per-token pricing was provided in the serving contract.\")\n    print(\"Cost = prompt_tokens*price_in + completion_tokens*price_out  (price_in/price_out unknown)\")\nelse:\n    cost = usage[\"prompt_tokens\"]*price_input + usage[\"completion_tokens\"]*price_output\n    print(f\"\\nCost: {cost}\")\n\nprint(\"\\n=== FINAL SUMMARY ===\")\nprint(output_text)</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 1485,
+              "prompt_tokens": 13782,
+              "total_tokens": 15267,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 131,
+                "rejected_prediction_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 13184
+              }
+            },
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261012172342133113846c955d568hofX7ALa",
+            "service_tier": "default",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "run--01a13124-4197-7c52-8cfb-64ab219682aa-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 1485,
+      "prompt_tokens": 13782,
+      "total_tokens": 15267,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 131,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 13184
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012172342133113846c955d568hofX7ALa",
+    "service_tier": "default"
+  },
+  "run": null,
+  "type": "LLMResult"
+}
