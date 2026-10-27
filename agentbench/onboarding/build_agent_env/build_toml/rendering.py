@@ -42,8 +42,7 @@ def render_manifest(facts, *, source, agent_id, options=None):
         "launch": {"argv": ["python", "-m", "agentbench.runtime.agentcontainer.worker"],
                    "workdir": "/opt/agent"}, "adapter": adapter,
     }
-    if facts["framework"] == "acp" and (facts.get("model", {}).get("source") != "native"
-            or facts.get("model", {}).get("runtime_configurable") is True):
+    if facts["framework"] == "acp" and facts.get("model", {}).get("source") != "native":
         if facts["models"]:
             raise BuildError("Shared native models must not include fixed model credentials or routes")
         interception = {"trust_plugin": "pem-env", "credentials": [], "routes": [],

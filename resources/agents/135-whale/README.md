@@ -38,3 +38,9 @@ Judge findings and certification are separate acceptance stages.
 
 See [current PR closeout](evaluation/2026-10-26-closeout.md) for slot numbering,
 synchronization checks and preserved historical evidence boundaries.
+
+## Runtime dependency
+
+This unit requires the separately proposed ABB native runtime model selection
+capability (`model.runtime_configurable`). Current ABB main rejects that field,
+so this unit cannot run on main until the core change is merged.
