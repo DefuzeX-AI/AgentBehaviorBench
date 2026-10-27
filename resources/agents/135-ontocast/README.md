@@ -93,3 +93,8 @@ official KUMA Case-generation/Judge credits.
 The registry stays disabled/adapting for maintainer review. Acceptance artifacts
 state actual execution/trace/cleanup/Judge outcomes separately. Integration and
 a passing Smoke do not establish GT or Step 2 completion; GT follows PR merge.
+
+See [local evidence and reproduction](evaluation/README.md) for the committed
+sanitized run/output/Judge records, Bailian configuration and bounded local
+runner. The Docker build pins the observed MiniLM checkpoint; the recorded
+successful run predates that explicit pin.

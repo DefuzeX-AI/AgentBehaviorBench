@@ -4,6 +4,7 @@ FROM python:3.12-slim-bookworm
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONPATH=/opt/abb-runtime \
     HOME=/home/agent OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
     HF_HOME=/opt/agent/tokenizer-cache \
+    ONTOCAST_EMBEDDING_REVISION=1110a243fdf4706b3f48f1d95db1a4f5529b4d41 \
     ONTOCAST_CACHE_DIR=/home/agent/workspace/cache
 RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -16,7 +17,7 @@ RUN --mount=type=cache,target=/home/agent/.cache/uv \
     uv pip install --system --require-hashes -r /tmp/ontocast-requirements.txt
 COPY agent/ ./
 RUN --mount=type=cache,target=/home/agent/.cache/uv uv pip install --system --no-deps .
-RUN python -c "from transformers import AutoTokenizer; AutoTokenizer.from_pretrained('sentence-transformers/all-MiniLM-L6-v2')"
+RUN python -c "import os; from transformers import AutoTokenizer; AutoTokenizer.from_pretrained('sentence-transformers/all-MiniLM-L6-v2', revision=os.environ['ONTOCAST_EMBEDDING_REVISION'])"
 RUN --mount=type=cache,target=/home/agent/.cache/uv uv pip install --system \
     --index-url https://download.pytorch.org/whl/cpu 'torch==2.14.1+cpu'
 RUN --mount=type=cache,target=/home/agent/.cache/uv uv pip install --system 'sentence-transformers==6.2.0' \
@@ -26,7 +27,9 @@ ENV AGG_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2 \
     CHUNK_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2 \
     EMBEDDING_MODEL_NAME=sentence-transformers/all-MiniLM-L6-v2 \
     TOKENIZERS_PARALLELISM=false MALLOC_ARENA_MAX=2
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2', device='cpu')"
+RUN python -c "import os; from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2', revision=os.environ['ONTOCAST_EMBEDDING_REVISION'], device='cpu')"
+# Native consumers use the repository name; resolve it to the pinned cached snapshot offline.
+RUN python -c "import os; from pathlib import Path; p=Path(os.environ['HF_HOME'])/'hub/models--sentence-transformers--all-MiniLM-L6-v2/refs/main'; p.parent.mkdir(parents=True, exist_ok=True); p.write_text(os.environ['ONTOCAST_EMBEDDING_REVISION'])"
 ENV HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
 # ABB's SDK/trace worker dependencies are separate from native Agent dependencies.
 RUN --mount=type=cache,target=/home/agent/.cache/pip python -m pip install \

@@ -17,3 +17,5 @@ The native graph and its prompts, loops, tools and validation remain unchanged. 
 Earlier runs remain distinct from this result: the DeepSeek v9 Agent completed but the original Judge returned no valid JSON and its CLI failed; a later separate replay passed without changing that original result. A Qwen-Long Judge-only replay returned non-JSON and failed. The passing result above is a new complete run, not a retroactive change to those records.
 
 The [summary](acceptance-summary.json) records the measured outcome and limitations; [smoke-case.json](smoke-case.json) contains the actual synthetic input and Agent profile context. This one local test does not establish broad behavioral correctness, official KUMA evaluation, a GT finding, PR approval or merge. Those remain separate stages.
+
+The [evidence and reproduction guide](README.md) links the sanitized run record, actual output, accepted Judge report and transport receipt, and supplies the provider configuration and portable runner. The embedding checkpoint was pinned to the observed snapshot after this successful run; that build change and the portable runner have not been executed as part of this update.
