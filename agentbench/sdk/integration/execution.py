@@ -18,7 +18,7 @@ from agentbench.runtime.docker import DockerRuntime
 from agentbench.runtime.docker.execution_policy import ControllerExecutionPolicy
 from agentbench.runtime.docker.worker_build import _ignore
 from agentbench.runtime.interception import TraceEvent
-from agentbench.runtime.agentcontainer.config import tomllib
+from agentbench.runtime.agentcontainer.config import tomllib, validated_memory
 from agentbench.sdk.contracts import SDKRunnerContext
 from agentbench.sdk.common.artifacts import Artifacts
 from agentbench.sdk.common.output_permissions import prepare_output
@@ -128,7 +128,9 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                     shutil.copystat(Path(source), Path(target))
                     return target
                 with span('Prepare Case workspace', kind='preparation'):
-                    policy = workspace_policy(tomllib.loads((descriptor.path / 'agent.toml').read_text()))
+                    manifest = tomllib.loads((descriptor.path / 'agent.toml').read_text())
+                    agent_memory = validated_memory(manifest.get('runtime', {}).get('memory'))
+                    policy = workspace_policy(manifest)
                     target = policy.path or repository_target
                     ledger_root = directory / 'sdk-repo'
                     Path(ledger_root).mkdir()
@@ -208,7 +210,8 @@ def run_evaluation(agent, *, context: SDKRunnerContext, output, stage_agent,
                     agent_outputs = directory / 'agent-output'
                     Path(agent_outputs).mkdir(mode=0o700)
                     options = dict(runtime_options)
-                    options['policy'] = AgentExecutionPolicy(repository, target, bool(policy.path), channel, agent_outputs)
+                    options['policy'] = AgentExecutionPolicy(repository, target, bool(policy.path), channel,
+                                                            agent_outputs, memory=agent_memory)
                     options['artifact_root'] = directory / 'agent-runtime'
                     Path(options['artifact_root']).mkdir()
                     options['run_id'] = directory.name + '-agent'
