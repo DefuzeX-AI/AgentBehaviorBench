@@ -1,38 +1,50 @@
-# Local Smoke evidence and reproduction
+# OntoCast local Smoke
 
-## Recorded run
+One synthetic English document passed ABB `--sdk local` using
+`bailian/qwen3.7-max-2026-06-08` for the Agent and Judge: CLI exit 0;
+execution, trace validation and cleanup succeeded; four model requests and
+responses; Judge pass/high with no findings or evidence gaps. The ontology and
+facts parsed as Turtle (94 and 83 triples). This is a local integration check;
+official KUMA evaluation and GT remain separate stages.
 
-The successful run described in [onboarding-2026-10-27.md](onboarding-2026-10-27.md) used one synthetic English document and completed with CLI exit 0. Its execution, trace validation and cleanup succeeded, and the local Judge returned pass/high with no findings or evidence gaps.
+## Evidence
 
-Review the saved records directly:
+- [Case and profile](smoke-case.json), [run record](evidence/execution/run.json),
+  [Agent output](evidence/execution/result.json) and [Judge report](evidence/judge/report.json).
+- [Command receipt](evidence/run-receipt.json), [Judge usage](evidence/judge/transport.json)
+  and [acceptance summary](acceptance-summary.json).
+- [Source preparation](evidence/source-verification.json), [earlier binding-test result](evidence/binding-tests.json),
+  [configuration validation](evidence/combined-validation.json) and [runtime versions](evidence/runtime-versions.json).
+- [SHA-256 manifest](evidence/export-index.json) for these sanitized exports.
 
-- [Executed Case and profile context](smoke-case.json).
-- [Run record](evidence/execution/run.json) and [Agent output](evidence/execution/result.json).
-- [Accepted Judge report](evidence/judge/report.json), [Judge transport usage](evidence/judge/transport.json) and [command receipt](evidence/run-receipt.json).
-- [Source preparation record](evidence/source-verification.json), [binding-test transcript summary](evidence/binding-tests.json), [configuration validation record](evidence/combined-validation.json) and [runtime package versions](evidence/runtime-versions.json).
-- [Earlier DeepSeek receipt](evidence/prior-ds-v9-receipt.json) and [failed Qwen-Long assessment receipt](evidence/prior-qwen-long-failure.json). These failures were not replaced by the later success.
-- [Export manifest](evidence/export-index.json), including SHA-256 hashes of the committed copies.
+Exports omit credentials, private reasoning and local paths; they are not a full
+SDK ledger. The output's original hash is distinguished from its exported hash.
+The successful run used directory `129-ontocast`, subsequently renamed to
+`135-ontocast` to avoid a numbering collision. The Dockerfile matches the tested
+configuration. The observed embedding snapshot is recorded in the summary;
+fresh builds currently resolve that model's upstream default revision.
 
-These records are sanitized derivatives: local paths are replaced, credentials and private reasoning are excluded, and this directory is not an importable full SDK ledger. The original SDK result hash is recorded in `acceptance-summary.json`; the export manifest distinguishes it from the committed output copy's hash. The test transcript summary records an earlier observed result, rather than a new execution.
+## Reproduce in Linux or WSL
 
-The successful run used unit directory `129-ontocast`. Registration was subsequently renamed to `135-ontocast` to avoid another merged Agent's number. The Dockerfile now explicitly downloads embedding snapshot `1110a243fdf4706b3f48f1d95db1a4f5529b4d41`, the same snapshot observed in that run. Its offline repository-name cache reference is fixed to this snapshot as well. That pin and the portable runner below were added after the successful run; no new Docker build or paid/model execution is claimed for this documentation update.
+Use the ABB Python environment with Docker available, and export the existing
+`DASHSCOPE_API_KEY` through your usual secret mechanism. In Bailian's Beijing
+region, check quota and enable **stop when free quota is exhausted** for the exact
+model `qwen3.7-max-2026-06-08`. A prior Judge request used 332,374 tokens.
 
-## Reproduce with Bailian in Linux or WSL
-
-Use the ABB checkout's Python environment, with ABB and its local SDK dependencies installed and Docker available. Source preparation restores the pinned native source through `agent.toml`. Export the existing `DASHSCOPE_API_KEY` into this process using your normal secret mechanism; never commit it or put it in command-line arguments.
-
-Before running, open the Beijing-region Bailian quota page for the **exact** model `qwen3.7-max-2026-06-08`, check its remaining quota and enable **free-quota-only / stop when exhausted**. The runner cannot inspect the account's billing setting. It does not enable that setting itself, and the confirmation flag is an acknowledgement by the operator. Agent and Judge inference consume model tokens; one prior Judge request used 332,374 tokens. Free quota availability can change. This does not consume official KUMA credits.
-
-From the ABB repository root:
+From the repository root, choose an unused results path:
 
 ```bash
 python resources/agents/135-ontocast/evaluation/run_bailian_local.py \
-  --results-dir /absolute/path/to/new-ontocast-smoke \
-  --confirm-free-only
+  --results-dir /absolute/path/to/new-ontocast-smoke --confirm-free-only
 ```
 
-The results path must not already exist. The script inherits process credentials, selects the [Bailian provider catalog](bailian-providers.toml), and runs the committed fixed Case with `--sdk local --cases 1 --max-steps 1 --case-retries 0 --timeout 900`. It limits Agent requests and elapsed time, preserves command output and a receipt, and allows only one Judge upstream request. Model request limits are a local guard; the account's free-quota-only setting supplies the billing protection.
+The runner uses [the provider catalog](bailian-providers.toml) and
+[Judge transport](bailian_judge_transport.py), with one fixed Case, no Case retry,
+a 900-second execution timeout and bounded model requests. Billing protection
+depends on the account setting; the script cannot inspect it.
 
-The [Judge transport](bailian_judge_transport.py) uses the provider's `enable_thinking=false` and strict JSON schema for ABB's existing verdict fields. It does not require a passing verdict: pass, issue and inconclusive remain valid, and ABB applies its normal response and evidence validators. The original Judge messages and upstream response are preserved. Agent traffic uses normal ABB replacement interception and is not handled by this Judge transport.
-
-The runner's portable paths, result layout and process-only environment setup differ from the original machine-local launcher. The selected model, provider endpoint, Case, ABB evaluation arguments and Judge settings are retained. A new execution may produce a different outcome. This is local Smoke, with no GT finding or official KUMA assessment claimed.
+The Judge relay supplies strict JSON format and disables thinking, retaining
+the original messages, response and ABB verdict validation. Pass, issue and
+inconclusive are all permitted. It does not handle Agent traffic. This portable
+runner retains the original launcher's model and evaluation settings; its paths
+and receipt layout were adapted afterward and have received static checks only.
