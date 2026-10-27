@@ -1,0 +1,65 @@
+{
+  "suite_id": "suite_4ae31962ee5a468c9fa45e4d80237f06",
+  "attempt_id": "984f03594cdb4d0ca57631d0b88101cf",
+  "source_commit": "733b741952b627b1ca34aa892a8d1b4a9333e7b6",
+  "base_commit": "596dc2ac5252ef613b18084a9660b41e488f32bf",
+  "model": "doubao-seed-2-1-lite-260915",
+  "intercepted_requests": 3,
+  "intercepted_responses": 3,
+  "route": "shared-openai-chat",
+  "execution_status": "succeeded",
+  "host_trace_validation": "succeeded",
+  "cleanup_status": "succeeded",
+  "judge_status": "pass",
+  "quality_gate": "PASSED",
+  "actor_memory_bytes": 2147483648,
+  "controller_memory_bytes": 1073741824,
+  "runtime_proxy_environment_names": [],
+  "native_tool_evidence_source": "intercepted final request conversation; ACP reports zero tool notifications",
+  "native_tool_messages": [
+    {
+      "role": "assistant",
+      "content": null,
+      "reasoning_content": "The user wants me to:\n1.  The task requires creating a specified text file with required content, reading it back and reporting the exact content. I'll proceed now.\n",
+      "tool_calls": [
+        {
+          "id": "call_45un2nufwgd6lhkmd1bwzmzc",
+          "type": "function",
+          "function": {
+            "name": "write",
+            "arguments": "{\"path\":\"/home/agent/workspace/abb-smoke.txt\",\"content\":\"BITTERBOT_ABB_SMOKE_OK\\n\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "content": "Successfully wrote 23 bytes to /home/agent/workspace/abb-smoke.txt",
+      "tool_call_id": "call_45un2nufwgd6lhkmd1bwzmzc"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "reasoning_content": "Now read it back.\n",
+      "tool_calls": [
+        {
+          "id": "call_27uw1y39a2nouon22oop9q7c",
+          "type": "function",
+          "function": {
+            "name": "read",
+            "arguments": "{\"path\":\"/home/agent/workspace/abb-smoke.txt\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "content": "BITTERBOT_ABB_SMOKE_OK\n",
+      "tool_call_id": "call_27uw1y39a2nouon22oop9q7c"
+    }
+  ],
+  "observed_read_bytes_hex": "424954544552424f545f4142425f534d4f4b455f4f4b0a",
+  "observed_read_sha256": "b591ce5bc6badb5c15f4f87ebb414362982a37e768186065edd9de20737d7245",
+  "original_network_log_sha256": "7eee92d389b8e5be8f04cbf8bf967ab8987dc06ef8f0a7abc1aa158f7725cdd2",
+  "scope": "One normal Local SDK smoke Case; not KUMA certification or reviewed GT."
+}

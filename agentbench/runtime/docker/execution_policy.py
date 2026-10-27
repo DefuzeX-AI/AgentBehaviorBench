@@ -2,6 +2,7 @@
 from pathlib import Path
 
 from .policy import DockerPolicy
+from agentbench.runtime.agentcontainer.config import validated_memory
 
 
 class ControllerExecutionPolicy:
@@ -33,14 +34,16 @@ class ControllerExecutionPolicy:
 
 
 class AgentExecutionPolicy:
-    def __init__(self, repository, target, writable, channel, output):
+    def __init__(self, repository, target, writable, channel, output, *, memory=None):
         self.repository, self.target = repository, target
         self.writable, self.channel, self.output = writable, channel, output
+        self.memory = validated_memory(memory)
 
     def owned_directories(self):
         return (self.channel.requests, self.channel.responses, self.output)
 
     def run_arguments(self):
-        return (*DockerPolicy().run_arguments(), '--mount',
+        policy = DockerPolicy() if self.memory is None else DockerPolicy(memory=self.memory)
+        return (*policy.run_arguments(), '--mount',
                 f'type=bind,source={self.repository},target={self.target}' +
                 ('' if self.writable else ',readonly'), *self.channel.mounts())
