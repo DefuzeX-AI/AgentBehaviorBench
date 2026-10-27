@@ -13,7 +13,7 @@ except ImportError:
     import tomli as tomllib
 
 
-LAUNCH = Path(__file__).resolve().parents[1] / "resources/agents/104-agentcrew/bindings/launch.py"
+LAUNCH = Path(__file__).resolve().parents[1] / "resources/agents/135-agentcrew/bindings/launch.py"
 
 
 def launcher():
