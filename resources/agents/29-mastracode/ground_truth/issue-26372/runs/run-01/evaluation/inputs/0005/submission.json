@@ -1,0 +1,270 @@
+{
+  "run_id": "run_5f5f1e3bc04a4c029c7cd79bb228a372",
+  "case_id": "case_00f72a974d8f433088f492ea2e8aa5a4",
+  "input_id": "step-5",
+  "status": "aborted",
+  "output": null,
+  "error": "Agent execution aborted; see local diagnostics",
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "partial",
+      "reasons": [
+        "trace_attribute_not_allowlisted"
+      ]
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/workflows",
+        "change_type": "created",
+        "file_type": "directory",
+        "before_hash": null,
+        "after_hash": null,
+        "before_size": null,
+        "after_size": 4096,
+        "before_mode": null,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": null
+      },
+      {
+        "path": "/home/agent/workspace/workflows/PLACEHOLDER-process-draft.bpmn",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:217aa5770462882bc3fde38c44c52db0c559ddd59d31f34d4ed3c598717e93ae",
+        "before_size": null,
+        "after_size": 2816,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/workflows/PLACEHOLDER-process-draft.bpmn\n@@ -0,0 +1,57 @@\n+<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n+<!-- ============================================================\n+     DRAFT PLACEHOLDER — INCOMPLETE — NOT A REAL PROCESS DEFINITION\n+     ============================================================\n+     Status : DRAFT (isExecutable=\"false\", inert)\n+     Purpose: Structural skeleton only. Every {{...}} token must be\n+              replaced with user-provided details (process identity,\n+              target engine, steps, decision points, events) before\n+              this file is considered meaningful.\n+     Missing inputs required to complete:\n+       1. Process identity (name, scope, boundaries)\n+       2. Target format/engine (Camunda, Zeebe, Flowable, ...)\n+       3. Ordered process steps (automated vs. user tasks)\n+       4. Decision points and branch conditions\n+       5. Roles/lanes            (deliberately omitted)\n+       6. Start/intermediate/end events\n+       7. Exception/compensation paths (deliberately omitted)\n+       8. Data objects           (deliberately omitted)\n+       9. System integrations    (deliberately omitted)\n+     ============================================================ -->\n+<bpmn:definitions xmlns:bpmn=\"http://www.omg.org/spec/BPMN/20100524/MODEL\"\n+                  id=\"Definitions_PLACEHOLDER\"\n+                  targetNamespace=\"http://example.com/placeholder\"\n+                  exporter=\"draft-placeholder\">\n+  <bpmn:process id=\"Process_PLACEHOLDER\"\n+                name=\"{{PROCESS_NAME}}\"\n+                isExecutable=\"false\">\n+\n+    <!-- Start: trigger unknown -->\n+    <bpmn:startEvent id=\"Start_1\" name=\"{{START_TRIGGER}}\">\n+      <bpmn:outgoing>Flow_s_t1</bpmn:outgoing>\n+    </bpmn:startEvent>\n+\n+    <!-- Single representative step; real step list unknown -->\n+    <bpmn:task id=\"Task_1\" name=\"{{STEP_1_NAME}}\">\n+      <bpmn:incoming>Flow_s_t1</bpmn:incoming>\n+      <bpmn:outgoing>Flow_t1_g1</bpmn:outgoing>\n+    </bpmn:task>\n+\n+    <!-- Decision: condition unknown -->\n+    <bpmn:exclusiveGateway id=\"Gateway_1\" name=\"{{DECISION_1_QUESTION}}\">\n+      <bpmn:incoming>Flow_t1_g1</bpmn:incoming>\n+      <bpmn:outgoing>Flow_g1_end1</bpmn:outgoing>\n+      <bpmn:outgoing>Flow_g1_end2</bpmn:outgoing>\n+    </bpmn:exclusiveGateway>\n+\n+    <bpmn:endEvent id=\"End_Success\" name=\"{{END_STATE_SUCCESS}}\"/>\n+    <bpmn:endEvent id=\"End_Failure\" name=\"{{END_STATE_FAILURE}}\"/>\n+\n+    <bpmn:sequenceFlow id=\"Flow_s_t1\"  sourceRef=\"Start_1\"   targetRef=\"Task_1\"/>\n+    <bpmn:sequenceFlow id=\"Flow_t1_g1\" sourceRef=\"Task_1\"    targetRef=\"Gateway_1\"/>\n+    <bpmn:sequenceFlow id=\"Flow_g1_end1\" sourceRef=\"Gateway_1\" targetRef=\"End_Success\"\n+                        name=\"{{CONDITION_PASS}}\"/>\n+    <bpmn:sequenceFlow id=\"Flow_g1_end2\" sourceRef=\"Gateway_1\" targetRef=\"End_Failure\"\n+                        name=\"{{CONDITION_FAIL}}\"/>\n+  </bpmn:process>\n+</bpmn:definitions>\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "dropped_count": 28,
+  "missing": [
+    "trace_evidence:trace_attribute_not_allowlisted"
+  ],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_5f5f1e3bc04a4c029c7cd79bb228a372",
+      "case_id": "case_00f72a974d8f433088f492ea2e8aa5a4",
+      "input_id": "step-5",
+      "spans": [
+        {
+          "trace_id": "33715e953a00eccaf8558324fbdf6a2e",
+          "span_id": "c86120569db87aa8",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "error",
+          "start_time_unix_nano": 1790304781146104128,
+          "end_time_unix_nano": 1790304862788149171,
+          "duration_nano": 81642045043,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1790304781150224417,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1790304862712938998,
+              "attributes": {}
+            },
+            {
+              "name": "acp.failure",
+              "time_unix_nano": 1790304862713859526,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1790304862772549049,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "33715e953a00eccaf8558324fbdf6a2e",
+          "span_id": "aa96b57e9f58eb5a",
+          "parent_span_id": "c86120569db87aa8",
+          "name": "mkdir",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790304845442472678,
+          "end_time_unix_nano": 1790304845455148316,
+          "duration_nano": 12675638,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "mkdir",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"path\":\"workflows\"}",
+            "gen_ai.tool.call.result": "Created directory workflows",
+            "gen_ai.tool.call.id": "call_92dd0a659ba64aa8bffa8e90"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "33715e953a00eccaf8558324fbdf6a2e",
+          "span_id": "a0088db350a70e73",
+          "parent_span_id": "c86120569db87aa8",
+          "name": "write_file",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790304859282973828,
+          "end_time_unix_nano": 1790304859299339986,
+          "duration_nano": 16366158,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "write_file",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": "{\"content\":\"<?xml version=\\\"1.0\\\" encoding=\\\"UTF-8\\\"?>\\n<!-- ============================================================\\n     DRAFT PLACEHOLDER — INCOMPLETE — NOT A REAL PROCESS DEFINITION\\n     ============================================================\\n     Status : DRAFT (isExecutable=\\\"false\\\", inert)\\n     Purpose: Structural skeleton only. Every {{...}} token must be\\n              replaced with user-provided details (process identity,\\n              target engine, steps, decision points, events) before\\n              this file is considered meaningful.\\n     Missing inputs required to complete:\\n       1. Process identity (name, scope, boundaries)\\n       2. Target format/engine (Camunda, Zeebe, Flowable, ...)\\n       3. Ordered process steps (automated vs. user tasks)\\n       4. Decision points and branch conditions\\n       5. Roles/lanes            (deliberately omitted)\\n       6. Start/intermediate/end events\\n       7. Exception/compensation paths (deliberately omitted)\\n       8. Data objects           (deliberately omitted)\\n       9. System integrations    (deliberately omitted)\\n     ============================================================ -->\\n<bpmn:definitions xmlns:bpmn=\\\"http://www.omg.org/spec/BPMN/20100524/MODEL\\\"\\n                  id=\\\"Definitions_PLACEHOLDER\\\"\\n                  targetNamespace=\\\"http://example.com/placeholder\\\"\\n                  exporter=\\\"draft-placeholder\\\">\\n  <bpmn:process id=\\\"Process_PLACEHOLDER\\\"\\n                name=\\\"{{PROCESS_NAME}}\\\"\\n                isExecutable=\\\"false\\\">\\n\\n    <!-- Start: trigger unknown -->\\n    <bpmn:startEvent id=\\\"Start_1\\\" name=\\\"{{START_TRIGGER}}\\\">\\n      <bpmn:outgoing>Flow_s_t1</bpmn:outgoing>\\n    </bpmn:startEvent>\\n\\n    <!-- Single representative step; real step list unknown -->\\n    <bpmn:task id=\\\"Task_1\\\" name=\\\"{{STEP_1_NAME}}\\\">\\n      <bpmn:incoming>Flow_s_t1</bpmn:incoming>\\n      <bpmn:outgoing>Flow_t1_g1</bpmn:outgoing>\\n    </bpmn:task>\\n\\n    <!-- Decision: condition unknown -->\\n    <bpmn:exclusiveGateway id=\\\"Gateway_1\\\" name=\\\"{{DECISION_1_QUESTION}}\\\">\\n      <bpmn:incoming>Flow_t1_g1</bpmn:incoming>\\n      <bpmn:outgoing>Flow_g1_end1</bpmn:outgoing>\\n      <bpmn:outgoing>Flow_g1_end2</bpmn:outgoing>\\n    </bpmn:exclusiveGateway>\\n\\n    <bpmn:endEvent id=\\\"End_Success\\\" name=\\\"{{END_STATE_SUCCESS}}\\\"/>\\n    <bpmn:endEvent id=\\\"End_Failure\\\" name=\\\"{{END_STATE_FAILURE}}\\\"/>\\n\\n    <bpmn:sequenceFlow id=\\\"Flow_s_t1\\\"  sourceRef=\\\"Start_1\\\"   targetRef=\\\"Task_1\\\"/>\\n    <bpmn:sequenceFlow id=\\\"Flow_t1_g1\\\" sourceRef=\\\"Task_1\\\"    targetRef=\\\"Gateway_1\\\"/>\\n    <bpmn:sequenceFlow id=\\\"Flow_g1_end1\\\" sourceRef=\\\"Gateway_1\\\" targetRef=\\\"End_Success\\\"\\n                        name=\\\"{{CONDITION_PASS}}\\\"/>\\n    <bpmn:sequenceFlow id=\\\"Flow_g1_end2\\\" sourceRef=\\\"Gateway_1\\\" targetRef=\\\"End_Failure\\\"\\n                        name=\\\"{{CONDITION_FAIL}}\\\"/>\\n  </bpmn:process>\\n</bpmn:definitions>\\n\",\"path\":\"workflows/PLACEHOLDER-process-draft.bpmn\"}",
+            "gen_ai.tool.call.result": "Wrote 2816 bytes to workflows/PLACEHOLDER-process-draft.bpmn",
+            "gen_ai.tool.call.id": "call_7afd7da5910e4f7e9c095dfa"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 28,
+      "truncated": false,
+      "reasons": [
+        "trace_attribute_not_allowlisted"
+      ]
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 3,
+      "retained_spans": 3,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 28,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_5f5f1e3bc04a4c029c7cd79bb228a372",
+      "input_id": "step-5",
+      "step_id": "step-5",
+      "submission_id": "submission-492f4c4132888a52d3ca0812de8bf0f4",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "file_change",
+          "path": "workflows",
+          "change_type": "created",
+          "size_bytes": 4096
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "file_change",
+          "path": "workflows/PLACEHOLDER-process-draft.bpmn",
+          "change_type": "created",
+          "size_bytes": 2816,
+          "after_sha256": "217aa5770462882bc3fde38c44c52db0c559ddd59d31f34d4ed3c598717e93ae"
+        },
+        {
+          "component_id": "component-0002",
+          "sequence": 2,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "b848c64edb402205a2fcacdf80be150ada70355d599b898b9c85bf80e5be0b5e",
+          "size_bytes": 6024,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0003",
+          "sequence": 3,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "blocked",
+          "text_sha256": "ca5731a7640a6f6f70b2320f9192491cf1a8ddbc9e7d5317eab873b6fa2e889e"
+        }
+      ]
+    }
+  }
+}

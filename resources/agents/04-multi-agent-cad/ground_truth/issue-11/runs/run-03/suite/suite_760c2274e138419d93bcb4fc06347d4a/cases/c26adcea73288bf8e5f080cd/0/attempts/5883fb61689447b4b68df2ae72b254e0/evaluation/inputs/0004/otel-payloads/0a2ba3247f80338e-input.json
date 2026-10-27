@@ -1,0 +1,558 @@
+{
+  "user_request": "Compute the hash of the generated IR after each pass and report the parentage chain linking each IR version to its predecessor.",
+  "cad_brief": {
+    "part_name": "l-bracket-50x30x35x5-R5",
+    "part_category": "L-bracket",
+    "length_unit": "mm",
+    "origin_convention": "corner_min",
+    "primary_workplane": "XZ",
+    "max_extent_x_mm": 50.0,
+    "max_extent_y_mm": 30.0,
+    "max_extent_z_mm": 35.0,
+    "target_volume_mm3": 12161.0,
+    "material": "PLA",
+    "material_density_g_cm3": 1.24,
+    "key_parameters": {
+      "BASE_LENGTH_X": 50.0,
+      "BASE_WIDTH_Y": 30.0,
+      "BASE_THICKNESS_Z": 5.0,
+      "ARM_WIDTH_Y": 30.0,
+      "ARM_THICKNESS_X": 5.0,
+      "ARM_HEIGHT_Z": 30.0,
+      "TOTAL_HEIGHT_Z": 35.0,
+      "OVERALL_LENGTH_X": 50.0,
+      "OVERALL_WIDTH_Y": 30.0,
+      "INSIDE_FILLET_RADIUS": 5.0,
+      "ARM_OUTER_FACE_X": 0.0,
+      "ARM_INNER_FACE_X": 5.0,
+      "FILLET_AXIS_X": 5.0,
+      "FILLET_AXIS_Z": 5.0,
+      "ARM_TOP_Z": 35.0,
+      "SYMMETRY_PLANE_Y": 15.0
+    },
+    "verification_targets": [
+      {
+        "id": "overall-x",
+        "kind": "overall_dimension",
+        "description": "Total bounding-box extent along X: base plate length 50mm (arm is flush with the X=0 end face, so it does not extend the part).",
+        "nominal": 50.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": 0.5,
+        "face_selector_expression": "Part.bounding_box().max.X - Part.bounding_box().min.X",
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "x",
+        "critical": true,
+        "notes": "Base spans X = 0 to BASE_LENGTH_X (50). Arm occupies X = 0 to ARM_THICKNESS_X (5), fully inside the base footprint."
+      },
+      {
+        "id": "overall-y",
+        "kind": "overall_dimension",
+        "description": "Total bounding-box extent along Y: base width 30mm, equal to the arm width (arm spans the full width of the base).",
+        "nominal": 30.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": 0.5,
+        "face_selector_expression": "Part.bounding_box().max.Y - Part.bounding_box().min.Y",
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "y",
+        "critical": true,
+        "notes": "Extrude direction of the L profile. Both base and arm span Y = 0 to BASE_WIDTH_Y (30)."
+      },
+      {
+        "id": "overall-z",
+        "kind": "overall_dimension",
+        "description": "Total bounding-box extent along Z: base thickness 5mm plus arm height 30mm measured above the top of the base = 35mm absolute from the bottom face (Z=0).",
+        "nominal": 35.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": 0.5,
+        "face_selector_expression": "Part.bounding_box().max.Z - Part.bounding_box().min.Z",
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "z",
+        "critical": true,
+        "notes": "ABSOLUTE value from the global Z=0 base plane. BASE_THICKNESS_Z (5) + ARM_HEIGHT_Z (30) = TOTAL_HEIGHT_Z (35). QA measures the full Z extent, not the 30mm arm-only figure."
+      },
+      {
+        "id": "single-body",
+        "kind": "single_body",
+        "description": "Base plate, vertical arm and the R5 inside fillet must be fused into exactly one connected solid (one Solid in Part.solids()).",
+        "nominal": 1.0,
+        "tolerance_upper": 0.0,
+        "tolerance_lower": 0.0,
+        "face_selector_expression": "len(Part.solids())",
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": null,
+        "critical": true,
+        "notes": "The union of base and arm must be a boolean fuse, not two separate solids touching at a face."
+      },
+      {
+        "id": "water-tightness",
+        "kind": "water_tightness",
+        "description": "Final bracket must be a closed, manifold solid with no open shells, gap seams or self-intersections (Part.is_valid() is True and volume > 0).",
+        "nominal": null,
+        "tolerance_upper": 0.0,
+        "tolerance_lower": 0.0,
+        "face_selector_expression": "Part.is_valid()",
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": null,
+        "critical": true,
+        "notes": "Verify after the R5 fillet is applied; a failed fillet operation frequently breaks the shell."
+      }
+    ],
+    "functional_requirements": [
+      "Rigid right-angle (90 degree) L-bracket: horizontal base for surface mounting/support and vertical arm for a perpendicular mounting or stop face.",
+      "5mm radius fillet on the reentrant (inside) corner reduces stress concentration under bending load at the junction of base and arm.",
+      "Base bottom face (Z=0) must be flat and planar for seating on a mounting surface.",
+      "Arm outer face (X=0) must be flat and planar and co-planar with the base end face.",
+      "No mounting holes, slots or lightening cutouts were specified - the part must be produced as a solid bracket.",
+      "Load path: bending across the filleted inside corner, so the fillet must be a true tangent-continuous blend, not a chamfer."
+    ],
+    "manufacturing_method": "3d_print_fdm",
+    "special_features": [
+      "The vertical arm MUST be flush with the base end face at X = ARM_OUTER_FACE_X (0.0), so arm outer face and base end face lie in the same plane X = 0.",
+      "The vertical arm MUST span the full base width in Y (Y = 0 to BASE_WIDTH_Y) and MUST rise from the base to Z = TOTAL_HEIGHT_Z (35.0), i.e. ARM_HEIGHT_Z (30.0) above the base top face.",
+      "The inside/reentrant corner at (X = FILLET_AXIS_X = 5.0, Z = FILLET_AXIS_Z = 5.0) MUST carry a concave fillet of radius INSIDE_FILLET_RADIUS (5.0) that ADDS material to the corner and is tangent to both the arm inner face (X = 5) and the base top face (Z = 5).",
+      "The inside fillet MUST run the full length of the corner along the Y axis, from Y = 0 to Y = ARM_WIDTH_Y (30), as a constant-radius sweep (no variable radius, no chamfer substitute).",
+      "The bracket MUST be symmetric about the plane Y = SYMMETRY_PLANE_Y (15.0): all features mirror about the mid-width plane, and the fillet axis MUST be parallel to the Y axis.",
+      "The base and arm MUST be a single fused solid; the arm MUST NOT be modeled as a separate body merely touching the base.",
+      "All edges other than the specified inside corner MUST remain sharp (no global fillet/chamfer operation applied to the whole part).",
+      "The part MUST NOT contain any holes, slots, cutouts, ribs or embosses - none were requested and adding them would violate the specified geometry.",
+      "The primary L-shaped profile MUST be sketched in the XZ plane as a closed L polygon and extruded along +Y by ARM_WIDTH_Y (30.0), giving one single extrude before the fillet is applied."
+    ],
+    "user_request_raw": "You are given the following plain-text part request: 'Create a simple L-shaped bracket with a base of 50mm x 30mm x 5mm and a vertical arm of 30mm x 30mm x 5mm, with a 5mm fillet on the inside corner.' Translate this request into a build123d script that produces the bracket. Do not execute the script yet.",
+    "spec_version": 1
+  },
+  "architect_plan": {
+    "plan_id": "plan-l-bracket-50x30x35x5-r5-v1",
+    "cad_brief_id": "l-bracket-50x30x35x5-R5",
+    "sketches": [
+      {
+        "sketch_id": "l-profile-xz",
+        "workplane": "XZ",
+        "workplane_offset_mm": 0.0,
+        "entities": [
+          {
+            "entity_type": "line",
+            "label": null,
+            "start": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "end": {
+              "x": 50.0,
+              "y": 0.0
+            },
+            "center": null,
+            "radius": null,
+            "start_angle_deg": null,
+            "end_angle_deg": null,
+            "width": null,
+            "height": null,
+            "corner_radius": null,
+            "num_sides": null,
+            "circumscribed_radius": null,
+            "control_points": null,
+            "text_string": null,
+            "font_size": null
+          },
+          {
+            "entity_type": "line",
+            "label": null,
+            "start": {
+              "x": 50.0,
+              "y": 0.0
+            },
+            "end": {
+              "x": 50.0,
+              "y": 5.0
+            },
+            "center": null,
+            "radius": null,
+            "start_angle_deg": null,
+            "end_angle_deg": null,
+            "width": null,
+            "height": null,
+            "corner_radius": null,
+            "num_sides": null,
+            "circumscribed_radius": null,
+            "control_points": null,
+            "text_string": null,
+            "font_size": null
+          },
+          {
+            "entity_type": "line",
+            "label": null,
+            "start": {
+              "x": 50.0,
+              "y": 5.0
+            },
+            "end": {
+              "x": 5.0,
+              "y": 5.0
+            },
+            "center": null,
+            "radius": null,
+            "start_angle_deg": null,
+            "end_angle_deg": null,
+            "width": null,
+            "height": null,
+            "corner_radius": null,
+            "num_sides": null,
+            "circumscribed_radius": null,
+            "control_points": null,
+            "text_string": null,
+            "font_size": null
+          },
+          {
+            "entity_type": "line",
+            "label": null,
+            "start": {
+              "x": 5.0,
+              "y": 5.0
+            },
+            "end": {
+              "x": 5.0,
+              "y": 35.0
+            },
+            "center": null,
+            "radius": null,
+            "start_angle_deg": null,
+            "end_angle_deg": null,
+            "width": null,
+            "height": null,
+            "corner_radius": null,
+            "num_sides": null,
+            "circumscribed_radius": null,
+            "control_points": null,
+            "text_string": null,
+            "font_size": null
+          },
+          {
+            "entity_type": "line",
+            "label": null,
+            "start": {
+              "x": 5.0,
+              "y": 35.0
+            },
+            "end": {
+              "x": 0.0,
+              "y": 35.0
+            },
+            "center": null,
+            "radius": null,
+            "start_angle_deg": null,
+            "end_angle_deg": null,
+            "width": null,
+            "height": null,
+            "corner_radius": null,
+            "num_sides": null,
+            "circumscribed_radius": null,
+            "control_points": null,
+            "text_string": null,
+            "font_size": null
+          },
+          {
+            "entity_type": "line",
+            "label": null,
+            "start": {
+              "x": 0.0,
+              "y": 35.0
+            },
+            "end": {
+              "x": 0.0,
+              "y": 0.0
+            },
+            "center": null,
+            "radius": null,
+            "start_angle_deg": null,
+            "end_angle_deg": null,
+            "width": null,
+            "height": null,
+            "corner_radius": null,
+            "num_sides": null,
+            "circumscribed_radius": null,
+            "control_points": null,
+            "text_string": null,
+            "font_size": null
+          }
+        ],
+        "constraints": [],
+        "fully_constrained": false,
+        "notes": "Closed L profile in XZ plane built from six line segments. Local x = world X, local y = world Z. Base bottom Z=0, base top Z=5, arm outer face X=0, arm inner face X=5, arm top Z=35."
+      },
+      {
+        "sketch_id": "inside-fillet-xz",
+        "workplane": "XZ",
+        "workplane_offset_mm": 0.0,
+        "entities": [
+          {
+            "entity_type": "polygon",
+            "label": null,
+            "start": null,
+            "end": null,
+            "center": null,
+            "radius": null,
+            "start_angle_deg": null,
+            "end_angle_deg": null,
+            "width": null,
+            "height": null,
+            "corner_radius": null,
+            "num_sides": null,
+            "circumscribed_radius": null,
+            "control_points": [
+              {
+                "x": 5.0,
+                "y": 5.0
+              },
+              {
+                "x": 10.0,
+                "y": 5.0
+              },
+              {
+                "x": 6.464466,
+                "y": 6.464466
+              },
+              {
+                "x": 5.0,
+                "y": 10.0
+              }
+            ],
+            "text_string": null,
+            "font_size": null
+          }
+        ],
+        "constraints": [],
+        "fully_constrained": false,
+        "notes": "Custom profile: concave quarter-round fillet wedge in XZ plane. The wedge adds material into the reentrant corner and is tangent to the arm inner face X=5 and the base top face Z=5. It runs the full Y width when extruded."
+      }
+    ],
+    "steps": [
+      {
+        "step_id": "step-01-extrude-l-profile",
+        "step_type": "extrude",
+        "label": "Extrude L profile along +Y",
+        "sketch_id": "l-profile-xz",
+        "distance_mm": 30.0,
+        "direction": "negative",
+        "taper_angle_deg": null,
+        "revolve_angle_deg": null,
+        "revolve_axis": null,
+        "revolve_axis_point": null,
+        "radius_mm": null,
+        "chamfer_distance_mm": null,
+        "chamfer_distance1_mm": null,
+        "chamfer_distance2_mm": null,
+        "edge_selector": null,
+        "hole_diameter_mm": null,
+        "hole_depth_mm": null,
+        "hole_position": null,
+        "hole_type": "simple",
+        "counterbore_diameter_mm": null,
+        "counterbore_depth_mm": null,
+        "countersink_angle_deg": null,
+        "target_step_id": null,
+        "tool_step_id": null,
+        "pattern_count": null,
+        "pattern_spacing_mm": null,
+        "pattern_axis": null,
+        "pattern_total_angle_deg": null,
+        "feature_step_ids": null,
+        "mirror_plane": null,
+        "mirror_plane_offset_mm": null,
+        "shell_thickness_mm": null,
+        "shell_open_faces": null,
+        "draft_angle_deg": null,
+        "draft_neutral_plane": null,
+        "draft_face_selectors": null,
+        "rib_thickness_mm": null,
+        "rib_height_mm": null,
+        "rib_face_selectors": null,
+        "reference_type": null,
+        "reference_definition": null,
+        "depends_on": [],
+        "notes": "Extrude the closed L profile by ARM_WIDTH_Y=30.0 along +Y. Plane.XZ normal is -Y, so direction 'negative' yields +Y. Solid spans X=0..50, Y=0..30, Z=0..35."
+      },
+      {
+        "step_id": "step-02-extrude-inside-fillet-wedge",
+        "step_type": "extrude",
+        "label": "Extrude inside fillet wedge along +Y",
+        "sketch_id": "inside-fillet-xz",
+        "distance_mm": 30.0,
+        "direction": "negative",
+        "taper_angle_deg": null,
+        "revolve_angle_deg": null,
+        "revolve_axis": null,
+        "revolve_axis_point": null,
+        "radius_mm": null,
+        "chamfer_distance_mm": null,
+        "chamfer_distance1_mm": null,
+        "chamfer_distance2_mm": null,
+        "edge_selector": null,
+        "hole_diameter_mm": null,
+        "hole_depth_mm": null,
+        "hole_position": null,
+        "hole_type": "simple",
+        "counterbore_diameter_mm": null,
+        "counterbore_depth_mm": null,
+        "countersink_angle_deg": null,
+        "target_step_id": null,
+        "tool_step_id": null,
+        "pattern_count": null,
+        "pattern_spacing_mm": null,
+        "pattern_axis": null,
+        "pattern_total_angle_deg": null,
+        "feature_step_ids": null,
+        "mirror_plane": null,
+        "mirror_plane_offset_mm": null,
+        "shell_thickness_mm": null,
+        "shell_open_faces": null,
+        "draft_angle_deg": null,
+        "draft_neutral_plane": null,
+        "draft_face_selectors": null,
+        "rib_thickness_mm": null,
+        "rib_height_mm": null,
+        "rib_face_selectors": null,
+        "reference_type": null,
+        "reference_definition": null,
+        "depends_on": [
+          "step-01-extrude-l-profile"
+        ],
+        "notes": "Extrude the concave fillet wedge by ARM_WIDTH_Y=30.0 along +Y using direction 'negative' (opposite Plane.XZ normal). The wedge fills the reentrant corner and is tangent to X=5 and Z=5 over the full Y width."
+      },
+      {
+        "step_id": "step-03-union-l-and-fillet",
+        "step_type": "boolean_union",
+        "label": "Fuse L body and fillet wedge",
+        "sketch_id": null,
+        "distance_mm": null,
+        "direction": null,
+        "taper_angle_deg": null,
+        "revolve_angle_deg": null,
+        "revolve_axis": null,
+        "revolve_axis_point": null,
+        "radius_mm": null,
+        "chamfer_distance_mm": null,
+        "chamfer_distance1_mm": null,
+        "chamfer_distance2_mm": null,
+        "edge_selector": null,
+        "hole_diameter_mm": null,
+        "hole_depth_mm": null,
+        "hole_position": null,
+        "hole_type": "simple",
+        "counterbore_diameter_mm": null,
+        "counterbore_depth_mm": null,
+        "countersink_angle_deg": null,
+        "target_step_id": "step-01-extrude-l-profile",
+        "tool_step_id": "step-02-extrude-inside-fillet-wedge",
+        "pattern_count": null,
+        "pattern_spacing_mm": null,
+        "pattern_axis": null,
+        "pattern_total_angle_deg": null,
+        "feature_step_ids": null,
+        "mirror_plane": null,
+        "mirror_plane_offset_mm": null,
+        "shell_thickness_mm": null,
+        "shell_open_faces": null,
+        "draft_angle_deg": null,
+        "draft_neutral_plane": null,
+        "draft_face_selectors": null,
+        "rib_thickness_mm": null,
+        "rib_height_mm": null,
+        "rib_face_selectors": null,
+        "reference_type": null,
+        "reference_definition": null,
+        "depends_on": [
+          "step-01-extrude-l-profile",
+          "step-02-extrude-inside-fillet-wedge"
+        ],
+        "notes": "Boolean union creates exactly one fused solid. The inside fillet is a constant-radius concave blend along the full Y width; all other edges remain sharp. No holes, slots, cutouts, ribs, or embosses are present."
+      }
+    ],
+    "estimated_volume_mm3": null,
+    "key_dimensions": {
+      "BASE_LENGTH_X": 50.0,
+      "BASE_WIDTH_Y": 30.0,
+      "BASE_THICKNESS_Z": 5.0,
+      "ARM_WIDTH_Y": 30.0,
+      "ARM_THICKNESS_X": 5.0,
+      "ARM_HEIGHT_Z": 30.0,
+      "TOTAL_HEIGHT_Z": 35.0,
+      "INSIDE_FILLET_RADIUS": 5.0,
+      "FILLET_CENTER_X": 10.0,
+      "FILLET_CENTER_Z": 10.0,
+      "FILLET_PEAK_X": 6.464466,
+      "FILLET_PEAK_Z": 6.464466,
+      "ARM_OUTER_FACE_X": 0.0,
+      "ARM_INNER_FACE_X": 5.0,
+      "FILLET_AXIS_X": 5.0,
+      "FILLET_AXIS_Z": 5.0,
+      "SYMMETRY_PLANE_Y": 15.0
+    },
+    "selector_map": {
+      "overall-x": "(skip)",
+      "overall-y": "(skip)",
+      "overall-z": "(skip)",
+      "single-body": "(skip)",
+      "water-tightness": "(skip)"
+    },
+    "tolerances_hint": null,
+    "expected_step_count": null,
+    "plan_version": 1,
+    "revision_history": []
+  },
+  "qa_report": {
+    "cad_brief_id": "(coder-failure)",
+    "engine_a": {
+      "engine_name": "cadpy_analysis",
+      "results": [],
+      "summary": "",
+      "warnings": [],
+      "errors": [],
+      "raw_json": null
+    },
+    "engine_b": {
+      "engine_name": "check_mesh",
+      "results": [],
+      "summary": "",
+      "warnings": [],
+      "errors": [
+        "Deterministic coder execution failed: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\n\nTraceback:\nTraceback (most recent call last):\n  File \"/opt/agent/agent/multi_agent_cad/nodes.py\", line 552, in _node_python_coder_deterministic\n    from cadpy.generation import EntrySpec, run_script_generator\n  File \"/opt/agent/agent/packages/cadpy/src/cadpy/generation.py\", line 40, in <module>\n    from cadpy.glb import (\n  File \"/opt/agent/agent/packages/cadpy/src/cadpy/glb.py\", line 32, in <module>\n    from cadpy.step_scene import ColorRGBA, LoadedStepScene, OccurrenceNode, SelectorBundle, occurrence_selector_id\n  File \"/opt/agent/agent/packages/cadpy/src/cadpy/step_scene.py\", line 32, in <module>\n    from OCP.TDF import TDF_ChildIterator, TDF_Label, TDF_LabelSequence\nImportError: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\n"
+      ],
+      "raw_json": null
+    },
+    "all_passed": false,
+    "passed_count": 0,
+    "failed_count": 0,
+    "noise_only_fail_count": 0,
+    "error_type": "dimension",
+    "error_details": [
+      "Deterministic coder execution failed: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\n\nTraceback:\nTraceback (most recent call last):\n  File \"/opt/agent/agent/multi_agent_cad/nodes.py\", line 552, in _node_python_coder_deterministic\n    from cadpy.generation import EntrySpec, run_script_generator\n  File \"/opt/agent/agent/packages/cadpy/src/cadpy/generation.py\", line 40, in <module>\n    from cadpy.glb import (\n  File \"/opt/agent/agent/packages/cadpy/src/cadpy/glb.py\", line 32, in <module>\n    from cadpy.step_scene import ColorRGBA, LoadedStepScene, OccurrenceNode, SelectorBundle, occurrence_selector_id\n  File \"/opt/agent/agent/packages/cadpy/src/cadpy/step_scene.py\", line 32, in <module>\n    from OCP.TDF import TDF_ChildIterator, TDF_Label, TDF_LabelSequence\nImportError: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\n"
+    ],
+    "improvement_suggestions": [],
+    "connectivity_warning": null,
+    "strength_score": null,
+    "manufacturability_warnings": [],
+    "topology_changed": false,
+    "topology_delta": {},
+    "iteration": 0
+  },
+  "iteration_count": 0,
+  "error_type": "dimension",
+  "max_iterations": 5,
+  "force_refresh": false,
+  "workflow_id": "original",
+  "node_history": [
+    "planner",
+    "architect",
+    "coder",
+    "coder"
+  ],
+  "execution_log": [
+    "node_python_coder [iter 0]: FAILED",
+    "  Script: /tmp/temp_design_0.py",
+    "  Error : Deterministic coder execution failed: cannot import name 'TDF_LabelSequence' from 'OCP.TDF' (/usr/local/lib/python3.11/site-packages/OCP/TDF/__init__.py)\n\nTraceback:\nTraceback (most recent call last):\n  File \"/opt/agent/agent/multi_agent_cad/nodes.py\", line 552, in _node_python_coder_deterministic\n "
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "step_id": "ini_edit",
+  "result": "settings.ini now contains timeout=30 on its own line immediately after retries=3 inside [client], added with exactly one edit_file call.",
+  "evidence": [
+    {
+      "kind": "diff",
+      "summary": "Single edit_file call: old_string \"retries=3\" -> new_string \"retries=3\\ntimeout=30\"; receipt reported 1 of 1 occurrences replaced.",
+      "paths": [
+        "settings.ini"
+      ]
+    },
+    {
+      "kind": "files",
+      "summary": "Read-back of settings.ini confirms [client] section is now retries=3 / timeout=30 / backoff=2 / user_agent=acme-sync/1.4, with no other lines altered.",
+      "paths": [
+        "settings.ini"
+      ]
+    }
+  ]
+}

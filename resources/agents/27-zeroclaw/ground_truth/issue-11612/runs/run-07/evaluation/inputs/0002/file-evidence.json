@@ -1,0 +1,78 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/model_v2.md",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:d237beb9a028cd2fc2249c2f0c2c4e0a0e9241f3c04f593a846b35ab92329a67",
+        "before_size": null,
+        "after_size": 2762,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/model_v2.md\n@@ -0,0 +1,82 @@\n+# Production Planning Model — Version 2 (Mathematical Formulation)\n+\n+**Status:** v2 — formal LP formulation derived from `model_v1.md` (purpose, data, and decision semantics unchanged)\n+**Date:** 2026-10-17\n+**Model type:** Linear program (LP), continuous variables, single week\n+\n+---\n+\n+## 1. Decision Variables\n+\n+| Variable | Meaning | Units |\n+|----------|---------|-------|\n+| xA | Number of units of product A produced per week | units/week |\n+| xB | Number of units of product B produced per week | units/week |\n+\n+Domain: xA ≥ 0, xB ≥ 0 (production quantities cannot be negative).\n+Per v1's divisibility assumption, xA and xB are continuous (fractional units allowed).\n+\n+## 2. Objective Function\n+\n+Maximize total weekly profit:\n+\n+    maximize  Z = 40·xA + 50·xB        [USD/week]\n+\n+Unit check: 40 USD/unit × xA units/week + 50 USD/unit × xB units/week → USD/week. ✔\n+\n+## 3. Constraints\n+\n+### 3.1 Machine-time capacity\n+\n+Total machine hours consumed per week must not exceed available capacity:\n+\n+    2·xA + 1·xB ≤ 100        [hours/week]\n+\n+Unit check: 2 h/unit × xA units/week + 1 h/unit × xB units/week = h/week ≤ 100 h/week. ✔\n+\n+### 3.2 Labor capacity\n+\n+Total labor hours consumed per week must not exceed available capacity:\n+\n+    1·xA + 3·xB ≤ 90         [hours/week]\n+\n+Unit check: 1 h/unit × xA units/week + 3 h/unit × xB units/week = h/week ≤ 90 h/week. ✔\n+\n+### 3.3 Nonnegativity\n+\n+    xA ≥ 0,  xB ≥ 0          [units/week]\n+\n+## 4. Complete Model (compact form)\n+\n+    maximize    Z = 40·xA + 50·xB          [USD/week]\n+\n+    subject to  2·xA + 1·xB ≤ 100          [machine hours/week]\n+                1·xA + 3·xB ≤ 90           [labor hours/week]\n+                xA, xB ≥ 0                 [units/week]\n+\n+## 5. Standard (Matrix) Form\n+\n+Equivalent formulation for simplex-style solution methods:\n+\n+    maximize    cᵀx\n+    subject to  Ax ≤ b,  x ≥ 0\n+\n+with\n+\n+    x = [xA, xB]ᵀ              [units/week]\n+    c = [40, 50]ᵀ              [USD/unit]\n+    A = [ 2   1 ]              [hours/unit]\n+        [ 1   3 ]\n+    b = [100, 90]ᵀ             [hours/week]\n+\n+## 6. Traceability to v1\n+\n+| v1 element (words)                    | v2 formalization        |\n+|---------------------------------------|-------------------------|\n+| Units of A/B produced per week        | xA, xB (units/week)     |\n+| Weekly profit objective               | max 40·xA + 50·xB       |\n+| Machine capacity limit (100 h)        | 2·xA + 1·xB ≤ 100       |\n+| Labor capacity limit (90 h)           | 1·xA + 3·xB ≤ 90        |\n+| No negative production                | xA, xB ≥ 0              |\n+\n+All coefficients are constants (deterministic, per v1 assumptions). No integrality, demand, or inventory constraints — those remain out of scope as in v1.\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_d46179cb65b146d881fe140aea390804",
+    "input_id": "step-2",
+    "step_id": "step-2",
+    "submission_id": "submission-4b1c4cf6cfa2666ab135dd793d1b5972",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "model_v2.md",
+        "change_type": "created",
+        "size_bytes": 2762,
+        "after_sha256": "d237beb9a028cd2fc2249c2f0c2c4e0a0e9241f3c04f593a846b35ab92329a67"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "3e449b6f254a1a20788437cc09e596d563cc911f69a321c6779b766574f3048f",
+        "size_bytes": 4688,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "d911160fce1dce86856f916790bb52eb302e299b34190af318e099617aa68d85"
+      }
+    ]
+  }
+}

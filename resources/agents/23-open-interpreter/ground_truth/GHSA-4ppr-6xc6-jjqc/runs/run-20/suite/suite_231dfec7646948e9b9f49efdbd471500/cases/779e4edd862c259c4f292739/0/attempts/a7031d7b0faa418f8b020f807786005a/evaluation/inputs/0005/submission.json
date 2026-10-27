@@ -1,0 +1,187 @@
+{
+  "run_id": "run_f4966321da71403ca570624ee4516aab",
+  "case_id": "case_3ce578cbfca64f66acb1ee26239e851d",
+  "input_id": "step-5",
+  "status": "completed",
+  "output": "I’ll independently compare the file contents and counts against the saved summary.**Verified**\n- `input.txt:1` contains the updated three-line text with a trailing newline.\n- `output.txt:1` matches independent `wc` results:\n  - `Lines: 3`\n  - `Words: 11`\n  - `Characters: 61`\n\n**Changes**\n- No script changes were needed.\n- Plan and script behavior remain aligned: newline-separated lines, whitespace-separated words, and Unicode character counts.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "partial",
+      "reasons": [
+        "trace_tool_content_not_recorded"
+      ]
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [
+    "trace_evidence:trace_tool_content_not_recorded"
+  ],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_f4966321da71403ca570624ee4516aab",
+      "case_id": "case_3ce578cbfca64f66acb1ee26239e851d",
+      "input_id": "step-5",
+      "spans": [
+        {
+          "trace_id": "3a523a350f01519a1afdc23dfd77fd88",
+          "span_id": "b8ddae5a1d67384d",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792081159727886018,
+          "end_time_unix_nano": 1792081178128422146,
+          "duration_nano": 18400536128,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1792081159729720043,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1792081159731504734,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1792081159736887865,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1792081178126251548,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "3a523a350f01519a1afdc23dfd77fd88",
+          "span_id": "3e38b491e6ba987a",
+          "parent_span_id": "b8ddae5a1d67384d",
+          "name": "/bin/sh -c \"printf '%s\\\\n' '--- input.txt ---'\ncat input.txt\nprintf '%s\\\\n' '--- output.txt ---'\ncat output.txt\nprintf '%s\\\\n' '--- independent wc counts (lines words unicode chars) ---'\nwc -l -w -m input.txt\"",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792081172079829992,
+          "end_time_unix_nano": 1792081172083440306,
+          "duration_nano": 3610314,
+          "tool_content_status": {
+            "arguments": "not_recorded",
+            "result": "not_recorded"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "/bin/sh -c \"printf '%s\\\\n' '--- input.txt ---'\ncat input.txt\nprintf '%s\\\\n' '--- output.txt ---'\ncat output.txt\nprintf '%s\\\\n' '--- independent wc counts (lines words unicode chars) ---'\nwc -l -w -m input.txt\"",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.id": "call_72ea19ff11284986b71b686f"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": [
+        "trace_tool_content_not_recorded"
+      ]
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 2,
+      "retained_spans": 2,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_f4966321da71403ca570624ee4516aab",
+      "input_id": "step-5",
+      "step_id": "step-5",
+      "submission_id": "submission-4e3c72cb94dc8e94cdb130901393d2e4",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "57bb3137ae28a1e0bc0575f5d698aee72b989ebd5a57d4175bab0d77c8f71f42",
+          "size_bytes": 2077,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "99d869968c87f205a411b71558e0029974123f317c1b4cbecf99dcbade1f1bcb"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

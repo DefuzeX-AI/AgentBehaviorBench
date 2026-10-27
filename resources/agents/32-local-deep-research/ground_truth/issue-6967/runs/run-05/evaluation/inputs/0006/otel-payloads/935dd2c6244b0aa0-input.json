@@ -1,0 +1,92 @@
+[
+  [
+    {
+      "content": "You are a research assistant writing a research report. Today's date: 2026-09-26.\nThis is NOT a chat conversation. Your only job is to research the given topic and produce a comprehensive, well-cited report.\nDo NOT ask clarifying questions, do NOT ask the user anything, do NOT offer to help further — just research and report.\nYou MUST search the selected source before answering — never answer from memory alone.\n\nStrategy:\n1. Start with web_search — it queries your selected primary source — for initial exploration.\n2. For complex multi-faceted questions, use research_subtopic to investigate specific aspects in parallel (pass 2-5 focused, non-overlapping questions. Batches of 6-10 are queued; larger batches are rejected without doing work).\n3. Rely on search snippets — full-page fetching is disabled for this run.\n4. When available, use specialized search_[engine] tools for domain-specific searches (search_arxiv for science, search_pubmed for medical, etc.).\n5. When you have enough information, provide a comprehensive answer citing sources as [1], [2], etc.\n\nPUBLIC-ONLY MODE: local search tools (library, collection, paperless) are not available in this session.\n",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "system",
+      "name": null,
+      "id": null
+    },
+    {
+      "content": "Write a short answer that is grounded only in the retrieved Wikipedia content, with numbered citations to the retrieved article.",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "human",
+      "name": null,
+      "id": "0d1df733-5382-4e9d-8ef5-61ec233be922"
+    },
+    {
+      "content": "",
+      "additional_kwargs": {
+        "refusal": null
+      },
+      "response_metadata": {
+        "token_usage": {
+          "completion_tokens": 529,
+          "prompt_tokens": 487,
+          "total_tokens": 1016,
+          "completion_tokens_details": {
+            "accepted_prediction_tokens": null,
+            "audio_tokens": null,
+            "reasoning_tokens": 472,
+            "rejected_prediction_tokens": null,
+            "text_tokens": null
+          },
+          "prompt_tokens_details": {
+            "audio_tokens": null,
+            "cache_write_tokens": null,
+            "cached_tokens": 0,
+            "image_tokens": null,
+            "text_tokens": null
+          }
+        },
+        "model_provider": "openai",
+        "model_name": "glm-5.3-flash",
+        "system_fingerprint": null,
+        "id": "b55bf2cc-7947-407f-83c0-75806d071864",
+        "finish_reason": "tool_calls",
+        "logprobs": null
+      },
+      "type": "ai",
+      "name": null,
+      "id": "lc_run--01a0dc59-d0b9-77a2-9a83-63b9db1568a6-0",
+      "tool_calls": [
+        {
+          "name": "research_subtopic",
+          "args": {
+            "subtopics": [
+              "What is Wikipedia and how does it operate (model, editing, volunteers)?",
+              "What are Wikipedia's core editorial policies (verifiability, no original research, neutral point of view) and main criticisms?"
+            ]
+          },
+          "id": "call_-7227398479822192385",
+          "type": "tool_call"
+        }
+      ],
+      "invalid_tool_calls": [],
+      "usage_metadata": {
+        "input_tokens": 487,
+        "output_tokens": 529,
+        "total_tokens": 1016,
+        "input_token_details": {
+          "cache_read": 0
+        },
+        "output_token_details": {
+          "reasoning": 472
+        }
+      }
+    },
+    {
+      "content": "## What is Wikipedia and how does it operate (model, editing, volunteers)?\n## What Wikipedia Is\n\nWikipedia is a free, web-based, multilingual encyclopedia that anyone can edit. It was launched on January 15, 2001, by Jimmy Wales and Larry Sanger, and is operated by the Wikimedia Foundation, a U.S.-based 501(c)(3) nonprofit [1][2]. It runs on MediaWiki, an open-source wiki platform, and its content is released under free licenses (Creative Commons Attribution-ShareAlike), meaning text and images can be reused and adapted with attribution [1][2].\n\n**Scale (as of 2025):** Wikipedia exists in 300+ language editions (roughly 320+ active), containing over 60 million articles in total; the English edition alone has nearly 7 million articles [1][3].\n\n## Operating Model\n\n- **Nonprofit, ad-free:** Wikipedia carries no advertising. It is funded primarily by millions of small individual donations, supplemented by grants and institutional gifts, managed by the Wikimedia Foundation [2]. The Foundation hosts the servers and develops software, but does not write or control editorial content.\n- **Community governance:** Content decisions are made by the volunteer community, not the Foundation. Policies are developed by consensus, guided by the \"Five Pillars\": Wikipedia is an encyclopedia; articles must maintain a neutral point of view; content is free to reuse; editors should be civil; and rules are not rigid [1][4].\n- **Core content policies:** Verifiability (claims must be attributable to published reliable sources) and \"no original research\" — editors cannot publish their own findings or interpretations [4].\n\n## Editing\n\n- **Open participation:** Anyone with internet access may edit most articles, even without an account; registered editors gain additional tools and privileges over time [1][4].\n- **Transparency tools:** Every page keeps a full revision history; \"talk\" pages allow discussion of content; watchlists and recent-changes feeds let editors monitor changes. Automated bots (e.g., ClueBot NG) help detect and revert obvious vandalism [1][4].\n- **Quality control:** Disputes are resolved through community discussion, and persistent problems can escalate to administrators or, in English Wikipedia's case, the Arbitration Committee — all volunteers [4].\n\n## Volunteers\n\nWikipedia's content is produced entirely by volunteers — no one is paid to write articles. There are roughly 250,000+ active editors per month across all language editions (editors with 5+ actions), with tens of thousands on English Wikipedia [3]. Roles are earned through community trust: ordinary editors, administrators, bureaucrats, stewards, and functionaries such as oversighters. A global network of affiliated chapters and user groups supports outreach and recruitment [2][4].\n\n## Reliability Context\n\nA landmark 2005 *Nature* study found English Wikipedia's science articles comparable in accuracy to Encyclopædia Britannica, though quality varies by topic and article maturity [5].\n\n---\n\n**Sources**\n[1] Wikipedia, \"Wikipedia\" and \"About Wikipedia\" (wikipedia.org)\n[2] Wikimedia Foundation, \"Our Projects\" / FAQ (wikimediafoundation.org)\n[3] Wikimedia Statistics and Wikipedia \"List of Wikipedias\" (stats.wikimedia.org)\n[4] Wikipedia, \"Five Pillars,\" \"Verifiability,\" \"No Original Research,\" \"Administrators\"\n[5] Giles, J., \"Internet encyclopaedias go head to head,\" *Nature* 438 (2005)\n\n---\n\n## What are Wikipedia's core editorial policies (verifiability, no original research, neutral point of view) and main criticisms?\n## Wikipedia's Core Editorial Policies\n\nWikipedia's content is governed by three \"core content policies,\" summarized in its \"Five Pillars\" [1][4]:\n\n**1. Neutral Point of View (NPOV)** [1]\n- The oldest policy, articulated by co-founder Larry Sanger in 2001. Articles must represent all significant published views \"fairly, proportionately, and as far as possible without editorial bias.\"\n- Key sub-principle: **due weight** — views are covered in proportion to their prominence in reliable sources, not given equal airtime (so fringe theories must not be presented as equivalent to mainstream consensus).\n\n**2. Verifiability (V)** [2]\n- \"The threshold for inclusion in Wikipedia is verifiability, not truth.\" Material must be attributable to published, reliable sources with inline citations.\n- The stricter **Biographies of Living Persons** policy requires unsourced contentious claims about living people to be removed on sight [2].\n\n**3. No Original Research (NOR)** [3]\n- Editors may not add unpublished analysis, arguments, or novel interpretations — including **synthesis** (combining sources to imply a conclusion none of them states). Everything must come from published sources.\n\n**Enforcement mechanisms:** talk-page consensus, dispute resolution (requests for comment, mediation, the Arbitration Committee), page protection/semi-protection, and deprecation of unreliable sources at the Reliable Sources Noticeboard; the Wikimedia Foundation can take \"office actions\" in extreme cases [1][4].\n\n## Main Criticisms\n\n**Accuracy and vandalism**\n- The 2005 *Nature* study found Wikipedia's science articles averaged ~4 errors vs. Britannica's ~3; Britannica disputed the methodology [5][6].\n- The 2005 Seigenthaler affair — a false biography linking him to the Kennedy assassinations persisted for months — triggered major policy tightening [7]. Long-lived hoaxes (e.g., the fake deity \"Jar'Edo Wens,\" undetected for ~2.5 years) recur [8].\n- A 2014 *PLOS ONE* study found ~10% of Wikipedia's articles on widely prescribed drugs contained factual errors against textbooks [9].\n\n**Systemic and demographic bias**\n- Editor surveys consistently find contributors are roughly 80–90% male and concentrated in the Global North, producing documented content gaps (women, Africa, Global South) — a bias Wikipedia itself acknowledges [10].\n\n**Ideological bias disputes**\n- Greenstein & Zhu found early political articles leaned left but became more balanced over time [11]; the 2024 Manhattan Institute report by Rozado claimed measurable left-leaning sentiment [12].\n- Co-founder Larry Sanger has become a prominent critic, arguing NPOV is no longer honored [13]. In 2025, the U.S. House Oversight Committee opened an inquiry into alleged bias in Wikipedia's Israel–Palestine coverage [14], and the ADL published a critical report after editors deprecated it as a source on antisemitism in 2024 [15].\n\n**Governance, conflicts of interest, and manipulation**\n- Undisclosed paid editing (the 2013 \"Wiki-PR\" sockpuppet scandal) [16]; edit wars on contentious topics; harassment (the 2014–15 Gamergate controversy); and state-influence concerns, including the Foundation's 2021 ban of seven editors over infiltration of the Chinese-language community [17].\n\n**Structural/epistemic critiques**\n- \"Verifiability, not truth\" can enshrine errors present in reliable sources; NPOV can produce \"false balance\"; NOR prevents experts from correcting errors without published citations; and citation rot is severe — a 2016 study found roughly half of external links in science articles dead [18].\n\n## References\n\n[1] Wikipedia: Neutral Point of View (policy). [2] Wikipedia: Verifiability (policy); Wikipedia: Biographies of Living Persons. [3] Wikipedia: No Original Research (policy). [4] Wikipedia: Five Pillars. [5] Giles, J., *Nature* 438 (2005): 900–901. [6] Britannica, \"Fatally Flawed\" (2006) and Nature's rebuttal. [7] Seigenthaler, J., \"A False Wikipedia 'Biography,'\" *USA Today* (Nov. 29, 2005). [8] Sydney Morning Herald coverage of the Jar'Edo Wens hoax (2015). [9] Hasty et al., *PLOS ONE* (2014). [10] WMF Community Insights / UNU-Merit editor surveys; Wikipedia: Systemic bias. [11] Greenstein & Zhu, *Management Science* (2018). [12] Rozado, D., Manhattan Institute (2024). [13] Sanger, L., \"Wikipedia Is Badly Biased\" (2020). [14] House Oversight Committee letter to Wikimedia Foundation (Aug. 2025). [15] ADL, \"A Free Pass for Hate\" (2025); English Wikipedia RfC deprecating the ADL (2024). [16] WMF sockpuppet bans re: Wiki-PR (2013). [17] WMF ban of seven editors (Sept. 2021). [18] Douglass et al., \"Citation Needed\" (2016).",
+      "additional_kwargs": {},
+      "response_metadata": {},
+      "type": "tool",
+      "name": "research_subtopic",
+      "id": "278c34e6-98a7-4ae6-98dd-14f407624d2e",
+      "tool_call_id": "call_-7227398479822192385",
+      "artifact": null,
+      "status": "success"
+    }
+  ]
+]

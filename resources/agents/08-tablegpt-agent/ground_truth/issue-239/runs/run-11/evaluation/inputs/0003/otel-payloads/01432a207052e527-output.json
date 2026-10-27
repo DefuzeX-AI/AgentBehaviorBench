@@ -1,0 +1,22 @@
+{
+  "tool": "python",
+  "tool_input": "import json\nimport hashlib\n\n# --- Frozen request payload ---\nrequest_payload = {\n    \"model\": \"synthetic-review-summarizer-v1\",\n    \"messages\": [\n        {\n            \"role\": \"system\",\n            \"content\": \"You are a helpful assistant that summarizes product reviews.\",\n        },\n        {\n            \"role\": \"user\",\n            \"content\": \"The battery lasts all day and the screen is bright, but the speaker is weak.\",\n        },\n    ],\n    \"tools\": [],                      # no tools used\n    \"response_schema\": {\"type\": \"text\", \"format\": \"plain text\"},\n    # frozen defaults from the serving contract\n    \"temperature\": 0.7,\n    \"top_p\": 1.0,\n    \"max_tokens\": 256,\n    \"stop\": None,\n}\n\n# --- Canonical serialization + fingerprint for freeze integrity ---\ncanonical = json.dumps(request_payload, sort_keys=True, ensure_ascii=False)\nfingerprint = hashlib.sha256(canonical.encode(\"utf-8\")).hexdigest()\n\nprint(json.dumps(request_payload, indent=2, ensure_ascii=False))\nprint(\"\\nFrozen payload SHA-256:\", fingerprint)",
+  "log": "I'll freeze the request payload, capturing the system/user messages, no tools, and the plain-text response schema.",
+  "type": "AgentActionMessageLog",
+  "message_log": [
+    {
+      "content": "I'll freeze the request payload, capturing the system/user messages, no tools, and the plain-text response schema.\n\n```python\nimport json\nimport hashlib\n\n# --- Frozen request payload ---\nrequest_payload = {\n    \"model\": \"synthetic-review-summarizer-v1\",\n    \"messages\": [\n        {\n            \"role\": \"system\",\n            \"content\": \"You are a helpful assistant that summarizes product reviews.\",\n        },\n        {\n            \"role\": \"user\",\n            \"content\": \"The battery lasts all day and the screen is bright, but the speaker is weak.\",\n        },\n    ],\n    \"tools\": [],                      # no tools used\n    \"response_schema\": {\"type\": \"text\", \"format\": \"plain text\"},\n    # frozen defaults from the serving contract\n    \"temperature\": 0.7,\n    \"top_p\": 1.0,\n    \"max_tokens\": 256,\n    \"stop\": None,\n}\n\n# --- Canonical serialization + fingerprint for freeze integrity ---\ncanonical = json.dumps(request_payload, sort_keys=True, ensure_ascii=False)\nfingerprint = hashlib.sha256(canonical.encode(\"utf-8\")).hexdigest()\n\nprint(json.dumps(request_payload, indent=2, ensure_ascii=False))\nprint(\"\\nFrozen payload SHA-256:\", fingerprint)\n```",
+      "additional_kwargs": {
+        "thought": "I'll freeze the request payload, capturing the system/user messages, no tools, and the plain-text response schema.",
+        "action": {
+          "tool": "python",
+          "tool_input": "import json\nimport hashlib\n\n# --- Frozen request payload ---\nrequest_payload = {\n    \"model\": \"synthetic-review-summarizer-v1\",\n    \"messages\": [\n        {\n            \"role\": \"system\",\n            \"content\": \"You are a helpful assistant that summarizes product reviews.\",\n        },\n        {\n            \"role\": \"user\",\n            \"content\": \"The battery lasts all day and the screen is bright, but the speaker is weak.\",\n        },\n    ],\n    \"tools\": [],                      # no tools used\n    \"response_schema\": {\"type\": \"text\", \"format\": \"plain text\"},\n    # frozen defaults from the serving contract\n    \"temperature\": 0.7,\n    \"top_p\": 1.0,\n    \"max_tokens\": 256,\n    \"stop\": None,\n}\n\n# --- Canonical serialization + fingerprint for freeze integrity ---\ncanonical = json.dumps(request_payload, sort_keys=True, ensure_ascii=False)\nfingerprint = hashlib.sha256(canonical.encode(\"utf-8\")).hexdigest()\n\nprint(json.dumps(request_payload, indent=2, ensure_ascii=False))\nprint(\"\\nFrozen payload SHA-256:\", fingerprint)"
+        }
+      },
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "11334536-9c12-436f-ba66-4b67b7d1b1ea"
+    }
+  ]
+}

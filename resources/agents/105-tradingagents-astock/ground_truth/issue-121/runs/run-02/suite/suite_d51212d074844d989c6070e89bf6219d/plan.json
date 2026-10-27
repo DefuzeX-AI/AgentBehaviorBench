@@ -1,0 +1,80 @@
+{
+  "schema": "abb.suite.plan.v1",
+  "suite_id": "suite_d51212d074844d989c6070e89bf6219d",
+  "created_at": "2026-10-22T03:06:25.303793+00:00",
+  "agents": [
+    {
+      "agent_id": "tradingagents-astock",
+      "path": "/home/wy/projects/DefuzeX/test/temp/src_review_pilot/overlay/tradingagents-astock/project/resources/agents/01-tradingagents-astock",
+      "enabled": true,
+      "status": "adapting",
+      "framework": "langgraph",
+      "source": "https://github.com/simonlin1212/TradingAgents-astock",
+      "case_count": 1,
+      "requirement_path": "/home/wy/projects/DefuzeX/test/temp/src_review_pilot/overlay/tradingagents-astock/project/resources/agents/01-tradingagents-astock/requirement.md",
+      "max_steps": 1,
+      "source_sha256": "16541502821e84d189a7e48f1fcc1c9e3d2d3fb5bb41cbe8cbefbf0a76087fd3",
+      "requirement_sha256": "39bd44334b1fb41bf5a967326e53b2ebbed3bc220ddae627418b591ed0e3eeae"
+    }
+  ],
+  "configuration": {
+    "sdk": "kuma",
+    "sdk_options": {
+      "case_collection": "/home/wy/projects/DefuzeX/test/temp/src_review_pilot/out/p326_run_custom_case/tradingagents-astock/srp-tradingagents-astock-h1-northbound-past-date-v1/20261022T025243Z/run-02/collection/case-collection.json",
+      "output": "/home/wy/projects/DefuzeX/test/temp/src_review_pilot/overlay/tradingagents-astock/project/results/observe",
+      "timeout": 3600.0,
+      "max_steps": 1
+    },
+    "model": "deepseek-chat",
+    "model_override": null,
+    "agent_models": {
+      "tradingagents-astock": {
+        "mode": "replace",
+        "routing": {
+          "targets": {
+            "default": {
+              "provider_id": "deepseek",
+              "model": "deepseek-chat",
+              "base_url": "https://api.deepseek.com",
+              "target_plugin": "compatible-json",
+              "endpoint_paths": {
+                "/chat/completions": "/chat/completions",
+                "/responses": "/responses",
+                "/messages": "/anthropic/v1/messages"
+              },
+              "headers": {}
+            }
+          },
+          "inputs": {
+            "default": [
+              "text",
+              "image"
+            ]
+          },
+          "rules": [],
+          "explicit": false
+        }
+      }
+    },
+    "sdk_configuration": {},
+    "model_provider": "deepseek",
+    "trace_max_bytes": 262144,
+    "workers": 1,
+    "judge_workers": 2,
+    "judge_queue_capacity": 8,
+    "retry_policy": {
+      "max_retries": 0,
+      "initial_delay": 5.0,
+      "multiplier": 3.0,
+      "maximum_delay": 60.0,
+      "jitter": 0.1
+    },
+    "sdk_distributions": {
+      "kuma-defuzex": "0.3.6"
+    },
+    "provider_base_url": "https://api.deepseek.com",
+    "runtime_source_sha256": "2e477632d425ce7b5260b4da8de1e029595429a87db3e3346f5e682791aebcc1"
+  },
+  "provenance_sha256": "6cf92075f16033e63dba558ab7ec15867e1228abee6f92361f406753dabbfe8e",
+  "result_log_path": "/home/wy/projects/DefuzeX/test/temp/src_review_pilot/overlay/tradingagents-astock/project/results/suites/suite_d51212d074844d989c6070e89bf6219d/events.json"
+}

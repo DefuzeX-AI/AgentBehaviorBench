@@ -1,0 +1,3 @@
+{
+  "command": "PYTHONPATH=/home/agent/workspace/.pydeps python3 << 'EOF'\nimport json\nfrom shapely.geometry import shape\n\nwith open('/home/agent/workspace/invalid_polygon.geojson') as f:\n    gj = json.load(f)\n\ngeom = shape(gj['features'][0]['geometry'])\nprint(\"geometry type :\", geom.geom_type)\nprint(\"is_valid      :\", geom.is_valid)\nprint(\"explain       :\", geom.explain_validity())\nprint(\"ring closed   :\", geom.exterior.is_ring, \"| ring pts:\", len(geom.exterior.coords))\nEOF"
+}

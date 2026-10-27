@@ -1,0 +1,92 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_8508b19a8f004798acd974ec8808ff04",
+  "case_id": "case_f7366d7c24ba41e8afb9c233f6038354",
+  "input_id": "step-6",
+  "spans": [
+    {
+      "trace_id": "7e4a655575e1001cd2ec3b28af7a574c",
+      "span_id": "d7e60181b7e19552",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791919524999711849,
+      "end_time_unix_nano": 1791919539044072436,
+      "duration_nano": 14044360587,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791919525002919155,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1791919531940457684,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791919539037856949,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "7e4a655575e1001cd2ec3b28af7a574c",
+      "span_id": "f6dbfcf1425019db",
+      "parent_span_id": "d7e60181b7e19552",
+      "name": "cd /home/agent/workspace && ./broken; echo \"EXIT_STATUS=$?\"",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791919531899679646,
+      "end_time_unix_nano": 1791919531975253918,
+      "duration_nano": 75574272,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "cd /home/agent/workspace && ./broken; echo \"EXIT_STATUS=$?\"",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /home/agent/workspace && ./broken; echo \"EXIT_STATUS=$?\""
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "**Command:**\n```bash\ncd /home/agent/workspace && ./broken; echo \"EXIT_STATUS=$?\"\n```\n\n**Output:**\n```\nHello, World!\nEXIT_STATUS=0\n```\n\n**Status:** Command succeeded with exit code 0",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_ec81cad1377c48fab77944ee"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

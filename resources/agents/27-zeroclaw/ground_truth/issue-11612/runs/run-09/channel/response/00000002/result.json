@@ -1,0 +1,55 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "fc22d3190a4f459aa18d46a1800354d5",
+  "case_id": "case_88e24974f1bb4eaa9f2ce0190b3fcc51",
+  "input_id": "step-3",
+  "invocation_id": "fc22d3190a4f459aa18d46a1800354d5",
+  "agent_id": "zeroclaw",
+  "status": "succeeded",
+  "output": "Both populated ✅\n\n```json\n// source.json\n{\"name\": \"Alice\", \"age\": 30, \"city\": \"New York\"}\n\n// target.json\n{\"name\": \"Alice\", \"age\": 31, \"country\": \"USA\"}\n```\n\nNice test data — it hits three distinct sync cases at once:\n\n- `name` — **identical** in both (no-op)\n- `age` — **conflicting values** (30 vs 31, will need a resolution strategy)\n- `city` / `country` — **each exists in only one file** (add/propagate decisions)\n\nReady to run a sync against rule R1 whenever you want. Just say the word and I'll implement the engine.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "zeroclaw-acp",
+        "title": "ZeroClaw ACP",
+        "version": "0.8.5"
+      },
+      "_meta": {
+        "zeroclaw": {
+          "defaultModel": "glm-5.3-flash",
+          "maxSessions": 10,
+          "sessionTimeoutSecs": 3600
+        }
+      }
+    },
+    "pid": 10,
+    "session": {
+      "sessionId": "1017edd1-c6f0-4a25-afba-e161cae3a4e6"
+    },
+    "session_id": "1017edd1-c6f0-4a25-afba-e161cae3a4e6",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "return_values": {
+    "output": "<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\">import sqlite3, os, json\n\np = \"./abb-tablegpt-0bueqplp/profile/history.sqlite\"\nprint(\"size:\", os.path.getsize(p))\ncon = sqlite3.connect(p)\ntabs = con.execute(\"SELECT name FROM sqlite_master WHERE type='table'\").fetchall()\nprint(\"tables:\", tabs)\nfor (t,) in tabs:\n    try:\n        rows = con.execute(f\"SELECT * FROM {t} LIMIT 3\").fetchall()\n        cols = [d[0] for d in con.execute(f\"SELECT * FROM {t} LIMIT 1\").description]\n        print(f\"\\n{t} cols: {cols}\\n sample: {str(rows)[:600]}\")\n    except Exception as e:\n        print(t, \"err\", e)\n</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>"
+  },
+  "log": "<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\">import sqlite3, os, json\n\np = \"./abb-tablegpt-0bueqplp/profile/history.sqlite\"\nprint(\"size:\", os.path.getsize(p))\ncon = sqlite3.connect(p)\ntabs = con.execute(\"SELECT name FROM sqlite_master WHERE type='table'\").fetchall()\nprint(\"tables:\", tabs)\nfor (t,) in tabs:\n    try:\n        rows = con.execute(f\"SELECT * FROM {t} LIMIT 3\").fetchall()\n        cols = [d[0] for d in con.execute(f\"SELECT * FROM {t} LIMIT 1\").description]\n        print(f\"\\n{t} cols: {cols}\\n sample: {str(rows)[:600]}\")\n    except Exception as e:\n        print(t, \"err\", e)\n</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+  "type": "AgentFinish"
+}

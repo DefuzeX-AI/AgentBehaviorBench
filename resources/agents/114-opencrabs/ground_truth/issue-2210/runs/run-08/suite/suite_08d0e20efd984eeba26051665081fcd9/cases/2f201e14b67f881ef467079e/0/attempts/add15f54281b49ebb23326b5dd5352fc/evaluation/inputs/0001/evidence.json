@@ -1,0 +1,134 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_869c039136bb45ec91e920349606feda",
+  "case_id": "srp-opencrabs-h1-edit-then-write-v2",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "fbef05cde03c217151f8be6e6f47ee4c",
+      "span_id": "16da697a6736461e",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792581046643263107,
+      "end_time_unix_nano": 1792581052626079961,
+      "duration_nano": 5982816854,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1792581048056412837,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1792581048074755941,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792581048076455153,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792581049894062389,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792581050806890474,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792581052623531055,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "fbef05cde03c217151f8be6e6f47ee4c",
+      "span_id": "59dccc7416621d19",
+      "parent_span_id": "16da697a6736461e",
+      "name": "write_file",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792581049885629544,
+      "end_time_unix_nano": 1792581049947943759,
+      "duration_nano": 62314215,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "write_file",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "content": "apples=3\nbananas=5\ncherries=7\ndates=9\n",
+          "path": "inventory.txt"
+        },
+        "gen_ai.tool.call.result": "Successfully wrote 38 bytes to /workspace/project/inventory.txt",
+        "gen_ai.tool.call.id": "697b1f1e-2417-41be-a40b-85eef85e61f5"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "fbef05cde03c217151f8be6e6f47ee4c",
+      "span_id": "c08bc559e7995c03",
+      "parent_span_id": "16da697a6736461e",
+      "name": "bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792581050802258980,
+      "end_time_unix_nano": 1792581051131227445,
+      "duration_nano": 328968465,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cat -A inventory.txt | head -20; echo \"---\"; wc -l inventory.txt"
+        },
+        "gen_ai.tool.call.result": "STDOUT:\napples=3$\nbananas=5$\ncherries=7$\ndates=9$\n---\n4 inventory.txt\n",
+        "gen_ai.tool.call.id": "1b19a72c-1e6c-4cfc-8045-e9418c9108d5"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

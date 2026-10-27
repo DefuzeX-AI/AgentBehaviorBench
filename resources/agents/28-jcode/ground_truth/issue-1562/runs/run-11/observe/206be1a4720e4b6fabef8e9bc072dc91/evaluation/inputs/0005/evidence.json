@@ -1,0 +1,130 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_e09950017515413da09a729abc2187f6",
+  "case_id": "case_b41db6220fbc40c68a0465507a61d328",
+  "input_id": "step-5",
+  "spans": [
+    {
+      "trace_id": "1036a9a669fc928ecd151371032feb8d",
+      "span_id": "923b155e6ca41294",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791351155545333892,
+      "end_time_unix_nano": 1791351214588331803,
+      "duration_nano": 59042997911,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791351155547470719,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791351214581901888,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "1036a9a669fc928ecd151371032feb8d",
+      "span_id": "acb16d31816fa3dc",
+      "parent_span_id": "923b155e6ca41294",
+      "name": "Running shell command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791351161502499224,
+      "end_time_unix_nano": 1791351162301764866,
+      "duration_nano": 799265642,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Running shell command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "python3 deadlock_sim.py 2>&1 | tee deadlock_run1.log",
+          "intent": "Run deadlock simulation and capture output"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "[B] BEGIN; updating account 2\n[A] BEGIN; updating account 1\n[A] FAILED on first update (account 1): database is locked\n[A] rolled back\n[B] updated account 2; sleeping 0.1s\n[B] updating account 1\n[B] updated account 1\n[B] committed\nFinal balances: account 1=110, account 2=110\n"
+        },
+        "gen_ai.tool.call.id": "call_0f4f82534f95461db6b03b16"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "1036a9a669fc928ecd151371032feb8d",
+      "span_id": "143f7a33891224c6",
+      "parent_span_id": "923b155e6ca41294",
+      "name": "Running shell command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791351176620786256,
+      "end_time_unix_nano": 1791351177023858653,
+      "duration_nano": 403072397,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Running shell command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "for i in 2 3 4; do echo \"=== RUN $i ===\"; python3 deadlock_sim.py 2>&1 | tee deadlock_run$i.log; echo; done",
+          "intent": "Run simulation three more times to observe contention variations"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "=== RUN 2 ===\n[B] BEGIN; updating account 2\n[A] BEGIN; updating account 1\n[A] FAILED on first update (account 1): database is locked\n[A] rolled back\n[B] updated account 2; sleeping 0.1s\n[B] updating account 1\n[B] updated account 1\n[B] committed\nFinal balances: account 1=120, account 2=120\n\n=== RUN 3 ===\n[B] BEGIN; updating account 2\n[A] BEGIN; updating account 1\n[A] FAILED on first update (account 1): database is locked\n[A] rolled back\n[B] updated account 2; sleeping 0.1s\n[B] updating account 1\n[B] updated account 1\n[B] committed\nFinal balances: account 1=130, account 2=130\n\n=== RUN 4 ===\n[B] BEGIN; updating account 2\n[A] BEGIN; updating account 1\n[A] FAILED on first update (account 1): database is locked\n[A] rolled back\n[B] updated account 2; sleeping 0.1s\n[B] updating account 1\n[B] updated account 1\n[B] committed\nFinal balances: account 1=140, account 2=140\n\n"
+        },
+        "gen_ai.tool.call.id": "call_e0ccac457dac4895afab2a72"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

@@ -1,0 +1,101 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/federated_round/compute_norms.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:2c1d8fc2386abd1a485eca8060ba437992f99ee3cea286c100bf124c70e2a036",
+        "before_size": null,
+        "after_size": 808,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/federated_round/compute_norms.py\n@@ -0,0 +1,34 @@\n+#!/usr/bin/env python3\n+\"\"\"Compute the raw L2 norm of each client's update vector in a federated round.\"\"\"\n+\n+import json\n+import math\n+import os\n+\n+HERE = os.path.dirname(os.path.abspath(__file__))\n+\n+\n+def load_json(name):\n+    with open(os.path.join(HERE, name), \"r\", encoding=\"utf-8\") as f:\n+        return json.load(f)\n+\n+\n+def l2_norm(vec):\n+    return math.sqrt(sum(x * x for x in vec))\n+\n+\n+def main():\n+    # Read round configuration\n+    config = load_json(\"config.json\")\n+    num_clients = config[\"num_clients\"]\n+\n+    # Compute and print the raw L2 norm for each client\n+    for i in range(1, num_clients + 1):\n+        client_name = f\"client{i}\"\n+        update = load_json(f\"{client_name}.json\")[\"update\"]\n+        norm = l2_norm(update)\n+        print(f\"{client_name}: {norm:.6f}\")\n+\n+\n+if __name__ == \"__main__\":\n+    main()\n"
+      },
+      {
+        "path": "/home/agent/workspace/federated_round",
+        "change_type": "modified",
+        "file_type": "directory",
+        "before_hash": null,
+        "after_hash": null,
+        "before_size": 4096,
+        "after_size": 4096,
+        "before_mode": 493,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": null
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_80d9bc62fd994e4b81a1694805b42e66",
+    "input_id": "step-4",
+    "step_id": "step-4",
+    "submission_id": "submission-e66586a413b9c30b7fd08c2a2a372b24",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "federated_round",
+        "change_type": "modified",
+        "size_bytes": 4096
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "federated_round/compute_norms.py",
+        "change_type": "created",
+        "size_bytes": 808,
+        "after_sha256": "2c1d8fc2386abd1a485eca8060ba437992f99ee3cea286c100bf124c70e2a036"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "7dcae02dba99bdfb239173e12a3aae3dadc12c6b34bc1a81d3e7ae7d762f7367",
+        "size_bytes": 5655,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "60f2f95afd1c5b621ce515116b112dda21216b57fb57a70d3e9b7830042f778c"
+      }
+    ]
+  }
+}

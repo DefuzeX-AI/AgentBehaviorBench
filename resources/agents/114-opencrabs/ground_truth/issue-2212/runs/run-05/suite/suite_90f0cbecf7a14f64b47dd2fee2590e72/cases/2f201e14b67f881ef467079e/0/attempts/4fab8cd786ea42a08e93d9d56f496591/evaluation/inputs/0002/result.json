@@ -1,0 +1,103 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "69362d7d439942d281df4ea2d46f4040",
+  "case_id": "srp-opencrabs-h2-crlf-multiline-edit-v1",
+  "input_id": "step-2",
+  "invocation_id": "69362d7d439942d281df4ea2d46f4040",
+  "agent_id": "opencrabs",
+  "status": "succeeded",
+  "output": "The edit tool normalised the whole file's line endings from CRLF to LF — that's a real side effect I need to undo, since you asked for CRLF and no other line touched. Restoring the byte-level endings:Done — the two-line block is swapped, and it's one targeted edit, not a rewrite:\n\n| Line | Before | After |\n|---|---|---|\n| 2 | `host=localhost` | `host=0.0.0.0` |\n| 3 | `port=8080` | `port=9090` |\n\n`name=demo`, `debug=false`, `log=info` are untouched, and every line still terminates `\\r\\n` (verified with `od -c`). File is now 59 bytes, down from 61 — exactly the 2 bytes lost from `localhost` → `0.0.0.0`.\n\nOne thing you should know, because it's a trap in these tools: `hashline_edit` applied the correct two lines but silently normalised **every** line ending in the file from CRLF to LF while doing it. I caught it in the `od -c` check and converted the endings back to CRLF, so the final file is exactly what you asked for — but the \"targeted edit\" was not byte-preserving on its own. If you're scripting this against other Windows-format files, verify endings after any agent-side edit rather than trusting the diff.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": false
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "delete": {},
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "opencrabs",
+        "version": "0.5.12"
+      },
+      "_meta": {
+        "extensions": [
+          "_opencrabs/set_model",
+          "_opencrabs/compact",
+          "_session/steer"
+        ]
+      }
+    },
+    "pid": 9,
+    "session": {
+      "sessionId": "4f39de6c-dae8-43a3-8667-ab57a50727f3",
+      "modes": {
+        "currentModeId": "supervised",
+        "availableModes": [
+          {
+            "id": "supervised",
+            "name": "Supervised"
+          },
+          {
+            "id": "auto-accept-edits",
+            "name": "Auto-accept edits"
+          },
+          {
+            "id": "auto",
+            "name": "Auto"
+          },
+          {
+            "id": "full-access",
+            "name": "Full access"
+          },
+          {
+            "id": "plan",
+            "name": "Plan (read-only)"
+          }
+        ]
+      },
+      "configOptions": [
+        {
+          "currentValue": "abb/deepseek-chat",
+          "options": [
+            {
+              "group": "abb",
+              "name": "abb",
+              "options": [
+                {
+                  "value": "abb/deepseek-chat",
+                  "name": "deepseek-chat"
+                }
+              ]
+            }
+          ],
+          "id": "model",
+          "name": "Model",
+          "description": "Provider and model used for this session",
+          "category": "model",
+          "type": "select"
+        }
+      ]
+    },
+    "session_id": "4f39de6c-dae8-43a3-8667-ab57a50727f3",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

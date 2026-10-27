@@ -1,0 +1,22 @@
+{
+  "messages": [
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "```pycon\n=====================================================ARRIVAL LOG======================================================\n arrival event_id pid    rev event_time wm_before wm_after      window  behind_wm                       action\n       1  evt-003  P3   7.25   00:02:00         — 00:01:30 00:02–00:04      False          in-order (buffered)\n       2  evt-001  P1  10.00   00:00:30  00:01:30 00:01:30 00:00–00:02       True behind WM, window still open\n       3  evt-007  P1 -10.00   00:06:00  00:01:30 00:05:30 00:06–00:08      False          in-order (buffered)\n       4  evt-002  P2  25.50   00:01:15  00:05:30 00:05:30 00:00–00:02       True     LATE -> emit revision #2\n       5  evt-005  P2   4.99   00:04:05  00:05:30 00:05:30 00:04–00:06       True behind WM, window still open\n       7  evt-004  P1  12.00   00:03:20  00:05:30 00:05:30 00:02–00:04       True     LATE -> emit revision #2\n       8  evt-010  P3  21.10   00:08:55  00:05:30 00:08:25 00:08–00:10      False          in-order (buffered)\n       9  evt-006  P3   8.75   00:05:10  00:08:25 00:08:25 00:04–00:06       True     LATE -> emit revision #2\n      10  evt-009  P3   3.50   00:07:30  00:08:25 00:08:25 00:06–00:08       True     LATE -> emit revision #2\n      11  evt-011  P2   6.40   00:09:40  00:08:25 00:09:10 00:08–00:10      False          in-order (buffered)\n      12  evt-008  P2  15.00   00:06:45  00:09:10 00:09:10 00:06–00:08       True     LATE -> emit revision #3\n\n====================================================PANE EMISSIONS====================================================\n at  window_lbl  pane                  kind                      trigger  value  n_elems                     elems\n  3 00:00–00:02     1               ON-TIME             WM >= window_end +10.00        1                   evt-001\n  3 00:02–00:04     1               ON-TIME             WM >= window_end  +7.25        1                   evt-003\n  4 00:00–00:02     2 LATE (retract+update)                 late element +35.50        2          evt-001, evt-002\n  7 00:02–00:04     2 LATE (retract+update)                 late element +19.25        2          evt-003, evt-004\n  8 00:00–00:02     2                 FINAL WM >= end + allowed_lateness +35.50        2          evt-001, evt-002\n  8 00:04–00:06     1               ON-TIME             WM >= window_end  +4.99        1                   evt-005\n  8 00:06–00:08     1               ON-TIME             WM >= window_end -10.00        1                   evt-007\n  9 00:04–00:06     2 LATE (retract+update)                 late element +13.74        2          evt-005, evt-006\n 10 00:06–00:08     2 LATE (retract+update)                 late element  -6.50        2          evt-007, evt-009\n 11 00:02–00:04     2                 FINAL WM >= end + allowed_lateness +19.25        2          evt-003, evt-004\n 12 00:06–00:08     3 LATE (retract+update)                 late element  +8.50        3 evt-007, evt-009, evt-008\nEOI 00:04–00:06     2                 FINAL WM >= end + allowed_lateness +13.74        2          evt-005, evt-006\nEOI 00:06–00:08     3                 FINAL WM >= end + allowed_lateness  +8.50        3 evt-007, evt-009, evt-008\nEOI 00:08–00:10     1               ON-TIME             WM >= window_end +27.50        2          evt-010, evt-011\nEOI 00:08–00:10     1                 FINAL WM >= end + allowed_lateness +27.50        2          evt-010, evt-011\n\nfinal (authoritative) sum per window:\n  [00:00, 00:02)    +35.50\n  [00:02, 00:04)    +19.25\n  [00:04, 00:06)    +13.74\n  [00:06, 00:08)     +8.50\n  [00:08, 00:10)    +27.50\n                   TOTAL   +104.49  (equals deduped grand total)\n\n```"
+        }
+      ],
+      "additional_kwargs": {
+        "parent_id": "ce944182-d045-4868-912b-478c6bbfb590"
+      },
+      "response_metadata": {},
+      "type": "tool",
+      "name": "python",
+      "id": "7a300764-3838-4c8e-aac8-a527ed41d316",
+      "tool_call_id": "8a8ee479-df20-4ec2-a040-cbb5a953059d",
+      "artifact": [],
+      "status": "success"
+    }
+  ]
+}

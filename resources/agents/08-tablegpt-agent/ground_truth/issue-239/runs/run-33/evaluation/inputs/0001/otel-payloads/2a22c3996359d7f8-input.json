@@ -1,0 +1,3 @@
+{
+  "query": "import site, sys, glob, os\n\n# Candidate user site-packages locations\ncandidates = []\nfor p in [site.getusersitepackages(), \"/tmp/.local/lib\"]:\n    candidates.append(p)\n\n# Also search common python version dirs under /tmp/.local/lib\ncandidates += glob.glob(\"/tmp/.local/lib/python*/site-packages\")\ncandidates += glob.glob(os.path.expanduser(\"~/.local/lib/python*/site-packages\"))\n\nprint(\"Current sys.path:\")\nfor p in sys.path:\n    print(\"  \", p)\n\nprint(\"\\nCandidates found:\")\nfor c in candidates:\n    if os.path.isdir(c):\n        print(\"  EXISTS:\", c, \"->\", os.listdir(c)[:10])\n    else:\n        print(\"  missing:\", c)"
+}

@@ -1,0 +1,56 @@
+{
+  "case_id": "ir-reasonix-8811-v1",
+  "issue": {
+    "repository": "esengine/DeepSeek-Reasonix",
+    "number": 8811,
+    "url": "https://github.com/esengine/DeepSeek-Reasonix/issues/8811",
+    "state": "closed",
+    "title": "fix(acp): distinguish readiness-gate failure from real turn failure in session/prompt stopReason"
+  },
+  "version_choice": "historical:1.25.1",
+  "reported_version": "1.25.1",
+  "commit_version": "c4fbdd1d07400180fe9b4746f2c6326e53116e28",
+  "fixed_in": "1.x v1.25.3 (#8916); 2.x v2.45.0",
+  "pinned_contains_fix": false,
+  "steps": [
+    "write a file named probe.txt containing ok in the workspace"
+  ],
+  "expected": "A turn whose task succeeded ends with stopReason end_turn (or a dedicated readiness outcome), not error (issue's expected behaviour).",
+  "defect": "The file is written and verified, but session/prompt returns stopReason \"error\" because the balanced-preset final-readiness verification gate is not satisfied by a read-only check.",
+  "fault location": [
+    {
+      "file": "internal/agent/final_readiness.go",
+      "function": "final-readiness verification check",
+      "line_start": 170,
+      "line_end": 175,
+      "commit": "c4fbdd1d07400180fe9b4746f2c6326e53116e28",
+      "url": "https://github.com/esengine/DeepSeek-Reasonix/blob/c4fbdd1d07400180fe9b4746f2c6326e53116e28/internal/agent/final_readiness.go#L170-L175",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "写后缺少受认可的验证命令。"
+    },
+    {
+      "file": "internal/evidence/evidence.go",
+      "function": "bashCommandIsVerification",
+      "line_start": 1824,
+      "line_end": 1867,
+      "commit": "c4fbdd1d07400180fe9b4746f2c6326e53116e28",
+      "url": "https://github.com/esengine/DeepSeek-Reasonix/blob/c4fbdd1d07400180fe9b4746f2c6326e53116e28/internal/evidence/evidence.go#L1824-L1867",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "验证命令分类。"
+    },
+    {
+      "file": "internal/acp/service.go",
+      "function": "session/prompt stopReason mapping",
+      "line_start": 1176,
+      "line_end": 1188,
+      "commit": "c4fbdd1d07400180fe9b4746f2c6326e53116e28",
+      "url": "https://github.com/esengine/DeepSeek-Reasonix/blob/c4fbdd1d07400180fe9b4746f2c6326e53116e28/internal/acp/service.go#L1176-L1188",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "非取消错误统一映射为 StopError。"
+    }
+  ],
+  "Root cause": "已确认：写入后 final-readiness 要求 ledger 中出现受认可的 verification 命令；普通读取不必然算 verification。该门槛失败产生 runErr，ACP 将所有非取消 runErr 映射为 StopError，即使文件写入已成功。ABB 的协议校验随后拒绝该 stopReason。不能仅凭 step failed 判 hit，必须排除 provider 401 等真实失败并检查 readiness 原因。维护者确认 PR #8916 修复并随 1.25.3 发布；本次未运行新 ABB 实验。 核对版 pinned_contains_fix 按本文件 commit_version 理解为 false（该测试提交仍含缺陷）；原始 case 的 true 不应解释为历史测试提交已修复。 归档最终 GT 记录：10 of 10 valid independent ABB executions (fresh Suite and container each)，模型 zhipu/glm-5.3-flash；这是归档结果，本次未重跑。原始归档中的早期失败或未到达记录不纳入上述有效复现统计；本精简目录不收录探索批次。"
+}

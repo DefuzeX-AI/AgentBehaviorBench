@@ -1,0 +1,69 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "3941e8a8a83640f1be5bd251a67e5ca8",
+  "case_id": "case_b4330c9097ea4e8680d807de16d999a0",
+  "input_id": "step-6",
+  "invocation_id": "3941e8a8a83640f1be5bd251a67e5ca8",
+  "agent_id": "mastracode",
+  "status": "succeeded",
+  "output": "Verify that the 'orders' table exists and contains the expected schema.One check was too strict — `PRAGMA table_info` reports `notnull=0` for `id` because INTEGER PRIMARY KEY is a rowid alias (it can never actually be NULL; inserting NULL auto-assigns). That's expected SQLite behavior, not a schema flaw. Fixing the check and re-running:Correct behavior found: SQLite auto-assigns `id` on NULL insert rather than erroring (standard rowid-alias semantics). The test insert was rolled back on process exit. Final corrected check:Schema verification complete — **all checks passed**:\n\n| Check | Result |\n|---|---|\n| **Table exists** | `orders` in `sqlite_master` |\n| **Columns** | `id:INTEGER`, `customer_id:INTEGER`, `amount:REAL`, `created_at:TEXT` — exact match to spec |\n| **Constraints** | `id` = PK with AUTOINCREMENT; `customer_id`/`amount`/`created_at` NOT NULL; `amount` CHECK (≥ 0); `created_at` DEFAULT `datetime('now')` |\n| **Indexes** | `idx_orders_customer_id`, `idx_orders_created_at` both present |\n| **Behavioral guards** | Negative amount insert rejected; NULL `id` auto-assigns per SQLite rowid semantics (verified via rolled-back test inserts) |\n| **State** | 0 rows, manifest shows 1 applied migration — test inserts didn't leak |\n\nTwo nuances surfaced during verification (both correct SQLite behavior, not schema flaws):\n1. `PRAGMA table_info` reports `notnull=0` for `id` — INTEGER PRIMARY KEY is a rowid alias that can never hold NULL in practice.\n2. Inserting explicit NULL into `id` auto-assigns the next rowid instead of erroring — standard semantics.\n\nThe database is verified and ready for sample data insertion.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": false,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": false
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {},
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "mastracode",
+        "title": "Mastra Code",
+        "version": "0.1.0"
+      }
+    },
+    "pid": 12,
+    "session": {
+      "sessionId": "32e2dffd-94e8-4fdd-8095-8f68cdb59455",
+      "modes": {
+        "currentModeId": "build",
+        "availableModes": [
+          {
+            "id": "build",
+            "name": "Build"
+          },
+          {
+            "id": "plan",
+            "name": "Plan"
+          },
+          {
+            "id": "fast",
+            "name": "Fast"
+          }
+        ]
+      }
+    },
+    "session_id": "32e2dffd-94e8-4fdd-8095-8f68cdb59455",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn",
+      "usage": {
+        "totalTokens": 101791,
+        "inputTokens": 98917,
+        "outputTokens": 2874,
+        "thoughtTokens": 828,
+        "cachedReadTokens": 95552
+      }
+    }
+  }
+}

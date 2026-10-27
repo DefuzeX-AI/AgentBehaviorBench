@@ -1,0 +1,95 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_fb370bf7324f4542a669eb4f74ff00e0",
+  "case_id": "case_f9558777e66d46cc8df310b959c22488",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "d86f266d16b0479ac55738becec61e77",
+      "span_id": "9462cc17a83d4355",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790299329216024923,
+      "end_time_unix_nano": 1790299365055226348,
+      "duration_nano": 35839201425,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1790299333839878245,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1790299338850861396,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1790299338852179648,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1790299365049381871,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "d86f266d16b0479ac55738becec61e77",
+      "span_id": "93d134b69066f116",
+      "parent_span_id": "9462cc17a83d4355",
+      "name": "write_file",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790299357573366468,
+      "end_time_unix_nano": 1790299357614245020,
+      "duration_nano": 40878552,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "write_file",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"content\":\"# Claim: Distributivity of doubling over addition\\n\\n## Function\\n\\nDefine a small arithmetic function `double` over the integers:\\n\\n    double(n) = n + n\\n\\n## Informal Claim\\n\\nDoubling distributes over integer addition. That is, for **all** integers `a` and `b`:\\n\\n    double(a) + double(b) = double(a + b)\\n\\nIn words: doubling two numbers separately and then adding the results gives the\\nsame value as adding the numbers first and then doubling the sum.\\n\\n## Reasoning sketch\\n\\nEach side simplifies to `2a + 2b` by the commutativity and associativity of\\ninteger addition, so the two sides must agree for every choice of `a` and `b`.\\n\\n## Formalization intent\\n\\nThis claim is intended to be verified formally, e.g., as a proof assistant\\nlemma (Lean/Coq/Isabelle) or an SMT-checked assertion, stating:\\n\\n    ∀ a b : ℤ, double a + double b = double (a + b)\\n\",\"path\":\"claim.md\"}",
+        "gen_ai.tool.call.result": "Wrote 846 bytes to claim.md",
+        "gen_ai.tool.call.id": "call_27535b517667466382d9d193"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 18,
+  "truncated": false,
+  "reasons": [
+    "trace_attribute_not_allowlisted"
+  ]
+}

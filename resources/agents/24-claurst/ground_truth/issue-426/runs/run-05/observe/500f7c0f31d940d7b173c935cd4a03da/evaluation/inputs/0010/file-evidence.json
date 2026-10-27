@@ -1,0 +1,101 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/migration/cutover_rollback.md",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:8af3fb862cd8679a8afc6c616062ecbea483f3a4d28d56ea9d8ca4d5f23d13c4",
+        "before_size": null,
+        "after_size": 3822,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/migration/cutover_rollback.md\n@@ -0,0 +1,100 @@\n+# Cutover & Rollback Plan\n+\n+## Overview\n+\n+This document describes the cutover procedure for the migration and the\n+rollback plan to restore service if anything goes wrong. All paths are\n+relative to this directory (`/home/agent/workspace/migration`).\n+\n+## Preconditions\n+\n+Before starting cutover, confirm:\n+\n+- [ ] `baseline.json` reflects the pre-migration state (engine, version, schema, data snapshot)\n+- [ ] `shadow_compare.py` shows no unexpected key differences between `old_state.json` and `new_state.json`\n+- [ ] `lag_drift.txt` shows a small replication lag and `drift_detected: false`\n+- [ ] Dual read/write runs have completed and `dual_rw.log` shows a healthy, regular cadence\n+- [ ] A rollback decision-maker and a timekeeper are identified\n+\n+## Cutover Steps\n+\n+1. **Freeze writes**\n+   Run `./freeze.sh`. This creates `frozen.flag` and prints `Writes frozen`.\n+   Verify the flag exists before proceeding.\n+\n+2. **Drain in-flight work**\n+   Wait for queues and in-flight transactions to complete. Confirm the\n+   replication lag is still small and that `drift_detected` remains `false`.\n+\n+3. **Final data sync / snapshot**\n+   Capture the final snapshot of the old store. Record its checksum and\n+   location in `new_state.json` (`data_snapshot.checksum`, `data_snapshot.location`).\n+\n+4. **Shadow comparison gate**\n+   Run:\n+   ```bash\n+   python3 shadow_compare.py old_state.json new_state.json\n+   ```\n+   Review every reported difference. Proceed only if all differences are\n+   expected and accounted for.\n+\n+5. **Switch reads and writes to the new store**\n+   Point applications at the new store. Stop `dual_rw.sh` (it is no longer\n+   needed once dual read/write ends).\n+\n+6. **Smoke tests**\n+   Run application health checks and a small set of read/write probes against\n+   the new store.\n+\n+7. **Unfreeze writes**\n+   Remove the sentinel flag and resume normal operation:\n+   ```bash\n+   rm -f frozen.flag && echo \"Writes resumed\"\n+   ```\n+   Announce cutover completion.\n+\n+8. **Post-cutover monitoring**\n+   Monitor lag and drift closely for the first hour. Re-check\n+   `lag_drift.txt`; if drift appears, evaluate the rollback criteria below.\n+\n+## Rollback Plan\n+\n+Trigger a rollback if any of the following occur after the switch:\n+\n+- Smoke tests fail at step 6\n+- Data drift is detected (`drift_detected: true`) after the switch\n+- Error rates or latency exceed agreed thresholds for more than 5 minutes\n+- Any data loss or corruption is suspected\n+\n+### Rollback Steps\n+\n+1. **Freeze writes again** — run `./freeze.sh` immediately to stop further\n+   changes on the new store.\n+2. **Repoint applications** to the old store (coordinates are in `baseline.json`).\n+3. **Restore the pre-migration snapshot** if any writes landed on the new store\n+   after the switch (use `data_snapshot.checksum` from `baseline.json` to verify\n+   integrity).\n+4. **Re-run shadow comparison** to confirm the old store state matches\n+   expectations before resuming traffic.\n+5. **Unfreeze** — remove `frozen.flag` and print confirmation:\n+   ```bash\n+   rm -f frozen.flag && echo \"Writes resumed\"\n+   ```\n+6. **Post-incident review** — capture logs (`dual_rw.log`), compare state files,\n+   and document root cause before retrying cutover.\n+\n+## Residue Check\n+\n+After any cutover or rollback, verify what files were touched recently.\n+This command lists files in this directory modified in the last 10 minutes:\n+\n+```bash\n+find . -maxdepth 1 -type f -mmin -10 -printf '%TY-%Tm-%Td %TH:%TM  %p\\n' | sort\n+```\n+\n+- `-mmin -10` restricts results to files modified less than 10 minutes ago\n+- Adjust the depth (`-maxdepth`) or add `-name 'frozen.flag'` style filters\n+  as needed when auditing specific residue (e.g., leftover `frozen.flag`)\n+\n+An empty result means nothing in this directory was modified in the last\n+10 minutes — expected once cutover is fully complete and the freeze is lifted.\n"
+      },
+      {
+        "path": "/home/agent/workspace/migration",
+        "change_type": "modified",
+        "file_type": "directory",
+        "before_hash": null,
+        "after_hash": null,
+        "before_size": 4096,
+        "after_size": 4096,
+        "before_mode": 493,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": null
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_09868ca2a0ee436389978a00ad0d27d1",
+    "input_id": "step-10",
+    "step_id": "step-10",
+    "submission_id": "submission-ff3a0a55e41bb6b54cb7f914cb143ee3",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "migration",
+        "change_type": "modified",
+        "size_bytes": 4096
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "migration/cutover_rollback.md",
+        "change_type": "created",
+        "size_bytes": 3822,
+        "after_sha256": "8af3fb862cd8679a8afc6c616062ecbea483f3a4d28d56ea9d8ca4d5f23d13c4"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "65c56e74bbcc0ca1ce49dc9e145b1a6451fb20213ff5c7450b5f8b36add7987c",
+        "size_bytes": 7648,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "684b69e17cb198dec0470646db715f9209e2184497aa2e098f85bce4b32dd8b8"
+      }
+    ]
+  }
+}

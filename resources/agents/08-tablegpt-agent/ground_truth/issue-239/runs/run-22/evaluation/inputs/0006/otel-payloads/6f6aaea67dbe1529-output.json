@@ -1,0 +1,22 @@
+{
+  "messages": [
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "```pycon\nexists: True size: 36864\n[('sessions', 'table'), ('sqlite_sequence', 'table'), ('history', 'table'), ('output_history', 'table')]\n\n---------------------------------------------------------------------------\nValueError                                Traceback (most recent call last)\nCell In[9], line 10\n      6 con = sqlite3.connect(db)\n      7 q = \"SELECT name, type FROM sqlite_master WHERE type IN ('table','view')\"\n      8 print(con.execute(q).fetchall())\n      9 # Peek at a couple of rows of any tables\n---> 10 for (name,) in con.execute(q).fetchall():\n     11     try:\n     12         rows = con.execute(f\"SELECT * FROM {name} LIMIT 3\").fetchall()\n     13         print(name, '->', rows)\n\nValueError: too many values to unpack (expected 1)\n```"
+        }
+      ],
+      "additional_kwargs": {
+        "parent_id": "841a1e10-a83e-471f-a007-2f45ed522d85"
+      },
+      "response_metadata": {},
+      "type": "tool",
+      "name": "python",
+      "id": "f31af7da-3d8c-4950-ad83-9ff6b9e9618b",
+      "tool_call_id": "f375d0cc-8ac9-443d-aefa-c9e416280533",
+      "artifact": [],
+      "status": "success"
+    }
+  ]
+}

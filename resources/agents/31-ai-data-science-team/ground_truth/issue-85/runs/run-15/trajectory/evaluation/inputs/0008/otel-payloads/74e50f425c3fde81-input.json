@@ -1,0 +1,50 @@
+{
+  "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # Ensure the input is a list\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # If no data is provided, return an empty DataFrame\n    if len(data_list) == 0:\n        return pd.DataFrame()\n\n    # Process each DataFrame individually\n    processed_dfs = []\n    for df in data_list:\n        if not isinstance(df, pd.DataFrame):\n            df = pd.DataFrame(df)\n\n        # 1. Standardize column names: lowercase, strip spaces, replace spaces with underscores\n        df.columns = [str(col).strip().lower().replace(' ', '_') for col in df.columns]\n\n        # 2. Normalize data types\n        for col in df.columns:\n            # Convert date/time columns to datetime\n            if 'date' in col or 'time' in col:\n                df[col] = pd.to_datetime(df[col], errors='coerce')\n            # Attempt to convert object columns that contain numeric values to numeric\n            elif df[col].dtype == 'object':\n                converted = pd.to_numeric(df[col], errors='coerce')\n                if converted.notna().sum() > len(df) * 0.5:\n                    df[col] = converted\n\n        # 3. Handle missing values without dropping rows\n        for col in df.columns:\n            if df[col].dtype.kind in 'biufc':  # numeric columns\n                median_val = df[col].median()\n                if pd.isna(median_val):\n                    df[col] = df[col].fillna(0)\n                else:\n                    df[col] = df[col].fillna(median_val)\n            else:\n                df[col] = df[col].fillna('Unknown')\n\n        # 6. Remove duplicate rows\n        df = df.drop_duplicates()\n        processed_dfs.append(df)\n\n    # 4. Merge or concatenate multiple datasets if present\n    if len(processed_dfs) > 1:\n        # If all datasets have identical columns, concatenate\n        first_cols = set(processed_dfs[0].columns)\n        same_cols = all(set(df.columns) == first_cols for df in processed_dfs)\n        if same_cols:\n            data = pd.concat(processed_dfs, ignore_index=True)\n        else:\n            # Merge on common columns to avoid Cartesian products\n            data = processed_dfs[0]\n            for df in processed_dfs[1:]:\n                common_cols = set(data.columns).intersection(set(df.columns))\n                if common_cols:\n                    data = pd.merge(data, df, on=list(common_cols), how='outer')\n                else:\n                    # If no common columns exist, concatenate horizontally\n                    data = pd.concat([data, df], axis=1)\n    else:\n        data = processed_dfs[0]\n\n    # 5. Categorical cleanup: convert category dtype to string for consistent grouping\n    for col in data.select_dtypes(include=['category']).columns:\n        data[col] = data[col].astype(str)\n\n    # Identify the sales column dynamically (search for sales/revenue/amount/total)\n    sales_col = None\n    for col in data.columns:\n        if any(kw in col for kw in ['sales', 'revenue', 'amount', 'total']):\n            sales_col = col\n            break\n    if sales_col is None:\n        # If no explicit sales column, try to compute from price and quantity\n        if 'price' in data.columns and 'quantity_sold' in data.columns:\n            data['total_sales'] = data['price'] * data['quantity_sold']\n            sales_col = 'total_sales'\n        else:\n            # Fallback: use the first numeric column\n            num_cols = data.select_dtypes(include=[np.number]).columns\n            if len(num_cols) > 0:\n                sales_col = num_cols[0]\n\n    # Identify a territory column by common keywords\n    territory_col = None\n    territory_keywords = ['territor', 'region', 'area', 'location', 'country', 'state', 'city', 'market']\n    for col in data.columns:\n        if any(kw in col for kw in territory_keywords):\n            territory_col = col\n            break\n    if territory_col is None:\n        # Fallback: use the first categorical column (object/string) that is not a date\n        for col in data.columns:\n            if data[col].dtype == 'object' and 'date' not in col:\n                territory_col = col\n                break\n        if territory_col is None:\n            # If no categorical column exists, create a dummy territory\n            data['territory'] = 'All'\n            territory_col = 'territory'\n\n    # Aggregate total sales by territory to enable comparison\n    if sales_col is not None:\n        result = data.groupby(territory_col, as_index=False)[sales_col].sum()\n        # Rename columns to standard output names\n        result = result.rename(columns={territory_col: 'territory', sales_col: 'total_sales'})\n    else:\n        # If no sales column could be identified, return the wrangled data as is\n        result = data\n\n    return result\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 7982,
+      "prompt_tokens": 736,
+      "total_tokens": 8718,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 6793,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261011192856740824947c955d568XtEg3c5K",
+    "service_tier": "default",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a12c70-8fd8-7a20-9698-654ce6997d67-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 736,
+    "output_tokens": 7982,
+    "total_tokens": 8718,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 6793
+    }
+  }
+}

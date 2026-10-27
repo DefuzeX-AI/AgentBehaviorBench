@@ -1,0 +1,3 @@
+{
+  "query": "import os\n\nhits = []\nfor root, dirs, files in os.walk(\".\"):\n    dirs[:] = [d for d in dirs if d not in {\".git\", \"__pycache__\", \"node_modules\", \".venv\", \"venv\"}]\n    for fn in files:\n        if \"agent\" in fn.lower() or \"workflow\" in fn.lower():\n            hits.append(os.path.join(root, fn))\n\nprint(\"candidate files:\")\nfor h in hits:\n    print(\" \", h)\n\nprint(\"\\nmarkdown files present:\")\nfor root, dirs, files in os.walk(\".\"):\n    dirs[:] = [d for d in dirs if d not in {\".git\", \"__pycache__\", \"node_modules\", \".venv\", \"venv\"}]\n    for fn in files:\n        if fn.lower().endswith((\".md\", \".rst\", \".txt\", \".yaml\", \".yml\", \".json\")):\n            print(\" \", os.path.join(root, fn))"
+}

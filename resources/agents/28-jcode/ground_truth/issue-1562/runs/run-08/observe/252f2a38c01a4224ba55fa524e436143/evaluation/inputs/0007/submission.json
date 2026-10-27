@@ -1,0 +1,191 @@
+{
+  "run_id": "run_b1a2c61c422d4f888359813190040f70",
+  "case_id": "case_8c14d2872f4b44db9c7056aa5808b6cd",
+  "input_id": "step-7",
+  "status": "completed",
+  "output": "All checks pass:\n\n| Item | Digest | Status |\n|---|---|---|\n| Recomputed from `release/artifact.txt` | `9245cdb48f94a5353a1ba88ec54a9b47c3b0af65d7397463e12ae203143d8835` | reference |\n| Stored in `release/digest.txt` | `9245cdb4...3d8835` | matches artifact |\n| Mapped in `release/mapping.json` for `1.0.0` | `9245cdb4...3d8835` | matches artifact |\n\nThe mapping in `release/mapping.json` is valid and consistent with the current artifact.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "partial",
+      "reasons": [
+        "trace_attribute_not_allowlisted"
+      ]
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 18,
+  "missing": [
+    "trace_evidence:trace_attribute_not_allowlisted"
+  ],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_b1a2c61c422d4f888359813190040f70",
+      "case_id": "case_8c14d2872f4b44db9c7056aa5808b6cd",
+      "input_id": "step-7",
+      "spans": [
+        {
+          "trace_id": "95a402cddea357ef5e9566b6aa349ce4",
+          "span_id": "729867bd55964980",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791314288430448831,
+          "end_time_unix_nano": 1791314299715370078,
+          "duration_nano": 11284921247,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1791314288432820695,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1791314299711841723,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "95a402cddea357ef5e9566b6aa349ce4",
+          "span_id": "f7918c3f3b42cbde",
+          "parent_span_id": "729867bd55964980",
+          "name": "Running shell command",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791314295712424196,
+          "end_time_unix_nano": 1791314295738066411,
+          "duration_nano": 25642215,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "Running shell command",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "command": "cd /home/agent/workspace && ACTUAL=$(sha256sum release/artifact.txt | awk '{print $1}') && STORED=$(awk '{print $1}' release/digest.txt) && MAPPED=$(python3 -c \"import json; print(json.load(open('release/mapping.json'))['1.0.0'])\") && echo \"actual:  $ACTUAL\" && echo \"stored:  $STORED\" && echo \"mapped:  $MAPPED\" && [ \"$ACTUAL\" = \"$STORED\" ] && echo \"digest.txt matches artifact\" || echo \"digest.txt MISMATCH\" ; [ \"$ACTUAL\" = \"$MAPPED\" ] && echo \"mapping.json matches artifact\" || echo \"mapping.json MISMATCH\"",
+              "intent": "Recompute digest and compare with digest.txt and mapping.json"
+            },
+            "gen_ai.tool.call.result": {
+              "error": null,
+              "output": "actual:  9245cdb48f94a5353a1ba88ec54a9b47c3b0af65d7397463e12ae203143d8835\nstored:  9245cdb48f94a5353a1ba88ec54a9b47c3b0af65d7397463e12ae203143d8835\nmapped:  9245cdb48f94a5353a1ba88ec54a9b47c3b0af65d7397463e12ae203143d8835\ndigest.txt matches artifact\nmapping.json matches artifact\n"
+            },
+            "gen_ai.tool.call.id": "call_fc386179e69344eb897effcc"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 18,
+      "truncated": false,
+      "reasons": [
+        "trace_attribute_not_allowlisted"
+      ]
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 2,
+      "retained_spans": 2,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 18,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_b1a2c61c422d4f888359813190040f70",
+      "input_id": "step-7",
+      "step_id": "step-7",
+      "submission_id": "submission-d3cae0e25d0b44c83edaa1546d2908be",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "7a4f3c3483e0162690436c96669e005a10b27d8c51debafbf93c95646349ed06",
+          "size_bytes": 2713,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "2f4f3e7c79337de1deed6f8186534c122d6cfa15f638bc328086c718f947d6fa"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

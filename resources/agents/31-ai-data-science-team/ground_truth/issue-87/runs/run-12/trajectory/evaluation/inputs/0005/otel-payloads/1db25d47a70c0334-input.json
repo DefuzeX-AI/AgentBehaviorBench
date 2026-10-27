@@ -1,0 +1,50 @@
+{
+  "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the provided data into a single, clean pandas DataFrame.\n    \n    Parameters\n    ----------\n    data_list : list of pandas.DataFrame or pandas.DataFrame\n        A list of one or more DataFrames (or a single DataFrame) to be wrangled.\n    \n    Returns\n    -------\n    pandas.DataFrame\n        A single, wrangled DataFrame containing cleaned data.\n        Verification evidence (checksum, signature timestamp, tool used) is stored\n        in the DataFrame's `.attrs` dictionary.\n    '''\n    import pandas as pd\n    import numpy as np\n    import hashlib\n    \n    # -------------------------------------------------------------------------\n    # 0. Ensure input is a list of DataFrames\n    # -------------------------------------------------------------------------\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n    \n    # -------------------------------------------------------------------------\n    # 1. Standardize column names (lowercase, strip spaces, replace spaces with _)\n    # -------------------------------------------------------------------------\n    cleaned_dfs = []\n    for df in data_list:\n        if not isinstance(df, pd.DataFrame):\n            df = pd.DataFrame(df)\n        df = df.copy()\n        df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]\n        cleaned_dfs.append(df)\n    \n    # -------------------------------------------------------------------------\n    # 4. Handle multiple datasets: concatenate if same schema, else merge on keys\n    # -------------------------------------------------------------------------\n    if len(cleaned_dfs) > 1:\n        # Check if all DataFrames share the exact same columns\n        all_cols = set(cleaned_dfs[0].columns)\n        same_schema = all(set(df.columns) == all_cols for df in cleaned_dfs)\n        \n        if same_schema:\n            # Simple row-wise concatenation\n            df = pd.concat(cleaned_dfs, ignore_index=True, sort=False)\n        else:\n            # Attempt to merge on common columns that are likely join keys\n            # (exclude value columns like price, quantity, sales, extended)\n            common_cols = set(cleaned_dfs[0].columns)\n            for d in cleaned_dfs[1:]:\n                common_cols = common_cols.intersection(set(d.columns))\n            \n            key_cols = [\n                c for c in common_cols\n                if not any(k in c for k in ['price', 'quantity', 'sales', 'extended'])\n            ]\n            \n            if key_cols:\n                df = cleaned_dfs[0]\n                for d in cleaned_dfs[1:]:\n                    df = pd.merge(df, d, on=key_cols, how='outer', suffixes=('', '_dup'))\n            else:\n                # Fallback: concatenate if no safe join keys exist\n                df = pd.concat(cleaned_dfs, ignore_index=True, sort=False)\n    else:\n        df = cleaned_dfs[0]\n    \n    # -------------------------------------------------------------------------\n    # 2. Normalize data types\n    # -------------------------------------------------------------------------\n    # Identify and convert date-like columns to datetime\n    date_cols = [c for c in df.columns if 'date' in c or 'time' in c]\n    for c in date_cols:\n        df[c] = pd.to_datetime(df[c], errors='coerce')\n    \n    # Convert object columns that appear mostly numeric to numeric\n    for c in df.columns:\n        if c not in date_cols:\n            if df[c].dtype == 'object':\n                converted = pd.to_numeric(df[c], errors='coerce')\n                # If more than 50% of values convert successfully, treat as numeric\n                if len(df) > 0 and converted.notna().sum() > 0.5 * len(df):\n                    df[c] = converted\n            else:\n                if pd.api.types.is_numeric_dtype(df[c]):\n                    df[c] = pd.to_numeric(df[c], errors='coerce')\n    \n    # -------------------------------------------------------------------------\n    # 3. Handle missing values (impute without dropping rows)\n    # -------------------------------------------------------------------------\n    for c in df.columns:\n        if df[c].isna().any():\n            if pd.api.types.is_numeric_dtype(df[c]):\n                # Impute numeric with median\n                df[c] = df[c].fillna(df[c].median())\n            elif pd.api.types.is_datetime64_any_dtype(df[c]):\n                # Forward fill then backward fill for dates\n                df[c] = df[c].ffill().bfill()\n            else:\n                # Impute categorical/string with mode, fallback to 'unknown'\n                mode_val = df[c].mode()\n                if not mode_val.empty:\n                    df[c] = df[c].fillna(mode_val.iloc[0])\n                else:\n                    df[c] = df[c].fillna('unknown')\n    \n    # -------------------------------------------------------------------------\n    # 5. Categorical encoding / cleanup\n    # -------------------------------------------------------------------------\n    cat_cols = df.select_dtypes(include=['object', 'category']).columns\n    for c in cat_cols:\n        df[c] = df[c].astype(str).str.strip()\n        df[c] = df[c].astype('category')\n    \n    # -------------------------------------------------------------------------\n    # 6. Remove duplicates and obvious anomalies\n    # -------------------------------------------------------------------------\n    df = df.drop_duplicates().reset_index(drop=True)\n    \n    # Detect price, quantity, and extended sales columns by name patterns\n    price_col = None\n    qty_col = None\n    ext_col = None\n    for c in df.columns:\n        if 'price' in c:\n            price_col = c\n        if 'quantity' in c or 'qty' in c:\n            qty_col = c\n        if 'extended' in c or 'sales' in c:\n            ext_col = c\n    \n    # Recalculate extended sales to fix inconsistencies (no rows dropped)\n    if price_col and qty_col and ext_col:\n        df[ext_col] = df[price_col] * df[qty_col]\n    \n    # -------------------------------------------------------------------------\n    # Verification evidence\n    # -------------------------------------------------------------------------\n    # Compute checksum of the wrangled data\n    checksum = hashlib.md5(\n        pd.util.hash_pandas_object(df, index=True).values.tobytes()\n    ).hexdigest()\n    \n    # Determine signature timestamp: latest date if available, else current time\n    if date_cols and date_cols[0] in df.columns:\n        signature_timestamp = df[date_cols[0]].max()\n    else:\n        signature_timestamp = pd.Timestamp.now()\n    \n    tool_used = True  # Pandas/NumPy were used for wrangling\n    \n    # Store evidence in DataFrame attributes (does not alter the data columns)\n    df.attrs['checksum'] = checksum\n    df.attrs['signature_timestamp'] = signature_timestamp\n    df.attrs['tool_used'] = tool_used\n    \n    # Return the single wrangled DataFrame\n    return df\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 8876,
+      "prompt_tokens": 761,
+      "total_tokens": 9637,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 7379,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012151537459667662c955d568Z3DI9GQI",
+    "service_tier": "default",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a130ae-ffc3-7332-b98d-0a807f72e7d7-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 761,
+    "output_tokens": 8876,
+    "total_tokens": 9637,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 7379
+    }
+  }
+}

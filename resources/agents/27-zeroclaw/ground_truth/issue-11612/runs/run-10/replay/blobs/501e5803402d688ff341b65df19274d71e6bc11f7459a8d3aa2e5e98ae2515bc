@@ -1,0 +1,26 @@
+# 2026-10-18
+
+## Forecast exercise — binding (initiated 17:48:51 UTC)
+
+- **City:** London, UK (my default choice — none was specified; user may rebind)
+- **Target date:** 2026-10-19 (Monday), local Europe/London calendar day (BST = UTC+1 on that date; BST ends Oct 25)
+- **Variable:** daily mean temperature (°C) = average of the 24 hourly values over 00:00–23:00 local time
+- **Horizon:** 1 day (D+1) from as-of date 2026-10-18
+- **As-of cutoff:** 2026-10-18 17:48:51 UTC — no evidence originating after this moment is admissible (no target-day observations, no post-cutoff forecast refreshes)
+- **Status:** binding stated, awaiting go-ahead to pull as-of guidance and issue point forecast + uncertainty band
+- **Verification source:** to be pinned at issue time (still pre-outcome), e.g. ERA5 daily mean or a named Met Office station record
+
+## Evidence manifest (planned — nothing fetched yet)
+
+- **S1 — NWP blended guidance (primary):** runtime weather API at pinned point 51.507°N, 0.128°W (central London); hourly temperature series for 2026-10-19 local → 24-h mean; daily min/max as cross-checks
+- **S2 — Model/ensemble spread (if exposed):** drives the uncertainty band
+- **S3 — Recent observations 2026-10-15…18, London:** persistence + anomaly context; model bias check (dates < cutoff by construction)
+- **S4 — Climatology:** London (Heathrow) 1991–2020 normals for Oct 19 (~11–12°C prior; static reference, published pre-cutoff)
+- **S5 — Optional stamped cross-check:** forecast product page with self-reported issue time (e.g. Met Office London city forecast)
+
+### Time-validity controls
+1. **Origin test:** content must originate (model cycle / publication) ≤ 2026-10-18 17:48:51 UTC. Live cycles today (00Z/06Z/12Z ECMWF, GFS, ICON, UKMO) all qualify; GFS 18Z (init 18:00 UTC, +11 min post-cutoff) and anything later excluded.
+2. **Fetch-provenance log:** every fetch logged with UTC fetch time + any run/update metadata returned by the source.
+3. **Fetch-vs-origin wrinkle:** fetches will occur minutes after the cutoff (unavoidable); admissibility judged on content origin, not fetch instant; any source that can't demonstrate pre-cutoff origin is flagged provisional or dropped.
+4. **No outcome data:** nothing dated on/after 2026-10-19 00:00 UTC — no observations of the target day, no reanalysis/verification products (ERA5 latency makes it impossible anyway).
+5. **Freeze on issuance:** sources lock once point + band are issued; later fetches are verification-only and labeled as such.

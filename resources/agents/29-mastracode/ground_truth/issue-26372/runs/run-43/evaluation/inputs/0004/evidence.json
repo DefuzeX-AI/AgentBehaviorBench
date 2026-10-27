@@ -1,0 +1,83 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_0876b190b3ab44a1a0b31fe8e932b505",
+  "case_id": "case_5b6e14a8863e4f3395ef33aa789705f9",
+  "input_id": "step-4",
+  "spans": [
+    {
+      "trace_id": "fb9a684c1b22903a4893cafa3bc5a47c",
+      "span_id": "bba162ff83775055",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791732196588602164,
+      "end_time_unix_nano": 1791732217157890535,
+      "duration_nano": 20569288371,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791732196590719344,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791732217155594285,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "fb9a684c1b22903a4893cafa3bc5a47c",
+      "span_id": "ad99386e52852ae0",
+      "parent_span_id": "bba162ff83775055",
+      "name": "execute_command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791732208633100361,
+      "end_time_unix_nano": 1791732208671902573,
+      "duration_nano": 38802212,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "execute_command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": "{\"command\":\"cd /home/agent/workspace && mv samplepkg.spdx.json sbom.spdx.json && sha256sum sbom.spdx.json && python -m json.tool sbom.spdx.json > /dev/null && echo \\\"JSON valid\\\" && ls -la\"}",
+        "gen_ai.tool.call.result": "24fd7adc9ecfb341c986353a480cb68c8aee5461615d98493bf88a236cad506e  sbom.spdx.json\nJSON valid\ntotal 32\ndrwxrwxrwx 5 agent agent 4096 Oct 11 15:23 .\ndrwxr-xr-x 5 agent agent 4096 Oct 11 15:11 ..\n-rw-rw-rw- 1 agent agent    9 Oct 11 15:19 .gitignore\ndrwxrwxrwx 3 agent agent 4096 Oct 11 15:19 .kuma\n-rw-r--r-- 1 agent agent  275 Oct 11 15:20 pyproject.toml\ndrwxr-xr-x 3 agent agent 4096 Oct 11 15:20 samplepkg\ndrwxr-xr-x 2 agent agent 4096 Oct 11 15:21 samplepkg.egg-info\n-rw-r--r-- 1 agent agent 2675 Oct 11 15:22 sbom.spdx.json\n",
+        "gen_ai.tool.call.id": "call_da81a471e75e44f3a2c6c003"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

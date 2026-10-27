@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_visualization(data_raw):\n    import pandas as pd\n    import numpy as np\n    import json\n    import plotly.graph_objects as go\n    import plotly.io as pio\n    import plotly.express as px\n\n    # ---- Data preparation -------------------------------------------------\n    # The source data is a summary-statistics table (rows = 'price' and\n    # 'quantity_sold'; columns = count, mean, std, min, 25%, 50%, 75%, max...).\n    # We pair the corresponding percentile values of price and quantity_sold\n    # to build the scatter plot.\n    statistic_labels = ['Min', '25th Percentile', 'Median', '75th Percentile', 'Max']\n    stat_keys = ['min', '25%', '50%', '75%', 'max']\n\n    # Default values (from the provided summary statistics)\n    price_vals = [350, 495, 2200, 5000, 9900]\n    quantity_vals = [2, 6, 11, 20, 108]\n\n    # Attempt to extract values directly from data_raw if it matches\n    # the expected summary-statistics structure; otherwise fall back\n    # to the defaults above.\n    try:\n        if (\n            isinstance(data_raw, pd.DataFrame)\n            and not data_raw.empty\n            and 'price' in data_raw.index\n            and 'quantity_sold' in data_raw.index\n            and all(k in data_raw.columns for k in stat_keys)\n        ):\n            price_vals = [float(data_raw.loc['price', k]) for k in stat_keys]\n            quantity_vals = [float(data_raw.loc['quantity_sold', k]) for k in stat_keys]\n    except Exception:\n        pass  # keep default percentile values\n\n    plot_df = pd.DataFrame({\n        'Statistic': statistic_labels,\n        'price': price_vals,\n        'quantity_sold': quantity_vals\n    })\n\n    # ---- Chart construction -----------------------------------------------\n    fig = px.scatter(\n        plot_df,\n        x='price',\n        y='quantity_sold',\n        text='Statistic',\n        title='Price vs Quantity Sold — Percentile-to-Percentile Comparison',\n        labels={'price': 'Price', 'quantity_sold': 'Quantity Sold'},\n        hover_data={'Statistic': True, 'price': True, 'quantity_sold': True},\n        template='plotly_white'\n    )\n\n    fig.update_traces(\n        marker=dict(size=12, color='#636EFA', line=dict(width=1.5, color='white')),\n        textposition='top center',\n        textfont=dict(size=12, color='#333333'),\n        cliponaxis=False\n    )\n\n    fig.update_layout(\n        xaxis_title='Price',\n        yaxis_title='Quantity Sold',\n        title=dict(x=0.5, xanchor='center'),\n        hovermode='closest',\n        margin=dict(l=60, r=40, t=80, b=60)\n    )\n\n    # ---- Serialize to dictionary -------------------------------------------\n    fig_json = pio.to_json(fig)\n    fig_dict = json.loads(fig_json)\n\n    return fig_dict\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 1749,
+      "prompt_tokens": 1132,
+      "total_tokens": 2881,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 1096,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "glm-5.3-flash",
+    "system_fingerprint": null,
+    "id": "202610201224319e0c54eb451a43d8",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a1578d-c6f8-76a2-af21-fe12fd4732a8-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 1132,
+    "output_tokens": 1749,
+    "total_tokens": 2881,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 1096
+    }
+  }
+}

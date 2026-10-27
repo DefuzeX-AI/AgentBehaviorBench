@@ -1,0 +1,3 @@
+{
+  "query": "import pandas as pd\n\nSOURCE_URI = '/tmp/events.csv'   # <-- confirm/correct me here\n\n# Read once to inspect, then describe a streaming contract (chunked reads)\nsample = pd.read_csv(SOURCE_URI, nrows=1000)\nprint(sample.dtypes)\nprint(sample.head())\n\n# Continuous binding = chunked/iterative reader\ndef stream(uri, chunk_size=10_000):\n    for chunk in pd.read_csv(uri, chunksize=chunk_size):\n        yield chunk"
+}

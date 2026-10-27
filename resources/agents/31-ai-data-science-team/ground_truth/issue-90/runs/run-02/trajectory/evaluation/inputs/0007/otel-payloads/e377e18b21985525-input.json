@@ -1,0 +1,50 @@
+{
+  "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data_list.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # Ensure data_list is a list\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # For this task, only one dataset is provided. If multiple existed, we would\n    # identify join keys and merge them appropriately, avoiding Cartesian products.\n    # Here we take the first (and only) DataFrame.\n    df = data_list[0].copy()\n\n    # 1. Inspect and standardize column names: lowercase, strip spaces\n    df.columns = df.columns.str.lower().str.strip()\n\n    # 2. Normalize data types\n    # Convert date-like column to datetime if present\n    if 'date' in df.columns:\n        df['date'] = pd.to_datetime(df['date'], errors='coerce')\n\n    # Identify numeric columns (integers/floats) and coerce them\n    for col in df.columns:\n        if df[col].dtype in ['int64', 'float64']:\n            continue  # already numeric\n        # Try to convert to numeric, ignoring errors\n        converted = pd.to_numeric(df[col], errors='coerce')\n        # If more than half of the non-null values are successfully converted, treat as numeric\n        if converted.notna().sum() > 0.5 * df[col].notna().sum():\n            df[col] = converted\n\n    # Ensure known numeric columns are numeric (price, quantity_sold, extended_sales)\n    # This is safe even if columns are already numeric.\n    for col in ['price', 'quantity_sold', 'extended_sales']:\n        if col in df.columns:\n            df[col] = pd.to_numeric(df[col], errors='coerce')\n\n    # Convert object columns that are clearly categorical (e.g., bike_model) to string and strip\n    if 'bike_model' in df.columns:\n        df['bike_model'] = df['bike_model'].astype(str).str.strip()\n\n    # 3. Handle missing values without dropping rows\n    # For numeric columns, fill missing with median (fallback to 0 if median is NaN)\n    for col in df.select_dtypes(include=[np.number]).columns:\n        median_val = df[col].median()\n        if pd.isna(median_val):\n            median_val = 0\n        df[col] = df[col].fillna(median_val)\n\n    # For categorical/object columns, fill missing with 'Unknown'\n    for col in df.select_dtypes(include=['object', 'category']).columns:\n        df[col] = df[col].fillna('Unknown')\n\n    # 4. Merge: not applicable as only one dataset is provided.\n\n    # 5. Categorical encoding / cleanup\n    # Convert low-cardinality object columns to 'category' dtype for efficiency\n    for col in df.select_dtypes(include=['object']).columns:\n        if df[col].nunique() / len(df) < 0.5:  # heuristic: less than 50% unique\n            df[col] = df[col].astype('category')\n\n    # 6. Remove duplicates and obvious anomalies\n    df = df.drop_duplicates()\n\n    # Drop rows where date is NaT (if date conversion failed) - this is an anomaly\n    if 'date' in df.columns:\n        df = df.dropna(subset=['date'])\n\n    # Remove negative values in numeric columns that should be non-negative (price, quantity_sold, extended_sales)\n    for col in ['price', 'quantity_sold', 'extended_sales']:\n        if col in df.columns:\n            df = df[df[col] >= 0]\n\n    # 7. Return a single pandas DataFrame\n    return df\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 2711,
+      "prompt_tokens": 767,
+      "total_tokens": 3478,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 1849,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012170433348882967c955d568k70vhHEC",
+    "service_tier": "default",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a13112-b32d-7461-b05f-41f74fb1eb06-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 767,
+    "output_tokens": 2711,
+    "total_tokens": 3478,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 1849
+    }
+  }
+}

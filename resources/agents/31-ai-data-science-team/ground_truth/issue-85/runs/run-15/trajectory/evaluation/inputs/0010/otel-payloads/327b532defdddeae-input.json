@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    \n    Returns a single pandas DataFrame with descriptive statistics for numeric columns.\n    '''\n    import pandas as pd\n    import numpy as np\n    \n    # ------------------------------------------------------------------\n    # 0. Ensure the input is a list of DataFrames\n    # ------------------------------------------------------------------\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n    \n    # ------------------------------------------------------------------\n    # 1. Combine multiple datasets if present\n    #    Since no explicit join keys are provided, we concatenate rows\n    #    after aligning columns. This avoids Cartesian products.\n    # ------------------------------------------------------------------\n    if len(data_list) > 1:\n        # Collect all unique columns across all DataFrames\n        all_columns = set()\n        for df in data_list:\n            all_columns.update(df.columns)\n        all_columns = list(all_columns)\n        \n        aligned_dfs = []\n        for df in data_list:\n            # Reindex to the full set of columns, filling missing with NaN\n            aligned = df.reindex(columns=all_columns)\n            aligned_dfs.append(aligned)\n        \n        df = pd.concat(aligned_dfs, ignore_index=True, sort=False)\n    else:\n        df = data_list[0].copy()\n    \n    # ------------------------------------------------------------------\n    # 2. Standardize column names: lowercase, strip spaces, replace spaces with underscores\n    # ------------------------------------------------------------------\n    df.columns = (\n        df.columns\n        .str.strip()\n        .str.lower()\n        .str.replace(' ', '_')\n    )\n    \n    # ------------------------------------------------------------------\n    # 3. Normalize data types\n    #    - Convert date-like columns to datetime\n    #    - Attempt to convert object columns to numeric where possible\n    # ------------------------------------------------------------------\n    for col in df.columns:\n        # Convert columns whose name contains 'date' to datetime\n        if 'date' in col.lower():\n            df[col] = pd.to_datetime(df[col], errors='coerce')\n        # Try to convert object columns to numeric\n        elif df[col].dtype == 'object':\n            try:\n                df[col] = pd.to_numeric(df[col])\n            except (ValueError, TypeError):\n                # If conversion fails, leave as is (categorical)\n                pass\n    \n    # ------------------------------------------------------------------\n    # 4. Handle missing values without dropping rows\n    #    - Numeric: fill with median\n    #    - Categorical/other: fill with mode (or 'Unknown' if no mode)\n    # ------------------------------------------------------------------\n    for col in df.columns:\n        if df[col].isnull().any():\n            if pd.api.types.is_numeric_dtype(df[col]):\n                df[col] = df[col].fillna(df[col].median())\n            else:\n                mode_val = df[col].mode()\n                if not mode_val.empty:\n                    df[col] = df[col].fillna(mode_val[0])\n                else:\n                    df[col] = df[col].fillna('Unknown')\n    \n    # ------------------------------------------------------------------\n    # 5. Remove duplicate rows\n    # ------------------------------------------------------------------\n    df = df.drop_duplicates()\n    \n    # ------------------------------------------------------------------\n    # 6. Summarize numeric columns with descriptive statistics\n    #    We select only numeric columns and compute standard statistics.\n    # ------------------------------------------------------------------\n    numeric_df = df.select_dtypes(include=[np.number])\n    \n    # If there are no numeric columns, return an empty summary DataFrame\n    if numeric_df.empty:\n        summary = pd.DataFrame()\n    else:\n        # Transpose so each row represents a numeric column and columns are stats\n        summary = numeric_df.describe().transpose()\n        # Add additional useful descriptive statistics\n        summary['median'] = numeric_df.median()\n        summary['skew'] = numeric_df.skew()\n        summary['kurtosis'] = numeric_df.kurtosis()\n        # Reorder for readability\n        summary = summary[['count', 'mean', 'std', 'min', '25%', 'median', '50%', '75%', 'max', 'skew', 'kurtosis']]\n    \n    # Return the final wrangled summary DataFrame\n    return summary\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 2579,
+      "prompt_tokens": 741,
+      "total_tokens": 3320,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 1660,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261011193121487560879c955d568HwHvlrKU",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a12c72-c547-71b2-b551-dfabcdfc2065-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 741,
+    "output_tokens": 2579,
+    "total_tokens": 3320,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 1660
+    }
+  }
+}

@@ -1,0 +1,126 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/json_normalize.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:2a6195c4e7b66d24e34856e9a72555240564c10f78f36a0ce51f4f4d6e53ed5f",
+        "before_size": null,
+        "after_size": 779,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/json_normalize.py\n@@ -0,0 +1,25 @@\n+#!/usr/bin/env python3\n+\"\"\"Normalize a field in a JSON file and write the result back.\"\"\"\n+import argparse\n+import json\n+\n+\n+def main():\n+    parser = argparse.ArgumentParser(description=\"Normalize a field in a JSON file.\")\n+    parser.add_argument(\"file\", help=\"Path to the JSON file\")\n+    parser.add_argument(\"--field\", default=\"email\", help=\"Field to normalize\")\n+    args = parser.parse_args()\n+\n+    with open(args.file, \"r\", encoding=\"utf-8\") as f:\n+        data = json.load(f)\n+\n+    if isinstance(data, dict) and args.field in data and isinstance(data[args.field], str):\n+        data[args.field] = data[args.field].strip().lower()\n+\n+    with open(args.file, \"w\", encoding=\"utf-8\") as f:\n+        json.dump(data, f, indent=4)\n+        f.write(\"\\n\")\n+\n+\n+if __name__ == \"__main__\":\n+    main()\n"
+      },
+      {
+        "path": "/home/agent/workspace/sample.before.json",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:675eb4013f6ec65bc0dfae76f62716be23d2ea84bc7fc3035f498ef32c6c52d5",
+        "before_size": null,
+        "after_size": 154,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/sample.before.json\n@@ -0,0 +1,12 @@\n+{\n+  \"name\": \"Ada Lovelace\",\n+  \"email\": \"ADA@Example.COM\",\n+  \"roles\": [\n+    \"admin\",\n+    \"user\"\n+  ],\n+  \"meta\": {\n+    \"active\": true,\n+    \"score\": 42\n+  }\n+}\n"
+      },
+      {
+        "path": "/home/agent/workspace/sample.json",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:abc289532bdd1e8e399fd0acbcf8c261b4a6c3d2dd1013dd074f470ede5bc1de",
+        "before_size": null,
+        "after_size": 182,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/sample.json\n@@ -0,0 +1,12 @@\n+{\n+    \"name\": \"Ada Lovelace\",\n+    \"email\": \"ada@example.com\",\n+    \"roles\": [\n+        \"admin\",\n+        \"user\"\n+    ],\n+    \"meta\": {\n+        \"active\": true,\n+        \"score\": 42\n+    }\n+}\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 3,
+      "diff_included_count": 3
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_96fa6c63e8f640829822762fb795a7f8",
+    "input_id": "step-3",
+    "step_id": "step-3",
+    "submission_id": "submission-bd50333b8339c942bbee698510190317",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "json_normalize.py",
+        "change_type": "created",
+        "size_bytes": 779,
+        "after_sha256": "2a6195c4e7b66d24e34856e9a72555240564c10f78f36a0ce51f4f4d6e53ed5f"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "sample.before.json",
+        "change_type": "created",
+        "size_bytes": 154,
+        "after_sha256": "675eb4013f6ec65bc0dfae76f62716be23d2ea84bc7fc3035f498ef32c6c52d5"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "file_change",
+        "path": "sample.json",
+        "change_type": "created",
+        "size_bytes": 182,
+        "after_sha256": "abc289532bdd1e8e399fd0acbcf8c261b4a6c3d2dd1013dd074f470ede5bc1de"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "d3daa5eba5c002055ec1075eb55aa93774a8e604fe4547a76dad519deba9b913",
+        "size_bytes": 6764,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0004",
+        "sequence": 4,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "3dd81ec262e07d7c0a17e76a82e34942f79c78bec92b3fe1916fcbc4fe9f339f"
+      }
+    ]
+  }
+}

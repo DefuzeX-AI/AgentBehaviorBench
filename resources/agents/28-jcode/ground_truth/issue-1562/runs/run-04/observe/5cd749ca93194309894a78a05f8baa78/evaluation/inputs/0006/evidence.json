@@ -1,0 +1,91 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_247ecd3f2b8e4d19b86358183c56703c",
+  "case_id": "case_2f9a797be0a94855b3c0e41b18d1a798",
+  "input_id": "step-6",
+  "spans": [
+    {
+      "trace_id": "a9c711a7b7d39ba82a944938f82f8428",
+      "span_id": "47d56e6100a01153",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791315401939903671,
+      "end_time_unix_nano": 1791315418915274253,
+      "duration_nano": 16975370582,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791315401942776474,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791315418907924034,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "a9c711a7b7d39ba82a944938f82f8428",
+      "span_id": "9c0da836748c0a07",
+      "parent_span_id": "47d56e6100a01153",
+      "name": "Running shell command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791315409865062763,
+      "end_time_unix_nano": 1791315409987671879,
+      "duration_nano": 122609116,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Running shell command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /home/agent/workspace && test -s revised_release_checklist.md && test -f revised_release_checklist.md && echo \"VERIFIED: exists and is non-empty\" && wc -lc revised_release_checklist.md && ls -la revised_release_checklist.md",
+          "intent": "Verify the revised checklist file exists and is non-empty"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "VERIFIED: exists and is non-empty\n  39 1710 revised_release_checklist.md\n-rw-r--r-- 1 agent agent 1710 Oct  6 19:33 revised_release_checklist.md\n"
+        },
+        "gen_ai.tool.call.id": "call_d9e080e09a1d47a99641493c"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 18,
+  "truncated": false,
+  "reasons": [
+    "trace_attribute_not_allowlisted"
+  ]
+}

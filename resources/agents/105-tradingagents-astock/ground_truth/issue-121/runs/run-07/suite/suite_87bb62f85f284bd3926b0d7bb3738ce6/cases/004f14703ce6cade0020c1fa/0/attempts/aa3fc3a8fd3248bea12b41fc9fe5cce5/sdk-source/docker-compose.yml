@@ -1,0 +1,56 @@
+services:
+  # CLI（默认）：docker compose run --rm tradingagents
+  tradingagents:
+    build: .
+    env_file:
+      - .env
+    volumes:
+      - tradingagents_data:/home/appuser/.tradingagents
+    tty: true
+    stdin_open: true
+
+  # Web UI：docker compose up web  → http://localhost:8501
+  #
+  # 入口用 `tradingagents-web`（= web.launch:main），它按 __file__ 解析 app.py 的
+  # 绝对路径，与工作目录无关。不要写成 `streamlit run web/app.py`——那条依赖 CWD，
+  # 一旦工作目录不对就报 "File does not exist: web/app.py"（issue #82）。
+  web:
+    build: .
+    entrypoint: ["tradingagents-web"]
+    env_file:
+      - .env
+    environment:
+      # 容器内必须监听 0.0.0.0，否则端口映射进不来
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_HEADLESS=true
+    ports:
+      - "8501:8501"
+    volumes:
+      - tradingagents_data:/home/appuser/.tradingagents
+
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    profiles:
+      - ollama
+
+  tradingagents-ollama:
+    build: .
+    env_file:
+      - .env
+    environment:
+      - LLM_PROVIDER=ollama
+    volumes:
+      - tradingagents_data:/home/appuser/.tradingagents
+    depends_on:
+      - ollama
+    tty: true
+    stdin_open: true
+    profiles:
+      - ollama
+
+volumes:
+  tradingagents_data:
+  ollama_data:

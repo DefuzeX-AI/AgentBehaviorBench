@@ -1,0 +1,9 @@
+[
+  {
+    "content": {
+      "text": "Command: cd /workspace/project && python3 - <<'PY'\np='split_lines.sh'\ns=open(p).read()\nbad=\"IFS=$\\n\\\\n'\\nread -r -a parts <<< \\\"$1\\\"\\nfor p in \\\"${parts[@]}\\\"; do\\n  echo \\\"[$p]\\\"\\ndone\"\ngood=\"IFS=$'\\\\n'\\nread -r -a parts <<< \\\"$1\\\"\\nfor p in \\\"${parts[@]}\\\"; do\\n  echo \\\"[$p]\\\"\\ndone\"\nassert bad in s, \"pattern not found\"\nopen(p,'w').write(s.replace(bad,good))\nPY\ncat -A split_lines.sh\nRead-only: false\nSandbox: disabled\nExit code: 0\n\nSTDOUT:\n#!/usr/bin/env bash$\n# split_lines.sh: print every field of the first argument on its own line$\nIFS=$\nread -r -a parts <<< \"$1\"$\nfor p in \"${parts[@]}\"; do$\n  echo \"[$p]\"$\ndone$\n\\n'$\nread -r -a parts <<< \"$1\"$\nfor p in \"${parts[@]}\"; do$\n  echo \"[$p]\"$\ndone$\n\n\nSTDERR:\nTraceback (most recent call last):\n  File \"<stdin>\", line 5, in <module>\nAssertionError: pattern not found\n",
+      "type": "text"
+    },
+    "type": "content"
+  }
+]

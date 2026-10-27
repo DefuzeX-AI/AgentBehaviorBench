@@ -5,7 +5,7 @@ import tomllib
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-UNIT = ROOT / 'resources/agents/127-whale'
+UNIT = ROOT / 'resources/agents/135-whale'
 
 
 def launcher():

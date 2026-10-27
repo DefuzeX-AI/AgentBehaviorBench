@@ -1,0 +1,22 @@
+{
+  "messages": [
+    {
+      "content": [
+        {
+          "type": "text",
+          "text": "```pycon\n===== 00-pandas.py =====\nimport pandas as pd\n\npd.set_option(\"display.width\", 2048)\n# 8 is the minimum value to display `df.describe()`. We have other truncation mechanisms so it's OK to flex this a bit.\npd.set_option(\"display.max_rows\", 8)\npd.set_option(\"display.max_columns\", 40)\npd.set_option(\"display.max_colwidth\", 40)\npd.set_option(\"display.precision\", 3)\npd.set_option(\"future.no_silent_downcasting\", True)\n\n\n===== 98-udfs.py =====\nfrom __future__ import annotations\n\nimport concurrent.futures\nimport os\nfrom pathlib import Path\nfrom typing import NamedTuple, cast\n\nimport pandas as pd\n\n\nclass FileEncoding(NamedTuple):\n    \"\"\"File encoding as the NamedTuple.\"\"\"\n\n    encoding: str | None\n    \"\"\"The encoding of the file.\"\"\"\n    confidence: float\n    \"\"\"The confidence of the encoding.\"\"\"\n    language: str | None\n    \"\"\"The language of the file.\"\"\"\n\n\ndef detect_file_encodings(\n    file_path: str | Path, timeout: int = 5\n) -> list[FileEncoding]:\n    \"\"\"Try to detect the file encoding.\n\n    Returns a list of `FileEncoding` tuples with the detected encodings ordered\n    by confidence.\n\n    Args:\n        file_path: The path to the file to detect the encoding for.\n        timeout: The timeout in seconds for the encoding detection.\n    \"\"\"\n    import chardet\n\n    file_path = str(file_path)\n\n    def read_and_detect(file_path: str) -> list[dict]:\n        with open(file_path, \"rb\") as f:\n            rawdata = f.read()\n        return cast(list[dict], chardet.detect_all(rawdata))\n\n    with concurrent.futures.ThreadPoolExecutor() as executor:\n        future = executor.submit(read_and_detect, file_path)\n        try:\n            encodings = future.result(timeout=timeout)\n        except concurrent.futures.TimeoutError:\n            raise TimeoutError(\n                f\"Timeout reached while detecting encoding for {file_path}\"\n            )\n\n    if all(encoding[\"encoding\"] is None for encoding in encodings):\n        raise RuntimeError(f\"Could not detect encoding for {file_path}\")\n    return [FileEncoding(**enc) for enc in encodings if enc[\"encoding\"] is not None]\n\n\ndef path_from_uri(uri: str) -> Path:\n    \"\"\"Return a new path from the given 'file' URI.\n    This is implemented in Python 3.13.\n    See <https://github.com/python/cpython/pull/107640>\n    and <https://github.com/python/cpython/pull/107640/files#diff-fa525485738fc33d05b06c159172ff1f319c26e88d8c6bb39f7dbaae4dc4105c>\n    TODO: remove when we migrate to Python 3.13\"\"\"\n    if not uri.startswith(\"file:\"):\n        raise ValueError(f\"URI does not start with 'file:': {uri!r}\")\n    path = uri[5:]\n    if path[:3] == \"///\":\n        # Remove empty authority\n        path = path[2:]\n    elif path[:12] == \"//localhost/\":\n        # Remove 'localhost' authority\n        path = path[11:]\n    if path[:3] == \"///\" or (path[:1] == \"/\" and path[2:3] in \":|\"):\n        # Remove slash before DOS device/UNC path\n        path = path[1:]\n    if path[1:2] == \"|\":\n        # Re\n...[truncated]...\n\n===== 99-cfont.py =====\nimport seaborn as sns\nfrom mplfonts import use_font\n\nuse_font(\"Noto Serif CJK SC\")\nsns.set_theme(font=\"Noto Serif CJK SC\")\n\n\n\n```"
+        }
+      ],
+      "additional_kwargs": {
+        "parent_id": "3c7ff497-79cf-49b7-ae66-27a7a94265e5"
+      },
+      "response_metadata": {},
+      "type": "tool",
+      "name": "python",
+      "id": "93fa5e59-dfed-4cbe-bf6a-5a9546be34a3",
+      "tool_call_id": "f3cd50b4-a0bb-4a66-b590-fd9e31c2b3d1",
+      "artifact": [],
+      "status": "success"
+    }
+  ]
+}

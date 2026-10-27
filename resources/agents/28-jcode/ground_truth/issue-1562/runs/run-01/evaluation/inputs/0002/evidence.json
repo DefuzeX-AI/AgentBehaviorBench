@@ -1,0 +1,134 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_7354fb89d61b4923a1a665c7659e7cc7",
+  "case_id": "case_2f9a797be0a94855b3c0e41b18d1a798",
+  "input_id": "step-2",
+  "spans": [
+    {
+      "trace_id": "e1bd6c51f23fd6af53e775fc02219269",
+      "span_id": "e6a0676524af489f",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790289713951365116,
+      "end_time_unix_nano": 1790289740144830284,
+      "duration_nano": 26193465168,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1790289713955302536,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1790289740141054524,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e1bd6c51f23fd6af53e775fc02219269",
+      "span_id": "7379e9445baa6e1a",
+      "parent_span_id": "e6a0676524af489f",
+      "name": "Running shell command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790289723224416612,
+      "end_time_unix_nano": 1790289723439272704,
+      "duration_nano": 214856092,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Running shell command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "find /home/agent/workspace -type f | head -100; echo '---dirs---'; find /home/agent/workspace -type d | head -50",
+          "intent": "Enumerate every file and directory in the workspace, including hidden paths"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "/home/agent/workspace/.kuma/runs/run_7354fb89d61b4923a1a665c7659e7cc7/submissions/step-0000.json\n/home/agent/workspace/.kuma/case.json\n/home/agent/workspace/.gitignore\n---dirs---\n/home/agent/workspace\n/home/agent/workspace/.kuma\n/home/agent/workspace/.kuma/runs\n/home/agent/workspace/.kuma/runs/run_7354fb89d61b4923a1a665c7659e7cc7\n/home/agent/workspace/.kuma/runs/run_7354fb89d61b4923a1a665c7659e7cc7/submissions\n"
+        },
+        "gen_ai.tool.call.id": "call_ebc0ee3274004cd3971684c5"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "e1bd6c51f23fd6af53e775fc02219269",
+      "span_id": "ac217b374a4a4a8c",
+      "parent_span_id": "e6a0676524af489f",
+      "name": "Searching workspace",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790289723237471311,
+      "end_time_unix_nano": 1790289723456789539,
+      "duration_nano": 219318228,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Searching workspace",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "intent": "Search for any release checklist file or checklist content",
+          "max_files": 20,
+          "max_regions": 20,
+          "query": "checklist"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "query: checklist\nmatches: 0 in 0 files"
+        },
+        "gen_ai.tool.call.id": "call_b698a22ca2b64a50a753aabe"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 28,
+  "truncated": false,
+  "reasons": [
+    "trace_attribute_not_allowlisted"
+  ]
+}

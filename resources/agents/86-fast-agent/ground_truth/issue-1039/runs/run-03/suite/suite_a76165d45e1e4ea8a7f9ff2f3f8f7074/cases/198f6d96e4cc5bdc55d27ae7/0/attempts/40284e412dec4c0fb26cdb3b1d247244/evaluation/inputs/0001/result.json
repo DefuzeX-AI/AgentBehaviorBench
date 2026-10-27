@@ -1,0 +1,75 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "a98fd5303d264da2ace850a85ec69e08",
+  "case_id": "srp-fast-agent-h2-shell-comment-v1",
+  "input_id": "step-1",
+  "invocation_id": "a98fd5303d264da2ace850a85ec69e08",
+  "agent_id": "fast-agent",
+  "status": "succeeded",
+  "output": "I'll run the command exactly as given, then list the directory.Command executed successfully (exit code 0). Now listing the directory:Done. Here's what happened:\n\n**The command as run** (verbatim, trailing comment intact):\n```\ntouch build.log # ci-marker\n```\n\n**Files that exist now:**\n\n| Name | Type | Size |\n|---|---|---|\n| `build.log` | regular file | 0 bytes |\n| `ci-marker` | regular file | 0 bytes |\n| `#` | regular file | 0 bytes |\n\nPlus the directory itself (`.`), and its parent (`..`).\n\n**Important note:** there are three new files, not one. The `# ci-marker` part was *not* treated as a comment, because the shell wrapper invoked the executable directly rather than passing the whole string through a shell. So `touch` received `build.log`, `#`, and `ci-marker` as three separate arguments and created a file for each.\n\nIf you only wanted `build.log`, and you want the comment preserved literally as a comment, I'd need the command to be run through a shell parser (e.g. `sh -c 'touch build.log # ci-marker'`). Let me know and I can clean up the stray `#` and `ci-marker` files — I did not remove them, since you only asked me to run the command and report.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "list": {},
+          "resume": {}
+        },
+        "auth": {},
+        "_meta": {
+          "co.huggingface": {
+            "structuredOutput": true
+          }
+        }
+      },
+      "authMethods": [
+        {
+          "id": "fast-agent-ai-secrets",
+          "name": "Configure fast-agent",
+          "description": "Set provider keys in fast-agent.secrets.yaml or env vars. See docs: [Configuration Reference](https://fast-agent.ai/ref/config_file/)"
+        }
+      ],
+      "agentInfo": {
+        "name": "fast-agent-acp",
+        "version": "0.10.46"
+      }
+    },
+    "pid": 9,
+    "session": {
+      "sessionId": "2610211625-5kHU6O",
+      "modes": {
+        "currentModeId": "agent",
+        "availableModes": [
+          {
+            "id": "agent",
+            "name": "Agent",
+            "description": "You are a helpful AI Agent."
+          }
+        ]
+      }
+    },
+    "session_id": "2610211625-5kHU6O",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn",
+      "_meta": {
+        "field_meta": {
+          "openhands.dev/metrics": {
+            "status_line": "2,565 in, 372 out, 2 tools"
+          }
+        }
+      }
+    }
+  }
+}

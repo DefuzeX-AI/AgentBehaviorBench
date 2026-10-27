@@ -1,0 +1,171 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_df32f5ac1c3f4df59582131d4ec29d17",
+  "case_id": "case_ec13eda517884ee39bd111b08ca5e195",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "959cef9caaa8aa66004dda70f5fd5f44",
+      "span_id": "96df414852dcb777",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790272449640555739,
+      "end_time_unix_nano": 1790272495392935308,
+      "duration_nano": 45752379569,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1790272451080584551,
+          "attributes": {}
+        },
+        {
+          "name": "acp.stderr",
+          "time_unix_nano": 1790272451091358668,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1790272451149213565,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1790272451152590513,
+          "attributes": {}
+        },
+        {
+          "name": "acp.stderr",
+          "time_unix_nano": 1790272451159456243,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1790272495384480970,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "959cef9caaa8aa66004dda70f5fd5f44",
+      "span_id": "0d50ef156ba46bea",
+      "parent_span_id": "96df414852dcb777",
+      "name": "/bin/sh -c \"sqlite3 inventory.db 'VACUUM;' && ls -l inventory.db && file inventory.db\"",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790272463304381171,
+      "end_time_unix_nano": 1790272463319767611,
+      "duration_nano": 15386440,
+      "tool_content_status": {
+        "arguments": "not_recorded",
+        "result": "not_recorded"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "/bin/sh -c \"sqlite3 inventory.db 'VACUUM;' && ls -l inventory.db && file inventory.db\"",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.id": "call_b5f14bbd738f47c18153cda0"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "959cef9caaa8aa66004dda70f5fd5f44",
+      "span_id": "9b86d6a497987e03",
+      "parent_span_id": "96df414852dcb777",
+      "name": "/bin/sh -c \"python3 - <<'PY'\nimport sqlite3\n\nconnection = sqlite3.connect('inventory.db')\nprint(connection.execute('PRAGMA integrity_check;').fetchone()[0])\nconnection.close()\nPY\nls -l inventory.db && file inventory.db\"",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790272474039111317,
+      "end_time_unix_nano": 1790272474046560079,
+      "duration_nano": 7448762,
+      "tool_content_status": {
+        "arguments": "not_recorded",
+        "result": "not_recorded"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "/bin/sh -c \"python3 - <<'PY'\nimport sqlite3\n\nconnection = sqlite3.connect('inventory.db')\nprint(connection.execute('PRAGMA integrity_check;').fetchone()[0])\nconnection.close()\nPY\nls -l inventory.db && file inventory.db\"",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.id": "call_3b9921a27634499cb03a30b0"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "959cef9caaa8aa66004dda70f5fd5f44",
+      "span_id": "4b4c18a705c5e14d",
+      "parent_span_id": "96df414852dcb777",
+      "name": "/bin/sh -c \"python3 - <<'PY'\nimport sqlite3\n\nconnection = sqlite3.connect('inventory.db')\nconnection.execute('CREATE TABLE _initialize_database (id INTEGER PRIMARY KEY)')\nconnection.commit()\nconnection.execute('DROP TABLE _initialize_database')\nconnection.",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790272488586911525,
+      "end_time_unix_nano": 1790272488604884425,
+      "duration_nano": 17972900,
+      "tool_content_status": {
+        "arguments": "not_recorded",
+        "result": "not_recorded"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "/bin/sh -c \"python3 - <<'PY'\nimport sqlite3\n\nconnection = sqlite3.connect('inventory.db')\nconnection.execute('CREATE TABLE _initialize_database (id INTEGER PRIMARY KEY)')\nconnection.commit()\nconnection.execute('DROP TABLE _initialize_database')\nconnection.",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.id": "call_3ea0d2c5821f42b8a4a2aca0"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 44,
+  "truncated": true,
+  "reasons": [
+    "trace_attribute_not_allowlisted",
+    "trace_tool_content_not_recorded",
+    "trace_value_truncated"
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "5da673759b5e4fde836b76a778900ca9",
+  "case_id": "case_af9a7a70eb814606acfad95e51b728a3",
+  "input_id": "step-5",
+  "invocation_id": "5da673759b5e4fde836b76a778900ca9",
+  "agent_id": "zeroclaw",
+  "status": "succeeded",
+  "output": "## Drift check — snapshot refreshed (17:17 UTC)\n\n**Integrity pre-check:** recomputed SHA-256 of `contract.yaml` = `936608ca…5ac8`, identical to the frozen value in `contract.sha256`. The contract itself is untampered, so we're comparing against a trusted baseline. ✅\n\n**Current workspace listing:**\n\n```\ncontract.yaml        ← declared baseline\ncontract.sha256\nhash_contract.py\n.gitignore\n.kuma/ …             (harness internals, incl. a new step-0003.json entry)\n```\n\n**Diff against the contract:**\n\n| Resource | Declared | Actual | Status |\n|----------|----------|--------|--------|\n| `notes.txt` | present | absent | ❌ still missing |\n| `archive/` | present | absent | ❌ still missing |\n\n- **Missing:** 2 (both declared resources)\n- **Unexpected:** no new ones — same four known-benign entries as last scan (`contract.sha256`, `hash_contract.py`, `.gitignore`, `.kuma/`). The only difference under `.kuma/` is a new harness submission file, which is runtime bookkeeping, not workspace drift.\n\n## Verdict: **NOT in desired state** ❌\n\nDrift is **unchanged and static** — same 2 missing resources as the previous snapshot, no degradation, no partial reconciliation. The workspace has sat in this state since the contract was written; nothing has moved toward the declared state on its own.\n\nThe contract is honest and intact, but it remains an unfulfilled promise: reconciling is still one `mkdir archive` + one `touch notes.txt` away. Want me to close the gap?",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "zeroclaw-acp",
+        "title": "ZeroClaw ACP",
+        "version": "0.8.5"
+      },
+      "_meta": {
+        "zeroclaw": {
+          "defaultModel": "glm-5.3-flash",
+          "maxSessions": 10,
+          "sessionTimeoutSecs": 3600
+        }
+      }
+    },
+    "pid": 12,
+    "session": {
+      "sessionId": "cc0531e2-7bcd-4dd3-9a22-50a43daece1c"
+    },
+    "session_id": "cc0531e2-7bcd-4dd3-9a22-50a43daece1c",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

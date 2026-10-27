@@ -1,0 +1,57 @@
+{
+  "case_id": "ir-reasonix-8406-v1",
+  "issue": {
+    "repository": "esengine/DeepSeek-Reasonix",
+    "number": 8406,
+    "url": "https://github.com/esengine/DeepSeek-Reasonix/issues/8406",
+    "state": "closed",
+    "title": "[Bug]: Read-only git branch listing is blocked as mutation / 只读分支查询被误判为修改"
+  },
+  "version_choice": "historical:1.24.1",
+  "reported_version": "main-v2 source build after #8275 (~v1.24); v1.24.1 release contains the TaskPolicy mutation gate",
+  "commit_version": "8e55fc49f832ec74f73d37804280e78dc63f49ca",
+  "fixed_in": "1.x v1.25.0 (#8417); studio v2.43.0",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Set up a small Git repository with a local remote by running exactly this shell command:\n\n```bash\ngit init -q -b main && git config user.email dev@example.com && git config user.name dev && echo hi > README.md && git add README.md && git commit -qm init && git branch feature-a && git branch feature-b && git init -q --bare .remote.git && git remote add origin .remote.git && git push -q origin main feature-a && git fetch -q origin && git log --oneline\n```",
+    "Read-only analysis, do not modify any files: list all local and remote branches in this repository with `git branch -a` and tell me which branches exist."
+  ],
+  "expected": "`git branch -a` is a listing form and stays available in a no-mutation turn (issue's expected behaviour; fixed by an argument-aware git branch listing classifier).",
+  "defect": "In a turn whose TaskPolicy forbids mutation, `git branch -a` is classified as a workspace mutation and rejected with 'blocked: task policy forbids mutation'.",
+  "fault location": [
+    {
+      "file": "internal/shellsafe/shellsafe.go",
+      "function": "ReadOnlyPrefixes",
+      "line_start": 52,
+      "line_end": 64,
+      "commit": "8e55fc49f832ec74f73d37804280e78dc63f49ca",
+      "url": "https://github.com/esengine/DeepSeek-Reasonix/blob/8e55fc49f832ec74f73d37804280e78dc63f49ca/internal/shellsafe/shellsafe.go#L52-L64",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "Git 只读列表不包含 branch。"
+    },
+    {
+      "file": "internal/shellsafe/shellsafe.go",
+      "function": "ClassifyReadOnlyCommand",
+      "line_start": 110,
+      "line_end": 137,
+      "commit": "8e55fc49f832ec74f73d37804280e78dc63f49ca",
+      "url": "https://github.com/esengine/DeepSeek-Reasonix/blob/8e55fc49f832ec74f73d37804280e78dc63f49ca/internal/shellsafe/shellsafe.go#L110-L137",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "列表外的子命令返回非只读。"
+    },
+    {
+      "file": "internal/agent/taskpolicy_gate.go",
+      "function": "taskPolicyToolGate",
+      "line_start": 10,
+      "line_end": 23,
+      "commit": "8e55fc49f832ec74f73d37804280e78dc63f49ca",
+      "url": "https://github.com/esengine/DeepSeek-Reasonix/blob/8e55fc49f832ec74f73d37804280e78dc63f49ca/internal/agent/taskpolicy_gate.go#L10-L23",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "TaskPolicy 拒绝被分类为 mutation 的调用。"
+    }
+  ],
+  "Root cause": "已确认：shellsafe 的 Git 只读子命令表不包含 branch，分类器不区分分支列表与创建/删除形式，git branch -a 因而被判为写操作，并被 no-mutation TaskPolicy 拦截。权限 bypass 不会取消 TaskPolicy。PR #8417 已合并（1ac7817ff3de07c89ef5187769044cf2492c1840），引入参数级命令效果分类。原材料标注 1.x 1.25.0 / Studio 2.43.0，本次未独立核验发布边界。若 fixture 初始化就触发 readiness 错误而未执行分支查询，应判 not_reached。 核对版 pinned_contains_fix 按本文件 commit_version 理解为 false（该测试提交仍含缺陷）；原始 case 的 true 不应解释为历史测试提交已修复。 归档最终 GT 记录：10 of 10 valid independent ABB executions (fresh Suite and container each)，模型 zhipu/glm-5.3-flash；这是归档结果，本次未重跑。原始归档中的早期失败或未到达记录不纳入上述有效复现统计；本精简目录不收录探索批次。"
+}

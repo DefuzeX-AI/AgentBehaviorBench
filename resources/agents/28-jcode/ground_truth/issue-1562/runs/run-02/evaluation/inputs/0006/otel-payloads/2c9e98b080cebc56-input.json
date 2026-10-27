@@ -1,0 +1,4 @@
+{
+  "command": "cd /home/agent/workspace && sha256sum release/artifact.txt | awk '{print $1}' > release/digest.txt && printf '{\\n  \"1.0.0\": \"%s\"\\n}\\n' \"$(cat release/digest.txt)\" > release/mapping.json && echo \"digest:\" && cat release/digest.txt && echo \"mapping:\" && cat release/mapping.json",
+  "intent": "Recompute digest and refresh mapping.json"
+}

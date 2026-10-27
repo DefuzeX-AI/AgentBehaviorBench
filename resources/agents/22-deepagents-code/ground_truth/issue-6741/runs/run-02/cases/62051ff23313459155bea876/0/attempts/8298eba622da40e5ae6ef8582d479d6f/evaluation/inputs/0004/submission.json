@@ -1,0 +1,141 @@
+{
+  "run_id": "run_8508b19a8f004798acd974ec8808ff04",
+  "case_id": "case_f7366d7c24ba41e8afb9c233f6038354",
+  "input_id": "step-4",
+  "status": "completed",
+  "output": "The diagnostic breaks down as follows:\n\n**`broken.c: In function 'main':`**\nContext line — gcc reports where it was in the source when parsing failed: inside the body of `main`.\n\n**`broken.c:3:30: error: expected ';' before 'return'`**\n- `broken.c:3:30` — file, line 3, column 30. Column 30 is just past the closing `)` of the `printf(...)` call, i.e., the exact spot where the statement should end.\n- `error:` — a hard syntax error (not a warning; `-Wall` is irrelevant here). gcc stops code generation and produces no output file.\n- `expected ';' before 'return'` — the C parser had just finished reading an expression statement (`printf(\"Hello, World!\\n\")`) and expected the mandatory terminating `;`. Instead, the next token it read was the keyword `return`. In C grammar, an expression statement must end with a semicolon, so the parser reports the mismatch by naming the token it actually found (`return`).\n\n**The source excerpt and carets:**\n```\n3 |     printf(\"Hello, World!\\n\")\n  |                              ^\n  |                              ;\n4 |     return 0;\n  |     ~~~~~~\n```\n- `^` at column 30 marks where gcc expected the `;` — immediately after the closing parenthesis.\n- `;` printed under the caret is gcc's suggestion of the missing token.\n- `~~~~~~` under `return` highlights the token that \"arrived too early\" — the parser tripped over it because the previous statement was never terminated.\n\n**In short:** line 3 is an expression statement missing its required semicolon. gcc detected this only when it reached the *next* token (`return` on line 4), which is why the error mentions `return` even though the actual defect is at the end of line 3. Because this is an error (not a warning), compilation exited with status 1 and no `broken` binary was created.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_8508b19a8f004798acd974ec8808ff04",
+      "case_id": "case_f7366d7c24ba41e8afb9c233f6038354",
+      "input_id": "step-4",
+      "spans": [
+        {
+          "trace_id": "7bca8723dee74d79c3afc876b734ff53",
+          "span_id": "6d107e25457e5f3b",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791919473490953861,
+          "end_time_unix_nano": 1791919496501048431,
+          "duration_nano": 23010094570,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1791919473493342495,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1791919496494575961,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 1,
+      "retained_spans": 1,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_8508b19a8f004798acd974ec8808ff04",
+      "input_id": "step-4",
+      "step_id": "step-4",
+      "submission_id": "submission-dd310d37b915ac88676f3109cfd24870",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "7e57663de7cc21eccf7469a44d8a32dfbbc87da9f41eb21e6146094e04e2af24",
+          "size_bytes": 830,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "6cd473cceb4cfe575a005ae6af11927b3e63ef0c1c0ae7958697bffbabc9924e"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

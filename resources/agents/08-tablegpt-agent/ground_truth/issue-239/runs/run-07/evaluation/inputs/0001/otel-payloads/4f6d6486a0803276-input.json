@@ -1,0 +1,3 @@
+{
+  "query": "import sys, os\nfor p in [os.path.expanduser('~/.local/lib/python3.12/site-packages'),\n          os.path.join(os.getcwd(), '.local/lib/python3.12/site-packages')]:\n    if os.path.isdir(p) and p not in sys.path:\n        sys.path.insert(0, p)\n        print(\"added:\", p)\n\nimport importlib\nimportlib.invalidate_caches()\nimport pyscf\nprint(\"pyscf version:\", pyscf.__version__)"
+}

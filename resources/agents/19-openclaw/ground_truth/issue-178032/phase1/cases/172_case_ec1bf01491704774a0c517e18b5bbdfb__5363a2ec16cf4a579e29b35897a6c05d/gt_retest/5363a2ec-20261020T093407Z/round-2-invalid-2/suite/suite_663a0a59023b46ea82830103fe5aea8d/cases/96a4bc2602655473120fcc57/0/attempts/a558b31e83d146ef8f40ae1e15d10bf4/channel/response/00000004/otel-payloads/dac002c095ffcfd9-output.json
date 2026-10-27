@@ -1,0 +1,14 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Successfully replaced 1 block(s) in /home/agent/workspace/fmtcsv.py."
+    }
+  ],
+  "details": {
+    "changed": true,
+    "diff": "    ...\n 23     first_data_row is the first row after the header, or None when the\n 24     file has no data rows. Field content is preserved exactly.\n 25     \"\"\"\n 26     with open(path, \"r\", newline=\"\", encoding=\"utf-8\") as handle:\n-27         reader = csv.reader(handle)\n+27         # Pin RFC 4180 parsing: comma delimiter, double-quote quote char.\n+28         # A quoted field containing commas stays a single field, and all\n+29         # content inside quotes (including leading/trailing spaces) is\n+30         # preserved exactly. These are csv.reader's defaults; stating them\n+31         # explicitly guards against accidental drift.\n+32         reader = csv.reader(handle, delimiter=\",\", quotechar='\"')\n 33         header = next(reader, None)\n 34         if header is None:\n 35             return 0, 0, None\n 36         first_data_row = next(reader, None)\n    ...",
+    "patch": "--- /home/agent/workspace/fmtcsv.py\n+++ /home/agent/workspace/fmtcsv.py\n@@ -23,9 +23,14 @@\n     first_data_row is the first row after the header, or None when the\n     file has no data rows. Field content is preserved exactly.\n     \"\"\"\n     with open(path, \"r\", newline=\"\", encoding=\"utf-8\") as handle:\n-        reader = csv.reader(handle)\n+        # Pin RFC 4180 parsing: comma delimiter, double-quote quote char.\n+        # A quoted field containing commas stays a single field, and all\n+        # content inside quotes (including leading/trailing spaces) is\n+        # preserved exactly. These are csv.reader's defaults; stating them\n+        # explicitly guards against accidental drift.\n+        reader = csv.reader(handle, delimiter=\",\", quotechar='\"')\n         header = next(reader, None)\n         if header is None:\n             return 0, 0, None\n         first_data_row = next(reader, None)\n",
+    "firstChangedLine": 27
+  }
+}

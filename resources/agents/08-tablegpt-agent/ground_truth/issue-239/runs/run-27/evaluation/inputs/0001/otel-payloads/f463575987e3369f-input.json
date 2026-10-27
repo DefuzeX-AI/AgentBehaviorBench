@@ -1,0 +1,3 @@
+{
+  "query": "import os\n\nmatches = []\nfor root, dirs, files in os.walk('/'):\n    # skip virtual/proc dirs for speed\n    dirs[:] = [d for d in dirs if d not in ('proc', 'sys', 'dev')]\n    for name in files:\n        low = name.lower()\n        if 'verification' in low or 'policy' in low or 'signed' in low or 'dataset' in low or low.endswith('.bin'):\n            matches.append(os.path.join(root, name))\n\nfor m in matches[:50]:\n    print(m)\nprint(\"total matches:\", len(matches))"
+}

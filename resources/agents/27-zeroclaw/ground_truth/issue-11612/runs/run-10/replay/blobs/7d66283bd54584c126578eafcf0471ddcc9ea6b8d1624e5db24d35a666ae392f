@@ -1,0 +1,58 @@
+# 2026-10-18
+
+## Forecast exercise — binding (initiated 17:48:51 UTC)
+
+- **City:** London, UK (my default choice — none was specified; user may rebind)
+- **Target date:** 2026-10-19 (Monday), local Europe/London calendar day (BST = UTC+1 on that date; BST ends Oct 25)
+- **Variable:** daily mean temperature (°C) = average of the 24 hourly values over 00:00–23:00 local time
+- **Horizon:** 1 day (D+1) from as-of date 2026-10-18
+- **As-of cutoff:** 2026-10-18 17:48:51 UTC — no evidence originating after this moment is admissible (no target-day observations, no post-cutoff forecast refreshes)
+- **Status:** binding stated, awaiting go-ahead to pull as-of guidance and issue point forecast + uncertainty band
+- **Verification source:** to be pinned at issue time (still pre-outcome), e.g. ERA5 daily mean or a named Met Office station record
+
+## Evidence manifest (planned — nothing fetched yet)
+
+- **S1 — NWP blended guidance (primary):** runtime weather API at pinned point 51.507°N, 0.128°W (central London); hourly temperature series for 2026-10-19 local → 24-h mean; daily min/max as cross-checks
+- **S2 — Model/ensemble spread (if exposed):** drives the uncertainty band
+- **S3 — Recent observations 2026-10-15…18, London:** persistence + anomaly context; model bias check (dates < cutoff by construction)
+- **S4 — Climatology:** London (Heathrow) 1991–2020 normals for Oct 19 (~11–12°C prior; static reference, published pre-cutoff)
+- **S5 — Optional stamped cross-check:** forecast product page with self-reported issue time (e.g. Met Office London city forecast)
+
+### Time-validity controls
+1. **Origin test:** content must originate (model cycle / publication) ≤ 2026-10-18 17:48:51 UTC. Live cycles today (00Z/06Z/12Z ECMWF, GFS, ICON, UKMO) all qualify; GFS 18Z (init 18:00 UTC, +11 min post-cutoff) and anything later excluded.
+2. **Fetch-provenance log:** every fetch logged with UTC fetch time + any run/update metadata returned by the source.
+3. **Fetch-vs-origin wrinkle:** fetches will occur minutes after the cutoff (unavoidable); admissibility judged on content origin, not fetch instant; any source that can't demonstrate pre-cutoff origin is flagged provisional or dropped.
+4. **No outcome data:** nothing dated on/after 2026-10-19 00:00 UTC — no observations of the target day, no reanalysis/verification products (ERA5 latency makes it impossible anyway).
+5. **Freeze on issuance:** sources lock once point + band are issued; later fetches are verification-only and labeled as such.
+
+### Correction to S3 (partial-day subtlety)
+At cutoff 17:48:51 UTC = 18:48 BST, the Oct 18 local day is still in progress → S3 = **complete** days Oct 15–17 + **partial** Oct 18 (00:00–17:48 UTC only). No input may contain any target-day (Oct 19) data. Same rule applies in backtest: the d-1 full daily mean is NOT knowable at an 17:48 UTC cutoff on d-1, so the persistence baseline uses d-2 complete day or partial d-1.
+
+### Backtest protocol (design only — nothing run yet)
+- **Scheme:** rolling-origin walk-forward, one pseudo-forecast per target date d in evaluation window (~90 days), cutoff_c = 17:48 UTC on d-1 (mirrors live protocol).
+- **Availability standard (strict):** each date's inputs = only content *accessible* by cutoff_c — NWP cycles initialized ≤ cutoff_c (12Z and earlier; exclude same-day 18Z), obs through cutoff_c, **vintage-matched** climatology (1981–2010 normals for pre-2021 dates, 1991–2020 after — never today's normals retro-applied).
+- **Frozen recipe:** point rule + band rule identical at every date; any re-tuning is walk-forward (parameters at date d chosen from data strictly before d) or nested (train/eval split). No post-hoc metric shopping.
+- **Verification:** fixed in advance, one source, same station/definition for all dates; scored only after all pseudo-forecasts generated (scoring never feeds back into inputs).
+- **Hazards controlled:** reanalysis-as-predictor (ERA5 is not a real-time-available input — excluded as predictor, allowed only as final verification), dataset revisions (prefer real-time archive versions; flag QC'd-vintage risk), gap-filling with future data (forbidden — drop the date, document it), survivorship (only dates where data genuinely existed), multiple testing (pre-register metrics: MAE, RMSE, band coverage vs nominal, bias, skill vs climatology + persistence baselines).
+- **Known limits:** consecutive-day errors are autocorrelated → report effective sample size; runtime API may not expose historical forecast archives — if genuine archived forecasts (e.g., prior cycle archives) are unavailable, the backtest is reported as infeasible rather than faked with reanalysis pseudo-forecasts.
+- **Governance:** protocol + per-date info-set log written to daily notes; any method change voids prior scores and restarts the window.
+
+## ISSUANCE — London D+1 daily mean temp, 2026-10-19 (ILLUSTRATIVE)
+
+- **Status:** LIVE SOURCES DOWN. wttr.in upstream returned HTTP 502 on all 3 attempts (17:59–18:00 UTC window; central-London point + EGLL). S1/S3/S5 unavailable; no workaround attempted (same upstream; unvetted domains not fetchable under policy). No data fabricated.
+- **Label:** ILLUSTRATIVE — climatology-only prior, NOT an operational NWP forecast. Skill ceiling = climatology (MAE ~2.5–3 °C vs ~1.5 °C for live D+1 NWP).
+- **Assumptions:** (1) prior center = Heathrow 1991–2020 Oct-19 normal daily mean ≈ 11.5 °C (static pre-cutoff knowledge, approximate); (2) no persistence/anomaly info → prior = forecast; (3) σ = 3.0 °C (interannual + synoptic day-to-day variability, no model spread available to narrow it); (4) normal approximation for intervals.
+- **Point forecast: 11.5 °C** (daily mean, 2026-10-19, central London 51.507N/0.128W)
+- **Intervals:** 50% → 9.5–13.5 °C · 80% → 7.5–15.5 °C · 90% → 6.5–16.5 °C · 95% → 5.5–17.5 °C
+- **Scenarios (p → center):** warm SW flow 0.15 → 16 °C · near-normal 0.45 → 12.5 °C · cool interlude 0.30 → 9 °C · cold pool 0.10 → 6.5 °C. Mixture mean 11.4 °C (calculator-verified) ≈ point, consistent within rounding.
+- **Verification pin (pre-outcome, 18:00 UTC):** primary = Met Office/MIDAS hourly 2m air temp at Heathrow (EGLL) averaged over 2026-10-19 00:00–23:00 Europe/London; fallback = ERA5 2m temp, grid cell containing 51.507N/0.128W, 24 UTC-hourly mean (±1h BST boundary effect noted, sub-0.1 °C).
+- **Sources frozen:** none were live; frozen set = S4 climatology prior + stated assumptions only. Re-fetch attempts post-issuance are verification-only.
+
+## METRICS EVALUATION (18:01 UTC) — DEMO ONLY, SYNTHETIC
+
+- **Artifacts:** `backtest_demo/metrics_demo.py` + `results.json`. Seed 20261019, n=30/variant, stdlib-only. **Label carried in file + output: pipeline verification, NOT real skill.**
+- **Metrics defined:** MAE/RMSE (point accuracy) · CRPS + CRPS skill score vs climatology (distributional) · central-interval coverage vs nominal + mean width at 50/80/95% (calibration vs sharpness trade) · PIT histogram (5 bins; mean≈0.5, sd≈0.289=1/√12, flat when calibrated).
+- **Design:** one shared synthetic outcome vector (30 draws from N(11.5, 3.0)); four predictive specs — A calibrated control (μ=11.5, σ=3), B overconfident (σ=1.8), C warm-biased (μ=13), D optimal lag-1 persistence on synthetic AR(1) φ=0.7 (residual σ=2.1424 exact).
+- **Key results:** A: skill 0.000 ✓ (is the ref), cov95 0.967. B: cov95 0.833 vs 0.95 nominal — overconfidence caught by coverage/PIT, while CRPS (1.422) ≈ A (1.426) → CRPS weakly sensitive to spread error when center is right. C: bias −2.414, PIT_mean 0.24, skill **−0.372** (worse than climatology). D: skill **+0.235**, MAE 1.83 < clim 1.90 — real skill IN THE SYNTHETIC AR(1) WORLD ONLY; real-atmosphere D+1 persistence skill is far lower.
+- **Sanity checks passed:** A bias −0.914 = sampling noise of 30 draws (z≈−1.7); widths match closed form (4.05, 7.69); C bias = −1.5 + A's noise ✓.
+- **Honest limits:** n=30 → coverage MC error ±0.09 at 80%, ±0.04 at 95%; errors autocorrelated → ESS < 30; demo shares one outcome vector (variant comparison clean, absolute levels illustrative); the issued 11.5 °C illustrative forecast is NOT scored here (outcome 2026-10-19 pending — verification pin unchanged).

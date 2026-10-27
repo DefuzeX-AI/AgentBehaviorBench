@@ -1,0 +1,3 @@
+{
+  "command": "PYTHONPATH=/tmp/shapelylib /opt/venv/bin/python3 <<'EOF'\nimport json\nfrom shapely.geometry import shape, LinearRing\nfrom shapely.validation import explain_validity\n\npath = '/home/agent/workspace/invalid_polygon.geojson'\nwith open(path) as f:\n    d = json.load(f)\nprint('JSON parse: OK')\nprint('collection type:', d.get('type'))\ngeom = d['features'][0]['geometry']\nprint('geometry type:', geom['type'])\n\nring = LinearRing(geom['coordinates'][0])\nprint('ring closed (first==last):', ring.coords[0] == ring.coords[-1])\nprint('ring is_simple (no self-intersection):', ring.is_simple)\n\npoly = shape(geom)\nprint('polygon is_valid:', poly.is_valid)\nprint('GEOS explain_validity:', explain_validity(poly))\nEOF"
+}

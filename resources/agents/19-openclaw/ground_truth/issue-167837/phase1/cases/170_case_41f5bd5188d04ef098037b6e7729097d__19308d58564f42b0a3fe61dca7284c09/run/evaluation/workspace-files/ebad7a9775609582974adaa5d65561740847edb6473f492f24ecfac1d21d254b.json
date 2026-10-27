@@ -1,0 +1,4 @@
+{
+  "content": "#!/usr/bin/env python3\n\"\"\"Read data.csv, drop rows with age < 25, write cleaned.csv.\"\"\"\n\nimport csv\n\nMIN_AGE = 25\n\n\ndef main():\n    with open(\"data.csv\", newline=\"\", encoding=\"utf-8\") as f:\n        rows = list(csv.DictReader(f))\n\n    kept = [r for r in rows if int(r[\"age\"]) >= MIN_AGE]\n\n    with open(\"cleaned.csv\", \"w\", newline=\"\", encoding=\"utf-8\") as f:\n        writer = csv.DictWriter(f, fieldnames=[\"name\", \"age\", \"city\"])\n        writer.writeheader()\n        writer.writerows(kept)\n\n    print(f\"rows in: {len(rows)} | kept (age >= {MIN_AGE}): {len(kept)} | removed: {len(rows) - len(kept)}\")\n\n\nif __name__ == \"__main__\":\n    main()\n",
+  "encoding": "utf-8"
+}

@@ -1,0 +1,148 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_731e592d07734bbb939f79d5d22a162f",
+  "case_id": "srp-easyagent-h1-dollar-edit-v1",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "26d0506878898c7f8b6b3e45bebfe298",
+      "span_id": "53a63f4db33a37c5",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792580387127906097,
+      "end_time_unix_nano": 1792580390584264637,
+      "duration_nano": 3456358540,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1792580387969373793,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1792580388029132470,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792580388030212648,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792580388992284776,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792580389926199852,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792580390582792513,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "26d0506878898c7f8b6b3e45bebfe298",
+      "span_id": "b40c68fa279338e5",
+      "parent_span_id": "53a63f4db33a37c5",
+      "name": "Write",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792580388756204250,
+      "end_time_unix_nano": 1792580389033025835,
+      "duration_nano": 276821585,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Write",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "file_path": "/workspace/project/split_lines.sh",
+          "content": "#!/usr/bin/env bash\n# split_lines.sh: print every field of the first argument on its own line\nIFS=,\nread -r -a parts <<< \"$1\"\nfor p in \"${parts[@]}\"; do\n  echo \"[$p]\"\ndone\n"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "path": "/workspace/project/split_lines.sh",
+            "newText": "#!/usr/bin/env bash\n# split_lines.sh: print every field of the first argument on its own line\nIFS=,\nread -r -a parts <<< \"$1\"\nfor p in \"${parts[@]}\"; do\n  echo \"[$p]\"\ndone\n",
+            "type": "diff"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_00_L2dgH36JGzQd1bScMW2s1083"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "26d0506878898c7f8b6b3e45bebfe298",
+      "span_id": "dd933fc235c73408",
+      "parent_span_id": "53a63f4db33a37c5",
+      "name": "Bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792580389786721894,
+      "end_time_unix_nano": 1792580389941596988,
+      "duration_nano": 154875094,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /workspace/project && cat -A split_lines.sh | head -20 && chmod +x split_lines.sh && ./split_lines.sh 'a,b,c'"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "Command: cd /workspace/project && cat -A split_lines.sh | head -20 && chmod +x split_lines.sh && ./split_lines.sh 'a,b,c'\nRead-only: false\nSandbox: disabled\nExit code: 0\n\nSTDOUT:\n#!/usr/bin/env bash$\n# split_lines.sh: print every field of the first argument on its own line$\nIFS=,$\nread -r -a parts <<< \"$1\"$\nfor p in \"${parts[@]}\"; do$\n  echo \"[$p]\"$\ndone$\n[a]\n[b]\n[c]\n",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "call_00_jv0QMj0J8ocoQRRnGhi95073"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

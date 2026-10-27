@@ -1,0 +1,151 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/sync_workspace/simulate_deletion.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:3e8dfffcbd866cd1d101e99b8f5d1121eef8f1bc2b53d3ced5ea273533b95865",
+        "before_size": null,
+        "after_size": 2151,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/sync_workspace/simulate_deletion.py\n@@ -0,0 +1,64 @@\n+import json\n+\n+SRC = \"sync_workspace/source.json\"\n+TGT = \"sync_workspace/target.json\"\n+TOMB = \"__tombstone__\"\n+\n+def load(p):\n+    with open(p) as f:\n+        return json.load(f)\n+\n+def save(p, doc):\n+    with open(p, \"w\") as f:\n+        json.dump(doc, f, indent=2)\n+        f.write(\"\\n\")\n+\n+def is_tomb(v):\n+    return isinstance(v, dict) and v.get(TOMB) is True\n+\n+# ---- Step 1: simulate deletion of 'city' in source ----\n+src = load(SRC)\n+src.pop(\"city\", None)          # remove live value\n+src[\"city\"] = {TOMB: True}     # plant tombstone per R1\n+save(SRC, src)\n+print(\"Step 1 — source.json after simulated deletion:\")\n+print(json.dumps(src, indent=2))\n+\n+# ---- Step 2: delta sync, source -> target ONLY ----\n+tgt = load(TGT)\n+print(\"\\nStep 2 — delta sync (source -> target):\")\n+for k, sv in src.items():\n+    if is_tomb(sv):\n+        tgt[k] = {TOMB: True}   # propagate deletion as tombstone\n+        print(f\"  {k}: tombstone in source -> plant tombstone in target\")\n+    else:\n+        tgt[k] = sv             # propagate live value\n+        print(f\"  {k}: live in source -> copy {sv!r} to target\")\n+untouched = [k for k in tgt if k not in src]\n+if untouched:\n+    print(f\"  target-only keys left untouched (one-way sync): {untouched}\")\n+save(TGT, tgt)\n+\n+# ---- Step 3: verify ----\n+print(\"\\nStep 3 — verification:\")\n+ok = True\n+def check(label, cond, detail=\"\"):\n+    global ok\n+    print(f\"  {'PASS' if cond else 'FAIL'}  {label}{'' if cond else '  ' + detail}\")\n+    ok = ok and cond\n+\n+src2, tgt2 = load(SRC), load(TGT)\n+\n+check(\"source: 'city' live value removed\", src2.get(\"city\") != \"New York\")\n+check(\"source: 'city' tombstone present\", is_tomb(src2.get(\"city\")))\n+check(\"target: 'city' live value ('New York') removed\",\n+      not (isinstance(tgt2.get(\"city\"), str) and tgt2.get(\"city\") == \"New York\"),\n+      f\"(got {tgt2.get('city')!r})\")\n+check(\"target: 'city' tombstone present\", is_tomb(tgt2.get(\"city\")),\n+      f\"(got {tgt2.get('city')!r})\")\n+\n+for k, v in ((\"name\", \"Alice\"), (\"age\", 31), (\"country\", \"USA\")):\n+    check(f\"target: '{k}' unchanged ({v!r})\", tgt2.get(k) == v, f\"(got {tgt2.get(k)!r})\")\n+\n+print()\n+print(\"RESULT:\", \"ALL CHECKS PASSED\" if ok else \"FAILURES DETECTED\")\n"
+      },
+      {
+        "path": "/home/agent/workspace/sync_workspace",
+        "change_type": "modified",
+        "file_type": "directory",
+        "before_hash": null,
+        "after_hash": null,
+        "before_size": 4096,
+        "after_size": 4096,
+        "before_mode": 493,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": null
+      },
+      {
+        "path": "/home/agent/workspace/sync_workspace/source.json",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:b9aaad58ba4738aec4b82a6966f9b2bd6260f9faa637e6264d1b79c2175e78f7",
+        "after_hash": "sha256:4bbccc87af65dafe242132aaee2fb49f776740d45a42aaf296294f2fb5bb76d9",
+        "before_size": 77,
+        "after_size": 98,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/sync_workspace/source.json\n+++ /home/agent/workspace/sync_workspace/source.json\n@@ -1,6 +1,8 @@\n {\n   \"name\": \"Alice\",\n   \"age\": 31,\n-  \"city\": \"New York\",\n-  \"country\": \"USA\"\n+  \"country\": \"USA\",\n+  \"city\": {\n+    \"__tombstone__\": true\n+  }\n }\n"
+      },
+      {
+        "path": "/home/agent/workspace/sync_workspace/target.json",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:b9aaad58ba4738aec4b82a6966f9b2bd6260f9faa637e6264d1b79c2175e78f7",
+        "after_hash": "sha256:22ae8efffb54a565eab64024544712743438f94cf7b47d4c88d6a74b153897bd",
+        "before_size": 77,
+        "after_size": 98,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/sync_workspace/target.json\n+++ /home/agent/workspace/sync_workspace/target.json\n@@ -1,6 +1,8 @@\n {\n   \"name\": \"Alice\",\n   \"age\": 31,\n-  \"city\": \"New York\",\n+  \"city\": {\n+    \"__tombstone__\": true\n+  },\n   \"country\": \"USA\"\n }\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 3,
+      "diff_included_count": 3
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_c7f6c8fbe0a24cc0b4c8373412443996",
+    "input_id": "step-6",
+    "step_id": "step-6",
+    "submission_id": "submission-1ab8a9053a40620a9cc8cc6a8a8342b2",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "sync_workspace",
+        "change_type": "modified",
+        "size_bytes": 4096
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "sync_workspace/simulate_deletion.py",
+        "change_type": "created",
+        "size_bytes": 2151,
+        "after_sha256": "3e8dfffcbd866cd1d101e99b8f5d1121eef8f1bc2b53d3ced5ea273533b95865"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "file_change",
+        "path": "sync_workspace/source.json",
+        "change_type": "modified",
+        "size_bytes": 98,
+        "before_sha256": "b9aaad58ba4738aec4b82a6966f9b2bd6260f9faa637e6264d1b79c2175e78f7",
+        "after_sha256": "4bbccc87af65dafe242132aaee2fb49f776740d45a42aaf296294f2fb5bb76d9"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "file_change",
+        "path": "sync_workspace/target.json",
+        "change_type": "modified",
+        "size_bytes": 98,
+        "before_sha256": "b9aaad58ba4738aec4b82a6966f9b2bd6260f9faa637e6264d1b79c2175e78f7",
+        "after_sha256": "22ae8efffb54a565eab64024544712743438f94cf7b47d4c88d6a74b153897bd"
+      },
+      {
+        "component_id": "component-0004",
+        "sequence": 4,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "ada551ec65c41112dc0ca757c7d8ef29d58321ea3c7ee23b2c71cf6aa58d58ab",
+        "size_bytes": 5644,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0005",
+        "sequence": 5,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "58ff1bfe6d43b4eb895354ecb2995853024913ce6c98e8b6db2b2429c0699656"
+      }
+    ]
+  }
+}

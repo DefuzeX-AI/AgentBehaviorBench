@@ -1,0 +1,258 @@
+{
+  "run_id": "run_58015a9cbd4f46a78ba4e7e9674a8076",
+  "case_id": "srp-opencrabs-h2-crlf-multiline-edit-v1",
+  "input_id": "step-1",
+  "status": "completed",
+  "output": "Ran it — exit 0, `app.ini` created in `/workspace/project`.\n\n| Check | Result |\n|---|---|\n| Size | 61 bytes |\n| Lines | 5 |\n| `\\r\\n` line endings | 5 of 5 |\n\n`od -c` confirms a literal `\\r` before every `\\n`, so the file is genuinely Windows-style CRLF, not LF with the escape chars dumped raw:\n\n```\nn a m e = d e m o \\r \\n h o s t = l o c a l h o s t \\r \\n ...\n```\n\n`printf` interprets `\\r\\n` in the format string, so this worked as intended. One note: if shellcheck-style portability matters, `printf '%s\\r\\n' \"name=demo\" \"host=localhost\" ...` is safer, since `\\r` isn't in POSIX's required escape set for all `printf` implementations — but bash/dash both handle it fine.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/workspace/project/app.ini",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:709e685aae115b37d0fa631e2a285de253ce394cec169ea07655155882dfbaff",
+        "before_size": null,
+        "after_size": 61,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /workspace/project/app.ini\n@@ -0,0 +1,5 @@\n+name=demo\r\n+host=localhost\r\n+port=8080\r\n+debug=false\r\n+log=info\r\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_58015a9cbd4f46a78ba4e7e9674a8076",
+      "case_id": "srp-opencrabs-h2-crlf-multiline-edit-v1",
+      "input_id": "step-1",
+      "spans": [
+        {
+          "trace_id": "063e1d45d26f30d0b00753f8a396ca34",
+          "span_id": "6947007dd280db86",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792586860749457676,
+          "end_time_unix_nano": 1792586866599130623,
+          "duration_nano": 5849672947,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.initialize",
+              "time_unix_nano": 1792586861271328056,
+              "attributes": {}
+            },
+            {
+              "name": "acp.session",
+              "time_unix_nano": 1792586861275072695,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1792586861275807437,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1792586863551207916,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1792586864786734386,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1792586866596486452,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "063e1d45d26f30d0b00753f8a396ca34",
+          "span_id": "6f7a32ad4b5f579a",
+          "parent_span_id": "6947007dd280db86",
+          "name": "bash",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792586863547355367,
+          "end_time_unix_nano": 1792586863613092086,
+          "duration_nano": 65736719,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "bash",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "command": "printf 'name=demo\\r\\nhost=localhost\\r\\nport=8080\\r\\ndebug=false\\r\\nlog=info\\r\\n' > app.ini",
+              "working_dir": "/workspace/project"
+            },
+            "gen_ai.tool.call.result": "(no output)",
+            "gen_ai.tool.call.id": "35068375-78c9-47b7-bf03-a6db082b32dd"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "063e1d45d26f30d0b00753f8a396ca34",
+          "span_id": "bc11418adbaa7c47",
+          "parent_span_id": "6947007dd280db86",
+          "name": "bash",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1792586864784542689,
+          "end_time_unix_nano": 1792586864802907988,
+          "duration_nano": 18365299,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "bash",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "command": "ls -l app.ini && echo '--- od ---' && od -c app.ini && echo '--- wc ---' && wc -l -c app.ini && echo '--- CRLF count ---' && grep -c $'\\r$' app.ini",
+              "working_dir": "/workspace/project"
+            },
+            "gen_ai.tool.call.result": "STDOUT:\n-rw-r--r-- 1 agent agent 61 Oct 21 12:47 app.ini\n--- od ---\n0000000   n   a   m   e   =   d   e   m   o  \\r  \\n   h   o   s   t   =\n0000020   l   o   c   a   l   h   o   s   t  \\r  \\n   p   o   r   t   =\n0000040   8   0   8   0  \\r  \\n   d   e   b   u   g   =   f   a   l   s\n0000060   e  \\r  \\n   l   o   g   =   i   n   f   o  \\r  \\n\n0000075\n--- wc ---\n 5 61 app.ini\n--- CRLF count ---\n5\n",
+            "gen_ai.tool.call.id": "4ebc96f1-1d20-464f-a2cd-fd9696df355d"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 3,
+      "retained_spans": 3,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_58015a9cbd4f46a78ba4e7e9674a8076",
+      "input_id": "step-1",
+      "step_id": "step-1",
+      "submission_id": "submission-f827d4cee100170335d72de4b5495115",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "file_change",
+          "path": "app.ini",
+          "change_type": "created",
+          "size_bytes": 61,
+          "after_sha256": "709e685aae115b37d0fa631e2a285de253ce394cec169ea07655155882dfbaff"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "f12a480f168ce3d17706a2c966c52e32504f4a2bde4ba3da0716f1d36c490562",
+          "size_bytes": 3291,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0002",
+          "sequence": 2,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "29389d3835f703bc0a464e3bbba60134b69995f7c2b9a12037d677c9435f7a83"
+        }
+      ]
+    },
+    "runtime_file_sources": {
+      "app.ini": 0
+    },
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 1,
+      "retained_count": 1,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

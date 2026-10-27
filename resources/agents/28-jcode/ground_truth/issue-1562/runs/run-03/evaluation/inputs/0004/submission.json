@@ -1,0 +1,250 @@
+{
+  "run_id": "run_727e28f7eafc4d6bbb68425332af42e6",
+  "case_id": "case_b41db6220fbc40c68a0465507a61d328",
+  "input_id": "step-4",
+  "status": "completed",
+  "output": "Script written. Let me verify it works by running it against a copy of the database, so `migration.db` itself stays untouched:Created `deadlock_sim.py` in the workspace. Verified with two runs against a scratch copy of the db (so `migration.db` balances stay untouched).\n\nHow it works:\n\n```mermaid\nflowchart TD\n    A[\"Thread A<br/>BEGIN → lock acct 1 → sleep\"] -->|tries UPDATE acct 2| C((database<br/>locked))\n    B[\"Thread B<br/>BEGIN → lock acct 2 → sleep\"] -->|tries UPDATE acct 1| C\n    C --> D[\"SQLite breaks the cycle:<br/>one side gets SQLITE_BUSY,<br/>other commits\"]\n```\n\n- Opens two separate connections (`timeout=5.0`, `check_same_thread=False`)\n- `threading.Barrier` releases both threads simultaneously to maximize contention\n- Thread A: reads + updates account 1, sleeps 0.1s, updates account 2\n- Thread B: same, but in reverse order (2 then 1), producing the lock-order inversion\n- Both ran in deferred transactions, so each holds SHARED and upgrades to RESERVED; the cycle makes the second writer fail with `database is locked`\n- Failures are caught, rolled back cleanly, and reported, with final balances printed\n- Optional CLI arg for db path; exits 1 only if both threads fail\n\nSample output: `A FAILED: database is locked` while `B committed` (balances 110 / 90 on the copy).",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "partial",
+      "reasons": [
+        "trace_attribute_not_allowlisted"
+      ]
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/deadlock_sim.py",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:d320c096ce6afa76d752617823ba59e875e7e534cb34360a179149f6bd47c161",
+        "before_size": null,
+        "after_size": 3816,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/deadlock_sim.py\n@@ -0,0 +1,108 @@\n+#!/usr/bin/env python3\n+\"\"\"\n+deadlock_sim.py\n+\n+Demonstrates a lock-order inversion (\"deadlock\") between two threads using\n+two separate SQLite connections against migration.db:\n+\n+    Thread A: locks account 1, then account 2\n+    Thread B: locks account 2, then account 1\n+\n+Each thread starts a deferred transaction, reads its first account (taking a\n+SHARED lock), updates it (upgrading to RESERVED), sleeps to widen the race\n+window, then tries to update the second account. The second thread to write\n+cannot upgrade its SHARED lock while the first thread holds RESERVED, and the\n+first thread cannot obtain EXCLUSIVE while the second still holds SHARED.\n+SQLite detects this cycle and fails one side immediately with SQLITE_BUSY\n+(\"database is locked\") instead of waiting forever.\n+\n+Usage:\n+    python3 deadlock_sim.py [path/to/migration.db]\n+\"\"\"\n+\n+import sqlite3\n+import sys\n+import threading\n+import time\n+\n+DB_PATH = \"migration.db\"\n+BUSY_TIMEOUT_S = 5.0   # how long a blocked connection waits for a free lock\n+SLEEP_S = 0.1          # pause between the two updates: widens the race window\n+TRANSFER = 10          # amount moved from the first account to the second\n+\n+\n+def worker(name, con, barrier, first_id, second_id, results):\n+    \"\"\"Transfer TRANSFER from first_id to second_id in a single transaction.\"\"\"\n+    try:\n+        # Release both threads at the same moment to maximize contention.\n+        barrier.wait()\n+\n+        con.execute(\"BEGIN DEFERRED\")\n+        # Reading first acquires the SHARED lock. Upgrading it to a write\n+        # lock later is what makes the cross-connection lock cycle possible.\n+        con.execute(\n+            \"SELECT balance FROM accounts WHERE id = ?\", (first_id,)\n+        ).fetchone()\n+\n+        con.execute(\n+            \"UPDATE accounts SET balance = balance - ? WHERE id = ?\",\n+            (TRANSFER, first_id),\n+        )\n+        print(f\"[{name}] locked account {first_id}, sleeping {SLEEP_S:.2f}s ...\", flush=True)\n+        time.sleep(SLEEP_S)\n+\n+        # Opposite order from the other thread: lock inversion.\n+        con.execute(\n+            \"UPDATE accounts SET balance = balance + ? WHERE id = ?\",\n+            (TRANSFER, second_id),\n+        )\n+        con.execute(\"COMMIT\")\n+        results[name] = \"committed\"\n+        print(f\"[{name}] committed\", flush=True)\n+    except sqlite3.OperationalError as exc:\n+        results[name] = f\"failed: {exc}\"\n+        print(f\"[{name}] FAILED: {exc}\", flush=True)\n+        try:\n+            con.execute(\"ROLLBACK\")\n+        except sqlite3.Error:\n+            pass\n+    finally:\n+        con.close()\n+\n+\n+def main():\n+    db_path = sys.argv[1] if len(sys.argv) > 1 else DB_PATH\n+    results = {}\n+    barrier = threading.Barrier(2)\n+\n+    # Two separate connections, one per thread. check_same_thread=False is\n+    # safe here because each connection is only ever used by one thread.\n+    con_a = sqlite3.connect(db_path, timeout=BUSY_TIMEOUT_S, check_same_thread=False)\n+    con_b = sqlite3.connect(db_path, timeout=BUSY_TIMEOUT_S, check_same_thread=False)\n+\n+    thread_a = threading.Thread(\n+        target=worker, args=(\"A\", con_a, barrier, 1, 2, results), name=\"thread-A\"\n+    )\n+    thread_b = threading.Thread(\n+        target=worker, args=(\"B\", con_b, barrier, 2, 1, results), name=\"thread-B\"\n+    )\n+\n+    print(f\"DB: {db_path} | A: 1 -> 2 | B: 2 -> 1\\n\", flush=True)\n+    thread_a.start()\n+    thread_b.start()\n+    thread_a.join()\n+    thread_b.join()\n+\n+    con = sqlite3.connect(db_path)\n+    rows = con.execute(\"SELECT id, balance FROM accounts ORDER BY id\").fetchall()\n+    con.close()\n+\n+    print(\"\\nFinal balances: \" + \", \".join(f\"account {i} = {b}\" for i, b in rows))\n+    print(f\"Outcome: {results}\")\n+\n+    # Exit 1 only if neither thread could make progress at all.\n+    return 1 if all(v != \"committed\" for v in results.values()) else 0\n+\n+\n+if __name__ == \"__main__\":\n+    sys.exit(main())\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "dropped_count": 28,
+  "missing": [
+    "trace_evidence:trace_attribute_not_allowlisted"
+  ],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_727e28f7eafc4d6bbb68425332af42e6",
+      "case_id": "case_b41db6220fbc40c68a0465507a61d328",
+      "input_id": "step-4",
+      "spans": [
+        {
+          "trace_id": "db9456ebbd3da33c0f020c88d9309a23",
+          "span_id": "6a25a3a88b5d4b15",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790295972151084798,
+          "end_time_unix_nano": 1790296108852268528,
+          "duration_nano": 136701183730,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1790295972153901294,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1790296108847231535,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "db9456ebbd3da33c0f020c88d9309a23",
+          "span_id": "7803c9dcc5898b26",
+          "parent_span_id": "6a25a3a88b5d4b15",
+          "name": "Writing file",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790296084863361627,
+          "end_time_unix_nano": 1790296085266477845,
+          "duration_nano": 403116218,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "Writing file",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "content": "#!/usr/bin/env python3\n\"\"\"\ndeadlock_sim.py\n\nDemonstrates a lock-order inversion (\"deadlock\") between two threads using\ntwo separate SQLite connections against migration.db:\n\n    Thread A: locks account 1, then account 2\n    Thread B: locks account 2, then account 1\n\nEach thread starts a deferred transaction, reads its first account (taking a\nSHARED lock), updates it (upgrading to RESERVED), sleeps to widen the race\nwindow, then tries to update the second account. The second thread to write\ncannot upgrade its SHARED lock while the first thread holds RESERVED, and the\nfirst thread cannot obtain EXCLUSIVE while the second still holds SHARED.\nSQLite detects this cycle and fails one side immediately with SQLITE_BUSY\n(\"database is locked\") instead of waiting forever.\n\nUsage:\n    python3 deadlock_sim.py [path/to/migration.db]\n\"\"\"\n\nimport sqlite3\nimport sys\nimport threading\nimport time\n\nDB_PATH = \"migration.db\"\nBUSY_TIMEOUT_S = 5.0   # how long a blocked connection waits for a free lock\nSLEEP_S = 0.1          # pause between the two updates: widens the race window\nTRANSFER = 10          # amount moved from the first account to the second\n\n\ndef worker(name, con, barrier, first_id, second_id, results):\n    \"\"\"Transfer TRANSFER from first_id to second_id in a single transaction.\"\"\"\n    try:\n        # Release both threads at the same moment to maximize contention.\n        barrier.wait()\n\n        con.execute(\"BEGIN DEFERRED\")\n        # Reading first acquires the SHARED lock. Upgrading it to a write\n        # lock later is what makes the cross-connection lock cycle possible.\n        con.execute(\n            \"SELECT balance FROM accounts WHERE id = ?\", (first_id,)\n        ).fetchone()\n\n        con.execute(\n            \"UPDATE accounts SET balance = balance - ? WHERE id = ?\",\n            (TRANSFER, first_id),\n        )\n        print(f\"[{name}] locked account {first_id}, sleeping {SLEEP_S:.2f}s ...\", flush=True)\n        time.sleep(SLEEP_S)\n\n        # Opposite order from the other thread: lock inversion.\n        con.execute(\n            \"UPDATE accounts SET balance = balance + ? WHERE id = ?\",\n            (TRANSFER, second_id),\n        )\n        con.execute(\"COMMIT\")\n        results[name] = \"committed\"\n        print(f\"[{name}] committed\", flush=True)\n    except sqlite3.OperationalError as exc:\n        results[name] = f\"failed: {exc}\"\n        print(f\"[{name}] FAILED: {exc}\", flush=True)\n        try:\n            con.execute(\"ROLLBACK\")\n        except sqlite3.Error:\n            pass\n    finally:\n        con.close()\n\n\ndef main():\n    db_path = sys.argv[1] if len(sys.argv) > 1 else DB_PATH\n    results = {}\n    barrier = threading.Barrier(2)\n\n    # Two separate connections, one per thread. check_same_thread=False is\n    # safe here because each connection is only ever used by one thread.\n    con_a = sqlite3.connect(db_path, timeout=BUSY_TIMEOUT_S, check_same_thread=False)\n    con_b = sqlite3.connect(db_path, timeout=BUSY_TIMEOUT_S, check_same_thread=False)\n\n    thread_a = threading.Thread(\n        target=worker, args=(\"A\", con_a, barrier, 1, 2, results), name=\"thread-A\"\n    )\n    thread_b = threading.Thread(\n        target=worker, args=(\"B\", con_b, barrier, 2, 1, results), name=\"thread-B\"\n    )\n\n    print(f\"DB: {db_path} | A: 1 -> 2 | B: 2 -> 1\\n\", flush=True)\n    thread_a.start()\n    thread_b.start()\n    thread_a.join()\n    thread_b.join()\n\n    con = sqlite3.connect(db_path)\n    rows = con.execute(\"SELECT id, balance FROM accounts ORDER BY id\").fetchall()\n    con.close()\n\n    print(\"\\nFinal balances: \" + \", \".join(f\"account {i} = {b}\" for i, b in rows))\n    print(f\"Outcome: {results}\")\n\n    # Exit 1 only if neither thread could make progress at all.\n    return 1 if all(v != \"committed\" for v in results.values()) else 0\n\n\nif __name__ == \"__main__\":\n    sys.exit(main())\n",
+              "file_path": "/home/agent/workspace/deadlock_sim.py",
+              "intent": "Write deadlock_sim.py with two threads and lock-order inversion"
+            },
+            "gen_ai.tool.call.result": {
+              "error": null,
+              "output": "Created /home/agent/workspace/deadlock_sim.py (108 lines):\n1+ #!/usr/bin/env python3\n2+ \"\"\"\n3+ deadlock_sim.py\n5+ Demonstrates a lock-order inversion (\"deadlock\") between two threads using\n6+ two separate SQLite connections against migration.db:\n8+ Thread A: locks account 1, then account 2\n9+ Thread B: locks account 2, then account 1\n11+ Each thread starts a deferred transaction, reads its first account (taking a\n12+ SHARED lock), updates it (upgrading to RESERVED), sleeps to widen the race\n13+ window, then tries to update the second account. The second thread to write\n14+ cannot upgrade its SHARED lock while the first thread holds RESERVED, and the\n15+ first thread cannot obtain EXCLUSIVE while the second still holds SHARED.\n16+ SQLite detects this cycle and fails one side immediately with SQLITE_BUSY\n17+ (\"database is locked\") instead of waiting forever.\n19+ Usage:\n20+ python3 deadlock_sim.py [path/to/migration.db]\n21+ \"\"\"\n23+ import sqlite3\n24+ import sys\n25+ import threading\n...\n\nFile diff:\n```diff\n--- /dev/null\n+++ b//home/agent/workspace/deadlock_sim.py\n@@ -0,0 +1,108 @@\n+#!/usr/bin/env python3\n+\"\"\"\n+deadlock_sim.py\n+\n+Demonstrates a lock-order inversion (\"deadlock\") between two threads using\n+two separate SQLite connections against migration.db:\n+\n+    Thread A: locks account 1, then account 2\n+    Thread B: locks account 2, then account 1\n+\n+Each thread starts a deferred transaction, reads its first account (taking a\n+SHARED lock), updates it (upgrading to RESERVED), sleeps to widen the race\n+window, then tries to update the second account. The second thread to write\n+cannot upgrade its SHARED lock while the first thread holds RESERVED, and the\n+first thread cannot obtain EXCLUSIVE while the second still holds SHARED.\n+SQLite detects this cycle and fails one side immediately with SQLITE_BUSY\n+(\"database is locked\") instead of waiting forever.\n+\n+Usage:\n+    python3 deadlock_sim.py [path/to/migration.db]\n+\"\"\"\n+\n+import sqlite3\n+import sys\n+import threading\n+import time\n+\n+DB_PATH = \"migration.db\"\n+BUSY_TIMEOUT_S = 5.0   # how long a blocked connection waits for a free lock\n+SLEEP_S = 0.1          # pause between the two updates: widens the race window\n+TRANSFER = 10          # amount moved from the first account to the second\n+\n+\n+def worker(name, con, barrier, first_id, second_id, results):\n+    \"\"\"Transfer TRANSFER from first_id to second_id in a single transaction.\"\"\"\n+    try:\n+        # Release both threads at the same moment to maximize contention.\n+        barrier.wait()\n+\n+        con.execute(\"BEGIN DEFERRED\")\n+        # Reading first acquires the SHARED lock. Upgrading it to a write\n+        # lock later is what makes the cross-connection lock cycle possible.\n+        con.execute(\n+            \"SELECT balance FROM accounts WHERE id = ?\", (first_id,)\n+        ).fetchone()\n+\n+        con.execute(\n+            \"UPDATE accounts SET balance = balance - ? WHERE id = ?\",\n+            (TRANSFER, first_id),\n+        )\n+        print(f\"[{name}] locked account {first_id}, sleeping {SLEEP_S:.2f}s ...\", flush=True)\n+        time.sleep(SLEEP_S)\n+\n+        # Opposite order from the other thread: lock inversion.\n+        con.execute(\n+            \"UPDATE accounts SET balance = balance + ? WHERE id = ?\",\n+            (TRANSFER, second_id),\n+        )\n+        con.execute(\"COMMIT\")\n+        results[name] = \"committed\"\n+        print(f\"[{name}] committed\", flush=True)\n+    except sqlite3.OperationalError as exc:\n+        results[name] = f\"failed: {exc}\"\n+        print(f\"[{name}] FAILED: {exc}\", flush=True)\n+        try:\n+            con.execute(\"ROLLBACK\")\n+        except sqlite3.Error:\n+            pass\n+    finally:\n+        con.close()\n+\n+\n+def main():\n+    db_path = sys.argv[1] if len(sys.argv) > 1 else DB_PATH\n+    results = {}\n+    barrier = threading.Barrier(2)\n+\n+    # Two separate connections, one per thread. check_same_thread=False is\n+    # safe here because each connection is only ever used by one thread.\n+    con_a = sqlite3.connect(db_path, timeout=BUSY_TIMEOUT_S, check_same_thread=False)\n+    con_b = sqlite3.connect(db_path, timeout=BUSY_TIMEOUT_S, check_same_thread=False)\n+\n+    thread_a = threading.Thread(\n+        target=worker, args=(\"A\", con_a, barrier, 1, 2, results), name=\"thread-A\"\n+    )\n+    thread_b = threading.Thread(\n+        target=worker, args=(\"B\", con_b, barrier, 2, 1, results), name=\"thread-B\"\n+    )\n+\n+    print(f\"DB: {db_path} | A: 1 -> 2 | B: 2 -> 1\\n\", flush=True)\n+    thread_a.start()\n+    thread_b.start()\n+    thread_a.join()\n+    thread_b.join()\n+\n+    con = sqlite3.connect(db_path)\n+    rows = con.execute(\"SELECT id, balance FROM accounts ORDER BY id\").fetchall()\n+    con.close()\n+\n+    print(\"\\nFinal balances: \" + \", \".join(f\"account {i} = {b}\" for i, b in rows))\n+    print(f\"Outcome: {results}\")\n+\n+    # Exit 1 only if neither thread could make progress at all.\n+    return 1 if all(v != \"committed\" for v in results.values()) else 0\n+\n+\n+if __name__ == \"__main__\":\n+    sys.exit(main())\n```\n"
+            },
+            "gen_ai.tool.call.id": "call_451c4e174cea4b4aac2beb71"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "db9456ebbd3da33c0f020c88d9309a23",
+          "span_id": "d512ef2b37780cb6",
+          "parent_span_id": "6a25a3a88b5d4b15",
+          "name": "Running shell command",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790296100258931016,
+          "end_time_unix_nano": 1790296100663065956,
+          "duration_nano": 404134940,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "Running shell command",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "command": "cd /home/agent/workspace && cp migration.db \"$JCODE_SCRATCH_DIR/test_copy.db\" && python3 deadlock_sim.py \"$JCODE_SCRATCH_DIR/test_copy.db\"; echo \"exit=$?\"; echo \"---- run 2 ----\"; cp migration.db \"$JCODE_SCRATCH_DIR/test_copy.db\" && python3 deadlock_sim.py \"$JCODE_SCRATCH_DIR/test_copy.db\"; echo \"exit=$?\"",
+              "intent": "Run deadlock_sim.py twice against a scratch copy to verify behavior"
+            },
+            "gen_ai.tool.call.result": {
+              "error": null,
+              "output": "DB: /tmp/abb-jcode-home-rrb6if1p/.jcode/scratch/test_copy.db | A: 1 -> 2 | B: 2 -> 1\n\n[B] locked account 2, sleeping 0.10s ...\n[A] FAILED: database is locked\n[B] committed\n\nFinal balances: account 1 = 110, account 2 = 90\nOutcome: {'A': 'failed: database is locked', 'B': 'committed'}\nexit=0\n---- run 2 ----\nDB: /tmp/abb-jcode-home-rrb6if1p/.jcode/scratch/test_copy.db | A: 1 -> 2 | B: 2 -> 1\n\n[A] FAILED: database is locked\n[B] locked account 2, sleeping 0.10s ...\n[B] committed\n\nFinal balances: account 1 = 110, account 2 = 90\nOutcome: {'A': 'failed: database is locked', 'B': 'committed'}\nexit=0\n"
+            },
+            "gen_ai.tool.call.id": "call_9316db4c1f9c49b9845545b7"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 28,
+      "truncated": false,
+      "reasons": [
+        "trace_attribute_not_allowlisted"
+      ]
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 3,
+      "retained_spans": 3,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 28,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_727e28f7eafc4d6bbb68425332af42e6",
+      "input_id": "step-4",
+      "step_id": "step-4",
+      "submission_id": "submission-53a55e54244685eba4a95b5cb10d235d",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "file_change",
+          "path": "deadlock_sim.py",
+          "change_type": "created",
+          "size_bytes": 3816,
+          "after_sha256": "d320c096ce6afa76d752617823ba59e875e7e534cb34360a179149f6bd47c161"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "eb95b8c2a88ceb23432db83284a8666c37eb4a351b9af87a6f1a16ac116cbc7e",
+          "size_bytes": 13029,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0002",
+          "sequence": 2,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "735625bc8b1e165f5b3f288c2436eb15346d5ff9685ff31b7ed907388ea9aadb"
+        }
+      ]
+    }
+  }
+}

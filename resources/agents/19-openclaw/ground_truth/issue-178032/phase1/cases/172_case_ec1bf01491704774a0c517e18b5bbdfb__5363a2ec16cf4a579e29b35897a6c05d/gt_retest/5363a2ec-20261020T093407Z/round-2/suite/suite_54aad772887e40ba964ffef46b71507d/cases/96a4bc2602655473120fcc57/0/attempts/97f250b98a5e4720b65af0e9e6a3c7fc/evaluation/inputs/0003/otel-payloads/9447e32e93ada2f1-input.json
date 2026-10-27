@@ -1,0 +1,9 @@
+{
+  "edits": [
+    {
+      "newText": "def test_quoted_comma_in_first_field(tmp_path):\n    # Regression: a comma inside the FIRST quoted field must not split the row.\n    path = write_csv(tmp_path, 'city,motto\\n\"Springfield, IL\",Capital\\n')\n    summary = summarize(read_csv(path))\n    assert summary[\"total_columns\"] == 2\n    assert summary[\"first_data_row\"] == [\"Springfield, IL\", \"Capital\"]\n\n\ndef test_quoted_comma_in_last_field(tmp_path):\n    # Regression: a comma inside the LAST quoted field must not add a column.\n    path = write_csv(tmp_path, 'city,motto\\nPortland,\"City of Roses, Bridges\"\\n')\n    summary = summarize(read_csv(path))\n    assert summary[\"total_columns\"] == 2\n    assert summary[\"first_data_row\"] == [\"Portland\", \"City of Roses, Bridges\"]\n\n\ndef test_multiple_quoted_commas_in_one_row(tmp_path):\n    # Regression: several quoted fields containing commas in the same row.\n    path = write_csv(tmp_path, 'a,b,c\\n\"x,1\",\"y,2\",\"z,3\"\\n')\n    summary = summarize(read_csv(path))\n    assert summary[\"total_columns\"] == 3\n    assert summary[\"first_data_row\"] == [\"x,1\", \"y,2\", \"z,3\"]\n\n\ndef test_cli_missing_file_exits_nonzero(tmp_path, capsys):",
+      "oldText": "def test_cli_missing_file_exits_nonzero(tmp_path, capsys):"
+    }
+  ],
+  "path": "/home/agent/workspace/test_fmtcsv.py"
+}

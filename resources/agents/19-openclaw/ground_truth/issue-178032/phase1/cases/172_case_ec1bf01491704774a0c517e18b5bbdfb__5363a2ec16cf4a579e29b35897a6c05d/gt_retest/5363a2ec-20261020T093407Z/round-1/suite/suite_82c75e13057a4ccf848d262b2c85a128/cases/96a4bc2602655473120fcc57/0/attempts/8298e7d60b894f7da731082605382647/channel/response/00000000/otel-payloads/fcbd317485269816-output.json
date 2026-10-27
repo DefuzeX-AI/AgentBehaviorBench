@@ -1,0 +1,14 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "Successfully replaced 1 block(s) in /home/agent/workspace/test_fmtcsv.py."
+    }
+  ],
+  "details": {
+    "changed": true,
+    "diff": "     ...\n  55         summary = fmtcsv.summarize(fmtcsv.read_csv(str(path)))\n  56         assert summary[\"first_data_row\"] == [\"Alice\", \"  padded  \"]\n  57 \n  58     def test_escaped_quotes_preserved(self, tmp_path):\n- 59         path = write_csv(\n- 60             tmp_path,\n- 61             \"\"\"\\\n- 62             word\n- 63             \"say \"\"hi\"\"\"\n- 64             \"\"\",\n- 65         )\n+ 59         path = write_csv(tmp_path, 'word\\n\"say \"\"hi\"\"\"\\n')\n  60         summary = fmtcsv.summarize(fmtcsv.read_csv(str(path)))\n  61         assert summary[\"first_data_row\"] == ['say \"hi\"']\n  62 \n  63     def test_multiline_quoted_field_counts_as_one_row(self, tmp_path):\n     ...",
+    "patch": "--- /home/agent/workspace/test_fmtcsv.py\n+++ /home/agent/workspace/test_fmtcsv.py\n@@ -55,15 +55,9 @@\n         summary = fmtcsv.summarize(fmtcsv.read_csv(str(path)))\n         assert summary[\"first_data_row\"] == [\"Alice\", \"  padded  \"]\n \n     def test_escaped_quotes_preserved(self, tmp_path):\n-        path = write_csv(\n-            tmp_path,\n-            \"\"\"\\\n-            word\n-            \"say \"\"hi\"\"\"\n-            \"\"\",\n-        )\n+        path = write_csv(tmp_path, 'word\\n\"say \"\"hi\"\"\"\\n')\n         summary = fmtcsv.summarize(fmtcsv.read_csv(str(path)))\n         assert summary[\"first_data_row\"] == ['say \"hi\"']\n \n     def test_multiline_quoted_field_counts_as_one_row(self, tmp_path):\n",
+    "firstChangedLine": 59
+  }
+}

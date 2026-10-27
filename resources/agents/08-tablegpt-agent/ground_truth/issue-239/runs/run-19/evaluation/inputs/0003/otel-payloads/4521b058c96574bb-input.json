@@ -1,0 +1,47 @@
+{
+  "content": "## Event time & watermark assignment\n\n### Event-time assignment\n\n`event_time` is taken **directly from the source field** (already tz-aware UTC). No ingestion-time fallback, no clock-skew correction — the producer is trusted to stamp it. Measured disorder over the given stream: **max 0s, p99 0s** — fully in-order in arrival, so the bound below is sized for the *contract*, not today's lucky data.\n\n### Watermark strategy: bounded out-of-orderness, `BOUND = 30s`\n\nI chose **bounded out-of-orderness** over the alternatives because the stream is a keyed, per-partition event log with a known 1-minute cadence:\n\n| Strategy | Fit here |\n|---|---|\n| **Bounded out-of-orderness (chosen)** | Bound = 30s = half a window; absorbs ≤30s of reorder while keeping latency low |\n| Monotonically-increasing | Too aggressive — one out-of-order event would drop data |\n| Punctuated / custom | No sentinel exists in the source schema |\n| No watermark | Never fires anything; unbounded state |\n\nRationale for exactly 30s: it equals **half the 5-min window**, tolerates one full cadence step (1 min) of jitter with margin, and — critically — is *smaller than the window*, so a single window still closes before the next one is due. A bound ≥ window size would be a bug (windows could never close before arriving out of order).\n\n### How watermarks advance\n\nThe rule, applied per event:\n\n```\npos_wm[partition] = max(pos_wm[partition], event_time - BOUND)     # monotonic, per partition\nglobal_wm         = min(pos_wm.values())                           # the barrier consumed by windows\nwindow [ws, ws+5m) fires  ⇔  global_wm >= ws + 5m\n```\n\n`global_wm` is the **minimum across partitions** — this is the crux. A window cannot close until *every* partition has moved past it, so a single laggard throttles the whole job.\n\n**Advance trace (baseline):**\n\n| arrival | ev | part | event_time | pos_wm | **global_wm** | state |\n|---|---|---|---|---|---|---|\n| 0 | e1 | 1 | 00:00 | 23:59:30 | 23:59:30 | buffered |\n| 1 | e2 | 2 | 00:01 | 00:00:30 | 23:59:30 | p1 still unset |\n| 2 | e3 | 1 | 00:02 | 00:01:30 | 00:00:30 | buffered |\n| 3 | e4 | 0 | 00:03 | 00:02:30 | 00:00:30 | buffered |\n| 4 | e5 | 2 | 00:04 | 00:03:30 | 00:01:30 | buffered |\n| 5 | e6 | 1 | 00:05 | 00:04:30 | 00:02:30 | buffered |\n| 6 | e7 | 0 | 00:06 | 00:05:30 | 00:03:30 | buffered |\n| 7 | e8 | 2 | 00:07 | 00:06:30 | 00:04:30 | buffered |\n| 8 | e9 | 1 | 00:08 | 00:07:30 | **00:05:30** | **FIRE [00:00,00:05)** |\n| 9 | e10 | 0 | 00:09 | 00:08:30 | 00:06:30 | buffered |\n\nThree properties are visible:\n1. **Global ≤ every partition.** On arrival 1, global_wm froze at `23:59:30` even though p2 advanced, because p1 hadn't started. The barrier waits for the slowest.\n2. **Monotonicity.** Neither layer ever moves backward.\n3. **Delay is real.** Window `[00:00,00:05)` closes only at arrival 8 (global_wm = 00:05:30), i.e. **8 events / ~5 min of stream time late** — the price of correctness under the min rule.\n\n**Final watermarks:** p0 `00:08:30`, p1 `00:07:30`, p2 **`00:06:30` (bottleneck)**, so global = `00:06:30`.\n\n### The firing problem\n\nOnly **`[00:00,00:05)` fired**. Window `[00:05,00:10)` never does, because it needs `global_wm ≥ 00:10:00`, driven by p2. p2 last saw 00:07:00, so it needs an event at **≥ 00:10:30** — but the stream ends at 00:09. That's expected, not a bug: the tail window is pending. It requires either an **idle marker** (advance an idle partition's wm) or an **end-of-stream flush** (bounded `allowed_lateness` then fire). Without one of those, the last window sits in state forever.\n\n### Late-event behavior\n\n**Case A — mildly late (`e11` @00:07 on p0, arriving last):** its candidate wm `00:06:30` is *below* p0's current `00:08:30`, so the max() no-ops — **the watermark does not move**, global_wm stays `00:06:30`, and no window fires. `e11` is on-time relative to its own partition's watermark and is absorbed into `[00:05,00:10)` normally. This is exactly the ≤30s disorder the bound was chosen to swallow.\n\n**Case B — very late (`e12` @00:02 into the already-fired `[00:00,00:05)`):** tagged **`LATE → side-output`**. The window closed at `global_wm=00:05:30`; `e12` arrives after its window is sealed, so it cannot join it. With this bound, `allowed_lateness = 0` — anything landing after its window fires is dropped to a dead-letter/side stream (or, if `allowed_lateness > 0`, would trigger a *late re-fire* / retraction).\n\n### Contract summary\n\n- **Event time:** `event_time`, source-supplied, UTC, per-partition monotonic (verified).\n- **Strategy:** bounded out-of-orderness, `BOUND = 30s`.\n- **Per-partition watermark:** `max(event_time) - 30s`, monotonic.\n- **Global watermark:** `min` across partitions — the windowing barrier.\n- **Firing:** window closes when `global_wm ≥ window_end`; floor-aligned 5-min tumbling.\n- **Late policy:** ≤30s → accepted; after fire → side-output (lateness = 0).\n\n**Two caveats to resolve before this is production-real:**\n1. **Laggard partitions stall the job.** p2 (user u2) is the bottleneck. With keys of wildly different activity, an idle/failed partition pins `global_wm` indefinitely. Fix: **idle-partition watermark advancement** (`withIdleness`) or a per-key watermark if windows are per-key.\n2. **`BOUND=30s` is chosen, not measured.** If real reorder exceeds 30s, Case-A events become Case-B drops. Instrument actual lateness and set the bound to the p99.9, not a guess.\n\nWant me to add the idle-source handling + end-of-stream flush so window `[00:05,00:10)` actually emits, and re-run the late-event cases against it?",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 2108,
+      "prompt_tokens": 20785,
+      "total_tokens": 22893,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 402,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 18304
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012144155319281769c955d568kbFTLqdI",
+    "service_tier": "default",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "run--01a13090-23de-7c33-b9b3-7c15f8dc9921-0",
+  "example": false,
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 20785,
+    "output_tokens": 2108,
+    "total_tokens": 22893,
+    "input_token_details": {
+      "cache_read": 18304
+    },
+    "output_token_details": {
+      "reasoning": 402
+    }
+  }
+}

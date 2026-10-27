@@ -1,0 +1,94 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_f325c706f377493a98f8d8d000890155",
+  "case_id": "case_ce8c1764613d44b293e23c596de22516",
+  "input_id": "step-5",
+  "spans": [
+    {
+      "trace_id": "f045546955254de3e3a1e0d59e8a5c15",
+      "span_id": "16e7cb4a65108771",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790277448043374623,
+      "end_time_unix_nano": 1790277491993426690,
+      "duration_nano": 43950052067,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1790277448045162393,
+          "attributes": {}
+        },
+        {
+          "name": "acp.stderr",
+          "time_unix_nano": 1790277448047230732,
+          "attributes": {}
+        },
+        {
+          "name": "acp.stderr",
+          "time_unix_nano": 1790277448052139595,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1790277491990276193,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "f045546955254de3e3a1e0d59e8a5c15",
+      "span_id": "9ff81caf1d8247f8",
+      "parent_span_id": "16e7cb4a65108771",
+      "name": "/bin/sh -c \"apply_patch <<'EOF'\n*** Begin Patch\n*** Add File: migration/verify.sql\n+INSERT INTO orders (total_amount) VALUES (500);\n+\n+SELECT * FROM orders;\n*** End Patch\nEOF\nls -l /home/agent/workspace/migration/verify.sql\"",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1790277462473694178,
+      "end_time_unix_nano": 1790277462477132258,
+      "duration_nano": 3438080,
+      "tool_content_status": {
+        "arguments": "not_recorded",
+        "result": "not_recorded"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "/bin/sh -c \"apply_patch <<'EOF'\n*** Begin Patch\n*** Add File: migration/verify.sql\n+INSERT INTO orders (total_amount) VALUES (500);\n+\n+SELECT * FROM orders;\n*** End Patch\nEOF\nls -l /home/agent/workspace/migration/verify.sql\"",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.id": "call_de36bae81e3a40ec8d1793d2"
+      },
+      "events": [],
+      "resource": {
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.44.0",
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 20,
+  "truncated": false,
+  "reasons": [
+    "trace_attribute_not_allowlisted",
+    "trace_tool_content_not_recorded"
+  ]
+}

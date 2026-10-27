@@ -1,0 +1,199 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_11e1baed688f4e4fa03943e0cbdb64d4",
+  "case_id": "srp-opencrabs-h2-crlf-multiline-edit-v1",
+  "input_id": "step-2",
+  "spans": [
+    {
+      "trace_id": "28cd0453c28e87e877a533f6d2eb1029",
+      "span_id": "6d312d802fe5fbf1",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792585135066390914,
+      "end_time_unix_nano": 1792585145941949576,
+      "duration_nano": 10875558662,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792585135068016852,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792585139662806667,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792585141953486459,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792585143466994250,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792585145939513715,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "28cd0453c28e87e877a533f6d2eb1029",
+      "span_id": "fa81ed1f710f1251",
+      "parent_span_id": "6d312d802fe5fbf1",
+      "name": "bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792585139660633241,
+      "end_time_unix_nano": 1792585139683352353,
+      "duration_nano": 22719112,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "pwd && ls -l app.ini && od -c app.ini"
+        },
+        "gen_ai.tool.call.result": "STDOUT:\n/workspace/project\n-rw-r--r-- 1 agent agent 61 Oct 21 12:18 app.ini\n0000000   n   a   m   e   =   d   e   m   o  \\r  \\n   h   o   s   t   =\n0000020   l   o   c   a   l   h   o   s   t  \\r  \\n   p   o   r   t   =\n0000040   8   0   8   0  \\r  \\n   d   e   b   u   g   =   f   a   l   s\n0000060   e  \\r  \\n   l   o   g   =   i   n   f   o  \\r  \\n\n0000075\n",
+        "gen_ai.tool.call.id": "56e16c02-1c5d-4cfe-a1cb-0d03eaaa72de"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "28cd0453c28e87e877a533f6d2eb1029",
+      "span_id": "2ec89eff92481ef6",
+      "parent_span_id": "6d312d802fe5fbf1",
+      "name": "read_file",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792585139684634459,
+      "end_time_unix_nano": 1792585139686907861,
+      "duration_nano": 2273402,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "read_file",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "path": "app.ini"
+        },
+        "gen_ai.tool.call.result": "name=demo\nhost=localhost\nport=8080\ndebug=false\nlog=info",
+        "gen_ai.tool.call.id": "f1af9d7d-5318-4d20-ab98-a8db9fd6e7ba"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "28cd0453c28e87e877a533f6d2eb1029",
+      "span_id": "04ee75a9534634da",
+      "parent_span_id": "6d312d802fe5fbf1",
+      "name": "edit_file",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792585141947281065,
+      "end_time_unix_nano": 1792585142035755816,
+      "duration_nano": 88474751,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "edit_file",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "new_text": "host=0.0.0.0\r\nport=9090",
+          "old_text": "host=localhost\r\nport=8080",
+          "operation": "replace",
+          "path": "app.ini"
+        },
+        "gen_ai.tool.call.result": "Successfully edited /workspace/project/app.ini. Lines: 5 → 5\n- host=localhost\n+ host=0.0.0.0\n- port=8080\n+ port=9090\n",
+        "gen_ai.tool.call.id": "81db6d19-2889-40ca-8c03-ab30c894dd78"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "28cd0453c28e87e877a533f6d2eb1029",
+      "span_id": "74f3bb65a93c5e18",
+      "parent_span_id": "6d312d802fe5fbf1",
+      "name": "bash",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792585143464998941,
+      "end_time_unix_nano": 1792585143881331837,
+      "duration_nano": 416332896,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "od -c app.ini && echo '---' && wc -c app.ini && file app.ini && echo '---' && git -C /workspace/project status --short 2>/dev/null || true"
+        },
+        "gen_ai.tool.call.result": "STDOUT:\n0000000   n   a   m   e   =   d   e   m   o  \\r  \\n   h   o   s   t   =\n0000020   0   .   0   .   0   .   0  \\r  \\n   p   o   r   t   =   9   0\n0000040   9   0  \\r  \\n   d   e   b   u   g   =   f   a   l   s   e  \\r\n0000060  \\n   l   o   g   =   i   n   f   o  \\r  \\n\n0000073\n---\n59 app.ini\n\n\nSTDERR:\n/bin/bash: line 1: file: command not found\n",
+        "gen_ai.tool.call.id": "9c31141c-0c01-4fde-b3a3-088cc2fbf224"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

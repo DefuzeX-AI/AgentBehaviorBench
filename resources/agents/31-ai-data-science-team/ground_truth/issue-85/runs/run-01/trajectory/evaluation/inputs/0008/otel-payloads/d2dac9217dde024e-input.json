@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    \n    This function \"submits\" the raw filing (the input data) for processing, \"validates\n    acceptance\" (type coercion, integrity checks), and \"handles suspension, correction,\n    dissemination, and withdrawal\" via flag columns and corrective recomputation:\n      - suspension  -> anomalies (e.g., negative values) are flagged but retained\n      - correction  -> inconsistent derived fields (extended_sales) are recomputed & flagged\n      - dissemination-> a clean, standardized, single DataFrame is returned\n      - withdrawal  -> exact duplicate records are removed (withdrawn from the dataset)\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # ------------------------------------------------------------------\n    # 0. Input normalization: ensure we always work with a list of frames\n    # ------------------------------------------------------------------\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n\n    # Keep only DataFrame entries, concatenate into one working frame\n    frames = [d.copy() for d in data_list if isinstance(d, pd.DataFrame)]\n    if not frames:\n        # Graceful fallback: return an empty frame if nothing valid was supplied\n        return pd.DataFrame()\n    df = pd.concat(frames, ignore_index=True)\n\n    # ------------------------------------------------------------------\n    # 1. Inspect & standardize column names (lowercase, underscores, strip)\n    # ------------------------------------------------------------------\n    df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]\n\n    # ------------------------------------------------------------------\n    # 2. Normalize data types\n    # ------------------------------------------------------------------\n    # --- 2a. Datetime: any column whose name suggests a date ---\n    date_cols = [c for c in df.columns if 'date' in c]\n    for col in date_cols:\n        df[col] = pd.to_datetime(df[col], errors='coerce')\n\n    # --- 2b. Numeric: attempt numeric coercion on object columns ---\n    #     (a text column like a model name will fail conversion and be skipped,\n    #      while numeric-looking columns stored as strings get converted)\n    for col in df.columns:\n        if col in date_cols:\n            continue\n        if df[col].dtype == object:\n            converted = pd.to_numeric(df[col], errors='coerce')\n            # If the vast majority of values parse as numbers, treat as numeric\n            if converted.notna().mean() > 0.5:\n                df[col] = converted\n\n    # --- 2c. Categorical cleanup: strip whitespace on remaining text columns ---\n    text_cols = [c for c in df.columns if df[c].dtype == object]\n    for col in text_cols:\n        df[col] = df[col].astype(str).str.strip()\n        # Consolidate to category dtype for memory efficiency / clean semantics\n        df[col] = df[col].astype('category')\n\n    # ------------------------------------------------------------------\n    # 3. Handle missing values (flag + simple imputation, no row dropping)\n    # ------------------------------------------------------------------\n    # Numeric columns: flag missingness, then impute with the column median\n    numeric_cols = df.select_dtypes(include=[np.number]).columns\n    for col in numeric_cols:\n        if df[col].isna().any():\n            df[f'{col}_was_missing'] = df[col].isna()\n            df[col] = df[col].fillna(df[col].median())\n\n    # Text/categorical columns: flag missingness, fill with explicit 'unknown'\n    for col in text_cols:\n        if df[col].isna().any() or (df[col].astype(str).str.lower() == 'nan').any():\n            df[f'{col}_was_missing'] = df[col].isna() | (df[col].astype(str).str.lower() == 'nan')\n            df[col] = df[col].cat.add_categories(['unknown']).fillna('unknown')\n            df.loc[df[f'{col}_was_missing'], col] = 'unknown'\n\n    # Datetime columns: flag missingness, then fill via forward/backward fill\n    for col in date_cols:\n        if df[col].isna().any():\n            df[f'{col}_was_missing'] = df[col].isna()\n            df[col] = df[col].ffill().bfill()\n\n    # ------------------------------------------------------------------\n    # 4. Single dataset provided -> no merge/join required\n    # ------------------------------------------------------------------\n\n    # ------------------------------------------------------------------\n    # 5. Validation / \"correction\" step:\n    #    Verify extended_sales == price * quantity_sold.\n    #    Where the filing is inconsistent, recompute (correct) and flag it.\n    # ------------------------------------------------------------------\n    if {'price', 'quantity_sold', 'extended_sales'}.issubset(df.columns):\n        recomputed = df['price'] * df['quantity_sold']\n        mismatch_mask = df['extended_sales'].notna() & ~np.isclose(\n            df['extended_sales'], recomputed, rtol=1e-6, equal_nan=False\n        )\n        df['extended_sales_corrected'] = mismatch_mask          # correction flag\n        df.loc[mismatch_mask, 'extended_sales'] = recomputed[mismatch_mask]\n\n    # ------------------------------------------------------------------\n    # 6. Anomalies (\"suspension\" flags) & duplicates (\"withdrawal\")\n    # ------------------------------------------------------------------\n    # Flag physically impossible values (negatives) rather than dropping rows\n    for col in ['price', 'quantity_sold']:\n        if col in df.columns:\n            df[f'{col}_anomaly'] = df[col] < 0\n\n    # Withdraw exact duplicate records (fully identical rows) from dissemination\n    before = len(df)\n    df = df.drop_duplicates().reset_index(drop=True)\n    # Record how many were withdrawn, as a dataset-level note (constant column)\n    # is avoided; instead we simply proceed with the deduplicated frame.\n\n    # ------------------------------------------------------------------\n    # 7. Final ordering & dissemination: sort chronologically for a clean output\n    # ------------------------------------------------------------------\n    if date_cols:\n        df = df.sort_values(date_cols[0]).reset_index(drop=True)\n\n    data_wrangled = df\n    return data_wrangled\n```",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 2740,
+      "prompt_tokens": 741,
+      "total_tokens": 3481,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 1437,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "glm-5.3-flash",
+    "system_fingerprint": null,
+    "id": "20260926033826fa922d209616494d",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a0da13-840b-7681-8671-898d20f75561-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 741,
+    "output_tokens": 2740,
+    "total_tokens": 3481,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 1437
+    }
+  }
+}

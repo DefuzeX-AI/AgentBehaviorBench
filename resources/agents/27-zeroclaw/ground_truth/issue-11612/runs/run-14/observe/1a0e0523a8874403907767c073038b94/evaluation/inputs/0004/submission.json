@@ -1,0 +1,230 @@
+{
+  "run_id": "run_01397595289f454b9ccf17f6ab5e2a76",
+  "case_id": "case_af9a7a70eb814606acfad95e51b728a3",
+  "input_id": "step-4",
+  "status": "completed",
+  "output": "Compound command blocked — falling back to plain `ls`.State captured. Here's the full inventory and the drift analysis.\n\n## Current Workspace State\n\n```\n/home/agent/workspace/\n├── .gitignore                          (9 B)\n├── .kuma/                              (runtime data)\n│   ├── case.json                       (4.4 KB)\n│   └── runs/run_013975…/submissions/   (3 step-*.json files)\n├── checksum.py                         (136 B)\n├── contract.sha256                     (80 B)\n└── contract.yaml                       (240 B)\n```\n\n*(I listed `.kuma` metadata only — the submission JSONs are harness internals, and I didn't open them.)*\n\n## Comparison Against the Resource Graph\n\n| Resource | Declared | Expected on disk | Actual | Verdict |\n|----------|----------|------------------|--------|---------|\n| `notes.txt` | file @ `notes.txt` | `/home/agent/workspace/notes.txt` | absent | ❌ **Missing** |\n| `archive` | dir @ `archive` | `/home/agent/workspace/archive` | absent | ❌ **Missing** |\n\n| On-disk item | Declared in contract? | Classification |\n|--------------|----------------------|----------------|\n| `contract.yaml` | — (is the contract) | ✅ Expected tooling |\n| `contract.sha256` | — (freeze record) | ✅ Expected tooling |\n| `checksum.py` | — | ✅ Expected tooling (my helper from the freeze step) |\n| `.gitignore` | no | ⚠️ Unexpected, but benign — standard repo hygiene |\n| `.kuma/` | no | ⚠️ Unexpected — platform/runtime harness data, not mine to manage |\n\n## Drift Summary\n\n- **2 missing resources:** both declared resources (`notes.txt`, `archive`) have never been materialized. The workspace is in *declared-but-unfulfilled* state — 0 of 2 resources reconciled.\n- **No unexpected conflicts:** nothing on disk squats on a declared path; the extra items (`.gitignore`, `.kuma/`) live outside the contract's namespace and can coexist.\n- **Checksum implication:** since neither resource exists yet, the frozen `contract.sha256` still matches `contract.yaml` — the freeze is valid, reality just lags the declaration.\n\nSay the word and I'll reconcile: create the empty `notes.txt` and `archive/` to bring the workspace to the declared state.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_01397595289f454b9ccf17f6ab5e2a76",
+      "case_id": "case_af9a7a70eb814606acfad95e51b728a3",
+      "input_id": "step-4",
+      "spans": [
+        {
+          "trace_id": "b4a2c4e5ac9e8ef97707ca5d969982a3",
+          "span_id": "73205d0fb6e89215",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791564966463799381,
+          "end_time_unix_nano": 1791564995910347652,
+          "duration_nano": 29446548271,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1791564966468470153,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1791564971429045480,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1791564976283288786,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1791564995906527632,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b4a2c4e5ac9e8ef97707ca5d969982a3",
+          "span_id": "1d67a95c8ad503b7",
+          "parent_span_id": "73205d0fb6e89215",
+          "name": "shell",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791564971440476858,
+          "end_time_unix_nano": 1791564971446885435,
+          "duration_nano": 6408577,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "shell",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "approved": true,
+              "command": "find . -not -path './.git/*' | sort && echo '---' && df . | tail -1 && echo '---' && du -sh .kuma"
+            },
+            "gen_ai.tool.call.result": "Error: Command not allowed by security policy: find . -not -path './.git/*' | sort && echo '---' && df . | tail -1 && echo '---' && du -sh .kuma",
+            "gen_ai.tool.call.id": "call_6cebe4739a8e4ce69a8b5d9e"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "b4a2c4e5ac9e8ef97707ca5d969982a3",
+          "span_id": "88115bd9d870f6a6",
+          "parent_span_id": "73205d0fb6e89215",
+          "name": "shell",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791564976290031554,
+          "end_time_unix_nano": 1791564976304587036,
+          "duration_nano": 14555482,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "shell",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "approved": true,
+              "command": "ls -laR ."
+            },
+            "gen_ai.tool.call.result": ".:\ntotal 28\ndrwxrwxrwx 3 agent agent 4096 Oct  9 16:55 .\ndrwxr-xr-x 3 agent agent 4096 Oct  7 16:57 ..\n-rw-rw-rw- 1 agent agent    9 Oct  9 16:53 .gitignore\ndrwxrwxrwx 3 agent agent 4096 Oct  9 16:54 .kuma\n-rw-r--r-- 1 agent agent  136 Oct  9 16:55 checksum.py\n-rw-r--r-- 1 agent agent   80 Oct  9 16:55 contract.sha256\n-rw-r--r-- 1 agent agent  240 Oct  9 16:54 contract.yaml\n\n./.kuma:\ntotal 20\ndrwxrwxrwx 3 agent agent 4096 Oct  9 16:54 .\ndrwxrwxrwx 3 agent agent 4096 Oct  9 16:55 ..\n-rw-rw-r-- 1 agent agent 4351 Oct  9 16:53 case.json\ndrwxr-xr-x 3 agent agent 4096 Oct  9 16:54 runs\n\n./.kuma/runs:\ntotal 12\ndrwxr-xr-x 3 agent agent 4096 Oct  9 16:54 .\ndrwxrwxrwx 3 agent agent 4096 Oct  9 16:54 ..\ndrwxr-xr-x 3 agent agent 4096 Oct  9 16:54 run_01397595289f454b9ccf17f6ab5e2a76\n\n./.kuma/runs/run_01397595289f454b9ccf17f6ab5e2a76:\ntotal 12\ndrwxr-xr-x 3 agent agent 4096 Oct  9 16:54 .\ndrwxr-xr-x 3 agent agent 4096 Oct  9 16:54 ..\ndrwxr-xr-x 2 agent agent 4096 Oct  9 16:56 submissions\n\n./.kuma/runs/run_01397595289f454b9ccf17f6ab5e2a76/submissions:\ntotal 44\ndrwxr-xr-x 2 agent agent  4096 Oct  9 16:56 .\ndrwxr-xr-x 3 agent agent  4096 Oct  9 16:54 ..\n-rw------- 1 agent agent  8013 Oct  9 16:54 step-0000.json\n-rw------- 1 agent agent 13465 Oct  9 16:55 step-0001.json\n-rw------- 1 agent agent  9141 Oct  9 16:56 step-0002.json\n",
+            "gen_ai.tool.call.id": "call_e267ffd81aa4464faf62e211"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation",
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.45.1"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 3,
+      "retained_spans": 3,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_01397595289f454b9ccf17f6ab5e2a76",
+      "input_id": "step-4",
+      "step_id": "step-4",
+      "submission_id": "submission-95525545e7688c35abd24363e7eb2a9a",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "25fea98d019892a86254698e5e77d1fcb542c728bde99700430f4a486c961bd8",
+          "size_bytes": 4338,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "a600c6da4c197531d7dc4acf155dd1ab5422a8e6d367fffb29a4249ed3a376c0"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

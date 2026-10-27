@@ -1,0 +1,79 @@
+{
+  "generations": [
+    [
+      {
+        "text": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n    \n    # Ensure the incoming data is a list (as required by the function contract)\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n    \n    # Keep only valid pandas DataFrames that are not empty\n    valid_dfs = [df for df in data_list if isinstance(df, pd.DataFrame) and not df.empty]\n    \n    # If no valid DataFrames are available, return an empty summary DataFrame\n    if not valid_dfs:\n        return pd.DataFrame(columns=['column', 'missing_count'])\n    \n    # Dictionary to accumulate missing value counts per column across all DataFrames\n    missing_counts = {}\n    \n    for df in valid_dfs:\n        # Work on a copy to avoid modifying the original data\n        df = df.copy()\n        # Standardize column names: convert to string, strip whitespace, lowercase\n        df.columns = df.columns.astype(str).str.strip().str.lower()\n        # Count missing values per column\n        counts = df.isnull().sum()\n        # Accumulate counts by column name\n        for col, count in counts.items():\n            missing_counts[col] = missing_counts.get(col, 0) + count\n    \n    # Build a DataFrame from the accumulated missing counts\n    missing_df = pd.DataFrame(\n        list(missing_counts.items()),\n        columns=['column', 'missing_count']\n    )\n    \n    # Keep only columns that actually have at least one missing value\n    missing_df = missing_df[missing_df['missing_count'] > 0].reset_index(drop=True)\n    \n    return missing_df\n```",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n    \n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n    \n    # Ensure the incoming data is a list (as required by the function contract)\n    if not isinstance(data_list, list):\n        data_list = [data_list]\n    \n    # Keep only valid pandas DataFrames that are not empty\n    valid_dfs = [df for df in data_list if isinstance(df, pd.DataFrame) and not df.empty]\n    \n    # If no valid DataFrames are available, return an empty summary DataFrame\n    if not valid_dfs:\n        return pd.DataFrame(columns=['column', 'missing_count'])\n    \n    # Dictionary to accumulate missing value counts per column across all DataFrames\n    missing_counts = {}\n    \n    for df in valid_dfs:\n        # Work on a copy to avoid modifying the original data\n        df = df.copy()\n        # Standardize column names: convert to string, strip whitespace, lowercase\n        df.columns = df.columns.astype(str).str.strip().str.lower()\n        # Count missing values per column\n        counts = df.isnull().sum()\n        # Accumulate counts by column name\n        for col, count in counts.items():\n            missing_counts[col] = missing_counts.get(col, 0) + count\n    \n    # Build a DataFrame from the accumulated missing counts\n    missing_df = pd.DataFrame(\n        list(missing_counts.items()),\n        columns=['column', 'missing_count']\n    )\n    \n    # Keep only columns that actually have at least one missing value\n    missing_df = missing_df[missing_df['missing_count'] > 0].reset_index(drop=True)\n    \n    return missing_df\n```",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 4824,
+              "prompt_tokens": 746,
+              "total_tokens": 5570,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 4435,
+                "rejected_prediction_tokens": null,
+                "text_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 0,
+                "image_tokens": null,
+                "text_tokens": null
+              }
+            },
+            "model_provider": "openai",
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261011192718213197980c955d568GwMxH3ga",
+            "service_tier": "default",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "lc_run--01a12c6f-0f02-7ca2-9279-a3dfbc0be6bf-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 4824,
+      "prompt_tokens": 746,
+      "total_tokens": 5570,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 4435,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261011192718213197980c955d568GwMxH3ga",
+    "service_tier": "default"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

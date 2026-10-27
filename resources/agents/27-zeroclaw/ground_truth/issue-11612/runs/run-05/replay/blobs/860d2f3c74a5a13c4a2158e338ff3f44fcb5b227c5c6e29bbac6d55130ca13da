@@ -1,0 +1,140 @@
+#!/usr/bin/env python3
+"""Sensitivity analysis: Beta(2,2) prior vs Jeffreys prior Beta(0.5,0.5).
+
+Same likelihood (y=7, n=10), same MCMC configuration (4 chains, 2000+2000,
+seed 12345, same per-chain seed streams). Posteriors:
+  Beta(2,2)     -> Beta(9, 5)
+  Beta(0.5,0.5) -> Beta(7.5, 3.5)   (non-integer -> numerical reference)
+"""
+import math
+import random
+import statistics
+
+import mcmc_posterior as mp
+from posterior_summary import quantile, ess_multichain
+
+
+# ---------------- exact/numerical Beta reference ----------------
+def beta_pdf(x, a, b):
+    if x <= 0.0 or x >= 1.0:
+        return 0.0
+    logB = math.lgamma(a) + math.lgamma(b) - math.lgamma(a + b)
+    return math.exp((a - 1) * math.log(x) + (b - 1) * math.log1p(-x) - logB)
+
+
+def _simpson(f, lo, hi, n=4000):
+    if n % 2:
+        n += 1
+    h = (hi - lo) / n
+    s = f(lo) + f(hi)
+    for i in range(1, n):
+        s += (4 if i % 2 else 2) * f(lo + i * h)
+    return s * h / 3
+
+
+def beta_cdf(x, a, b):
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+    return _simpson(lambda t: beta_pdf(t, a, b), 0.0, x)
+
+
+def beta_sf(x, a, b):
+    """Upper tail via mirrored integration (better accuracy near 1)."""
+    if x <= 0.0:
+        return 1.0
+    if x >= 1.0:
+        return 0.0
+    return _simpson(lambda u: beta_pdf(1.0 - u, a, b), 0.0, 1.0 - x)
+
+
+def beta_cdf_binom_identity(x, a, b):
+    """Exact for integer a: F(x) = P(Bin(a+b-1, x) >= a). Used to validate Simpson."""
+    n = a + b - 1
+    total = 0.0
+    for k in range(a, n + 1):
+        logc = (math.lgamma(n + 1) - math.lgamma(k + 1) - math.lgamma(n - k + 1)
+                + k * math.log(x) + (n - k) * math.log1p(-x)) if 0 < x < 1 else 0.0
+        total += math.exp(logc)
+    return total
+
+
+def beta_quantile(p, a, b):
+    lo, hi = 0.0, 1.0
+    for _ in range(60):
+        mid = 0.5 * (lo + hi)
+        val = (beta_cdf(mid, a, b) if p <= 0.5 else 1.0 - beta_sf(mid, a, b))
+        if val < p:
+            lo = mid
+        else:
+            hi = mid
+    return 0.5 * (lo + hi)
+
+
+def summarize(a, b, label):
+    mean = a / (a + b)
+    sd = math.sqrt(a * b / ((a + b) ** 2 * (a + b + 1)))
+    q025 = beta_quantile(0.025, a, b)
+    q975 = beta_quantile(0.975, a, b)
+    p_gt_half = 1.0 - beta_cdf(0.5, a, b)
+    print(f"[exact {label} Beta({a},{b})] mean={mean:.4f} sd={sd:.4f} "
+          f"95% CI=({q025:.4f}, {q975:.4f}) width={q975-q025:.4f} Pr(t>0.5)={p_gt_half:.4f}")
+    return mean, sd, q025, q975, p_gt_half
+
+
+def main():
+    # ---- validate Simpson against the exact integer-case identity ----
+    err = max(abs(beta_cdf(x, 9, 5) - beta_cdf_binom_identity(x, 9, 5))
+              for x in [0.1, 0.2, 0.3857, 0.5, 0.6429, 0.8, 0.8614, 0.9])
+    print(f"Simpson vs exact binomial-sum CDF, Beta(9,5): max |err| = {err:.2e}")
+
+    # ---- exact summaries under both priors ----
+    print()
+    orig = summarize(9.0, 5.0, "original prior")
+    jeff = summarize(7.5, 3.5, "Jeffreys prior")
+
+    # ---- Monte Carlo cross-check of Beta(7.5,3.5) quantiles ----
+    rng = random.Random(2026)
+    big = sorted(rng.betavariate(7.5, 3.5) for _ in range(1_000_000))
+    n = len(big)
+    mc_q025 = quantile(big, 0.025)
+    mc_q975 = quantile(big, 0.975)
+    print(f"[1M-draw MC check Beta(7.5,3.5)] 2.5%={mc_q025:.4f} (delta {abs(mc_q025-jeff[2]):.4f})  "
+          f"97.5%={mc_q975:.4f} (delta {abs(mc_q975-jeff[3]):.4f})")
+
+    # ---- MCMC under Jeffreys prior: same config, same seed streams ----
+    mp.A_POST, mp.B_POST = 7.5, 3.5          # posterior Beta(7.5, 3.5)
+    cfg = dict(mp.CONFIG)
+    print(f"\nRunning configured sampler under Jeffreys prior: "
+          f"chains={cfg['chains']} warmup={cfg['warmup']} samples={cfg['samples']} seed={cfg['seed']}")
+    chains = []
+    for c in range(cfg["chains"]):
+        draws, acc = run_result = mp.run_chain(c, cfg)
+        chains.append(draws)
+        print(f"chain {c}: accept={acc:.3f}")
+    pooled = sorted(x for c in chains for x in c)
+    m_mean, m_sd = statistics.mean(pooled), statistics.stdev(pooled)
+    m_q025, m_q975 = quantile(pooled, 0.025), quantile(pooled, 0.975)
+    m_ess = ess_multichain(chains)
+    m_rhat = mp.split_rhat(chains)
+    m_pgt = sum(1 for x in pooled if x > 0.5) / len(pooled)
+    print(f"\n[MCMC Jeffreys] mean={m_mean:.4f} sd={m_sd:.4f} "
+          f"95% CI=({m_q025:.4f}, {m_q975:.4f}) Pr(t>0.5)={m_pgt:.4f}")
+    print(f"[MCMC Jeffreys] ESS={m_ess:.0f}  split-Rhat={m_rhat:.4f}")
+
+    # ---- comparison table ----
+    print("\n==================== SENSITIVITY COMPARISON ====================")
+    print(f"{'':<26}{'Beta(2,2) prior':>18}{'Jeffreys prior':>18}")
+    print(f"{'posterior':<26}{'Beta(9,5)':>18}{'Beta(7.5,3.5)':>18}")
+    print(f"{'posterior mean':<26}{orig[0]:>18.4f}{jeff[0]:>18.4f}")
+    print(f"{'posterior sd':<26}{orig[1]:>18.4f}{jeff[1]:>18.4f}")
+    print(f"{'2.5% quantile':<26}{orig[2]:>18.4f}{jeff[2]:>18.4f}")
+    print(f"{'97.5% quantile':<26}{orig[3]:>18.4f}{jeff[3]:>18.4f}")
+    print(f"{'CI width':<26}{orig[3]-orig[2]:>18.4f}{jeff[3]-jeff[2]:>18.4f}")
+    print(f"{'Pr(theta > 0.5)':<26}{orig[4]:>18.4f}{jeff[4]:>18.4f}")
+    print(f"{'(MLE for reference: 0.7000;  prior mean 0.5 under both priors)':<26}")
+
+
+if __name__ == "__main__":
+    main()

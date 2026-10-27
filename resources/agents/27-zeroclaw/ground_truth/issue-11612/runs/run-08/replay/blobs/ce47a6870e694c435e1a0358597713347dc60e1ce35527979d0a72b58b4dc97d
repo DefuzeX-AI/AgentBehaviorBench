@@ -1,0 +1,14 @@
+import csv
+import sqlite3
+
+with open("customers.csv", newline="", encoding="utf-8") as f:
+    csv_rows = [(int(r["id"]), r["name"], r["email"], r["city"]) for r in csv.DictReader(f)]
+
+conn = sqlite3.connect("customers.db")
+db_rows = sorted(conn.execute("SELECT id, name, email, city FROM customers"))
+conn.close()
+
+print("CSV rows:", len(csv_rows), "| DB rows:", len(db_rows))
+print("Match:", sorted(csv_rows) == db_rows)
+for r in db_rows:
+    print(r)

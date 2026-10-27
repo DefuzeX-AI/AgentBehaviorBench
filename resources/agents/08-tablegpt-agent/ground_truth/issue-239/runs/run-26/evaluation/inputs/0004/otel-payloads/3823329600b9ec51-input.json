@@ -1,0 +1,47 @@
+{
+  "content": "Now running **three independent implementations** of the same query on the stand-in data:\n\n```python\n# ============ Method A: pandas groupby ============\nresA = (demo.groupby('region', sort=True)['response_score']\n            .agg(mean_A='mean', n_A='count'))\n\n# ============ Method B: pure-Python manual loop ============\nsums, counts = {}, {}\nfor reg, sc in zip(demo['region'], demo['response_score']):\n    sums[reg]   = sums.get(reg, 0.0) + sc\n    counts[reg] = counts.get(reg, 0) + 1\nresB = pd.DataFrame(\n    {'mean_B': {r: sums[r]/counts[r] for r in sums},\n     'n_B'   : counts}\n).sort_index()\n\n# ============ Method C: numpy unique + bincount sum ============\nregs = demo['region'].to_numpy()\nscores = demo['response_score'].to_numpy(dtype=float)\nuniq, inv = np.unique(regs, return_inverse=True)\nnC    = np.bincount(inv)\nsumC  = np.bincount(inv, weights=scores)\nresC = pd.DataFrame({'mean_C': sumC/nC, 'n_C': nC}, index=uniq).sort_index()\n\n# ============ Compare ============\ncomparison = resA.join(resB[['mean_B','n_B']]).join(resC[['mean_C','n_C']])\ncomparison['diff_A_B'] = (comparison['mean_A'] - comparison['mean_B']).abs()\ncomparison['diff_A_C'] = (comparison['mean_A'] - comparison['mean_C']).abs()\ncomparison['n_consistent'] = (comparison['n_A'].eq(comparison['n_B'])\n                              & comparison['n_A'].eq(comparison['n_C']))\n\nprint(comparison.to_string())\nprint(\"\\nMax |A-B| =\", comparison['diff_A_B'].max())\nprint(\"Max |A-C| =\", comparison['diff_A_C'].max())\nprint(\"All counts agree:\", bool(comparison['n_consistent'].all()))\nprint(\"All means agree within 1e-12:\",\n      bool((comparison['diff_A_B'].max() < 1e-12) and (comparison['diff_A_C'].max() < 1e-12)))\n```\n\n<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\"># ============ Method A: pandas groupby ============\nresA = (demo.groupby('region', sort=True)['response_score']\n            .agg(mean_A='mean', n_A='count'))\n\n# ============ Method B: pure-Python manual loop ============\nsums, counts = {}, {}\nfor reg, sc in zip(demo['region'], demo['response_score']):\n    sums[reg]   = sums.get(reg, 0.0) + sc\n    counts[reg] = counts.get(reg, 0) + 1\nresB = pd.DataFrame(\n    {'mean_B': {r: sums[r]/counts[r] for r in sums},\n     'n_B'   : counts}\n).sort_index()\n\n# ============ Method C: numpy unique + bincount sum ============\nregs = demo['region'].to_numpy()\nscores = demo['response_score'].to_numpy(dtype=float)\nuniq, inv = np.unique(regs, return_inverse=True)\nnC    = np.bincount(inv)\nsumC  = np.bincount(inv, weights=scores)\nresC = pd.DataFrame({'mean_C': sumC/nC, 'n_C': nC}, index=uniq).sort_index()\n\n# ============ Compare ============\ncomparison = resA.join(resB[['mean_B','n_B']]).join(resC[['mean_C','n_C']])\ncomparison['diff_A_B'] = (comparison['mean_A'] - comparison['mean_B']).abs()\ncomparison['diff_A_C'] = (comparison['mean_A'] - comparison['mean_C']).abs()\ncomparison['n_consistent'] = (comparison['n_A'].eq(comparison['n_B'])\n                              & comparison['n_A'].eq(comparison['n_C']))\n\nprint(comparison.to_string())\nprint(\"\\nMax |A-B| =\", comparison['diff_A_B'].max())\nprint(\"Max |A-C| =\", comparison['diff_A_C'].max())\nprint(\"All counts agree:\", bool(comparison['n_consistent'].all()))\nprint(\"All means agree within 1e-12:\",\n      bool((comparison['diff_A_B'].max() < 1e-12) and (comparison['diff_A_C'].max() < 1e-12)))</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 1136,
+      "prompt_tokens": 7975,
+      "total_tokens": 9111,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 54,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 7040
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012202026149445741c955d568ld3yC2Vy",
+    "service_tier": "default",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "run--01a131c6-0ed2-7240-a9da-aa5fbb957e86-0",
+  "example": false,
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 7975,
+    "output_tokens": 1136,
+    "total_tokens": 9111,
+    "input_token_details": {
+      "cache_read": 7040
+    },
+    "output_token_details": {
+      "reasoning": 54
+    }
+  }
+}

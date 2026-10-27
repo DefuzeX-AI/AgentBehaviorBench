@@ -1,0 +1,188 @@
+{
+  "run_id": "run_6c51338d52964ca6ade7fcbee600b746",
+  "case_id": "case_f7366d7c24ba41e8afb9c233f6038354",
+  "input_id": "step-7",
+  "status": "completed",
+  "output": "**Exists:** `/home/agent/workspace/broken` — 15,960 bytes, permissions `-rwxr-xr-x` (owner/group/others all have execute).\n\n**Executable:** yes — confirmed by `test -x` and the `x` permission bits; it already ran successfully.\n\n**File type** (per `file`):\n```\nELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked,\ninterpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=944f8263..., not stripped\n```\n\nIn plain terms: a 64-bit x86-64 ELF binary, PIE (position-independent executable), dynamically linked against the system loader `ld-linux-x86-64.so.2`, with debug/symbol info intact (not stripped).",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_6c51338d52964ca6ade7fcbee600b746",
+      "case_id": "case_f7366d7c24ba41e8afb9c233f6038354",
+      "input_id": "step-7",
+      "spans": [
+        {
+          "trace_id": "25b5329a31566ede7d32f47a469a2b2d",
+          "span_id": "e700fea15f6b7007",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791919807233895751,
+          "end_time_unix_nano": 1791919824065633159,
+          "duration_nano": 16831737408,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1791919807236270911,
+              "attributes": {}
+            },
+            {
+              "name": "acp.permission",
+              "time_unix_nano": 1791919814170466749,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1791919824061194441,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "25b5329a31566ede7d32f47a469a2b2d",
+          "span_id": "d93e035f4717b528",
+          "parent_span_id": "e700fea15f6b7007",
+          "name": "ls -l /home/agent/workspace/broken && file /home/agent/workspace/broken && test -x /home/agent/workspace/broken && echo \"EXECUTABLE: yes\"",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1791919814157864222,
+          "end_time_unix_nano": 1791919814195765065,
+          "duration_nano": 37900843,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "ls -l /home/agent/workspace/broken && file /home/agent/workspace/broken && test -x /home/agent/workspace/broken && echo \"EXECUTABLE: yes\"",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "command": "ls -l /home/agent/workspace/broken && file /home/agent/workspace/broken && test -x /home/agent/workspace/broken && echo \"EXECUTABLE: yes\""
+            },
+            "gen_ai.tool.call.result": [
+              {
+                "content": {
+                  "text": "**Command:**\n```bash\nls -l /home/agent/workspace/broken && file /home/agent/workspace/broken && test -x /home/agent/workspace/broken && echo \"EXECUTABLE: yes\"\n```\n\n**Output:**\n```\n-rwxr-xr-x 1 agent agent 15960 Oct 13 19:29 /home/agent/workspace/broken\n/home/agent/workspace/broken: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=944f826381ba8090828f5eb1d3f8c392ac6b76bc, for GNU/Linux 3.2.0, not stripped\nEXECUTABLE: yes\n```\n\n**Status:** Command succeeded with exit code 0",
+                  "type": "text"
+                },
+                "type": "content"
+              }
+            ],
+            "gen_ai.tool.call.id": "call_04c149895c9843398e53e5ab"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 2,
+      "retained_spans": 2,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_6c51338d52964ca6ade7fcbee600b746",
+      "input_id": "step-7",
+      "step_id": "step-7",
+      "submission_id": "submission-3180221eec3ab9d8ce5201ff94bf1238",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "43e7c5fa78d425e5a949733b9e37a680df032a6ddf26c9cfbf4457d2d0b91f36",
+          "size_bytes": 2636,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "4517020a3f75a682eb3db101bf9c48da63865217ead751a5180143d104940980"
+        }
+      ]
+    },
+    "runtime_file_sources": {},
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 0,
+      "retained_count": 0,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

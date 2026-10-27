@@ -1,0 +1,89 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_7a2751d19b3d4d8fa393c645620c1368",
+  "case_id": "case_b41db6220fbc40c68a0465507a61d328",
+  "input_id": "step-5",
+  "spans": [
+    {
+      "trace_id": "22edea4c7f51ae5a928cadb1cabd53ca",
+      "span_id": "a6f94c1f35b61e8c",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791350670393069748,
+      "end_time_unix_nano": 1791350686216349530,
+      "duration_nano": 15823279782,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791350670394983667,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791350686209714448,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "22edea4c7f51ae5a928cadb1cabd53ca",
+      "span_id": "996a6780ec7f038d",
+      "parent_span_id": "a6f94c1f35b61e8c",
+      "name": "Running shell command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791350674832891633,
+      "end_time_unix_nano": 1791350675059577969,
+      "duration_nano": 226686336,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Running shell command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "python3 deadlock_sim.py > deadlock_output.txt 2>&1; echo \"exit code: $?\"; echo \"----- captured output -----\"; cat deadlock_output.txt",
+          "intent": "Run deadlock_sim.py and capture output to file"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "exit code: 0\n----- captured output -----\nSimulating deadlock on /home/agent/workspace/migration.db (sleep=0.1s)\n[A] BEGIN; updating account 1\n[B] BEGIN; updating account 2\n[A] updated account 1; sleeping 0.1s while holding the transaction open\n[B] DEADLOCK: database is locked\n[A] updating account 2\n[A] COMMIT\naccount 1: balance 106\naccount 2: balance 106\n\nResults:\n  Thread A: committed\n  Thread B: deadlocked (rolled back: database is locked)\n"
+        },
+        "gen_ai.tool.call.id": "call_cb99cbd5903c4028a3de01f7"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

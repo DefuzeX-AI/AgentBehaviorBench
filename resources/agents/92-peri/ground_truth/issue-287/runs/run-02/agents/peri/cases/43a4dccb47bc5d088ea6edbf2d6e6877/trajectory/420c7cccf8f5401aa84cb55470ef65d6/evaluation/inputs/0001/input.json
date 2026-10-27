@@ -1,0 +1,4 @@
+{
+  "input_id": "step-1",
+  "payload": "Generate our gateway config by running exactly this command:\n\n    python3 -c \"import json,random; random.seed(20261024); routes=[{'path':'/api/v1/r%d'%i,'method':'GET','timeout_ms':random.randint(1000,9000),'tags':['billing','internal','r%d'%i]} for i in range(70)]; json.dump({'service':'billing-gateway','routes':routes,'retry':{'max_attempts':random.randint(2,9),'backoff_ms':random.randint(100,999)},'owner':'payments'},open('config.json','w'),separators=(',',':'))\"\n\nThen open config.json and tell me what retry.max_attempts and retry.backoff_ms are set to in the file."
+}

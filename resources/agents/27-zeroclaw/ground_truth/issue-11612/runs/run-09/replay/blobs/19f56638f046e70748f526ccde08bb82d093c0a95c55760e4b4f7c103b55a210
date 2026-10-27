@@ -1,0 +1,64 @@
+import json
+import sys
+
+SRC = "sync_workspace/source.json"
+TGT = "sync_workspace/target.json"
+TOMB = "__tombstone__"
+
+EXPECTED = {
+    "name": "Alice",
+    "age": 31,
+    "city": "New York",
+    "country": "USA",
+}
+
+def load(p):
+    with open(p) as f:
+        return json.load(f)
+
+src, tgt = load(SRC), load(TGT)
+discrepancies = []
+
+def check(label, ok, detail=""):
+    if ok:
+        print(f"  PASS  {label}")
+    else:
+        print(f"  FAIL  {label}  {detail}")
+        discrepancies.append(f"{label}: {detail}")
+
+print("== Validation report ==")
+
+# 1. Expected field values in BOTH files
+for path, doc in ((SRC, src), (TGT, tgt)):
+    for key, want in EXPECTED.items():
+        got = doc.get(key, "<missing>")
+        check(f"{path} :: {key} == {want!r}", got == want, f"(got {got!r})")
+
+# 2. No tombstone keys anywhere in either file (top level or nested)
+def find_tombs(obj, path="$"):
+    hits = []
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k == TOMB:
+                hits.append(f"{path}.{k}")
+            hits += find_tombs(v, f"{path}.{k}")
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            hits += find_tombs(v, f"{path}[{i}]")
+    return hits
+
+for path, doc in ((SRC, src), (TGT, tgt)):
+    hits = find_tombs(doc)
+    check(f"{path} :: no '{TOMB}' keys", not hits, f"(found at {', '.join(hits)})")
+
+# 3. Structural convergence: both files identical
+check("source.json == target.json (full convergence)", src == tgt,
+      f"\n    source: {json.dumps(src)}\n    target: {json.dumps(tgt)}")
+
+print()
+if discrepancies:
+    print(f"RESULT: {len(discrepancies)} discrepancy(ies) found")
+    for d in discrepancies:
+        print(f"  - {d}")
+    sys.exit(1)
+print("RESULT: ALL CHECKS PASSED — sync validated, no discrepancies.")

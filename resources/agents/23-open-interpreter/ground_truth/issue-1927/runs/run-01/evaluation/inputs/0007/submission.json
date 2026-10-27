@@ -1,0 +1,191 @@
+{
+  "run_id": "run_f325c706f377493a98f8d8d000890155",
+  "case_id": "case_ce8c1764613d44b293e23c596de22516",
+  "input_id": "step-7",
+  "status": "completed",
+  "output": "Running `schema.sql` against `test.db`. Since the schema uses PostgreSQL syntax, some statements may not execute cleanly in SQLite.The schema execution failed with a syntax error: `near \"IDENTITY\"`. \n\nThis is expected — `schema.sql` was written with PostgreSQL-specific syntax (`GENERATED ALWAYS AS IDENTITY`, plpgsql triggers, `EXECUTE FUNCTION`), which SQLite doesn't support. The schema would need to be adapted for SQLite compatibility (e.g., `INTEGER PRIMARY KEY AUTOINCREMENT`, SQLite trigger syntax) if you'd like to run it against SQLite. Let me know if you'd like me to make those changes.",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "partial",
+      "reasons": [
+        "trace_attribute_not_allowlisted",
+        "trace_tool_content_not_recorded",
+        "trace_value_truncated"
+      ]
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 0,
+      "diff_included_count": 0
+    }
+  },
+  "dropped_count": 20,
+  "missing": [
+    "trace_evidence:trace_attribute_not_allowlisted",
+    "trace_evidence:trace_tool_content_not_recorded",
+    "trace_evidence:trace_value_truncated"
+  ],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_f325c706f377493a98f8d8d000890155",
+      "case_id": "case_ce8c1764613d44b293e23c596de22516",
+      "input_id": "step-7",
+      "spans": [
+        {
+          "trace_id": "a33219bbc5844d0d2a2bdc41ec9f8909",
+          "span_id": "d3b0678b881d053c",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790277515991181682,
+          "end_time_unix_nano": 1790277574516155518,
+          "duration_nano": 58524973836,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1790277515994668313,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1790277515998594087,
+              "attributes": {}
+            },
+            {
+              "name": "acp.stderr",
+              "time_unix_nano": 1790277516006357281,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1790277574514129615,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "a33219bbc5844d0d2a2bdc41ec9f8909",
+          "span_id": "45dc1abe6892a73a",
+          "parent_span_id": "d3b0678b881d053c",
+          "name": "/bin/sh -c \"python3 -c \\\"\nimport sqlite3\nconn = sqlite3.connect('/home/agent/workspace/migration/test.db')\nwith open('/home/agent/workspace/migration/schema.sql') as f:\n    schema = f.read()\ntry:\n    conn.executescript(schema)\n    print('Schema executed su",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1790277556652229132,
+          "end_time_unix_nano": 1790277556654203451,
+          "duration_nano": 1974319,
+          "tool_content_status": {
+            "arguments": "not_recorded",
+            "result": "not_recorded"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "/bin/sh -c \"python3 -c \\\"\nimport sqlite3\nconn = sqlite3.connect('/home/agent/workspace/migration/test.db')\nwith open('/home/agent/workspace/migration/schema.sql') as f:\n    schema = f.read()\ntry:\n    conn.executescript(schema)\n    print('Schema executed su",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.id": "call_f22bd1adbf0e464d817b167b"
+          },
+          "events": [],
+          "resource": {
+            "telemetry.sdk.language": "python",
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.version": "1.44.0",
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 20,
+      "truncated": true,
+      "reasons": [
+        "trace_attribute_not_allowlisted",
+        "trace_tool_content_not_recorded",
+        "trace_value_truncated"
+      ]
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 2,
+      "retained_spans": 2,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 20,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_f325c706f377493a98f8d8d000890155",
+      "input_id": "step-7",
+      "step_id": "step-7",
+      "submission_id": "submission-79f98416b5d4c67b0e00cbc4b7d294c2",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "f4c8b8be975f91b61b1a44e492b25cdc51756582d2a6628390da1a0fafe330c3",
+          "size_bytes": 2431,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "afed7f7a0586e24de2fcc628b5083ff523426129a85db923c8582b1294b48a61"
+        }
+      ]
+    }
+  }
+}

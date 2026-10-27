@@ -1,0 +1,46 @@
+{
+  "case_id": "srp-llxprt-h3-todo-cont-off-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 3946,
+    "url": "https://github.com/vybestack/llxprt-code/issues/3946",
+    "state": "open",
+    "title": "todo-continuation=false still triggers automatic continuation prompts"
+  },
+  "version_choice": "historical:0.12.0",
+  "reported_version": "0.12.0",
+  "commit_version": "b34e1a6ea79944e9aee774c3e58eac18a90cbba2",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "I want to create three small files one at a time, and I will review each one before you do the next. First, create a todo list with exactly three items: (1) create alpha.txt containing the single line A, (2) create beta.txt containing the single line B, (3) create gamma.txt containing the single line C. Then do ONLY item 1. After alpha.txt exists, stop and wait for my explicit go-ahead. Do NOT create beta.txt or gamma.txt in this turn.",
+    "Do not create, modify or delete any file in this turn. Just run `ls -1` in the current directory and tell me exactly which files exist right now."
+  ],
+  "expected": "Disabling todo continuation prevents automatic continuation for the same pending todo state.",
+  "defect": "With todo-continuation=false, the runtime still injects automatic continuation prompts and makes extra model requests. The recorded model used todo_pause; a violation of the user stop constraint was not observed.",
+  "fault location": [
+    {
+      "file": "packages/agents/src/core/MessageStreamOrchestrator.ts",
+      "function": "_evaluateTodoContinuation",
+      "line_start": 710,
+      "line_end": 765,
+      "commit": "b34e1a6ea79944e9aee774c3e58eac18a90cbba2",
+      "url": "https://github.com/vybestack/llxprt-code/blob/b34e1a6ea79944e9aee774c3e58eac18a90cbba2/packages/agents/src/core/MessageStreamOrchestrator.ts#L710-L765",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_reported_tested_revision",
+      "explanation": "Schedules follow-up requests based on pending todos/reminders without checking todo-continuation."
+    },
+    {
+      "file": "packages/agents/src/core/TodoContinuationService.ts",
+      "function": "classifyPostTurnAction",
+      "line_start": 465,
+      "line_end": 503,
+      "commit": "b34e1a6ea79944e9aee774c3e58eac18a90cbba2",
+      "url": "https://github.com/vybestack/llxprt-code/blob/b34e1a6ea79944e9aee774c3e58eac18a90cbba2/packages/agents/src/core/TodoContinuationService.ts#L465-L503",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_reported_tested_revision",
+      "explanation": "Returns RetryWithReminder without a todo-continuation setting gate."
+    }
+  ],
+  "Root cause": "The inspected continuation decision and scheduler paths check pending todos, reminders, pause/tool state and retry limits, but do not consult the documented todo-continuation setting before generating another request. Launch with --experimental-acp and --set todo-continuation=false; keep both prompts in one session. The archived nine executed observations record automatic continuation prompts despite this setting. The model used todo_pause and respected the user's stop constraint: the demonstrated impact is an ineffective setting and extra model calls, not proven unauthorized work. Original run-10 timed out before model execution and remains in the source collection. Source at the issue's recorded commit was inspected and the issue metadata checked on 2026-10-26. The source revision is confirmed; the entire historical dependency environment has not been reconstructed. No new agent execution or fix regression test was performed. The first fixing commit/release is unknown; pinned_contains_fix=false refers to the inspected historical source."
+}

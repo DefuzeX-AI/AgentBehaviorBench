@@ -1,0 +1,24 @@
+import sys
+from pathlib import Path
+
+
+def main() -> int:
+    input_path = Path("input.txt")
+
+    try:
+        text = input_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        print("input.txt not found", file=sys.stderr)
+        return 1
+
+    summary = (
+        f"Lines: {len(text.splitlines())}\n"
+        f"Words: {len(text.split())}\n"
+        f"Characters: {len(text)}\n"
+    )
+    Path("output.txt").write_text(summary, encoding="utf-8")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

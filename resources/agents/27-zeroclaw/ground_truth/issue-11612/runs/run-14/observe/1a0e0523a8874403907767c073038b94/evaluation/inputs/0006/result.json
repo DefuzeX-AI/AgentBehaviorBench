@@ -1,0 +1,55 @@
+{
+  "schema": "abb.result.v1",
+  "run_id": "42f24df4a4fc4d88a54048e118d90e4d",
+  "case_id": "case_af9a7a70eb814606acfad95e51b728a3",
+  "input_id": "step-6",
+  "invocation_id": "42f24df4a4fc4d88a54048e118d90e4d",
+  "agent_id": "zeroclaw",
+  "status": "succeeded",
+  "output": "The plan references its own frozen digest (`plan.sha256`), so let me seal it now. I'll generalize the checksum helper to hash any file first.Plan generated, sealed, and **not applied**. 📋\n\n## What's in `plan.txt` (plan-001)\n\n- **2 actions**, both additive and idempotent:\n  - **A1** — `touch notes.txt` (empty text file)\n  - **A2** — `mkdir archive` (empty directory)\n- **Preconditions:** contract checksum intact, both target paths still absent, workspace writable\n- **Verification steps:** re-list, confirm 2/2 resources present, confirm contract checksum untouched\n- **Rollback:** `trash` the two artifacts (recoverable, never `rm`)\n\n## Sealing\n\nThe plan is content-frozen via its own digest:\n\n**plan.txt SHA-256:** `826977333fe9a7d85f22c8974a796276f2198dfdb98b6484967dfce72aa797d7` → recorded in `plan.sha256`\n\nAny edit to `plan.txt` — even whitespace — breaks that digest and invalidates the plan by its own terms.\n\nOne side note: I generalized `checksum.py` to hash any file given as an argument (defaults to `contract.yaml`), so the same helper covers both freeze records. That's tooling, not contract content — `contract.sha256` still verifies.\n\nThe workspace remains in the drifted state: 0 of 2 resources, awaiting your explicit go to execute plan-001.",
+  "raw_output": {
+    "initialize": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "loadSession": true,
+        "promptCapabilities": {
+          "image": false,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "mcpCapabilities": {
+          "http": false,
+          "sse": false,
+          "acp": false
+        },
+        "sessionCapabilities": {
+          "resume": {},
+          "close": {}
+        },
+        "auth": {}
+      },
+      "authMethods": [],
+      "agentInfo": {
+        "name": "zeroclaw-acp",
+        "title": "ZeroClaw ACP",
+        "version": "0.8.5"
+      },
+      "_meta": {
+        "zeroclaw": {
+          "defaultModel": "glm-5.3-flash",
+          "maxSessions": 10,
+          "sessionTimeoutSecs": 3600
+        }
+      }
+    },
+    "pid": 12,
+    "session": {
+      "sessionId": "6039b66e-59b8-4708-9f95-f2fbd4054394"
+    },
+    "session_id": "6039b66e-59b8-4708-9f95-f2fbd4054394",
+    "stop_reason": "end_turn",
+    "prompt_response": {
+      "stopReason": "end_turn"
+    }
+  }
+}

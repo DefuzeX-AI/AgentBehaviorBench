@@ -1,0 +1,22 @@
+{
+  "case_id": "archived-probe-nanocoder-1553",
+  "issue": {
+    "repository": "Nano-Collective/nanocoder",
+    "number": 1553,
+    "url": "https://github.com/Nano-Collective/nanocoder/issues/1553",
+    "state": "closed",
+    "title": "fetch_url sets globalThis.process to null on pages with an <iframe>, and the next error kills nanocoder with a masked TypeError"
+  },
+  "version_choice": "historical:1.30.0",
+  "reported_version": "1.30.0",
+  "commit_version": "unknown",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": null,
+  "steps": [
+    "Network connectivity check. Use your own tools: your web search / web fetch tools if you have them, otherwise the shell. Do every step, and report the exact result or the exact error. Never guess.\n1. Web search: search the web for \"octocat Hello-World repository\" and give the first result's URL. Say which tool you used; if you have no web search tool, say so.\n2. Web fetch: fetch https://example.com/ with your web fetch tool (or curl if you have none) and quote the text of its <h1>.\n3. Shell: run `git ls-remote https://github.com/octocat/Hello-World HEAD` and report the commit hash.\n4. Shell: run `curl -s https://api.github.com/repos/octocat/Hello-World` and report its \"full_name\" field.\n5. Shell: run `curl -s -o /dev/null -w '%{http_code}' https://en.wikipedia.org/wiki/Main_Page` and report the code.\nEnd with a table: step | tool used | succeeded (yes/no) | evidence."
+  ],
+  "expected": "Fetching a page should preserve globalThis.process and report the original exception.",
+  "defect": "Fetching a page is followed by a masked process.env TypeError and ACP connection closure.",
+  "fault location": [],
+  "Root cause": "The issue provides an offline iframe reproduction for get-md 1.7.0 and happy-dom-without-node 14.12.3 corrupting globalThis.process. The historical network probe did not retain the returned HTML, so an iframe as the trigger in that observation is unconfirmed. This is a service-wiring probe, not an official KUMA case. Its exact tested repository commit is not recorded in the probe; the commit of a different 1.30.0 observation must not be silently substituted. Fault location remains empty because package versions alone do not establish this probe source revision. A closed issue or proposed PR does not establish the first fixing commit. Original and packaged observations may use different prompts or overlap; these are retained evidence records, not a pooled independent trial cohort. Root steps describe the first retained case; consult each run-local original input. No runtime reproduction was performed during this organization. This record has no original official case.json; case_id is an organizational identifier and steps are extracted verbatim from archived invocation requests."
+}

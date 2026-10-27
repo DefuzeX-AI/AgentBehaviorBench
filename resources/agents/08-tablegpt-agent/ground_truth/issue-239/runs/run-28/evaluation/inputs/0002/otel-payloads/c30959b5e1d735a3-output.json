@@ -1,0 +1,18 @@
+{
+  "messages": [
+    {
+      "content": "## Results\n\n**Bounded multiset of 12 events** — all records pass validation (0 invalid) and every `event_time` falls inside the closed window `[2025-01-01T00:00:00Z, 2025-01-01T00:10:00Z]`. It is genuinely a *multiset*: 12 records but only **11 distinct `event_id`s**.\n\n### Required features present\n| Requirement | Record(s) | Notes |\n|---|---|---|\n| Duplicate `event_id` | `evt-001` @ arrival 2 and 6 | identical payload — a producer retry/replay, dropped by first-write-wins |\n| Negative revenue (correction) | `evt-007` = **-10.00**, P1 @ 00:06:00 | posted as a *new* event, never an in-place mutation — consistent with the append-only contract |\n\n### Contract behavior exercised\n- **Processing time at ingress**: `processing_time` is absent from the ingested frame, as the contract requires (runtime-populated). `assert` confirms it.\n- **Out-of-order arrival vs. event time**: arrival order runs `evt-003, evt-001, evt-007, …`, yet all aggregation is done on `event_time`, and results are identical regardless of arrival order — the determinism the event-time contract promises.\n- **Dedup**: `event_id` as PK, first-write-wins → 12 → **11 events**, dropping exactly one replay.\n- **Ledger semantics**: corrections net out rather than overwrite. P1 shows `22.00` gross exposure before the adjustment and **`12.00` net** after `evt-007`.\n\n### Aggregates (event-time, post-dedup)\n| product | revenue |\n|---|---|\n| P1 | 12.00 |\n| P2 | 51.89 |\n| P3 | 40.60 |\n\nTotal: **104.49** — and the granularity check holds (`sum(by_product) == sum(by_minute) == 104.49`), versus `114.49` if the duplicate were naively counted. The 10.00 gap is exactly the replayed `evt-001`, showing why consumer-side dedup is mandatory under at-least-once delivery.\n\nOne thing worth flagging for downstream use: the duplicate `evt-001` is byte-identical to its original. If you need to test **conflicting** replays (same `event_id`, differing `revenue`), that would require amending the contract's dedup policy — first-write-wins silently discards the conflict, and you'd likely want a quarantine path instead.",
+      "additional_kwargs": {
+        "parent_id": "4234ff00-c990-454d-b638-ad1df58b9d74"
+      },
+      "response_metadata": {},
+      "type": "ai",
+      "name": null,
+      "id": "6c31e24e-ff5d-4b21-8dc0-4eac50497766",
+      "example": false,
+      "tool_calls": [],
+      "invalid_tool_calls": [],
+      "usage_metadata": null
+    }
+  ]
+}

@@ -1,0 +1,273 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_dbe8a2c86db64b6c917227e2b1b35291",
+  "case_id": "srp-codewhale-h2-crlf-to-lf-write-v1",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "cf80f11166eccea65470e576ca7f2faa",
+      "span_id": "c4b85cf76912feef",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792638095349702823,
+      "end_time_unix_nano": 1792638102589043530,
+      "duration_nano": 7239340707,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1792638096403890457,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1792638096415027947,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792638096416934337,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792638098815521163,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792638102583959422,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "cf80f11166eccea65470e576ca7f2faa",
+      "span_id": "d157ef07352b78f9",
+      "parent_span_id": "c4b85cf76912feef",
+      "name": "read: /workspace/project/notes.txt",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792638097638137820,
+      "end_time_unix_nano": 1792638097674177601,
+      "duration_nano": 36039781,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "read: /workspace/project/notes.txt",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "path": "/workspace/project/notes.txt"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "Release checklist\r\n=================\r\n\r\n1. Bump the verison number in setup.cfg\r\n2. Run the full test suite and make shure it passes\r\n3. Tag the release and push the tag\r\n4. Anounce the release on the mailing list\r\n",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "8eed67cd-3cbc-4be8-a13d-144def004818"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "cf80f11166eccea65470e576ca7f2faa",
+      "span_id": "1a20c0a4f4e1fff4",
+      "parent_span_id": "c4b85cf76912feef",
+      "name": "list_dir: /workspace/project",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792638097644201102,
+      "end_time_unix_nano": 1792638097693730936,
+      "duration_nano": 49529834,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "list_dir: /workspace/project",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "path": "/workspace/project"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "[{\"name\":\".codewhale\",\"is_dir\":true},{\"name\":\"listing.md\",\"is_dir\":false},{\"name\":\"notes.txt\",\"is_dir\":false}]",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "4b9a7710-d583-481d-b67e-a7241b3921f2"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "cf80f11166eccea65470e576ca7f2faa",
+      "span_id": "496bc4a012352865",
+      "parent_span_id": "c4b85cf76912feef",
+      "name": "write: /workspace/project/notes.txt",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792638098804374334,
+      "end_time_unix_nano": 1792638098946372214,
+      "duration_nano": 141997880,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "write: /workspace/project/notes.txt",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "path": "/workspace/project/notes.txt",
+          "content": "Release checklist\n=================\n\n1. Bump the version number in setup.cfg\n2. Run the full test suite and make sure it passes\n3. Tag the release and push the tag\n4. Announce the release on the mailing list\n"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "[approval] This tool call required approval and was approved by the user before execution.\n\nSuccessfully wrote 215 bytes to /workspace/project/notes.txt",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "6ab766c1-0553-4337-989d-d7e80816161f"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "cf80f11166eccea65470e576ca7f2faa",
+      "span_id": "46379ed68d38b09c",
+      "parent_span_id": "c4b85cf76912feef",
+      "name": "read: /workspace/project/notes.txt",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792638099854744515,
+      "end_time_unix_nano": 1792638099867720765,
+      "duration_nano": 12976250,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "read: /workspace/project/notes.txt",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "path": "/workspace/project/notes.txt"
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "Release checklist\r\n=================\r\n\r\n1. Bump the version number in setup.cfg\r\n2. Run the full test suite and make sure it passes\r\n3. Tag the release and push the tag\r\n4. Announce the release on the mailing list\r\n",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "7368613d-68b9-4018-993a-7bbfbf985487"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "cf80f11166eccea65470e576ca7f2faa",
+      "span_id": "15d798e758c8ade5",
+      "parent_span_id": "c4b85cf76912feef",
+      "name": "grep_files: /workspace/project/notes.txt",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792638100951164823,
+      "end_time_unix_nano": 1792638100959402555,
+      "duration_nano": 8237732,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "grep_files: /workspace/project/notes.txt",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "pattern": "\\r",
+          "path": "/workspace/project/notes.txt",
+          "context_lines": 0
+        },
+        "gen_ai.tool.call.result": [
+          {
+            "content": {
+              "text": "{\"matches\":[],\"total_matches\":0,\"files_searched\":1,\"truncated\":false}",
+              "type": "text"
+            },
+            "type": "content"
+          }
+        ],
+        "gen_ai.tool.call.id": "104bf31a-ee5d-4c3c-a15f-9ad12b69bd20"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

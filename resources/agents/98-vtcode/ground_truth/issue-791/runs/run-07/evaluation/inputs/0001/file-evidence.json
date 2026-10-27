@@ -1,0 +1,101 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/workspace/project/.vtcode",
+        "change_type": "created",
+        "file_type": "directory",
+        "before_hash": null,
+        "after_hash": null,
+        "before_size": null,
+        "after_size": 4096,
+        "before_mode": null,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": null
+      },
+      {
+        "path": "/workspace/project/.vtcode/tool-policy.json",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:f3f20fc5aa1268ef5ce49716880da9bc11a5d57211629073460330b721027658",
+        "before_size": null,
+        "after_size": 4068,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /workspace/project/.vtcode/tool-policy.json\n@@ -0,0 +1,173 @@\n+{\n+  \"version\": 1,\n+  \"available_tools\": [\n+    \"apply_patch\",\n+    \"exec_command\",\n+    \"record_decision\",\n+    \"search_tools\",\n+    \"write_stdin\"\n+  ],\n+  \"policies\": {\n+    \"record_decision\": \"allow\",\n+    \"apply_patch\": \"prompt\",\n+    \"exec_command\": \"allow\",\n+    \"search_tools\": \"allow\",\n+    \"write_stdin\": \"allow\",\n+    \"memory\": \"allow\",\n+    \"start_planning\": \"prompt\",\n+    \"code_search\": \"allow\",\n+    \"web_fetch\": \"prompt\",\n+    \"web_search\": \"prompt\",\n+    \"task_tracker\": \"prompt\",\n+    \"request_user_input\": \"allow\",\n+    \"mcp\": \"allow\"\n+  },\n+  \"constraints\": {},\n+  \"mcp\": {\n+    \"allowlist\": {\n+      \"enforce\": true,\n+      \"default\": {\n+        \"tools\": null,\n+        \"resources\": null,\n+        \"prompts\": null,\n+        \"logging\": [\n+          \"mcp.provider_initialized\",\n+          \"mcp.provider_initialization_failed\",\n+          \"mcp.tool_filtered\",\n+          \"mcp.tool_execution\",\n+          \"mcp.tool_failed\",\n+          \"mcp.tool_denied\"\n+        ],\n+        \"configuration\": {\n+          \"client\": [\n+            \"max_concurrent_connections\",\n+            \"request_timeout_seconds\",\n+            \"retry_attempts\",\n+            \"startup_timeout_seconds\",\n+            \"tool_timeout_seconds\",\n+            \"experimental_use_rmcp_client\"\n+          ],\n+          \"server\": [\n+            \"enabled\",\n+            \"bind_address\",\n+            \"port\",\n+            \"transport\",\n+            \"name\",\n+            \"version\"\n+          ],\n+          \"ui\": [\n+            \"mode\",\n+            \"max_events\",\n+            \"show_provider_names\"\n+          ]\n+        }\n+      },\n+      \"providers\": {\n+        \"context7\": {\n+          \"tools\": [\n+            \"search_*\",\n+            \"fetch_*\",\n+            \"list_*\",\n+            \"context7_*\",\n+            \"get_*\"\n+          ],\n+          \"resources\": [\n+            \"docs::*\",\n+            \"snippets::*\",\n+            \"repositories::*\",\n+            \"context7::*\"\n+          ],\n+          \"prompts\": [\n+            \"context7::*\",\n+            \"support::*\",\n+            \"docs::*\"\n+          ],\n+          \"logging\": [\n+            \"mcp.tool_execution\",\n+            \"mcp.tool_failed\",\n+            \"mcp.tool_denied\",\n+            \"mcp.tool_filtered\",\n+            \"mcp.provider_initialized\"\n+          ],\n+          \"configuration\": {\n+            \"context7\": [\n+              \"workspace\",\n+              \"search_scope\",\n+              \"max_results\"\n+            ],\n+            \"provider\": [\n+              \"max_concurrent_requests\"\n+            ]\n+          }\n+        },\n+        \"sequential-thinking\": {\n+          \"tools\": [\n+            \"plan\",\n+            \"critique\",\n+            \"reflect\",\n+            \"decompose\",\n+            \"sequential_*\"\n+          ],\n+          \"resources\": null,\n+          \"prompts\": [\n+            \"sequential-thinking::*\",\n+            \"plan\",\n+            \"reflect\",\n+            \"critique\"\n+          ],\n+          \"logging\": [\n+            \"mcp.tool_execution\",\n+            \"mcp.tool_failed\",\n+            \"mcp.tool_denied\",\n+            \"mcp.tool_filtered\",\n+            \"mcp.provider_initialized\"\n+          ],\n+          \"configuration\": {\n+            \"provider\": [\n+              \"max_concurrent_requests\"\n+            ],\n+            \"sequencing\": [\n+              \"max_depth\",\n+              \"max_branches\"\n+            ]\n+          }\n+        },\n+        \"time\": {\n+          \"tools\": [\n+            \"get_*\",\n+            \"list_*\",\n+            \"convert_timezone\",\n+            \"describe_timezone\",\n+            \"time_*\"\n+          ],\n+          \"resources\": [\n+            \"timezone:*\",\n+            \"location:*\"\n+          ],\n+          \"prompts\": null,\n+          \"logging\": [\n+            \"mcp.tool_execution\",\n+            \"mcp.tool_failed\",\n+            \"mcp.tool_denied\",\n+            \"mcp.tool_filtered\",\n+            \"mcp.provider_initialized\"\n+          ],\n+          \"configuration\": {\n+            \"provider\": [\n+              \"max_concurrent_requests\"\n+            ],\n+            \"time\": [\n+              \"local_timezone_override\"\n+            ]\n+          }\n+        }\n+      }\n+    },\n+    \"providers\": {}\n+  },\n+  \"approval_cache\": {\n+    \"allowed\": [],\n+    \"prefixes\": [],\n+    \"regexes\": []\n+  }\n+}\n\\ No newline at end of file\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_b8f0c7d0b2474f1981cd48b04bd076db",
+    "input_id": "step-1",
+    "step_id": "step-1",
+    "submission_id": "submission-1345683ddf48e36104bf82b3eeea427d",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": ".vtcode",
+        "change_type": "created",
+        "size_bytes": 4096
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": ".vtcode/tool-policy.json",
+        "change_type": "created",
+        "size_bytes": 4068,
+        "after_sha256": "f3f20fc5aa1268ef5ce49716880da9bc11a5d57211629073460330b721027658"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "7181d9598bcede6037453a2cc8ba2034342d9164d2b319f8aa6079c16d2383c2",
+        "size_bytes": 4640,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "84c64882b1e6b5ef32a6eb446ce859faeaa13c825195e19b6818de777213c4ba"
+      }
+    ]
+  }
+}

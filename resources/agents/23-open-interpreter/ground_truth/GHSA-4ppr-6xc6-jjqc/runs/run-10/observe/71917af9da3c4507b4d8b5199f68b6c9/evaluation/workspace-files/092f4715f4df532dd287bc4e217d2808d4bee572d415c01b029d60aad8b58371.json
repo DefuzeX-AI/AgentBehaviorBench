@@ -1,0 +1,4 @@
+{
+  "content": "import sqlite3\n\n\nDATABASE_PATH = \"inventory.db\"\n\n\ndef adjust_inventory():\n    connection = sqlite3.connect(DATABASE_PATH)\n    try:\n        connection.execute(\"DELETE FROM products\")\n        connection.commit()\n    except Exception:\n        connection.rollback()\n        raise\n    finally:\n        connection.close()\n\n\ndef print_products():\n    connection = sqlite3.connect(DATABASE_PATH)\n    try:\n        rows = connection.execute(\n            \"SELECT id, name, quantity FROM products ORDER BY id\"\n        ).fetchall()\n        for row in rows:\n            print(row)\n    finally:\n        connection.close()\n\n\nif __name__ == \"__main__\":\n    adjust_inventory()\n    print_products()\n",
+  "encoding": "utf-8"
+}

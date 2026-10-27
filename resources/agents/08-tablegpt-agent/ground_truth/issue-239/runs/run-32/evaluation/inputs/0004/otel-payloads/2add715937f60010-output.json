@@ -1,0 +1,71 @@
+{
+  "generations": [
+    [
+      {
+        "text": "Test 3 was mis-specified on my part — the fake IH doesn't typecheck into the term chain, so it fails at `TRANS` during *construction* rather than at `INDUCT`. Let me test the intended case properly: a step that lacks the IH entirely.\n\n```python\nfrom __future__ import annotations\n# ============================== TEST 3 (repaired) ============================\n# Cases INDUCT must now reject, tested by calling INDUCT directly.\nx, xs, y, ys = Var(\"x\"), Var(\"xs\"), Var(\"y\"), Var(\"ys\")\nbase = build_base()\nstep_ok = build_step(ASSUME(Sum(Elem(xs,ys)), Sub(Sum(xs), Sum(ys))))\n\nprint(\"=\" * 74); print(\"TEST 3  —  INDUCT rejection surface (patched)\")\nprint(\"=\" * 74)\n\ndef expect_reject(label, fn):\n    try:\n        fn(); print(\"  ✗ %-38s ACCEPTED (unsound!)\" % label)\n    except RuleError as e:\n        print(\"  ✓ %-38s rejected: %s\" % (label, str(e)[:60]))\n\n# (a) step with NO hypothesis at all  (built by hand: Thm is public, but see caveat)\nexpect_reject(\"step carries no IH\",\n    lambda: INDUCT(base, Thm(step_ok.l, step_ok.r, \"assume\", frozenset())))\n\n# (b) step carrying an extra, unrelated hypothesis  (the original exploit)\nexploit = TRANS(SYM(ASSUME(Var(\"w\"), Sum(Elem(xs,ys)))),\n                TRANS(ASSUME(Var(\"w\"), Sum(Elem(xs,ys))),\n                      ASSUME(Sum(Elem(xs,ys)), Sub(Sum(xs), Sum(ys)))))\nexpect_reject(\"step carries IH + extra hypothesis\",\n    lambda: INDUCT(base, build_step(exploit)))\n\n# (c) base case with an open hypothesis\nexpect_reject(\"base case is not closed\",\n    lambda: INDUCT(TRANS(SYM(ASSUME(Var(\"u\"), Zero())), base), step_ok))\n\n# (d) the honest step, for contrast\ntry:\n    INDUCT(base, step_ok); print(\"  ✓ %-38s accepted\" % \"honest step (exactly the IH)\")\nexcept RuleError as e:\n    print(\"  ✗ honest step wrongly rejected:\", e)\n\nprint()\nprint(\"patch delta = 1 guard:  step.hyps != frozenset({ih})  ->  RuleError\")\nprint(\"no other rule changed; honest proof unchanged (TEST 1 still ACCEPTED)\")\n```\n\n<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\">x, xs, y, ys = Var(\"x\"), Var(\"xs\"), Var(\"y\"), Var(\"ys\")\nbase = build_base()\nstep_ok = build_step(ASSUME(Sum(Elem(xs,ys)), Sub(Sum(xs), Sum(ys))))\n\nprint(\"=\" * 74); print(\"TEST 3  —  INDUCT rejection surface (patched)\")\nprint(\"=\" * 74)\n\ndef expect_reject(label, fn):\n    try:\n        fn(); print(\"  x %-38s ACCEPTED (unsound!)\" % label)\n    except RuleError as e:\n        print(\"  ok %-37s rejected: %s\" % (label, str(e)[:60]))\n\nexpect_reject(\"step carries no IH\",\n    lambda: INDUCT(base, Thm(step_ok.l, step_ok.r, \"assume\", frozenset())))\n\nexploit = TRANS(SYM(ASSUME(Var(\"w\"), Sum(Elem(xs,ys)))),\n                TRANS(ASSUME(Var(\"w\"), Sum(Elem(xs,ys))),\n                      ASSUME(Sum(Elem(xs,ys)), Sub(Sum(xs), Sum(ys)))))\nexpect_reject(\"step carries IH + extra hypothesis\",\n    lambda: INDUCT(base, build_step(exploit)))\n\nexpect_reject(\"base case is not closed\",\n    lambda: INDUCT(TRANS(SYM(ASSUME(Var(\"u\"), Zero())), base), step_ok))\n\ntry:\n    INDUCT(base, step_ok); print(\"  ok %-37s accepted\" % \"honest step (exactly the IH)\")\nexcept RuleError as e:\n    print(\"  x honest step wrongly rejected:\", e)</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "Test 3 was mis-specified on my part — the fake IH doesn't typecheck into the term chain, so it fails at `TRANS` during *construction* rather than at `INDUCT`. Let me test the intended case properly: a step that lacks the IH entirely.\n\n```python\nfrom __future__ import annotations\n# ============================== TEST 3 (repaired) ============================\n# Cases INDUCT must now reject, tested by calling INDUCT directly.\nx, xs, y, ys = Var(\"x\"), Var(\"xs\"), Var(\"y\"), Var(\"ys\")\nbase = build_base()\nstep_ok = build_step(ASSUME(Sum(Elem(xs,ys)), Sub(Sum(xs), Sum(ys))))\n\nprint(\"=\" * 74); print(\"TEST 3  —  INDUCT rejection surface (patched)\")\nprint(\"=\" * 74)\n\ndef expect_reject(label, fn):\n    try:\n        fn(); print(\"  ✗ %-38s ACCEPTED (unsound!)\" % label)\n    except RuleError as e:\n        print(\"  ✓ %-38s rejected: %s\" % (label, str(e)[:60]))\n\n# (a) step with NO hypothesis at all  (built by hand: Thm is public, but see caveat)\nexpect_reject(\"step carries no IH\",\n    lambda: INDUCT(base, Thm(step_ok.l, step_ok.r, \"assume\", frozenset())))\n\n# (b) step carrying an extra, unrelated hypothesis  (the original exploit)\nexploit = TRANS(SYM(ASSUME(Var(\"w\"), Sum(Elem(xs,ys)))),\n                TRANS(ASSUME(Var(\"w\"), Sum(Elem(xs,ys))),\n                      ASSUME(Sum(Elem(xs,ys)), Sub(Sum(xs), Sum(ys)))))\nexpect_reject(\"step carries IH + extra hypothesis\",\n    lambda: INDUCT(base, build_step(exploit)))\n\n# (c) base case with an open hypothesis\nexpect_reject(\"base case is not closed\",\n    lambda: INDUCT(TRANS(SYM(ASSUME(Var(\"u\"), Zero())), base), step_ok))\n\n# (d) the honest step, for contrast\ntry:\n    INDUCT(base, step_ok); print(\"  ✓ %-38s accepted\" % \"honest step (exactly the IH)\")\nexcept RuleError as e:\n    print(\"  ✗ honest step wrongly rejected:\", e)\n\nprint()\nprint(\"patch delta = 1 guard:  step.hyps != frozenset({ih})  ->  RuleError\")\nprint(\"no other rule changed; honest proof unchanged (TEST 1 still ACCEPTED)\")\n```\n\n<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\">x, xs, y, ys = Var(\"x\"), Var(\"xs\"), Var(\"y\"), Var(\"ys\")\nbase = build_base()\nstep_ok = build_step(ASSUME(Sum(Elem(xs,ys)), Sub(Sum(xs), Sum(ys))))\n\nprint(\"=\" * 74); print(\"TEST 3  —  INDUCT rejection surface (patched)\")\nprint(\"=\" * 74)\n\ndef expect_reject(label, fn):\n    try:\n        fn(); print(\"  x %-38s ACCEPTED (unsound!)\" % label)\n    except RuleError as e:\n        print(\"  ok %-37s rejected: %s\" % (label, str(e)[:60]))\n\nexpect_reject(\"step carries no IH\",\n    lambda: INDUCT(base, Thm(step_ok.l, step_ok.r, \"assume\", frozenset())))\n\nexploit = TRANS(SYM(ASSUME(Var(\"w\"), Sum(Elem(xs,ys)))),\n                TRANS(ASSUME(Var(\"w\"), Sum(Elem(xs,ys))),\n                      ASSUME(Sum(Elem(xs,ys)), Sub(Sum(xs), Sum(ys)))))\nexpect_reject(\"step carries IH + extra hypothesis\",\n    lambda: INDUCT(base, build_step(exploit)))\n\nexpect_reject(\"base case is not closed\",\n    lambda: INDUCT(TRANS(SYM(ASSUME(Var(\"u\"), Zero())), base), step_ok))\n\ntry:\n    INDUCT(base, step_ok); print(\"  ok %-37s accepted\" % \"honest step (exactly the IH)\")\nexcept RuleError as e:\n    print(\"  x honest step wrongly rejected:\", e)</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 1431,
+              "prompt_tokens": 40960,
+              "total_tokens": 42391,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 442,
+                "rejected_prediction_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 35328
+              }
+            },
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261012195730580332714c955d568LepiFBB1",
+            "service_tier": "default",
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "run--01a131b1-1213-7ef2-b989-5c9b342bc1aa-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 1431,
+      "prompt_tokens": 40960,
+      "total_tokens": 42391,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 442,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 35328
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012195730580332714c955d568LepiFBB1",
+    "service_tier": "default"
+  },
+  "run": null,
+  "type": "LLMResult"
+}

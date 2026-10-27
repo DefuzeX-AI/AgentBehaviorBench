@@ -1,0 +1,3 @@
+{
+  "query": "import os\n\ntargets = {'envelope.json', 'sales_data.csv'}\nfound = []\nfor root, dirs, files in os.walk('/', topdown=True):\n    # skip noisy system dirs\n    dirs[:] = [d for d in dirs if d not in {'proc','sys','dev','run'}]\n    for f in files:\n        if f in targets:\n            found.append(os.path.join(root, f))\n\nprint(\"Matches found:\", found if found else \"NONE\")"
+}

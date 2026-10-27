@@ -1,0 +1,104 @@
+{
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/fmtcsv.py",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:9466f612e3ec918f243e408979ab993add7e3f3d7616f4ee46a1d2f54d95a4d0",
+        "after_hash": "sha256:f6110d9a4d2554c838d0a4ad01e0665a9c8ffcabfa37bce8886b92267dedf381",
+        "before_size": 1919,
+        "after_size": 2098,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/fmtcsv.py\n+++ /home/agent/workspace/fmtcsv.py\n@@ -25,7 +25,9 @@\n     fields, including leading/trailing whitespace inside quotes.\n     \"\"\"\n     with open(path, newline=\"\", encoding=\"utf-8\") as f:\n-        return list(csv.reader(f))\n+        # skipinitialspace ignores whitespace between a delimiter and the next\n+        # field's opening quote, so quoted fields after \", \" stay one field.\n+        return list(csv.reader(f, skipinitialspace=True))\n \n \n def format_summary(rows):\n"
+      },
+      {
+        "path": "/home/agent/workspace/test_fmtcsv.py",
+        "change_type": "modified",
+        "file_type": "file",
+        "before_hash": "sha256:57474eb35d21727c36faa4edad48c897ab5be701fb29981ca5a0331e421c53de",
+        "after_hash": "sha256:21a2d8f4262d588f493fff7f960da66ce5f4a54841f77fbee32684dab9eb769d",
+        "before_size": 3032,
+        "after_size": 3994,
+        "before_mode": 420,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /home/agent/workspace/test_fmtcsv.py\n+++ /home/agent/workspace/test_fmtcsv.py\n@@ -28,6 +28,18 @@\n def padded_quotes_csv(tmp_path):\n     path = tmp_path / \"padded.csv\"\n     path.write_text('name,note\\nAlice,\"  padded  \"\\n', encoding=\"utf-8\")\n+    return path\n+\n+\n+@pytest.fixture\n+def spaced_delimiter_csv(tmp_path):\n+    # Regression: whitespace between the comma and the opening quote used to\n+    # split the quoted field in half.\n+    path = tmp_path / \"spaced.csv\"\n+    path.write_text(\n+        'name,city,note\\n\"Doe, John\", \"Paris, France\", frequent traveler\\n',\n+        encoding=\"utf-8\",\n+    )\n     return path\n \n \n@@ -70,6 +82,11 @@\n     ]\n \n \n+def test_parse_csv_quoted_commas_after_spaced_delimiter(spaced_delimiter_csv):\n+    rows = parse_csv(spaced_delimiter_csv)\n+    assert rows[1] == [\"Doe, John\", \"Paris, France\", \"frequent traveler\"]\n+\n+\n def test_format_summary_preserves_spaces(padded_quotes_csv):\n     lines = format_summary(parse_csv(padded_quotes_csv))\n     assert \"First data row: ['Alice', '  padded  ']\" in lines\n@@ -110,3 +127,17 @@\n         check=True,\n     )\n     assert \"First data row: ['Alice', '  padded  ']\" in result.stdout\n+\n+\n+def test_cli_quoted_comma_after_spaced_delimiter(spaced_delimiter_csv):\n+    result = subprocess.run(\n+        [sys.executable, \"fmtcsv.py\", str(spaced_delimiter_csv)],\n+        capture_output=True,\n+        text=True,\n+        check=True,\n+    )\n+    assert result.stdout == (\n+        \"Total rows: 1\\n\"\n+        \"Total columns: 3\\n\"\n+        \"First data row: ['Doe, John', 'Paris, France', 'frequent traveler']\\n\"\n+    )\n"
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 2,
+      "diff_included_count": 2
+    }
+  },
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "runtime_evidence": {
+    "schema_version": "defuzex.runtime_evidence.v1",
+    "run_id": "run_54d149d9b9854bc88aeaea1a056d1bbc",
+    "input_id": "step-3",
+    "step_id": "step-3",
+    "submission_id": "submission-b7d4266ad684f479ebaeee95831f789d",
+    "components": [
+      {
+        "component_id": "component-0000",
+        "sequence": 0,
+        "kind": "file_change",
+        "path": "fmtcsv.py",
+        "change_type": "modified",
+        "size_bytes": 2098,
+        "before_sha256": "9466f612e3ec918f243e408979ab993add7e3f3d7616f4ee46a1d2f54d95a4d0",
+        "after_sha256": "f6110d9a4d2554c838d0a4ad01e0665a9c8ffcabfa37bce8886b92267dedf381"
+      },
+      {
+        "component_id": "component-0001",
+        "sequence": 1,
+        "kind": "file_change",
+        "path": "test_fmtcsv.py",
+        "change_type": "modified",
+        "size_bytes": 3994,
+        "before_sha256": "57474eb35d21727c36faa4edad48c897ab5be701fb29981ca5a0331e421c53de",
+        "after_sha256": "21a2d8f4262d588f493fff7f960da66ce5f4a54841f77fbee32684dab9eb769d"
+      },
+      {
+        "component_id": "component-0002",
+        "sequence": 2,
+        "kind": "artifact_snapshot",
+        "artifact_id": "opentelemetry-trace-evidence",
+        "sha256": "0d23182862a70448e5005a8327b1dfd75fead4e79cdda129249a47bbe1334718",
+        "size_bytes": 17911,
+        "media_type": "application/vnd.defuzex.trace-evidence+json"
+      },
+      {
+        "component_id": "component-0003",
+        "sequence": 3,
+        "kind": "agent_response_claim",
+        "claim_id": "submission-response",
+        "claim": "completed",
+        "text_sha256": "f9c103876ee4387e8bd4ddadb9a00f08c14361f2e831d31c7f5700e3a0937bcf"
+      }
+    ]
+  }
+}

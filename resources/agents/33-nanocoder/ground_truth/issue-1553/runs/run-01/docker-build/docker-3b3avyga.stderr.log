@@ -1,0 +1,118 @@
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.60kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:24-bookworm
+#2 DONE 0.3s
+
+#3 [ 1/13] FROM docker.io/library/node:24-bookworm@sha256:64af3819f9275802414d7cdc38c27e9d82bd564dec4d4da87d008255d36c63b4
+#3 CACHED
+
+#4 [internal] load .dockerignore
+#4 transferring context: 108B done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 213.34kB 0.0s done
+#5 DONE 0.0s
+
+#6 [ 2/13] RUN apt-get update && apt-get install -y --no-install-recommends python3-venv python3-pip ripgrep     && rm -rf /var/lib/apt/lists/* && python3 -m venv /opt/venv
+#6 CACHED
+
+#7 [ 3/13] WORKDIR /opt/agent
+#7 CACHED
+
+#8 [ 4/13] COPY agent/ ./agent/
+#8 DONE 0.0s
+
+#9 [ 5/13] RUN cd agent && npm ci --omit=dev --no-audit --no-fund && npm cache clean --force     && node node_modules/@nanocollective/nanocoder/dist/cli.js --help > /dev/null     && python -m pip install --no-cache-dir 'opentelemetry-sdk>=1.30,<2' 'jsonschema>=4.23,<5' 'python-dotenv>=1,<2'     && (userdel -r node 2>/dev/null || true) && useradd --create-home --uid 1000 agent     && mkdir -p /home/agent/workspace     && chown -R agent:agent /home/agent
+#9 1.660 npm warn deprecated whatwg-encoding@3.1.1: Use @exodus/bytes instead for a more spec-conformant and faster implementation
+#9 10.62 
+#9 10.62 added 352 packages in 10s
+#9 10.62 npm notice
+#9 10.62 npm notice New major version of npm available! 11.19.0 -> 12.1.0
+#9 10.62 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.1.0
+#9 10.62 npm notice To update run: npm install -g npm@12.1.0
+#9 10.62 npm notice
+#9 10.71 npm warn using --force Recommended protections disabled.
+#9 11.81 Collecting opentelemetry-sdk<2,>=1.30
+#9 12.38   Downloading opentelemetry_sdk-1.45.0-py3-none-any.whl (140 kB)
+#9 12.65      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 140.1/140.1 kB 482.5 kB/s eta 0:00:00
+#9 12.91 Collecting jsonschema<5,>=4.23
+#9 13.15   Downloading jsonschema-4.26.0-py3-none-any.whl (90 kB)
+#9 13.39      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 90.6/90.6 kB 344.8 kB/s eta 0:00:00
+#9 14.16 Collecting python-dotenv<2,>=1
+#9 14.41   Downloading python_dotenv-1.2.3-py3-none-any.whl (22 kB)
+#9 14.67 Collecting opentelemetry-api==1.45.0
+#9 14.92   Downloading opentelemetry_api-1.45.0-py3-none-any.whl (60 kB)
+#9 15.16      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 60.0/60.0 kB 33.9 MB/s eta 0:00:00
+#9 15.41 Collecting opentelemetry-semantic-conventions==0.66b0
+#9 15.65   Downloading opentelemetry_semantic_conventions-0.66b0-py3-none-any.whl (206 kB)
+#9 16.16      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 206.3/206.3 kB 727.6 kB/s eta 0:00:00
+#9 16.42 Collecting typing-extensions>=4.5.0
+#9 16.66   Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+#9 16.67      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 45.6/45.6 kB 31.1 MB/s eta 0:00:00
+#9 16.92 Collecting attrs>=22.2.0
+#9 17.17   Downloading attrs-26.1.0-py3-none-any.whl (67 kB)
+#9 17.44      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 67.5/67.5 kB 216.2 kB/s eta 0:00:00
+#9 17.69 Collecting jsonschema-specifications>=2023.03.6
+#9 17.93   Downloading jsonschema_specifications-2025.9.1-py3-none-any.whl (18 kB)
+#9 18.58 Collecting referencing>=0.28.4
+#9 18.81   Downloading referencing-0.37.0-py3-none-any.whl (26 kB)
+#9 19.69 Collecting rpds-py>=0.25.0
+#9 19.93   Downloading rpds_py-2026.6.3-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (371 kB)
+#9 20.17      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 371.3/371.3 kB 1.5 MB/s eta 0:00:00
+#9 20.24 Installing collected packages: typing-extensions, rpds-py, python-dotenv, attrs, referencing, opentelemetry-api, opentelemetry-semantic-conventions, jsonschema-specifications, opentelemetry-sdk, jsonschema
+#9 20.49 Successfully installed attrs-26.1.0 jsonschema-4.26.0 jsonschema-specifications-2025.9.1 opentelemetry-api-1.45.0 opentelemetry-sdk-1.45.0 opentelemetry-semantic-conventions-0.66b0 python-dotenv-1.2.3 referencing-0.37.0 rpds-py-2026.6.3 typing-extensions-4.16.0
+#9 20.61 useradd: warning: the home directory /home/agent already exists.
+#9 20.61 useradd: Not copying any file from skel directory into it.
+#9 DONE 20.7s
+
+#10 [ 6/13] COPY .abb-runtime/ /opt/abb-runtime/
+#10 DONE 0.1s
+
+#11 [ 7/13] COPY agent.toml ./
+#11 DONE 0.0s
+
+#12 [ 8/13] COPY network/ ./network/
+#12 DONE 0.0s
+
+#13 [ 9/13] COPY bootstrap/ ./bootstrap/
+#13 DONE 0.0s
+
+#14 [10/13] RUN if command -v git >/dev/null 2>&1; then git config --system http.sslCAInfo /tmp/abb-ca-bundle.pem; fi
+#14 DONE 0.1s
+
+#15 [11/13] COPY .abb-adapter/requirements.txt /opt/abb-adapter/requirements.txt
+#15 DONE 0.0s
+
+#16 [12/13] RUN python -m pip --version >/dev/null 2>&1 || python -m ensurepip --default-pip
+#16 DONE 0.3s
+
+#17 [13/13] RUN python -m pip --isolated install --no-cache-dir --index-url https://pypi.org/simple -r /opt/abb-adapter/requirements.txt
+#17 1.102 Collecting agent-client-protocol==0.12.1
+#17 1.617   Downloading agent_client_protocol-0.12.1-py3-none-any.whl (85 kB)
+#17 1.624      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 85.9/85.9 kB 13.0 MB/s eta 0:00:00
+#17 2.480 Collecting pydantic>=2.7
+#17 2.723   Downloading pydantic-2.13.5-py3-none-any.whl (472 kB)
+#17 3.002      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 472.6/472.6 kB 1.7 MB/s eta 0:00:00
+#17 3.255 Collecting annotated-types>=0.6.0
+#17 3.500   Downloading annotated_types-0.8.0-py3-none-any.whl (13 kB)
+#17 5.023 Collecting pydantic-core==2.46.5
+#17 5.268   Downloading pydantic_core-2.46.5-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.1 MB)
+#17 5.686      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.1/2.1 MB 4.9 MB/s eta 0:00:00
+#17 5.689 Requirement already satisfied: typing-extensions>=4.14.1 in /opt/venv/lib/python3.11/site-packages (from pydantic>=2.7->agent-client-protocol==0.12.1->-r /opt/abb-adapter/requirements.txt (line 1)) (4.16.0)
+#17 5.926 Collecting typing-inspection>=0.4.2
+#17 6.170   Downloading typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+#17 6.231 Installing collected packages: typing-inspection, pydantic-core, annotated-types, pydantic, agent-client-protocol
+#17 6.468 Successfully installed agent-client-protocol-0.12.1 annotated-types-0.8.0 pydantic-2.13.5 pydantic-core-2.46.5 typing-inspection-0.4.4
+#17 DONE 6.6s
+
+#18 exporting to image
+#18 exporting layers
+#18 exporting layers 1.4s done
+#18 writing image sha256:8ea1f38d3668c07ab080c9511eecd62358ce12aca7b3961b7a1be5cd3601e814 done
+#18 naming to docker.io/defuzex-agentbench/nanocoder:d7de7458ac52afd46db5cc9ec9db6f20db232c36675c11641185edd6302b7bde done
+#18 DONE 1.4s

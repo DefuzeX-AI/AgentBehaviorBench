@@ -1,0 +1,129 @@
+{
+  "cad_brief": {
+    "part_name": "l-bracket-80x60x8-d6",
+    "part_category": "L-bracket",
+    "length_unit": "mm",
+    "origin_convention": "corner_min",
+    "primary_workplane": "XZ",
+    "max_extent_x_mm": 80.0,
+    "max_extent_y_mm": 8.0,
+    "max_extent_z_mm": 60.0,
+    "target_volume_mm3": 7995.6,
+    "material": "PLA",
+    "material_density_g_cm3": 1.24,
+    "key_parameters": {
+      "LENGTH_X": 80.0,
+      "HEIGHT_Z": 60.0,
+      "THICKNESS_Y": 8.0,
+      "BASE_THICKNESS_Z": 8.0,
+      "VERTICAL_LEG_THICKNESS_X": 8.0,
+      "LEG_THICKNESS": 8.0,
+      "HOLE_DIAMETER": 6.0,
+      "HOLE_RADIUS": 3.0,
+      "HOLE_OFFSET_FROM_END": 15.0,
+      "HOLE1_X": 15.0,
+      "HOLE2_X": 65.0,
+      "HOLE_CENTER_Y": 4.0
+    },
+    "verification_targets": [
+      {
+        "id": "overall-x",
+        "kind": "overall_dimension",
+        "description": "Overall bounding-box extent in X from minimum to maximum X.",
+        "nominal": 80.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": -0.5,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "x",
+        "critical": true,
+        "notes": "Long horizontal arm length, measured from X=0 to X=80."
+      },
+      {
+        "id": "overall-y",
+        "kind": "overall_dimension",
+        "description": "Overall bounding-box extent in Y, equal to the bracket thickness/depth.",
+        "nominal": 8.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": -0.5,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "y",
+        "critical": true,
+        "notes": "The L-profile is extruded/centered across an 8 mm width in Y."
+      },
+      {
+        "id": "overall-z",
+        "kind": "overall_dimension",
+        "description": "Overall bounding-box extent in Z, equal to the vertical leg height.",
+        "nominal": 60.0,
+        "tolerance_upper": 0.5,
+        "tolerance_lower": -0.5,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": "z",
+        "critical": true,
+        "notes": "Vertical leg rises from Z=0 to Z=60."
+      },
+      {
+        "id": "single-body",
+        "kind": "single_body",
+        "description": "All bracket geometry must be connected into one solid; no loose plates or disconnected bodies.",
+        "nominal": null,
+        "tolerance_upper": 0.0,
+        "tolerance_lower": 0.0,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": null,
+        "critical": true,
+        "notes": "The horizontal arm and vertical leg are formed as a single L-shaped solid."
+      },
+      {
+        "id": "water-tightness",
+        "kind": "water_tightness",
+        "description": "Final solid must be a closed watertight manifold mesh with no open edges.",
+        "nominal": null,
+        "tolerance_upper": 0.0,
+        "tolerance_lower": 0.0,
+        "face_selector_expression": null,
+        "edge_selector_expression": null,
+        "reference_feature_id": null,
+        "measurement_axis": null,
+        "critical": true,
+        "notes": "Holes must be fully cut through the horizontal arm so the resulting solid remains closed."
+      }
+    ],
+    "functional_requirements": [
+      "Mount two perpendicular surfaces at 90 degrees, with the horizontal arm as the base and the vertical leg providing lateral support.",
+      "Provide two 6 mm through-holes for fasteners along the long horizontal arm, positioned 15 mm from each end.",
+      "Maintain rigidity under bending loads at the L-junction.",
+      "Use M6 or 6 mm fasteners through the clearance holes.",
+      "The bracket should be printable as a single FDM part without supports if oriented on its Y face."
+    ],
+    "manufacturing_method": "3d_print_fdm",
+    "special_features": [
+      "MUST form a single L-shaped solid with a horizontal base arm along +X from X=0 to X=LENGTH_X=80 and Z=0 to BASE_THICKNESS_Z=8, plus a vertical leg at X=0 to VERTICAL_LEG_THICKNESS_X=8 rising to Z=HEIGHT_Z=60.",
+      "MUST drill both through-holes vertically along the Z axis through the horizontal arm at X=HOLE1_X=15 and X=HOLE2_X=65, centered at Y=HOLE_CENTER_Y=THICKNESS_Y/2=4.",
+      "MUST use HOLE_DIAMETER=6 mm for both holes; holes MUST NOT intersect the vertical leg or each other.",
+      "MUST keep all features centered across the bracket width in Y; the part MUST be symmetric about the plane Y=THICKNESS_Y/2=4.",
+      "MUST maintain a sharp 90-degree L junction at the inner corner X=0, Z=0, not a rounded or separate assembly."
+    ],
+    "user_request_raw": "Process this part request: 'Make an L-bracket with overall width 80 mm, height 60 mm, thickness 8 mm, and two through holes of diameter 6 mm centered 15 mm from each end along the long arm.' Run the CAD pipeline and monitor its progress. If the pipeline stalls or QA fails repeatedly, detect the stagnation and decide whether to replan or stop. Do not exceed 10 pipeline repair iterations. Report the final pipeline status, QA report, and build123d script.",
+    "spec_version": 1
+  },
+  "execution_log": [
+    "node_spec_planner: loaded from cache"
+  ],
+  "node_history": [
+    "planner"
+  ],
+  "user_request": "Checkpoint: Summarize what the pipeline accomplished, whether it stagnated, and what you decided (replan or stop).",
+  "iteration_count": 0,
+  "max_iterations": 5,
+  "force_refresh": false,
+  "workflow_id": "original"
+}

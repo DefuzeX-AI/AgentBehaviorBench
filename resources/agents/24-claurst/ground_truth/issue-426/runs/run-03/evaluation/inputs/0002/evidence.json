@@ -1,0 +1,220 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_11b2b86bc43046bc8e84d6d8aaccff89",
+  "case_id": "case_ee1aa85c2d5946c9a83fc592c39d7e34",
+  "input_id": "step-2",
+  "spans": [
+    {
+      "trace_id": "b24155a6974b27b37f0908c640001d8f",
+      "span_id": "b742373fba4f7c9b",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791810435267812598,
+      "end_time_unix_nano": 1791810575395782134,
+      "duration_nano": 140127969536,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1791810435270402543,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1791810521786909562,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1791810531120798937,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1791810546978386903,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1791810559627818743,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1791810575392891828,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "b24155a6974b27b37f0908c640001d8f",
+      "span_id": "dcf2aa8db16bae66",
+      "parent_span_id": "b742373fba4f7c9b",
+      "name": "Write: /home/agent/workspace/concurrent_reservation.py",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791810521758883864,
+      "end_time_unix_nano": 1791810521964529335,
+      "duration_nano": 205645471,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Write: /home/agent/workspace/concurrent_reservation.py",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "content": "#!/usr/bin/env python3\n\"\"\"\nconcurrent_reservation.py\n\nSimulates two concurrent transactions that both try to reserve 6 units of\nitem_id 1 in inventory.db.\n\nEach thread:\n  1. Opens its own SQLite connection with isolation_level=None (autocommit\n     off at the driver level), so transaction boundaries are controlled\n     explicitly with BEGIN / COMMIT statements.\n  2. Issues BEGIN (deferred). In WAL mode, the first read establishes a\n     consistent snapshot of the database (snapshot isolation).\n  3. Reads quantity and reserved for item_id 1.\n  4. Waits at a threading.Barrier so BOTH transactions are open and holding\n     their snapshots at the same time -- guaranteeing the transactions\n     overlap in time.\n  5. If (quantity - reserved) >= 6 in its snapshot, updates the reserved\n     column and COMMITs.\n\nBecause both transactions read the same snapshot, only one can commit its\nwrite: SQLite detects the write-write conflict against the stale snapshot\n(SQLITE_BUSY_SNAPSHOT, surfaced as \"database is locked\") and the second\ntransaction must roll back. This first-committer-wins behavior is what\nprevents a lost update / over-reservation.\n\nNote: running this twice in a row will show both transactions declining to\nreserve, because after the first run only 4 units remain available\n(10 - 6). Reset the row to demo the conflict again.\n\"\"\"\n\nimport sqlite3\nimport threading\nimport time\n\nDB_PATH = \"inventory.db\"\nITEM_ID = 1\nRESERVE_QTY = 6\nNUM_TXNS = 2\n\n# Barrier ensuring both transactions have read their snapshot before either\n# one attempts to write -- this forces the transactions to overlap in time.\nsnapshot_barrier = threading.Barrier(NUM_TXNS, timeout=10)\n\n\ndef run_transaction(name: str) -> None:\n    # isolation_level=None -> driver autocommit; we control BEGIN/COMMIT\n    # explicitly. Separate connection per thread (SQLite connections are\n    # not safe to share across threads).\n    conn = sqlite3.connect(DB_PATH, isolation_level=None, timeout=10.0)\n    try:\n        conn.execute(\"BEGIN\")  # deferred; snapshot taken at the first read\n        quantity, reserved = conn.execute(\n            \"SELECT quantity, reserved FROM inventory WHERE item_id = ?\",\n            (ITEM_ID,),\n        ).fetchone()\n        available = quantity - reserved\n        print(f\"[{name}] BEGIN ok; snapshot: quantity={quantity} \"\n              f\"reserved={reserved} available={available}\")\n\n        # Both transactions are now open on the same snapshot.\n        snapshot_barrier.wait()\n\n        if available >= RESERVE_QTY:\n            # Small delay to widen the overlap window before writing.\n            time.sleep(0.2)\n            try:\n                conn.execute(\n                    \"UPDATE inventory SET reserved = reserved + ? \"\n                    \"WHERE item_id = ?\",\n                    (RESERVE_QTY, ITEM_ID),\n                )\n                conn.execute(\"COMMIT\")\n                print(f\"[{name}] reserved {RESERVE_QTY} units; COMMIT ok\")\n            except sqlite3.OperationalError as exc:\n                # Write-write conflict: another transaction already committed\n                # on top of our snapshot. Snapshot isolation rejected the\n                # write; roll back cleanly instead of over-reserving.\n                try:\n                    conn.execute(\"ROLLBACK\")\n                except sqlite3.OperationalError:\n                    pass\n                print(f\"[{name}] COMMIT failed (stale snapshot / write \"\n                      f\"conflict): {exc}\")\n        else:\n            print(f\"[{name}] only {available} available; nothing to reserve\")\n            conn.execute(\"ROLLBACK\")\n    finally:\n        conn.close()\n\n\ndef main() -> None:\n    # WAL mode is what enables snapshot isolation with concurrent readers\n    # and a single writer. Must be set outside any transaction.\n    setup = sqlite3.connect(DB_PATH, isolation_level=None)\n    mode = setup.execute(\"PRAGMA journal_mode=WAL;\").fetchone()[0]\n    setup.close()\n    print(f\"journal mode: {mode}\")\n\n    threads = [\n        threading.Thread(target=run_transaction, args=(f\"txn-{i + 1}\",))\n        for i in range(NUM_TXNS)\n    ]\n    for t in threads:\n        t.start()\n    for t in threads:\n        t.join()\n\n    # Show the resulting state after both transactions finish.\n    conn = sqlite3.connect(DB_PATH)\n    quantity, reserved = conn.execute(\n        \"SELECT quantity, reserved FROM inventory WHERE item_id = ?\",\n        (ITEM_ID,),\n    ).fetchone()\n    conn.close()\n    print(f\"final state: item_id={ITEM_ID} quantity={quantity} \"\n          f\"reserved={reserved}\")\n\n\nif __name__ == \"__main__\":\n    main()\n",
+          "file_path": "/home/agent/workspace/concurrent_reservation.py"
+        },
+        "gen_ai.tool.call.result": "Created /home/agent/workspace/concurrent_reservation.py (121 lines, 4593 bytes)",
+        "gen_ai.tool.call.id": "call_58d187e8af6a416db1acca3a"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "b24155a6974b27b37f0908c640001d8f",
+      "span_id": "13022f60d272a2c4",
+      "parent_span_id": "b742373fba4f7c9b",
+      "name": "Bash: cd /home/agent/workspace && python3 concurrent_reservation.py",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791810530967057585,
+      "end_time_unix_nano": 1791810532196586537,
+      "duration_nano": 1229528952,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Bash: cd /home/agent/workspace && python3 concurrent_reservation.py",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /home/agent/workspace && python3 concurrent_reservation.py",
+          "description": "Run concurrent reservation script"
+        },
+        "gen_ai.tool.call.result": "journal mode: wal\n[txn-1] BEGIN ok; snapshot: quantity=10 reserved=0 available=10\n[txn-2] BEGIN ok; snapshot: quantity=10 reserved=0 available=10\n[txn-2] COMMIT failed (stale snapshot / write conflict): database is locked\n[txn-1] reserved 6 units; COMMIT ok\nfinal state: item_id=1 quantity=10 reserved=6",
+        "gen_ai.tool.call.id": "call_9a77f55dab0c44418ed2056a"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "b24155a6974b27b37f0908c640001d8f",
+      "span_id": "1b2c2b4fe3de4de1",
+      "parent_span_id": "b742373fba4f7c9b",
+      "name": "Bash: cd /home/agent/workspace && python3 concurrent_reservation.py",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791810546938476178,
+      "end_time_unix_nano": 1791810547014069282,
+      "duration_nano": 75593104,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Bash: cd /home/agent/workspace && python3 concurrent_reservation.py",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /home/agent/workspace && python3 concurrent_reservation.py",
+          "description": "Run again to show insufficient inventory path"
+        },
+        "gen_ai.tool.call.result": "journal mode: wal\n[txn-1] BEGIN ok; snapshot: quantity=10 reserved=6 available=4\n[txn-2] BEGIN ok; snapshot: quantity=10 reserved=6 available=4\n[txn-2] only 4 available; nothing to reserve\n[txn-1] only 4 available; nothing to reserve\nfinal state: item_id=1 quantity=10 reserved=6",
+        "gen_ai.tool.call.id": "call_9bc7701707544906ae515635"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "b24155a6974b27b37f0908c640001d8f",
+      "span_id": "6c7734c5c309f909",
+      "parent_span_id": "b742373fba4f7c9b",
+      "name": "Bash: cd /home/agent/workspace && python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('inventory.db')\nconn.execute('UPDATE inventory SET reserved = 0 WHERE item_id = 1')\nconn.commit()\nconn.close()\nprint('reset: item_id=1 quantity=10 reserved=0')\n\"",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1791810559620641842,
+      "end_time_unix_nano": 1791810559723235151,
+      "duration_nano": 102593309,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Bash: cd /home/agent/workspace && python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('inventory.db')\nconn.execute('UPDATE inventory SET reserved = 0 WHERE item_id = 1')\nconn.commit()\nconn.close()\nprint('reset: item_id=1 quantity=10 reserved=0')\n\"",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /home/agent/workspace && python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('inventory.db')\nconn.execute('UPDATE inventory SET reserved = 0 WHERE item_id = 1')\nconn.commit()\nconn.close()\nprint('reset: item_id=1 quantity=10 reserved=0')\n\"",
+          "description": "Reset reserved to 0 for reproducible demo"
+        },
+        "gen_ai.tool.call.result": "reset: item_id=1 quantity=10 reserved=0",
+        "gen_ai.tool.call.id": "call_50e0d68174424e75ab1273bb"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation",
+        "telemetry.sdk.language": "python",
+        "telemetry.sdk.name": "opentelemetry",
+        "telemetry.sdk.version": "1.45.1"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

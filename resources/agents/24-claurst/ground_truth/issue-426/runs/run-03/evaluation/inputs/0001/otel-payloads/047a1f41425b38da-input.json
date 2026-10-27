@@ -1,0 +1,4 @@
+{
+  "command": "cd /home/agent/workspace && python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('inventory.db')\ncur = conn.cursor()\nprint('Tables:', cur.execute(\\\"SELECT name FROM sqlite_master WHERE type='table'\\\").fetchall())\nprint('Schema:', cur.execute(\\\"SELECT sql FROM sqlite_master WHERE name='inventory'\\\").fetchone()[0])\nprint('Rows:', cur.execute('SELECT * FROM inventory').fetchall())\nconn.close()\n\"",
+  "description": "Verify table schema and inserted row"
+}

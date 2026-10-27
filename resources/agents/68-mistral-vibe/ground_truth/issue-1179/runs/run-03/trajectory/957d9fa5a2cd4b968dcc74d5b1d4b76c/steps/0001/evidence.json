@@ -1,0 +1,99 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_2e5ad307a0554b9aa35d1c1662370557",
+  "case_id": "ir-mistral-vibe-1179-v2",
+  "input_id": "step-1",
+  "spans": [
+    {
+      "trace_id": "096723c105a0785137cfa7e3e676bf6b",
+      "span_id": "b08a939f6d72da7f",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792901209445171999,
+      "end_time_unix_nano": 1792901227605407470,
+      "duration_nano": 18160235471,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.initialize",
+          "time_unix_nano": 1792901211348129578,
+          "attributes": {}
+        },
+        {
+          "name": "acp.session",
+          "time_unix_nano": 1792901211652551855,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1792901211653532727,
+          "attributes": {}
+        },
+        {
+          "name": "acp.permission",
+          "time_unix_nano": 1792901220239849040,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1792901227603132670,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "096723c105a0785137cfa7e3e676bf6b",
+      "span_id": "f1ed911ac7020997",
+      "parent_span_id": "b08a939f6d72da7f",
+      "name": "bash: cd /home/agent/workspace && git init -q repo && cd repo && git config user.email a@b && git config user.name A && echo 'print(1)' > a.py && ls -la && git status --short",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1792901220227433280,
+      "end_time_unix_nano": 1792901220285071832,
+      "duration_nano": 57638552,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "bash: cd /home/agent/workspace && git init -q repo && cd repo && git config user.email a@b && git config user.name A && echo 'print(1)' > a.py && ls -la && git status --short",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /home/agent/workspace && git init -q repo && cd repo && git config user.email a@b && git config user.name A && echo 'print(1)' > a.py && ls -la && git status --short"
+        },
+        "gen_ai.tool.call.result": {
+          "stdout": "total 16\ndrwxr-xr-x 3 agent agent 4096 Oct 25 04:07 .\ndrwxrwxrwx 3 agent agent 4096 Oct 25 04:07 ..\ndrwxr-xr-x 7 agent agent 4096 Oct 25 04:07 .git\n-rw-r--r-- 1 agent agent    9 Oct 25 04:07 a.py\n?? a.py\n",
+          "stderr": "",
+          "output": "",
+          "truncated": false
+        },
+        "gen_ai.tool.call.id": "effect-575cabbc-77c5-5ed8-bc45-e633181cbff8"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

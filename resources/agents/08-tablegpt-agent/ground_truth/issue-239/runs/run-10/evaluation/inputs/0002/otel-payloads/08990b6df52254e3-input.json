@@ -1,0 +1,3 @@
+{
+  "query": "import os, datetime\n\nfor top in [\"abb-tablegpt-5utytjj_\", \"kuma\"]:\n    print(f\"=== Full tree: {top}/ ===\")\n    if not os.path.isdir(top):\n        print(\"  (missing)\\n\"); continue\n    for root, dirs, files in os.walk(top):\n        depth = root.count(os.sep)\n        print(f\"  {'  '*depth}{os.path.basename(root) or root}/\")\n        for f in sorted(files):\n            full = os.path.join(root, f)\n            try:\n                st = os.stat(full)\n                print(f\"  {'  '*(depth+1)}{f}  ({st.st_size} B, mtime={datetime.datetime.fromtimestamp(st.st_mtime)})\")\n            except Exception as e:\n                print(f\"  {'  '*(depth+1)}{f}  (err: {e})\")\n    print()"
+}

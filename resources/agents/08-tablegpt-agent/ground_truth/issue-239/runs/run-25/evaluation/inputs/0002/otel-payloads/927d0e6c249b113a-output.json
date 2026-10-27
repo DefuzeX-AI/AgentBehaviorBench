@@ -1,0 +1,71 @@
+{
+  "generations": [
+    [
+      {
+        "text": "<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\">import sqlite3, os, json\n\np = \"./abb-tablegpt-0bueqplp/profile/history.sqlite\"\nprint(\"size:\", os.path.getsize(p))\ncon = sqlite3.connect(p)\ntabs = con.execute(\"SELECT name FROM sqlite_master WHERE type='table'\").fetchall()\nprint(\"tables:\", tabs)\nfor (t,) in tabs:\n    try:\n        rows = con.execute(f\"SELECT * FROM {t} LIMIT 3\").fetchall()\n        cols = [d[0] for d in con.execute(f\"SELECT * FROM {t} LIMIT 1\").description]\n        print(f\"\\n{t} cols: {cols}\\n sample: {str(rows)[:600]}\")\n    except Exception as e:\n        print(t, \"err\", e)\n</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+        "generation_info": {
+          "finish_reason": "stop",
+          "logprobs": null
+        },
+        "type": "ChatGeneration",
+        "message": {
+          "content": "<｜｜DSML｜｜ calls>\n<｜｜DSML｜｜ invoke name=\"python\">\n<｜｜DSML｜｜ parameter name=\"query\" string=\"true\">import sqlite3, os, json\n\np = \"./abb-tablegpt-0bueqplp/profile/history.sqlite\"\nprint(\"size:\", os.path.getsize(p))\ncon = sqlite3.connect(p)\ntabs = con.execute(\"SELECT name FROM sqlite_master WHERE type='table'\").fetchall()\nprint(\"tables:\", tabs)\nfor (t,) in tabs:\n    try:\n        rows = con.execute(f\"SELECT * FROM {t} LIMIT 3\").fetchall()\n        cols = [d[0] for d in con.execute(f\"SELECT * FROM {t} LIMIT 1\").description]\n        print(f\"\\n{t} cols: {cols}\\n sample: {str(rows)[:600]}\")\n    except Exception as e:\n        print(t, \"err\", e)\n</｜｜DSML｜｜ parameter>\n</｜｜DSML｜｜ invoke>\n</｜｜DSML｜｜ calls>",
+          "additional_kwargs": {
+            "refusal": null
+          },
+          "response_metadata": {
+            "token_usage": {
+              "completion_tokens": 293,
+              "prompt_tokens": 3849,
+              "total_tokens": 4142,
+              "completion_tokens_details": {
+                "accepted_prediction_tokens": null,
+                "audio_tokens": null,
+                "reasoning_tokens": 83,
+                "rejected_prediction_tokens": null
+              },
+              "prompt_tokens_details": {
+                "audio_tokens": null,
+                "cache_write_tokens": null,
+                "cached_tokens": 2176
+              }
+            },
+            "model_name": "deepseek-v4.1-flash",
+            "system_fingerprint": null,
+            "id": "chatcmpl-20261012193608650710169c955d568ac40PJHi",
+            "service_tier": null,
+            "finish_reason": "stop",
+            "logprobs": null
+          },
+          "type": "ai",
+          "name": null,
+          "id": "run--01a1319d-8270-75c0-965f-4506b5f5d8f5-0"
+        }
+      }
+    ]
+  ],
+  "llm_output": {
+    "token_usage": {
+      "completion_tokens": 293,
+      "prompt_tokens": 3849,
+      "total_tokens": 4142,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 83,
+        "rejected_prediction_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 2176
+      }
+    },
+    "model_name": "deepseek-v4.1-flash",
+    "system_fingerprint": null,
+    "id": "chatcmpl-20261012193608650710169c955d568ac40PJHi",
+    "service_tier": null
+  },
+  "run": null,
+  "type": "LLMResult"
+}

@@ -1,0 +1,49 @@
+{
+  "content": "```python\ndef data_wrangler(data_list):\n    '''\n    Wrangle the data provided in data.\n\n    Reconciled definition used: extended_sales = price * quantity_sold.\n    Goal: compute monthly extended sales per bike model.\n\n    data_list: A list of one or more pandas data frames containing the raw data to be wrangled.\n    '''\n    import pandas as pd\n    import numpy as np\n\n    # ------------------------------------------------------------------\n    # Step 0: Input normalization - ensure we have a list of DataFrames\n    # ------------------------------------------------------------------\n    if not isinstance(data_list, list):\n        data_list = [data_list]  # convert a single DataFrame into a list\n\n    frames = [df.copy() for df in data_list if isinstance(df, pd.DataFrame)]\n    if not frames:\n        return pd.DataFrame()  # nothing usable was supplied\n\n    # Combine datasets (a single dataset is expected; identical schemas are\n    # stacked with concat - no join keys needed, so no Cartesian product risk)\n    df = pd.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0]\n\n    # ------------------------------------------------------------------\n    # Step 1: Standardize column names (lowercase, strip spaces,\n    #         inner spaces -> underscores)\n    # ------------------------------------------------------------------\n    df.columns = [str(c).strip().lower().replace(' ', '_') for c in df.columns]\n\n    # ------------------------------------------------------------------\n    # Step 2: Identify column roles dynamically from column names\n    #         (no hard-coded names - keyword matching on the actual schema)\n    # ------------------------------------------------------------------\n    def find_col(keywords):\n        for c in df.columns:\n            if any(k in c for k in keywords):\n                return c\n        return None\n\n    date_col  = find_col(['date', 'day'])                  # transaction date\n    model_col = find_col(['model', 'product', 'item'])     # categorical model identifier\n    price_col = find_col(['price', 'rate', 'unit'])        # unit price\n    qty_col   = find_col(['quantity', 'qty', 'units'])     # quantity sold\n    # Extended sales: prefer an explicit \"extended\" column, else any sales/revenue column\n    sales_col = find_col(['extended'])\n    if sales_col is None:\n        sales_col = find_col(['sales', 'revenue', 'amount'])\n    numeric_cols = [c for c in (price_col, qty_col, sales_col) if c is not None]\n\n    # ------------------------------------------------------------------\n    # Step 3: Normalize data types (datetime / categorical / numeric)\n    # ------------------------------------------------------------------\n    if date_col is not None:\n        df[date_col] = pd.to_datetime(df[date_col], errors='coerce')\n\n    if model_col is not None:\n        # Clean whitespace, then store as a proper category\n        df[model_col] = df[model_col].astype(str).str.strip()\n        df[model_col] = df[model_col].astype('category')\n\n    for c in numeric_cols:\n        # Coerce bad/non-numeric entries to NaN so they can be handled below\n        df[c] = pd.to_numeric(df[c], errors='coerce')\n\n    # ------------------------------------------------------------------\n    # Step 4: Remove exact duplicate rows (only true duplicates dropped)\n    # ------------------------------------------------------------------\n    df = df.drop_duplicates().reset_index(drop=True)\n\n    # ------------------------------------------------------------------\n    # Step 5: Handle missing values - flag them, then simple imputation\n    # ------------------------------------------------------------------\n    for c in numeric_cols:\n        df[c + '_was_missing'] = df[c].isna().astype(int)  # audit flag, no rows dropped\n        df[c] = df[c].fillna(0)  # zero imputation is neutral for summing sales\n\n    # ------------------------------------------------------------------\n    # Step 6: Reconcile the extended-sales definition\n    # ------------------------------------------------------------------\n    # Reconciled definition: extended_sales = price * quantity_sold.\n    # Recompute it for every row so the aggregate uses one consistent\n    # definition, overriding any inconsistent pre-existing values.\n    if price_col is not None and qty_col is not None:\n        if sales_col is None:\n            sales_col = 'extended_sales'\n            numeric_cols.append(sales_col)\n        df[sales_col] = df[price_col] * df[qty_col]\n\n    # ------------------------------------------------------------------\n    # Step 7: Aggregate -> monthly extended sales per model\n    # ------------------------------------------------------------------\n    if date_col is not None and model_col is not None and sales_col is not None:\n        # Rows without a valid date cannot be assigned to a month, so they\n        # are excluded from the aggregation (imputation here is not meaningful)\n        work = df[df[date_col].notna()].copy()\n\n        # Derive a 'YYYY-MM' month key from the date column\n        work['month'] = work[date_col].dt.to_period('M').astype(str)\n\n        # Sum extended sales by month x model (observed=True avoids empty\n        # combinations for unused categorical levels)\n        monthly_sales = (\n            work.groupby(['month', model_col], observed=True, as_index=False)[sales_col]\n                .sum()\n        )\n\n        # Tidy output: sort chronologically, then alphabetically by model\n        monthly_sales = (\n            monthly_sales\n            .sort_values(['month', model_col])\n            .reset_index(drop=True)\n        )\n        return monthly_sales\n\n    # Fallback: if the required columns are absent, return the cleaned data\n    return df.reset_index(drop=True)\n```\n\nKey steps explained:\n- **Column standardization**: names are lowercased and stripped of spaces before any logic runs, and column roles (date / model / price / quantity / sales) are detected by keyword matching rather than hard-coding names.\n- **Type normalization**: the date becomes a true datetime, the model becomes a cleaned categorical, and numeric columns are coerced with `errors='coerce'`.\n- **Missing values**: numeric gaps are flagged with `*_was_missing` audit columns and filled with 0 (neutral for summing sales); no rows are dropped except true duplicates and date-less rows that cannot be assigned to a month.\n- **Reconciled definition**: `extended_sales` is recomputed as `price * quantity_sold` on every row, guaranteeing a single consistent definition before aggregation.\n- **Final output**: one row per (month, bike_model) with summed `extended_sales`, sorted chronologically then by model — a single tidy pandas DataFrame.",
+  "additional_kwargs": {
+    "refusal": null
+  },
+  "response_metadata": {
+    "token_usage": {
+      "completion_tokens": 4398,
+      "prompt_tokens": 735,
+      "total_tokens": 5133,
+      "completion_tokens_details": {
+        "accepted_prediction_tokens": null,
+        "audio_tokens": null,
+        "reasoning_tokens": 3056,
+        "rejected_prediction_tokens": null,
+        "text_tokens": null
+      },
+      "prompt_tokens_details": {
+        "audio_tokens": null,
+        "cache_write_tokens": null,
+        "cached_tokens": 0,
+        "image_tokens": null,
+        "text_tokens": null
+      }
+    },
+    "model_provider": "openai",
+    "model_name": "glm-5.3-flash",
+    "system_fingerprint": null,
+    "id": "202609260739255be26592bee7402c",
+    "finish_reason": "stop",
+    "logprobs": null
+  },
+  "type": "ai",
+  "name": null,
+  "id": "lc_run--01a0daf0-2299-7572-96ca-606559c2bcd6-0",
+  "tool_calls": [],
+  "invalid_tool_calls": [],
+  "usage_metadata": {
+    "input_tokens": 735,
+    "output_tokens": 4398,
+    "total_tokens": 5133,
+    "input_token_details": {
+      "cache_read": 0
+    },
+    "output_token_details": {
+      "reasoning": 3056
+    }
+  }
+}
