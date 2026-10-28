@@ -1,0 +1,33 @@
+{
+  "case_id": "ir-gptme-992-v1",
+  "issue": {
+    "repository": "gptme/gptme",
+    "number": 992,
+    "url": "https://github.com/gptme/gptme/issues/992",
+    "state": "closed",
+    "title": "fix: shell bg command fails when not first command in code block"
+  },
+  "version_choice": "pinned",
+  "reported_version": "v0.31.0",
+  "commit_version": "0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07",
+  "fixed_in": "v0.32.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Run this shell block exactly as written:\n\ncd /tmp\nbg sleep 30",
+    "Run `cd /tmp && bg sleep 30`."
+  ],
+  "expected": "The `bg` command starts a background job (`Started background job #1: ...`) even when it follows other commands, or a clear error explains the limitation.",
+  "defect": "When `bg` is not the first command in the block it falls through to bash's builtin and fails with `bash: line 32: bg: no job control`.",
+  "fault location": [],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/gptme/gptme/pull/994 (commit f32186a63ec3b9a763f2348dfdae535844dfcbab). In v0.31.0, execute_shell recognised the background-job syntax only via `cmd.strip().lower().startswith(\"bg \")`, i.e. when `bg` was the first token of the whole block. With a preceding `cd` line (or `cd ... && bg ...`) the block was sent unchanged to the persistent non-interactive bash, where `bg` is the job-control builtin and fails with 'no job control'. PR #994 scans each line for a leading `bg `, runs the preceding lines in the stateful shell first and then starts the background job. The fix ships in v0.32.0. Note that the `&&` variant is not handled by #994, and at the pinned revision the `bg <cmd>` prefix syntax has been removed altogether (background jobs are requested with a `background` argument), so a literal `bg` there always reaches the bash builtin by design.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/gptme/gptme/pull/994",
+      "https://github.com/gptme/gptme/commit/f32186a63ec3b9a763f2348dfdae535844dfcbab"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "The pinned revision 0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07 (v0.35.1) already contains the fix, but no release that lacks the fix provides the gptme-acp entry point (gptme-acp first appears in pyproject.toml at commit 75d94dd34, 2025-12-18, first tagged in v0.31.1.dev20260227 / v0.32.0), so version_choice stays 'pinned'. Because the faulty code no longer exists at the tested revision, 'fault location' is left empty and the pre-fix location is recorded here instead: gptme/tools/shell.py execute_shell (`if cmd_lower.startswith(\"bg \")`) at f32186a63^. A commit containing ACP but not the fix exists (e.g. 75d94dd34..f32186a63^, Dec 18-25 2025) but no tag. Important: at the pinned revision execute_shell has no `bg ` prefix handling at all (background is a kwarg; see execute_shell at line 3615), so running these steps at the pinned revision will show `bg: no job control` for a different reason (feature removed/renamed), not this bug. Steps replace `npm run dev` with `sleep 30` (round-4 plan)."
+  }
+}

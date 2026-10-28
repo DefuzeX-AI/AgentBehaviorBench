@@ -1,0 +1,56 @@
+{
+  "case_id": "ir-mistral-vibe-1338-v1",
+  "issue": {
+    "repository": "mistralai/mistral-vibe",
+    "number": 1338,
+    "url": "https://github.com/mistralai/mistral-vibe/issues/1338",
+    "state": "open",
+    "title": "bug: write_file creates new files with mode 0600 despite umask 022"
+  },
+  "version_choice": "historical:3.0.1",
+  "reported_version": "3.0.1",
+  "commit_version": "dd2c04ce717c417731ab89c333cd0a72541e33ba",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Create a new file index.html in this project: a minimal HTML5 page titled \"Ops scripts\" that lists deploy.bat and notes.txt with one sentence each (see README.md). Use your file-writing tool to create index.html. Then use the shell to run exactly `touch shell_note.txt && ls -l index.html shell_note.txt` and show me the output."
+  ],
+  "expected": "For ordinary new files under umask 022, the native file-writing tool should create mode 0644 like shell touch, while respecting restrictive umasks and preserving existing target permissions. Upstream intent concerning an owner-only default remains unconfirmed.",
+  "defect": "A new native write_file target inherits the atomic temporary file's 0600 permissions. The fresh original ABB execution showed index.html at 0600 and the same-session shell-created baseline at 0644.",
+  "fault location": [
+    {
+      "file": "harness/runtimes/python/python/mistralai_vibe_local_harness/vibe/_sandbox_helper.py",
+      "function": "write_file",
+      "line_start": 290,
+      "line_end": 302,
+      "commit": "dd2c04ce717c417731ab89c333cd0a72541e33ba",
+      "url": "https://github.com/mistralai/mistral-vibe/blob/dd2c04ce717c417731ab89c333cd0a72541e33ba/harness/runtimes/python/python/mistralai_vibe_local_harness/vibe/_sandbox_helper.py#L290-L302",
+      "role": "call_site",
+      "verification": "causal_repair_confirmed_by_ABB_and_POSIX_mode_controls",
+      "explanation": "Delegates creation to _atomic_write_text. The original native ABB write creates mode 0600; the patched write creates 0644 under umask 022. Controls preserve restrictive umask and existing permissions. ACP client file callbacks were disabled in both arms."
+    },
+    {
+      "file": "harness/runtimes/python/python/mistralai_vibe_local_harness/vibe/_sandbox_helper.py",
+      "function": "_atomic_write_text",
+      "line_start": 810,
+      "line_end": 836,
+      "commit": "dd2c04ce717c417731ab89c333cd0a72541e33ba",
+      "url": "https://github.com/mistralai/mistral-vibe/blob/dd2c04ce717c417731ab89c333cd0a72541e33ba/harness/runtimes/python/python/mistralai_vibe_local_harness/vibe/_sandbox_helper.py#L810-L836",
+      "role": "new_file_permissions",
+      "verification": "causal_repair_confirmed_by_ABB_and_POSIX_mode_controls",
+      "explanation": "Creates a NamedTemporaryFile and replaces the destination; chmod is applied only when an existing target mode was captured. New targets retain the temporary file's owner-only permissions. The original native ABB write creates mode 0600; the patched write creates 0644 under umask 022. Controls preserve restrictive umask and existing permissions. ACP client file callbacks were disabled in both arms."
+    }
+  ],
+  "Root cause": "CONFIRMED BY SOURCE, FRESH ABB FILE PERMISSIONS AND LINUX CONTROLS AT v3.0.1. write_file calls _atomic_write_text, which creates a NamedTemporaryFile with owner-only permissions and replaces the destination. It restores a saved mode only for an existing target. A new target therefore retains mode 0600 instead of receiving ordinary 0666 masked by the process umask. In the original ABB execution, write_file created index.html with mode 0600, while touch created shell_note.txt with mode 0644 in the same session. The candidate repair gives write_file's new targets a requested mode of 0666 using exclusive os.open creation, letting the operating system apply umask; existing target modes and the helper's default private mode remain unchanged. The patched ABB execution showed both files at 0644. Full-module Linux controls confirmed 0644 under umask 022, 0600 under umask 077, preservation of an existing 0750 mode, and retention of 0600 for internal atomic writes using the private default. Both ABB arms disabled ACP client filesystem capabilities so Vibe's own file tools performed the writes; the default client-side write route bypasses this fault location. The controlled comparison validates the permission mechanism and candidate repair. It does not establish whether upstream intentionally prefers owner-only creation as a product policy. fixed_in remains unknown; pinned_contains_fix=false refers to the unmodified tested commit, not the experimental patch. The official 3.0.1 wheel was checksummed and the target Python source matched this commit before patching; native Rust components were not rebuilt. The original prompt and model configuration were unchanged. POSIX permissions were tested; Windows ACL behavior was not tested.",
+  "_meta": {
+    "fix_status": "source_confirmed",
+    "fix_refs": [],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "source_case": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\68-mistral-vibe\\ground_truth\\issue-1338\\case.verified.json",
+    "source_case_id": "srp-mistral-vibe-h1-new-file-mode-v2",
+    "preparation_status": "prepared_from_recorded_case",
+    "runtime_validation": "not_run_in_this_completion",
+    "notes": "Reused the existing ABB source-confirmed case. Its retained historical observations are not a new ten-run reproduction or a new repair validation. Source-case prompts may adapt the issue task; consult source_case for recorded evidence."
+  }
+}

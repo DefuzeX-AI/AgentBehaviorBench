@@ -1,0 +1,66 @@
+{
+  "case_id": "ir-zeroclaw-10887-v1",
+  "issue": {
+    "repository": "zeroclaw-labs/zeroclaw",
+    "number": 10887,
+    "url": "https://github.com/zeroclaw-labs/zeroclaw/issues/10887",
+    "state": "closed",
+    "title": "[Bug]: Non-vision capability gate fails the turn on marker-shaped prose that references no loadable image"
+  },
+  "version_choice": "pinned",
+  "reported_version": "v0.8.5",
+  "commit_version": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+  "fixed_in": "v0.8.6",
+  "pinned_contains_fix": false,
+  "steps": [
+    "I am writing a test spec for image markers. In the spec, a missing image is written as [IMAGE:/nonexistent/shot.png] and should be kept as plain text. Please summarize in one sentence what that marker means."
+  ],
+  "expected": "Because the marker references no loadable image, the message is treated as text and the agent answers normally.",
+  "defect": "The turn fails before any model request with `provider_capability_error ... capability=vision message=received 1 image marker(s), but this model_provider does not support vision input`.",
+  "fault location": [
+    {
+      "file": "crates/zeroclaw-runtime/src/agent/turn/vision_route.rs",
+      "function": "resolve_vision_provider",
+      "line_start": 87,
+      "line_end": 113,
+      "commit": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/cb2b20a9fe59004b7ef03e123942d31f29236d15/crates/zeroclaw-runtime/src/agent/turn/vision_route.rs#L87-L113",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Returns a hard ProviderCapabilityError whenever the latest user message has any image marker and the model lacks vision; PR #10904 (commit 638d0f6) gates this on count_latest_user_resolvable_image_markers and otherwise degrades to text."
+    },
+    {
+      "file": "crates/zeroclaw-providers/src/multimodal.rs",
+      "function": "count_latest_user_image_markers",
+      "line_start": 414,
+      "line_end": 421,
+      "commit": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/cb2b20a9fe59004b7ef03e123942d31f29236d15/crates/zeroclaw-providers/src/multimodal.rs#L414-L421",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Counts markers on syntax alone (parse_image_markers), without checking that the path exists or the data URI is valid; PR #10904 adds count_latest_user_resolvable_image_markers."
+    },
+    {
+      "file": "crates/zeroclaw-providers/src/multimodal.rs",
+      "function": "is_loadable_image_reference",
+      "line_start": 272,
+      "line_end": 279,
+      "commit": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/cb2b20a9fe59004b7ef03e123942d31f29236d15/crates/zeroclaw-providers/src/multimodal.rs#L272-L279",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Treats any reference starting with '/', http(s)://, data: or a Windows drive as an attachment, so `/nonexistent/shot.png` qualifies."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/zeroclaw-labs/zeroclaw/pull/10904 (commit https://github.com/zeroclaw-labs/zeroclaw/commit/638d0f63361f223702c1c98900d7afaa753c05a8, \"fix(runtime): gate the no-vision error on image markers that resolve\"). At the pinned v0.8.5, resolve_vision_provider computes latest_user_image_marker_count with multimodal::count_latest_user_image_markers, which counts every `[IMAGE:...]` marker whose reference passes is_loadable_image_reference — a purely syntactic test (leading '/', http(s)://, data:, drive letter). When the selected model has no vision capability and no vision_model_provider is configured, a non-zero count makes the function return ProviderCapabilityError, so a user message that merely quotes `[IMAGE:/nonexistent/shot.png]` fails the turn before dispatch, while the same text arriving as a tool result is only stripped with a WARN. The fix adds count_latest_user_resolvable_image_markers (existing, policy-allowed files; structurally valid data URIs; remote URLs only when remote fetch is enabled) and uses it for the hard-fail gate, degrading to text-only otherwise. The fix first ships in v0.8.6; the pinned revision does not contain it. Whether the unit's custom slot reports vision=false is not stated in launch.py (round-4).",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/zeroclaw-labs/zeroclaw/pull/10904",
+      "https://github.com/zeroclaw-labs/zeroclaw/commit/638d0f63361f223702c1c98900d7afaa753c05a8"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "gh_web: CLOSED/COMPLETED (2026-10-19), closing PR #10904 MERGED (638d0f6, first tag v0.8.6, not an ancestor of pinned). Linked PRs #8180/#10480/#10860 are background. The issue describes a v0.8.5-era session (no version field); pinned is v0.8.5. The step is my construction containing the literal marker from round-3; the original message was a long implementation brief."
+  }
+}

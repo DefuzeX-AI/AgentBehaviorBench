@@ -1,0 +1,67 @@
+{
+  "case_id": "ir-multi-agent-cad-10-v1",
+  "issue": {
+    "repository": "Pan-Chera/Multi-Agent-CAD",
+    "number": 10,
+    "url": "https://github.com/Pan-Chera/Multi-Agent-CAD/issues/10",
+    "state": "closed",
+    "title": "Fresh install fails at the coder stage: `cadpy/step_scene.py` imports `TDF_LabelSequence`, which no longer exists in OCP 8.x (pulled in by unpinned `build123d>=0.8`)"
+  },
+  "version_choice": "pinned",
+  "reported_version": "8bf91d83a95f52626d0aa963c6575c79b653ab06",
+  "commit_version": "f31a2f65aa1b1e16fa6c45f1d642142fb696db28",
+  "fixed_in": "unreleased:2195f005c5fa",
+  "pinned_contains_fix": false,
+  "steps": [
+    "flat plate 100x50x5 mm with four 6 mm holes"
+  ],
+  "expected": "The pipeline runs the deterministic coder and produces the CAD part for the request.",
+  "defect": "Every request halts with `Status: HALTED (ErrorType.FATAL)`, `Iterations: 0` and `Deterministic coder execution failed: cannot import name 'TDF_LabelSequence' from 'OCP.TDF'` before any CAD script runs.",
+  "fault location": [
+    {
+      "file": "pyproject.toml",
+      "function": "<dependencies>",
+      "line_start": 28,
+      "line_end": 28,
+      "commit": "f31a2f65aa1b1e16fa6c45f1d642142fb696db28",
+      "url": "https://github.com/Pan-Chera/Multi-Agent-CAD/blob/f31a2f65aa1b1e16fa6c45f1d642142fb696db28/pyproject.toml#L28-L28",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "`build123d>=0.8` is unbounded, so a fresh install resolves build123d 0.13 with cadquery-ocp-novtk 8.x; commit 2195f00 constrains it to `build123d>=0.8,<0.13`."
+    },
+    {
+      "file": "packages/cadpy/pyproject.toml",
+      "function": "<dependencies>",
+      "line_start": 11,
+      "line_end": 12,
+      "commit": "f31a2f65aa1b1e16fa6c45f1d642142fb696db28",
+      "url": "https://github.com/Pan-Chera/Multi-Agent-CAD/blob/f31a2f65aa1b1e16fa6c45f1d642142fb696db28/packages/cadpy/pyproject.toml#L11-L12",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "cadpy, whose step_scene.py (L32) imports OCP 7.x's TDF_LabelSequence, declares `build123d` and `cadquery-ocp-novtk` with no bounds; 2195f00 pins `build123d>=0.8,<0.13` and `cadquery-ocp-novtk<8`."
+    },
+    {
+      "file": "requirements.txt",
+      "function": "<dependencies>",
+      "line_start": 26,
+      "line_end": 26,
+      "commit": "f31a2f65aa1b1e16fa6c45f1d642142fb696db28",
+      "url": "https://github.com/Pan-Chera/Multi-Agent-CAD/blob/f31a2f65aa1b1e16fa6c45f1d642142fb696db28/requirements.txt#L26-L26",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "The pip install path also uses unbounded `build123d>=0.8`; 2195f00 changes it to `build123d>=0.8,<0.13` (environment.yml L28 likewise)."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/Pan-Chera/Multi-Agent-CAD/commit/2195f005c5fa2198826e33393561fd35b0c9abac. packages/cadpy/src/cadpy/step_scene.py imports `TDF_LabelSequence` from `OCP.TDF` at module level (L32) and uses it in its STEP traversal; that typedef only exists in OCP 7.x. The project's dependency declarations (root pyproject.toml, packages/cadpy/pyproject.toml, requirements.txt, environment.yml) leave build123d / cadquery-ocp-novtk unbounded, so a fresh install now resolves build123d 0.13.0, which requires cadquery-ocp-novtk 8.x, where the type moved to OCP.collections.Sequence_TDF_Label. The deterministic coder's first `from cadpy.generation import ...` transitively imports cadpy.glb -> cadpy.step_scene, raises ImportError, and the graph halts with ErrorType.FATAL at iteration 0. Commit 2195f00 (\"fix(deps): keep CAD runtime on compatible OCP 7\", 2026-10-17) constrains build123d to <0.13 and cadquery-ocp-novtk to <8 in all dependency files and documents it; it does not port step_scene.py to OCP 8. The fix is not in any release tag (latest tag v1.0.0 predates it) and is not in the pinned revision f31a2f6, which is older than the reported 8bf91d8. Whether the case reproduces depends on the unit image resolving build123d 0.13.x (round 4: reproduced in ABB).",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/Pan-Chera/Multi-Agent-CAD/commit/2195f005c5fa2198826e33393561fd35b0c9abac"
+    ],
+    "abb_entry": "langgraph",
+    "user_messages_from_issue": [
+      "flat plate 100x50x5 mm with four 6 mm holes"
+    ],
+    "notes": "gh_web: issue CLOSED/COMPLETED, no closing PR; linked commits 2195f00 (the dependency fix), 8b4f181 (CI test importing the CAD runtime, test-only, omitted) and 8bf91d8 (the reported revision). tag --contains 2195f00 is empty (tags: ui-demo-v1, v1.0.0, both older), so fixed_in is unreleased. The pinned f31a2f6 is an ancestor of 8bf91d8 (the issue says the defect is also seen at f31a2f6) and does not contain the fix; version_choice pinned. The fault locations are dependency specifications; the import that actually fails is step_scene.py L32 (verified at f31a2f6), which the fix leaves unchanged. Line numbers verified with git show at f31a2f6."
+  }
+}

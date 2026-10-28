@@ -1,0 +1,56 @@
+{
+  "case_id": "ir-opencrabs-2227-v1",
+  "issue": {
+    "repository": "opencrabs/opencrabs",
+    "number": 2227,
+    "url": "https://github.com/opencrabs/opencrabs/issues/2227",
+    "state": "closed",
+    "title": "fix(tool): edit_file line operations drop the final newline and convert CRLF files to LF"
+  },
+  "version_choice": "pinned",
+  "reported_version": "0.5.13",
+  "commit_version": "0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Use the shell and Python pathlib.Path to create settings.ini with write_bytes(b'[app]\\r\\nname = demo\\r\\nmode = debug\\r\\nport = 8080\\r\\nworkers = 4\\r\\n'). Create its parent directory if needed. Read it with read_file.",
+    "Use edit_file delete_lines to remove the mode = debug line from settings.ini. Preserve every other byte and the final newline."
+  ],
+  "expected": "Deleting one line preserves CRLF and the final newline of unaffected content.",
+  "defect": "Line-operation edits rebuild the whole file with LF separators and drop its final newline.",
+  "fault location": [
+    {
+      "file": "src/brain/tools/edit.rs",
+      "function": "EditTool::execute ReplaceLines",
+      "line_start": 268,
+      "line_end": 289,
+      "commit": "0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402",
+      "url": "https://github.com/opencrabs/opencrabs/blob/0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402/src/brain/tools/edit.rs#L268-L289",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "DeleteLines and sibling operations collect content.lines() and join with a hardcoded LF; Rust lines removes CRLF terminators and final-newline information. c51b6a7e preserves the original byte spans."
+    }
+  ],
+  "Root cause": "DeleteLines and sibling operations collect content.lines() and join with a hardcoded LF; Rust lines removes CRLF terminators and final-newline information. c51b6a7e preserves the original byte spans.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/opencrabs/opencrabs/commit/c51b6a7ec5ea5c5e0651ad341585939ac144218b"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "Exact issue bytes. The tool line indices are zero-based in the report, so mode is index 2. Confirm the actual tool argument contract rather than prescribing the wrong index.",
+    "preparation_status": "prepared",
+    "runtime_validation": "not_run_in_this_completion",
+    "root_cause_verification": "source_review_only",
+    "unit_pin": "0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402",
+    "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\114-opencrabs",
+    "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+    "upstream_checked_at": "2026-10-28",
+    "evidence_issue": "evidence/upstream/issues.json",
+    "evidence_timeline": "evidence/upstream/timelines.json",
+    "evidence_comments": "evidence/upstream/comments.json",
+    "source_snapshot": "evidence/upstream/review_sources.json",
+    "duplicate_group": null
+  }
+}

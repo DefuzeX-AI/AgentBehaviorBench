@@ -1,0 +1,43 @@
+{
+  "case_id": "ir-jcode-709-v1",
+  "issue": {
+    "repository": "1jehuang/jcode",
+    "number": 709,
+    "url": "https://github.com/1jehuang/jcode/issues/709",
+    "state": "closed",
+    "title": "bash gate blocks read-only commands: `echo hi 2>/dev/null` is classified Catastrophic"
+  },
+  "version_choice": "historical:v0.64.2",
+  "reported_version": "v0.64.2",
+  "commit_version": "6c6fbba1c655ad9df6bdfc58bd6bf93ff4cf5a8c",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Create file.txt containing hello and notes.md containing TODO. Keep all fixtures in the current workspace.",
+    "Run exactly this bash command and show its actual result: echo hi 2>/dev/null"
+  ],
+  "expected": "A read-only command or discard-device redirect is not classified as catastrophic deletion.",
+  "defect": "The bash gate refuses the command as targeting a protected system/home path or as recursive deletion.",
+  "fault location": [],
+  "Root cause": "The command-risk parser confuses redirects and literal shell content with destructive operands. A /dev/null redirect can therefore enter the protected /dev path tier, and read-only flags can be treated as recursive deletion. Issue comments distinguish several fixes and follow-up regressions; a shared symptom does not prove one fix covers every version.",
+  "_meta": {
+    "fix_status": "inferred",
+    "fix_refs": [],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "The command follows the issue minimal example; #725 substitutes a local missing symlink for the private /proc iteration. Fixture preparation is an added first turn. Require an actual bash invocation and the target-path refusal. These related reports share a defect family and must not be assumed to be independent root causes.",
+    "preparation_status": "prepared",
+    "runtime_validation": "not_run_in_this_completion",
+    "root_cause_verification": "issue_derived_inference",
+    "unit_pin": "944f747e922b069a0a6110565103a0222fe1fe93",
+    "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\28-jcode",
+    "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+    "upstream_checked_at": "2026-10-28",
+    "evidence_issue": "evidence/upstream/issues.json",
+    "evidence_timeline": "evidence/upstream/timelines.json",
+    "evidence_comments": "evidence/upstream/comments.json",
+    "source_snapshot": "evidence/upstream/review_sources.json",
+    "duplicate_group": "jcode-command-risk-redirect-parsing",
+    "historical_acp_source_present": true
+  }
+}

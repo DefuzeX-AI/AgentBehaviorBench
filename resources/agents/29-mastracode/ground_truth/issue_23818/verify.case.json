@@ -1,0 +1,67 @@
+{
+  "case_id": "ir-mastracode-23818-v1",
+  "issue": {
+    "repository": "mastra-ai/mastra",
+    "number": 23818,
+    "url": "https://github.com/mastra-ai/mastra/issues/23818",
+    "state": "closed",
+    "title": "[BUG] Native grep reports success and \"0 matches\" when stat/readdir/readFile fail"
+  },
+  "version_choice": "historical:mastracode@0.40.0",
+  "reported_version": "@mastra/core@1.63.0",
+  "commit_version": "871bdaa5957c2b680cd043a728b1b7fec4101512",
+  "fixed_in": "mastracode@0.41.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create a file named readable.txt containing the single line `needle`.",
+    "Use the grep tool to search for 'needle' in the path does-not-exist."
+  ],
+  "expected": "Searching a path that does not exist returns a file-not-found error (or at least says the path was not searched) instead of a normal empty result.",
+  "defect": "The grep tool returns the normal successful summary `0 matches across 0 files`, indistinguishable from a real search with no hits.",
+  "fault location": [
+    {
+      "file": "packages/core/src/workspace/tools/grep.ts",
+      "function": "grepTool.execute",
+      "line_start": 131,
+      "line_end": 132,
+      "commit": "871bdaa5957c2b680cd043a728b1b7fec4101512",
+      "url": "https://github.com/mastra-ai/mastra/blob/871bdaa5957c2b680cd043a728b1b7fec4101512/packages/core/src/workspace/tools/grep.ts#L131-L132",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Resolves the search target with filesystem.stat(searchPath) inside a try block whose failure is not reported; PR #24053 (commit d7f0579) reports a missing/unreadable target instead."
+    },
+    {
+      "file": "packages/core/src/workspace/tools/grep.ts",
+      "function": "grepTool.execute",
+      "line_start": 242,
+      "line_end": 245,
+      "commit": "871bdaa5957c2b680cd043a728b1b7fec4101512",
+      "url": "https://github.com/mastra-ai/mastra/blob/871bdaa5957c2b680cd043a728b1b7fec4101512/packages/core/src/workspace/tools/grep.ts#L242-L245",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "`catch { filePaths = []; }` turns any stat failure (e.g. ENOENT for does-not-exist) into an empty file list, so the tool prints `0 matches across 0 files` with success; PR #24053 surfaces the error (and counts skipped paths) instead."
+    },
+    {
+      "file": "packages/core/src/workspace/tools/grep.ts",
+      "function": "grepTool.execute",
+      "line_start": 176,
+      "line_end": 184,
+      "commit": "871bdaa5957c2b680cd043a728b1b7fec4101512",
+      "url": "https://github.com/mastra-ai/mastra/blob/871bdaa5957c2b680cd043a728b1b7fec4101512/packages/core/src/workspace/tools/grep.ts#L176-L184",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Directory walk swallows readdir failures (`catch { return []; }`), and the readFile batch at lines 372-377 likewise returns undefined for unreadable files, so partial searches look complete; PR #24053 records these as skipped/unreadable in the summary (or throws in strict mode)."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/mastra-ai/mastra/pull/24053 (commit d7f0579a0445469430b9eadbf9c28ed3fa009839). In the tested source, grepTool.execute in packages/core/src/workspace/tools/grep.ts wraps target resolution in try { const stat = await filesystem.stat(searchPath); ... } catch { filePaths = []; }, so a path that does not exist (or cannot be stat'ed) silently becomes an empty file list; the directory walk swallows readdir errors with `catch { return []; }`, file reads swallow readFile errors and are skipped, and loadGitignore swallows any error. None of these reach the outer error handler, so the tool returns the ordinary `0 matches across 0 files` summary and ends its span as successful, leading the agent to conclude the content does not exist. The fix replaces grepTool with createGrepTool({ strict }), distinguishes ENOENT/ENOTDIR from other errors, reports missing targets and skipped unreadable directories/files in the summary (or throws when strict), and narrows loadGitignore's catch to a missing file. The fix is first released in mastracode@0.41.0 / @mastra/core@1.68.0, which is exactly the pinned revision, so the case is tested at mastracode@0.40.0 (the last release before the fix), which still has the swallowing catches.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/mastra-ai/mastra/pull/24053",
+      "https://github.com/mastra-ai/mastra/commit/d7f0579a0445469430b9eadbf9c28ed3fa009839"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "Issue page: CLOSED/COMPLETED, closing PR #24053 MERGED (commit d7f0579a, 2026-09-15). git tag --contains: first in mastracode@0.41.0 and @mastra/core@1.68.0 (the pinned tag), so pinned_contains_fix is true. reported_version is as stated (@mastra/core@1.63.0, dist build); the closest mastracode release before the fix with ACP is mastracode@0.40.0 (2026-09-15, @mastra/core@1.67.0), used as commit_version. Step 1 is from the round-4 plan (not strictly needed for the missing-path case); step 2 is the round-3 repro_prompt; in mastracode the grep tool is exposed as search_content. The loadGitignore swallow (packages/core/src/workspace/gitignore.ts line 28) is part of the same fix but not on the missing-path path, so it is not listed. The mastracode ACP server (--acp, PR #18231, 2026-06-23) first ships in mastracode@0.25.0; mastracode maps core workspace tools to its own names (mastracode/sdk/src/tool-names.ts: read_file->view, list_files->find_files, grep->search_content, execute_command unchanged)."
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "case_id": "ir-llxprt-code-3606-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 3606,
+    "url": "https://github.com/vybestack/llxprt-code/issues/3606",
+    "state": "closed",
+    "title": "replace tool converts literal Python newline escapes into source newlines"
+  },
+  "version_choice": "pinned",
+  "reported_version": "unknown",
+  "commit_version": "5400f65a6c7eef52844697c8f8c85390df29eea1",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Create sample.py with exactly this one-line Python source and a final newline: value = \"old\". Read it with read_file.",
+    "Use the built-in replace tool to replace the complete source line with exactly the following text (backslashes are literal source characters):\nvalue = \"\\n\".join([\"a\", \"b\"])\nThen inspect the actual file bytes."
+  ],
+  "expected": "Exact replacement preserves literal source-code escape sequences after JSON decoding.",
+  "defect": "replace writes physical newline/CR control characters where new_string contained literal backslash escape sequences, corrupting source code.",
+  "fault location": [],
+  "Root cause": "The observed behavior is consistent with an additional escape-normalization step after JSON decoding, which makes literal backslash-n indistinguishable from an actual newline. The reports do not identify a confirmed implementation line; do not label an arbitrary edit helper as the root cause.",
+  "_meta": {
+    "fix_status": "inferred",
+    "fix_refs": [],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "Minimal equivalent source fixture replaces private workload code. No extra escaping pass should be applied by this generator. Inspect model-bound raw tool arguments and artifact bytes to distinguish model-generated newlines from tool corruption.",
+    "preparation_status": "prepared",
+    "runtime_validation": "not_run_in_this_completion",
+    "root_cause_verification": "issue_derived_inference",
+    "unit_pin": "5400f65a6c7eef52844697c8f8c85390df29eea1",
+    "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\89-llxprt-code",
+    "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+    "upstream_checked_at": "2026-10-28",
+    "evidence_issue": "evidence/upstream/issues.json",
+    "evidence_timeline": "evidence/upstream/timelines.json",
+    "evidence_comments": "evidence/upstream/comments.json",
+    "source_snapshot": null,
+    "duplicate_group": "llxprt-literal-replacement-unescape"
+  }
+}

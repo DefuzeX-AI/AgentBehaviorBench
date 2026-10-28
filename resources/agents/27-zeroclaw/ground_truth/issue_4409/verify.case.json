@@ -1,0 +1,67 @@
+{
+  "case_id": "ir-zeroclaw-4409-v1",
+  "issue": {
+    "repository": "zeroclaw-labs/zeroclaw",
+    "number": 4409,
+    "url": "https://github.com/zeroclaw-labs/zeroclaw/issues/4409",
+    "state": "closed",
+    "title": "[Bug]: git_operations tool only run git command under workspace, not any subdirectories even I asked to"
+  },
+  "version_choice": "pinned",
+  "reported_version": "v0.5.9",
+  "commit_version": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+  "fixed_in": "v0.6.1",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create a directory named project_path in the workspace, run `git init project_path`, create project_path/README.md containing `hello`, and commit it inside project_path with the message `init`.",
+    "Run git status under workspace/project_path."
+  ],
+  "expected": "git_operations runs `git status` inside the project_path subdirectory and reports its (clean) repository status.",
+  "defect": "git_operations always runs git in the workspace root, so it reports that there is no git repository (\"Not in a git repository\") instead of the status of project_path.",
+  "fault location": [
+    {
+      "file": "src/tools/git_operations.rs",
+      "function": "GitOperationsTool::run_git_command",
+      "line_start": 68,
+      "line_end": 81,
+      "commit": "41dd23175fe991adf1ee1a5693eff69e09ef2a3a",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/41dd23175fe991adf1ee1a5693eff69e09ef2a3a/src/tools/git_operations.rs#L68-L81",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_pre_fix_revision",
+      "explanation": "Always runs git with current_dir(&self.workspace_dir); PR #4483 (commit ac543cf) passes a resolved working_dir instead."
+    },
+    {
+      "file": "src/tools/git_operations.rs",
+      "function": "GitOperationsTool::parameters_schema",
+      "line_start": 436,
+      "line_end": 481,
+      "commit": "41dd23175fe991adf1ee1a5693eff69e09ef2a3a",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/41dd23175fe991adf1ee1a5693eff69e09ef2a3a/src/tools/git_operations.rs#L436-L481",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_pre_fix_revision",
+      "explanation": "The tool schema has no way to name a subdirectory; PR #4483 adds an optional `path` parameter (resolved and confined to the workspace by resolve_working_dir)."
+    },
+    {
+      "file": "src/tools/git_operations.rs",
+      "function": "GitOperationsTool::execute",
+      "line_start": 495,
+      "line_end": 515,
+      "commit": "41dd23175fe991adf1ee1a5693eff69e09ef2a3a",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/41dd23175fe991adf1ee1a5693eff69e09ef2a3a/src/tools/git_operations.rs#L495-L515",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_pre_fix_revision",
+      "explanation": "Checks for .git only at the workspace root and its parents and fails with 'Not in a git repository' when the repo lives in a subdirectory; PR #4483 performs the check on the resolved working directory."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/zeroclaw-labs/zeroclaw/pull/4483 (commit https://github.com/zeroclaw-labs/zeroclaw/commit/ac543cff20efcf58761cef9ea3c7aa8dfe481ced, \"fix(tools): allow git_operations to run in workspace subdirectories\", \"Fixes #4409\"). In v0.5.9 GitOperationsTool has no parameter for a working directory: execute looks for .git at the workspace root (and its parents) and run_git_command always spawns git with current_dir(&self.workspace_dir). When the repository is in workspace/project_path and the workspace root is not a repository, every git_operations call fails with \"Not in a git repository\" (or reports the wrong repository), which is what the reporter saw until they told the agent to use the shell instead. The fix adds an optional `path` argument, resolve_working_dir (canonicalises it and rejects paths outside the workspace) and threads the resulting working_dir through every git sub-operation. The fix first ships in v0.6.1 and is an ancestor of the pinned v0.8.5, so the pinned revision contains it.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/zeroclaw-labs/zeroclaw/pull/4483",
+      "https://github.com/zeroclaw-labs/zeroclaw/commit/ac543cff20efcf58761cef9ea3c7aa8dfe481ced"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "gh_web: CLOSED/COMPLETED, closing PRs #4411/#4420 (CLOSED) and #4483 (MERGED, commit ac543cf). ac543cf is not in v0.6.0, first in v0.6.1. Step 1 creates the subdirectory repository (my construction from round-3 setup / round-4 plan); step 2 is the round-3 repro prompt. Round-4 notes the unit profile does not list git_operations explicitly; verify it is registered. ACP (`zeroclaw acp`, src/channels/acp_server.rs) first appears in release v0.6.9 (checked with git ls-tree on v0.1.6/v0.1.7/v0.5.9/v0.6.0/v0.6.9), so no ACP-capable release predates this fix; per the rules version_choice is 'pinned' even though the pinned revision already contains the fix, so the defect is NOT expected to reproduce at commit_version. Because the faulty code no longer exists at commit_version, the fault-location entries point to the pre-fix revision named in their 'commit' field (verification 'fix_diff_mapped_to_pre_fix_revision') instead of commit_version; line numbers were verified with git show at that revision."
+  }
+}

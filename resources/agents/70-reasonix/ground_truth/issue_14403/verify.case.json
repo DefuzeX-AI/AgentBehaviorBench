@@ -1,0 +1,67 @@
+{
+  "case_id": "ir-reasonix-14403-v1",
+  "issue": {
+    "repository": "esengine/DeepSeek-Reasonix",
+    "number": 14403,
+    "url": "https://github.com/esengine/DeepSeek-Reasonix/issues/14403",
+    "state": "closed",
+    "title": "[Bug]: Literal edit matches insert bare LF into CRLF files"
+  },
+  "version_choice": "commit:a708a88a75302d2ff4391cea6a041c0072ffc618",
+  "reported_version": "a708a88a75302d2ff4391cea6a041c0072ffc618",
+  "commit_version": "a708a88a75302d2ff4391cea6a041c0072ffc618",
+  "fixed_in": "merged PR #14404; merge commit e29812d38f8aebb24151f983c5e1dbade0181edd; first release: unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "In settings.ini add the setting timeout=30 on its own line right after retries=3. Do it with exactly one edit_file call whose old_string is the text retries=3 (just those 9 characters, no line break) and whose new_string is retries=3, a line break, then timeout=30. After the edit, show me the bytes of the [client] section with: od -c settings.ini | tail -n 6"
+  ],
+  "expected": "Literal edit_file/multi_edit replacements preserve the target line CRLF ending.",
+  "defect": "A literal match with a multiline LF replacement inserts bare LF into a CRLF file.",
+  "fault location": [
+    {
+      "file": "internal/tools/builtin/encoding_helpers.go",
+      "function": "matchLineEndings",
+      "line_start": 42,
+      "line_end": 50,
+      "commit": "a708a88a75302d2ff4391cea6a041c0072ffc618",
+      "url": "https://github.com/esengine/DeepSeek-Reasonix/blob/a708a88a75302d2ff4391cea6a041c0072ffc618/internal/tools/builtin/encoding_helpers.go#L42-L50",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "字面匹配跳过换行转换。"
+    },
+    {
+      "file": "internal/tools/builtin/encoding_helpers.go",
+      "function": "applyOldStringEdit",
+      "line_start": 92,
+      "line_end": 105,
+      "commit": "a708a88a75302d2ff4391cea6a041c0072ffc618",
+      "url": "https://github.com/esengine/DeepSeek-Reasonix/blob/a708a88a75302d2ff4391cea6a041c0072ffc618/internal/tools/builtin/encoding_helpers.go#L92-L105",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "replace_all 字面分支原样写入。"
+    },
+    {
+      "file": "internal/tools/builtin/encoding_helpers.go",
+      "function": "applyOldStringEdit",
+      "line_start": 144,
+      "line_end": 154,
+      "commit": "a708a88a75302d2ff4391cea6a041c0072ffc618",
+      "url": "https://github.com/esengine/DeepSeek-Reasonix/blob/a708a88a75302d2ff4391cea6a041c0072ffc618/internal/tools/builtin/encoding_helpers.go#L144-L154",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_tested_revision",
+      "explanation": "单次字面分支原样写入。"
+    }
+  ],
+  "Root cause": "已确认：matchLineEndings 在 old_string 字面匹配时直接返回原 new_string；applyOldStringEdit 的单次及 replace_all 字面分支直接替换，未按目标行换行符规范化。CRLF settings.ini 中以单行 retries=3 匹配并插入含 LF 的多行文本，会混入裸 LF。源码 SHA a708a88a75302d2ff4391cea6a041c0072ffc618 已确认；提交说明关联 Studio 2.48.0，但本次未独立验证发布标签映射，故使用 commit 固定。修复 PR #14404 已合并，merge SHA e29812d38f8aebb24151f983c5e1dbade0181edd；首次发布版本 unknown。复现前须提供含 [client]、retries=3、backoff=2 的 CRLF settings.ini。验证时需要检查工具输入和编辑后的原始文件字节，不能仅凭文件名或成功提示认定复现。 核对版 pinned_contains_fix 按本文件 commit_version 理解为 false（该测试提交仍含缺陷）；原始 case 的 true 不应解释为历史测试提交已修复。",
+  "_meta": {
+    "fix_status": "source_confirmed",
+    "fix_refs": [],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "source_case": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\70-reasonix\\ground_truth\\issue-14403\\case.verified.json",
+    "source_case_id": "srp-reasonix-h1-crlf-literal-edit-v1",
+    "preparation_status": "prepared_from_recorded_case",
+    "runtime_validation": "not_run_in_this_completion",
+    "notes": "Reused the existing ABB source-confirmed case. Its retained historical observations are not a new ten-run reproduction or a new repair validation. Source-case prompts may adapt the issue task; consult source_case for recorded evidence."
+  }
+}

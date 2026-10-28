@@ -1,0 +1,45 @@
+{
+  "case_id": "ir-reasonix-9405-v1",
+  "issue": {
+    "repository": "esengine/DeepSeek-Reasonix",
+    "number": 9405,
+    "url": "https://github.com/esengine/DeepSeek-Reasonix/issues/9405",
+    "state": "closed",
+    "title": "[Bug]: shell contract blocks pure verification commands / 纯验证命令被误拦"
+  },
+  "version_choice": "historical:v1.38.3",
+  "reported_version": "unknown",
+  "commit_version": "fa018e4109268c912063c8cc619302fccdb57d74",
+  "fixed_in": "1.x v1.38.8",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Create a local Git repository with calc.py containing value = 1, configure user.name Fixture and user.email fixture@example.com, and commit it.",
+    "Read calc.py, use edit_file to change value = 1 to value = 2, commit this change, then run git diff --check as a separate bash call. Show the actual verification result."
+  ],
+  "expected": "A pure verification command is allowed after an edit or commit.",
+  "defect": "The shell contract refuses git diff --check as mixed mutation/verification even though the current call has no mutation.",
+  "fault location": [],
+  "Root cause": "The issue hypothesizes that the shell-contract classifier carries or conservatively infers mutation when evaluating a later verification call. #10223 removes the old evidence-gate machinery in 1.x. The precise branch responsible for this reported session remains inferred until trace validation.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/esengine/DeepSeek-Reasonix/commit/8d2259ee82ed170bb1e094dfa717d5e3bf600905"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "The selected pure verification command is verbatim from the issue and does not require Go. Keep edit, commit and verification in the same user turn; later user turns may reset relevant ledger state.",
+    "preparation_status": "prepared",
+    "runtime_validation": "not_run_in_this_completion",
+    "root_cause_verification": "issue_derived_inference",
+    "unit_pin": "2ddc6f646e71eafd415c7168fb7c800e43ee0ccf",
+    "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\70-reasonix",
+    "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+    "upstream_checked_at": "2026-10-28",
+    "evidence_issue": "evidence/upstream/issues.json",
+    "evidence_timeline": "evidence/upstream/timelines.json",
+    "evidence_comments": "evidence/upstream/comments.json",
+    "source_snapshot": "evidence/upstream/review_sources.json",
+    "duplicate_group": null,
+    "historical_acp_source_present": true
+  }
+}

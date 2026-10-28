@@ -1,0 +1,44 @@
+{
+  "case_id": "ir-reasonix-9994-v1",
+  "issue": {
+    "repository": "esengine/DeepSeek-Reasonix",
+    "number": 9994,
+    "url": "https://github.com/esengine/DeepSeek-Reasonix/issues/9994",
+    "state": "closed",
+    "title": "[Bug]: edit_file 后 read-evidence 无法清除，bash 被永久阻塞，且报错路径指向已删除的文件"
+  },
+  "version_choice": "historical:v1.38.3",
+  "reported_version": "1.38.3",
+  "commit_version": "fa018e4109268c912063c8cc619302fccdb57d74",
+  "fixed_in": "1.x v1.38.8",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "In this single turn, use write_file to create calc_metrics.py containing value = 1 and print(value) on separate lines. Read it, then use edit_file to change value = 1 to value = 2. Read the updated file in full using read_file, then use bash to execute python3 calc_metrics.py. Show the actual command result."
+  ],
+  "expected": "A successful fresh read satisfies the evidence requirement and the edited script can run.",
+  "defect": "bash remains blocked by an outstanding read-evidence requirement despite a successful full read of the updated source.",
+  "fault location": [],
+  "Root cause": "Persistent read-evidence debt is not reconciled with the observed edited file version. The exact-file read path and the global bash outstanding check can therefore disagree. #10223 replaces the debt gate with live file observations at mutation boundaries.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/esengine/DeepSeek-Reasonix/commit/8d2259ee82ed170bb1e094dfa717d5e3bf600905"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "Minimal self-contained version of the issue calc_metrics.py workflow. All operations must stay inside one user turn. An initial legitimate stale-read refusal alone is not the defect; require failed recovery after the fresh full read.",
+    "preparation_status": "prepared",
+    "runtime_validation": "not_run_in_this_completion",
+    "root_cause_verification": "issue_derived_inference",
+    "unit_pin": "2ddc6f646e71eafd415c7168fb7c800e43ee0ccf",
+    "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\70-reasonix",
+    "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+    "upstream_checked_at": "2026-10-28",
+    "evidence_issue": "evidence/upstream/issues.json",
+    "evidence_timeline": "evidence/upstream/timelines.json",
+    "evidence_comments": "evidence/upstream/comments.json",
+    "source_snapshot": "evidence/upstream/review_sources.json",
+    "duplicate_group": "reasonix-persistent-read-evidence",
+    "historical_acp_source_present": true
+  }
+}

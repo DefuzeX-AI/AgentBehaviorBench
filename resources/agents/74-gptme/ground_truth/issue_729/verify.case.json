@@ -1,0 +1,35 @@
+{
+  "case_id": "ir-gptme-729-v1",
+  "issue": {
+    "repository": "gptme/gptme",
+    "number": 729,
+    "url": "https://github.com/gptme/gptme/issues/729",
+    "state": "closed",
+    "title": "Issues with shell tool"
+  },
+  "version_choice": "pinned",
+  "reported_version": "v0.28.3",
+  "commit_version": "0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07",
+  "fixed_in": "v0.29.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create the directory ~/gptme-bob/scripts and a file ~/gptme-bob/scripts/autonomous-run.sh containing these lines:\n\n#!/bin/bash\n# journal setup\necho journal start\nmkdir -p journal\necho done",
+    "Run `cd ~/gptme-bob && grep -A 5 \"journal\" scripts/autonomous-run.sh | head -20`.",
+    "Run `grep -A 5 \"journal\" ~/gptme-bob/scripts/autonomous-run.sh | head -20`."
+  ],
+  "expected": "Both commands print the matching lines from autonomous-run.sh.",
+  "defect": "The first command fails with `bash: cd: too many arguments` and the second with `grep: ~/gptme-bob/scripts/autonomous-run.sh: No such file or directory` because the tool rewrites the commands.",
+  "fault location": [],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/gptme/gptme/pull/730 (commit 1213b3722a6db8468b33c2a826cf0433170dd9b4). After #724/#725, ShellSession._run split every pipeline with shlex at the first `|` and re-joined both halves with shlex.join() to insert `< /dev/null`. shlex.join quotes tokens such as `&&` and `~/...`, so `cd ~/gptme-bob && grep ...` became `cd ~/gptme-bob '&&' grep ...` (cd: too many arguments) and the tilde path became a quoted literal that bash does not expand (No such file or directory). PR #730 passes commands containing &&, || or ; through unchanged and joins pipeline halves with plain spaces; PR #736 further handles fd redirects. Both ship in v0.29.0; the pinned revision contains them (it now splits the raw string at the first unquoted pipe).",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/gptme/gptme/pull/730",
+      "https://github.com/gptme/gptme/pull/736",
+      "https://github.com/gptme/gptme/commit/1213b3722a6db8468b33c2a826cf0433170dd9b4"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "The pinned revision 0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07 (v0.35.1) already contains the fix, but no release that lacks the fix provides the gptme-acp entry point (gptme-acp first appears in pyproject.toml at commit 75d94dd34, 2025-12-18, first tagged in v0.31.1.dev20260227 / v0.32.0), so version_choice stays 'pinned'. Because the faulty code no longer exists at the tested revision, 'fault location' is left empty and the pre-fix location is recorded here instead: gptme/tools/shell.py ShellSession._run pipeline branch (`first_cmd = shlex.join(first_parts)`) at 1213b3722^. The reporter's file is private; step 1 creates an equivalent file at the same path (round-3 setup). The original was an allowlisted command in an autonomous run. reported_version: v0.28.3."
+  }
+}

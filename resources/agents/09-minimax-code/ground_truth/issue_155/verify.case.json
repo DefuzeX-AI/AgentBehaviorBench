@@ -1,0 +1,56 @@
+{
+  "case_id": "ir-minimax-code-155-v1",
+  "issue": {
+    "repository": "MiniMax-AI/minimax-code",
+    "number": 155,
+    "url": "https://github.com/MiniMax-AI/minimax-code/issues/155",
+    "state": "closed",
+    "title": "[Bug]: edit with replace_all corrupts literal dollar sequences in replacement text"
+  },
+  "version_choice": "historical:0.4.12",
+  "reported_version": "0.4.12",
+  "commit_version": "17b8ded9c16da54224c2a05e54185cbee4f15021",
+  "fixed_in": "v0.5.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create a file named example.txt in the current workspace whose content is exactly two lines: `before TOKEN after` and `TOKEN`, each ending with a newline.",
+    "In example.txt, replace all occurrences of TOKEN with the literal text $$ using the edit tool with replace_all."
+  ],
+  "expected": "Every TOKEN is replaced by the literal text `$$`, so example.txt becomes `before $$ after\\n$$\\n`.",
+  "defect": "The edit tool reports success but the file becomes `before $ after\\n$\\n`, because `$$` in new_string is interpreted as a JavaScript replacement pattern.",
+  "fault location": [
+    {
+      "file": "packages/agent-tools/src/shared/replace-all-edit.ts",
+      "function": "rawStringReplaceAll",
+      "line_start": 94,
+      "line_end": 99,
+      "commit": "17b8ded9c16da54224c2a05e54185cbee4f15021",
+      "url": "https://github.com/MiniMax-AI/minimax-code/blob/17b8ded9c16da54224c2a05e54185cbee4f15021/packages/agent-tools/src/shared/replace-all-edit.ts#L94-L99",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Calls haystack.replaceAll(needle, replacement) with the model's new_string as a replacement string, so `$$`, `$&`, `$'` and `$`` are expanded as special patterns; PR #165 (commit f3160cd) passes a callback `() => replacement` so the text is inserted literally."
+    },
+    {
+      "file": "packages/agent-tools/src/shared/replace-all-edit.ts",
+      "function": "buildReplaceAllEdit",
+      "line_start": 80,
+      "line_end": 80,
+      "commit": "17b8ded9c16da54224c2a05e54185cbee4f15021",
+      "url": "https://github.com/MiniMax-AI/minimax-code/blob/17b8ded9c16da54224c2a05e54185cbee4f15021/packages/agent-tools/src/shared/replace-all-edit.ts#L80-L80",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Builds the full-file replace_all edit by calling rawStringReplaceAll(rawContent, oldString, newString), feeding the unescaped new_string into the faulty replacement; this call site is unchanged by the fix but is the path the replace_all edit takes."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/MiniMax-AI/minimax-code/pull/165 (commit f3160cdb224a126576e4403d022b5d17c7558770). When the edit tool is called with replace_all: true, LocalEditTool delegates to buildReplaceAllEdit, which counts occurrences and then rewrites the whole file with rawStringReplaceAll(rawContent, oldString, newString). That helper uses String.prototype.replaceAll with new_string as a replacement string, and JavaScript expands `$$` to `$`, `$&` to the match, and `$'`/`$`` to the text after/before the match, so the written file differs from what the model asked for while the tool still reports success (and `$&` yields a false 'No changes made'). The fix passes a replacer callback `() => replacement`, which makes the replacement literal. The fix (2026-09-19) is first contained in release v0.5.0; the ABB-pinned revision a5639bcc (also package version 0.4.12) already contains it, so the case is tested at the issue's stated source commit 17b8ded9 (0.4.12), where the faulty line 96 is present.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/MiniMax-AI/minimax-code/pull/165",
+      "https://github.com/MiniMax-AI/minimax-code/commit/f3160cdb224a126576e4403d022b5d17c7558770"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "Issue page: CLOSED/COMPLETED, closing PR #165 MERGED, linked commit f3160cdb. The issue states source version 0.4.12 at commit 17b8ded9 (2026-09-18). No release tag precedes the fix (the earliest tag is v0.5.0, 2026-09-20), so version_choice uses the issue's own commit 17b8ded9, labelled by its package.json version 0.4.12, rather than a tag. git merge-base confirms f3160cdb is an ancestor of the pinned a5639bcc (pinned_contains_fix true). The 21 commits between 17b8ded9 and a5639bcc do not touch ACP files, so the unit's `acp` entry is present at 17b8ded9 (not separately verified beyond this). Steps: the issue gives a direct tool-level reproduction, not a chat message; step 2 is the round-3 repro_prompt and step 1 creates the fixture. Reproduction depends on the model actually choosing replace_all."
+  }
+}

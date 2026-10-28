@@ -1,0 +1,35 @@
+{
+  "case_id": "ir-gptme-55-v1",
+  "issue": {
+    "repository": "gptme/gptme",
+    "number": 55,
+    "url": "https://github.com/gptme/gptme/issues/55",
+    "state": "closed",
+    "title": "`bashlex.errors.ParsingError` that occurs when the `gptme` tool; an unexpected newline character (`'\\n'`). - bug"
+  },
+  "version_choice": "pinned",
+  "reported_version": "v0.11.0",
+  "commit_version": "0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07",
+  "fixed_in": "v0.11.1",
+  "pinned_contains_fix": true,
+  "steps": [
+    "what does a red D mean in the htop command in status colum",
+    "how do we make sure that process is not dead?"
+  ],
+  "expected": "Any `ps -p <PID>` block the assistant proposes either runs (bash reports a normal syntax error) or is reported as a tool error; gptme keeps running.",
+  "defect": "Executing the suggested `ps -p <PID>` block raises `bashlex.errors.ParsingError: unexpected token '\\n'` in gptme's shell parser and the traceback kills the app.",
+  "fault location": [],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/gptme/gptme/commit/becab4d69a85f2c769f610f6200de44c7fabdcaf. The assistant answered with a placeholder command `ps -p <PID>`; when gptme executed the block, the shell tool's split_commands() parsed the script with bashlex, which treats `<PID>` as an input redirection followed by a word and fails with ParsingError at the newline. execute_msg did not catch tool exceptions, so the ParsingError propagated up the CLI loop and terminated gptme. Commit becab4d (linked from the issue page) catches exceptions from tools and returns them to the conversation as a system message; split_commands now converts bashlex errors into a 'Shell syntax error' ValueError that is reported to the model. The fix first ships in v0.11.1 and the pinned revision contains it.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/gptme/gptme/commit/becab4d69a85f2c769f610f6200de44c7fabdcaf"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [
+      "what does a red D mean in the htop command in status colum",
+      "how do we make sure that process is not dead?"
+    ],
+    "notes": "The pinned revision 0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07 (v0.35.1) already contains the fix, but no release that lacks the fix provides the gptme-acp entry point (gptme-acp first appears in pyproject.toml at commit 75d94dd34, 2025-12-18, first tagged in v0.31.1.dev20260227 / v0.32.0), so version_choice stays 'pinned'. Because the faulty code no longer exists at the tested revision, 'fault location' is left empty and the pre-fix location is recorded here instead: gptme/tools/__init__.py execute_msg at becab4d^ (uncaught tool exception) with the bashlex call in gptme/tools/shell.py split_commands. The issue page also links 24751b07a ('add button to delete conversations (#55)'), a PR number from another repo, unrelated. Steps are the reporter's two verbatim messages; the defect only triggers if the model emits a runnable `ps -p <PID>` block (model-dependent). reported_version: v0.11.0 was the latest tag on 2023-12-10."
+  }
+}

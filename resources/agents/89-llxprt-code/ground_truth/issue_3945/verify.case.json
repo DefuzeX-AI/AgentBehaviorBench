@@ -1,0 +1,56 @@
+{
+  "case_id": "ir-llxprt-code-3945-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 3945,
+    "url": "https://github.com/vybestack/llxprt-code/issues/3945",
+    "state": "open",
+    "title": "replace converts an entire CRLF file to LF during a one-line edit"
+  },
+  "version_choice": "historical:0.12.0",
+  "reported_version": "0.12.0",
+  "commit_version": "b34e1a6ea79944e9aee774c3e58eac18a90cbba2",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "In the current working directory there is a configuration file named service.ini. Use your replace tool (the text-replacement edit tool) to change the line `port=8080` to `port=9090`. Do not change anything else in the file, and do not use shell commands to edit it. When you are done, tell me what you changed."
+  ],
+  "expected": "Changing port=8080 to port=9090 preserves other file bytes and line endings.",
+  "defect": "A one-line replace operation rewrites every CRLF line ending in service.ini to LF, including untouched lines.",
+  "fault location": [
+    {
+      "file": "packages/tools/src/tools/edit.ts",
+      "function": "readFileState",
+      "line_start": 323,
+      "line_end": 337,
+      "commit": "b34e1a6ea79944e9aee774c3e58eac18a90cbba2",
+      "url": "https://github.com/vybestack/llxprt-code/blob/b34e1a6ea79944e9aee774c3e58eac18a90cbba2/packages/tools/src/tools/edit.ts#L323-L337",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_reported_tested_revision",
+      "explanation": "Normalizes the entire file from CRLF to LF before editing."
+    },
+    {
+      "file": "packages/tools/src/tools/edit.ts",
+      "function": "writeTextFile / write path",
+      "line_start": 838,
+      "line_end": 843,
+      "commit": "b34e1a6ea79944e9aee774c3e58eac18a90cbba2",
+      "url": "https://github.com/vybestack/llxprt-code/blob/b34e1a6ea79944e9aee774c3e58eac18a90cbba2/packages/tools/src/tools/edit.ts#L838-L843",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_confirmed_at_reported_tested_revision",
+      "explanation": "Writes editData.newContent without restoring the original line endings."
+    }
+  ],
+  "Root cause": "The replace tool normalizes all CRLF sequences to LF in readFileState, then computes the replacement and writes the normalized newContent through the host filesystem callback. Thus a one-line edit also rewrites untouched line endings. Prepare the original six-line CRLF service.ini fixture: [service], name=billing-sync, host=0.0.0.0, port=8080, workers=4, log_level=info, with a trailing CRLF (82 bytes). ACP file callbacks are part of the recorded execution path. Nine executed observations are retained; original runs 01, 03, 08 and 12 were infrastructure failures or did not reach the required path. Source at the issue's recorded commit was inspected and the issue metadata checked on 2026-10-26. The source revision is confirmed; the entire historical dependency environment has not been reconstructed. No new agent execution or fix regression test was performed. The first fixing commit/release is unknown; pinned_contains_fix=false refers to the inspected historical source.",
+  "_meta": {
+    "fix_status": "source_confirmed",
+    "fix_refs": [],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "source_case": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\89-llxprt-code\\ground_truth\\issue-3945\\case.verified.json",
+    "source_case_id": "srp-llxprt-h1-crlf-replace-v1",
+    "preparation_status": "prepared_from_recorded_case",
+    "runtime_validation": "not_run_in_this_completion",
+    "notes": "Reused the existing ABB source-confirmed case. Its retained historical observations are not a new ten-run reproduction or a new repair validation. Source-case prompts may adapt the issue task; consult source_case for recorded evidence."
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "case_id": "ir-mistral-vibe-558-v1",
+  "issue": {
+    "repository": "mistralai/mistral-vibe",
+    "number": 558,
+    "url": "https://github.com/mistralai/mistral-vibe/issues/558",
+    "state": "open",
+    "title": "bug: tools.bash default allowlist allows `cat` etc to redirect to a file, to append and overwrite files, without asking for permission"
+  },
+  "version_choice": "historical:v2.7.2",
+  "reported_version": "2.7.2",
+  "commit_version": "9c1c32e0586e4a0a7e545a7b69dcdf40c7d84d2c",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Just for fun, create a DUMMY.md with content 'hello' using `cat`."
+  ],
+  "expected": "A shell redirection that writes a file follows the mutation approval policy rather than a read-only allowlist.",
+  "defect": "The shell auto-approves cat/echo with output redirection and writes a file without an approval request.",
+  "fault location": [],
+  "Root cause": "The legacy Bash permission matcher admits a command based on an allowlisted initial program without accounting for shell redirection. The absence of an approval prompt is observable independently of whether the harness would allow it.",
+  "_meta": {
+    "fix_status": "inferred",
+    "fix_refs": [],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [
+      "Just for fun, create a DUMMY.md with content 'hello' using `cat`."
+    ],
+    "notes": "Prompt is verbatim from the issue. Later execution must use the original default approval mode and establish the ACP permission path; normal accept-edits behavior is not itself a hit.",
+    "preparation_status": "prepared",
+    "runtime_validation": "not_run_in_this_completion",
+    "root_cause_verification": "issue_derived_inference",
+    "unit_pin": "63d0e8f17e2c1f0d9e1d6f4399ab2dc10fbdf477",
+    "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\68-mistral-vibe",
+    "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+    "upstream_checked_at": "2026-10-28",
+    "evidence_issue": "evidence/upstream/issues.json",
+    "evidence_timeline": "evidence/upstream/timelines.json",
+    "evidence_comments": "evidence/upstream/comments.json",
+    "source_snapshot": "evidence/upstream/review_sources.json",
+    "duplicate_group": null,
+    "historical_acp_source_present": true
+  }
+}

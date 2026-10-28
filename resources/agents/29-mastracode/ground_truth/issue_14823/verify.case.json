@@ -1,0 +1,44 @@
+{
+  "case_id": "ir-mastracode-14823-v1",
+  "issue": {
+    "repository": "mastra-ai/mastra",
+    "number": 14823,
+    "url": "https://github.com/mastra-ai/mastra/issues/14823",
+    "state": "closed",
+    "title": "mastra_workspace_list_files: pattern \"*\" silently filters out all files at depth > 0"
+  },
+  "version_choice": "pinned",
+  "reported_version": "@mastra/core 1.3.15",
+  "commit_version": "429d7b9f935a62a6fa1d71a6fadb5f633d75bbaf",
+  "fixed_in": "not-fixed",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Create two files using your tools: dir-a/file1.txt containing `one` and dir-b/file2.txt containing `two`.",
+    "Call your list files tool (find_files) with { path: \".\", maxDepth: 3, pattern: \"*\" } and report the files found."
+  ],
+  "expected": "Listing with pattern \"*\" and maxDepth 3 returns the files in subdirectories (dir-a/file1.txt, dir-b/file2.txt), or at least does not silently report that no files exist.",
+  "defect": "The tool lists only the directories and reports `2 directories, 0 files`, silently dropping every file below the top level.",
+  "fault location": [
+    {
+      "file": "packages/core/src/workspace/tools/tree-formatter.ts",
+      "function": "formatAsTree (inner buildTree)",
+      "line_start": 311,
+      "line_end": 317,
+      "commit": "429d7b9f935a62a6fa1d71a6fadb5f633d75bbaf",
+      "url": "https://github.com/mastra-ai/mastra/blob/429d7b9f935a62a6fa1d71a6fadb5f633d75bbaf/packages/core/src/workspace/tools/tree-formatter.ts#L311-L317",
+      "role": "static_analysis",
+      "verification": "source_inferred_at_tested_revision",
+      "explanation": "The glob filter matches each file's path relative to the listing root (e.g. `dir-a/file1.txt`) against the pattern, and `*` does not cross `/`, so every file at depth > 0 is rejected while directories pass through unconditionally; nothing warns that the pattern removed all files."
+    }
+  ],
+  "Root cause": "INFERRED FROM SOURCE (no upstream fix found). The closing PR #14897 (commit aa0aeffa, first in mastracode@0.10.2 / @mastra/core@1.20.0) only rewrote the list_files tool description to tell the model not to pass pattern \"*\"; it did not change the filtering, so the behaviour is still present at the pinned revision. In packages/core/src/workspace/tools/tree-formatter.ts, formatAsTree compiles the pattern into a glob matcher and its inner buildTree filters entries at every depth by matching getRelativePath(path, currentPath, name), i.e. `subdir/file.txt`, against it. Standard glob `*` does not match `/`, so all files below the root are discarded, directories are kept by the explicit `if (e.type === 'directory') return true`, and the summary becomes `N directories, 0 files` with no hint that the pattern caused it. Minimal fix: when the pattern contains no `/` (e.g. `*`, `*.ts`), match it against the entry's basename instead of the full relative path (matching `find -name` semantics), or treat a bare `*` like an omitted pattern; alternatively append a note when the pattern filtered out every file.",
+  "_meta": {
+    "fix_status": "inferred",
+    "fix_refs": [
+      "https://github.com/mastra-ai/mastra/pull/14897"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "Issue page: CLOSED/COMPLETED; closing PRs #14830 (CLOSED, not merged) and #14897 (MERGED, linked commit 2c565b1e; landed as aa0aeffa on the release line). #14897 is description-only (packages/core/src/workspace/tools/list-files.ts) and is already in the pinned revision (list-files.ts lines 24 and 49 carry the new text), but the filter code is unchanged, so fixed_in is recorded as not-fixed for the behaviour and version_choice is pinned (mastracode@0.41.0). The issue was reported on @mastra/core 1.3.15. Steps: step 1 creates the fixture from the round-3 setup; step 2 is the round-3 repro_prompt with the tool name adapted to mastracode's find_files. Speculation: at pinned, the new description may make the model refuse or drop pattern \"*\"; the step asks for it explicitly. The mastracode ACP server (--acp, PR #18231, 2026-06-23) first ships in mastracode@0.25.0; mastracode maps core workspace tools to its own names (mastracode/sdk/src/tool-names.ts: read_file->view, list_files->find_files, grep->search_content, execute_command unchanged)."
+  }
+}

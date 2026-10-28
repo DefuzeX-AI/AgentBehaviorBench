@@ -1,0 +1,35 @@
+{
+  "case_id": "ir-gptme-1290-v1",
+  "issue": {
+    "repository": "gptme/gptme",
+    "number": 1290,
+    "url": "https://github.com/gptme/gptme/issues/1290",
+    "state": "closed",
+    "title": "bug: acp in zed: acp protocol flow error after first 'hello' message from user to agent"
+  },
+  "version_choice": "pinned",
+  "reported_version": "0.31.0 (git 2f390bdc5e60b15c44e8dca1e288686353700c11)",
+  "commit_version": "0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07",
+  "fixed_in": "v0.32.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "hello"
+  ],
+  "expected": "gptme-acp replies to the first prompt normally.",
+  "defect": "The first session/prompt fails with ACP `Internal error`; the client shows `'TextContentBlock' object has no attribute 'get'`.",
+  "fault location": [],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/gptme/gptme/pull/1291 (commit c30f86e4cf4e9ecd67053acc429382f845e6ed6a), followed by https://github.com/gptme/gptme/pull/1293 and https://github.com/gptme/gptme/pull/1300. Newer agent-client-protocol SDKs deliver prompt content as Pydantic models (TextContentBlock) instead of dicts, but gptme/acp/adapter.py acp_content_to_gptme_message called `c.get(\"type\")` on each block, raising AttributeError that the SDK turned into 'Internal error' on the very first prompt (agent.py also used dict access on RequestPermissionResponse and an invalid stop_reason 'error'). PR #1291 accepts both dicts and Pydantic objects; #1293 and #1300 fix the next failures on the same path ('No model loaded') by propagating ContextVars into the executor thread and re-setting the default model/tools in each ACP handler. All three ship in v0.32.0; the pinned revision contains them.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/gptme/gptme/pull/1291",
+      "https://github.com/gptme/gptme/pull/1293",
+      "https://github.com/gptme/gptme/pull/1300"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [
+      "hello"
+    ],
+    "notes": "The pinned revision 0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07 (v0.35.1) already contains the fix, but no release that lacks the fix provides the gptme-acp entry point (gptme-acp first appears in pyproject.toml at commit 75d94dd34, 2025-12-18, first tagged in v0.31.1.dev20260227 / v0.32.0), so version_choice stays 'pinned'. Because the faulty code no longer exists at the tested revision, 'fault location' is left empty and the pre-fix location is recorded here instead: gptme/acp/adapter.py acp_content_to_gptme_message (`if c.get(\"type\") == \"text\"`) and gptme/acp/agent.py GptmeAgent.prompt (`loop.run_in_executor(None, run_chat_step)`) at c30f86e4c^. The reporter's build 2f390bd has ACP but no release tag exists between ACP's introduction (75d94dd34, 2025-12-18) and the fix (2026-02-18); the defect also depends on the installed ACP SDK version. PR #1301 (CLOSED, unmerged) was ignored."
+  }
+}

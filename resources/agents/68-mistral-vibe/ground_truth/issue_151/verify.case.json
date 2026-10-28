@@ -1,0 +1,44 @@
+{
+  "case_id": "ir-mistral-vibe-151-v1",
+  "issue": {
+    "repository": "mistralai/mistral-vibe",
+    "number": 151,
+    "url": "https://github.com/mistralai/mistral-vibe/issues/151",
+    "state": "closed",
+    "title": "Vibe, not being able to successfully activate a Python virtual environment"
+  },
+  "version_choice": "historical:v1.1.3",
+  "reported_version": "unknown",
+  "commit_version": "661588de0ccee6338de8546749d70513b5b8f837",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Create a Python virtual environment named .venv in the current workspace and confirm that it exists.",
+    "Activate .venv and check whether it is activated.",
+    "Check again whether the virtual environment is activated, and report the actual Python interpreter and VIRTUAL_ENV value."
+  ],
+  "expected": "The agent reports shell-environment persistence accurately across separate tool calls.",
+  "defect": "The agent claims activation succeeded, then a later check finds the environment was not retained.",
+  "fault location": [],
+  "Root cause": "The issue describes process-local shell activation being reported as persistent session state. A subprocess activation does not affect a later unrelated shell process. Without its original trace the source of the incorrect claim is not established, and this case does not equate all stateless shells with an implementation defect.",
+  "_meta": {
+    "fix_status": "inferred",
+    "fix_refs": [],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "The issue supplies a natural-language sequence, not exact user text. Each step paraphrases it. No source-confirmed fault location is claimed; compare the actual activation and subsequent interpreter evidence.",
+    "preparation_status": "prepared",
+    "runtime_validation": "not_run_in_this_completion",
+    "root_cause_verification": "issue_derived_inference",
+    "unit_pin": "63d0e8f17e2c1f0d9e1d6f4399ab2dc10fbdf477",
+    "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\68-mistral-vibe",
+    "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+    "upstream_checked_at": "2026-10-28",
+    "evidence_issue": "evidence/upstream/issues.json",
+    "evidence_timeline": "evidence/upstream/timelines.json",
+    "evidence_comments": "evidence/upstream/comments.json",
+    "source_snapshot": null,
+    "duplicate_group": null,
+    "historical_acp_source_present": true
+  }
+}

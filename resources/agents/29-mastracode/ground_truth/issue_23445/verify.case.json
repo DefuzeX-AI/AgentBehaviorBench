@@ -1,0 +1,55 @@
+{
+  "case_id": "ir-mastracode-23445-v1",
+  "issue": {
+    "repository": "mastra-ai/mastra",
+    "number": 23445,
+    "url": "https://github.com/mastra-ai/mastra/issues/23445",
+    "state": "closed",
+    "title": "[BUG] applyTail reports a fractional line count, so the truncation notice disagrees with the lines returned"
+  },
+  "version_choice": "historical:mastracode@0.39.1",
+  "reported_version": "mastracode@0.39.1",
+  "commit_version": "cbd18af524e1f336fc7a7803d870b2f98b106f75",
+  "fixed_in": "mastracode@0.40.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Use execute_command to run a command that prints 10 lines (e.g. seq 10) with tail set to 2.5, and show me the returned output header."
+  ],
+  "expected": "The truncation notice states the same whole number of lines that is actually returned (or the fractional tail is rejected).",
+  "defect": "The tool returns `[showing last 2.5 of 10 lines]` followed by only 2 lines, so the notice disagrees with the body.",
+  "fault location": [
+    {
+      "file": "packages/core/src/workspace/tools/output-helpers.ts",
+      "function": "applyTail",
+      "line_start": 61,
+      "line_end": 72,
+      "commit": "cbd18af524e1f336fc7a7803d870b2f98b106f75",
+      "url": "https://github.com/mastra-ai/mastra/blob/cbd18af524e1f336fc7a7803d870b2f98b106f75/packages/core/src/workspace/tools/output-helpers.ts#L61-L72",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Uses n = Math.abs(tail ?? DEFAULT_TAIL_LINES) both for lines.slice(-n), which truncates 2.5 to 2, and verbatim in the `[showing last ${n} of ...]` notice; PR #23570 (commit 44057ea) wraps it in Math.floor so the notice and the slice agree."
+    },
+    {
+      "file": "packages/core/src/workspace/tools/execute-command.ts",
+      "function": "<module> (executeCommandInputSchema)",
+      "line_start": 23,
+      "line_end": 28,
+      "commit": "cbd18af524e1f336fc7a7803d870b2f98b106f75",
+      "url": "https://github.com/mastra-ai/mastra/blob/cbd18af524e1f336fc7a7803d870b2f98b106f75/packages/core/src/workspace/tools/execute-command.ts#L23-L28",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "The tail parameter is z.preprocess(coerceNumericString, z.number()) with no integer constraint, so a fractional 2.5 (or \"2.5\") reaches applyTail; PR #23570 changes it to z.number().int()."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/mastra-ai/mastra/pull/23570 (commit 44057eac6fd048100574bf71c6dc095f769a6d63). The execute_command (and get_process_output) input schema accepts tail as any number, and coerceNumericString also turns decimal strings into numbers, so a model-supplied tail of 2.5 reaches applyTail in packages/core/src/workspace/tools/output-helpers.ts unchanged. applyTail uses the same value n for Array.prototype.slice(-n), which truncates 2.5 toward zero and keeps 2 lines, and for the notice `[showing last ${n} of ${lines.length} lines]`, which prints 2.5, so the model is told about an impossible cut. The fix floors n in applyTail (treating |tail| < 1 as no limit) and constrains tail to integers with z.number().int() in execute-command.ts and get-process-output.ts. The fix is first released in mastracode@0.40.0 (@mastra/core@1.67.0); the pinned mastracode@0.41.0 already contains it, so the case is tested at mastracode@0.39.1, the last release before the fix and the latest release when the issue was opened, which provides the ACP entry and still has the faulty code.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/mastra-ai/mastra/pull/23570",
+      "https://github.com/mastra-ai/mastra/commit/44057eac6fd048100574bf71c6dc095f769a6d63"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "Issue page: CLOSED/COMPLETED; closing PRs #23446 (CLOSED) and #23570 (MERGED); linked commit 2efa6bab is the main commit the issue's permalinks point to, not the fix. Fix 44057eac (2026-09-10 -0700) is first contained in mastracode@0.40.0 and @mastra/core@1.67.0 and is an ancestor of pinned 429d7b9f. reported_version: not stated; mastracode@0.39.1 (2026-09-10) is the latest release at issue creation (2026-09-11). Commit_version is the commit mastracode@0.39.1 resolves to. The same schema change also applies to get-process-output.ts (not listed; same pattern). Step is the round-3 repro_prompt; relies on the model passing a fractional tail. Tested version uses an npm install of mastracode@0.39.1; assumes its bundled @mastra/core matches the tag's source. The mastracode ACP server (--acp, PR #18231, 2026-06-23) first ships in mastracode@0.25.0; mastracode maps core workspace tools to its own names (mastracode/sdk/src/tool-names.ts: read_file->view, list_files->find_files, grep->search_content, execute_command unchanged)."
+  }
+}

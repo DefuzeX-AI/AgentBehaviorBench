@@ -1,0 +1,52 @@
+{
+  "case_id": "ir-jobsmith-16-v1",
+  "issue": {
+    "repository": "kevin333353/jobsmith",
+    "number": 16,
+    "url": "https://github.com/kevin333353/jobsmith/issues/16",
+    "state": "open",
+    "title": "[Bug]: Cover letter agent has no \"don't invent candidate facts\" rule, and the AI critic's fabrication check never sees the profile"
+  },
+  "version_choice": "pinned",
+  "reported_version": "f5427c156d4d0289463f048a2beedb87c80e802b",
+  "commit_version": "f5427c156d4d0289463f048a2beedb87c80e802b",
+  "fixed_in": "not-fixed",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Generate a cover letter for a Senior Data Engineer job at Finlytics (required skills Python, SQL) for candidate Alex Chen whose profile says only 'Built and maintained ETL pipelines using Python and Airflow; optimized Redshift queries.'"
+  ],
+  "expected": "The cover letter only uses facts present in the candidate's profile and job input, without inventing metrics, names or achievements.",
+  "defect": "The generated cover letter states achievements and details the candidate never provided, e.g. 每日處理數百萬筆資料 (\"processing millions of records per day\"), a ~40% report-time reduction, or an invented Chinese name such as \"陳彥廷\".",
+  "fault location": [
+    {
+      "file": "app/agents/cover_letter.py",
+      "function": "<module> (COVER_SYSTEM)",
+      "line_start": 6,
+      "line_end": 11,
+      "commit": "f5427c156d4d0289463f048a2beedb87c80e802b",
+      "url": "https://github.com/kevin333353/jobsmith/blob/f5427c156d4d0289463f048a2beedb87c80e802b/app/agents/cover_letter.py#L6-L11",
+      "role": "static_analysis",
+      "verification": "source_inferred_at_tested_revision",
+      "explanation": "The cover-letter system prompt asks the model to highlight the candidate's experience but only forbids inventing company facts; unlike resume.py (L10) and refine.py it has no rule against fabricating candidate experience."
+    },
+    {
+      "file": "app/agents/critic.py",
+      "function": "critique_package",
+      "line_start": 32,
+      "line_end": 40,
+      "commit": "f5427c156d4d0289463f048a2beedb87c80e802b",
+      "url": "https://github.com/kevin333353/jobsmith/blob/f5427c156d4d0289463f048a2beedb87c80e802b/app/agents/critic.py#L32-L40",
+      "role": "static_analysis",
+      "verification": "source_inferred_at_tested_revision",
+      "explanation": "The critic's fabrication criterion (CRITIC_SYSTEM L15) cannot work because the request only contains the job and the generated documents, never the candidate profile to compare against."
+    }
+  ],
+  "Root cause": "INFERRED FROM SOURCE (no upstream fix found). write_cover_letter sends the job, the full candidate profile and any company brief to the model with COVER_SYSTEM, which tells it to write a Taiwanese-style cover letter that 凸顯求職者的相關經歷 (highlights the candidate's relevant experience) and only says not to invent company facts when no company brief is given. There is no instruction to stay within the provided candidate facts, whereas the resume and refine agents explicitly forbid fabricating experience, so the model embellishes the sparse profile with invented volumes, percentages, names and sources. The secondary guard does not help: critique_package lists fabrication as a criterion but builds its request from the job and the generated documents only, so the critic has no profile to compare against (and the ABB binding disables quality review anyway). Minimal fix: add a grounding rule to COVER_SYSTEM equivalent to resume.py's (嚴禁捏造求職者沒有的經歷；只能重組與強調既有內容, including no invented numbers/names), and include the candidate profile in critique_package's sections. Caveat: the first location is a prompt-level fix and the resulting behaviour remains model-dependent.",
+  "_meta": {
+    "fix_status": "inferred",
+    "fix_refs": [],
+    "abb_entry": "langgraph",
+    "user_messages_from_issue": [],
+    "notes": "gh_web: issue OPEN, no closing PRs; the only linked commit is f5427c1 itself (the tested revision). The clone's newest commit is the pinned f5427c1 (v0.1.8 plus two commits), so nothing upstream fixes it; reported_version is the commit the issue states. The step is the round-3 repro_prompt (no verbatim user message exists); round 4 suggests sending it as a JSON job/profile input, which depends on the binding's input schema. Only the cover-letter half is reproducible in ABB (critic disabled); the match score must clear the threshold for a letter to be drafted. Lines verified with git show at f5427c1."
+  }
+}

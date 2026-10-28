@@ -1,0 +1,54 @@
+{
+  "case_id": "ir-nanocoder-1057-v1",
+  "issue": {
+    "repository": "Nano-Collective/nanocoder",
+    "number": 1057,
+    "url": "https://github.com/Nano-Collective/nanocoder/issues/1057",
+    "state": "closed",
+    "title": "[Bug] Replacement strings containing $ corrupt every string_replace and diff_edit"
+  },
+  "version_choice": "pinned",
+  "reported_version": "1.30.0",
+  "commit_version": "59874391f939bdfe93c273a10d23a7a94009edd1",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Create script.sh with exactly #!/bin/sh, echo \"old\", exit 0 on three LF-separated lines, with a final newline. Read it with read_file.",
+    "Use string_replace on script.sh, replacing echo \"old\" with exactly this literal text:\necho \"pid=$$ match=$& pre=$` post=$'\"\nThen inspect the saved bytes."
+  ],
+  "expected": "The replacement text is inserted literally, preserving all four JavaScript replacement-token sequences.",
+  "defect": "The edit tool expands $$, $&, $` and $' in new_str, silently changing content and duplicating file context.",
+  "fault location": [
+    {
+      "file": "source/tools/file-ops/string-replace.tsx",
+      "function": "executeStringReplace",
+      "line_start": 91,
+      "line_end": 92,
+      "commit": "59874391f939bdfe93c273a10d23a7a94009edd1",
+      "url": "https://github.com/Nano-Collective/nanocoder/blob/59874391f939bdfe93c273a10d23a7a94009edd1/source/tools/file-ops/string-replace.tsx#L91-L92",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "string_replace calls String.replace(old_str, new_str), and diff_edit does the same per block. A string replacement parameter invokes JavaScript substitution semantics; a function replacer would preserve the supplied text literally."
+    }
+  ],
+  "Root cause": "string_replace calls String.replace(old_str, new_str), and diff_edit does the same per block. A string replacement parameter invokes JavaScript substitution semantics; a function replacer would preserve the supplied text literally.",
+  "_meta": {
+    "fix_status": "source_reviewed",
+    "fix_refs": [],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "Exact reduced fixture from the issue. The source command is never passed through a shell by this preparation script. The timeline commit ff6333bd fixes custom-command templates, not these edit-tool call sites, and must not be labeled this issue fix.",
+    "preparation_status": "prepared",
+    "runtime_validation": "not_run_in_this_completion",
+    "root_cause_verification": "source_review_only",
+    "unit_pin": "59874391f939bdfe93c273a10d23a7a94009edd1",
+    "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\33-nanocoder",
+    "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+    "upstream_checked_at": "2026-10-28",
+    "evidence_issue": "evidence/upstream/issues.json",
+    "evidence_timeline": "evidence/upstream/timelines.json",
+    "evidence_comments": "evidence/upstream/comments.json",
+    "source_snapshot": "evidence/upstream/review_sources.json",
+    "duplicate_group": null
+  }
+}

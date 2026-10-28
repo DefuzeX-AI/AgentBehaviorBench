@@ -1,0 +1,59 @@
+{
+  "case_id": "ir-deer-flow-6019-v1",
+  "issue": {
+    "repository": "bytedance/deer-flow",
+    "number": 6019,
+    "url": "https://github.com/bytedance/deer-flow/issues/6019",
+    "state": "closed",
+    "title": "ReadBeforeWriteMiddleware lacks file line count in append guidance; read_file inverted range error triggers hallucinated file-length assumptions"
+  },
+  "version_choice": "historical:v2.1.0",
+  "reported_version": "unknown",
+  "commit_version": "345f08be00c8a9495079b732a39b46aa9af1584e",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create /mnt/user-data/workspace/notes.txt with exactly 206 lines, line 1 through line 206, using the shell. Do not read it yet.",
+    "Append one line named extra to notes.txt using write_file.",
+    "Read /mnt/user-data/workspace/notes.txt with start_line=150 and end_line=50. Show the exact tool response."
+  ],
+  "expected": "Write-block guidance includes the file line count; inverted read bounds return an explicit invalid-parameter message.",
+  "defect": "Read-before-write guidance omits the line count, and the inverted range says no lines in range rather than explaining the parameter error.",
+  "fault location": [
+    {
+      "file": "backend/packages/harness/deerflow/agents/middlewares/read_before_write_middleware.py",
+      "function": "read-before-write block message",
+      "line_start": 85,
+      "line_end": 90,
+      "commit": "345f08be00c8a9495079b732a39b46aa9af1584e",
+      "url": "https://github.com/bytedance/deer-flow/blob/345f08be00c8a9495079b732a39b46aa9af1584e/backend/packages/harness/deerflow/agents/middlewares/read_before_write_middleware.py#L85-L90",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "The middleware computes current content for its hash but omits the line count from its error, while read_file_contract describes inverted bounds as an empty range. #6020 adds the count and actionable validation."
+    }
+  ],
+  "Root cause": "The middleware computes current content for its hash but omits the line count from its error, while read_file_contract describes inverted bounds as an empty range. #6020 adds the count and actionable validation.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/bytedance/deer-flow/commit/67db3d883c38264e2a188d9aaad44f7a7b55015d"
+    ],
+    "abb_entry": "langgraph",
+    "user_messages_from_issue": [],
+    "notes": "The case explicitly probes the invalid range used in the issue; a parameter error alone is expected, but the misleading message is the reported defect. Do not count model speculation as code evidence.",
+    "preparation_status": "prepared",
+    "runtime_validation": "not_run_in_this_completion",
+    "root_cause_verification": "source_review_only",
+    "unit_pin": "a1eb3971412ee269f1f89bfb5cc9e158b682f86e",
+    "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\01-deer-flow",
+    "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+    "upstream_checked_at": "2026-10-28",
+    "evidence_issue": "evidence/upstream/issues.json",
+    "evidence_timeline": "evidence/upstream/timelines.json",
+    "evidence_comments": "evidence/upstream/comments.json",
+    "source_snapshot": "evidence/upstream/review_sources.json",
+    "duplicate_group": null,
+    "historical_acp_source_present": true,
+    "historical_entry_check": "native embedded LangGraph client; ACP not required"
+  }
+}

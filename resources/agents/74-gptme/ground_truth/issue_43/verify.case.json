@@ -1,0 +1,34 @@
+{
+  "case_id": "ir-gptme-43-v1",
+  "issue": {
+    "repository": "gptme/gptme",
+    "number": 43,
+    "url": "https://github.com/gptme/gptme/issues/43",
+    "state": "closed",
+    "title": "`'?$'`, which is not a valid integer literal, hence the `ValueError`., kills the app"
+  },
+  "version_choice": "pinned",
+  "reported_version": "v0.10.5",
+  "commit_version": "0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07",
+  "fixed_in": "v0.11.1",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Find the installed gptme package's tools/shell.py file (for example with `python -c \"import gptme.tools.shell as s; print(s.__file__)\"`).",
+    "Run the shell command `head -n 1000 <that path>` to show its contents."
+  ],
+  "expected": "The file's first 1000 lines are shown as normal shell output and the session continues.",
+  "defect": "Printing shell.py's own source (which contains the `echo ReturnCode:$?` marker text) makes the return-code parser raise `ValueError: invalid literal for int() ... '$?'`, which kills the app.",
+  "fault location": [],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/gptme/gptme/commit/becab4d69a85f2c769f610f6200de44c7fabdcaf. The 2023 shell tool detected the end of a command by scanning stdout for a line containing `ReturnCode:<n> <delimiter>` and converting the token after `ReturnCode:` with int(). When the command's own output is gptme's shell.py source, the literal text `echo ReturnCode:$? ...` matches first, int('$?') raises ValueError, and because execute_msg did not catch tool exceptions the exception propagated through the chat loop and terminated gptme. Commit becab4d ('fix: catch exceptions from tools and propagate as messages', linked from the issue page) wraps execute_codeblock in try/except and yields a system message instead of crashing; the return-code parsing was later rewritten to match only `ReturnCode:(\\d+)` together with the delimiter (PR #335) and the current code strips a per-session marker. The crash fix first ships in v0.11.1; the pinned revision contains both changes.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/gptme/gptme/commit/becab4d69a85f2c769f610f6200de44c7fabdcaf"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [
+      "head -n 1000 gptme/gptme/tools/shell.py"
+    ],
+    "notes": "The pinned revision 0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07 (v0.35.1) already contains the fix, but no release that lacks the fix provides the gptme-acp entry point (gptme-acp first appears in pyproject.toml at commit 75d94dd34, 2025-12-18, first tagged in v0.31.1.dev20260227 / v0.32.0), so version_choice stays 'pinned'. Because the faulty code no longer exists at the tested revision, 'fault location' is left empty and the pre-fix location is recorded here instead: gptme/tools/__init__.py execute_msg (no try/except around execute_codeblock) and ShellSession._run's ReturnCode parsing in gptme/tools/shell.py at becab4d^. The issue page also links 5d60cd9a9 ('retry getting session id (#43)'), which refers to a PR #43 in another repo and is unrelated. The steps use the installed package path instead of the reporter's private checkout gptme/gptme/tools/shell.py (round-4 plan). The pinned shell tool uses a different marker scheme, so the ValueError is not expected at the tested revision."
+  }
+}

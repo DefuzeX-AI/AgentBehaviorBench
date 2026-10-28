@@ -1,0 +1,67 @@
+{
+  "case_id": "ir-multi-agent-cad-11-v1",
+  "issue": {
+    "repository": "Pan-Chera/Multi-Agent-CAD",
+    "number": 11,
+    "url": "https://github.com/Pan-Chera/Multi-Agent-CAD/issues/11",
+    "state": "closed",
+    "title": "Aider runs with `InputOutput(yes=True)` on the raw user request: URLs in the prompt are auto-scraped, and aider auto-installs `aider-chat[playwright]`, which upgrades aider and downgrades numpy to 1.26.4"
+  },
+  "version_choice": "pinned",
+  "reported_version": "8bf91d83a95f52626d0aa963c6575c79b653ab06",
+  "commit_version": "f31a2f65aa1b1e16fa6c45f1d642142fb696db28",
+  "fixed_in": "unreleased:7e4cf4b71d96",
+  "pinned_contains_fix": false,
+  "steps": [
+    "L-bracket, base 50x30x5 mm, arm 30x30x5 mm, 5 mm inside fillet. Reference drawing: https://example.com/bracket.txt"
+  ],
+  "expected": "The URL is treated as plain request text; Aider does not fetch it or install any packages during the run.",
+  "defect": "Aider auto-confirms \"Add URL to the chat?\", scrapes the URL into the code-generation prompt (`Here is the content of <url>:`) and auto-installs `aider-chat[playwright]`, upgrading aider and downgrading numpy to 1.26.4.",
+  "fault location": [
+    {
+      "file": "multi_agent_cad/nodes.py",
+      "function": "_fill_unsupported_with_aider",
+      "line_start": 2459,
+      "line_end": 2470,
+      "commit": "f31a2f65aa1b1e16fa6c45f1d642142fb696db28",
+      "url": "https://github.com/Pan-Chera/Multi-Agent-CAD/blob/f31a2f65aa1b1e16fa6c45f1d642142fb696db28/multi_agent_cad/nodes.py#L2459-L2470",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "The hybrid coder builds InputOutput(yes=True) and Coder.create(...) without detect_urls=False, so URLs in the prompt are auto-scraped; commit 7e4cf4b adds detect_urls=False."
+    },
+    {
+      "file": "multi_agent_cad/nodes.py",
+      "function": "generate_initial_solution",
+      "line_start": 5913,
+      "line_end": 5923,
+      "commit": "f31a2f65aa1b1e16fa6c45f1d642142fb696db28",
+      "url": "https://github.com/Pan-Chera/Multi-Agent-CAD/blob/f31a2f65aa1b1e16fa6c45f1d642142fb696db28/multi_agent_cad/nodes.py#L5913-L5923",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "The initial-generation Aider coder is created the same way (yes=True, URL detection on); 7e4cf4b adds detect_urls=False."
+    },
+    {
+      "file": "multi_agent_cad/nodes.py",
+      "function": "_run_repair_on_script",
+      "line_start": 6102,
+      "line_end": 6112,
+      "commit": "f31a2f65aa1b1e16fa6c45f1d642142fb696db28",
+      "url": "https://github.com/Pan-Chera/Multi-Agent-CAD/blob/f31a2f65aa1b1e16fa6c45f1d642142fb696db28/multi_agent_cad/nodes.py#L6102-L6112",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "The repair-stage Aider coder is created the same way; 7e4cf4b adds detect_urls=False."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/Pan-Chera/Multi-Agent-CAD/commit/7e4cf4b71d96188cfbaa9076ed8b8554e484763b. The three Aider stages (hybrid coder, initial generation, repair) create `InputOutput(yes=True, ...)` and `Coder.create(...)` with Aider's default URL detection enabled and pass prompts that contain the user's request verbatim. In aider 0.82.3, Coder.preproc_user_input -> check_for_urls asks `confirm_ask(\"Add URL to the chat?\")`, which yes=True auto-accepts, so each URL is fetched via /web and inserted as `Here is the content of <url>:`; the first fetch also calls install_playwright, whose `Install playwright?` prompt is likewise auto-accepted and runs `pip install --upgrade \"aider-chat[playwright]\"`, upgrading aider and pulling numpy 1.26.4. Commit 7e4cf4b (\"fix: disable automatic URL scraping in Aider stages\", 2026-10-17, which says it addresses #11) passes `detect_urls=False` to all three Coder.create calls and adds regression tests. The fix is unreleased (no tag contains it) and is not in the pinned revision f31a2f6. Under ABB egress the fetch and pip are denied, so the model-request text and denied traffic are the evidence; the Aider stages are only reached if the deterministic coder does not halt first (#10).",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/Pan-Chera/Multi-Agent-CAD/commit/7e4cf4b71d96188cfbaa9076ed8b8554e484763b"
+    ],
+    "abb_entry": "langgraph",
+    "user_messages_from_issue": [
+      "L-bracket, base 50x30x5 mm, arm 30x30x5 mm, 5 mm inside fillet. Reference drawing: https://example.com/bracket.txt"
+    ],
+    "notes": "gh_web: issue CLOSED/COMPLETED, no closing PR; linked commits 7e4cf4b (the fix) and 8bf91d8 (reported revision). tag --contains 7e4cf4b is empty, so fixed_in is unreleased. The pinned f31a2f6 is the revision of the recorded run (the issue cites nodes.py:2459/5913/6102 there) and does not contain the fix; version_choice pinned. The fix diff hunks (at 2927/6822/7020 in the newer file) map to Coder.create calls at L2465, L5918, L6107 at f31a2f6; locations include the preceding InputOutput(yes=True) construction. Round 4: Aider stages may be unreachable while #10's OCP ImportError halts the coder; pinning build123d<0.13 in the image makes reproduction reliable. Line numbers verified with git show at f31a2f6."
+  }
+}

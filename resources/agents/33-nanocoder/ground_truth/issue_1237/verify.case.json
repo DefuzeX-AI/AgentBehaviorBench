@@ -1,0 +1,55 @@
+{
+  "case_id": "ir-nanocoder-1237-v1",
+  "issue": {
+    "repository": "Nano-Collective/nanocoder",
+    "number": 1237,
+    "url": "https://github.com/Nano-Collective/nanocoder/issues/1237",
+    "state": "closed",
+    "title": "[Bug] list_directory leaks all hidden files/dotfiles by default due to !dirPath.startsWith('.')"
+  },
+  "version_choice": "pinned",
+  "reported_version": "1.30.0",
+  "commit_version": "59874391f939bdfe93c273a10d23a7a94009edd1",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Create .env containing DUMMY_ONLY=1, a .config directory containing local.txt with placeholder text, and visible.txt. Use list_directory with its default arguments {} and show the raw listing."
+  ],
+  "expected": "With hidden files disabled by default, the directory listing omits dotfiles and hidden directories.",
+  "defect": "The default path . bypasses the hidden-file filter and exposes .env and .config entries.",
+  "fault location": [
+    {
+      "file": "source/tools/list-directory.tsx",
+      "function": "executeListDirectory.walkDirectory",
+      "line_start": 70,
+      "line_end": 75,
+      "commit": "59874391f939bdfe93c273a10d23a7a94009edd1",
+      "url": "https://github.com/Nano-Collective/nanocoder/blob/59874391f939bdfe93c273a10d23a7a94009edd1/source/tools/list-directory.tsx#L70-L75",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "The filter requires both item.name.startsWith(\".\") and !dirPath.startsWith(\".\"). For the default dirPath=\".\", the second condition is always false, disabling the filter. c94658d1 fixes the condition."
+    }
+  ],
+  "Root cause": "The filter requires both item.name.startsWith(\".\") and !dirPath.startsWith(\".\"). For the default dirPath=\".\", the second condition is always false, disabling the filter. c94658d1 fixes the condition.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/Nano-Collective/nanocoder/commit/c94658d18ad4c0ba6c1b71d6f8ab98d8a2536b7a"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "Only dummy hidden files are created. Require the default showHiddenFiles setting, rather than an explicit request to include hidden entries.",
+    "preparation_status": "prepared",
+    "runtime_validation": "not_run_in_this_completion",
+    "root_cause_verification": "source_review_only",
+    "unit_pin": "59874391f939bdfe93c273a10d23a7a94009edd1",
+    "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\33-nanocoder",
+    "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+    "upstream_checked_at": "2026-10-28",
+    "evidence_issue": "evidence/upstream/issues.json",
+    "evidence_timeline": "evidence/upstream/timelines.json",
+    "evidence_comments": "evidence/upstream/comments.json",
+    "source_snapshot": "evidence/upstream/review_sources.json",
+    "duplicate_group": null
+  }
+}

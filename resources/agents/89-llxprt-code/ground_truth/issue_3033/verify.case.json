@@ -1,0 +1,67 @@
+{
+  "case_id": "ir-llxprt-code-3033-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 3033,
+    "url": "https://github.com/vybestack/llxprt-code/issues/3033",
+    "state": "closed",
+    "title": "apply_patch AX: delete patches silently truncate, success message is not evidence, and path/format errors misdescribe the rule"
+  },
+  "version_choice": "historical:v0.10.0",
+  "reported_version": "v0.10.0",
+  "commit_version": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+  "fixed_in": "v0.11.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create src/deprecated.ts containing exactly these three lines:\nexport function oldHelper(): string {\n  return 'this file exists only to be deleted by a patch';\n}",
+    "Use apply_patch on src/deprecated.ts with the following patch, then check whether the file still exists:\n--- a/deprecated.ts\n+++ /dev/null\n@@ -1,3 +0,0 @@\n-export function oldHelper(): string {\n-  return 'this file exists only to be deleted by a patch';\n-}"
+  ],
+  "expected": "The delete patch removes src/deprecated.ts (or the tool reports that deletion is unsupported), and the success message reflects what actually happened.",
+  "defect": "apply_patch reports \"Successfully applied patch to file: .../src/deprecated.ts.\" but the file still exists, truncated to 0 bytes.",
+  "fault location": [
+    {
+      "file": "packages/tools/src/tools/apply-patch.ts",
+      "function": "ApplyPatchToolInvocation.validatePatchTarget",
+      "line_start": 476,
+      "line_end": 489,
+      "commit": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+      "url": "https://github.com/vybestack/llxprt-code/blob/2d228fb17e7881b0f717b00a4eaaf34ba696937e/packages/tools/src/tools/apply-patch.ts#L476-L489",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Explicitly accepts `+++ /dev/null` delete patches (isDeleteToNull), advertising deletion support; PR #3060 keeps the acceptance but carries the delete classification through to execution."
+    },
+    {
+      "file": "packages/tools/src/tools/apply-patch.ts",
+      "function": "ApplyPatchToolInvocation.execute",
+      "line_start": 322,
+      "line_end": 337,
+      "commit": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+      "url": "https://github.com/vybestack/llxprt-code/blob/2d228fb17e7881b0f717b00a4eaaf34ba696937e/packages/tools/src/tools/apply-patch.ts#L322-L337",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Computes classifyPatchOperations() but only forwards it for LSP diagnostics; the applied (empty) content is always written back; PR #3060 branches on the delete operation."
+    },
+    {
+      "file": "packages/tools/src/tools/apply-patch.ts",
+      "function": "ApplyPatchToolInvocation.writeAndFormatResult",
+      "line_start": 532,
+      "line_end": 580,
+      "commit": "2d228fb17e7881b0f717b00a4eaaf34ba696937e",
+      "url": "https://github.com/vybestack/llxprt-code/blob/2d228fb17e7881b0f717b00a4eaaf34ba696937e/packages/tools/src/tools/apply-patch.ts#L532-L580",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Unconditionally calls writeTextFile(filePath, newContent) (no unlink anywhere) and then reports 'Successfully applied patch'; PR #3060 deletes the file for delete patches and makes the success message describe the verified outcome."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/3060. In v0.10.0, apply_patch validates the patch header, and validatePatchTarget deliberately accepts delete-style patches whose new header is /dev/null. execute then applies the hunk with Diff.applyPatch, which for a full-file removal yields an empty string, and writeAndFormatResult always writes that content back with writeTextFile and returns 'Successfully applied patch to file'. classifyPatchOperations does recognise the delete, but its result is only passed to the LSP diagnostics helper, and the file has no unlink path, so the file remains as a 0-byte file under a success message. Commit 98e6e0e (PR #3060, 'Make apply_patch feedback truthful: deletes delete, success is evidence, errors name the cause') adds a delete branch that removes the file, verifies the result before reporting success, and also fixes the doubled 'Failed to apply patch:' prefix (line 435 plus the catch at 441-444) and the ENOENT-as-context-mismatch message. The fix first ships in v0.11.0, the pinned version, so the case is tested at v0.10.0.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/vybestack/llxprt-code/pull/3060",
+      "https://github.com/vybestack/llxprt-code/commit/98e6e0ed3f91156e7ee912f2303cc36228b7c0ff"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "Issue page: CLOSED/COMPLETED, closing PR #3060 MERGED; main commit 98e6e0e (2026-08-05), first tag v0.11.0, ancestor of pinned; eab5548 is the PR head. apply-patch.ts is identical at v0.10.0 and at the fix parent, so line numbers map directly. The issue reports several AX problems (B1 delete truncation, B2 doubled prefix, B3 ENOENT as context mismatch); the steps target B1 as in rounds 3/4. Issue created 2026-08-05, latest release v0.10.0."
+  }
+}

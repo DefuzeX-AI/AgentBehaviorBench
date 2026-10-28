@@ -1,0 +1,56 @@
+{
+  "case_id": "ir-mistral-vibe-561-v1",
+  "issue": {
+    "repository": "mistralai/mistral-vibe",
+    "number": 561,
+    "url": "https://github.com/mistralai/mistral-vibe/issues/561",
+    "state": "closed",
+    "title": "bug: Vibe doesn't know today's date"
+  },
+  "version_choice": "historical:2.10.1",
+  "reported_version": "2.7.2",
+  "commit_version": "f71bfd3b8cdddbb4369c843da9c48d5f6c637ef7",
+  "fixed_in": "2.11.0",
+  "pinned_contains_fix": false,
+  "steps": [
+    "What is today's date? Answer with the exact calendar date."
+  ],
+  "expected": "The agent should receive the actual current calendar date in its system context and answer that date without requiring the user to supply it.",
+  "defect": "The tested version omits the current date from system context. In the fresh original ABB execution the model answered 2024-06-14 although the actual test date was 2026-10-26.",
+  "fault location": [
+    {
+      "file": "vibe/core/system_prompt.py",
+      "function": "get_universal_system_prompt",
+      "line_start": 298,
+      "line_end": 384,
+      "commit": "f71bfd3b8cdddbb4369c843da9c48d5f6c637ef7",
+      "url": "https://github.com/mistralai/mistral-vibe/blob/f71bfd3b8cdddbb4369c843da9c48d5f6c637ef7/vibe/core/system_prompt.py#L298-L384",
+      "role": "missing_date_injection",
+      "verification": "causal_repair_confirmed_by_ABB_before_after",
+      "explanation": "Original model requests omit current-date context. Adding the dynamically computed date here makes it appear in actual requests and changes the answer to the actual test date."
+    },
+    {
+      "file": "vibe/core/prompts/cli.md",
+      "function": "CLI system prompt template",
+      "line_start": 1,
+      "line_end": 3,
+      "commit": "f71bfd3b8cdddbb4369c843da9c48d5f6c637ef7",
+      "url": "https://github.com/mistralai/mistral-vibe/blob/f71bfd3b8cdddbb4369c843da9c48d5f6c637ef7/vibe/core/prompts/cli.md#L1-L3",
+      "role": "missing_date_placeholder",
+      "verification": "supporting_template_omission_source_confirmed",
+      "explanation": "The template lacks a current-date placeholder. This is supporting context; the tested patch injects the date in get_universal_system_prompt without editing this template."
+    }
+  ],
+  "Root cause": "CONFIRMED BY SOURCE, ACTUAL MODEL REQUESTS AND A FRESH ABB BEFORE/AFTER COMPARISON AT v2.10.1. get_universal_system_prompt assembles instructions without injecting the current calendar date; the CLI template also lacks a date placeholder. The original outgoing system context contained no current-date line, and the model answered 2024-06-14. A minimal candidate patch adds a dynamically computed date.today().isoformat() line to the assembled instructions. On the actual test date, 2026-10-26, the patched outgoing system context included 'Today's date is 2026-10-26.' and the model answered 2026-10-26. Neither arm called a date tool, and the user prompt and model configuration were unchanged. Separate source-function controls with simulated dates 2024-02-29 and 2030-01-02 confirmed that the patch derives the date at runtime rather than hardcoding the successful answer. These results validate the missing-context fault and candidate repair. fixed_in=2.11.0 records the previously established upstream date-injection release, not a release tested in this repair experiment. pinned_contains_fix=false refers to the unmodified tested v2.10.1 commit. The earlier reported version was 2.7.2. Correct answers remain model-dependent; a model could also obtain the date through a tool without this repair.",
+  "_meta": {
+    "fix_status": "source_confirmed",
+    "fix_refs": [],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "source_case": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\68-mistral-vibe\\ground_truth\\issue-561\\case.verified.json",
+    "source_case_id": "ir-mistral-vibe-561-v1",
+    "preparation_status": "prepared_from_recorded_case",
+    "runtime_validation": "not_run_in_this_completion",
+    "notes": "Reused the existing ABB source-confirmed case. Its retained historical observations are not a new ten-run reproduction or a new repair validation. Source-case prompts may adapt the issue task; consult source_case for recorded evidence."
+  }
+}

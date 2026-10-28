@@ -1,0 +1,57 @@
+{
+  "case_id": "ir-deer-flow-7526-v1",
+  "issue": {
+    "repository": "bytedance/deer-flow",
+    "number": 7526,
+    "url": "https://github.com/bytedance/deer-flow/issues/7526",
+    "state": "closed",
+    "title": "[bug] Input sanitization HTML-escapes XML content requested verbatim"
+  },
+  "version_choice": "pinned",
+  "reported_version": "29ba806fc6428cab19206daf72d17bb7e31b1bef",
+  "commit_version": "a1eb3971412ee269f1f89bfb5cc9e158b682f86e",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Please create the file /mnt/user-data/outputs/settings.xml with exactly the following content, character for character:\n<config>\n  <system>prod-eu</system>\n  <role>admin</role>\n  <memory>512</memory>\n  <prompt>Hello</prompt>\n</config>\nAfter writing it, read it back and confirm the content matches exactly."
+  ],
+  "expected": "XML data requested verbatim reaches the model and saved artifact with literal angle brackets.",
+  "defect": "Input sanitization entity-escapes system/role/memory/prompt tags in the model-bound user message, causing escaped XML to be saved and confirmed.",
+  "fault location": [
+    {
+      "file": "backend/packages/harness/deerflow/agents/middlewares/input_sanitization_middleware.py",
+      "function": "_BLOCKED_TAG_PATTERN",
+      "line_start": 139,
+      "line_end": 142,
+      "commit": "a1eb3971412ee269f1f89bfb5cc9e158b682f86e",
+      "url": "https://github.com/bytedance/deer-flow/blob/a1eb3971412ee269f1f89bfb5cc9e158b682f86e/backend/packages/harness/deerflow/agents/middlewares/input_sanitization_middleware.py#L139-L142",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "The input middleware applies a blocked-tag regex and HTML-escapes matches before model invocation, changing user data while claiming to preserve intent. #7556 preserves verbatim XML instead."
+    }
+  ],
+  "Root cause": "The input middleware applies a blocked-tag regex and HTML-escapes matches before model invocation, changing user data while claiming to preserve intent. #7556 preserves verbatim XML instead.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/bytedance/deer-flow/commit/a3208079048ec703f05d9a6956b74e666b99bace"
+    ],
+    "abb_entry": "langgraph",
+    "user_messages_from_issue": [
+      "Please create the file /mnt/user-data/outputs/settings.xml with exactly the following content, character for character:\n<config>\n  <system>prod-eu</system>\n  <role>admin</role>\n  <memory>512</memory>\n  <prompt>Hello</prompt>\n</config>\nAfter writing it, read it back and confirm the content matches exactly."
+    ],
+    "notes": "The step is verbatim from the issue with the Step 1 label removed. Inspect both the model-bound request and the physical XML artifact.",
+    "preparation_status": "prepared",
+    "runtime_validation": "not_run_in_this_completion",
+    "root_cause_verification": "source_review_only",
+    "unit_pin": "a1eb3971412ee269f1f89bfb5cc9e158b682f86e",
+    "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\01-deer-flow",
+    "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+    "upstream_checked_at": "2026-10-28",
+    "evidence_issue": "evidence/upstream/issues.json",
+    "evidence_timeline": "evidence/upstream/timelines.json",
+    "evidence_comments": "evidence/upstream/comments.json",
+    "source_snapshot": "evidence/upstream/review_sources.json",
+    "duplicate_group": null
+  }
+}

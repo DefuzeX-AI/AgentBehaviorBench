@@ -1,0 +1,56 @@
+{
+  "case_id": "ir-easy-agent-125-v1",
+  "issue": {
+    "repository": "ConardLi/easy-agent",
+    "number": 125,
+    "url": "https://github.com/ConardLi/easy-agent/issues/125",
+    "state": "open",
+    "title": "Edit and MultiEdit replace requested curly quotes with straight quotes"
+  },
+  "version_choice": "pinned",
+  "reported_version": "aec616a97114ce9683e4fbfcff3abbc55155fe50",
+  "commit_version": "aec616a97114ce9683e4fbfcff3abbc55155fe50",
+  "fixed_in": "not-fixed",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Create a file named NOTES.md in the current directory with exactly the following content:\n\n# Release notes\n\nTagline: Fast and simple\n\nThis release fixes the login bug.",
+    "Our style guide requires typographic (curly) quotation marks in published prose. In NOTES.md, change only the tagline line so it reads exactly:\n\nTagline: “Fast” and ‘simple’\n\nUse the curly characters “ ” ‘ ’ (U+201C, U+201D, U+2018, U+2019), not straight quotes. Do not change any other line."
+  ],
+  "expected": "Edit writes new_string literally, so the tagline line becomes `Tagline: “Fast” and ‘simple’` with the curly characters U+201C/U+201D/U+2018/U+2019.",
+  "defect": "Edit normalizes new_string to straight quotes, so the line is written as `Tagline: \"Fast\" and 'simple'` (0x22/0x27 per cat -A / od -c) while the tool reports success and its preview shows the normalized text.",
+  "fault location": [
+    {
+      "file": "src/tools/editCore.ts",
+      "function": "applyEditToContent",
+      "line_start": 48,
+      "line_end": 49,
+      "commit": "aec616a97114ce9683e4fbfcff3abbc55155fe50",
+      "url": "https://github.com/ConardLi/easy-agent/blob/aec616a97114ce9683e4fbfcff3abbc55155fe50/src/tools/editCore.ts#L48-L49",
+      "role": "static_analysis",
+      "verification": "source_inferred_at_tested_revision",
+      "explanation": "normalizeQuotes is applied to new_string as well as old_string (L49), so requested curly quotes in the replacement are rewritten to straight quotes before writing."
+    },
+    {
+      "file": "src/tools/editCore.ts",
+      "function": "normalizeQuotes",
+      "line_start": 26,
+      "line_end": 28,
+      "commit": "aec616a97114ce9683e4fbfcff3abbc55155fe50",
+      "url": "https://github.com/ConardLi/easy-agent/blob/aec616a97114ce9683e4fbfcff3abbc55155fe50/src/tools/editCore.ts#L26-L28",
+      "role": "static_analysis",
+      "verification": "source_inferred_at_tested_revision",
+      "explanation": "Maps U+2018/U+2019 to ' and U+201C/U+201D to \"; intended (per the file header) only to let the model's search string match straight-quote files."
+    }
+  ],
+  "Root cause": "INFERRED FROM SOURCE (no upstream fix found). applyEditToContent, shared by Edit and MultiEdit, starts with `const oldString = normalizeQuotes(edit.old_string); const newString = normalizeQuotes(edit.new_string);`. normalizeQuotes replaces all curly single and double quotes with ASCII ' and \". The module header says the normalization exists so a model's curly quotes can still match a straight-quote file, which only justifies normalizing the search string; applying it to new_string means the curly quotes the user explicitly asked for are written as 0x22/0x27, and the tool still reports one successful replacement. Minimal fix: stop normalizing new_string (use edit.new_string as-is on line 49), optionally preserving the file's quote style only when the match itself needed normalization. Speculation: the `oldString === newString` no-op check would then compare the normalized old string with the raw new string, which is the desired semantics for this case.",
+  "_meta": {
+    "fix_status": "inferred",
+    "fix_refs": [],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [
+      "Create a file named NOTES.md in the current directory with exactly the following content:\n\n# Release notes\n\nTagline: Fast and simple\n\nThis release fixes the login bug.",
+      "Our style guide requires typographic (curly) quotation marks in published prose. In NOTES.md, change only the tagline line so it reads exactly:\n\nTagline: “Fast” and ‘simple’\n\nUse the curly characters “ ” ‘ ’ (U+201C, U+201D, U+2018, U+2019), not straight quotes. Do not change any other line."
+    ],
+    "notes": "gh_web: issue OPEN, no closing/linked PRs or commits. The clone's newest commit is the pinned aec616a (also the issue's tested revision); no later commit touches src/tools/editCore.ts. Steps are the issue's verbatim Step 1/Step 2 with the 'Step N:' labels removed. The model repaired the line in every recorded run, so evidence is the first Edit call versus the intermediate file content, not the final file. Line numbers verified with git show at aec616a."
+  }
+}

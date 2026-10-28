@@ -1,0 +1,44 @@
+{
+  "case_id": "ir-reasonix-10103-v1",
+  "issue": {
+    "repository": "esengine/DeepSeek-Reasonix",
+    "number": 10103,
+    "url": "https://github.com/esengine/DeepSeek-Reasonix/issues/10103",
+    "state": "closed",
+    "title": "[Bug]: read-evidence gate can permanently block all bash in a session (unrecoverable, and failed read-only probes make it worse)"
+  },
+  "version_choice": "historical:v1.38.3",
+  "reported_version": "1.38.3",
+  "commit_version": "fa018e4109268c912063c8cc619302fccdb57d74",
+  "fixed_in": "1.x v1.38.8",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "In this single turn, create scripts/foo.py with exactly 250 lines: 249 comment lines numbered 1 through 249 and a final print(1). Read it in full and edit the final line to print(2). Run python3 scripts/foo.py. If the tool asks for a fresh read, read all 250 lines using read_file in a completed tool round, then retry the identical command once. Also run python3 -c \"print(1)\" and report the real outputs or errors."
+  ],
+  "expected": "A complete read permits the updated script to run; a refused read-only probe does not add unresolved evidence debt.",
+  "defect": "The evidence gate remains locked after complete reads, and a harmless interpreter probe continues to be refused with stale file debt.",
+  "fault location": [],
+  "Root cause": "The evidence ledger can keep or recreate unresolved requirements after edits and refused bash calls, contradicting full-read observations. #10223 removes this persistent state machine in favor of live file observations. Timing-sensitive details require later runtime evidence.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/esengine/DeepSeek-Reasonix/commit/8d2259ee82ed170bb1e094dfa717d5e3bf600905"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "The 250-line fixture and read/edit/interpreter sequence follow the issue. Use a bounded retry rather than the original roughly 15-call loop; no new session is introduced.",
+    "preparation_status": "prepared",
+    "runtime_validation": "not_run_in_this_completion",
+    "root_cause_verification": "issue_derived_inference",
+    "unit_pin": "2ddc6f646e71eafd415c7168fb7c800e43ee0ccf",
+    "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\70-reasonix",
+    "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+    "upstream_checked_at": "2026-10-28",
+    "evidence_issue": "evidence/upstream/issues.json",
+    "evidence_timeline": "evidence/upstream/timelines.json",
+    "evidence_comments": "evidence/upstream/comments.json",
+    "source_snapshot": "evidence/upstream/review_sources.json",
+    "duplicate_group": "reasonix-persistent-read-evidence",
+    "historical_acp_source_present": true
+  }
+}

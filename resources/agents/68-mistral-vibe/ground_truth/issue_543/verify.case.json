@@ -1,0 +1,57 @@
+{
+  "case_id": "ir-mistral-vibe-543-v1",
+  "issue": {
+    "repository": "mistralai/mistral-vibe",
+    "number": 543,
+    "url": "https://github.com/mistralai/mistral-vibe/issues/543",
+    "state": "closed",
+    "title": "bug:  search_replace tool is struggling to edit files in shift-jis encoding"
+  },
+  "version_choice": "historical:v2.7.0",
+  "reported_version": "2.7.0",
+  "commit_version": "6a50d1d5219e784523e5c08baa8de69befd2f8c4",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Use Python to create legacy.txt with the Shift-JIS encoding of 日本語 old followed by a newline. Read the file.",
+    "Use search_replace to change old to new in legacy.txt while preserving its Shift-JIS encoding."
+  ],
+  "expected": "The edit tool handles the legacy encoding or returns a clear limitation without corrupting unrelated bytes.",
+  "defect": "search_replace assumes UTF-8 and fails on Shift-JIS text.",
+  "fault location": [
+    {
+      "file": "vibe/core/tools/builtins/search_replace.py",
+      "function": "SearchReplace._read_file / _write_file",
+      "line_start": 223,
+      "line_end": 240,
+      "commit": "6a50d1d5219e784523e5c08baa8de69befd2f8c4",
+      "url": "https://github.com/mistralai/mistral-vibe/blob/6a50d1d5219e784523e5c08baa8de69befd2f8c4/vibe/core/tools/builtins/search_replace.py#L223-L240",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "The original tool decodes text using a UTF-8 default instead of detecting the source encoding. Commit 0614f875 proposes encoding detection on the legacy path; it is a diverged commit and not proof the current Unified Harness contains that fix."
+    }
+  ],
+  "Root cause": "The original tool decodes text using a UTF-8 default instead of detecting the source encoding. Commit 0614f875 proposes encoding detection on the legacy path; it is a diverged commit and not proof the current Unified Harness contains that fix.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/mistralai/mistral-vibe/commit/0614f875ac0b7baf0f2bb14cbb49f679b47dceea"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "Minimal equivalent local fixture; preserves the issue encoding and edit operation. Linux can create the same bytes explicitly, so Windows is not a required trigger.",
+    "preparation_status": "prepared",
+    "runtime_validation": "not_run_in_this_completion",
+    "root_cause_verification": "source_review_only",
+    "unit_pin": "63d0e8f17e2c1f0d9e1d6f4399ab2dc10fbdf477",
+    "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\68-mistral-vibe",
+    "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+    "upstream_checked_at": "2026-10-28",
+    "evidence_issue": "evidence/upstream/issues.json",
+    "evidence_timeline": "evidence/upstream/timelines.json",
+    "evidence_comments": "evidence/upstream/comments.json",
+    "source_snapshot": "evidence/upstream/review_sources.json",
+    "duplicate_group": null,
+    "historical_acp_source_present": true
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "case_id": "ir-llxprt-code-3943-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 3943,
+    "url": "https://github.com/vybestack/llxprt-code/issues/3943",
+    "state": "open",
+    "title": "run_shell_command always reports \"Stderr: (empty)\" and puts stderr output under \"Stdout:\""
+  },
+  "version_choice": "pinned",
+  "reported_version": "0.11.0",
+  "commit_version": "5400f65a6c7eef52844697c8f8c85390df29eea1",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Run exactly python3 -c \"import sys; print('to-stdout'); print('to-stderr', file=sys.stderr)\" using run_shell_command. Tell me separately what was printed to stdout and stderr, quoting the tool result."
+  ],
+  "expected": "Output labels accurately distinguish stdout and stderr, or state that the streams are combined.",
+  "defect": "The model-facing tool result puts to-stderr under Stdout and hardcodes Stderr: (empty).",
+  "fault location": [
+    {
+      "file": "packages/tools/src/tools/shell.ts",
+      "function": "formatNormalOutput",
+      "line_start": 679,
+      "line_end": 684,
+      "commit": "5400f65a6c7eef52844697c8f8c85390df29eea1",
+      "url": "https://github.com/vybestack/llxprt-code/blob/5400f65a6c7eef52844697c8f8c85390df29eea1/packages/tools/src/tools/shell.ts#L679-L684",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "formatNormalOutput formats the merged filteredOutput under Stdout and always emits the literal Stderr: (empty). This contradicts the advertised separate-stream result contract."
+    }
+  ],
+  "Root cause": "formatNormalOutput formats the merged filteredOutput under Stdout and always emits the literal Stderr: (empty). This contradicts the advertised separate-stream result contract.",
+  "_meta": {
+    "fix_status": "source_reviewed",
+    "fix_refs": [],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "The shell command is from the issue. The historical reproduction used a scripted model; this case requests the same real tool action through the normal model and does not start a stub server.",
+    "preparation_status": "prepared",
+    "runtime_validation": "not_run_in_this_completion",
+    "root_cause_verification": "source_review_only",
+    "unit_pin": "5400f65a6c7eef52844697c8f8c85390df29eea1",
+    "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\89-llxprt-code",
+    "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+    "upstream_checked_at": "2026-10-28",
+    "evidence_issue": "evidence/upstream/issues.json",
+    "evidence_timeline": "evidence/upstream/timelines.json",
+    "evidence_comments": "evidence/upstream/comments.json",
+    "source_snapshot": "evidence/upstream/review_sources.json",
+    "duplicate_group": null
+  }
+}

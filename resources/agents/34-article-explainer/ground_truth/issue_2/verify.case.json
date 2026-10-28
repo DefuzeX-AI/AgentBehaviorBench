@@ -1,0 +1,54 @@
+{
+  "case_id": "ir-article-explainer-2-v1",
+  "issue": {
+    "repository": "duartecaldascardoso/article-explainer",
+    "number": 2,
+    "url": "https://github.com/duartecaldascardoso/article-explainer/issues/2",
+    "state": "open",
+    "title": "Parallel handoff tool calls crash the swarm with INVALID_CHAT_HISTORY, so multi-part requests get no answer"
+  },
+  "version_choice": "pinned",
+  "reported_version": "2cf067dc4b9158b03361c7b3e2544e067b75f1ae",
+  "commit_version": "2cf067dc4b9158b03361c7b3e2544e067b75f1ae",
+  "fixed_in": "not-fixed",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Here is an article about transformer models. Please provide a summary, an analogy for the attention mechanism, and a code sketch illustrating positional encoding.\n\n[ARTICLE START]\nTransformers have revolutionized natural language processing. The core innovation is the self-attention mechanism, which allows each token to attend to all other tokens in the sequence. Positional encoding is added to input embeddings to give the model information about token order. Training large transformers requires significant computational resources.\n[ARTICLE END]"
+  ],
+  "expected": "The swarm hands off to the specialists one at a time and returns a summary, an analogy for attention and a positional-encoding code sketch.",
+  "defect": "The explainer emits several transfer_to_* handoff calls in one message, langgraph_swarm follows only one, and the next agent's call fails with `ValueError: Found AIMessages with tool_calls that do not have a corresponding ToolMessage` (INVALID_CHAT_HISTORY), so the user gets no answer.",
+  "fault location": [
+    {
+      "file": "explainer/graph.py",
+      "function": "<module>",
+      "line_start": 59,
+      "line_end": 69,
+      "commit": "2cf067dc4b9158b03361c7b3e2544e067b75f1ae",
+      "url": "https://github.com/duartecaldascardoso/article-explainer/blob/2cf067dc4b9158b03361c7b3e2544e067b75f1ae/explainer/graph.py#L59-L69",
+      "role": "static_analysis",
+      "verification": "source_inferred_at_tested_revision",
+      "explanation": "The default `explainer` agent is built with create_react_agent(model, tools=[four handoff tools]) on a model that may emit parallel tool calls, so it can call several transfer_to_* tools in one turn, which langgraph-swarm does not support."
+    },
+    {
+      "file": "explainer/graph.py",
+      "function": "<module>",
+      "line_start": 12,
+      "line_end": 12,
+      "commit": "2cf067dc4b9158b03361c7b3e2544e067b75f1ae",
+      "url": "https://github.com/duartecaldascardoso/article-explainer/blob/2cf067dc4b9158b03361c7b3e2544e067b75f1ae/explainer/graph.py#L12-L12",
+      "role": "static_analysis",
+      "verification": "source_inferred_at_tested_revision",
+      "explanation": "The shared chat model is used unmodified by all five swarm agents; parallel tool calling is never disabled (e.g. via bind_tools(..., parallel_tool_calls=False))."
+    }
+  ],
+  "Root cause": "INFERRED FROM SOURCE (no upstream fix found). explainer/graph.py builds all five swarm agents (developer, summarizer, explainer, analogy_creator, vulnerability_expert; lines 35-93) with create_react_agent(model, tools=[...four handoff tools...]) using the shared model from get_chat_model(), with no restriction on parallel tool calls. For a request that needs several specialists, the default `explainer` agent returns one AIMessage containing two or three transfer_to_* calls. langgraph-swarm handles only one handoff (the Command from one tool switches the active agent), so the remaining tool calls get no ToolMessage; when the receiving agent's react loop prepares its model call, LangChain validates the history and raises INVALID_CHAT_HISTORY, aborting app.invoke and discarding the explainer's already written text. Minimal fix: disable parallel tool calls for the swarm agents, e.g. pass `model.bind_tools(tools, parallel_tool_calls=False)` to each create_react_agent (or wrap the handoff tools so extra handoffs in the same message get a stub ToolMessage), and/or instruct agents to hand off to one specialist at a time. Speculation: some OpenAI-compatible providers ignore parallel_tool_calls, in which case a post-model hook that truncates tool_calls to the first handoff would be needed.",
+  "_meta": {
+    "fix_status": "inferred",
+    "fix_refs": [],
+    "abb_entry": "langgraph",
+    "user_messages_from_issue": [
+      "Here is an article about transformer models. Please provide a summary, an analogy for the attention mechanism, and a code sketch illustrating positional encoding.\n\n[ARTICLE START]\nTransformers have revolutionized natural language processing. The core innovation is the self-attention mechanism, which allows each token to attend to all other tokens in the sequence. Positional encoding is added to input embeddings to give the model information about token order. Training large transformers requires significant computational resources.\n[ARTICLE END]"
+    ],
+    "notes": "gh_web: issue OPEN, no closing/linked PRs or commits; the repo has no tags and the clone's newest commit is the pinned 2cf067d (the version named in the issue), so there is no later fix. reported_version is the commit SHA because the project has no releases. Step 1 is the issue's verbatim request. The defect also depends on langgraph-swarm not supporting parallel handoffs (langgraph-swarm-py#58); the location is where this repo could prevent it. Trigger depends on the model emitting parallel handoff calls. Lines verified with git show at 2cf067d."
+  }
+}

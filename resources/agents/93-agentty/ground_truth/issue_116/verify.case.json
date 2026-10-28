@@ -1,0 +1,54 @@
+{
+  "case_id": "ir-agentty-116-v1",
+  "issue": {
+    "repository": "agentty-org/agentty",
+    "number": 116,
+    "url": "https://github.com/agentty-org/agentty/issues/116",
+    "state": "closed",
+    "title": "ACP: parallel tool calls lose their arguments except the last one"
+  },
+  "version_choice": "pinned",
+  "reported_version": "0.9.32",
+  "commit_version": "b8c8b7192c3d003a1c733693f2c8447019851374",
+  "fixed_in": "v0.9.33",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Create a small Python package with __init__.py and three modules, then run one of them."
+  ],
+  "expected": "Every parallel write call receives the arguments the model streamed for it, so all four files are created and one module runs.",
+  "defect": "When the model emits several tool calls in one response, only the last call keeps its arguments; the others execute with `{}` and fail with `[invalid args] path required (received keys: (no object / empty))`.",
+  "fault location": [
+    {
+      "file": "src/acp/server.cpp",
+      "function": "AgentServer::stream_completion",
+      "line_start": 2914,
+      "line_end": 2914,
+      "commit": "b8c8b7192c3d003a1c733693f2c8447019851374",
+      "url": "https://github.com/agentty-org/agentty/blob/b8c8b7192c3d003a1c733693f2c8447019851374/src/acp/server.cpp#L2914-L2914",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "A single `std::string cur_tool_json` buffer holds argument JSON for the whole response; commit fe2808a replaces it with a per-call-id map plus a find_call lookup."
+    },
+    {
+      "file": "src/acp/server.cpp",
+      "function": "AgentServer::stream_completion",
+      "line_start": 2980,
+      "line_end": 3004,
+      "commit": "b8c8b7192c3d003a1c733693f2c8447019851374",
+      "url": "https://github.com/agentty-org/agentty/blob/b8c8b7192c3d003a1c733693f2c8447019851374/src/acp/server.cpp#L2980-L3004",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "StreamToolUseStart clears the shared buffer, StreamToolUseDelta appends regardless of ev.id, and StreamToolUseEnd always parses into assistant.tool_calls.back(); fe2808a routes Start/Delta/Snapshot/End by call id."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/agentty-org/agentty/commit/fe2808a6910bde031a45cc002ec5bc8f7fc94020. In the ACP turn loop (AgentServer::stream_completion), tool-call argument JSON is accumulated in one shared cur_tool_json buffer: each StreamToolUseStart clears it, every StreamToolUseDelta appends to it without looking at ev.id, and each StreamToolUseEnd parses it into assistant.tool_calls.back(). The OpenAI-compatible transport interleaves the deltas of parallel calls and emits all End events at the end of the turn, so by the time the Ends arrive the buffer was reset at the last Start and the last call is the only one parsed; every earlier call keeps empty args `{}` and its write fails with `path required`. The TUI reducer already routed by id, which is why only ACP is affected. Commit fe2808a (\"acp: parallel tool calls keep their own arguments (#116)\") keeps a buffer per call id, looks up the call by id for Delta/Snapshot/End (falling back to the last call only for id-less events), and adds an integration test with three interleaved writes. The fix first ships in v0.9.33; the pinned revision b8c8b71 is v0.9.32 (the reported version) and does not contain it.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/agentty-org/agentty/commit/fe2808a6910bde031a45cc002ec5bc8f7fc94020"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "gh_web: issue CLOSED/COMPLETED, no closing PR, linked commit fe2808a. tag --contains fe2808a: v0.9.33..v0.9.36; merge-base shows it is not an ancestor of the pinned b8c8b71 (= v0.9.32^{commit}), so version_choice is pinned. The issue gives steps, not a verbatim message; the single step is the round-3 repro_prompt paraphrasing step 2 of the issue. Triggering depends on the model emitting several tool calls in one response. Line numbers verified with git show at b8c8b71."
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "case_id": "ir-zeroclaw-5584-v1",
+  "issue": {
+    "repository": "zeroclaw-labs/zeroclaw",
+    "number": 5584,
+    "url": "https://github.com/zeroclaw-labs/zeroclaw/issues/5584",
+    "state": "closed",
+    "title": "[Bug]: Duplicate consecutive assistant messages in provider request when model returns narration text alongside tool calls"
+  },
+  "version_choice": "historical:v0.6.9",
+  "reported_version": "v0.6.9",
+  "commit_version": "1a61ea731cc2fa8f765654578fe7f9b51ab589c5",
+  "fixed_in": "v0.7.4",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create a file named notes.txt containing the line `hello`, then show its contents with cat, and then count its lines with wc -l."
+  ],
+  "expected": "Each tool-call turn appears in later provider requests as exactly one assistant message carrying both the narration text and tool_calls.",
+  "defect": "When the model narrates alongside tool calls, every later request contains two consecutive assistant messages with identical content, one plain and one with tool_calls.",
+  "fault location": [
+    {
+      "file": "src/agent/agent.rs",
+      "function": "Agent::turn_streamed",
+      "line_start": 1233,
+      "line_end": 1244,
+      "commit": "1a61ea731cc2fa8f765654578fe7f9b51ab589c5",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/1a61ea731cc2fa8f765654578fe7f9b51ab589c5/src/agent/agent.rs#L1233-L1244",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Pushes the narration text as a plain assistant Chat message and then an AssistantToolCalls entry that carries the same text, producing two assistant messages per tool turn; PR #6093 (commit 70a620a) removes the plain push. This is the path the ACP server uses."
+    },
+    {
+      "file": "src/agent/agent.rs",
+      "function": "Agent::turn",
+      "line_start": 957,
+      "line_end": 970,
+      "commit": "1a61ea731cc2fa8f765654578fe7f9b51ab589c5",
+      "url": "https://github.com/zeroclaw-labs/zeroclaw/blob/1a61ea731cc2fa8f765654578fe7f9b51ab589c5/src/agent/agent.rs#L957-L970",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Same duplicate push in the non-streaming turn path (the history push is removed by PR #6093, the stdout print is kept)."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/zeroclaw-labs/zeroclaw/pull/6093 (commit https://github.com/zeroclaw-labs/zeroclaw/commit/70a620adb4d8bda0bc43bc0bdd869130969f4a8f, \"fix(agent): drop redundant narration push before AssistantToolCalls\"). In v0.6.9, when a response has tool calls and non-empty text, Agent::turn and Agent::turn_streamed first push ConversationMessage::Chat(ChatMessage::assistant(text)) and then ConversationMessage::AssistantToolCalls { text: response.text, tool_calls, ... }. Both are converted into assistant messages for the provider, so every subsequent request contains the narration twice in a row (once without and once with tool_calls); the model sees its own text duplicated and output grows repetitive, and role-alternation-strict providers may reject the request. The fix deletes the plain Chat push in both paths so the AssistantToolCalls entry is the single assistant record, and adds regression tests. It first ships in v0.7.4 and is an ancestor of the pinned v0.8.5, so the case tests v0.6.9 (the reported version). The ACP server calls Agent::turn_streamed (src/channels/acp_server.rs L337 at v0.6.9).",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/zeroclaw-labs/zeroclaw/pull/6093",
+      "https://github.com/zeroclaw-labs/zeroclaw/commit/70a620adb4d8bda0bc43bc0bdd869130969f4a8f"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [
+      "ping 8.8.8.8 and then read a file"
+    ],
+    "notes": "gh_web: CLOSED/COMPLETED, closing PR #6093 MERGED (70a620a, first release v0.7.4); linked PR #5829 not used. The verbatim message needs ping (not on the default allowlist, no network) and an unspecified file, so the step is a self-contained multi-tool task per round-4. Trigger depends on the model emitting narration together with tool_calls. v0.6.9 (tag commit 1a61ea7) is the first release with `zeroclaw acp` (src/main.rs Commands::Acp, L272) and its ACP server drives Agent::turn_streamed (src/channels/acp_server.rs L337). Speculation: the unit's launch.py writes a schema_version = 3 config and passes --config-dir; these may need adapting for the v0.6.9 binary."
+  }
+}

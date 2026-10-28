@@ -1,0 +1,55 @@
+{
+  "case_id": "ir-llxprt-code-1757-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 1757,
+    "url": "https://github.com/vybestack/llxprt-code/issues/1757",
+    "state": "closed",
+    "title": "ast_edit preview succeeds for non-existent files then force fails"
+  },
+  "version_choice": "historical:v0.9.3",
+  "reported_version": "v0.9.3",
+  "commit_version": "6485690bbd97f785413c8bb648c0335780afbd8c",
+  "fixed_in": "v0.10.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Call ast_edit on src/missing.ts with old_string `const a = 1;` and new_string `const a = 2;` (without force), then call it again with force: true."
+  ],
+  "expected": "The first (preview) ast_edit call reports that src/missing.ts does not exist instead of returning a successful preview.",
+  "defect": "The preview returns \"AST validation: PASSED\", 0 declarations and \"NEXT STEP: Call again with force: true\"; only the force call reports \"File not found\".",
+  "fault location": [
+    {
+      "file": "packages/core/src/tools/ast-edit.ts",
+      "function": "ASTEditToolInvocation.readFileContent",
+      "line_start": 2271,
+      "line_end": 2282,
+      "commit": "6485690bbd97f785413c8bb648c0335780afbd8c",
+      "url": "https://github.com/vybestack/llxprt-code/blob/6485690bbd97f785413c8bb648c0335780afbd8c/packages/core/src/tools/ast-edit.ts#L2271-L2282",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Swallows ENOENT and returns an empty string, so a missing file looks like an empty existing file to the preview; after PR #2029 the preview no longer uses this helper and gets calculateEdit's FILE_NOT_FOUND error."
+    },
+    {
+      "file": "packages/core/src/tools/ast-edit.ts",
+      "function": "ASTEditToolInvocation.executePreview",
+      "line_start": 1886,
+      "line_end": 1942,
+      "commit": "6485690bbd97f785413c8bb648c0335780afbd8c",
+      "url": "https://github.com/vybestack/llxprt-code/blob/6485690bbd97f785413c8bb648c0335780afbd8c/packages/core/src/tools/ast-edit.ts#L1886-L1942",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Builds and validates a preview from that empty content without the file-existence check that calculateEdit performs for the apply path; PR #2029 routes the preview through calculateEdit and returns its error."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/2029. In v0.9.3 the ast_edit preview path reads the target through readFileContent, which turns ENOENT into an empty string, and then applies the replacement to '' and validates it, so a non-existent target yields a 'successful' preview with zero declarations and AST validation PASSED. The apply path instead uses calculateEdit, which detects !fileExists with a non-empty old_string and returns 'File not found'. Commit e88afa5 (PR #2029, 'Validate ast_edit preview replacements', written for #1755) removes the separate preview read and makes executePreview call calculateEdit and return its error, which also covers the missing-file case. The fix first ships in v0.10.0; the pinned v0.11.0 contains it, so the case is tested at v0.9.3. The issue itself was closed as NOT_PLANNED; the attribution of the fix to PR #2029 is an inference from the diff.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/vybestack/llxprt-code/pull/2029",
+      "https://github.com/vybestack/llxprt-code/commit/e88afa5b1a1aa74e14d1c08e610120f80e66290a"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "Issue page: CLOSED/NOT_PLANNED, no closing PR; only link is PR #2736 (dev/0.11.0 integration). No commit references #1757. The behavioural fix was identified by reading e88afa5 (#2029): executePreview now calls calculateEdit, whose !fileExists branch returns FILE_NOT_FOUND (same logic as v0.9.3 calculateEdit lines 2197-2204). Treated as fixed via that diff; if the caller prefers the strict rule, downgrade to not_fixed. Issue created 2026-03-23, latest release then v0.9.3 (ACP present). Single step: no setup needed since the file must not exist."
+  }
+}

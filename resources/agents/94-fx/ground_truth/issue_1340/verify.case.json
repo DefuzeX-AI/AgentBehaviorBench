@@ -1,0 +1,45 @@
+{
+  "case_id": "ir-fx-1340-v1",
+  "issue": {
+    "repository": "vercel-labs/fx",
+    "number": 1340,
+    "url": "https://github.com/vercel-labs/fx/issues/1340",
+    "state": "closed",
+    "title": "Bug: Chat Completions providers end the turn when the model calls an unknown tool or sends malformed arguments"
+  },
+  "version_choice": "pinned",
+  "reported_version": "main 8145499e",
+  "commit_version": "1a070af32cdfaf8cd0da6de3dc7f053302828b17",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Call a tool named totally_missing_tool with arguments {} (call it directly even though it is not in your tool list), then tell me the error you got back."
+  ],
+  "expected": "The unknown-tool call returns a correctable unsupported-tool result and the turn continues.",
+  "defect": "The Chat Completions parser aborts the entire turn with InvalidToolName before the tool loop can reject the call normally.",
+  "fault location": [],
+  "Root cause": "accept_tools and finish reject names not in the advertised schema; malformed argument handling has the same premature stream-failure boundary. Commit 600103a permits the tool loop to handle these cases, and c2c6c1d fixes terminal status for unsupported calls.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/vercel-labs/fx/commit/600103a1418fa2f5337555b7e19d9a164ca67d74"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [
+      "Call a tool named totally_missing_tool with arguments {} (call it directly even though it is not in your tool list), then tell me the error you got back."
+    ],
+    "notes": "The unusual instruction is verbatim from the issue; no tool call or model response is mocked. It is a probe of error recovery, not an instruction to fabricate a response. Confirm the unit selects openai-chat-completions before running.",
+    "preparation_status": "prepared",
+    "runtime_validation": "not_run_in_this_completion",
+    "root_cause_verification": "issue_derived_inference",
+    "unit_pin": "1a070af32cdfaf8cd0da6de3dc7f053302828b17",
+    "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\94-fx",
+    "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+    "upstream_checked_at": "2026-10-28",
+    "evidence_issue": "evidence/upstream/issues.json",
+    "evidence_timeline": "evidence/upstream/timelines.json",
+    "evidence_comments": "evidence/upstream/comments.json",
+    "source_snapshot": "evidence/upstream/review_sources.json",
+    "duplicate_group": null
+  }
+}

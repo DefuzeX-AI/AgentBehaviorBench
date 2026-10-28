@@ -1,0 +1,58 @@
+{
+  "case_id": "ir-gptme-4490-v1",
+  "issue": {
+    "repository": "gptme/gptme",
+    "number": 4490,
+    "url": "https://github.com/gptme/gptme/issues/4490",
+    "state": "open",
+    "title": "Thinking tags inside a save block silently prevent tool execution"
+  },
+  "version_choice": "pinned",
+  "reported_version": "0dec0263",
+  "commit_version": "0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07",
+  "fixed_in": "not-fixed",
+  "pinned_contains_fix": false,
+  "steps": [
+    "In the current working directory, create a file named prompt_template.xml for our LLM evaluation harness. Its content must be exactly the following template (keep every tag and line as-is):\n\n<system>\nso Assume You are a careful math tutor.\n</system>\n<instructions>\nBefore answering, reason inside the thinking tags, then give only the final number inside the answer tags.\n</instructions>\n<thinking>\nWork through the problem step by step here.\n</thinking>\n<answer>\nFinal numeric answer here.\n</answer>",
+    "Please show me the exact current content of prompt_template.xml as it is on disk, so I can verify it was created correctly."
+  ],
+  "expected": "The save block is executed and prompt_template.xml is written with the exact template, or a failure is reported instead of being silently ignored.",
+  "defect": "The model's well-formed save block (and any following shell block) is never executed: no 'Saved to' result, no prompt_template.xml on disk, and the ACP turn ends with end_turn.",
+  "fault location": [
+    {
+      "file": "gptme/codeblock.py",
+      "function": "_extract_codeblocks",
+      "line_start": 377,
+      "line_end": 391,
+      "commit": "0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07",
+      "url": "https://github.com/gptme/gptme/blob/0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07/gptme/codeblock.py#L377-L391",
+      "role": "static_analysis",
+      "verification": "source_inferred_at_tested_revision",
+      "explanation": "Finds the first `</thinking>` anywhere in the reply and, because a line-start `<thinking>` exists before it (inside the save block's content), discards everything up to and including that tag, cutting the save block's opening fence away."
+    },
+    {
+      "file": "gptme/codeblock.py",
+      "function": "_extract_codeblocks",
+      "line_start": 404,
+      "line_end": 407,
+      "commit": "0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07",
+      "url": "https://github.com/gptme/gptme/blob/0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07/gptme/codeblock.py#L404-L407",
+      "role": "static_analysis",
+      "verification": "source_inferred_at_tested_revision",
+      "explanation": "The unclosed-thinking early exit also matches `<thinking>` at a line start inside a code fence and returns without extracting any block."
+    }
+  ],
+  "Root cause": "INFERRED FROM SOURCE (no upstream fix found). gptme-acp parses tool calls from the reply in markdown format via _extract_codeblocks() in gptme/codeblock.py. Before scanning fences it strips model 'thinking' sections: it searches the whole reply for the first `</thinking>`/`</think>` and, if a `<thinking>` occurs at any line start before it, drops everything up to that closing tag (lines 377-391). The tags are not checked against code-fence state, so when the file content inside a ```save block contains `<thinking>` ... `</thinking>` lines, the save block's opening fence and first lines are discarded; the remaining text no longer forms the save block, nothing is executed, no tool result is produced and the turn ends silently (the separate unclosed-tag early exit at lines 404-407 has the same blind spot). Minimal fix: only treat thinking tags as section markers when they appear at a line start outside any code fence, which is what the still-open PR https://github.com/gptme/gptme/pull/4491 (commit 91bcdd797, `_is_standalone_outside_fences`) proposes; it is not merged.",
+  "_meta": {
+    "fix_status": "inferred",
+    "fix_refs": [
+      "https://github.com/gptme/gptme/pull/4491"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [
+      "Step 1: In the current working directory, create a file named prompt_template.xml ... (template with <thinking> lines)",
+      "Step 2: Please show me the exact current content of prompt_template.xml as it is on disk, so I can verify it was created correctly."
+    ],
+    "notes": "Issue OPEN; closing PR #4491 OPEN (commit 91bcdd797 not an ancestor of the pinned revision), so fixed_in is 'not-fixed' and fault location comes from reading the pinned source (the open PR's diff touches the same lines, which supports the inference). Reported at revision 0dec0263; the unit pins 0c131bb0 (v0.35.1), which has the same parsing code. Steps are the two verbatim messages with their 'Step N:' prefixes removed. A side effect noted in the issue (ACP stream hiding lines between thinking tags, gptme/llm/__init__.py) is not part of the fault location."
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "case_id": "ir-llxprt-code-1756-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 1756,
+    "url": "https://github.com/vybestack/llxprt-code/issues/1756",
+    "state": "closed",
+    "title": "ast_edit silently replaces first occurrence on ambiguous matches"
+  },
+  "version_choice": "historical:v0.9.3",
+  "reported_version": "v0.9.3",
+  "commit_version": "6485690bbd97f785413c8bb648c0335780afbd8c",
+  "fixed_in": "v0.11.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create src/config.ts containing:\nexport function makeUser() {\n  return {\n    name: 'a',\n    active: true,\n  };\n}\n\nexport const DEFAULT_USER = {\n  name: 'b',\n  active: true,\n};",
+    "Call ast_edit on src/config.ts with old_string `active: true,` and new_string `active: false,`, then call it again with force: true."
+  ],
+  "expected": "ast_edit rejects the edit (or at least warns) because `active: true,` matches two locations, consistent with the replace tool.",
+  "defect": "The preview shows no warning and the force call silently replaces only the first occurrence of `active: true,`.",
+  "fault location": [
+    {
+      "file": "packages/core/src/tools/ast-edit.ts",
+      "function": "ASTEditToolInvocation.countOccurrences",
+      "line_start": 2263,
+      "line_end": 2269,
+      "commit": "6485690bbd97f785413c8bb648c0335780afbd8c",
+      "url": "https://github.com/vybestack/llxprt-code/blob/6485690bbd97f785413c8bb648c0335780afbd8c/packages/core/src/tools/ast-edit.ts#L2263-L2269",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Returns 1 whenever old_string is present (content.includes), so multiple matches are never detected; commit 883de72 (landed via PR #2736) counts every occurrence and calculateEdit rejects counts > 1 with EDIT_EXPECTED_OCCURRENCE_MISMATCH."
+    },
+    {
+      "file": "packages/core/src/tools/ast-edit.ts",
+      "function": "ASTEditTool.applyReplacement",
+      "line_start": 1563,
+      "line_end": 1564,
+      "commit": "6485690bbd97f785413c8bb648c0335780afbd8c",
+      "url": "https://github.com/vybestack/llxprt-code/blob/6485690bbd97f785413c8bb648c0335780afbd8c/packages/core/src/tools/ast-edit.ts#L1563-L1564",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "Uses String.replace, which replaces only the first match, so the ambiguous edit lands on the first occurrence without notice."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/2736. In v0.9.3, ast_edit's calculateEdit validates old_string through countOccurrences, which returns content.includes(old_string) ? 1 : 0, and then applies the edit with String.replace. When old_string appears twice, the count is still 1, no ambiguity error is raised, and the first occurrence is replaced silently. Commit 883de72 ('fix(ast-edit): reject ambiguous matches instead of silent first-replace', on dev/0.11.0) makes countOccurrences return the real count and rejects counts above one; it reached main in 2077498 (PR #2736, 'Integrate dev/0.11.0 into main after the v0.10.0 release'). The closing PR #2870 (8917721) only adds a regression test and updates the old_string schema description to state that ambiguous matches are rejected. The behaviour first ships in v0.11.0, which is the pinned version, so the case is tested at v0.9.3 (v0.10.0 still has the 0/1 count).",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/vybestack/llxprt-code/pull/2736",
+      "https://github.com/vybestack/llxprt-code/commit/2077498481a5d3399d3bf1abd9ae2a47222d7446",
+      "https://github.com/vybestack/llxprt-code/commit/883de728e198b2a30f09137ddcea9644c9fa1ebe",
+      "https://github.com/vybestack/llxprt-code/pull/2870"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "Issue page: CLOSED/COMPLETED, closing PR #2870 MERGED (8917721, first tag v0.11.0) but that PR only touches the schema text and tests. The behavioural change was found in the clone with `git log -S 'let idx = content.indexOf(searchString)'` on packages/tools/src/tools/ast-edit/edit-calculator.ts: 883de72 on dev/0.11.0, merged to main by 2077498 (#2736, ancestor of pinned). v0.10.0's edit-calculator.ts still returns 0/1. The v0.9.3 code is in packages/core/src/tools/ast-edit.ts. As with #1755, gh_web's createdAt (2026-07-30) conflicts with the issue-number ordering (~March 2026); v0.9.3 was chosen as the last release before late March and is also unfixed if the later date is right (v0.10.0 would equally reproduce)."
+  }
+}

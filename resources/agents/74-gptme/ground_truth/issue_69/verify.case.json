@@ -1,0 +1,32 @@
+{
+  "case_id": "ir-gptme-69-v1",
+  "issue": {
+    "repository": "gptme/gptme",
+    "number": 69,
+    "url": "https://github.com/gptme/gptme/issues/69",
+    "state": "closed",
+    "title": "Shell doesn't capture output for expressions like `for i in {1..10}; do echo $i; done`"
+  },
+  "version_choice": "pinned",
+  "reported_version": "v0.11.1",
+  "commit_version": "0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07",
+  "fixed_in": "v0.12.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Run the shell command `for i in {1..10}; do echo $i; done`."
+  ],
+  "expected": "The shell tool returns the numbers 1 to 10 as output.",
+  "defect": "The shell tool does not capture any output for the for-loop expression.",
+  "fault location": [],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/gptme/gptme/pull/70 (commit 8612ca2b295ecdb8b8700aba56aa8d5f9d9cd69b). split_commands() in gptme/tools/shell.py parsed the code block with bashlex and only rebuilt top-level nodes of kind 'command'; a for loop is a 'compound' node, which fell through without being appended, so nothing was executed and no output was captured. PR #70 ('restart shell on broken pipe, handle composite expressions') adds a 'compound' branch (later, PR #725 keeps compound nodes intact by slicing the original source). The fix first ships in v0.12.0 and the pinned revision contains it.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/gptme/gptme/pull/70",
+      "https://github.com/gptme/gptme/commit/8612ca2b295ecdb8b8700aba56aa8d5f9d9cd69b"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "The pinned revision 0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07 (v0.35.1) already contains the fix, but no release that lacks the fix provides the gptme-acp entry point (gptme-acp first appears in pyproject.toml at commit 75d94dd34, 2025-12-18, first tagged in v0.31.1.dev20260227 / v0.32.0), so version_choice stays 'pinned'. Because the faulty code no longer exists at the tested revision, 'fault location' is left empty and the pre-fix location is recorded here instead: gptme/tools/shell.py split_commands at 8612ca2b2^ (loop over bashlex parts handling only part.kind == 'command'). The issue page also lists PR #782 and server-auth commits whose '#69/#70' references belong to other repos (gptme-webui); they are unrelated. The PR number #70 in this repo is the 2024-01-22 commit 8612ca2b2. reported_version: v0.11.1 (2024-01-20) was the latest tag at issue creation."
+  }
+}

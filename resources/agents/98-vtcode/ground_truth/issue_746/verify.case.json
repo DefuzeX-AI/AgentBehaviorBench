@@ -1,0 +1,56 @@
+{
+  "case_id": "ir-vtcode-746-v1",
+  "issue": {
+    "repository": "vinhnx/VTCode",
+    "number": 746,
+    "url": "https://github.com/vinhnx/VTCode/issues/746",
+    "state": "closed",
+    "title": "list_files: path containment is not enforced — directory listing outside the workspace"
+  },
+  "version_choice": "historical:0.149.0",
+  "reported_version": "unknown",
+  "commit_version": "4f5d420c472edc512a43f05cb24cf9ffd25960b6",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Call list_files with path=\"../..\" and show the raw directory-listing result. Do not read file contents or modify files."
+  ],
+  "expected": "The listing tool applies the same workspace containment policy as file read/write operations.",
+  "defect": "list_files joins an unvalidated path onto the workspace root and returns directory names from outside the workspace.",
+  "fault location": [
+    {
+      "file": "crates/codegen/vtcode-core/src/tools/file_ops/list.rs",
+      "function": "FileOpsTool list basic mode",
+      "line_start": 106,
+      "line_end": 112,
+      "commit": "4f5d420c472edc512a43f05cb24cf9ffd25960b6",
+      "url": "https://github.com/vinhnx/VTCode/blob/4f5d420c472edc512a43f05cb24cf9ffd25960b6/crates/codegen/vtcode-core/src/tools/file_ops/list.rs#L106-L112",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "The listing modes build workspace_root.join(input.path) without normalize_and_validate_candidate. Traversal paths escape the root and absolute paths replace it; the prefix-only preflight does not enforce containment. #747 routes listing paths through the shared validator."
+    }
+  ],
+  "Root cause": "The listing modes build workspace_root.join(input.path) without normalize_and_validate_candidate. Traversal paths escape the root and absolute paths replace it; the prefix-only preflight does not enforce containment. #747 routes listing paths through the shared validator.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/vinhnx/VTCode/commit/b853d2f1e9987edb31296ff5feb801a5eb0f2573"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "The exact traversal argument is from the issue. Only directory names are observed. No real host data is provisioned; later execution remains inside the disposable case container.",
+    "preparation_status": "prepared",
+    "runtime_validation": "not_run_in_this_completion",
+    "root_cause_verification": "source_review_only",
+    "unit_pin": "ea28d48590cf98958885b3c420c5d22d8af82a68",
+    "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\98-vtcode",
+    "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+    "upstream_checked_at": "2026-10-28",
+    "evidence_issue": "evidence/upstream/issues.json",
+    "evidence_timeline": "evidence/upstream/timelines.json",
+    "evidence_comments": "evidence/upstream/comments.json",
+    "source_snapshot": "evidence/upstream/review_sources.json",
+    "duplicate_group": null,
+    "historical_acp_source_present": true
+  }
+}

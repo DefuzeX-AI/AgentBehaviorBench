@@ -1,0 +1,42 @@
+{
+  "case_id": "ir-llxprt-code-3598-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 3598,
+    "url": "https://github.com/vybestack/llxprt-code/issues/3598",
+    "state": "open",
+    "title": "search_file_content returns no matches in ignored log directory despite both ignore filters disabled"
+  },
+  "version_choice": "pinned",
+  "reported_version": "3d06a0960e357eaa6653002797f938dd3b9fbf80",
+  "commit_version": "5400f65a6c7eef52844697c8f8c85390df29eea1",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Initialize a Git repository, add tmp/ to .gitignore, and create tmp/pr3591-lint-completion/ci-lint-failed.log with exactly 10000 lines of ##[warning] ESLint found too many warnings and a final ##[error]Process completed with exit code 1. Create javascript-lint-job-101877140635.log in the same directory with the same text.",
+    "Use search_file_content with path=\"tmp/pr3591-lint-completion\", pattern=\"error|Error|FAIL|failed|EXIT|warning\", and file_filtering_options={\"respect_git_ignore\":false,\"respect_llxprt_ignore\":false}. Show the raw result."
+  ],
+  "expected": "Explicitly disabled ignore filters permit search of the specified ignored logs, or the tool explains why it excludes them.",
+  "defect": "The search tool says No matches found despite the supplied directory containing matching text logs.",
+  "fault location": [],
+  "Root cause": "The issue establishes a mismatch between explicit ignore-filter options and search results, but does not establish the responsible code boundary. The private original logs are replaced by matching text of comparable size; no source-confirmed root cause is claimed.",
+  "_meta": {
+    "fix_status": "inferred",
+    "fix_refs": [],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "Equivalent fixture preserves the ignored tmp path, approximate log size and search options. A miss in the new fixture requires later runtime validation; the original task logs are not available.",
+    "preparation_status": "prepared",
+    "runtime_validation": "not_run_in_this_completion",
+    "root_cause_verification": "issue_derived_inference",
+    "unit_pin": "5400f65a6c7eef52844697c8f8c85390df29eea1",
+    "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\89-llxprt-code",
+    "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+    "upstream_checked_at": "2026-10-28",
+    "evidence_issue": "evidence/upstream/issues.json",
+    "evidence_timeline": "evidence/upstream/timelines.json",
+    "evidence_comments": "evidence/upstream/comments.json",
+    "source_snapshot": "evidence/upstream/review_sources.json",
+    "duplicate_group": null
+  }
+}

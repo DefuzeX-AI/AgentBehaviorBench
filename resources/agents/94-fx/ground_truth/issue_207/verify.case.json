@@ -1,0 +1,56 @@
+{
+  "case_id": "ir-fx-207-v1",
+  "issue": {
+    "repository": "vercel-labs/fx",
+    "number": 207,
+    "url": "https://github.com/vercel-labs/fx/issues/207",
+    "state": "closed",
+    "title": "ACP streams terminal-rendered text instead of raw Markdown"
+  },
+  "version_choice": "historical:v0.0.4",
+  "reported_version": "v0.0.3; also v0.0.4",
+  "commit_version": "d8db856b4c041f69aae436a98b1aa92649bac09c",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Return raw Markdown containing a level-one heading named Markdown Showcase, a bullet list with First item, a two-column Name/Count table with api and 7, bold and italic text, and a fenced Python code block."
+  ],
+  "expected": "ACP agent_message_chunk text preserves the model Markdown source.",
+  "defect": "ACP emits terminal-rendered text, removing heading/emphasis markers and converting tables and lists to terminal glyphs.",
+  "fault location": [
+    {
+      "file": "src/acp/prompt.zig",
+      "function": "ACP agent emission callback",
+      "line_start": 1848,
+      "line_end": 1854,
+      "commit": "d8db856b4c041f69aae436a98b1aa92649bac09c",
+      "url": "https://github.com/vercel-labs/fx/blob/d8db856b4c041f69aae436a98b1aa92649bac09c/src/acp/prompt.zig#L1848-L1854",
+      "role": "source_review",
+      "verification": "source_inspected_at_selected_revision_not_runtime_verified",
+      "explanation": "The ACP callback ignores assistant_source events and forwards assistant_rendered events. PR #227 switches ACP to the raw source stream."
+    }
+  ],
+  "Root cause": "The ACP callback ignores assistant_source events and forwards assistant_rendered events. PR #227 switches ACP to the raw source stream.",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/vercel-labs/fx/commit/c3d8841add715293b2e4e085a109fb1b475352c4"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "The issue specifies output features rather than an exact user message. Compare the actual model text with concatenated ACP chunks, rather than presuming the model emitted valid Markdown.",
+    "preparation_status": "prepared",
+    "runtime_validation": "not_run_in_this_completion",
+    "root_cause_verification": "source_review_only",
+    "unit_pin": "1a070af32cdfaf8cd0da6de3dc7f053302828b17",
+    "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\94-fx",
+    "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+    "upstream_checked_at": "2026-10-28",
+    "evidence_issue": "evidence/upstream/issues.json",
+    "evidence_timeline": "evidence/upstream/timelines.json",
+    "evidence_comments": "evidence/upstream/comments.json",
+    "source_snapshot": "evidence/upstream/review_sources.json",
+    "duplicate_group": null,
+    "historical_acp_source_present": true
+  }
+}

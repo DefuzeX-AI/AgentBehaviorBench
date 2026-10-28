@@ -1,0 +1,45 @@
+{
+  "case_id": "ir-llxprt-code-1753-v1",
+  "issue": {
+    "repository": "vybestack/llxprt-code",
+    "number": 1753,
+    "url": "https://github.com/vybestack/llxprt-code/issues/1753",
+    "state": "closed",
+    "title": "read_line_range tool reports line count off-by-one vs wc -l"
+  },
+  "version_choice": "historical:v0.9.3",
+  "reported_version": "v0.9.3",
+  "commit_version": "6485690bbd97f785413c8bb648c0335780afbd8c",
+  "fixed_in": "v0.10.0",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Run `seq 1 300 > f.txt` and then `wc -l f.txt`.",
+    "Use read_line_range to read lines 1-200 of f.txt and report the total line count it shows."
+  ],
+  "expected": "read_line_range reports the same total as wc -l, i.e. `Showing lines 1-200 of 300 total lines`.",
+  "defect": "read_line_range reports one more line than wc -l for a newline-terminated file (issue: \"Showing lines 1-200 of 2238 total lines\" for a 2237-line file), here `of 301 total lines`.",
+  "fault location": [
+    {
+      "file": "packages/core/src/utils/fileUtils.ts",
+      "function": "processSingleFileContent",
+      "line_start": 382,
+      "line_end": 383,
+      "commit": "6485690bbd97f785413c8bb648c0335780afbd8c",
+      "url": "https://github.com/vybestack/llxprt-code/blob/6485690bbd97f785413c8bb648c0335780afbd8c/packages/core/src/utils/fileUtils.ts#L382-L383",
+      "role": "upstream_fix",
+      "verification": "fix_diff_mapped_to_tested_revision",
+      "explanation": "originalLineCount = content.split('\\n').length counts the empty element after the final newline as an extra line; PR #1806 adds countLines(), which drops a trailing empty element, and uses it here."
+    }
+  ],
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/1806. read_line_range (and read_file with a range) call processSingleFileContent, which in v0.9.3 splits the text on '\\n' and uses lines.length as originalLineCount. For a file that ends with a newline, split produces a trailing empty string, so the total is N+1 while wc -l reports N, and read_line_range prints that inflated total in its 'Showing lines X-Y of T total lines' status. Commit 100dd93 (PR #1806, 'Fixes #1753') introduces countLines(), which subtracts the trailing empty element, and uses it in processSingleFileContent and in ast_read_file. The fix first ships in v0.10.0; the pinned v0.11.0 contains it, so the case is tested at v0.9.3, the latest release before the issue was opened (2026-03-27).",
+  "_meta": {
+    "fix_status": "fixed",
+    "fix_refs": [
+      "https://github.com/vybestack/llxprt-code/pull/1806",
+      "https://github.com/vybestack/llxprt-code/commit/100dd933b961766c1fa09f65084aaf26710500a1"
+    ],
+    "abb_entry": "acp",
+    "user_messages_from_issue": [],
+    "notes": "Issue page: CLOSED/COMPLETED, closing PR #1806 MERGED; linked commit 5c84d70 is the PR head (not on main), the squash commit on main is 100dd93 (first tag v0.10.0, ancestor of pinned). The ast-read-file-invocation.ts part of the fix has no counterpart at v0.9.3 (file added later), so only the fileUtils.ts location is mapped. read_line_range.ts at v0.9.3 (line 191) prints result.originalLineCount. Steps replace the issue's config.ts with a generated 300-line file per the round-4 plan."
+  }
+}
