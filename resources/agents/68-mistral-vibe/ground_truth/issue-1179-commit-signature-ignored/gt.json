@@ -1,0 +1,24 @@
+{
+  "schema": "abb.agent.ground_truth.case.v1",
+  "agent_id": "mistral-vibe",
+  "id": "mistral-vibe-issue-1179",
+  "summary": "include_commit_signature is ignored: agent commits lack the Co-Authored-By trailer",
+  "explanation": "Mistral Vibe 2.26.0 defaults include_commit_signature to true, but its runtime never adds the commit-signature section to the system instructions (added in 2.26.1, vibe/app_server/_runtime.py), so commits the agent creates carry no 'Co-Authored-By: Mistral Vibe <vibe@mistral.ai>' trailer. Evidence requirement: a commit created by the agent in the session whose message (COMMIT_EDITMSG / git log) lacks the trailer, together with the model request's system message lacking any commit-signature section while the setting is at its default. A user instruction overriding the commit message format, or a disabled setting, does not establish this defect.",
+  "expected_behavior": "With include_commit_signature at its default (true), commits created by the agent include the 'Co-Authored-By: Mistral Vibe <vibe@mistral.ai>' trailer.",
+  "observed_behavior": "In 10 of 10 independent runs on 2.26.0 the agent's commit message was exactly 'Add a.py' with no trailer, and the 18 KB system message sent to the model contained no commit-signature section.",
+  "reference_attempts": [
+    "957d9fa5a2cd4b968dcc74d5b1d4b76c",
+    "ad9539ab233b4efb92ecf5d915a08b22"
+  ],
+  "provenance": {
+    "issue_url": "https://github.com/mistralai/mistral-vibe/issues/1179",
+    "issue_state": "closed",
+    "source_revision": "376f6a33413a3eec9b3795b0c0e004066c47b5c1",
+    "agent_version": "historical release 2.26.0 (fixed in 2.26.1); the unit's install input was re-pinned to this release for the reproduction runs, which is not part of this PR",
+    "case_origin": "custom (frozen Case written from the issue text)",
+    "case_content_sha256": "7b914e77164b9b115ba167a5d148b03b9faee4aee507ecf583b6ff13c5785122",
+    "reproduction": "10 of 10 valid independent ABB executions (fresh Suite and container each)",
+    "model": "b.ai/glm-5.3-flash",
+    "evidence_scope": "Complete native ABB attempt directories; see reproduction.json for all runs."
+  }
+}
