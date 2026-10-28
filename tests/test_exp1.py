@@ -55,7 +55,7 @@ def test_case_order_budget_and_duplicate_identity(tmp_path):
     for name in ('10', '2', '1'):
         write_json(tmp_path / f'{name}.json', case(name))
     group = load_cases(tmp_path, 2)
-    assert [c['case_id'] for c in group['cases']] == ['1', '2']
+    assert [c['case_id'] for c in group['cases']] == ['1', '2', '10']
     assert group['available_cases'] == 3
     write_json(tmp_path / '01.json', case('extra'))
     with pytest.raises(ValueError, match='Duplicate'):
@@ -143,14 +143,14 @@ def test_execute_then_match_without_judge_and_without_rerunning(project, oracle,
     result = experiment.run('example', case_dir, tests=1)
     assert len(seen) == 1, result
     assert result['metrics']['Detection@1']['value'] == 1
-    assert result['cost']['execution_attempts'] == 1
+    assert result['cost']['execution_attempts'] == 2
     assert result['issues'][0]['hit_count'] == 1
     assert result['issues'][0]['first_hit'] == 1
     assert policies and set(policies) == {0}
     assert result['issues'][0]['tests'][0]['evidence']['candidate']
-    assert len(agent.requests) == 1
+    assert len(agent.requests) == 2
     assert all(p.closed for p in processes)
-    suite = service.result(result['suite'])
+    suite = service.result(result['rounds'][0]['suite'])
     assert suite['suite']['judge_counts'].get('issue', 0) == 0
     assert not list(Path(suite['directory']).rglob('report.json'))
     # The target sees exactly the submitted public payload, never hidden GT.
@@ -165,6 +165,18 @@ def test_execute_then_match_without_judge_and_without_rerunning(project, oracle,
     # The evaluator uses its frozen GT snapshot, not a later edited live Issue.
     (service.root / 'unit/ground_truth/issue_1/case.verified.json').unlink()
     assert experiment.match(result['directory'])['metrics'] == result['metrics']
+
+    # Existing v2 plans have one Suite and one execution per Case.
+    directory = Path(result['directory'])
+    plan = json.loads((directory / 'plan.json').read_text())
+    plan.pop('execution_mode')
+    write_json(directory / 'plan.json', plan)
+    execution = json.loads((directory / 'execution.json').read_text())
+    write_json(directory / 'execution.json', execution['rounds'][0])
+    experiment.ask = lambda *a, **k: answer()
+    legacy = experiment.match(directory)
+    assert len(legacy['issues'][0]['tests']) == 2
+    assert legacy['metrics'] == result['metrics']
 
 
 def test_one_execution_is_matched_against_every_issue(project, oracle, monkeypatch):
@@ -183,13 +195,13 @@ def test_one_execution_is_matched_against_every_issue(project, oracle, monkeypat
     inject_candidate(service, monkeypatch)
     result = Experiment1(service.root, execution_service=service, ask=ask, output=lambda _: None).run(
         'example', case_dir, tests=2)
-    assert len(agent.requests) == 2
-    assert result['cost']['execution_attempts'] == 2
+    assert len(agent.requests) == 4
+    assert result['cost']['execution_attempts'] == 4
     # Both tests share one injected trajectory, so each Issue's second request reuses the first.
     assert sorted(compared) == [1, 2]
     assert [i['issue_id'] for i in result['issues']] == ['issue_1', 'issue_2']
     assert [i['hit_count'] for i in result['issues']] == [2, 0]
-    assert [[t['cache_reused'] for t in i['tests']] for i in result['issues']] == [[False, True]] * 2
+    assert [[t['cache_reused'] for t in i['tests']] for i in result['issues']] == [[False, True, True, True]] * 2
     assert result['metrics']['Detection@1']['value'] == .5
     assert result['status'] == 'completed'
 
@@ -284,7 +296,7 @@ def test_cli_registration_and_default_budget():
         build_parser().parse_args(['exp1', 'run', 'example'])
 
 
-def test_case_workers_are_bounded_and_each_case_submitted_once(project, oracle, monkeypatch):
+def test_case_workers_are_bounded_and_all_cases_repeat_each_round(project, oracle, monkeypatch):
     service, _, _ = project
     calls = []
     for number in (1, 2):
@@ -300,10 +312,11 @@ def test_case_workers_are_bounded_and_each_case_submitted_once(project, oracle, 
     monkeypatch.setattr(service, 'execute', execute)
     result = Experiment1(service.root, execution_service=service, output=lambda _: None).run(
         'example', service.root / 'cases/run-01', tests=3, workers=2)
-    assert calls == [['0', '1', '2']]
+    assert calls == [['0', '1', '2', '3', '4']] * 3
     assert result['issue_count'] == 2
-    assert result['submitted_tests'] == 3
-    assert all(len(i['tests']) == 3 for i in result['issues'])
+    assert result['submitted_tests'] == 15
+    assert result['submitted_rounds'] == 3
+    assert all(len(i['tests']) == 15 and len(i['rounds']) == 3 for i in result['issues'])
 
 
 def test_cli_result_is_read_only_and_needs_no_credentials(tmp_path, capsys, monkeypatch):
@@ -313,3 +326,62 @@ def test_cli_result_is_read_only_and_needs_no_credentials(tmp_path, capsys, monk
                         lambda *a, **k: pytest.fail('Read-only result must not load credentials'))
     assert cli(['exp1', 'result', '--experiment', str(tmp_path)]) == 0
     assert json.loads(capsys.readouterr().out)['status'] == 'completed'
+
+
+@pytest.mark.parametrize(('case_count', 'round_count'), [(1, 10), (3, 2)])
+def test_all_cases_repeat_in_fresh_sessions_and_workspaces(project, oracle, monkeypatch, case_count, round_count):
+    from agentbench.sdk.integration import execution
+    service, agent, processes = project
+    manifest = service.root / 'unit/agent.toml'
+    with manifest.open('a') as stream:
+        stream.write('[evaluation.workspace]\npath="/home/agent/work"\ninitial_state="empty"\n')
+    install_issue(service)
+    case_dir = service.root / 'cases/run-01'
+    for i in range(case_count):
+        write_json(case_dir / f'{i+1:04d}.json', {
+            'case_id': f'case-{i}', 'inputs': [
+                {'input_id': 'task', 'payload': f'{i}-one'}]})
+    workspaces = []
+    prepare = execution.prepare_workspace
+    def inspect_workspace(root, destination, policy):
+        assert not list(destination.iterdir())
+        workspaces.append(destination)
+        return prepare(root, destination, policy)
+    monkeypatch.setattr(execution, 'prepare_workspace', inspect_workspace)
+    inject_candidate(service, monkeypatch)
+    experiment = Experiment1(service.root, execution_service=service,
+                             ask=lambda *a, **k: answer(), output=lambda _: None)
+    result = experiment.run('example', case_dir, tests=round_count)
+    assert result['submitted_rounds'] == round_count and result['submitted_tests'] == case_count * round_count
+    assert len(result['rounds']) == round_count
+    assert len({r['suite'] for r in result['rounds']}) == round_count
+    assert all(r['wall_seconds'] > 0 for r in result['rounds'])
+    assert [r['round_index'] for r in result['tests']] == [round_index for round_index in range(1, round_count + 1) for _ in range(case_count)]
+    assert [r['case_id'] for r in result['tests']] == [f'case-{i}' for i in range(case_count)] * round_count
+    assert all(r['execution_attempts'] == 1 and r['execution_wall_seconds'] is not None
+               for r in result['tests'])
+    assert len(agent.requests) == case_count * round_count
+    assert len({r['session_id'] for r in agent.requests}) == case_count * round_count
+    assert len({p for p in workspaces if p.parent.name == 'attempts'}) == case_count * round_count
+    assert all(not p.exists() for p in workspaces)
+    assert all(p.closed for p in processes)
+    assert result['issues'][0]['first_hit'] == 1
+    assert len(result['issues'][0]['rounds']) == round_count
+    assert result['metrics']['Detection@1']['value'] == 1
+    for i in range(1, round_count + 1):
+        saved = Path(result['directory']) / 'execution/rounds' / f'{i:04d}/execution.json'
+        assert json.loads(saved.read_text())['wall_seconds'] == result['rounds'][i-1]['wall_seconds']
+    monkeypatch.setattr(service, 'execute', lambda *a, **k: pytest.fail('Match must not execute'))
+    experiment.ask = lambda *a, **k: pytest.fail('Match must reuse oracle result')
+    assert experiment.match(result['directory'])['metrics'] == result['metrics']
+
+
+def test_detection_counts_rounds_not_individual_cases():
+    from agentbench.experiments.exp1_metrics import summarize_rounds
+    rows = [{'round_index': number, 'hit': hit}
+            for number, hits in [(1, [False, False]), (2, [None, False]), (3, [False, True])]
+            for hit in hits]
+    rounds = summarize_rounds(rows)
+    assert [r['hit'] for r in rounds] == [False, None, True]
+    assert all(r['case_count'] == 2 for r in rounds)
+    assert summarize([{'tests': rounds}], 3)['Detection@1']['value'] == 0

@@ -41,4 +41,4 @@ def load_cases(directory, budget):
     if any(not isinstance(c, str) or not c.strip() for c in ids) or len(set(ids)) != len(ids):
         raise ValueError('Case IDs must be nonempty and unique')
     # Preserve array order or numeric filename order, never completion order.
-    return {'available_cases': len(cases), 'cases': cases[:budget]}
+    return {'available_cases': len(cases), 'cases': cases}

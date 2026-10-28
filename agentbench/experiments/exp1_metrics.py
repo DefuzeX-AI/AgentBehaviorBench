@@ -23,3 +23,16 @@ def summarize(issues, budget):
             'hit_issues': hit, 'pending_issues': pending, 'issues': count,
             'bounds': [hit / count, (hit + pending) / count] if count else None}
     return metrics
+
+
+def summarize_rounds(rows):
+    """A round hits when any Case hits; uncertain Cases remain uncertain."""
+    groups = {}
+    for row in rows:
+        groups.setdefault(row['round_index'], []).append(row)
+    result = []
+    for number, members in sorted(groups.items()):
+        hit = (True if any(r['hit'] is True for r in members) else
+               None if any(r['hit'] is None for r in members) else False)
+        result.append({'round_index': number, 'hit': hit, 'case_count': len(members)})
+    return result

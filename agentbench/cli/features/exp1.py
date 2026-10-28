@@ -10,11 +10,11 @@ from .base import CommandFeature
 def configure(parser):
     from agentbench.project import project_root
     commands = parser.add_subparsers(dest='operation', required=True)
-    run = commands.add_parser('run', help='Execute imported Cases once, then match every Issue GT')
+    run = commands.add_parser('run', help='Run every imported Case for N rounds, then match every Issue GT')
     run.add_argument('agent_id')
     run.add_argument('--case-dir', type=Path, required=True,
                      help='Case group directory holding numbered Case files or cases.json')
-    run.add_argument('--tests', type=int, default=50, help='Cases to execute, each once (1-50; default 50)')
+    run.add_argument('--tests', type=int, default=50, help='Independent rounds over all supplied Cases (1-50; default 50)')
     run.add_argument('--workers', type=int, default=1, help='Concurrent Cases (default 1)')
     run.add_argument('--results-dir', type=Path)
     run.add_argument('--prompt-template', type=Path, help='Record the shared testing prompt template')
