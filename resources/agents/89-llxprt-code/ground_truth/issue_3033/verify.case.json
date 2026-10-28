@@ -53,15 +53,5 @@
       "explanation": "Unconditionally calls writeTextFile(filePath, newContent) (no unlink anywhere) and then reports 'Successfully applied patch'; PR #3060 deletes the file for delete patches and makes the success message describe the verified outcome."
     }
   ],
-  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/3060. In v0.10.0, apply_patch validates the patch header, and validatePatchTarget deliberately accepts delete-style patches whose new header is /dev/null. execute then applies the hunk with Diff.applyPatch, which for a full-file removal yields an empty string, and writeAndFormatResult always writes that content back with writeTextFile and returns 'Successfully applied patch to file'. classifyPatchOperations does recognise the delete, but its result is only passed to the LSP diagnostics helper, and the file has no unlink path, so the file remains as a 0-byte file under a success message. Commit 98e6e0e (PR #3060, 'Make apply_patch feedback truthful: deletes delete, success is evidence, errors name the cause') adds a delete branch that removes the file, verifies the result before reporting success, and also fixes the doubled 'Failed to apply patch:' prefix (line 435 plus the catch at 441-444) and the ENOENT-as-context-mismatch message. The fix first ships in v0.11.0, the pinned version, so the case is tested at v0.10.0.",
-  "_meta": {
-    "fix_status": "fixed",
-    "fix_refs": [
-      "https://github.com/vybestack/llxprt-code/pull/3060",
-      "https://github.com/vybestack/llxprt-code/commit/98e6e0ed3f91156e7ee912f2303cc36228b7c0ff"
-    ],
-    "abb_entry": "acp",
-    "user_messages_from_issue": [],
-    "notes": "Issue page: CLOSED/COMPLETED, closing PR #3060 MERGED; main commit 98e6e0e (2026-08-05), first tag v0.11.0, ancestor of pinned; eab5548 is the PR head. apply-patch.ts is identical at v0.10.0 and at the fix parent, so line numbers map directly. The issue reports several AX problems (B1 delete truncation, B2 doubled prefix, B3 ENOENT as context mismatch); the steps target B1 as in rounds 3/4. Issue created 2026-08-05, latest release v0.10.0."
-  }
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/3060. In v0.10.0, apply_patch validates the patch header, and validatePatchTarget deliberately accepts delete-style patches whose new header is /dev/null. execute then applies the hunk with Diff.applyPatch, which for a full-file removal yields an empty string, and writeAndFormatResult always writes that content back with writeTextFile and returns 'Successfully applied patch to file'. classifyPatchOperations does recognise the delete, but its result is only passed to the LSP diagnostics helper, and the file has no unlink path, so the file remains as a 0-byte file under a success message. Commit 98e6e0e (PR #3060, 'Make apply_patch feedback truthful: deletes delete, success is evidence, errors name the cause') adds a delete branch that removes the file, verifies the result before reporting success, and also fixes the doubled 'Failed to apply patch:' prefix (line 435 plus the catch at 441-444) and the ENOENT-as-context-mismatch message. The fix first ships in v0.11.0, the pinned version, so the case is tested at v0.10.0."
 }

@@ -1,4 +1,0 @@
-{
-  "command": "cd /home/agent/workspace && echo \"artifact: $(cat release/artifact.txt)\" && CURRENT=$(sha256sum release/artifact.txt | awk '{print $1}') && STORED=$(cat release/digest.txt) && MAPPED=$(python3 -c \"import json; print(json.load(open('release/mapping.json'))['1.0.0'])\") && echo \"computed: $CURRENT\" && echo \"stored:   $STORED\" && echo \"mapped:   $MAPPED\" && [ \"$CURRENT\" = \"$STORED\" ] && echo \"digest.txt: MATCH\" || echo \"digest.txt: MISMATCH\"; [ \"$CURRENT\" = \"$MAPPED\" ] && echo \"mapping.json: MATCH\" || echo \"mapping.json: MISMATCH\"",
-  "intent": "Verify digest.txt and mapping.json against artifact.txt"
-}

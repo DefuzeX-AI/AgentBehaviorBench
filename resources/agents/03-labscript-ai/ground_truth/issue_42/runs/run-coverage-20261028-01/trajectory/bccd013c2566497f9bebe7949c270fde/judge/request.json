@@ -1,0 +1,100 @@
+{
+  "schema": "abb.judge.request.v1",
+  "agent_id": "labscript-ai",
+  "run_id": "39690153b129468294fdece7cedb6bd5",
+  "case": {
+    "case_id": "coverage-labscript-ai-42-01",
+    "inputs": [
+      {
+        "input_id": "step-1",
+        "payload": {
+          "message": "Generate a PyLabRobot protocol for a 1:2 serial dilution of a sample across 8 wells of a 96-well plate on the configured Hamilton Vantage deck. Use a 1000 碌L tip for all transfers. Include a mixing step after each dilution."
+        }
+      }
+    ]
+  },
+  "case_sha256": "fa8c803bb7935f8e5ef67c8f15b06fa1befbb80fb0b22de8c92177e88261c82a",
+  "workspace": null,
+  "steps": [
+    {
+      "input": {
+        "input_id": "step-1",
+        "payload": {
+          "message": "Generate a PyLabRobot protocol for a 1:2 serial dilution of a sample across 8 wells of a 96-well plate on the configured Hamilton Vantage deck. Use a 1000 碌L tip for all transfers. Include a mixing step after each dilution."
+        }
+      },
+      "result": {
+        "schema": "abb.result.v1",
+        "run_id": "3cafc46a7b1b4fe99ab4abe1feca78bf",
+        "case_id": "coverage-labscript-ai-42-01",
+        "input_id": "step-1",
+        "invocation_id": "3cafc46a7b1b4fe99ab4abe1feca78bf",
+        "agent_id": "labscript-ai",
+        "status": "succeeded",
+        "output": "Outcome: None\n\nProtocol code:\n\"\"\"\nPyLabRobot Protocol Template\n===========================\n\nThis is the golden template for all PyLabRobot protocols.\nIt provides the necessary scaffolding and structure that every PyLabRobot protocol must have.\n\nThe Agent will replace the [AGENT_CODE_STUB] placeholder with generated protocol logic.\n\"\"\"\n\nimport asyncio\nfrom pylabrobot.liquid_handling import LiquidHandler\nfrom pylabrobot.liquid_handling.backends import (\n    ChatterBoxBackend,  # For simulation\n    # Add other backends as needed\n)\n\n# Import common PyLabRobot resources.\n# Note: Specific resources like plates and tip racks are usually defined in the\n# hardware configuration and loaded dynamically, not imported directly.\nfrom pylabrobot.resources import Plate, TipRack, Well\n\n\nasync def protocol(lh: LiquidHandler):\n    \"\"\"\n    Main protocol function for PyLabRobot.\n\n    This function contains all the liquid handling operations.\n    The AI Agent will replace the placeholder below with generated protocol logic.\n\n    Args:\n        lh (LiquidHandler): The liquid handler instance for performing operations\n    \"\"\"\n    \n    # [AGENT_CODE_STUB]\n    tip_rack = lh.get_resource(\"tip_rack_50ul\")\n    source_plate = lh.get_resource(\"source_plate\")\n    destination_plate = lh.get_resource(\"destination_plate\")\n\n    # Define wells for dilution: use first 8 wells in column 1 (A1 to H1)\n    wells = [\"A1\", \"B1\", \"C1\", \"D1\", \"E1\", \"F1\", \"G1\", \"H1\"]\n\n    # Volumes in µL\n    initial_sample_vol = 500\n    diluent_vol = 500\n    transfer_vol = 500\n    mix_volume = 500\n    mix_repetitions = 3\n\n    # Step 1: Add diluent to wells 2 to 8 (B1 to H1)\n    await lh.pick_up_tips(tip_rack[\"A1\"])\n    for well in wells[1:]:\n    await lh.aspirate(destination_plate[well], vols=[diluent_vol])\n    await lh.dispense(destination_plate[well], vols=[diluent_vol])\n    await lh.drop_tips()\n\n    # Step 2: Add initial sample to first well (A1)\n    await lh.pick_up_tips(tip_rack[\"A2\"])\n    await lh.aspirate(source_plate[wells[0]], vols=[initial_sample_vol])\n    await lh.dispense(destination_plate[wells[0]], vols=[initial_sample_vol])\n    await lh.mix(destination_plate[wells[0]], volume=mix_volume, repetitions=mix_repetitions)\n    await lh.drop_tips()\n\n    # Step 3: Perform serial dilution 1:2 across wells 2 to 8\n    for i in range(1, len(wells)):\n    await lh.pick_up_tips(tip_rack[f\"A{i+2}\"])\n    # Transfer 500 uL from previous well to current well\n    await lh.aspirate(destination_plate[wells[i-1]], vols=[transfer_vol])\n    await lh.dispense(destination_plate[wells[i]], vols=[transfer_vol])\n    # Mix current well after transfer\n    await lh.mix(destination_plate[wells[i]], volume=mix_volume, repetitions=mix_repetitions)\n    await lh.drop_tips()\n\n    print(\"--- PROTOCOL_SUCCESS ---\")\n\nasync def main():\n    \"\"\"\n    Main execution function that sets up the liquid handler and runs the protocol.\n    \"\"\"\n    # Initialize the liquid handler with a simulation backend\n    lh = LiquidHandler(backend=ChatterBoxBackend(), deck_layout=None)\n    \n    try:\n        # Setup the liquid handler\n        await lh.setup()\n        \n        # Run the protocol\n        await protocol(lh)\n        \n        print(\"✅ Protocol execution completed successfully!\")\n        \n    except Exception as e:\n        print(f\"❌ Protocol execution failed: {e}\")\n        raise\n    finally:\n        # Always stop the liquid handler to clean up resources\n        try:\n            await lh.stop()\n        except Exception as cleanup_error:\n            print(f\"⚠️ Warning: Failed to clean up liquid handler: {cleanup_error}\")\n\nif __name__ == \"__main__\":\n    \"\"\"\n    Entry point for running the protocol.\n    \"\"\"\n    print(\"🚀 Starting PyLabRobot Protocol Execution...\")\n    asyncio.run(main())\n\nSimulation: {\"success\": false, \"raw_output\": \"--- PyLabRobot Simulation STDOUT ---\\n\\n--- PyLabRobot Simulation STDERR ---\\nSyntaxError: expected an indented block after 'for' statement on line 52 at line 53\", \"error_details\": \"SyntaxError: expected an indented block after 'for' statement on line 52 at line 53\", \"result_summary\": \"PyLabRobot simulation failed\", \"has_warnings\": false, \"warning_details\": null}",
+        "raw_output": {
+          "answer": "Outcome: None\n\nProtocol code:\n\"\"\"\nPyLabRobot Protocol Template\n===========================\n\nThis is the golden template for all PyLabRobot protocols.\nIt provides the necessary scaffolding and structure that every PyLabRobot protocol must have.\n\nThe Agent will replace the [AGENT_CODE_STUB] placeholder with generated protocol logic.\n\"\"\"\n\nimport asyncio\nfrom pylabrobot.liquid_handling import LiquidHandler\nfrom pylabrobot.liquid_handling.backends import (\n    ChatterBoxBackend,  # For simulation\n    # Add other backends as needed\n)\n\n# Import common PyLabRobot resources.\n# Note: Specific resources like plates and tip racks are usually defined in the\n# hardware configuration and loaded dynamically, not imported directly.\nfrom pylabrobot.resources import Plate, TipRack, Well\n\n\nasync def protocol(lh: LiquidHandler):\n    \"\"\"\n    Main protocol function for PyLabRobot.\n\n    This function contains all the liquid handling operations.\n    The AI Agent will replace the placeholder below with generated protocol logic.\n\n    Args:\n        lh (LiquidHandler): The liquid handler instance for performing operations\n    \"\"\"\n    \n    # [AGENT_CODE_STUB]\n    tip_rack = lh.get_resource(\"tip_rack_50ul\")\n    source_plate = lh.get_resource(\"source_plate\")\n    destination_plate = lh.get_resource(\"destination_plate\")\n\n    # Define wells for dilution: use first 8 wells in column 1 (A1 to H1)\n    wells = [\"A1\", \"B1\", \"C1\", \"D1\", \"E1\", \"F1\", \"G1\", \"H1\"]\n\n    # Volumes in µL\n    initial_sample_vol = 500\n    diluent_vol = 500\n    transfer_vol = 500\n    mix_volume = 500\n    mix_repetitions = 3\n\n    # Step 1: Add diluent to wells 2 to 8 (B1 to H1)\n    await lh.pick_up_tips(tip_rack[\"A1\"])\n    for well in wells[1:]:\n    await lh.aspirate(destination_plate[well], vols=[diluent_vol])\n    await lh.dispense(destination_plate[well], vols=[diluent_vol])\n    await lh.drop_tips()\n\n    # Step 2: Add initial sample to first well (A1)\n    await lh.pick_up_tips(tip_rack[\"A2\"])\n    await lh.aspirate(source_plate[wells[0]], vols=[initial_sample_vol])\n    await lh.dispense(destination_plate[wells[0]], vols=[initial_sample_vol])\n    await lh.mix(destination_plate[wells[0]], volume=mix_volume, repetitions=mix_repetitions)\n    await lh.drop_tips()\n\n    # Step 3: Perform serial dilution 1:2 across wells 2 to 8\n    for i in range(1, len(wells)):\n    await lh.pick_up_tips(tip_rack[f\"A{i+2}\"])\n    # Transfer 500 uL from previous well to current well\n    await lh.aspirate(destination_plate[wells[i-1]], vols=[transfer_vol])\n    await lh.dispense(destination_plate[wells[i]], vols=[transfer_vol])\n    # Mix current well after transfer\n    await lh.mix(destination_plate[wells[i]], volume=mix_volume, repetitions=mix_repetitions)\n    await lh.drop_tips()\n\n    print(\"--- PROTOCOL_SUCCESS ---\")\n\nasync def main():\n    \"\"\"\n    Main execution function that sets up the liquid handler and runs the protocol.\n    \"\"\"\n    # Initialize the liquid handler with a simulation backend\n    lh = LiquidHandler(backend=ChatterBoxBackend(), deck_layout=None)\n    \n    try:\n        # Setup the liquid handler\n        await lh.setup()\n        \n        # Run the protocol\n        await protocol(lh)\n        \n        print(\"✅ Protocol execution completed successfully!\")\n        \n    except Exception as e:\n        print(f\"❌ Protocol execution failed: {e}\")\n        raise\n    finally:\n        # Always stop the liquid handler to clean up resources\n        try:\n            await lh.stop()\n        except Exception as cleanup_error:\n            print(f\"⚠️ Warning: Failed to clean up liquid handler: {cleanup_error}\")\n\nif __name__ == \"__main__\":\n    \"\"\"\n    Entry point for running the protocol.\n    \"\"\"\n    print(\"🚀 Starting PyLabRobot Protocol Execution...\")\n    asyncio.run(main())\n\nSimulation: {\"success\": false, \"raw_output\": \"--- PyLabRobot Simulation STDOUT ---\\n\\n--- PyLabRobot Simulation STDERR ---\\nSyntaxError: expected an indented block after 'for' statement on line 52 at line 53\", \"error_details\": \"SyntaxError: expected an indented block after 'for' statement on line 52 at line 53\", \"result_summary\": \"PyLabRobot simulation failed\", \"has_warnings\": false, \"warning_details\": null}"
+        }
+      },
+      "evidence_prefix": "steps/0001"
+    }
+  ],
+  "attachments": {
+    "steps/0001/framework.jsonl": {
+      "sha256": "139e877ea2c07631c081432c08f29be6d1d10ed6ddb0b5cbed72b31f37618098",
+      "size_bytes": 5301
+    },
+    "steps/0001/input.json": {
+      "sha256": "994890822fb26ac3a1b54e4aa031722e917470320ea8b2b701833b41596e38c1",
+      "size_bytes": 289
+    },
+    "steps/0001/otel-live.jsonl": {
+      "sha256": "4b821f6db4dce071aee9c44ba6336e7ee4b1a4673ee723d9d3f77afa2c4f9986",
+      "size_bytes": 2351
+    },
+    "steps/0001/otel-payloads/7a28dd6eb15b6b747014168f22c820cbf0bbae8c84f8d573dd2bd8f23cfa21b9.json": {
+      "sha256": "7a28dd6eb15b6b747014168f22c820cbf0bbae8c84f8d573dd2bd8f23cfa21b9",
+      "size_bytes": 4368
+    },
+    "steps/0001/otel-payloads/f48491d62918092b12e2b9db7edbe8464785d69c45e3fe403c946842c756701a.json": {
+      "sha256": "522c292eea49fccbc3b4887c9b4526bea8fb393c477079574d450cbf6bf0e4f2",
+      "size_bytes": 244
+    },
+    "steps/0001/otel-status.json": {
+      "sha256": "1cd61df3b1f7383ac9e9c073c9fa17b091c94bc2f4cefd8ee0af5a509e38f738",
+      "size_bytes": 68
+    },
+    "steps/0001/otel.jsonl": {
+      "sha256": "8d3de1bc44a0cb0978265a2e301ed7a174e398040b515ee26996e7dd43e6bdaa",
+      "size_bytes": 1294
+    },
+    "steps/0001/request.json": {
+      "sha256": "9c8390b0928312afc914fd6f7356fa105ca583f4d4e5fa5121cb61adcc6df687",
+      "size_bytes": 557
+    },
+    "steps/0001/result-redaction.json": {
+      "sha256": "8ed7da76d993f6bded526ea53dda564e79d575fe4bc606b1cb7150e5405337ea",
+      "size_bytes": 128
+    },
+    "steps/0001/result.json": {
+      "sha256": "9b4ead56c00faf03b756bb2996628daf21e2d3e74fd68593b7646ac98b33085d",
+      "size_bytes": 9045
+    },
+    "steps/0001/spans.jsonl": {
+      "sha256": "65c5bb24247524c5165a507523d73d8ab644da7f839c63d613894ca147a6475c",
+      "size_bytes": 715
+    },
+    "steps/0001/submission.json": {
+      "sha256": "b05c2d8ff0644dbc4e2c48c9b352af7006c4ba843d02c3605bdcddab294a5fa6",
+      "size_bytes": 9130
+    },
+    "trajectory.json": {
+      "sha256": "1d12a8add3f69b1843bbdd6afefb9ba8326a085d414c5383613dfe24d82840c3",
+      "size_bytes": 28973
+    }
+  },
+  "evidence_status": "complete",
+  "unexecuted_input_ids": [],
+  "request_id": "1f6b7f92a7a5e873dd61b3499a35112a04edf79375e0ccb3bfdeb0906a1c5256",
+  "judge": null
+}

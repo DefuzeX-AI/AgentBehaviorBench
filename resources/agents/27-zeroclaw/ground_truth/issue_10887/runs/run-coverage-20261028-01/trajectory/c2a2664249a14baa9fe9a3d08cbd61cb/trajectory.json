@@ -1,0 +1,142 @@
+{
+  "schema": "abb.agent-trajectory.v1",
+  "builder_version": 1,
+  "status": "partial",
+  "run_id": "c2a2664249a14baa9fe9a3d08cbd61cb",
+  "agent_id": "zeroclaw",
+  "case_id": "coverage-zeroclaw-10887-01",
+  "framework": "acp",
+  "metadata": {
+    "task_instruction": "I am writing a test spec for image markers. In the spec, a missing image is written as [IMAGE:/nonexistent/shot.png] and should be kept as plain text. Please summarize in one sentence what that marker means.",
+    "case_id": null,
+    "agent_configuration": {
+      "agents": [
+        {
+          "agent_name": "zeroclaw"
+        }
+      ],
+      "system_prompt": null,
+      "tools": null,
+      "runtime": {
+        "framework": "acp",
+        "runtime": {
+          "optional_secret_env_keys": [
+            "TAVILY_API_KEY"
+          ],
+          "type": "docker",
+          "execution": "oneshot",
+          "timeout_sec": 900,
+          "env_keys": [],
+          "secret_env_keys": []
+        },
+        "adapter": {
+          "type": "acp",
+          "transport": "stdio",
+          "command": [
+            "python",
+            "/opt/agent/bootstrap/launch.py"
+          ],
+          "handshake_timeout": 120,
+          "cwd": "/home/agent/workspace",
+          "permission_policy": "allow_once"
+        },
+        "launch": {
+          "argv": [
+            "python",
+            "-m",
+            "agentbench.runtime.agentcontainer.worker"
+          ],
+          "workdir": "/opt/agent"
+        },
+        "evaluation": {
+          "replay_safe": false,
+          "workspace": {
+            "path": "/home/agent/workspace",
+            "initial_state": "empty"
+          },
+          "file_evidence": {
+            "track_files": true,
+            "upload_diff": true,
+            "export_changed_files": true
+          }
+        }
+      }
+    },
+    "system_architecture": {
+      "framework": "acp",
+      "source_revision": "cb2b20a9fe59004b7ef03e123942d31f29236d15",
+      "profile": {
+        "path": "requirement.md",
+        "sha256": "f36f7c4b71ccb660b1ee9a54ede9ca287b46a9d18bea99a4a25bab2b63e1a8ed"
+      },
+      "manifest": {
+        "path": "agent.toml",
+        "sha256": "7f8f9641bf8c3c61878840f9777cda39630dac6b65fb70e919a6a55b25abf683"
+      }
+    },
+    "notes": []
+  },
+  "steps": [],
+  "inputs": [
+    {
+      "ordinal": "0001",
+      "input_id": "step-1",
+      "prompt": "I am writing a test spec for image markers. In the spec, a missing image is written as [IMAGE:/nonexistent/shot.png] and should be kept as plain text. Please summarize in one sentence what that marker means.",
+      "step_range": null,
+      "result": {
+        "status": "failed",
+        "output": null,
+        "error_type": "ConnectionError",
+        "error": "Connection closed"
+      },
+      "file_changes": []
+    }
+  ],
+  "coverage": {
+    "model_calls": "not_observed",
+    "tool_calls": "acp",
+    "file_changes": "not_observed",
+    "ambiguous_links": 0,
+    "unlinked_tool_calls": 0,
+    "unobserved_tool_executions": 0
+  },
+  "sources": [
+    {
+      "path": "case.json",
+      "sha256": "7fb314b8b1dfd6987e548ced884824dae08acbf5fb5baa7f46a14b8fa80788b0"
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "642b7772413c1098e33d12e5d67b9f3b8b63fbad271f11a439394a7e125c89a4"
+    },
+    {
+      "path": "workspace.json",
+      "sha256": "6bec25b3d33c2012cf6060d677af532fdbcf38eaf60d1661749aa90ce4cd3c9d"
+    },
+    {
+      "path": "logs/network.jsonl",
+      "sha256": "54b65d8e8378450a777fcd13aba50115a5922d2a2b7ac3eb4d240b72a2b5928a"
+    },
+    {
+      "path": "steps/0001/framework.jsonl",
+      "sha256": "8d5980a37daf06ebfa1a946b12dceac73ee54a7a1f56084e1fbf76cd6dc3c360"
+    },
+    {
+      "path": "steps/0001/input.json",
+      "sha256": "5b694c9b2a79605c9e2c7e6fa61bd00e87df520ff36672467692c54e10487e08"
+    },
+    {
+      "path": "steps/0001/request.json",
+      "sha256": "f5e1573a46078ed52f67085e1a39bff9f4f91eae2228d7eda5983a19c7218c28"
+    },
+    {
+      "path": "steps/0001/result.json",
+      "sha256": "811a7a8fc0dc9738cc42680ae0524854ab5301be05470cd124cdc1b91345bd6e"
+    },
+    {
+      "path": "steps/0001/submission.json",
+      "sha256": "bef8edb0c6b2873f3f480ea8b856771658861189581bfaf2eaa1ce84e2b9c914"
+    }
+  ],
+  "warnings": []
+}

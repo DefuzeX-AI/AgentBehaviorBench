@@ -41,16 +41,5 @@
       "explanation": "Writes editData.newContent without restoring the original line endings."
     }
   ],
-  "Root cause": "The replace tool normalizes all CRLF sequences to LF in readFileState, then computes the replacement and writes the normalized newContent through the host filesystem callback. Thus a one-line edit also rewrites untouched line endings. Prepare the original six-line CRLF service.ini fixture: [service], name=billing-sync, host=0.0.0.0, port=8080, workers=4, log_level=info, with a trailing CRLF (82 bytes). ACP file callbacks are part of the recorded execution path. Nine executed observations are retained; original runs 01, 03, 08 and 12 were infrastructure failures or did not reach the required path. Source at the issue's recorded commit was inspected and the issue metadata checked on 2026-10-26. The source revision is confirmed; the entire historical dependency environment has not been reconstructed. No new agent execution or fix regression test was performed. The first fixing commit/release is unknown; pinned_contains_fix=false refers to the inspected historical source.",
-  "_meta": {
-    "fix_status": "source_confirmed",
-    "fix_refs": [],
-    "abb_entry": "acp",
-    "user_messages_from_issue": [],
-    "source_case": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\89-llxprt-code\\ground_truth\\issue-3945\\case.verified.json",
-    "source_case_id": "srp-llxprt-h1-crlf-replace-v1",
-    "preparation_status": "prepared_from_recorded_case",
-    "runtime_validation": "not_run_in_this_completion",
-    "notes": "Reused the existing ABB source-confirmed case. Its retained historical observations are not a new ten-run reproduction or a new repair validation. Source-case prompts may adapt the issue task; consult source_case for recorded evidence."
-  }
+  "Root cause": "The replace tool normalizes all CRLF sequences to LF in readFileState, then computes the replacement and writes the normalized newContent through the host filesystem callback. Thus a one-line edit also rewrites untouched line endings. Prepare the original six-line CRLF service.ini fixture: [service], name=billing-sync, host=0.0.0.0, port=8080, workers=4, log_level=info, with a trailing CRLF (82 bytes). ACP file callbacks are part of the recorded execution path. Nine executed observations are retained; original runs 01, 03, 08 and 12 were infrastructure failures or did not reach the required path. Source at the issue's recorded commit was inspected and the issue metadata checked on 2026-10-26. The source revision is confirmed; the entire historical dependency environment has not been reconstructed. No new agent execution or fix regression test was performed. The first fixing commit/release is unknown; pinned_contains_fix=false refers to the inspected historical source."
 }

@@ -19,17 +19,5 @@
   "expected": "The agent attempts the replace, it fails because \"goodbye\" is not in the file, and no_match.txt is left unchanged as `hello world`.",
   "defect": "Instead of reporting the failed replace, the agent rewrites the file (e.g. with write_file) so that it contains \"goodbye\"/\"farewell\"; the issue's test reports \"File content was modified!\" with new content \"This is a test file that contains the word goodbye again.\"",
   "fault location": [],
-  "Root cause": "",
-  "_meta": {
-    "fix_status": "not_located",
-    "fix_refs": [
-      "https://github.com/vybestack/llxprt-code/pull/753",
-      "https://github.com/vybestack/llxprt-code/commit/40e85927bc37a82f863ddcca4450b714b334f678"
-    ],
-    "abb_entry": "acp",
-    "user_messages_from_issue": [
-      "replace \"goodbye\" with \"farewell\" in no_match.txt"
-    ],
-    "notes": "Issue page: CLOSED/COMPLETED via PR #753 (commit 40e8592, merged as 163306f, first in v0.7.0). That change only edits integration-tests/replace.test.ts to exclude write tools for the test; no agent/tool code changed. The defect is model behaviour (the LLM chooses write_file to make the replace succeed), not a locatable code fault in llxprt-code, so fault location and Root cause are left empty and the case stays on the pinned version (the product behaviour is unchanged there). reported_version v0.6.2 is the latest release before 2025-12-10."
-  }
+  "Root cause": ""
 }

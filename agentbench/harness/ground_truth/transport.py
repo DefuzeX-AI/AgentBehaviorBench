@@ -13,7 +13,7 @@ def model_config(environ):
     return judge_model(configured)
 
 
-def ask_once(model, *, system, payload):
+def ask_once(model, *, system, payload, on_response=None):
     body = json.dumps({'model': model.model, 'temperature': 0, 'max_tokens': 4096,
                        'messages': [{'role': 'system', 'content': system},
                                     {'role': 'user', 'content': json.dumps(payload, ensure_ascii=False)}]}).encode()
@@ -26,6 +26,8 @@ def ask_once(model, *, system, payload):
         raise RuntimeError(f'ABB GT matcher HTTP {exc.code}; no automatic retry') from None
     except OSError:
         raise RuntimeError('ABB GT matcher connection failed; no automatic retry') from None
+    if on_response is not None:
+        on_response(raw)
     try:
         return json_object(raw['choices'][0]['message'].get('content') or '')
     except (KeyError, IndexError, TypeError):

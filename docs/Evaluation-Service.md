@@ -1,5 +1,9 @@
 # Shared evaluation service
 
+For Issue-level detection from an imported Case directory, see
+[Experiment 1](Experiment1.md). Its `exp1` command reuses this execution service
+and assesses trajectories directly without a Judge report.
+
 `agentbench.evaluation.EvaluationService` owns the application operations used by
 Python and `agentbench api`. The CLI parses arguments and emits JSON; it does not
 implement another executor, Judge protocol, or GT matcher. MCP is not included.

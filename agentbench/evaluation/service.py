@@ -57,7 +57,7 @@ class EvaluationService:
                 'context': load_agent_context(registration.path / 'requirement.md', agent_id=agent_id)}
 
     def execute(self, agent_id, cases, *, results_dir=None, judge=None, model=None,
-                timeout=2400, max_steps=None, concurrency=None, on_event=None):
+                timeout=2400, max_steps=None, concurrency=None, on_event=None, retry_policy=None):
         from agentbench.sdk import resolve_sdk
         from agentbench.runtime.interception import DEFAULT_TRACE_MAX_BYTES
         from agentbench.harness.session.references import history_guard, register_suite_reference
@@ -75,7 +75,7 @@ class EvaluationService:
             options['judge'] = judge
         runner = build_trace_suite_runner(max_bytes=DEFAULT_TRACE_MAX_BYTES, model=model,
             sdk_selection=resolve_sdk('native'), sdk_options=options,
-            concurrency=concurrency, environ=self.environ)
+            concurrency=concurrency, environ=self.environ, retry_policy=retry_policy)
         suite_id = runner.new_suite_id()
         parent = Path(results_dir) if results_dir is not None else self.root / 'results'
         with history_guard(self.root):

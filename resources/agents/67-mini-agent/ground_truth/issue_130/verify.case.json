@@ -32,15 +32,5 @@
       "explanation": "Path.read_text uses universal-newline decoding (CRLF -> LF) and write_text writes the LF content back, so the whole file loses its CRLF endings even though only old_str was replaced."
     }
   ],
-  "Root cause": "INFERRED FROM SOURCE (no upstream fix found). EditTool.execute reads the target with `file_path.read_text(encoding=\"utf-8\")`, which opens the file in text mode with universal newlines and translates every `\\r\\n` into `\\n`. It then does `content.replace(old_str, new_str)` and writes the result with `file_path.write_text(new_content, encoding=\"utf-8\")`, which on Linux writes `\\n` unchanged. A one-token edit in a CRLF file therefore rewrites every line terminator while the tool reports `Successfully edited`; ReadTool (L108ff) also opens files in text mode, so the agent never sees the `\\r` and cannot notice. Minimal fix: read and write without newline translation, e.g. `with open(file_path, encoding=\"utf-8\", newline=\"\") as f: content = f.read()` and write back with `open(file_path, \"w\", encoding=\"utf-8\", newline=\"\")` (optionally converting LF in old_str/new_str to the file's detected line ending so matches still work). Open PR #131 addresses this issue but is not merged, so it is not treated as an upstream fix.",
-  "_meta": {
-    "fix_status": "inferred",
-    "fix_refs": [],
-    "abb_entry": "acp",
-    "user_messages_from_issue": [
-      "In deploy.ini, change the service port from 8080 to 9090. Do not change anything else in the file.",
-      "Without modifying any file, run `od -c deploy.ini | head -n 8` and paste the output verbatim."
-    ],
-    "notes": "gh_web: issue OPEN; closing PR #131 is OPEN (not merged). The clone's newest commit is the pinned d76a4f6, which is the issue's tested revision; no tags. Step 1 creates the ten-line CRLF deploy.ini via printf as round 4 suggests (the file content is my construction; the issue only says ten CRLF lines including port=8080); steps 2-3 are the issue's verbatim Step 1/Step 2 without labels. Line numbers verified with git show at d76a4f6."
-  }
+  "Root cause": "INFERRED FROM SOURCE (no upstream fix found). EditTool.execute reads the target with `file_path.read_text(encoding=\"utf-8\")`, which opens the file in text mode with universal newlines and translates every `\\r\\n` into `\\n`. It then does `content.replace(old_str, new_str)` and writes the result with `file_path.write_text(new_content, encoding=\"utf-8\")`, which on Linux writes `\\n` unchanged. A one-token edit in a CRLF file therefore rewrites every line terminator while the tool reports `Successfully edited`; ReadTool (L108ff) also opens files in text mode, so the agent never sees the `\\r` and cannot notice. Minimal fix: read and write without newline translation, e.g. `with open(file_path, encoding=\"utf-8\", newline=\"\") as f: content = f.read()` and write back with `open(file_path, \"w\", encoding=\"utf-8\", newline=\"\")` (optionally converting LF in old_str/new_str to the file's detected line ending so matches still work). Open PR #131 addresses this issue but is not merged, so it is not treated as an upstream fix."
 }

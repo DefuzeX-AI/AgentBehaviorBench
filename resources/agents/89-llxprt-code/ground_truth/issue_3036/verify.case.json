@@ -42,15 +42,5 @@
       "explanation": "The same phantom element inflates totalLines in the 'exceeds file length' error, and appending past EOF is rejected although the description promises it; PR #3053 fixes the line model and the documented append behaviour."
     }
   ],
-  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/3053. In v0.10.0, delete_line_range splits the file with content.split('\\n'); for a newline-terminated file this yields a trailing empty string that represents the final newline. totalLines includes it, and the splice count is end_line - start_line + 1 without clamping to the real number of lines. With end_line equal to the last line the phantom element survives and join('\\n') restores the final newline, but with end_line beyond EOF the splice also removes the phantom element and the file loses its trailing newline. insert_at_line uses the same line model, so its errors report one line too many, and it rejects line numbers past EOF although its description says the content will be appended. Commit 5c2dc30 (PR #3053, 'Fix range-editor tools' phantom trailing-newline line model') adds shared line-editing helpers that keep the trailing newline separate, clamps ranges, and aligns insert_at_line with its documented append. The fix first ships in v0.11.0, the pinned version, so the case is tested at v0.10.0.",
-  "_meta": {
-    "fix_status": "fixed",
-    "fix_refs": [
-      "https://github.com/vybestack/llxprt-code/pull/3053",
-      "https://github.com/vybestack/llxprt-code/commit/5c2dc30b465f88ac7911dc64bb0620e091b205f7"
-    ],
-    "abb_entry": "acp",
-    "user_messages_from_issue": [],
-    "notes": "Issue page: CLOSED/COMPLETED, closing PR #3053 MERGED; commit 5c2dc30 first tag v0.11.0, ancestor of pinned (971505b is the PR head). delete_line_range.ts and insert_at_line.ts are unchanged between v0.10.0 and the fix parent. In step 1 the `\\n` in the message denotes newline characters to be written with printf."
-  }
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/3053. In v0.10.0, delete_line_range splits the file with content.split('\\n'); for a newline-terminated file this yields a trailing empty string that represents the final newline. totalLines includes it, and the splice count is end_line - start_line + 1 without clamping to the real number of lines. With end_line equal to the last line the phantom element survives and join('\\n') restores the final newline, but with end_line beyond EOF the splice also removes the phantom element and the file loses its trailing newline. insert_at_line uses the same line model, so its errors report one line too many, and it rejects line numbers past EOF although its description says the content will be appended. Commit 5c2dc30 (PR #3053, 'Fix range-editor tools' phantom trailing-newline line model') adds shared line-editing helpers that keep the trailing newline separate, clamps ranges, and aligns insert_at_line with its documented append. The fix first ships in v0.11.0, the pinned version, so the case is tested at v0.10.0."
 }

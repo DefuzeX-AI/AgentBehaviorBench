@@ -1,0 +1,97 @@
+{
+  "schema": "abb.agent-trajectory.v1",
+  "builder_version": 1,
+  "status": "partial",
+  "run_id": "8e5c3221d30f435f984b09e4793ab575",
+  "agent_id": "code-assistant",
+  "case_id": "coverage-code-assistant-276-01",
+  "framework": "unknown",
+  "metadata": {
+    "task_instruction": null,
+    "case_id": null,
+    "agent_configuration": {
+      "agents": [
+        {
+          "agent_name": "code-assistant"
+        }
+      ],
+      "system_prompt": null,
+      "tools": null,
+      "runtime": {
+        "framework": "acp",
+        "runtime": {
+          "type": "docker",
+          "execution": "oneshot",
+          "timeout_sec": 1200,
+          "env_keys": [],
+          "secret_env_keys": []
+        },
+        "adapter": {
+          "type": "acp",
+          "transport": "stdio",
+          "command": [
+            "python",
+            "/opt/agent/bootstrap/launch.py"
+          ],
+          "handshake_timeout": 120,
+          "cwd": "/home/agent/workspace",
+          "permission_policy": "allow_once"
+        },
+        "launch": {
+          "argv": [
+            "python",
+            "-m",
+            "agentbench.runtime.agentcontainer.worker"
+          ],
+          "workdir": "/opt/agent"
+        },
+        "evaluation": {
+          "replay_safe": false,
+          "workspace": {
+            "path": "/home/agent/workspace",
+            "initial_state": "empty"
+          },
+          "file_evidence": {
+            "track_files": true,
+            "upload_diff": true,
+            "export_changed_files": true
+          }
+        }
+      }
+    },
+    "system_architecture": {
+      "framework": "unknown",
+      "source_revision": "b942737b7360de9608f2f84f28bf9a463d7a5bc1",
+      "profile": {
+        "path": "requirement.md",
+        "sha256": "22c383bd9915f93975466ce2c1dfceba8c5ce59a431f7f9b8de62b589cdf5795"
+      },
+      "manifest": {
+        "path": "agent.toml",
+        "sha256": "e9a103f89f75169649c0bf8cf4a531e1f6056e3cf06782336f4b1cae403d6ad8"
+      }
+    },
+    "notes": []
+  },
+  "steps": [],
+  "inputs": [],
+  "coverage": {
+    "model_calls": "not_observed",
+    "tool_calls": "not_observed",
+    "file_changes": "not_observed",
+    "ambiguous_links": 0,
+    "unlinked_tool_calls": 0,
+    "unobserved_tool_executions": 0
+  },
+  "sources": [
+    {
+      "path": "workspace.json",
+      "sha256": "6bec25b3d33c2012cf6060d677af532fdbcf38eaf60d1661749aa90ce4cd3c9d"
+    },
+    {
+      "path": "logs/network.jsonl",
+      "sha256": "2ca34771aceda723731e3ea16ce910fd594bd1ed3048352fb6c3bd2687e381b9"
+    }
+  ],
+  "warnings": []
+}

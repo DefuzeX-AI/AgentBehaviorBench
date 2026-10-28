@@ -42,17 +42,5 @@
       "explanation": "The unclosed-thinking early exit also matches `<thinking>` at a line start inside a code fence and returns without extracting any block."
     }
   ],
-  "Root cause": "INFERRED FROM SOURCE (no upstream fix found). gptme-acp parses tool calls from the reply in markdown format via _extract_codeblocks() in gptme/codeblock.py. Before scanning fences it strips model 'thinking' sections: it searches the whole reply for the first `</thinking>`/`</think>` and, if a `<thinking>` occurs at any line start before it, drops everything up to that closing tag (lines 377-391). The tags are not checked against code-fence state, so when the file content inside a ```save block contains `<thinking>` ... `</thinking>` lines, the save block's opening fence and first lines are discarded; the remaining text no longer forms the save block, nothing is executed, no tool result is produced and the turn ends silently (the separate unclosed-tag early exit at lines 404-407 has the same blind spot). Minimal fix: only treat thinking tags as section markers when they appear at a line start outside any code fence, which is what the still-open PR https://github.com/gptme/gptme/pull/4491 (commit 91bcdd797, `_is_standalone_outside_fences`) proposes; it is not merged.",
-  "_meta": {
-    "fix_status": "inferred",
-    "fix_refs": [
-      "https://github.com/gptme/gptme/pull/4491"
-    ],
-    "abb_entry": "acp",
-    "user_messages_from_issue": [
-      "Step 1: In the current working directory, create a file named prompt_template.xml ... (template with <thinking> lines)",
-      "Step 2: Please show me the exact current content of prompt_template.xml as it is on disk, so I can verify it was created correctly."
-    ],
-    "notes": "Issue OPEN; closing PR #4491 OPEN (commit 91bcdd797 not an ancestor of the pinned revision), so fixed_in is 'not-fixed' and fault location comes from reading the pinned source (the open PR's diff touches the same lines, which supports the inference). Reported at revision 0dec0263; the unit pins 0c131bb0 (v0.35.1), which has the same parsing code. Steps are the two verbatim messages with their 'Step N:' prefixes removed. A side effect noted in the issue (ACP stream hiding lines between thinking tags, gptme/llm/__init__.py) is not part of the fault location."
-  }
+  "Root cause": "INFERRED FROM SOURCE (no upstream fix found). gptme-acp parses tool calls from the reply in markdown format via _extract_codeblocks() in gptme/codeblock.py. Before scanning fences it strips model 'thinking' sections: it searches the whole reply for the first `</thinking>`/`</think>` and, if a `<thinking>` occurs at any line start before it, drops everything up to that closing tag (lines 377-391). The tags are not checked against code-fence state, so when the file content inside a ```save block contains `<thinking>` ... `</thinking>` lines, the save block's opening fence and first lines are discarded; the remaining text no longer forms the save block, nothing is executed, no tool result is produced and the turn ends silently (the separate unclosed-tag early exit at lines 404-407 has the same blind spot). Minimal fix: only treat thinking tags as section markers when they appear at a line start outside any code fence, which is what the still-open PR https://github.com/gptme/gptme/pull/4491 (commit 91bcdd797, `_is_standalone_outside_fences`) proposes; it is not merged."
 }

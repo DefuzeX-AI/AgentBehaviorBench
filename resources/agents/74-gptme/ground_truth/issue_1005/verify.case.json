@@ -18,15 +18,5 @@
   "expected": "docs/example.md is written with the heading and the complete fenced python block (an outer fence of four or more backticks keeps the inner triple backticks).",
   "defect": "The inner ```python block closes the outer save block prematurely, so the saved file is truncated.",
   "fault location": [],
-  "Root cause": "FIXED UPSTREAM IN https://github.com/gptme/gptme/pull/1009 (commit fe24f45cbc4276815818ab13c5f6c6b1cfa6ddbf). gptme's markdown tool format extracts tool calls with _extract_codeblocks() in gptme/codeblock.py, which recognised only fences starting with exactly ``` and used `line.startswith(\"```\")` / `line.strip() == \"```\"` to open and close blocks, so a ````save block was not tracked by its fence length and the first inner bare ``` closed it. PR #1009 records the opening fence length (3+ backticks) and only closes the block on a bare fence of the same length, per CommonMark. Ships in v0.32.0; the pinned revision contains it.",
-  "_meta": {
-    "fix_status": "fixed",
-    "fix_refs": [
-      "https://github.com/gptme/gptme/pull/1009",
-      "https://github.com/gptme/gptme/commit/fe24f45cbc4276815818ab13c5f6c6b1cfa6ddbf"
-    ],
-    "abb_entry": "acp",
-    "user_messages_from_issue": [],
-    "notes": "The pinned revision 0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07 (v0.35.1) already contains the fix, but no release that lacks the fix provides the gptme-acp entry point (gptme-acp first appears in pyproject.toml at commit 75d94dd34, 2025-12-18, first tagged in v0.31.1.dev20260227 / v0.32.0), so version_choice stays 'pinned'. Because the faulty code no longer exists at the tested revision, 'fault location' is left empty and the pre-fix location is recorded here instead: gptme/codeblock.py _extract_codeblocks and Codeblock.from_markdown at fe24f45cb^. Framed as a feature request; only relevant because gptme-acp uses tool_format='markdown'. Whether it triggers depends on the model choosing a nested fence layout."
-  }
+  "Root cause": "FIXED UPSTREAM IN https://github.com/gptme/gptme/pull/1009 (commit fe24f45cbc4276815818ab13c5f6c6b1cfa6ddbf). gptme's markdown tool format extracts tool calls with _extract_codeblocks() in gptme/codeblock.py, which recognised only fences starting with exactly ``` and used `line.startswith(\"```\")` / `line.strip() == \"```\"` to open and close blocks, so a ````save block was not tracked by its fence length and the first inner bare ``` closed it. PR #1009 records the opening fence length (3+ backticks) and only closes the block on a bare fence of the same length, per CommonMark. Ships in v0.32.0; the pinned revision contains it."
 }

@@ -42,15 +42,5 @@
       "explanation": "Always tells the model to page with offset/limit (offset: end) even when the truncation is within one line; PR #3855 adds a column_offset parameter and emits clipped-line guidance only when it can continue the line."
     }
   ],
-  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/3855. In v0.11.0, read_file's text path (processTextFile) clips every line to MAX_LINE_LENGTH_TEXT_FILE (2000 characters) and appends '... [truncated]', setting isTruncated without recording where the clipped line continues. buildTruncatedLlmContent then always renders 'Showing lines X-Y of N total lines' and 'Action: ... use offset: <end>', i.e. line pagination. For a file consisting of one long JSON line, the only advice is offset: 1, which lies after the single line, and the tool exposes no character/column parameter, so the truncated tail cannot be read with read_file. Commit 2306637 (PR #3855, 'make clipped file lines recoverable') adds a column_offset parameter, windowed line clipping that reports the next column offset, and guidance text naming the exact read_file call that continues the clipped line. The fix is merged on main after v0.11.0 and is not in any full release yet (it is in v0.12.0-nightly.261019 and later), so the pinned version is tested.",
-  "_meta": {
-    "fix_status": "fixed",
-    "fix_refs": [
-      "https://github.com/vybestack/llxprt-code/pull/3855",
-      "https://github.com/vybestack/llxprt-code/commit/2306637e7a40d14a29bed2e268180784698b1c0e"
-    ],
-    "abb_entry": "acp",
-    "user_messages_from_issue": [],
-    "notes": "Issue page: CLOSED/COMPLETED, closing PR #3855 MERGED; main commit 2306637 (2026-10-12) is not an ancestor of pinned 5400f65 and is first contained in nightly tags v0.12.0-nightly.261019.45a5157c7. The fix's base differs from v0.11.0 in read-file.ts/fileUtils.ts, so locations were mapped by reading v0.11.0 directly. The issue does not give the exact output limit; 6000 characters exceed the 2000-character line cap at v0.11.0."
-  }
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/3855. In v0.11.0, read_file's text path (processTextFile) clips every line to MAX_LINE_LENGTH_TEXT_FILE (2000 characters) and appends '... [truncated]', setting isTruncated without recording where the clipped line continues. buildTruncatedLlmContent then always renders 'Showing lines X-Y of N total lines' and 'Action: ... use offset: <end>', i.e. line pagination. For a file consisting of one long JSON line, the only advice is offset: 1, which lies after the single line, and the tool exposes no character/column parameter, so the truncated tail cannot be read with read_file. Commit 2306637 (PR #3855, 'make clipped file lines recoverable') adds a column_offset parameter, windowed line clipping that reports the next column offset, and guidance text naming the exact read_file call that continues the clipped line. The fix is merged on main after v0.11.0 and is not in any full release yet (it is in v0.12.0-nightly.261019 and later), so the pinned version is tested."
 }

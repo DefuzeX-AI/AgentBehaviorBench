@@ -41,15 +41,5 @@
       "explanation": "Builds and validates a preview from that empty content without the file-existence check that calculateEdit performs for the apply path; PR #2029 routes the preview through calculateEdit and returns its error."
     }
   ],
-  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/2029. In v0.9.3 the ast_edit preview path reads the target through readFileContent, which turns ENOENT into an empty string, and then applies the replacement to '' and validates it, so a non-existent target yields a 'successful' preview with zero declarations and AST validation PASSED. The apply path instead uses calculateEdit, which detects !fileExists with a non-empty old_string and returns 'File not found'. Commit e88afa5 (PR #2029, 'Validate ast_edit preview replacements', written for #1755) removes the separate preview read and makes executePreview call calculateEdit and return its error, which also covers the missing-file case. The fix first ships in v0.10.0; the pinned v0.11.0 contains it, so the case is tested at v0.9.3. The issue itself was closed as NOT_PLANNED; the attribution of the fix to PR #2029 is an inference from the diff.",
-  "_meta": {
-    "fix_status": "fixed",
-    "fix_refs": [
-      "https://github.com/vybestack/llxprt-code/pull/2029",
-      "https://github.com/vybestack/llxprt-code/commit/e88afa5b1a1aa74e14d1c08e610120f80e66290a"
-    ],
-    "abb_entry": "acp",
-    "user_messages_from_issue": [],
-    "notes": "Issue page: CLOSED/NOT_PLANNED, no closing PR; only link is PR #2736 (dev/0.11.0 integration). No commit references #1757. The behavioural fix was identified by reading e88afa5 (#2029): executePreview now calls calculateEdit, whose !fileExists branch returns FILE_NOT_FOUND (same logic as v0.9.3 calculateEdit lines 2197-2204). Treated as fixed via that diff; if the caller prefers the strict rule, downgrade to not_fixed. Issue created 2026-03-23, latest release then v0.9.3 (ACP present). Single step: no setup needed since the file must not exist."
-  }
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/2029. In v0.9.3 the ast_edit preview path reads the target through readFileContent, which turns ENOENT into an empty string, and then applies the replacement to '' and validates it, so a non-existent target yields a 'successful' preview with zero declarations and AST validation PASSED. The apply path instead uses calculateEdit, which detects !fileExists with a non-empty old_string and returns 'File not found'. Commit e88afa5 (PR #2029, 'Validate ast_edit preview replacements', written for #1755) removes the separate preview read and makes executePreview call calculateEdit and return its error, which also covers the missing-file case. The fix first ships in v0.10.0; the pinned v0.11.0 contains it, so the case is tested at v0.9.3. The issue itself was closed as NOT_PLANNED; the attribution of the fix to PR #2029 is an inference from the diff."
 }

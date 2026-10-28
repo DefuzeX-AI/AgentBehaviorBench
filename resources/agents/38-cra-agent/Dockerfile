@@ -12,7 +12,7 @@
 FROM python:3.11-slim
 
 # Package index override for dependency layers, so the build can use a mirror.
-ARG ABB_PIP_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple
+ARG ABB_PIP_INDEX_URL=https://pypi.org/simple
 
 # Pinned so a build is reproducible. This is the resolution the binding was
 # verified against on 2026-10-07; upstream declares the same packages as open

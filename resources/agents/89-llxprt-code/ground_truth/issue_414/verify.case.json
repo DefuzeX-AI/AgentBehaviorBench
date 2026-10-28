@@ -42,17 +42,5 @@
       "explanation": "Marks user-role content as tool only when every block is a tool_response (blocks.every), so tool_response + text blocks stay human; PR #415 switches to blocks.some()."
     }
   ],
-  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/415. When read_many_files returns large output, the tool result is a part list with one functionResponse plus several text parts. In v0.4.7, GeminiChat.convertPartListUnionToIContent handles this 'mixed' case by setting the speaker to 'ai' only if a functionCall is present and otherwise defaulting to 'human', and ContentConverters.toIContent only upgrades a user-role content to the 'tool' speaker when all blocks are tool_response. Both paths therefore classify the tool result as a human message, the OpenAI provider serializes it as `role: 'user'`, and the assistant tool_call is left without a matching tool message, which strict OpenAI-compatible APIs reject with HTTP 400. Commit e170bc6 (PR #415) tracks hasToolContent and prefers the 'tool' speaker in geminiChat.ts, and uses blocks.some() in ContentConverters.ts (it also adds a --dumponerror debug flag, unrelated to the defect). The fix first ships in v0.4.8; the pinned v0.11.0 contains it, so the case is tested at v0.4.7, the latest release before the issue was opened on 2025-11-01.",
-  "_meta": {
-    "fix_status": "fixed",
-    "fix_refs": [
-      "https://github.com/vybestack/llxprt-code/pull/415",
-      "https://github.com/vybestack/llxprt-code/commit/e170bc6edfefd10b929a8b640c0a06ca53339e75"
-    ],
-    "abb_entry": "acp",
-    "user_messages_from_issue": [
-      "use read_many_files to look at the docs dir summarize"
-    ],
-    "notes": "Issue page: CLOSED/COMPLETED, closing PR #415 MERGED. The squash commit on main is e170bc6 (2025-11-01 02:12Z, after the issue's 01:38Z creation); git tag --contains gives v0.4.8 as the first release, so v0.4.7 is the last unfixed release; it ships zed-integration (ACP). geminiChat.ts is unchanged between v0.4.7 and the fix parent except for 4 unrelated lines; line numbers were read at v0.4.7. The original reproduction used a local docs dir of the llxprt repo; step 1 creates an equivalent docs dir. A visible 400 needs an endpoint that enforces tool_call/tool pairing; the malformed request is visible in model traffic regardless."
-  }
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/415. When read_many_files returns large output, the tool result is a part list with one functionResponse plus several text parts. In v0.4.7, GeminiChat.convertPartListUnionToIContent handles this 'mixed' case by setting the speaker to 'ai' only if a functionCall is present and otherwise defaulting to 'human', and ContentConverters.toIContent only upgrades a user-role content to the 'tool' speaker when all blocks are tool_response. Both paths therefore classify the tool result as a human message, the OpenAI provider serializes it as `role: 'user'`, and the assistant tool_call is left without a matching tool message, which strict OpenAI-compatible APIs reject with HTTP 400. Commit e170bc6 (PR #415) tracks hasToolContent and prefers the 'tool' speaker in geminiChat.ts, and uses blocks.some() in ContentConverters.ts (it also adds a --dumponerror debug flag, unrelated to the defect). The fix first ships in v0.4.8; the pinned v0.11.0 contains it, so the case is tested at v0.4.7, the latest release before the issue was opened on 2025-11-01."
 }

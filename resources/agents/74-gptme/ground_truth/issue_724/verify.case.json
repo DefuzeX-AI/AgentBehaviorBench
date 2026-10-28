@@ -18,15 +18,5 @@
   "expected": "The loop runs and prints the three `=== PR #... ===` headers each followed by `a` and `b`.",
   "defect": "The shell tool rewrites the loop through shlex (`for pr in 723 ... ';' do echo '=== PR #$pr ===' ... < /dev/null | head -5 done`), bash reports `syntax error near unexpected token` and the tool stalls until the shell timeout.",
   "fault location": [],
-  "Root cause": "FIXED UPSTREAM IN https://github.com/gptme/gptme/pull/725 (commit 64f7d7c46789197156ef3619cf9dc48c0ce38bbe). Two pieces of the shell tool mangled for loops: split_commands() rebuilt bashlex 'compound' nodes by joining word slices with spaces, losing newlines and keywords' structure, and ShellSession._run tokenised every command with shlex to insert `< /dev/null` before the first pipe, re-joining tokens with shlex quoting so `;` became `';'` and the loop body lost its structure; bash then raised a syntax error and the tool waited for the marker until timeout. PR #725 keeps compound nodes as a single slice of the original source and skips the shlex rewrite for commands starting with for/while/if/case/function/until/select. The fix first ships in v0.29.0 and the pinned revision contains it (the current _run_pipe inserts `< /dev/null` by locating the first unquoted pipe in the raw string).",
-  "_meta": {
-    "fix_status": "fixed",
-    "fix_refs": [
-      "https://github.com/gptme/gptme/pull/725",
-      "https://github.com/gptme/gptme/commit/64f7d7c46789197156ef3619cf9dc48c0ce38bbe"
-    ],
-    "abb_entry": "acp",
-    "user_messages_from_issue": [],
-    "notes": "The pinned revision 0c131bb0d642fcdd1edb2c6fec02eccfe7f71a07 (v0.35.1) already contains the fix, but no release that lacks the fix provides the gptme-acp entry point (gptme-acp first appears in pyproject.toml at commit 75d94dd34, 2025-12-18, first tagged in v0.31.1.dev20260227 / v0.32.0), so version_choice stays 'pinned'. Because the faulty code no longer exists at the tested revision, 'fault location' is left empty and the pre-fix location is recorded here instead: gptme/tools/shell.py ShellSession._run (shlex tokenisation + pipe rewrite) and split_commands (compound branch) at 64f7d7c46^. The original block used `gh pr checks`, unavailable in ABB; per round-4 the syntax error happens before gh runs, so a local printf|head pipeline replaces it. reported_version: v0.28.3 was the latest release on 2025-10-16."
-  }
+  "Root cause": "FIXED UPSTREAM IN https://github.com/gptme/gptme/pull/725 (commit 64f7d7c46789197156ef3619cf9dc48c0ce38bbe). Two pieces of the shell tool mangled for loops: split_commands() rebuilt bashlex 'compound' nodes by joining word slices with spaces, losing newlines and keywords' structure, and ShellSession._run tokenised every command with shlex to insert `< /dev/null` before the first pipe, re-joining tokens with shlex quoting so `;` became `';'` and the loop body lost its structure; bash then raised a syntax error and the tool waited for the marker until timeout. PR #725 keeps compound nodes as a single slice of the original source and skips the shlex rewrite for commands starting with for/while/if/case/function/until/select. The fix first ships in v0.29.0 and the pinned revision contains it (the current _run_pipe inserts `< /dev/null` by locating the first unquoted pipe in the raw string)."
 }

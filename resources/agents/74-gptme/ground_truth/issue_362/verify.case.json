@@ -31,17 +31,5 @@
       "explanation": "For a command without a pipe or explicit stdin redirect, the tool appends `< /dev/null`; `git shortlog` with no revision reads the log from non-terminal stdin, so it now gets empty input and prints nothing instead of summarising HEAD."
     }
   ],
-  "Root cause": "INFERRED FROM SOURCE (no upstream fix found). `git shortlog` without a revision argument reads a log from standard input whenever stdin is not a terminal. gptme's shell tool runs commands inside a persistent bash whose stdin is a pipe, so in the reported version `git shortlog -sn` blocked reading that pipe and the tool call never returned. Commit 97110820b (PR #604, v0.28.0) began appending `< /dev/null` to commands without explicit stdin redirection (now ShellSession._run_pipe lines 1224-1230 at the tested revision), which removes the hang but makes git shortlog read an empty log and print nothing, so the user still does not get the committer list unless the model adds HEAD itself. A dedicated fix (commit 3a7b0dbd5, 'auto-add HEAD to git shortlog without revision', PR #895) was closed without being merged. Minimal fix: in _run_pipe (or before it), when the command is `git shortlog` without a revision argument, append `HEAD` before redirections, as PR #895 proposed. Speculation: whether the case fails at the tested revision depends on whether the model notices the empty output and retries with `git shortlog -sn HEAD`.",
-  "_meta": {
-    "fix_status": "inferred",
-    "fix_refs": [
-      "https://github.com/gptme/gptme/pull/895",
-      "https://github.com/gptme/gptme/pull/604"
-    ],
-    "abb_entry": "acp",
-    "user_messages_from_issue": [
-      "who commits in this repo?"
-    ],
-    "notes": "Issue CLOSED/COMPLETED but its only closing PR #895 is CLOSED (not merged); its commits 3a7b0dbd5/e0475ecf3 are not ancestors of the pinned revision. The hang itself disappears after PR #604 (97110820be, first release v0.28.0), which redirects stdin to /dev/null; that is a side effect, not a fix of the expected output, so fix_status is 'inferred'. Step 1 builds the repo the reporter had (round-3 setup / round-4 plan); step 2 is the verbatim message. reported_version: v0.25.0 was the latest tag on 2024-12-22."
-  }
+  "Root cause": "INFERRED FROM SOURCE (no upstream fix found). `git shortlog` without a revision argument reads a log from standard input whenever stdin is not a terminal. gptme's shell tool runs commands inside a persistent bash whose stdin is a pipe, so in the reported version `git shortlog -sn` blocked reading that pipe and the tool call never returned. Commit 97110820b (PR #604, v0.28.0) began appending `< /dev/null` to commands without explicit stdin redirection (now ShellSession._run_pipe lines 1224-1230 at the tested revision), which removes the hang but makes git shortlog read an empty log and print nothing, so the user still does not get the committer list unless the model adds HEAD itself. A dedicated fix (commit 3a7b0dbd5, 'auto-add HEAD to git shortlog without revision', PR #895) was closed without being merged. Minimal fix: in _run_pipe (or before it), when the command is `git shortlog` without a revision argument, append `HEAD` before redirections, as PR #895 proposed. Speculation: whether the case fails at the tested revision depends on whether the model notices the empty output and retries with `git shortlog -sn HEAD`."
 }

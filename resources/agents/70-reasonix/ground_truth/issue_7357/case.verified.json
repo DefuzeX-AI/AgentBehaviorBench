@@ -52,32 +52,5 @@
       "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
     }
   ],
-  "Root cause": "Edit loading initializes configuration with Default(), then decodes user TOML onto the existing provider slice. Omitted billing fields survive from the default DeepSeek provider in a custom provider entry. The startup migration persists this contaminated configuration. The trigger requires the old-schema provider fixture; the cat prompt alone is insufficient. Local source and historical before/after records support the decoding mechanism.",
-  "_meta": {
-    "wangyi_import": {
-      "archive": "C:\\Song_startup\\benchmark\\wangyi gt_ v2\\agent-failures_20261028T023807Z(1)\\agent-failures_20261028T023807Z\\reasonix\\issue-7357.zip",
-      "declared_rate": "10/10",
-      "root_cause_sources": [],
-      "validation": "Imported archived evidence; no fresh execution or repair validation performed. Borrowed root cause retains its original evidence status and may refer to a different revision."
-    },
-    "evidence_review": {
-      "date": "2026-10-28",
-      "status": "source_and_archived_trace_review",
-      "source_snapshots": [
-        "C:\\Song_startup\\benchmark\\发到paper的数据\\issue\\generate_case\\evidence\\wangyi_review\\esengine_DeepSeek-Reasonix_b36a7e3d54a6_internal_config_load.go.json",
-        "C:\\Song_startup\\benchmark\\发到paper的数据\\issue\\generate_case\\evidence\\wangyi_review\\esengine_DeepSeek-Reasonix_b36a7e3d54a6_internal_config_pricing.go.json"
-      ],
-      "trace_results": [
-        {
-          "path": "runs\\run-01\\trajectory\\1672193e05e847b0bc8b671caeb44114\\steps\\0001\\result.json",
-          "sha256": "579d25043e9cedd8612a263a4682f11544ada679286597a0b31a3d9f4f4b04a2",
-          "status": "succeeded",
-          "output": "Here's the `[[providers]]` section exactly as printed by `cat \"${REASONIX_HOME:-$HOME/.reasonix}/config.toml\"`:\n\n```toml\n[[providers]]\nname        = \"abb\"\nkind        = \"openai\"\nbase_url    = \"https://open.bigmodel.cn/api/coding/paas/v4\"\nmodels      = [\"glm-5.3-flash\"]\ndefault     = \"glm-5.3-flash\"\napi_key_env = \"ABB_AGENT_MODEL_API_KEY\"\nbalance_url = \"https://api.deepseek.com/user/balance\"   # optional; wallet-balance endpoint shown in the status bar\ncontext_window = 128000   # tokens; compaction triggers near this limit\nprice       = { cache_hit = 0.0028, input = 0.14, output = 0.28, currency = \"$\" }   # provider-wide fallback, per 1M tokens\n```\n\nThat's the only provider configured in this session. A couple of notes:\n\n- The API key isn't stored here — it's referenced via `api_key_env = \"ABB_AGENT_MODEL_API_KEY\"` and kept in Reasonix's global `.env`.\n- `default = \"glm-5.3-flash\"` matches `default_model = \"abb/glm-5.3-flash\"` at the top of the file, so this provider serves the session's main model.",
-          "error": null
-        }
-      ],
-      "fresh_execution": false,
-      "repair_validation_performed": false
-    }
-  }
+  "Root cause": "Edit loading initializes configuration with Default(), then decodes user TOML onto the existing provider slice. Omitted billing fields survive from the default DeepSeek provider in a custom provider entry. The startup migration persists this contaminated configuration. The trigger requires the old-schema provider fixture; the cat prompt alone is insufficient. Local source and historical before/after records support the decoding mechanism."
 }

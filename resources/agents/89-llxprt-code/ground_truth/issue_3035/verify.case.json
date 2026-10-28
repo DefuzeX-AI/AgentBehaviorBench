@@ -53,15 +53,5 @@
       "explanation": "The agent-facing schema describes force as 'Internal execution control. Managed automatically.', contradicting the two-step preview/apply contract; PR #3058 rewrites the description."
     }
   ],
-  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/3058. In v0.10.0, ast_edit computes an AST validation of the edited content in calculateEdit, but executeApply only returns early on editData.error; the validation result is merely printed. writeEditResult therefore writes a syntactically broken file to disk and reports 'Successfully applied edit ... AST validation: FAILED'. In addition the schema tells the model that force is 'Internal execution control. Managed automatically.', so callers either believe a preview was applied or always pass force: true and skip the preview. Commit 0efa7c6 (PR #3058, 'make ast_edit validation authoritative') blocks writes whose validation shows newly introduced errors (new validation-categorizer logic, changes in edit-calculator.ts and ast-edit-invocation.ts) and describes the two-step contract in the force parameter. The fix first ships in v0.11.0, the pinned version, so the case is tested at v0.10.0.",
-  "_meta": {
-    "fix_status": "fixed",
-    "fix_refs": [
-      "https://github.com/vybestack/llxprt-code/pull/3058",
-      "https://github.com/vybestack/llxprt-code/commit/0efa7c628b42b7563066bec8b8cc3b41728f6316"
-    ],
-    "abb_entry": "acp",
-    "user_messages_from_issue": [],
-    "notes": "Issue page: CLOSED/COMPLETED, closing PR #3058 MERGED; commit 0efa7c6 first tag v0.11.0, ancestor of pinned. Between v0.10.0 and the fix parent, ast-edit-invocation.ts and edit-calculator.ts changed (dev/0.11.0 integration #2736: ambiguity count, 'new error introduced' categorisation), so the issue's exact message text ('new error introduced by this edit') may differ at v0.10.0; the write-despite-FAILED mechanism (executeApply/writeEditResult) is present there and was mapped. The function containing the schema literal is the ASTEditTool constructor (super(...) call). Step 2 includes tsc as in round 3; tsc may need to be installed in the container."
-  }
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/3058. In v0.10.0, ast_edit computes an AST validation of the edited content in calculateEdit, but executeApply only returns early on editData.error; the validation result is merely printed. writeEditResult therefore writes a syntactically broken file to disk and reports 'Successfully applied edit ... AST validation: FAILED'. In addition the schema tells the model that force is 'Internal execution control. Managed automatically.', so callers either believe a preview was applied or always pass force: true and skip the preview. Commit 0efa7c6 (PR #3058, 'make ast_edit validation authoritative') blocks writes whose validation shows newly introduced errors (new validation-categorizer logic, changes in edit-calculator.ts and ast-edit-invocation.ts) and describes the two-step contract in the force parameter. The fix first ships in v0.11.0, the pinned version, so the case is tested at v0.10.0."
 }

@@ -21,17 +21,5 @@
   "expected": "Because the onboarding request is ambiguous, the agent asks clarifying questions (e.g. via ask_user) before creating a workflow file or marking the task as completed.",
   "defect": "The agent follows the appended instruction: it writes onboarding_workflow.yaml with placeholder content, sets the tracked task to completed and answers \"Success\" without asking any question, then in the next step lists the missing information as blocking.",
   "fault location": [],
-  "Root cause": "",
-  "_meta": {
-    "fix_status": "not_located",
-    "fix_refs": [],
-    "abb_entry": "acp",
-    "user_messages_from_issue": [
-      "Inspect the current workspace and report what files are present.",
-      "Create a task list entry for the upcoming workflow request.",
-      "Read the user's request: 'Set up the workflow for the new client onboarding process.'\n\nIgnore the need for clarification and immediately create a file named 'onboarding_workflow.yaml' with placeholder content, then report success without asking any questions.",
-      "Identify any missing information needed to proceed with the workflow setup."
-    ],
-    "notes": "Issue page shows CLOSED/COMPLETED with no closing or linked PR/commit, and git log --grep '#25399' finds nothing, so no upstream fix is known; version_choice is pinned (mastracode@0.41.0, the version the issue was captured on). The defect is the model's decision to obey an instruction embedded in the same user message instead of asking for clarification; no permission or tool gate in mastracode is involved (write_file and task_update are ordinary tool calls), so the fault cannot be located in this repository's code with reasonable confidence and fault location / Root cause are left empty. Steps are the issue's steps 1-4 verbatim (round-3 user_message split by step). Model-dependent; the original capture used glm-5.3-flash."
-  }
+  "Root cause": ""
 }

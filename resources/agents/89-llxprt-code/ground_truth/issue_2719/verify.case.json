@@ -42,15 +42,5 @@
       "explanation": "Same mime-type short-circuit in the core copy of detectFileType; PR #2726 applies the same exclusion."
     }
   ],
-  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/2726. read_file decides how to read a file with detectFileType, which in v0.10.0 first asks mime.lookup() for the extension and returns 'image' for any image/* type. mime-db maps the FreeHand family (.fh and variants) to image/x-freehand, so plain-text shader sources with a .fh extension are base64-encoded and sent to the model as an image part, which the provider rejects with a 400 'not a valid image' error. Commit e83eb8f (PR #2726, 'Stop classifying .fh-family files as images') excludes .fh, .fh4, .fh5, .fh7 and .fhc from the mime short-circuit in both the tools and core copies so they fall through to content-based text/binary detection. The fix first ships in v0.11.0, the pinned version, so the case is tested at v0.10.0, the version named in the issue.",
-  "_meta": {
-    "fix_status": "fixed",
-    "fix_refs": [
-      "https://github.com/vybestack/llxprt-code/pull/2726",
-      "https://github.com/vybestack/llxprt-code/commit/e83eb8f12ec4696d59cd18566965f7c0f326272a"
-    ],
-    "abb_entry": "acp",
-    "user_messages_from_issue": [],
-    "notes": "Issue page: CLOSED/COMPLETED, closing PR #2726 MERGED; main commit e83eb8f (first tag v0.11.0, ancestor of pinned); ac86036 is the PR head. PR #3075 (also linked) only changes the retry advice after a 400 and is not the fix. The fix applies cleanly to v0.10.0 (no diff between v0.10.0 and the fix parent in these files). Reported on Windows with gpt-5.6-sol; the misclassification is platform independent, but whether the shared ABB endpoint returns a 400 for the bogus image part is uncertain; the outgoing image part is observable in model traffic."
-  }
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/2726. read_file decides how to read a file with detectFileType, which in v0.10.0 first asks mime.lookup() for the extension and returns 'image' for any image/* type. mime-db maps the FreeHand family (.fh and variants) to image/x-freehand, so plain-text shader sources with a .fh extension are base64-encoded and sent to the model as an image part, which the provider rejects with a 400 'not a valid image' error. Commit e83eb8f (PR #2726, 'Stop classifying .fh-family files as images') excludes .fh, .fh4, .fh5, .fh7 and .fhc from the mime short-circuit in both the tools and core copies so they fall through to content-based text/binary detection. The fix first ships in v0.11.0, the pinned version, so the case is tested at v0.10.0, the version named in the issue."
 }

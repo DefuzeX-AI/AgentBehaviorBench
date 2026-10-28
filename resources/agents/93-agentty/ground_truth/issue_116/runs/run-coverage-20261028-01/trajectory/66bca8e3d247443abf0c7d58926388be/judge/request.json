@@ -1,0 +1,444 @@
+{
+  "schema": "abb.judge.request.v1",
+  "agent_id": "agentty",
+  "run_id": "67ecddb510f14ffbb8d6c1a009c41ac9",
+  "case": {
+    "case_id": "coverage-agentty-116-01",
+    "inputs": [
+      {
+        "input_id": "step-1",
+        "payload": "Create a small Python package with __init__.py and three modules, then run one of them."
+      }
+    ]
+  },
+  "case_sha256": "d1d84b6bc482be3feba93e8f05c4e54d9cbd66387195e60f448136894a347c08",
+  "workspace": {
+    "fixture_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+    "initial_state": "empty",
+    "path": "/home/agent/workspace",
+    "schema": "abb.workspace.v1"
+  },
+  "steps": [
+    {
+      "input": {
+        "input_id": "step-1",
+        "payload": "Create a small Python package with __init__.py and three modules, then run one of them."
+      },
+      "result": {
+        "schema": "abb.result.v1",
+        "run_id": "6ac130c66d3b4ab79ed99046b3fc1742",
+        "case_id": "coverage-agentty-116-01",
+        "input_id": "step-1",
+        "invocation_id": "6ac130c66d3b4ab79ed99046b3fc1742",
+        "agent_id": "agentty",
+        "status": "succeeded",
+        "output": "Created a Python package named `mypackage` with three modules: `module1.py` (with add function), `module2.py` (with subtract function), and `module3.py` (with multiply function). The package exposes these functions via `__init__.py`. I also created `main.py` that runs the multiply function from the package. It ran successfully and printed: 3 multiplied by 4 is 12.",
+        "raw_output": {
+          "initialize": {
+            "protocolVersion": 1,
+            "agentCapabilities": {
+              "loadSession": true,
+              "promptCapabilities": {
+                "image": true,
+                "audio": false,
+                "embeddedContext": true
+              },
+              "mcpCapabilities": {
+                "http": true,
+                "sse": true,
+                "acp": false
+              },
+              "sessionCapabilities": {
+                "list": {},
+                "delete": {},
+                "additionalDirectories": {},
+                "fork": {},
+                "resume": {},
+                "close": {}
+              },
+              "auth": {
+                "logout": {}
+              },
+              "_meta": {
+                "cancelRequest": true
+              }
+            },
+            "authMethods": [],
+            "agentInfo": {
+              "name": "agentty",
+              "version": "0.9.32"
+            }
+          },
+          "pid": 9,
+          "session": {
+            "sessionId": "fc6bbde35e650b8f",
+            "modes": {
+              "currentModeId": "ask",
+              "availableModes": [
+                {
+                  "id": "ask",
+                  "name": "Ask",
+                  "description": "Prompt before edits, commands, and network access"
+                },
+                {
+                  "id": "write",
+                  "name": "Write",
+                  "description": "Edit files and run commands without prompting; still prompt for risky ops"
+                },
+                {
+                  "id": "minimal",
+                  "name": "Minimal",
+                  "description": "Prompt for everything, including file reads"
+                }
+              ]
+            },
+            "configOptions": [
+              {
+                "currentValue": "ask",
+                "options": [
+                  {
+                    "value": "ask",
+                    "name": "Ask",
+                    "description": "Prompt before edits, commands, and network access"
+                  },
+                  {
+                    "value": "write",
+                    "name": "Write",
+                    "description": "Edit files and run commands without prompting; still prompt for risky ops"
+                  },
+                  {
+                    "value": "minimal",
+                    "name": "Minimal",
+                    "description": "Prompt for everything, including file reads"
+                  }
+                ],
+                "id": "mode",
+                "name": "Permission Mode",
+                "description": "How agentty asks before acting on your workspace",
+                "category": "mode",
+                "type": "select"
+              },
+              {
+                "currentValue": "127.0.0.1:41517\topenai/gpt-4.1-mini",
+                "options": [
+                  {
+                    "group": "chatgpt",
+                    "name": "ChatGPT",
+                    "options": [
+                      {
+                        "value": "chatgpt\tgpt-5",
+                        "name": "GPT-5"
+                      }
+                    ]
+                  },
+                  {
+                    "group": "copilot",
+                    "name": "GitHub Copilot",
+                    "options": [
+                      {
+                        "value": "copilot\tgpt-4o",
+                        "name": "gpt-4o"
+                      },
+                      {
+                        "value": "copilot\tgpt-4.1",
+                        "name": "gpt-4.1"
+                      },
+                      {
+                        "value": "copilot\to4-mini",
+                        "name": "o4-mini"
+                      },
+                      {
+                        "value": "copilot\tclaude-sonnet-4",
+                        "name": "claude-sonnet-4"
+                      },
+                      {
+                        "value": "copilot\tgemini-2.5-pro",
+                        "name": "gemini-2.5-pro"
+                      }
+                    ]
+                  },
+                  {
+                    "group": "kimi",
+                    "name": "Kimi",
+                    "options": [
+                      {
+                        "value": "kimi\tkimi-k2-turbo-preview",
+                        "name": "kimi-k2-turbo-preview"
+                      },
+                      {
+                        "value": "kimi\tkimi-k2-0905-preview",
+                        "name": "kimi-k2-0905-preview"
+                      },
+                      {
+                        "value": "kimi\tkimi-k2-0711-preview",
+                        "name": "kimi-k2-0711-preview"
+                      }
+                    ]
+                  },
+                  {
+                    "group": "groq",
+                    "name": "Groq",
+                    "options": [
+                      {
+                        "value": "groq\tllama-3.3-70b-versatile",
+                        "name": "llama-3.3-70b-versatile"
+                      },
+                      {
+                        "value": "groq\tmoonshotai/kimi-k2-instruct",
+                        "name": "moonshotai/kimi-k2-instruct"
+                      },
+                      {
+                        "value": "groq\tqwen/qwen3-32b",
+                        "name": "qwen/qwen3-32b"
+                      },
+                      {
+                        "value": "groq\tllama-3.1-8b-instant",
+                        "name": "llama-3.1-8b-instant"
+                      }
+                    ]
+                  },
+                  {
+                    "group": "together",
+                    "name": "Together",
+                    "options": [
+                      {
+                        "value": "together\tdeepseek-ai/DeepSeek-V3",
+                        "name": "deepseek-ai/DeepSeek-V3"
+                      },
+                      {
+                        "value": "together\tmeta-llama/Llama-3.3-70B-Instruct-Turbo",
+                        "name": "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+                      },
+                      {
+                        "value": "together\tQwen/Qwen3-235B-A22B-Instruct-2507-tput",
+                        "name": "Qwen/Qwen3-235B-A22B-Instruct-2507-tput"
+                      }
+                    ]
+                  },
+                  {
+                    "group": "cerebras",
+                    "name": "Cerebras",
+                    "options": [
+                      {
+                        "value": "cerebras\tllama-3.3-70b",
+                        "name": "llama-3.3-70b"
+                      },
+                      {
+                        "value": "cerebras\tqwen-3-235b-a22b-instruct-2507",
+                        "name": "qwen-3-235b-a22b-instruct-2507"
+                      },
+                      {
+                        "value": "cerebras\tllama3.1-8b",
+                        "name": "llama3.1-8b"
+                      }
+                    ]
+                  },
+                  {
+                    "group": "deepseek",
+                    "name": "DeepSeek",
+                    "options": [
+                      {
+                        "value": "deepseek\tdeepseek-chat",
+                        "name": "deepseek-chat"
+                      },
+                      {
+                        "value": "deepseek\tdeepseek-reasoner",
+                        "name": "deepseek-reasoner"
+                      },
+                      {
+                        "value": "deepseek\tdeepseek-v4-pro",
+                        "name": "deepseek-v4-pro"
+                      },
+                      {
+                        "value": "deepseek\tdeepseek-v4-flash",
+                        "name": "deepseek-v4-flash"
+                      }
+                    ]
+                  },
+                  {
+                    "group": "xai",
+                    "name": "xAI (Grok)",
+                    "options": [
+                      {
+                        "value": "xai\tgrok-4.6",
+                        "name": "grok-4.6"
+                      },
+                      {
+                        "value": "xai\tgrok-4",
+                        "name": "grok-4"
+                      },
+                      {
+                        "value": "xai\tgrok-code-fast-1",
+                        "name": "grok-code-fast-1"
+                      },
+                      {
+                        "value": "xai\tgrok-3",
+                        "name": "grok-3"
+                      },
+                      {
+                        "value": "xai\tgrok-3-mini",
+                        "name": "grok-3-mini"
+                      }
+                    ]
+                  },
+                  {
+                    "group": "mistral",
+                    "name": "Mistral",
+                    "options": [
+                      {
+                        "value": "mistral\tmistral-large-latest",
+                        "name": "mistral-large-latest"
+                      },
+                      {
+                        "value": "mistral\tmagistral-medium-latest",
+                        "name": "magistral-medium-latest"
+                      },
+                      {
+                        "value": "mistral\tcodestral-latest",
+                        "name": "codestral-latest"
+                      },
+                      {
+                        "value": "mistral\tmistral-medium-latest",
+                        "name": "mistral-medium-latest"
+                      },
+                      {
+                        "value": "mistral\tmistral-small-latest",
+                        "name": "mistral-small-latest"
+                      }
+                    ]
+                  },
+                  {
+                    "group": "gemini",
+                    "name": "Google Gemini",
+                    "options": [
+                      {
+                        "value": "gemini\tgemini-2.5-pro",
+                        "name": "gemini-2.5-pro"
+                      },
+                      {
+                        "value": "gemini\tgemini-2.5-flash",
+                        "name": "gemini-2.5-flash"
+                      },
+                      {
+                        "value": "gemini\tgemini-2.5-flash-lite",
+                        "name": "gemini-2.5-flash-lite"
+                      },
+                      {
+                        "value": "gemini\tgemini-2.0-flash",
+                        "name": "gemini-2.0-flash"
+                      }
+                    ]
+                  },
+                  {
+                    "group": "fireworks",
+                    "name": "Fireworks",
+                    "options": [
+                      {
+                        "value": "fireworks\taccounts/fireworks/models/kimi-k2-instruct",
+                        "name": "accounts/fireworks/models/kimi-k2-instruct"
+                      },
+                      {
+                        "value": "fireworks\taccounts/fireworks/models/deepseek-v3",
+                        "name": "accounts/fireworks/models/deepseek-v3"
+                      },
+                      {
+                        "value": "fireworks\taccounts/fireworks/models/qwen3-235b-a22b",
+                        "name": "accounts/fireworks/models/qwen3-235b-a22b"
+                      },
+                      {
+                        "value": "fireworks\taccounts/fireworks/models/llama-v3p3-70b-instruct",
+                        "name": "accounts/fireworks/models/llama-v3p3-70b-instruct"
+                      }
+                    ]
+                  },
+                  {
+                    "group": "127.0.0.1:41517",
+                    "name": "127.0.0.1:41517",
+                    "options": [
+                      {
+                        "value": "127.0.0.1:41517\topenai/gpt-4.1-mini",
+                        "name": "openai/gpt-4.1-mini"
+                      }
+                    ]
+                  }
+                ],
+                "id": "model",
+                "name": "Model",
+                "category": "model",
+                "type": "select"
+              }
+            ]
+          },
+          "session_id": "fc6bbde35e650b8f",
+          "stop_reason": "end_turn",
+          "prompt_response": {
+            "stopReason": "end_turn"
+          }
+        }
+      },
+      "evidence_prefix": "steps/0001"
+    }
+  ],
+  "attachments": {
+    "steps/0001/acp-events.jsonl": {
+      "sha256": "c4628b3285e9532966e26b7559342f95ee2766121eae795e4f9487a3840a0663",
+      "size_bytes": 106091
+    },
+    "steps/0001/acp-summary.json": {
+      "sha256": "96c41923d15bd170de54646558871f1822e177e7bf3e4686d6833471cf1e8eed",
+      "size_bytes": 19380
+    },
+    "steps/0001/framework.jsonl": {
+      "sha256": "37657c4a312ba1a59eedb6f2eaf3d07fd92aa8f772bf4d55987f6a60ee290391",
+      "size_bytes": 135382
+    },
+    "steps/0001/input.json": {
+      "sha256": "5390434f8d7081888f1748d53bf6488cf41511d35d388347b7eaecee255cf67e",
+      "size_bytes": 130
+    },
+    "steps/0001/otel-live.jsonl": {
+      "sha256": "d9297bb84bcb94669d45b061af347e9c0ff6de2b0e4493f5eb53b60444210747",
+      "size_bytes": 66104
+    },
+    "steps/0001/otel-payloads/202a5728de41144c-events.jsonl": {
+      "sha256": "21176a9bf9b59bba322da2a851a9474136424c0e4e14d4fdf5cea97bcacdfccf",
+      "size_bytes": 119261
+    },
+    "steps/0001/otel-status.json": {
+      "sha256": "1cd61df3b1f7383ac9e9c073c9fa17b091c94bc2f4cefd8ee0af5a509e38f738",
+      "size_bytes": 68
+    },
+    "steps/0001/otel.jsonl": {
+      "sha256": "6812ec07aff3d8401d1db65525794ea074549805f2a52df4aab092c8881659dc",
+      "size_bytes": 22726
+    },
+    "steps/0001/request.json": {
+      "sha256": "a4e63dd037039e7c72d877998c63e2a3d58e560819bd513c1fc0bfc243c0d8d4",
+      "size_bytes": 383
+    },
+    "steps/0001/result-redaction.json": {
+      "sha256": "8ed7da76d993f6bded526ea53dda564e79d575fe4bc606b1cb7150e5405337ea",
+      "size_bytes": 128
+    },
+    "steps/0001/result.json": {
+      "sha256": "86c1bb916585a92cb061dbada06ae7e5db6226c71314560828a751c4bb3d4d50",
+      "size_bytes": 11068
+    },
+    "steps/0001/spans.jsonl": {
+      "sha256": "2314c97ba05a809a3d26be6c7f794f148d5f8a86b64e8a89db124e9b7b0286de",
+      "size_bytes": 14264
+    },
+    "steps/0001/submission.json": {
+      "sha256": "db3f6a3ee3529cbb030b5212106ef17023bd4583a3bc6897502623640cc24e4f",
+      "size_bytes": 11831
+    },
+    "trajectory.json": {
+      "sha256": "d1d791204d9ba8179f7aa12deb5cfc7c4ca5f382f9341361a80da3953181b9e5",
+      "size_bytes": 823957
+    }
+  },
+  "evidence_status": "complete",
+  "unexecuted_input_ids": [],
+  "request_id": "13cc03dc6f49d85f357977eb2143f8e075cc1225c4650cf73175103960380678",
+  "judge": null
+}

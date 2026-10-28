@@ -31,15 +31,5 @@
       "explanation": "The preview reads the file and builds newContent with applyReplacement directly, never checking that old_string occurs; PR #2029 makes executePreview call calculateEdit first and return its error (e.g. 0 occurrences) before rendering a preview."
     }
   ],
-  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/2029. ast_edit is a two-step tool: without force it renders a preview, with force: true it applies the edit. In v0.9.3 the preview path (executePreview) reads the file, calls ASTEditTool.applyReplacement (String.replace, which silently does nothing when old_string is absent) and validates the unchanged content, so it reports 'AST validation: PASSED' and tells the caller to re-run with force. Only executeApply goes through calculateEdit, which counts occurrences and returns 'Failed to edit, 0 occurrences found'. Commit e88afa5 (PR #2029, 'Validate ast_edit preview replacements') makes the preview call calculateEdit and return its error, sharing the apply path's validation. The fix first ships in v0.10.0; the pinned v0.11.0 contains it, so the case is tested at v0.9.3.",
-  "_meta": {
-    "fix_status": "fixed",
-    "fix_refs": [
-      "https://github.com/vybestack/llxprt-code/pull/2029",
-      "https://github.com/vybestack/llxprt-code/commit/e88afa5b1a1aa74e14d1c08e610120f80e66290a"
-    ],
-    "abb_entry": "acp",
-    "user_messages_from_issue": [],
-    "notes": "Issue page: CLOSED/COMPLETED, closing PR #2029 MERGED; its main commit is e88afa5 (2026-06-14), first tag v0.10.0, ancestor of pinned. The fix diff targets packages/tools/src/tools/ast-edit/ast-edit-invocation.ts (tools package extracted after v0.9.3 by 6fddd10); the same executePreview logic lives in packages/core/src/tools/ast-edit.ts at v0.9.3 and was mapped there. gh_web reports createdAt 2026-06-13, but neighbouring issue numbers (#1753 on 2026-03-27, #1757 on 2026-03-23) suggest the issue dates from late March 2026; either way the latest release before it is v0.9.3."
-  }
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/2029. ast_edit is a two-step tool: without force it renders a preview, with force: true it applies the edit. In v0.9.3 the preview path (executePreview) reads the file, calls ASTEditTool.applyReplacement (String.replace, which silently does nothing when old_string is absent) and validates the unchanged content, so it reports 'AST validation: PASSED' and tells the caller to re-run with force. Only executeApply goes through calculateEdit, which counts occurrences and returns 'Failed to edit, 0 occurrences found'. Commit e88afa5 (PR #2029, 'Validate ast_edit preview replacements') makes the preview call calculateEdit and return its error, sharing the apply path's validation. The fix first ships in v0.10.0; the pinned v0.11.0 contains it, so the case is tested at v0.9.3."
 }

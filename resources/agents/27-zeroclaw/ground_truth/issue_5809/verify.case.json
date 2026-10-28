@@ -42,18 +42,5 @@
       "explanation": "Blocks any git argument equal to \"-c\" using the lowercased list, conflating benign -C with -c; PR #5939 compares -c against the case-preserved arguments."
     }
   ],
-  "Root cause": "FIXED UPSTREAM IN https://github.com/zeroclaw-labs/zeroclaw/pull/5939 (merge commit https://github.com/zeroclaw-labs/zeroclaw/commit/1c206c9aa452f7c2c0ad75178bddabfa28b88bc8; change commit 0bc0dc67660, \"fix(security): distinguish git -C from git -c in security policy\", \"Closes #5809\"). In v0.6.9 SecurityPolicy::is_command_allowed splits each segment into words and lowercases all arguments (`words.map(|w| w.to_ascii_lowercase())`) before calling is_args_safe, whose git rule rejects any argument equal to \"-c\" (git's config-override flag, a known injection vector). Because `-C <path>` (change directory) is lowercased to `-c`, `git -C projects/repo status --short` is rejected as not allowed by security policy regardless of autonomy level or path policy. The fix passes both a case-preserved args_cased list and the lowercased list to is_args_safe and checks `-c` against the cased list. It first ships in v0.7.5 and is an ancestor of the pinned v0.8.5 (policy.rs L2609-2633 there), so the case tests v0.6.9, the version the issue was reported against.",
-  "_meta": {
-    "fix_status": "fixed",
-    "fix_refs": [
-      "https://github.com/zeroclaw-labs/zeroclaw/pull/5939",
-      "https://github.com/zeroclaw-labs/zeroclaw/commit/1c206c9aa452f7c2c0ad75178bddabfa28b88bc8",
-      "https://github.com/zeroclaw-labs/zeroclaw/commit/0bc0dc67660b21226304d0cbc7225678b03f245d"
-    ],
-    "abb_entry": "acp",
-    "user_messages_from_issue": [
-      "shell: git -C projects/repo status --short"
-    ],
-    "notes": "gh_web: CLOSED/COMPLETED (2026-05-09), closing PR #5939 MERGED; merge commit 1c206c9 (second parent 0bc0dc6), first release v0.7.5 (backup/pre-po-cleanup is not a release); linked PR #5468 not used. The issue body does not include a version field; round-4 says it was reported on 0.6.9, the latest release at creation (2026-04-20). Step 1 creates the repository (round-4 plan); step 2 is verbatim. v0.6.9 (tag commit 1a61ea7) is the first release with `zeroclaw acp` (src/main.rs Commands::Acp, L272) and its ACP server drives Agent::turn_streamed (src/channels/acp_server.rs L337). Speculation: the unit's launch.py writes a schema_version = 3 config and passes --config-dir; these may need adapting for the v0.6.9 binary."
-  }
+  "Root cause": "FIXED UPSTREAM IN https://github.com/zeroclaw-labs/zeroclaw/pull/5939 (merge commit https://github.com/zeroclaw-labs/zeroclaw/commit/1c206c9aa452f7c2c0ad75178bddabfa28b88bc8; change commit 0bc0dc67660, \"fix(security): distinguish git -C from git -c in security policy\", \"Closes #5809\"). In v0.6.9 SecurityPolicy::is_command_allowed splits each segment into words and lowercases all arguments (`words.map(|w| w.to_ascii_lowercase())`) before calling is_args_safe, whose git rule rejects any argument equal to \"-c\" (git's config-override flag, a known injection vector). Because `-C <path>` (change directory) is lowercased to `-c`, `git -C projects/repo status --short` is rejected as not allowed by security policy regardless of autonomy level or path policy. The fix passes both a case-preserved args_cased list and the lowercased list to is_args_safe and checks `-c` against the cased list. It first ships in v0.7.5 and is an ancestor of the pinned v0.8.5 (policy.rs L2609-2633 there), so the case tests v0.6.9, the version the issue was reported against."
 }

@@ -30,38 +30,5 @@
       "url": "https://raw.githubusercontent.com/Kuberwastaken/claurst/0f5d970bd78738434afb0c7abae3350d03246938/src-rust/crates/tools/src/apply_patch.rs"
     }
   ],
-  "Root cause": "The unified-diff parser treats every line beginning with --- as a new file header before considering whether it is inside a hunk. Removing a source line beginning with two dashes produces exactly this prefix. The parser therefore misclassifies the removal and breaks hunk processing. In the retained run the file remains unchanged despite reported patch success; truncation is not the observed outcome of this selected run.",
-  "_meta": {
-    "wangyi_import": {
-      "archive": "C:\\Song_startup\\benchmark\\wangyi gt_ v2\\agent-failures_20261028T023807Z(1)\\agent-failures_20261028T023807Z\\claurst\\issue-448.zip",
-      "declared_rate": "10/10",
-      "root_cause_sources": [],
-      "validation": "Imported archived evidence; no fresh execution or repair validation performed. Borrowed root cause retains its original evidence status and may refer to a different revision."
-    },
-    "evidence_review": {
-      "date": "2026-10-28",
-      "status": "source_and_archived_trace_review",
-      "source_snapshots": [
-        "C:\\Song_startup\\benchmark\\发到paper的数据\\issue\\generate_case\\evidence\\wangyi_review\\Kuberwastaken_claurst_0f5d970bd787_src-rust_crates_tools_src_apply_patch.rs.json"
-      ],
-      "trace_results": [
-        {
-          "path": "runs\\run-01\\trajectory\\ce2df31c4cf14efe80515d8046911b3e\\steps\\0001\\result.json",
-          "sha256": "8f208b08b71c493ebfe64944360c06ea4c342cc662b1c99875a1e1442375dfe1",
-          "status": "succeeded",
-          "output": "Done. I created `notes.txt` in the workspace with exactly these three lines and verified the contents:\n\n```\nalpha\n-- old comment\nomega\n```",
-          "error": null
-        },
-        {
-          "path": "runs\\run-01\\trajectory\\ce2df31c4cf14efe80515d8046911b3e\\steps\\0002\\result.json",
-          "sha256": "dd14369b7baee83eb58a4a372763b806313d0a12d096e011bff196e913f6eae4",
-          "status": "succeeded",
-          "output": "The patch tool reported success, but the result is unexpected — let me verify the raw file bytes:The patch tool reported success, but **verification shows the file was actually unchanged** — the removal line was not applied. Here are the full contents of `notes.txt` as they stand right now (confirmed with both the Read tool and a raw byte dump):\n\n```\nalpha\n-- old comment\nomega\n```\n\n**What went wrong:** The line being deleted (`-- old comment`) begins with dashes. Prefixing it with the unified diff removal marker `-` produces `--- old comment`, which is indistinguishable from a `--- <path>` file-header line. The patch parser treated it as a header instead of a deletion, so the hunk silently applied with no effect — the tool's \"+0 -0 lines\" report reflects that nothing actually changed.\n\nIf you'd like, I can remove the `-- old comment` line using a direct file edit instead (which doesn't suffer from the dash-ambiguity), or re-emit the diff in a form the parser handles. Just say the word — I didn't want to change the file beyond what you explicitly asked for.",
-          "error": null
-        }
-      ],
-      "fresh_execution": false,
-      "repair_validation_performed": false
-    }
-  }
+  "Root cause": "The unified-diff parser treats every line beginning with --- as a new file header before considering whether it is inside a hunk. Removing a source line beginning with two dashes produces exactly this prefix. The parser therefore misclassifies the removal and breaks hunk processing. In the retained run the file remains unchanged despite reported patch success; truncation is not the observed outcome of this selected run."
 }

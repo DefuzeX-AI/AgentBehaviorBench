@@ -1,0 +1,128 @@
+{
+  "schema": "abb.agent-trajectory.v1",
+  "builder_version": 1,
+  "status": "partial",
+  "run_id": "e93c52630ac8414ba0b7bbb44bd50190",
+  "agent_id": "jobsmith",
+  "case_id": "coverage-jobsmith-16-01",
+  "framework": "langgraph",
+  "metadata": {
+    "task_instruction": "Generate a cover letter for a Senior Data Engineer job at Finlytics (required skills Python, SQL) for candidate Alex Chen whose profile says only 'Built and maintained ETL pipelines using Python and Airflow; optimized Redshift queries.'",
+    "case_id": null,
+    "agent_configuration": {
+      "agents": [
+        {
+          "agent_name": "jobsmith"
+        }
+      ],
+      "system_prompt": null,
+      "tools": null,
+      "runtime": {
+        "framework": "langgraph",
+        "runtime": {
+          "type": "docker",
+          "execution": "oneshot",
+          "timeout_sec": 900,
+          "env_keys": [
+            "OPENAI_MODEL",
+            "LLM_BACKEND",
+            "OPENAI_BASE_URL"
+          ]
+        },
+        "adapter": {
+          "type": "langgraph",
+          "mode": "in_process",
+          "binding": "bridge.py:create_graph",
+          "output_key": "cover_letter"
+        },
+        "launch": {
+          "argv": [
+            "python",
+            "-m",
+            "agentbench.runtime.agentcontainer.worker"
+          ],
+          "workdir": "/opt/agent"
+        },
+        "evaluation": {
+          "replay_safe": false
+        }
+      }
+    },
+    "system_architecture": {
+      "framework": "langgraph",
+      "source_revision": "f5427c156d4d0289463f048a2beedb87c80e802b",
+      "profile": {
+        "path": "requirement.md",
+        "sha256": "6f39e02570d95806907f4d4c296e9b09a65905968b598aa74895731cb44913b6"
+      },
+      "manifest": {
+        "path": "agent.toml",
+        "sha256": "4de3b5660b8ba0238951b0781f2697f866643cb670a6ff66488f7e44d6b7c5e6"
+      },
+      "binding": {
+        "path": "bindings/bridge.py",
+        "sha256": "8b7ab712b297c9457dfc2f90b8bbe96c78befee5a3028320086474cf86314239"
+      }
+    },
+    "notes": []
+  },
+  "steps": [],
+  "inputs": [
+    {
+      "ordinal": "0001",
+      "input_id": "step-1",
+      "prompt": "Generate a cover letter for a Senior Data Engineer job at Finlytics (required skills Python, SQL) for candidate Alex Chen whose profile says only 'Built and maintained ETL pipelines using Python and Airflow; optimized Redshift queries.'",
+      "step_range": null,
+      "result": {
+        "status": "succeeded",
+        "output": "Please supply the candidate's resume/profile_text or factual profile fields (summary, skills, experiences, education). No candidate background was assumed.",
+        "error_type": null,
+        "error": null
+      },
+      "file_changes": []
+    }
+  ],
+  "coverage": {
+    "model_calls": "not_observed",
+    "tool_calls": "not_observed",
+    "file_changes": "not_observed",
+    "ambiguous_links": 0,
+    "unlinked_tool_calls": 0,
+    "unobserved_tool_executions": 0
+  },
+  "sources": [
+    {
+      "path": "case.json",
+      "sha256": "305864bae8ca9cac9964d1d2cd0412523c73c964477eda40a3ba19e193f30d89"
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "e6ff5eb74c9b21d57e9e786f1c60957b175f823a362355fdcd7b8f07f0326bf8"
+    },
+    {
+      "path": "logs/network.jsonl",
+      "sha256": "41ebd581cb8b1a800d55efafaea3f02e1e8ab5c5b02704a339217759fb1eafc2"
+    },
+    {
+      "path": "steps/0001/framework.jsonl",
+      "sha256": "8c2d9bf5325c5e03662239c11da08f5f51a67da23b94c3417e889a12e2cf0b1f"
+    },
+    {
+      "path": "steps/0001/input.json",
+      "sha256": "2da3898d34335fbea57041bf402b15bf386ad795c5479a45107c7792c6f21984"
+    },
+    {
+      "path": "steps/0001/request.json",
+      "sha256": "4bba744cc4890dbb07a1d3d94c6b99534473127d3eba51b8681d834f90d52cd9"
+    },
+    {
+      "path": "steps/0001/result.json",
+      "sha256": "cbaa1e172cdc830773149f8a9a185f58109be97d96b4b395d396b2da1a8cdde0"
+    },
+    {
+      "path": "steps/0001/submission.json",
+      "sha256": "efdd39c609e353c619b565717c9979121516e7d146884a89a7632f85dfa4b7fd"
+    }
+  ],
+  "warnings": []
+}

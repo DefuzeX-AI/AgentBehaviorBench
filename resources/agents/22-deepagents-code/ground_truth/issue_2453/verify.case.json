@@ -32,27 +32,5 @@
       "explanation": "The backend slices source lines first; the filesystem middleware then reapplies limit to the wrapped rendered rows. The next offset advances past source content that was never emitted. #3641 removes the second limiting step."
     }
   ],
-  "Root cause": "The backend slices source lines first; the filesystem middleware then reapplies limit to the wrapped rendered rows. The next offset advances past source content that was never emitted. #3641 removes the second limiting step.",
-  "_meta": {
-    "fix_status": "fixed",
-    "fix_refs": [
-      "https://github.com/langchain-ai/deepagents/commit/390551d61d57ce68c2a80ed78c07eaa8e985908b"
-    ],
-    "abb_entry": "acp",
-    "user_messages_from_issue": [],
-    "notes": "The issue invokes StateBackend; this case uses the normal ACP filesystem backend, which must share the same middleware formatting path. Preparation of the file is an extra first turn; the two read requests preserve the issue text. The virtual StateBackend path /wrapped.txt is replaced with /home/agent/workspace/wrapped.txt for the native filesystem unit; the read offsets and limits are unchanged.",
-    "preparation_status": "prepared",
-    "runtime_validation": "not_run_in_this_completion",
-    "root_cause_verification": "source_review_only",
-    "unit_pin": "a764619aa8c850bc75e2e916cf53a587637d8c81",
-    "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\22-deepagents-code",
-    "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
-    "upstream_checked_at": "2026-10-28",
-    "evidence_issue": "evidence/upstream/issues.json",
-    "evidence_timeline": "evidence/upstream/timelines.json",
-    "evidence_comments": "evidence/upstream/comments.json",
-    "source_snapshot": "evidence/upstream/review_sources.json",
-    "duplicate_group": null,
-    "historical_acp_source_present": true
-  }
+  "Root cause": "The backend slices source lines first; the filesystem middleware then reapplies limit to the wrapped rendered rows. The next offset advances past source content that was never emitted. #3641 removes the second limiting step."
 }

@@ -42,15 +42,5 @@
       "explanation": "The functionResponse sent to the model is { error: error.message }; PR #3051 adds a modelFacingContent parameter and uses it in preference to error.message."
     }
   ],
-  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/3051. Tools return a ToolResult whose llmContent is written for the model (constraint plus remedy) and whose error.message is a terse log/UI string. In v0.10.0, when a tool result has an error, ResultAggregator.publishResult wraps result.error.message in a new Error and calls createErrorResponse, which builds the tool_response part as { error: error.message }; result.llmContent is discarded at this boundary. For insert_at_line the model therefore sees 'line_number 999 exceeds file length (8)' instead of 'Cannot insert at line 999: exceeds file length (8). Use line_number <= 9 to append.' Commit 85ce51c (PR #3051, 'Deliver the model-facing llmContent remedy on tool errors') adds extractModelFacingErrorText (with the same output limiting as the success path) and passes it into createErrorResponse, which prefers it over error.message. The fix first ships in v0.11.0, the pinned version, so the case is tested at v0.10.0.",
-  "_meta": {
-    "fix_status": "fixed",
-    "fix_refs": [
-      "https://github.com/vybestack/llxprt-code/pull/3051",
-      "https://github.com/vybestack/llxprt-code/commit/85ce51cb267b8a53ecac35ec58387a3f7e3a3b65"
-    ],
-    "abb_entry": "acp",
-    "user_messages_from_issue": [],
-    "notes": "Issue page: CLOSED/COMPLETED, closing PR #3051 MERGED; commit 85ce51c first tag v0.11.0, ancestor of pinned. Follow-up PR #3077 (f80e043, #3063) is a separate fix and not used. Line numbers read at v0.10.0. Speculation: the ACP server's tool path goes through the same scheduler/ResultAggregator; if it used a different error path the remedy loss would come from that path instead. The off-by-one '(8)' for a 7-line file is #3036's phantom line."
-  }
+  "Root cause": "FIXED UPSTREAM IN https://github.com/vybestack/llxprt-code/pull/3051. Tools return a ToolResult whose llmContent is written for the model (constraint plus remedy) and whose error.message is a terse log/UI string. In v0.10.0, when a tool result has an error, ResultAggregator.publishResult wraps result.error.message in a new Error and calls createErrorResponse, which builds the tool_response part as { error: error.message }; result.llmContent is discarded at this boundary. For insert_at_line the model therefore sees 'line_number 999 exceeds file length (8)' instead of 'Cannot insert at line 999: exceeds file length (8). Use line_number <= 9 to append.' Commit 85ce51c (PR #3051, 'Deliver the model-facing llmContent remedy on tool errors') adds extractModelFacingErrorText (with the same output limiting as the success path) and passes it into createErrorResponse, which prefers it over error.message. The fix first ships in v0.11.0, the pinned version, so the case is tested at v0.10.0."
 }
