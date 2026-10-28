@@ -20,7 +20,8 @@ official KUMA evaluation and GT remain separate stages.
 Exports omit credentials, private reasoning and local paths; they are not a full
 SDK ledger. The output's original hash is distinguished from its exported hash.
 The successful run used directory `129-ontocast`, subsequently renamed to
-`135-ontocast` to avoid a numbering collision. The Dockerfile matches the tested
+`135-ontocast` and then `138-ontocast` as other integrations merged. These directory
+renames do not represent new executions. The Dockerfile matches the tested
 configuration. The observed embedding snapshot is recorded in the summary;
 fresh builds currently resolve that model's upstream default revision.
 
@@ -34,7 +35,7 @@ model `qwen3.7-max-2026-06-08`. A prior Judge request used 332,374 tokens.
 From the repository root, choose an unused results path:
 
 ```bash
-python resources/agents/135-ontocast/evaluation/run_bailian_local.py \
+python resources/agents/138-ontocast/evaluation/run_bailian_local.py \
   --results-dir /absolute/path/to/new-ontocast-smoke --confirm-free-only
 ```
 
