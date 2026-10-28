@@ -1,0 +1,80 @@
+# Manual ABB integration for zamalali/langchain-code.
+# OpenRouter json_schema generation (agent add -b) is unavailable on the
+# DeepSeek direct API; files follow the LangGraph unit conventions of 57/60.
+schema_version = "defuzex-bench.agent.v2"
+agent_id = "langchain-code"
+display_name = "LangCode (langchain-code) Deep Agent"
+framework = "langgraph"
+
+[evaluation]
+replay_safe = false
+
+[source]
+method = "git"
+repository = "https://github.com/zamalali/langchain-code"
+revision = "d75d039ce2b4d1d2bff01d7f8858068209564ecc"
+downloaded_on = "2026-10-23"
+
+[runtime]
+worker_env_keys = ["KUMA_API_KEY", "DEFUZEX_API_KEY", "KUMA_BASE_URL"]
+type = "docker"
+execution = "oneshot"
+timeout_sec = 1200
+
+[build]
+context = "."
+dockerfile = "Dockerfile"
+
+[launch]
+argv = ["python", "-I", "-c", "import runpy,sys; sys.path.insert(0, '/opt/abb-sdk-runtime'); runpy.run_module('agentbench.sdk.plugin.kuma.worker', run_name='__main__')"]
+workdir = "/opt/agent"
+
+# LangCode is a Typer CLI with no langgraph.json. The binding reproduces the
+# turn logic of `langcode chat --mode deep --auto --llm openai`, whose graph is
+# built in Python by build_deep_agent (langgraph.prebuilt.create_react_agent).
+[adapter]
+type = "langgraph"
+mode = "in_process"
+binding = "bridge.py:create_graph"
+output_key = "answer"
+
+# get_model("openai") builds ChatOpenAI(model="gpt-4o-mini") at the default
+# OpenAI endpoint. That is the only model route; the sub-agent task tool and
+# process_multimodal reuse the same model object.
+[llm_interception]
+trust_plugin = "pem-env"
+
+[[llm_interception.credentials]]
+id = "openai"
+agent_env = "OPENAI_API_KEY"
+auth_plugin = "bearer-token"
+
+[[llm_interception.routes]]
+id = "openai-chat"
+host_patterns = ["api.openai.com"]
+ports = [443]
+methods = ["POST"]
+path_patterns = ["/v1/chat/completions"]
+protocol_plugin = "openai-chat"
+credential = "openai"
+
+[[llm_interception.tool_routes]]
+purpose = "evaluation"
+host_patterns = ["api.github.com"]
+ports = [443]
+methods = ["GET"]
+path_patterns = ["/repos/DefuzeX-AI/KUMA-DefuzeX/releases/latest"]
+
+[[llm_interception.tool_routes]]
+purpose = "evaluation"
+host_patterns = ["defuzex.ai"]
+ports = [443]
+methods = ["GET", "POST"]
+path_patterns = ["/api/agentdefuze"]
+
+[[llm_interception.tool_routes]]
+purpose = "evaluation"
+host_patterns = ["defuzex.ai"]
+ports = [443]
+methods = ["GET", "POST"]
+path_patterns = ["/api/agentdefuze/sdk/*"]

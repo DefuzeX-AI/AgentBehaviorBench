@@ -1,0 +1,111 @@
+{
+  "case_id": "ir-opencrabs-2211-v1",
+  "issue": {
+    "repository": "opencrabs/opencrabs",
+    "number": 2211,
+    "url": "https://github.com/opencrabs/opencrabs/issues/2211",
+    "state": "closed",
+    "title": "fix(tools): recent-failure guard blocks a valid retry after the missing file is created"
+  },
+  "version_choice": "pinned",
+  "reported_version": "0.5.13",
+  "commit_version": "0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Step 1: Run this shell command exactly as written, as a single command with nothing added before or after it (no echo, no printf, no exit-code helpers): cat release.cfg\nThen show me its output and tell me whether it failed.",
+    "Step 2: Create a file named release.cfg in the current directory whose entire content is the single line: version=1.4.2",
+    "Step 3: Now run exactly the same shell command again, character for character and with nothing added: cat release.cfg\nShow me the real output of that run. Do not substitute or wrap it in a different command."
+  ],
+  "expected": "Step 3 的 `cat release.cfg` 被 bash 工具真正执行并返回 `version=1.4.2`；因为成功的 write_file 和新的用户轮次已使先前失败记录失效（依据：issue 引用的 src/brain/tools/bash.rs:449-452 注释 'Stops the same-command-twice loop' 与 :1308-1311 承认 'the environment may have recovered'，且维护者确认应在新用户轮/成功变更型工具调用后清除记录）。",
+  "defect": "bash 工具在命令执行前被 recent-failure guard 短路，返回 'You already ran this exact command in the last 5 bash calls and it failed ... Previous error: cat: release.cfg: No such file or directory'，而 release.cfg 此时已存在，用户明确要求重跑的命令没有被执行。",
+  "fault location": [
+    {
+      "file": "src/brain/tools/bash.rs",
+      "function": "check_recent_failure",
+      "line_start": 1343,
+      "line_end": 1367,
+      "commit": "0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402",
+      "url": "https://raw.githubusercontent.com/opencrabs/opencrabs/0dfe3b7fd03e62e4184edf4d5e98ee7e73f45402/src/brain/tools/bash.rs",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "The recent-failure guard keys rejection on the same command and session within its time/block budget without invalidating the cached failure after a filesystem repair. It returns the previous missing-file error before executing the retried command. The retained trace creates release.cfg between the failure and the blocked identical retry.",
+  "_meta": {
+    "wangyi_import": {
+      "archive": "C:\\Song_startup\\benchmark\\wangyi gt_ v2\\agent-failures_20261028T023807Z(1)\\agent-failures_20261028T023807Z\\opencrabs\\issue-2211.zip",
+      "declared_rate": "9/10",
+      "root_cause_sources": [
+        {
+          "field": "Root cause",
+          "source": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\114-opencrabs\\ground_truth\\issue_2211\\verify.case.json",
+          "source_commit": "2cf3e6ead8d97ac560216ffff59e9561252e9d3d",
+          "matches_execution_commit": false,
+          "original_meta": {
+            "fix_status": "source_confirmed",
+            "fix_refs": [],
+            "abb_entry": "acp",
+            "user_messages_from_issue": [],
+            "source_case": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\114-opencrabs\\ground_truth\\issue-2211\\case.verified.json",
+            "source_case_id": "srp-opencrabs-h3-rerun-after-fix-v2",
+            "preparation_status": "prepared_from_recorded_case",
+            "runtime_validation": "not_run_in_this_completion",
+            "notes": "Reused the existing ABB source-confirmed case. Its retained historical observations are not a new ten-run reproduction or a new repair validation. Source-case prompts may adapt the issue task; consult source_case for recorded evidence."
+          }
+        },
+        {
+          "field": "fault location",
+          "source": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\114-opencrabs\\ground_truth\\issue_2211\\verify.case.json",
+          "source_commit": "2cf3e6ead8d97ac560216ffff59e9561252e9d3d",
+          "matches_execution_commit": false,
+          "original_meta": {
+            "fix_status": "source_confirmed",
+            "fix_refs": [],
+            "abb_entry": "acp",
+            "user_messages_from_issue": [],
+            "source_case": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\114-opencrabs\\ground_truth\\issue-2211\\case.verified.json",
+            "source_case_id": "srp-opencrabs-h3-rerun-after-fix-v2",
+            "preparation_status": "prepared_from_recorded_case",
+            "runtime_validation": "not_run_in_this_completion",
+            "notes": "Reused the existing ABB source-confirmed case. Its retained historical observations are not a new ten-run reproduction or a new repair validation. Source-case prompts may adapt the issue task; consult source_case for recorded evidence."
+          }
+        }
+      ],
+      "validation": "Imported archived evidence; no fresh execution or repair validation performed. Borrowed root cause retains its original evidence status and may refer to a different revision."
+    },
+    "evidence_review": {
+      "date": "2026-10-28",
+      "status": "source_and_archived_trace_review",
+      "source_snapshots": [
+        "C:\\Song_startup\\benchmark\\发到paper的数据\\issue\\generate_case\\evidence\\wangyi_review\\opencrabs_opencrabs_0dfe3b7fd03e_src_brain_tools_bash.rs.json"
+      ],
+      "trace_results": [
+        {
+          "path": "runs\\run-01\\trajectory\\285bdec1abe14fee9791ab94890400a2\\steps\\0001\\result.json",
+          "sha256": "cb7cbf9983ec53c02b5b8fd1ec604978153bee85bcb5d07b261ecd1bcda9506c",
+          "status": "succeeded",
+          "output": "Ran it exactly as written. It failed — exit code 1:\n\n```\ncat: release.cfg: No such file or directory\n```\n\nNothing named `release.cfg` in the working directory (`/home/agent/workspace`). Want me to check what's actually there, or is the file supposed to live somewhere else?",
+          "error": null
+        },
+        {
+          "path": "runs\\run-01\\trajectory\\285bdec1abe14fee9791ab94890400a2\\steps\\0002\\result.json",
+          "sha256": "5a7ebffe954a9ca48d611efb6210c5d954ec4d118cf09918e1e1798cec6630e9",
+          "status": "succeeded",
+          "output": "Created `release.cfg` — 14 bytes (`version=1.4.2` + trailing newline). Ready for step 3.",
+          "error": null
+        },
+        {
+          "path": "runs\\run-01\\trajectory\\285bdec1abe14fee9791ab94890400a2\\steps\\0003\\result.json",
+          "sha256": "8cd4888eecbba423d94cfb9a661ee54860b1a66924b5ae4b0d0b5fb46aa521b5",
+          "status": "succeeded",
+          "output": "Straight answer: **that run did not happen.** The runtime's duplicate-call guard blocked the exact re-run — it matched `cat release.cfg` against the earlier failed call and refused to re-issue it, citing the old `No such file or directory` error. That guard message is all I got back; there is no fresh `cat` output to show you, and I won't invent one.\n\nWhat I can tell you from a genuinely different command (`ls -l release.cfg`): the file is there now, 14 bytes. So the earlier failure is stale — the guard just doesn't know that.\n\nIf you want the real output, your options: approve me retrying the identical call, or I run `cat ./release.cfg` — a different string, same semantics, would slip past the guard. Say the word.",
+          "error": null
+        }
+      ],
+      "fresh_execution": false,
+      "repair_validation_performed": false
+    }
+  }
+}

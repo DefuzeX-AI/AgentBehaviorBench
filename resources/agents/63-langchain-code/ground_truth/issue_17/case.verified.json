@@ -1,0 +1,103 @@
+{
+  "case_id": "ir-langchain-code-17-v1",
+  "issue": {
+    "repository": "zamalali/langchain-code",
+    "number": 17,
+    "url": "https://github.com/zamalali/langchain-code/issues/17",
+    "state": "open",
+    "title": "Deep mode: delegating to a sub-agent (`task`) always fails with \"StructuredTool does not support sync invocation\""
+  },
+  "version_choice": "pinned",
+  "reported_version": "d75d039",
+  "commit_version": "d75d039ce2b4d1d2bff01d7f8858068209564ecc",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Please delegate this job to your general-purpose sub-agent rather than doing it yourself: the sub-agent should create the file report/total.txt containing only the sum of 17, 25 and 58."
+  ],
+  "expected": "The deep agent should delegate to its general-purpose sub-agent and let it create report/total.txt containing only 100, as requested in issue #17 and supported by the unit requirement.md and create_task_tool at the pinned commit.",
+  "defect": "Invoking the async-only task tool through the synchronous deep-agent turn raises StructuredTool does not support sync invocation., so the turn fails before the sub-agent runs or creates report/total.txt.",
+  "fault location": [
+    {
+      "file": "src/langchain_code/agent/subagents.py",
+      "function": "create_task_tool.task",
+      "line_start": 99,
+      "line_end": 131,
+      "commit": "d75d039ce2b4d1d2bff01d7f8858068209564ecc",
+      "url": "https://raw.githubusercontent.com/zamalali/langchain-code/d75d039ce2b4d1d2bff01d7f8858068209564ecc/src/langchain_code/agent/subagents.py",
+      "role": "static_analysis",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "src/langchain_code/cli/commands/chat.py",
+      "function": "chat",
+      "line_start": 568,
+      "line_end": 568,
+      "commit": "d75d039ce2b4d1d2bff01d7f8858068209564ecc",
+      "url": "https://raw.githubusercontent.com/zamalali/langchain-code/d75d039ce2b4d1d2bff01d7f8858068209564ecc/src/langchain_code/cli/commands/chat.py",
+      "role": "static_analysis",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "An async-only subagent task tool is invoked through the synchronous chat execution path. StructuredTool cannot service that synchronous call and raises before the delegated job executes. The retained failure is exactly StructuredTool does not support sync invocation.",
+  "_meta": {
+    "wangyi_import": {
+      "archive": "C:\\Song_startup\\benchmark\\wangyi gt_ v2\\agent-failures_20261028T023807Z(1)\\agent-failures_20261028T023807Z\\langchain-code\\issue-17.zip",
+      "declared_rate": "10/10",
+      "root_cause_sources": [
+        {
+          "field": "Root cause",
+          "source": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\63-langchain-code\\ground_truth\\issue_17\\verify.case.json",
+          "source_commit": "d75d039ce2b4d1d2bff01d7f8858068209564ecc",
+          "matches_execution_commit": true,
+          "original_meta": {
+            "fix_status": "inferred",
+            "fix_refs": [],
+            "abb_entry": "langgraph",
+            "user_messages_from_issue": [
+              "Please delegate this job to your general-purpose sub-agent rather than doing it yourself: the sub-agent should create the file report/total.txt containing only the sum of 17, 25 and 58."
+            ],
+            "notes": "gh_web: issue OPEN, no closing/linked PRs or commits. The clone's newest commit is the pinned d75d039 (the issue's stated revision); the repo has no tags, so reported_version is the commit SHA and nothing upstream fixes it. The step is the issue's verbatim message. Fault locations follow the issue's analysis (subagents.py L107 async def, chat.py L568 sync invoke) and were verified with git show at d75d039."
+          }
+        },
+        {
+          "field": "fault location",
+          "source": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\63-langchain-code\\ground_truth\\issue_17\\verify.case.json",
+          "source_commit": "d75d039ce2b4d1d2bff01d7f8858068209564ecc",
+          "matches_execution_commit": true,
+          "original_meta": {
+            "fix_status": "inferred",
+            "fix_refs": [],
+            "abb_entry": "langgraph",
+            "user_messages_from_issue": [
+              "Please delegate this job to your general-purpose sub-agent rather than doing it yourself: the sub-agent should create the file report/total.txt containing only the sum of 17, 25 and 58."
+            ],
+            "notes": "gh_web: issue OPEN, no closing/linked PRs or commits. The clone's newest commit is the pinned d75d039 (the issue's stated revision); the repo has no tags, so reported_version is the commit SHA and nothing upstream fixes it. The step is the issue's verbatim message. Fault locations follow the issue's analysis (subagents.py L107 async def, chat.py L568 sync invoke) and were verified with git show at d75d039."
+          }
+        }
+      ],
+      "validation": "Imported archived evidence; no fresh execution or repair validation performed. Borrowed root cause retains its original evidence status and may refer to a different revision."
+    },
+    "evidence_review": {
+      "date": "2026-10-28",
+      "status": "source_and_archived_trace_review",
+      "source_snapshots": [
+        "C:\\Song_startup\\benchmark\\发到paper的数据\\issue\\generate_case\\evidence\\wangyi_review\\zamalali_langchain-code_d75d039ce2b4_src_langchain_code_agent_subagents.py.json",
+        "C:\\Song_startup\\benchmark\\发到paper的数据\\issue\\generate_case\\evidence\\wangyi_review\\zamalali_langchain-code_d75d039ce2b4_src_langchain_code_cli_commands_chat.py.json"
+      ],
+      "trace_results": [
+        {
+          "path": "runs\\run-01\\trajectory\\0d0a72c63ac14b98979ea66257a59c83\\steps\\0001\\result.json",
+          "sha256": "58e5b396ef03cd2b2de0087a55979fe2b018b3c2eb68387c622af482c5cfffe9",
+          "status": "failed",
+          "output": null,
+          "error": "StructuredTool does not support sync invocation."
+        }
+      ],
+      "fresh_execution": false,
+      "repair_validation_performed": false
+    }
+  }
+}

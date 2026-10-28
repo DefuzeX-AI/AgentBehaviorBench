@@ -1,0 +1,70 @@
+{
+  "case_id": "ir-nanocoder-1391-v1",
+  "issue": {
+    "repository": "Nano-Collective/nanocoder",
+    "number": 1391,
+    "url": "https://github.com/Nano-Collective/nanocoder/issues/1391",
+    "state": "closed",
+    "title": "[Bug] processToolUse never sets isError for a non-zero shell exit, so --json and ACP report failed commands as successful"
+  },
+  "version_choice": "pinned",
+  "reported_version": "1.30.0",
+  "commit_version": "59874391f939bdfe93c273a10d23a7a94009edd1",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Use your shell tool to run the command `exit 7` exactly, then tell me the exit code."
+  ],
+  "expected": "The execute_bash tool call for `exit 7` should be marked as failed (result.isError === true), and therefore the ACP tool-call status should be failed rather than completed; the issue explicitly expects result.isError === true and states acp-conversation.ts derives status from isError.",
+  "defect": "The execute_bash tool call for `exit 7` is reported as completed (isError stays undefined), so a command that exited 7 is indistinguishable from a clean successful run in the ACP trace.",
+  "fault location": [
+    {
+      "file": "source/acp/acp-conversation.ts",
+      "line_start": 459,
+      "line_end": 469,
+      "function": "tool completion status mapping",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations.",
+      "commit": "59874391f939bdfe93c273a10d23a7a94009edd1",
+      "url": "https://raw.githubusercontent.com/Nano-Collective/nanocoder/59874391f939bdfe93c273a10d23a7a94009edd1/source/acp/acp-conversation.ts"
+    },
+    {
+      "file": "source/tools/execute-bash.tsx",
+      "line_start": 34,
+      "line_end": 47,
+      "function": "formatBashResultForLLM",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations.",
+      "commit": "59874391f939bdfe93c273a10d23a7a94009edd1",
+      "url": "https://raw.githubusercontent.com/Nano-Collective/nanocoder/59874391f939bdfe93c273a10d23a7a94009edd1/source/tools/execute-bash.tsx"
+    }
+  ],
+  "Root cause": "The ACP conversation layer derives tool failure from whether the returned text begins with Error. execute_bash formats a nonzero command exit as EXIT_CODE: 7, so the prefix check marks the call completed. The retained protocol update contains status=completed with rawOutput=EXIT_CODE: 7. The model correctly reports the exit code; the fault is loss of failure semantics in the protocol status.",
+  "_meta": {
+    "wangyi_import": {
+      "archive": "C:\\Song_startup\\benchmark\\wangyi gt_ v2\\agent-failures_20261028T023807Z(1)\\agent-failures_20261028T023807Z\\nanocoder\\issue-1391.zip",
+      "declared_rate": "10/10",
+      "root_cause_sources": [],
+      "validation": "Imported archived evidence; no fresh execution or repair validation performed. Borrowed root cause retains its original evidence status and may refer to a different revision."
+    },
+    "evidence_review": {
+      "date": "2026-10-28",
+      "status": "source_and_archived_trace_review",
+      "source_snapshots": [
+        "C:\\Song_startup\\benchmark\\发到paper的数据\\issue\\generate_case\\evidence\\wangyi_review\\Nano-Collective_nanocoder_59874391f939_source_acp_acp-conversation.ts.json",
+        "C:\\Song_startup\\benchmark\\发到paper的数据\\issue\\generate_case\\evidence\\wangyi_review\\Nano-Collective_nanocoder_59874391f939_source_tools_execute-bash.tsx.json"
+      ],
+      "trace_results": [
+        {
+          "path": "runs\\run-01\\trajectory\\7a1ab7430efc4b719072c9e4a04e4c95\\steps\\0001\\result.json",
+          "sha256": "7863873acff62b54f3ce28c05a0f89e7c2eb5eff4332df17e6a07c15a2c9c930",
+          "status": "succeeded",
+          "output": "Exit code: **7**\n\nThe command `exit 7` terminated the shell with exit status 7, which was reported back by the tool.",
+          "error": null
+        }
+      ],
+      "fresh_execution": false,
+      "repair_validation_performed": false
+    }
+  }
+}

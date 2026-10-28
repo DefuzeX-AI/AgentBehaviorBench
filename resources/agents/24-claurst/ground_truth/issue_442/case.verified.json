@@ -1,0 +1,59 @@
+{
+  "case_id": "ir-claurst-442-v1",
+  "issue": {
+    "repository": "Kuberwastaken/claurst",
+    "number": 442,
+    "url": "https://github.com/Kuberwastaken/claurst/issues/442",
+    "state": "closed",
+    "title": "Bash tool runtime: multibyte truncation panic, 2 MB reader stall, no PAGER, spill large output to a file"
+  },
+  "version_choice": "pinned",
+  "reported_version": "0.1.7",
+  "commit_version": "0f5d970bd78738434afb0c7abae3350d03246938",
+  "fixed_in": "0.2.0 (approx: first release after fix)",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Run this exact command with your Bash tool, without pipes or redirections: seq 1 2000000\nThen tell me the exit code, how many lines of output came back, and whether any of the output was trimmed or lost."
+  ],
+  "expected": "Bash 工具执行 `seq 1 2000000`（约 15 MB 输出）应正常结束：返回 head+tail 摘要，把完整输出写入 claurst home 下的 0600 spill 文件（如 <home>/tool-output/<id>.txt），并在工具结果里附 `Full output: <path>`；pty 不得因写满而卡死，调用不超时、不丢输出（issue 正文 Spec 与修复 PR #455 定义的行为）。",
+  "defect": "按 issue：pty reader 只有 head-only 2 MB cap，读满 2 MB 后停止排空 → 子进程写满管道阻塞 → Bash 调用挂起直到超时、输出丢失，且没有任何 spill 文件或 `Full output:` 路径返回给模型。",
+  "fault location": [
+    {
+      "file": "src-rust/crates/tools/src/pty_bash.rs",
+      "line_start": 496,
+      "line_end": 523,
+      "function": "PTY output reader",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations.",
+      "commit": "0f5d970bd78738434afb0c7abae3350d03246938",
+      "url": "https://raw.githubusercontent.com/Kuberwastaken/claurst/0f5d970bd78738434afb0c7abae3350d03246938/src-rust/crates/tools/src/pty_bash.rs"
+    }
+  ],
+  "Root cause": "The PTY reader stops draining after total bytes exceed 2 MiB, retaining only the captured prefix. The later output formatter truncates again without a durable full-output retrieval handle. This causes output loss and can impose backpressure on a still-running writer. The retained answer reports unavailable/truncated output, but does not establish that this particular child process hung; the hang consequence remains conditional.",
+  "_meta": {
+    "wangyi_import": {
+      "archive": "C:\\Song_startup\\benchmark\\wangyi gt_ v2\\agent-failures_20261028T023807Z(1)\\agent-failures_20261028T023807Z\\claurst\\issue-442.zip",
+      "declared_rate": "10/10",
+      "root_cause_sources": [],
+      "validation": "Imported archived evidence; no fresh execution or repair validation performed. Borrowed root cause retains its original evidence status and may refer to a different revision."
+    },
+    "evidence_review": {
+      "date": "2026-10-28",
+      "status": "source_and_archived_trace_review",
+      "source_snapshots": [
+        "C:\\Song_startup\\benchmark\\发到paper的数据\\issue\\generate_case\\evidence\\wangyi_review\\Kuberwastaken_claurst_0f5d970bd787_src-rust_crates_tools_src_pty_bash.rs.json"
+      ],
+      "trace_results": [
+        {
+          "path": "runs\\run-01\\trajectory\\bf4024f7918e4dc98c556d69b4f8ed43\\steps\\0001\\result.json",
+          "sha256": "2b6983d4140e0cebb82eb496071e72b80d376fcd32ad189969706003f79a27cf",
+          "status": "succeeded",
+          "output": "The exact command ran — but here's the critical observation: the tool result came back as `[tool result truncated to save context]`, i.e., the harness replaced the entire result with a truncation notice and delivered **zero lines** of the actual output to me. The command itself didn't fail (no error banner / non-zero exit report), but I can't just assert details I didn't observe, so let me verify the exit code and output volume with separate diagnostic commands:That's revealing — and something strange is going on. Let me note what happened so far, because it's not simple head/tail trimming:\n\n- The literal `seq 1 2000000` run: result replaced **entirely** by `[tool result truncated to save context]` — zero lines delivered.\n- `seq 1 100000`: also fully replaced by the placeholder.\n- A tiny `echo; seq 1 10; echo done` command: **also** replaced by the placeholder (!), while a `seq 1 10000` run came through in full (all 10,000 lines visible). So the truncation isn't strictly per-command size — it looks like the harness drops results to keep the conversation context under budget, and after the 10,000-line result landed, even small results are being withheld.\n\nSince Bash results are currently being swallowed, let me recover the ground truth via files, which I can read with the Read tool:The diagnostic command itself ran cleanly and silently (all output went to the report file). Now let me read it:I now have verified ground truth. Here's the full report:\n\n## Results\n\n**1. Exit code: `0`**\n\nThe direct tool result doesn't display the exit code, so I verified it separately (`seq 1 2000000 > /dev/null; echo $?` captured to a file, then read back): `exit_code=0`. No stderr output either.\n\n**2. How many lines came back to me: `0`**\n\nThe command produced 2,000,000 lines (~14.9 MB), but the Bash tool result I received contained **none of them** — the harness replaced the entire result with the placeholder `[tool result truncated to save context]`. So from my side, 0 of 2,000,000 lines were delivered.\n\n**3. Was output trimmed or lost?**\n\n- **Not by `seq` itself**: capturing stdout to a file confirms the full 2,000,000 lines were generated intact — first line `1`, last line `2000000`, exactly 2,000,000 lines / 14,888,896 bytes.\n- **Entirely elided by the tool harness**: this wasn't a head/tail trim. There was no partial content, no \"[... N lines truncated ...]\" marker — the whole result was discarded and replaced by a summary notice. Effectively 100% of the visible output was \"lost\" to me (though it existed, and it was the harness's context-saving mechanism, not the command, that dropped it).\n\n## Notable behavior details\n\n- The truncation appears **context-budget-driven, not a fixed per-command cap**: `seq 1 10000` (10,000 lines) came through in full, while `seq 1 100000` and the 2M-line run were fully elided.\n- After the large results landed in context, even a tiny 11-line command's result got withheld once — consistent with the harness suppressing results when the context is under pressure — before recovering for a later no-output command.\n- Practical takeaway: for bulk output, redirect to a file (`cmd > /tmp/out.txt`) and inspect with `wc`, `head`, `tail`, or the Read tool — which is exactly how I verified the true 2,000,000-line result here.",
+          "error": null
+        }
+      ],
+      "fresh_execution": false,
+      "repair_validation_performed": false
+    }
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "case_id": "ir-easy-agent-124-v1",
+  "issue": {
+    "repository": "ConardLi/easy-agent",
+    "number": 124,
+    "url": "https://github.com/ConardLi/easy-agent/issues/124",
+    "state": "open",
+    "title": "Edit and MultiEdit interEdit and MultiEdit interpret replacement text as JavaScript substitution patternspret replacement text as JavaScript substitution patterns"
+  },
+  "version_choice": "pinned",
+  "reported_version": "aec616a97114ce9683e4fbfcff3abbc55155fe50",
+  "commit_version": "aec616a97114ce9683e4fbfcff3abbc55155fe50",
+  "fixed_in": "not-fixed",
+  "pinned_contains_fix": "unknown",
+  "steps": [
+    "Create a file named split_lines.sh in the current directory with exactly the following content (keep every character as given):\n\n#!/usr/bin/env bash\n# split_lines.sh: print every field of the first argument on its own line\nIFS=,\nread -r -a parts <<< \"$1\"\nfor p in \"${parts[@]}\"; do\n  echo \"[$p]\"\ndone",
+    "In split_lines.sh, change only the line `IFS=,` to `IFS=$'\\n'` so the fields are split on newlines instead of commas. Do not change any other line."
+  ],
+  "expected": "Edit（或 MultiEdit）应把 new_string 原样写入被替换处，即第 3 行变成 IFS=$'\\n'、其余 6 行不变（依据：src/tools/fileEditTool.ts 的 Edit 描述 'Find a string in a file and replace it'、new_string = 'Replacement text'，multiEditTool.ts 同理，systemPrompt.ts:90 要求用 Edit 做精确修改）。",
+  "defect": "非 replace_all 的 Edit 走 String.prototype.replace(string, string)，new_string 里的 $' 被当作 JS 替换模式展开，落盘文件变成 'IFS=' + 原第 4 行起的整段内容 + 字面 \\n'，行数从 7 增到 12、bash 报 unexpected EOF，而工具结果 completed 且 diff preview 显示的是请求的正确文本。",
+  "fault location": [
+    {
+      "file": "src/tools/editCore.ts",
+      "function": "applyEditToContent",
+      "line_start": 68,
+      "line_end": 68,
+      "commit": "aec616a97114ce9683e4fbfcff3abbc55155fe50",
+      "url": "https://raw.githubusercontent.com/ConardLi/easy-agent/aec616a97114ce9683e4fbfcff3abbc55155fe50/src/tools/editCore.ts",
+      "role": "static_analysis",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "The non-replace_all branch passes newString as a string argument to String.replace. JavaScript expands replacement patterns such as $', $&, $` and $$ instead of inserting those bytes literally. The archived Edit corrupts the script and the model later rewrites it. The final repaired file does not negate the intermediate tool failure.",
+  "_meta": {
+    "wangyi_import": {
+      "archive": "C:\\Song_startup\\benchmark\\wangyi gt_ v2\\agent-failures_20261028T023807Z(1)\\agent-failures_20261028T023807Z\\easy-agent\\issue-124.zip",
+      "declared_rate": "10/10",
+      "root_cause_sources": [
+        {
+          "field": "Root cause",
+          "source": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\108-easy-agent\\ground_truth\\issue_124\\verify.case.json",
+          "source_commit": "aec616a97114ce9683e4fbfcff3abbc55155fe50",
+          "matches_execution_commit": true,
+          "original_meta": {
+            "fix_status": "inferred",
+            "fix_refs": [],
+            "abb_entry": "acp",
+            "user_messages_from_issue": [
+              "Create a file named split_lines.sh in the current directory with exactly the following content (keep every character as given):\n\n#!/usr/bin/env bash\n# split_lines.sh: print every field of the first argument on its own line\nIFS=,\nread -r -a parts <<< \"$1\"\nfor p in \"${parts[@]}\"; do\n  echo \"[$p]\"\ndone",
+              "In split_lines.sh, change only the line `IFS=,` to `IFS=$'\\n'` so the fields are split on newlines instead of commas. Do not change any other line."
+            ],
+            "notes": "gh_web: issue OPEN, no closing/linked PRs or commits. The clone's newest commit is the pinned aec616a (v0.1.1-136-gaec616a), which is also the issue's tested revision; no later commit touches src/tools/editCore.ts, so nothing upstream fixes it. Steps are the issue's verbatim Step 1/Step 2 with the 'Step N:' labels removed. The issue title is duplicated/garbled as published and is copied unchanged. Lasting corruption was seen in 2/10 runs; the model often repairs the file, so evidence is the first Edit result and intermediate file state. Line numbers verified with git show at aec616a."
+          }
+        },
+        {
+          "field": "fault location",
+          "source": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\108-easy-agent\\ground_truth\\issue_124\\verify.case.json",
+          "source_commit": "aec616a97114ce9683e4fbfcff3abbc55155fe50",
+          "matches_execution_commit": true,
+          "original_meta": {
+            "fix_status": "inferred",
+            "fix_refs": [],
+            "abb_entry": "acp",
+            "user_messages_from_issue": [
+              "Create a file named split_lines.sh in the current directory with exactly the following content (keep every character as given):\n\n#!/usr/bin/env bash\n# split_lines.sh: print every field of the first argument on its own line\nIFS=,\nread -r -a parts <<< \"$1\"\nfor p in \"${parts[@]}\"; do\n  echo \"[$p]\"\ndone",
+              "In split_lines.sh, change only the line `IFS=,` to `IFS=$'\\n'` so the fields are split on newlines instead of commas. Do not change any other line."
+            ],
+            "notes": "gh_web: issue OPEN, no closing/linked PRs or commits. The clone's newest commit is the pinned aec616a (v0.1.1-136-gaec616a), which is also the issue's tested revision; no later commit touches src/tools/editCore.ts, so nothing upstream fixes it. Steps are the issue's verbatim Step 1/Step 2 with the 'Step N:' labels removed. The issue title is duplicated/garbled as published and is copied unchanged. Lasting corruption was seen in 2/10 runs; the model often repairs the file, so evidence is the first Edit result and intermediate file state. Line numbers verified with git show at aec616a."
+          }
+        }
+      ],
+      "validation": "Imported archived evidence; no fresh execution or repair validation performed. Borrowed root cause retains its original evidence status and may refer to a different revision."
+    },
+    "evidence_review": {
+      "date": "2026-10-28",
+      "status": "source_and_archived_trace_review",
+      "source_snapshots": [
+        "C:\\Song_startup\\benchmark\\发到paper的数据\\issue\\generate_case\\evidence\\wangyi_review\\ConardLi_easy-agent_aec616a97114_src_tools_editCore.ts.json"
+      ],
+      "trace_results": [
+        {
+          "path": "runs\\run-01\\trajectory\\41aa2d11970349cc83ced29f6a673a39\\steps\\0001\\result.json",
+          "sha256": "dd5d5fa816169fd783b39261576a089a91b51178618ae5c6ca60ec72a2af580a",
+          "status": "succeeded",
+          "output": "Created `split_lines.sh` in the current directory. Verifying the content:The file matches exactly — 8 lines with the shebang, comment, `IFS=,` split, `read -r -a` into the `parts` array, and the loop echoing each field as `[$p]`.",
+          "error": null
+        },
+        {
+          "path": "runs\\run-01\\trajectory\\41aa2d11970349cc83ced29f6a673a39\\steps\\0002\\result.json",
+          "sha256": "8cf0b615a2bb2cb74b5b2cdda6f251c5f84bac064e16566593495994bf9123d7",
+          "status": "succeeded",
+          "output": "The Edit tool mangled the file — the readback shows duplicated lines and a stray `\\n'` fragment instead of the intended change. I'll rewrite the file cleanly with the exact intended content:Fixed. The `Edit` tool corrupted the file (its handling of the `$'\\n'` escape duplicated lines and left a stray fragment), so I rewrote it with the exact intended content.\n\nThe file is now back to the correct 8 lines, with only line 3 changed to `IFS=$'\\n'` — all other lines are untouched:\n\n```bash\n#!/usr/bin/env bash\n# split_lines.sh: print every field of the first argument on its own line\nIFS=$'\\n'\nread -r -a parts <<< \"$1\"\nfor p in \"${parts[@]}\"; do\n  echo \"[$p]\"\ndone\n```",
+          "error": null
+        }
+      ],
+      "fresh_execution": false,
+      "repair_validation_performed": false
+    }
+  }
+}

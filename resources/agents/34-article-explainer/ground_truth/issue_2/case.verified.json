@@ -1,0 +1,102 @@
+{
+  "case_id": "ir-article-explainer-2-v1",
+  "issue": {
+    "repository": "duartecaldascardoso/article-explainer",
+    "number": 2,
+    "url": "https://github.com/duartecaldascardoso/article-explainer/issues/2",
+    "state": "open",
+    "title": "Parallel handoff tool calls crash the swarm with INVALID_CHAT_HISTORY, so multi-part requests get no answer"
+  },
+  "version_choice": "pinned",
+  "reported_version": "2cf067dc4b9158b03361c7b3e2544e067b75f1ae",
+  "commit_version": "2cf067dc4b9158b03361c7b3e2544e067b75f1ae",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Here is an article about transformer models. Please provide a summary, an analogy for the attention mechanism, and a code sketch illustrating positional encoding.\n\n[ARTICLE START]\nTransformers have revolutionized natural language processing. The core innovation is the self-attention mechanism, which allows each token to attend to all other tokens in the sequence. Positional encoding is added to input embeddings to give the model information about token order. Training large transformers requires significant computational resources.\n[ARTICLE END]"
+  ],
+  "expected": "Return an answer covering the supplied article summary, attention analogy and positional-encoding code sketch while keeping all tool calls paired with ToolMessages, as required by issue #2 Expected behavior and the unit requirement.md Multi-expert coordination contract.",
+  "defect": "When the explainer emits multiple handoff tool calls in one message, the receiving agent sees unpaired calls and raises ValueError / INVALID_CHAT_HISTORY, aborting the first user turn without an answer.",
+  "fault location": [
+    {
+      "file": "explainer/graph.py",
+      "function": "<module>",
+      "line_start": 59,
+      "line_end": 69,
+      "commit": "2cf067dc4b9158b03361c7b3e2544e067b75f1ae",
+      "url": "https://raw.githubusercontent.com/duartecaldascardoso/article-explainer/2cf067dc4b9158b03361c7b3e2544e067b75f1ae/explainer/graph.py",
+      "role": "static_analysis",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "explainer/graph.py",
+      "function": "<module>",
+      "line_start": 12,
+      "line_end": 12,
+      "commit": "2cf067dc4b9158b03361c7b3e2544e067b75f1ae",
+      "url": "https://raw.githubusercontent.com/duartecaldascardoso/article-explainer/2cf067dc4b9158b03361c7b3e2544e067b75f1ae/explainer/graph.py",
+      "role": "static_analysis",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "The graph permits one assistant message to emit several swarm handoff calls, while the handoff transition follows only one receiving agent. Pending calls remain without corresponding ToolMessages. The retained execution explicitly fails on unmatched transfer_to_summarizer and transfer_to_analogy_creator calls with INVALID_CHAT_HISTORY.",
+  "_meta": {
+    "wangyi_import": {
+      "archive": "C:\\Song_startup\\benchmark\\wangyi gt_ v2\\agent-failures_20261028T023807Z(1)\\agent-failures_20261028T023807Z\\article-explainer\\issue-2.zip",
+      "declared_rate": "10/10",
+      "root_cause_sources": [
+        {
+          "field": "Root cause",
+          "source": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\34-article-explainer\\ground_truth\\issue_2\\verify.case.json",
+          "source_commit": "2cf067dc4b9158b03361c7b3e2544e067b75f1ae",
+          "matches_execution_commit": true,
+          "original_meta": {
+            "fix_status": "inferred",
+            "fix_refs": [],
+            "abb_entry": "langgraph",
+            "user_messages_from_issue": [
+              "Here is an article about transformer models. Please provide a summary, an analogy for the attention mechanism, and a code sketch illustrating positional encoding.\n\n[ARTICLE START]\nTransformers have revolutionized natural language processing. The core innovation is the self-attention mechanism, which allows each token to attend to all other tokens in the sequence. Positional encoding is added to input embeddings to give the model information about token order. Training large transformers requires significant computational resources.\n[ARTICLE END]"
+            ],
+            "notes": "gh_web: issue OPEN, no closing/linked PRs or commits; the repo has no tags and the clone's newest commit is the pinned 2cf067d (the version named in the issue), so there is no later fix. reported_version is the commit SHA because the project has no releases. Step 1 is the issue's verbatim request. The defect also depends on langgraph-swarm not supporting parallel handoffs (langgraph-swarm-py#58); the location is where this repo could prevent it. Trigger depends on the model emitting parallel handoff calls. Lines verified with git show at 2cf067d."
+          }
+        },
+        {
+          "field": "fault location",
+          "source": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\34-article-explainer\\ground_truth\\issue_2\\verify.case.json",
+          "source_commit": "2cf067dc4b9158b03361c7b3e2544e067b75f1ae",
+          "matches_execution_commit": true,
+          "original_meta": {
+            "fix_status": "inferred",
+            "fix_refs": [],
+            "abb_entry": "langgraph",
+            "user_messages_from_issue": [
+              "Here is an article about transformer models. Please provide a summary, an analogy for the attention mechanism, and a code sketch illustrating positional encoding.\n\n[ARTICLE START]\nTransformers have revolutionized natural language processing. The core innovation is the self-attention mechanism, which allows each token to attend to all other tokens in the sequence. Positional encoding is added to input embeddings to give the model information about token order. Training large transformers requires significant computational resources.\n[ARTICLE END]"
+            ],
+            "notes": "gh_web: issue OPEN, no closing/linked PRs or commits; the repo has no tags and the clone's newest commit is the pinned 2cf067d (the version named in the issue), so there is no later fix. reported_version is the commit SHA because the project has no releases. Step 1 is the issue's verbatim request. The defect also depends on langgraph-swarm not supporting parallel handoffs (langgraph-swarm-py#58); the location is where this repo could prevent it. Trigger depends on the model emitting parallel handoff calls. Lines verified with git show at 2cf067d."
+          }
+        }
+      ],
+      "validation": "Imported archived evidence; no fresh execution or repair validation performed. Borrowed root cause retains its original evidence status and may refer to a different revision."
+    },
+    "evidence_review": {
+      "date": "2026-10-28",
+      "status": "source_and_archived_trace_review",
+      "source_snapshots": [
+        "C:\\Song_startup\\benchmark\\发到paper的数据\\issue\\generate_case\\evidence\\wangyi_review\\duartecaldascardoso_article-explainer_2cf067dc4b91_explainer_graph.py.json"
+      ],
+      "trace_results": [
+        {
+          "path": "runs\\run-01\\trajectory\\ae1fd40aa36645ebbc51ff47dd573685\\steps\\0001\\result.json",
+          "sha256": "c75d6b6a10e2f30d6c90ed97ee536afb96a204387e3cee0e64c118ff64524c56",
+          "status": "failed",
+          "output": null,
+          "error": "Found AIMessages with tool_calls that do not have a corresponding ToolMessage. Here are the first few of those tool calls: [{'name': 'transfer_to_summarizer', 'args': {}, 'id': 'call_-7130756218104052774', 'type': 'tool_call'}, {'name': 'transfer_to_analogy_creator', 'args': {}, 'id': 'call_-7130756218104052773', 'type': 'tool_call'}].\n\nEvery tool call (LLM requesting to call a tool) in the message history MUST have a corresponding ToolMessage (result of a tool invocation to return to the LLM) - this is required by most LLM providers.\nFor troubleshooting, visit: https://python.langchain.com/docs/troubleshooting/errors/INVALID_CHAT_HISTORY"
+        }
+      ],
+      "fresh_execution": false,
+      "repair_validation_performed": false
+    }
+  }
+}

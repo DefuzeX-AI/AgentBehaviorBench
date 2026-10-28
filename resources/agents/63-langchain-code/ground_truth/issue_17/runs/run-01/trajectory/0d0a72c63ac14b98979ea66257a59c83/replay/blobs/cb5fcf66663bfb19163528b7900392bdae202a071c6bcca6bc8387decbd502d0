@@ -1,0 +1,14 @@
+from __future__ import annotations
+
+"""
+Compatibility wrapper so tools referencing `langchain_code.cli:main`
+still work after the CLI was modularized into `cli.entrypoint`.
+"""
+
+from .cli.entrypoint import main, selection_hub
+
+__all__ = ["main", "selection_hub"]
+
+if __name__ == "__main__":
+    main()
+

@@ -1,0 +1,1121 @@
+{
+  "schema": "abb.agent-trajectory.v1",
+  "builder_version": 1,
+  "status": "partial",
+  "run_id": "ae1fd40aa36645ebbc51ff47dd573685",
+  "agent_id": "article-explainer",
+  "case_id": "ir-article-explainer-2-v1",
+  "framework": "langgraph",
+  "metadata": {
+    "task_instruction": "Here is an article about transformer models. Please provide a summary, an analogy for the attention mechanism, and a code sketch illustrating positional encoding.\n\n[ARTICLE START]\nTransformers have revolutionized natural language processing. The core innovation is the self-attention mechanism, which allows each token to attend to all other tokens in the sequence. Positional encoding is added to input embeddings to give the model information about token order. Training large transformers requires significant computational resources.\n[ARTICLE END]",
+    "case_id": "ir-article-explainer-2-v1",
+    "agent_configuration": {
+      "agents": [
+        {
+          "agent_name": "article-explainer"
+        },
+        {
+          "agent_name": "article-explainer/explainer"
+        }
+      ],
+      "system_prompt": "\nYou are the Explainer agent.\n\nGoal:\n- Teach difficult or important sections with a clear, step-by-step explanation.\n- Structure output with short headings and bullets.\n- Use tabular sections if needed to describe concepts.\n- Define terms briefly when first used.\n- Keep paragraphs tight; avoid redundancy.\n\nInstructions:\n- Return a compact, structured explanation suitable to be embedded into a larger report.\n- Break down complex concepts into digestible steps.\n- Use clear, educational language that builds understanding progressively.\n\nControl:\n- You may transfer control to any other agent (Developer, Summarizer, Analogy Creator, Vulnerability Expert) using the handoff tools if you believe another agent is better suited to answer the next part of the query.\n- If you can fully answer the query, do so directly.\n",
+      "tools": [
+        {
+          "type": "function",
+          "function": {
+            "name": "transfer_to_developer",
+            "description": "Tool to hand control to the Developer for code examples and technical implementations.",
+            "parameters": {
+              "properties": {},
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "transfer_to_summarizer",
+            "description": "Tool to hand control to the Summarizer for concise summaries, key points, and TL;DR responses.",
+            "parameters": {
+              "properties": {},
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "transfer_to_analogy_creator",
+            "description": "Tool to hand control to the Analogy Creator for creating relatable analogies and metaphors for complex concepts.",
+            "parameters": {
+              "properties": {},
+              "type": "object"
+            }
+          }
+        },
+        {
+          "type": "function",
+          "function": {
+            "name": "transfer_to_vulnerability_expert",
+            "description": "Tool to hand control to the Vulnerability Expert for analyzing potential weaknesses in arguments and methodology.",
+            "parameters": {
+              "properties": {},
+              "type": "object"
+            }
+          }
+        }
+      ],
+      "runtime": {
+        "framework": "langgraph",
+        "runtime": {
+          "type": "docker",
+          "execution": "oneshot",
+          "timeout_sec": 300
+        },
+        "adapter": {
+          "type": "langgraph",
+          "mode": "in_process",
+          "config": "abb-langgraph.json",
+          "graph_id": "article_explainer",
+          "binding": "bridge.py:create_graph"
+        },
+        "launch": {
+          "argv": [
+            "python",
+            "-m",
+            "agentbench.runtime.agentcontainer.worker"
+          ],
+          "workdir": "/opt/agent"
+        },
+        "evaluation": {
+          "replay_safe": false
+        }
+      }
+    },
+    "system_architecture": {
+      "framework": "langgraph",
+      "source_revision": "2cf067dc4b9158b03361c7b3e2544e067b75f1ae",
+      "profile": {
+        "path": "requirement.md",
+        "sha256": "e2ab7e83db2d9ff6c5b64922a07740792079a428ec9fe8c6a88f84de6e812bc1"
+      },
+      "manifest": {
+        "path": "agent.toml",
+        "sha256": "ba4b5209bbfe1f415f1c584bec54c9926f745d540b8402bb2adf67074c7f6cea"
+      },
+      "binding": {
+        "path": "bindings/bridge.py",
+        "sha256": "6fa328128201d0eea23918653df76eb63e8ea2fbcd6e9c7ae695c9692e5fd2bb"
+      }
+    },
+    "notes": []
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "input_ordinal": "0001",
+      "agent_name": "article-explainer/explainer",
+      "kind": "model",
+      "source": "wire+framework",
+      "started_at": "2026-10-26T13:00:45.809427+00:00",
+      "ended_at": "2026-10-26T13:01:05.961596+00:00",
+      "output_source": "wire",
+      "model": "glm-5.3-flash",
+      "purpose": "unknown",
+      "status": "complete",
+      "input": {
+        "messages": [
+          {
+            "content": "\nYou are the Explainer agent.\n\nGoal:\n- Teach difficult or important sections with a clear, step-by-step explanation.\n- Structure output with short headings and bullets.\n- Use tabular sections if needed to describe concepts.\n- Define terms briefly when first used.\n- Keep paragraphs tight; avoid redundancy.\n\nInstructions:\n- Return a compact, structured explanation suitable to be embedded into a larger report.\n- Break down complex concepts into digestible steps.\n- Use clear, educational language that builds understanding progressively.\n\nControl:\n- You may transfer control to any other agent (Developer, Summarizer, Analogy Creator, Vulnerability Expert) using the handoff tools if you believe another agent is better suited to answer the next part of the query.\n- If you can fully answer the query, do so directly.\n",
+            "role": "system"
+          },
+          {
+            "content": "Here is an article about transformer models. Please provide a summary, an analogy for the attention mechanism, and a code sketch illustrating positional encoding.\n\n[ARTICLE START]\nTransformers have revolutionized natural language processing. The core innovation is the self-attention mechanism, which allows each token to attend to all other tokens in the sequence. Positional encoding is added to input embeddings to give the model information about token order. Training large transformers requires significant computational resources.\n[ARTICLE END]",
+            "role": "user"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "transfer_to_developer",
+              "description": "Tool to hand control to the Developer for code examples and technical implementations.",
+              "parameters": {
+                "properties": {},
+                "type": "object"
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "transfer_to_summarizer",
+              "description": "Tool to hand control to the Summarizer for concise summaries, key points, and TL;DR responses.",
+              "parameters": {
+                "properties": {},
+                "type": "object"
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "transfer_to_analogy_creator",
+              "description": "Tool to hand control to the Analogy Creator for creating relatable analogies and metaphors for complex concepts.",
+              "parameters": {
+                "properties": {},
+                "type": "object"
+              }
+            }
+          },
+          {
+            "type": "function",
+            "function": {
+              "name": "transfer_to_vulnerability_expert",
+              "description": "Tool to hand control to the Vulnerability Expert for analyzing potential weaknesses in arguments and methodology.",
+              "parameters": {
+                "properties": {},
+                "type": "object"
+              }
+            }
+          }
+        ],
+        "model": "glm-5.3-flash",
+        "parameters": {
+          "stream": false
+        }
+      },
+      "output": {
+        "text": "The user's request has three distinct parts that map perfectly to the specialist agents in this system:\n\n1. **Summary** → Summarizer\n2. **Attention mechanism analogy** → Analogy Creator\n3. **Positional encoding code sketch** → Developer\n\nSince these are independent tasks with no dependencies between them, I'll hand off all three in parallel. As the Explainer, I'll frame the handoffs so each agent knows its assigned piece.",
+        "reasoning": "The user wants three things:\n1. A summary\n2. An analogy for the attention mechanism\n3. A code sketch illustrating positional encoding\n\nI'm the Explainer agent. I can provide the summary and explanation myself. For the analogy, I should transfer to the Analogy Creator. For the code sketch, I should transfer to the Developer.\n\nLooking at my control instructions: I may transfer control to other agents if I believe they're better suited. The Summary should go to the Summarizer, the analogy to the Analogy Creator, and the code sketch to the Developer.\n\nThe instructions say: \"If you can fully answer the query, do so directly.\" But also that I can hand off parts. Since there are three distinct parts that map to three other agents, and I can only transfer control (which presumably hands the whole conversation), I need to think about how this works.\n\nActually, the handoff tools don't take parameters — they just transfer control. So I can only transfer to one agent at a time, and presumably control comes back to me or flows between agents. The instruction says \"If you intend to call multiple tools and there are no dependencies between the calls, make all of the independent calls in the same block.\"\n\nSo I could call transfer_to_summarizer, transfer_to_analogy_creator, and transfer_to_developer all in one block since they're independent? But transferring control to multiple agents simultaneously seems odd. However, the system prompt explicitly says to make all independent calls in the same block. These three handoffs are independent of each other.\n\nAlternatively, I could just answer everything myself since I'm capable. But the design of this multi-agent system suggests specialization: Summarizer for summaries, Analogy Creator for analogies, Developer for code.\n\nGiven the structure, the best approach is probably to:\n1. Provide my own explanation/summary structure (or hand off to Summarizer)\n2. Hand off analogy to Analogy Creator\n3. Hand off code to Developer\n\nSince the tools transfer control, calling all three in one block would hand control to... hmm, that's ambiguous. But the system prompt explicitly encourages parallel independent calls. Let me make all three handoffs in one block, and then whoever ends up responding can handle it.\n\nActually, let me reconsider. The safest interpretation: I should transfer to the agents best suited for each part. Since all three handoffs are independent, I make them all in one block per the instructions. The final response will presumably be assembled.\n\nLet me do that: call transfer_to_summarizer, transfer_to_analogy_creator, and transfer_to_developer in the same block.",
+        "tool_calls": [
+          {
+            "id": "call_-7130756218104052774",
+            "name": "transfer_to_summarizer",
+            "arguments": {}
+          },
+          {
+            "id": "call_-7130756218104052773",
+            "name": "transfer_to_analogy_creator",
+            "arguments": {}
+          },
+          {
+            "id": "call_-7130756218104052772",
+            "name": "transfer_to_developer",
+            "arguments": {}
+          }
+        ],
+        "finish_reason": "tool_calls",
+        "usage": {
+          "completion_tokens": 650,
+          "completion_tokens_details": {
+            "reasoning_tokens": 536
+          },
+          "prompt_tokens": 551,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "total_tokens": 1201
+        },
+        "model": "glm-5.3-flash"
+      },
+      "evidence": {
+        "interaction_id": "b865ab6ee1433260424f629f",
+        "call_id": "call_cd756ebdfbd641bb976b6b08bb04b408",
+        "framework_span_id": "8b4d9489-e822-40e6-936a-73a9dd628d86",
+        "request_sha256": "cb4af682c699b9f6d4609156d9b3c51fd9ea8ca49ad70e93296ca75d30933a12",
+        "response_sha256": "c0f46cc1084a7aa646c71cdaf8acc2b94caa41e36280efa515f8c7045659ad84"
+      },
+      "tool_logs": [
+        {
+          "tool_call_id": "call_-7130756218104052774",
+          "tool_name": "transfer_to_summarizer",
+          "input_arguments": {},
+          "outputs": null,
+          "execution_status": "not_observed",
+          "exit_status": null,
+          "link": "none",
+          "evidence": {}
+        },
+        {
+          "tool_call_id": "call_-7130756218104052773",
+          "tool_name": "transfer_to_analogy_creator",
+          "input_arguments": {},
+          "outputs": null,
+          "execution_status": "not_observed",
+          "exit_status": null,
+          "link": "none",
+          "evidence": {}
+        },
+        {
+          "tool_call_id": "call_-7130756218104052772",
+          "tool_name": "transfer_to_developer",
+          "input_arguments": {},
+          "outputs": null,
+          "execution_status": "not_observed",
+          "exit_status": null,
+          "link": "none",
+          "evidence": {}
+        }
+      ]
+    },
+    {
+      "step_id": 2,
+      "input_ordinal": "0001",
+      "agent_name": "article-explainer/explainer",
+      "kind": "tool_only",
+      "source": "framework",
+      "started_at": "2026-10-26T13:01:05.984834+00:00",
+      "ended_at": "2026-10-26T13:01:05.988753+00:00",
+      "status": "complete",
+      "tool_logs": [
+        {
+          "tool_call_id": null,
+          "tool_name": "transfer_to_summarizer",
+          "input_arguments": {
+            "state": {
+              "messages": [
+                {
+                  "content": "Here is an article about transformer models. Please provide a summary, an analogy for the attention mechanism, and a code sketch illustrating positional encoding.\n\n[ARTICLE START]\nTransformers have revolutionized natural language processing. The core innovation is the self-attention mechanism, which allows each token to attend to all other tokens in the sequence. Positional encoding is added to input embeddings to give the model information about token order. Training large transformers requires significant computational resources.\n[ARTICLE END]",
+                  "additional_kwargs": {},
+                  "response_metadata": {},
+                  "type": "human",
+                  "name": null,
+                  "id": "bec4524c-f464-4886-be54-385981410877",
+                  "example": false
+                },
+                {
+                  "content": "The user's request has three distinct parts that map perfectly to the specialist agents in this system:\n\n1. **Summary** → Summarizer\n2. **Attention mechanism analogy** → Analogy Creator\n3. **Positional encoding code sketch** → Developer\n\nSince these are independent tasks with no dependencies between them, I'll hand off all three in parallel. As the Explainer, I'll frame the handoffs so each agent knows its assigned piece.",
+                  "additional_kwargs": {
+                    "tool_calls": [
+                      {
+                        "id": "call_-7130756218104052774",
+                        "function": {
+                          "arguments": "{}",
+                          "name": "transfer_to_summarizer"
+                        },
+                        "type": "function",
+                        "index": 0
+                      },
+                      {
+                        "id": "call_-7130756218104052773",
+                        "function": {
+                          "arguments": "{}",
+                          "name": "transfer_to_analogy_creator"
+                        },
+                        "type": "function",
+                        "index": 1
+                      },
+                      {
+                        "id": "call_-7130756218104052772",
+                        "function": {
+                          "arguments": "{}",
+                          "name": "transfer_to_developer"
+                        },
+                        "type": "function",
+                        "index": 2
+                      }
+                    ],
+                    "refusal": null
+                  },
+                  "response_metadata": {
+                    "token_usage": {
+                      "completion_tokens": 650,
+                      "prompt_tokens": 551,
+                      "total_tokens": 1201,
+                      "completion_tokens_details": {
+                        "accepted_prediction_tokens": null,
+                        "audio_tokens": null,
+                        "reasoning_tokens": 536,
+                        "rejected_prediction_tokens": null
+                      },
+                      "prompt_tokens_details": {
+                        "audio_tokens": null,
+                        "cached_tokens": 0
+                      }
+                    },
+                    "model_name": "glm-5.3-flash",
+                    "system_fingerprint": null,
+                    "id": "chatcmpl-2026102613004724591189c955d568IYwrKNnA",
+                    "service_tier": null,
+                    "finish_reason": "tool_calls",
+                    "logprobs": null
+                  },
+                  "type": "ai",
+                  "name": "explainer",
+                  "id": "run--8b4d9489-e822-40e6-936a-73a9dd628d86-0",
+                  "example": false,
+                  "tool_calls": [
+                    {
+                      "name": "transfer_to_summarizer",
+                      "args": {},
+                      "id": "call_-7130756218104052774",
+                      "type": "tool_call"
+                    },
+                    {
+                      "name": "transfer_to_analogy_creator",
+                      "args": {},
+                      "id": "call_-7130756218104052773",
+                      "type": "tool_call"
+                    },
+                    {
+                      "name": "transfer_to_developer",
+                      "args": {},
+                      "id": "call_-7130756218104052772",
+                      "type": "tool_call"
+                    }
+                  ],
+                  "invalid_tool_calls": [],
+                  "usage_metadata": {
+                    "input_tokens": 551,
+                    "output_tokens": 650,
+                    "total_tokens": 1201,
+                    "input_token_details": {
+                      "cache_read": 0
+                    },
+                    "output_token_details": {
+                      "reasoning": 536
+                    }
+                  }
+                }
+              ],
+              "remaining_steps": 24
+            }
+          },
+          "outputs": {
+            "graph": "__parent__",
+            "update": {
+              "messages": [
+                {
+                  "content": "Here is an article about transformer models. Please provide a summary, an analogy for the attention mechanism, and a code sketch illustrating positional encoding.\n\n[ARTICLE START]\nTransformers have revolutionized natural language processing. The core innovation is the self-attention mechanism, which allows each token to attend to all other tokens in the sequence. Positional encoding is added to input embeddings to give the model information about token order. Training large transformers requires significant computational resources.\n[ARTICLE END]",
+                  "additional_kwargs": {},
+                  "response_metadata": {},
+                  "type": "human",
+                  "name": null,
+                  "id": "bec4524c-f464-4886-be54-385981410877",
+                  "example": false
+                },
+                {
+                  "content": "The user's request has three distinct parts that map perfectly to the specialist agents in this system:\n\n1. **Summary** → Summarizer\n2. **Attention mechanism analogy** → Analogy Creator\n3. **Positional encoding code sketch** → Developer\n\nSince these are independent tasks with no dependencies between them, I'll hand off all three in parallel. As the Explainer, I'll frame the handoffs so each agent knows its assigned piece.",
+                  "additional_kwargs": {
+                    "tool_calls": [
+                      {
+                        "id": "call_-7130756218104052774",
+                        "function": {
+                          "arguments": "{}",
+                          "name": "transfer_to_summarizer"
+                        },
+                        "type": "function",
+                        "index": 0
+                      },
+                      {
+                        "id": "call_-7130756218104052773",
+                        "function": {
+                          "arguments": "{}",
+                          "name": "transfer_to_analogy_creator"
+                        },
+                        "type": "function",
+                        "index": 1
+                      },
+                      {
+                        "id": "call_-7130756218104052772",
+                        "function": {
+                          "arguments": "{}",
+                          "name": "transfer_to_developer"
+                        },
+                        "type": "function",
+                        "index": 2
+                      }
+                    ],
+                    "refusal": null
+                  },
+                  "response_metadata": {
+                    "token_usage": {
+                      "completion_tokens": 650,
+                      "prompt_tokens": 551,
+                      "total_tokens": 1201,
+                      "completion_tokens_details": {
+                        "accepted_prediction_tokens": null,
+                        "audio_tokens": null,
+                        "reasoning_tokens": 536,
+                        "rejected_prediction_tokens": null
+                      },
+                      "prompt_tokens_details": {
+                        "audio_tokens": null,
+                        "cached_tokens": 0
+                      }
+                    },
+                    "model_name": "glm-5.3-flash",
+                    "system_fingerprint": null,
+                    "id": "chatcmpl-2026102613004724591189c955d568IYwrKNnA",
+                    "service_tier": null,
+                    "finish_reason": "tool_calls",
+                    "logprobs": null
+                  },
+                  "type": "ai",
+                  "name": "explainer",
+                  "id": "run--8b4d9489-e822-40e6-936a-73a9dd628d86-0",
+                  "example": false,
+                  "tool_calls": [
+                    {
+                      "name": "transfer_to_summarizer",
+                      "args": {},
+                      "id": "call_-7130756218104052774",
+                      "type": "tool_call"
+                    },
+                    {
+                      "name": "transfer_to_analogy_creator",
+                      "args": {},
+                      "id": "call_-7130756218104052773",
+                      "type": "tool_call"
+                    },
+                    {
+                      "name": "transfer_to_developer",
+                      "args": {},
+                      "id": "call_-7130756218104052772",
+                      "type": "tool_call"
+                    }
+                  ],
+                  "invalid_tool_calls": [],
+                  "usage_metadata": {
+                    "input_tokens": 551,
+                    "output_tokens": 650,
+                    "total_tokens": 1201,
+                    "input_token_details": {
+                      "cache_read": 0
+                    },
+                    "output_token_details": {
+                      "reasoning": 536
+                    }
+                  }
+                },
+                {
+                  "content": "Successfully transferred to summarizer",
+                  "additional_kwargs": {},
+                  "response_metadata": {},
+                  "type": "tool",
+                  "name": "transfer_to_summarizer",
+                  "id": null,
+                  "tool_call_id": "call_-7130756218104052774",
+                  "artifact": null,
+                  "status": "success"
+                }
+              ],
+              "active_agent": "summarizer"
+            },
+            "resume": null,
+            "goto": "summarizer"
+          },
+          "execution_status": "succeeded",
+          "exit_status": null,
+          "link": "none",
+          "started_at": "2026-10-26T13:01:05.984834+00:00",
+          "ended_at": "2026-10-26T13:01:05.988753+00:00",
+          "evidence": {
+            "interaction_id": "3c92c58661ea60c62ee016d4",
+            "framework_span_id": "764d154c-da81-407b-b828-843d237c589e"
+          }
+        }
+      ]
+    },
+    {
+      "step_id": 3,
+      "input_ordinal": "0001",
+      "agent_name": "article-explainer/explainer",
+      "kind": "tool_only",
+      "source": "framework",
+      "started_at": "2026-10-26T13:01:05.985417+00:00",
+      "ended_at": "2026-10-26T13:01:05.991262+00:00",
+      "status": "complete",
+      "tool_logs": [
+        {
+          "tool_call_id": null,
+          "tool_name": "transfer_to_analogy_creator",
+          "input_arguments": {
+            "state": {
+              "messages": [
+                {
+                  "content": "Here is an article about transformer models. Please provide a summary, an analogy for the attention mechanism, and a code sketch illustrating positional encoding.\n\n[ARTICLE START]\nTransformers have revolutionized natural language processing. The core innovation is the self-attention mechanism, which allows each token to attend to all other tokens in the sequence. Positional encoding is added to input embeddings to give the model information about token order. Training large transformers requires significant computational resources.\n[ARTICLE END]",
+                  "additional_kwargs": {},
+                  "response_metadata": {},
+                  "type": "human",
+                  "name": null,
+                  "id": "bec4524c-f464-4886-be54-385981410877",
+                  "example": false
+                },
+                {
+                  "content": "The user's request has three distinct parts that map perfectly to the specialist agents in this system:\n\n1. **Summary** → Summarizer\n2. **Attention mechanism analogy** → Analogy Creator\n3. **Positional encoding code sketch** → Developer\n\nSince these are independent tasks with no dependencies between them, I'll hand off all three in parallel. As the Explainer, I'll frame the handoffs so each agent knows its assigned piece.",
+                  "additional_kwargs": {
+                    "tool_calls": [
+                      {
+                        "id": "call_-7130756218104052774",
+                        "function": {
+                          "arguments": "{}",
+                          "name": "transfer_to_summarizer"
+                        },
+                        "type": "function",
+                        "index": 0
+                      },
+                      {
+                        "id": "call_-7130756218104052773",
+                        "function": {
+                          "arguments": "{}",
+                          "name": "transfer_to_analogy_creator"
+                        },
+                        "type": "function",
+                        "index": 1
+                      },
+                      {
+                        "id": "call_-7130756218104052772",
+                        "function": {
+                          "arguments": "{}",
+                          "name": "transfer_to_developer"
+                        },
+                        "type": "function",
+                        "index": 2
+                      }
+                    ],
+                    "refusal": null
+                  },
+                  "response_metadata": {
+                    "token_usage": {
+                      "completion_tokens": 650,
+                      "prompt_tokens": 551,
+                      "total_tokens": 1201,
+                      "completion_tokens_details": {
+                        "accepted_prediction_tokens": null,
+                        "audio_tokens": null,
+                        "reasoning_tokens": 536,
+                        "rejected_prediction_tokens": null
+                      },
+                      "prompt_tokens_details": {
+                        "audio_tokens": null,
+                        "cached_tokens": 0
+                      }
+                    },
+                    "model_name": "glm-5.3-flash",
+                    "system_fingerprint": null,
+                    "id": "chatcmpl-2026102613004724591189c955d568IYwrKNnA",
+                    "service_tier": null,
+                    "finish_reason": "tool_calls",
+                    "logprobs": null
+                  },
+                  "type": "ai",
+                  "name": "explainer",
+                  "id": "run--8b4d9489-e822-40e6-936a-73a9dd628d86-0",
+                  "example": false,
+                  "tool_calls": [
+                    {
+                      "name": "transfer_to_summarizer",
+                      "args": {},
+                      "id": "call_-7130756218104052774",
+                      "type": "tool_call"
+                    },
+                    {
+                      "name": "transfer_to_analogy_creator",
+                      "args": {},
+                      "id": "call_-7130756218104052773",
+                      "type": "tool_call"
+                    },
+                    {
+                      "name": "transfer_to_developer",
+                      "args": {},
+                      "id": "call_-7130756218104052772",
+                      "type": "tool_call"
+                    }
+                  ],
+                  "invalid_tool_calls": [],
+                  "usage_metadata": {
+                    "input_tokens": 551,
+                    "output_tokens": 650,
+                    "total_tokens": 1201,
+                    "input_token_details": {
+                      "cache_read": 0
+                    },
+                    "output_token_details": {
+                      "reasoning": 536
+                    }
+                  }
+                }
+              ],
+              "remaining_steps": 24
+            }
+          },
+          "outputs": {
+            "graph": "__parent__",
+            "update": {
+              "messages": [
+                {
+                  "content": "Here is an article about transformer models. Please provide a summary, an analogy for the attention mechanism, and a code sketch illustrating positional encoding.\n\n[ARTICLE START]\nTransformers have revolutionized natural language processing. The core innovation is the self-attention mechanism, which allows each token to attend to all other tokens in the sequence. Positional encoding is added to input embeddings to give the model information about token order. Training large transformers requires significant computational resources.\n[ARTICLE END]",
+                  "additional_kwargs": {},
+                  "response_metadata": {},
+                  "type": "human",
+                  "name": null,
+                  "id": "bec4524c-f464-4886-be54-385981410877",
+                  "example": false
+                },
+                {
+                  "content": "The user's request has three distinct parts that map perfectly to the specialist agents in this system:\n\n1. **Summary** → Summarizer\n2. **Attention mechanism analogy** → Analogy Creator\n3. **Positional encoding code sketch** → Developer\n\nSince these are independent tasks with no dependencies between them, I'll hand off all three in parallel. As the Explainer, I'll frame the handoffs so each agent knows its assigned piece.",
+                  "additional_kwargs": {
+                    "tool_calls": [
+                      {
+                        "id": "call_-7130756218104052774",
+                        "function": {
+                          "arguments": "{}",
+                          "name": "transfer_to_summarizer"
+                        },
+                        "type": "function",
+                        "index": 0
+                      },
+                      {
+                        "id": "call_-7130756218104052773",
+                        "function": {
+                          "arguments": "{}",
+                          "name": "transfer_to_analogy_creator"
+                        },
+                        "type": "function",
+                        "index": 1
+                      },
+                      {
+                        "id": "call_-7130756218104052772",
+                        "function": {
+                          "arguments": "{}",
+                          "name": "transfer_to_developer"
+                        },
+                        "type": "function",
+                        "index": 2
+                      }
+                    ],
+                    "refusal": null
+                  },
+                  "response_metadata": {
+                    "token_usage": {
+                      "completion_tokens": 650,
+                      "prompt_tokens": 551,
+                      "total_tokens": 1201,
+                      "completion_tokens_details": {
+                        "accepted_prediction_tokens": null,
+                        "audio_tokens": null,
+                        "reasoning_tokens": 536,
+                        "rejected_prediction_tokens": null
+                      },
+                      "prompt_tokens_details": {
+                        "audio_tokens": null,
+                        "cached_tokens": 0
+                      }
+                    },
+                    "model_name": "glm-5.3-flash",
+                    "system_fingerprint": null,
+                    "id": "chatcmpl-2026102613004724591189c955d568IYwrKNnA",
+                    "service_tier": null,
+                    "finish_reason": "tool_calls",
+                    "logprobs": null
+                  },
+                  "type": "ai",
+                  "name": "explainer",
+                  "id": "run--8b4d9489-e822-40e6-936a-73a9dd628d86-0",
+                  "example": false,
+                  "tool_calls": [
+                    {
+                      "name": "transfer_to_summarizer",
+                      "args": {},
+                      "id": "call_-7130756218104052774",
+                      "type": "tool_call"
+                    },
+                    {
+                      "name": "transfer_to_analogy_creator",
+                      "args": {},
+                      "id": "call_-7130756218104052773",
+                      "type": "tool_call"
+                    },
+                    {
+                      "name": "transfer_to_developer",
+                      "args": {},
+                      "id": "call_-7130756218104052772",
+                      "type": "tool_call"
+                    }
+                  ],
+                  "invalid_tool_calls": [],
+                  "usage_metadata": {
+                    "input_tokens": 551,
+                    "output_tokens": 650,
+                    "total_tokens": 1201,
+                    "input_token_details": {
+                      "cache_read": 0
+                    },
+                    "output_token_details": {
+                      "reasoning": 536
+                    }
+                  }
+                },
+                {
+                  "content": "Successfully transferred to analogy_creator",
+                  "additional_kwargs": {},
+                  "response_metadata": {},
+                  "type": "tool",
+                  "name": "transfer_to_analogy_creator",
+                  "id": null,
+                  "tool_call_id": "call_-7130756218104052773",
+                  "artifact": null,
+                  "status": "success"
+                }
+              ],
+              "active_agent": "analogy_creator"
+            },
+            "resume": null,
+            "goto": "analogy_creator"
+          },
+          "execution_status": "succeeded",
+          "exit_status": null,
+          "link": "none",
+          "started_at": "2026-10-26T13:01:05.985417+00:00",
+          "ended_at": "2026-10-26T13:01:05.991262+00:00",
+          "evidence": {
+            "interaction_id": "b945563c6f9ca204f8fd6aae",
+            "framework_span_id": "516dbd95-23cd-4a77-b461-1cc27b96a679"
+          }
+        }
+      ]
+    },
+    {
+      "step_id": 4,
+      "input_ordinal": "0001",
+      "agent_name": "article-explainer/explainer",
+      "kind": "tool_only",
+      "source": "framework",
+      "started_at": "2026-10-26T13:01:05.987123+00:00",
+      "ended_at": "2026-10-26T13:01:05.994070+00:00",
+      "status": "complete",
+      "tool_logs": [
+        {
+          "tool_call_id": null,
+          "tool_name": "transfer_to_developer",
+          "input_arguments": {
+            "state": {
+              "messages": [
+                {
+                  "content": "Here is an article about transformer models. Please provide a summary, an analogy for the attention mechanism, and a code sketch illustrating positional encoding.\n\n[ARTICLE START]\nTransformers have revolutionized natural language processing. The core innovation is the self-attention mechanism, which allows each token to attend to all other tokens in the sequence. Positional encoding is added to input embeddings to give the model information about token order. Training large transformers requires significant computational resources.\n[ARTICLE END]",
+                  "additional_kwargs": {},
+                  "response_metadata": {},
+                  "type": "human",
+                  "name": null,
+                  "id": "bec4524c-f464-4886-be54-385981410877",
+                  "example": false
+                },
+                {
+                  "content": "The user's request has three distinct parts that map perfectly to the specialist agents in this system:\n\n1. **Summary** → Summarizer\n2. **Attention mechanism analogy** → Analogy Creator\n3. **Positional encoding code sketch** → Developer\n\nSince these are independent tasks with no dependencies between them, I'll hand off all three in parallel. As the Explainer, I'll frame the handoffs so each agent knows its assigned piece.",
+                  "additional_kwargs": {
+                    "tool_calls": [
+                      {
+                        "id": "call_-7130756218104052774",
+                        "function": {
+                          "arguments": "{}",
+                          "name": "transfer_to_summarizer"
+                        },
+                        "type": "function",
+                        "index": 0
+                      },
+                      {
+                        "id": "call_-7130756218104052773",
+                        "function": {
+                          "arguments": "{}",
+                          "name": "transfer_to_analogy_creator"
+                        },
+                        "type": "function",
+                        "index": 1
+                      },
+                      {
+                        "id": "call_-7130756218104052772",
+                        "function": {
+                          "arguments": "{}",
+                          "name": "transfer_to_developer"
+                        },
+                        "type": "function",
+                        "index": 2
+                      }
+                    ],
+                    "refusal": null
+                  },
+                  "response_metadata": {
+                    "token_usage": {
+                      "completion_tokens": 650,
+                      "prompt_tokens": 551,
+                      "total_tokens": 1201,
+                      "completion_tokens_details": {
+                        "accepted_prediction_tokens": null,
+                        "audio_tokens": null,
+                        "reasoning_tokens": 536,
+                        "rejected_prediction_tokens": null
+                      },
+                      "prompt_tokens_details": {
+                        "audio_tokens": null,
+                        "cached_tokens": 0
+                      }
+                    },
+                    "model_name": "glm-5.3-flash",
+                    "system_fingerprint": null,
+                    "id": "chatcmpl-2026102613004724591189c955d568IYwrKNnA",
+                    "service_tier": null,
+                    "finish_reason": "tool_calls",
+                    "logprobs": null
+                  },
+                  "type": "ai",
+                  "name": "explainer",
+                  "id": "run--8b4d9489-e822-40e6-936a-73a9dd628d86-0",
+                  "example": false,
+                  "tool_calls": [
+                    {
+                      "name": "transfer_to_summarizer",
+                      "args": {},
+                      "id": "call_-7130756218104052774",
+                      "type": "tool_call"
+                    },
+                    {
+                      "name": "transfer_to_analogy_creator",
+                      "args": {},
+                      "id": "call_-7130756218104052773",
+                      "type": "tool_call"
+                    },
+                    {
+                      "name": "transfer_to_developer",
+                      "args": {},
+                      "id": "call_-7130756218104052772",
+                      "type": "tool_call"
+                    }
+                  ],
+                  "invalid_tool_calls": [],
+                  "usage_metadata": {
+                    "input_tokens": 551,
+                    "output_tokens": 650,
+                    "total_tokens": 1201,
+                    "input_token_details": {
+                      "cache_read": 0
+                    },
+                    "output_token_details": {
+                      "reasoning": 536
+                    }
+                  }
+                }
+              ],
+              "remaining_steps": 24
+            }
+          },
+          "outputs": {
+            "graph": "__parent__",
+            "update": {
+              "messages": [
+                {
+                  "content": "Here is an article about transformer models. Please provide a summary, an analogy for the attention mechanism, and a code sketch illustrating positional encoding.\n\n[ARTICLE START]\nTransformers have revolutionized natural language processing. The core innovation is the self-attention mechanism, which allows each token to attend to all other tokens in the sequence. Positional encoding is added to input embeddings to give the model information about token order. Training large transformers requires significant computational resources.\n[ARTICLE END]",
+                  "additional_kwargs": {},
+                  "response_metadata": {},
+                  "type": "human",
+                  "name": null,
+                  "id": "bec4524c-f464-4886-be54-385981410877",
+                  "example": false
+                },
+                {
+                  "content": "The user's request has three distinct parts that map perfectly to the specialist agents in this system:\n\n1. **Summary** → Summarizer\n2. **Attention mechanism analogy** → Analogy Creator\n3. **Positional encoding code sketch** → Developer\n\nSince these are independent tasks with no dependencies between them, I'll hand off all three in parallel. As the Explainer, I'll frame the handoffs so each agent knows its assigned piece.",
+                  "additional_kwargs": {
+                    "tool_calls": [
+                      {
+                        "id": "call_-7130756218104052774",
+                        "function": {
+                          "arguments": "{}",
+                          "name": "transfer_to_summarizer"
+                        },
+                        "type": "function",
+                        "index": 0
+                      },
+                      {
+                        "id": "call_-7130756218104052773",
+                        "function": {
+                          "arguments": "{}",
+                          "name": "transfer_to_analogy_creator"
+                        },
+                        "type": "function",
+                        "index": 1
+                      },
+                      {
+                        "id": "call_-7130756218104052772",
+                        "function": {
+                          "arguments": "{}",
+                          "name": "transfer_to_developer"
+                        },
+                        "type": "function",
+                        "index": 2
+                      }
+                    ],
+                    "refusal": null
+                  },
+                  "response_metadata": {
+                    "token_usage": {
+                      "completion_tokens": 650,
+                      "prompt_tokens": 551,
+                      "total_tokens": 1201,
+                      "completion_tokens_details": {
+                        "accepted_prediction_tokens": null,
+                        "audio_tokens": null,
+                        "reasoning_tokens": 536,
+                        "rejected_prediction_tokens": null
+                      },
+                      "prompt_tokens_details": {
+                        "audio_tokens": null,
+                        "cached_tokens": 0
+                      }
+                    },
+                    "model_name": "glm-5.3-flash",
+                    "system_fingerprint": null,
+                    "id": "chatcmpl-2026102613004724591189c955d568IYwrKNnA",
+                    "service_tier": null,
+                    "finish_reason": "tool_calls",
+                    "logprobs": null
+                  },
+                  "type": "ai",
+                  "name": "explainer",
+                  "id": "run--8b4d9489-e822-40e6-936a-73a9dd628d86-0",
+                  "example": false,
+                  "tool_calls": [
+                    {
+                      "name": "transfer_to_summarizer",
+                      "args": {},
+                      "id": "call_-7130756218104052774",
+                      "type": "tool_call"
+                    },
+                    {
+                      "name": "transfer_to_analogy_creator",
+                      "args": {},
+                      "id": "call_-7130756218104052773",
+                      "type": "tool_call"
+                    },
+                    {
+                      "name": "transfer_to_developer",
+                      "args": {},
+                      "id": "call_-7130756218104052772",
+                      "type": "tool_call"
+                    }
+                  ],
+                  "invalid_tool_calls": [],
+                  "usage_metadata": {
+                    "input_tokens": 551,
+                    "output_tokens": 650,
+                    "total_tokens": 1201,
+                    "input_token_details": {
+                      "cache_read": 0
+                    },
+                    "output_token_details": {
+                      "reasoning": 536
+                    }
+                  }
+                },
+                {
+                  "content": "Successfully transferred to developer",
+                  "additional_kwargs": {},
+                  "response_metadata": {},
+                  "type": "tool",
+                  "name": "transfer_to_developer",
+                  "id": null,
+                  "tool_call_id": "call_-7130756218104052772",
+                  "artifact": null,
+                  "status": "success"
+                }
+              ],
+              "active_agent": "developer"
+            },
+            "resume": null,
+            "goto": "developer"
+          },
+          "execution_status": "succeeded",
+          "exit_status": null,
+          "link": "none",
+          "started_at": "2026-10-26T13:01:05.987123+00:00",
+          "ended_at": "2026-10-26T13:01:05.994070+00:00",
+          "evidence": {
+            "interaction_id": "6327c4d91faac7812735cb24",
+            "framework_span_id": "763f6f34-3933-4820-9b6c-9aebf481f2c6"
+          }
+        }
+      ]
+    }
+  ],
+  "inputs": [
+    {
+      "ordinal": "0001",
+      "input_id": "step-1",
+      "prompt": "Here is an article about transformer models. Please provide a summary, an analogy for the attention mechanism, and a code sketch illustrating positional encoding.\n\n[ARTICLE START]\nTransformers have revolutionized natural language processing. The core innovation is the self-attention mechanism, which allows each token to attend to all other tokens in the sequence. Positional encoding is added to input embeddings to give the model information about token order. Training large transformers requires significant computational resources.\n[ARTICLE END]",
+      "step_range": [
+        1,
+        4
+      ],
+      "result": {
+        "status": "failed",
+        "output": null,
+        "error_type": "ValueError",
+        "error": "Found AIMessages with tool_calls that do not have a corresponding ToolMessage. Here are the first few of those tool calls: [{'name': 'transfer_to_summarizer', 'args': {}, 'id': 'call_-7130756218104052774', 'type': 'tool_call'}, {'name': 'transfer_to_analogy_creator', 'args': {}, 'id': 'call_-7130756218104052773', 'type': 'tool_call'}].\n\nEvery tool call (LLM requesting to call a tool) in the message history MUST have a corresponding ToolMessage (result of a tool invocation to return to the LLM) - this is required by most LLM providers.\nFor troubleshooting, visit: https://python.langchain.com/docs/troubleshooting/errors/INVALID_CHAT_HISTORY"
+      },
+      "file_changes": []
+    }
+  ],
+  "coverage": {
+    "model_calls": "wire+framework",
+    "tool_calls": "framework",
+    "file_changes": "skipped",
+    "ambiguous_links": 0,
+    "unlinked_tool_calls": 3,
+    "unobserved_tool_executions": 3
+  },
+  "sources": [
+    {
+      "path": "case.json",
+      "sha256": "e78e3dcf954b5866425a2e86899fa75f390d847a4ac3aedc4344ea969d21be5e"
+    },
+    {
+      "path": "judge/report.json",
+      "sha256": "74a175ecff28517f8569088327e3e4e3375b7cb5097c0eaa32f25537eb96f2b7"
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "9c76c7d3f9d0a485918134563affa8ac6dd5d7801b22f8a587c0ce11f7208a31"
+    },
+    {
+      "path": "logs/sdk.jsonl",
+      "sha256": "52479074c6f4d44453d6e7335a556b80da403682bf3d4817dfeeac9ce04e456d"
+    },
+    {
+      "path": "logs/network.jsonl",
+      "sha256": "8c09a1e0af9733661973ad18d2661d9bb865b1f6bc7dd3403d425d744980d0a7"
+    },
+    {
+      "path": "steps/0001/file-evidence.json",
+      "sha256": "17725dae1447aa898049db15a78839c5fbdf80e792163670f8dcd9c757f24d13"
+    },
+    {
+      "path": "steps/0001/framework.jsonl",
+      "sha256": "201c7678a1b918fdd2cb66477095b1f6112654d0691b5e6b019c602df8117faf"
+    },
+    {
+      "path": "steps/0001/input.json",
+      "sha256": "65ac95040b93883a32ee80f7c757bbc6ad149d2eabed35305ba86c5be206477c"
+    },
+    {
+      "path": "steps/0001/request.json",
+      "sha256": "5391dfa4397a0fb17c6e97acea3e8831ddcf967645ac95ae16e39baed8964b72"
+    },
+    {
+      "path": "steps/0001/result.json",
+      "sha256": "c75d6b6a10e2f30d6c90ed97ee536afb96a204387e3cee0e64c118ff64524c56"
+    },
+    {
+      "path": "steps/0001/submission.json",
+      "sha256": "c8cca347d079f29a8a2c167296de10e301c59143fc1de2631c75e1fe023b23a2"
+    },
+    {
+      "path": "replay/events.jsonl",
+      "sha256": "fe513add117bf9293d187d2c42fc3b95855ee44479899235af5db60d3a697286"
+    }
+  ],
+  "warnings": [
+    "tool call call_-7130756218104052774 was emitted but its execution was not observed",
+    "tool call call_-7130756218104052773 was emitted but its execution was not observed",
+    "tool call call_-7130756218104052772 was emitted but its execution was not observed"
+  ]
+}

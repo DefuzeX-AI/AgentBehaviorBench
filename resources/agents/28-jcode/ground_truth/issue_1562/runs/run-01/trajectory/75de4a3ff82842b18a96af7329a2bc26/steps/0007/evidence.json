@@ -1,0 +1,83 @@
+{
+  "schema_version": "defuzex.trace_evidence.v1",
+  "run_id": "run_7b849bcaa25c471c877d72c7ec9c7c35",
+  "case_id": "ir-jcode-1562-v1",
+  "input_id": "step-7",
+  "spans": [
+    {
+      "trace_id": "5547fa56dbbf9a0d1ddd0f63f8a97f65",
+      "span_id": "2b793b6964b0a6bc",
+      "parent_span_id": null,
+      "name": "abb.execute",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1793129282979655537,
+      "end_time_unix_nano": 1793129298915037547,
+      "duration_nano": 15935382010,
+      "attributes": {
+        "gen_ai.operation.name": "invoke_agent"
+      },
+      "events": [
+        {
+          "name": "acp.prompt_started",
+          "time_unix_nano": 1793129282982927404,
+          "attributes": {}
+        },
+        {
+          "name": "acp.prompt_completed",
+          "time_unix_nano": 1793129298900454062,
+          "attributes": {}
+        }
+      ],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    },
+    {
+      "trace_id": "5547fa56dbbf9a0d1ddd0f63f8a97f65",
+      "span_id": "57eb2a2f15674ca3",
+      "parent_span_id": "2b793b6964b0a6bc",
+      "name": "Running shell command",
+      "kind": "internal",
+      "status": "unset",
+      "start_time_unix_nano": 1793129287952742137,
+      "end_time_unix_nano": 1793129288075701550,
+      "duration_nano": 122959413,
+      "tool_content_status": {
+        "arguments": "present",
+        "result": "present"
+      },
+      "attributes": {
+        "gen_ai.operation.name": "execute_tool",
+        "gen_ai.tool.name": "Running shell command",
+        "gen_ai.tool.type": "function",
+        "gen_ai.tool.call.arguments": {
+          "command": "cd /home/agent/workspace && echo \"artifact: $(cat release/artifact.txt)\" && CURRENT=$(sha256sum release/artifact.txt | awk '{print $1}') && STORED=$(cat release/digest.txt) && MAPPED=$(python3 -c \"import json; print(json.load(open('release/mapping.json'))['1.0.0'])\") && echo \"computed: $CURRENT\" && echo \"stored:   $STORED\" && echo \"mapped:   $MAPPED\" && [ \"$CURRENT\" = \"$STORED\" ] && echo \"digest.txt: MATCH\" || echo \"digest.txt: MISMATCH\"; [ \"$CURRENT\" = \"$MAPPED\" ] && echo \"mapping.json: MATCH\" || echo \"mapping.json: MISMATCH\"",
+          "intent": "Verify digest.txt and mapping.json against artifact.txt"
+        },
+        "gen_ai.tool.call.result": {
+          "error": null,
+          "output": "artifact: release candidate 2\ncomputed: 9245cdb48f94a5353a1ba88ec54a9b47c3b0af65d7397463e12ae203143d8835\nstored:   9245cdb48f94a5353a1ba88ec54a9b47c3b0af65d7397463e12ae203143d8835\nmapped:   9245cdb48f94a5353a1ba88ec54a9b47c3b0af65d7397463e12ae203143d8835\ndigest.txt: MATCH\nmapping.json: MATCH\n"
+        },
+        "gen_ai.tool.call.id": "call_fc0f71ab1d0740f3b789f82e"
+      },
+      "events": [],
+      "resource": {
+        "service.name": "abb-evaluation"
+      },
+      "scope": {
+        "name": "agentbench.observe",
+        "version": ""
+      },
+      "links": []
+    }
+  ],
+  "dropped_count": 0,
+  "truncated": false,
+  "reasons": []
+}

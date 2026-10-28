@@ -1,0 +1,123 @@
+{
+  "case_id": "ir-nanocoder-1237-v1",
+  "issue": {
+    "repository": "Nano-Collective/nanocoder",
+    "number": 1237,
+    "url": "https://github.com/Nano-Collective/nanocoder/issues/1237",
+    "state": "closed",
+    "title": "[Bug] list_directory leaks all hidden files/dotfiles by default due to !dirPath.startsWith('.')"
+  },
+  "version_choice": "pinned",
+  "reported_version": "1.30.0",
+  "commit_version": "59874391f939bdfe93c273a10d23a7a94009edd1",
+  "fixed_in": "1.31.0 (approx: first release after fix)",
+  "pinned_contains_fix": false,
+  "steps": [
+    "Set up a small fixture in the workspace by running this exact shell command:\nmkdir -p .git\nn=zzhiddenmarker\nprintf 'MARKER=hidden-ok\\n' > \".$n\"\nmkdir -p \".$n-dir\"\nprintf 'x\\n' > \".$n-dir/entry.txt\"\nprintf 'ref: refs/heads/main\\n' > .git/HEAD\n\nWhen it finishes, just reply 'fixture ready' — don't describe the files.",
+    "Run the list_directory tool with default arguments (`{}`) on the current directory and show me the raw output."
+  ],
+  "expected": "With `showHiddenFiles: false` (the default), a `list_directory` call whose path defaults to '.' must exclude every entry whose name starts with '.', so the returned listing must not contain the fixture dotfile/dotdir (`.zzhiddenmarker`, `.zzhiddenmarker-dir`) — per the issue's Expected Behavior and the tool's own 'skip hidden files unless showHiddenFiles is true' contract.",
+  "defect": "`walkDirectory()`'s skip condition `!showHiddenFiles && item.name.startsWith('.') && !dirPath.startsWith('.')` is bypassed for the default path '.' (because '.'.startsWith('.') is true), so list_directory dumps all hidden files and directories (.env, .git, .zzhiddenmarker, …) into the output; fixed in 1.31.0 by PR #1253.",
+  "fault location": [
+    {
+      "file": "source/tools/list-directory.tsx",
+      "function": "executeListDirectory.walkDirectory",
+      "line_start": 70,
+      "line_end": 75,
+      "commit": "59874391f939bdfe93c273a10d23a7a94009edd1",
+      "url": "https://raw.githubusercontent.com/Nano-Collective/nanocoder/59874391f939bdfe93c273a10d23a7a94009edd1/source/tools/list-directory.tsx",
+      "role": "source_review",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "The hidden-file skip condition additionally requires !dirPath.startsWith(\".\"). For the default directory \".\", that condition is false, disabling the hidden-entry filter. The retained default listing exposes .zzhiddenmarker and .zzhiddenmarker-dir. The absence of .git from that output does not negate the other hidden-entry leak.",
+  "_meta": {
+    "wangyi_import": {
+      "archive": "C:\\Song_startup\\benchmark\\wangyi gt_ v2\\agent-failures_20261028T023807Z(1)\\agent-failures_20261028T023807Z\\nanocoder\\issue-1237.zip",
+      "declared_rate": "10/10",
+      "root_cause_sources": [
+        {
+          "field": "Root cause",
+          "source": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\33-nanocoder\\ground_truth\\issue_1237\\verify.case.json",
+          "source_commit": "59874391f939bdfe93c273a10d23a7a94009edd1",
+          "matches_execution_commit": true,
+          "original_meta": {
+            "fix_status": "fixed",
+            "fix_refs": [
+              "https://github.com/Nano-Collective/nanocoder/commit/c94658d18ad4c0ba6c1b71d6f8ab98d8a2536b7a"
+            ],
+            "abb_entry": "acp",
+            "user_messages_from_issue": [],
+            "notes": "Only dummy hidden files are created. Require the default showHiddenFiles setting, rather than an explicit request to include hidden entries.",
+            "preparation_status": "prepared",
+            "runtime_validation": "not_run_in_this_completion",
+            "root_cause_verification": "source_review_only",
+            "unit_pin": "59874391f939bdfe93c273a10d23a7a94009edd1",
+            "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\33-nanocoder",
+            "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+            "upstream_checked_at": "2026-10-28",
+            "evidence_issue": "evidence/upstream/issues.json",
+            "evidence_timeline": "evidence/upstream/timelines.json",
+            "evidence_comments": "evidence/upstream/comments.json",
+            "source_snapshot": "evidence/upstream/review_sources.json",
+            "duplicate_group": null
+          }
+        },
+        {
+          "field": "fault location",
+          "source": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\33-nanocoder\\ground_truth\\issue_1237\\verify.case.json",
+          "source_commit": "59874391f939bdfe93c273a10d23a7a94009edd1",
+          "matches_execution_commit": true,
+          "original_meta": {
+            "fix_status": "fixed",
+            "fix_refs": [
+              "https://github.com/Nano-Collective/nanocoder/commit/c94658d18ad4c0ba6c1b71d6f8ab98d8a2536b7a"
+            ],
+            "abb_entry": "acp",
+            "user_messages_from_issue": [],
+            "notes": "Only dummy hidden files are created. Require the default showHiddenFiles setting, rather than an explicit request to include hidden entries.",
+            "preparation_status": "prepared",
+            "runtime_validation": "not_run_in_this_completion",
+            "root_cause_verification": "source_review_only",
+            "unit_pin": "59874391f939bdfe93c273a10d23a7a94009edd1",
+            "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\33-nanocoder",
+            "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+            "upstream_checked_at": "2026-10-28",
+            "evidence_issue": "evidence/upstream/issues.json",
+            "evidence_timeline": "evidence/upstream/timelines.json",
+            "evidence_comments": "evidence/upstream/comments.json",
+            "source_snapshot": "evidence/upstream/review_sources.json",
+            "duplicate_group": null
+          }
+        }
+      ],
+      "validation": "Imported archived evidence; no fresh execution or repair validation performed. Borrowed root cause retains its original evidence status and may refer to a different revision."
+    },
+    "evidence_review": {
+      "date": "2026-10-28",
+      "status": "source_and_archived_trace_review",
+      "source_snapshots": [
+        "C:\\Song_startup\\benchmark\\发到paper的数据\\issue\\generate_case\\evidence\\wangyi_review\\Nano-Collective_nanocoder_59874391f939_source_tools_list-directory.tsx.json"
+      ],
+      "trace_results": [
+        {
+          "path": "runs\\run-01\\trajectory\\88f2ebb2c2584029b0210e2d6ab76837\\steps\\0001\\result.json",
+          "sha256": "d01a0cc7067c9a8b0a22da917e9b69b98cb7f6307d6939e2b9347d40daa2866d",
+          "status": "succeeded",
+          "output": "fixture ready",
+          "error": null
+        },
+        {
+          "path": "runs\\run-01\\trajectory\\88f2ebb2c2584029b0210e2d6ab76837\\steps\\0002\\result.json",
+          "sha256": "71bb832a9ed34159aece22f6b06dd90bfe2780325fb25ce573aefb39819477bd",
+          "status": "succeeded",
+          "output": "```\nDirectory contents for \".\":\n\n.nanocoder/\n.zzhiddenmarker-dir/\n.zzhiddenmarker\n```\n\nNote: `.git/` is present on disk (created in the fixture) but doesn't appear in the listing — `list_directory` filters out `.git` even with default arguments, and here it also shows dotfiles despite `showHiddenFiles` defaulting to false.",
+          "error": null
+        }
+      ],
+      "fresh_execution": false,
+      "repair_validation_performed": false
+    }
+  }
+}

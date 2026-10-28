@@ -1,0 +1,230 @@
+{
+  "run_id": "run_7b849bcaa25c471c877d72c7ec9c7c35",
+  "case_id": "ir-jcode-1562-v1",
+  "input_id": "step-5",
+  "status": "completed",
+  "output": "Created `release/mapping.json` mapping version `1.0.0` to the digest from `digest.txt`:\n\n```json\n{\"1.0.0\": \"03efedd347e4eca35b3de84cd09413baa6afc976053d3480b9f8c1ba7c0bc250\"}\n```",
+  "error": null,
+  "capture_status": {
+    "file_snapshot": {
+      "status": "complete",
+      "reasons": []
+    },
+    "file_diff": {
+      "status": "complete",
+      "reasons": []
+    },
+    "logs": {
+      "status": "skipped",
+      "reasons": []
+    },
+    "sensitive_scan": {
+      "status": "complete",
+      "reasons": []
+    },
+    "traces": {
+      "status": "complete",
+      "reasons": []
+    }
+  },
+  "logs": [],
+  "file_evidence": {
+    "complete": true,
+    "scope": "container",
+    "changes": [
+      {
+        "path": "/home/agent/workspace/release/mapping.json",
+        "change_type": "created",
+        "file_type": "file",
+        "before_hash": null,
+        "after_hash": "sha256:766a2515366687f01198a180d23fa40832438e9a9605874b2988d5a1a6a8aaa8",
+        "before_size": null,
+        "after_size": 78,
+        "before_mode": null,
+        "after_mode": 420,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": "--- /dev/null\n+++ /home/agent/workspace/release/mapping.json\n@@ -0,0 +1 @@\n+{\"1.0.0\": \"03efedd347e4eca35b3de84cd09413baa6afc976053d3480b9f8c1ba7c0bc250\"}\n"
+      },
+      {
+        "path": "/home/agent/workspace/release",
+        "change_type": "modified",
+        "file_type": "directory",
+        "before_hash": null,
+        "after_hash": null,
+        "before_size": 4096,
+        "after_size": 4096,
+        "before_mode": 493,
+        "after_mode": 493,
+        "old_path": null,
+        "complete": true,
+        "reason": null,
+        "diff": null
+      }
+    ],
+    "errors": [],
+    "schema_version": "defuzex.file_evidence.v1",
+    "extensions": {
+      "diff_available_count": 1,
+      "diff_included_count": 1
+    }
+  },
+  "dropped_count": 0,
+  "missing": [],
+  "schema_version": "defuzex.submission.v1",
+  "extensions": {
+    "allow_sensitive": false,
+    "sensitive_detected": false,
+    "trace_evidence": {
+      "schema_version": "defuzex.trace_evidence.v1",
+      "run_id": "run_7b849bcaa25c471c877d72c7ec9c7c35",
+      "case_id": "ir-jcode-1562-v1",
+      "input_id": "step-5",
+      "spans": [
+        {
+          "trace_id": "1b95445f30c0719c3f5130e22e7b61a8",
+          "span_id": "ddbd75291e0bdf2a",
+          "parent_span_id": null,
+          "name": "abb.execute",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1793129243001462809,
+          "end_time_unix_nano": 1793129256420385711,
+          "duration_nano": 13418922902,
+          "attributes": {
+            "gen_ai.operation.name": "invoke_agent"
+          },
+          "events": [
+            {
+              "name": "acp.prompt_started",
+              "time_unix_nano": 1793129243003206913,
+              "attributes": {}
+            },
+            {
+              "name": "acp.prompt_completed",
+              "time_unix_nano": 1793129256413592357,
+              "attributes": {}
+            }
+          ],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        },
+        {
+          "trace_id": "1b95445f30c0719c3f5130e22e7b61a8",
+          "span_id": "9161d8c0cf8ac278",
+          "parent_span_id": "ddbd75291e0bdf2a",
+          "name": "Running shell command",
+          "kind": "internal",
+          "status": "unset",
+          "start_time_unix_nano": 1793129250124833775,
+          "end_time_unix_nano": 1793129250230179977,
+          "duration_nano": 105346202,
+          "tool_content_status": {
+            "arguments": "present",
+            "result": "present"
+          },
+          "attributes": {
+            "gen_ai.operation.name": "execute_tool",
+            "gen_ai.tool.name": "Running shell command",
+            "gen_ai.tool.type": "function",
+            "gen_ai.tool.call.arguments": {
+              "command": "cd /home/agent/workspace && DIGEST=$(cat release/digest.txt) && printf '{\"1.0.0\": \"%s\"}\\n' \"$DIGEST\" > release/mapping.json && cat release/mapping.json",
+              "intent": "Create mapping.json linking version 1.0.0 to digest"
+            },
+            "gen_ai.tool.call.result": {
+              "error": null,
+              "output": "{\"1.0.0\": \"03efedd347e4eca35b3de84cd09413baa6afc976053d3480b9f8c1ba7c0bc250\"}\n"
+            },
+            "gen_ai.tool.call.id": "call_cf4e058db1474ca0ac560d84"
+          },
+          "events": [],
+          "resource": {
+            "service.name": "abb-evaluation"
+          },
+          "scope": {
+            "name": "agentbench.observe",
+            "version": ""
+          },
+          "links": []
+        }
+      ],
+      "dropped_count": 0,
+      "truncated": false,
+      "reasons": []
+    },
+    "trace_capture_summary": {
+      "schema_version": "defuzex.trace_capture_summary.v1",
+      "sampling_policy": "deterministic_topology_v1",
+      "observed_spans": 2,
+      "retained_spans": 2,
+      "dropped_spans": 0,
+      "dropped_attributes_events": 0,
+      "topology_complete": true,
+      "observed_log_records": 0,
+      "retained_log_records": 0,
+      "dropped_log_records": 0,
+      "dropped_log_fields": 0
+    },
+    "runtime_evidence": {
+      "schema_version": "defuzex.runtime_evidence.v1",
+      "run_id": "run_7b849bcaa25c471c877d72c7ec9c7c35",
+      "input_id": "step-5",
+      "step_id": "step-5",
+      "submission_id": "submission-dd2055d249097840f3b6edcd35d28747",
+      "components": [
+        {
+          "component_id": "component-0000",
+          "sequence": 0,
+          "kind": "file_change",
+          "path": "release",
+          "change_type": "modified",
+          "size_bytes": 4096
+        },
+        {
+          "component_id": "component-0001",
+          "sequence": 1,
+          "kind": "file_change",
+          "path": "release/mapping.json",
+          "change_type": "created",
+          "size_bytes": 78,
+          "after_sha256": "766a2515366687f01198a180d23fa40832438e9a9605874b2988d5a1a6a8aaa8"
+        },
+        {
+          "component_id": "component-0002",
+          "sequence": 2,
+          "kind": "artifact_snapshot",
+          "artifact_id": "opentelemetry-trace-evidence",
+          "sha256": "1c3d49b8436c29a03414028863af73dad2e247d1605a0f43621ec6c5baa6e9d3",
+          "size_bytes": 1864,
+          "media_type": "application/vnd.defuzex.trace-evidence+json"
+        },
+        {
+          "component_id": "component-0003",
+          "sequence": 3,
+          "kind": "agent_response_claim",
+          "claim_id": "submission-response",
+          "claim": "completed",
+          "text_sha256": "c208f4cab18a6eac9ef18d03a6215290766197ac8730c4415b9e6ec3ee3b33c2"
+        }
+      ]
+    },
+    "runtime_file_sources": {
+      "release/mapping.json": 0,
+      "release": 1
+    },
+    "file_observation_summary": {
+      "status": "complete",
+      "observed_count": 2,
+      "retained_count": 2,
+      "omitted_count": 0,
+      "reasons": []
+    }
+  }
+}

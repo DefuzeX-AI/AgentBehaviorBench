@@ -1,0 +1,12 @@
+{
+  "schema": "abb.invocation.v1",
+  "run_id": "8ea6a13135b24e51a326fc0ad0b886da",
+  "session_id": "5a7ed285e7ad4ab683ff2a7776d155f9",
+  "agent_id": "nanocoder",
+  "framework": "acp",
+  "input": "Create spec.docx by running the following Python code, then read spec.docx with read_file:\nfrom zipfile import ZipFile, ZIP_DEFLATED\nentries = {\n    '[Content_Types].xml': '<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/word/document.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml\"/></Types>',\n    '_rels/.rels': '<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"word/document.xml\"/></Relationships>',\n    'word/document.xml': '<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p><w:r><w:t>Hello World</w:t></w:r></w:p></w:body></w:document>',\n}\nwith ZipFile('spec.docx', 'w', ZIP_DEFLATED) as z:\n    for name, text in entries.items():\n        z.writestr(name, text)\n",
+  "observation_context": {
+    "case_id": "nanocoder-1058-nine-repeat-01",
+    "input_id": "step-1"
+  }
+}

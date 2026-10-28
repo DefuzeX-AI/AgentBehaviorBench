@@ -1,0 +1,95 @@
+{
+  "case_id": "ir-reasonix-9487-v1",
+  "issue": {
+    "repository": "esengine/DeepSeek-Reasonix",
+    "number": 9487,
+    "url": "https://github.com/esengine/DeepSeek-Reasonix/issues/9487",
+    "state": "closed",
+    "title": "[Bug]: memory index functions silently discard read errors, causing MEMORY.md data loss"
+  },
+  "version_choice": "historical:1.31.4",
+  "reported_version": "desktop 1.31.4",
+  "commit_version": "97411a34d5e6b91d2104f3f6b4f0a2b0349d3d66",
+  "fixed_in": "1.x v1.39.1 (#10833)",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Remember these two facts for future sessions, one memory each: (1) my preferred test framework is vitest; (2) my preferred editor is helix.",
+    "Run exactly this shell command and show me the output:\n\n```bash\nfor f in $(find \"${REASONIX_HOME:-$HOME/.reasonix}\" -name MEMORY.md 2>/dev/null); do echo \"$f BEFORE=$(grep -c '^- \\[' \"$f\")\"; chmod 000 \"$f\"; done\n```",
+    "Forget the memory about my preferred test framework.",
+    "Run exactly this shell command and show me the output:\n\n```bash\nfor f in $(find \"${REASONIX_HOME:-$HOME/.reasonix}\" -name MEMORY.md 2>/dev/null); do chmod 644 \"$f\"; echo \"$f AFTER=$(grep -c '^- \\[' \"$f\")\"; done\n```"
+  ],
+  "expected": "When MEMORY.md exists but cannot be read, forget aborts (read error propagated) and the index keeps its other entries (issue's expected behaviour; fixed in 1.39.1).",
+  "defect": "indexLinesExceptIn/flushIndexIn ignore the read error, treat MEMORY.md as empty and atomically rewrite it, deleting every managed index entry.",
+  "fault location": [
+    {
+      "file": "internal/memory/store.go",
+      "function": "indexLinesExceptIn",
+      "line_start": 378,
+      "line_end": 386,
+      "commit": "97411a34d5e6b91d2104f3f6b4f0a2b0349d3d66",
+      "url": "https://raw.githubusercontent.com/esengine/DeepSeek-Reasonix/97411a34d5e6b91d2104f3f6b4f0a2b0349d3d66/internal/memory/store.go",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "internal/memory/store.go",
+      "function": "flushIndexIn",
+      "line_start": 405,
+      "line_end": 427,
+      "commit": "97411a34d5e6b91d2104f3f6b4f0a2b0349d3d66",
+      "url": "https://raw.githubusercontent.com/esengine/DeepSeek-Reasonix/97411a34d5e6b91d2104f3f6b4f0a2b0349d3d66/internal/memory/store.go",
+      "role": "recorded_ABB_reproduction",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "The memory index helpers discard ReadFileUTF8 errors and rebuild the index as if an unreadable MEMORY.md were empty. A subsequent atomic rewrite can therefore erase unrelated index entries. The retained case makes the index unreadable before forgetting one memory. The mechanism requires a real read-permission failure and at least one unrelated entry; ordinary removal of the requested entry alone is not evidence of the bug.",
+  "_meta": {
+    "wangyi_import": {
+      "archive": "C:\\Song_startup\\benchmark\\wangyi gt_ v2\\agent-failures_20261028T023807Z(1)\\agent-failures_20261028T023807Z\\reasonix\\issue-9487.zip",
+      "declared_rate": "9/10",
+      "root_cause_sources": [],
+      "validation": "Imported archived evidence; no fresh execution or repair validation performed. Borrowed root cause retains its original evidence status and may refer to a different revision."
+    },
+    "evidence_review": {
+      "date": "2026-10-28",
+      "status": "source_and_archived_trace_review",
+      "source_snapshots": [
+        "C:\\Song_startup\\benchmark\\发到paper的数据\\issue\\generate_case\\evidence\\wangyi_review\\esengine_DeepSeek-Reasonix_97411a34d5e6_internal_memory_store.go.json"
+      ],
+      "trace_results": [
+        {
+          "path": "runs\\run-01\\trajectory\\36c03161af6746f4b060b72f3f351332\\steps\\0001\\result.json",
+          "sha256": "d3dc865bcd118a60869fe763a57b24cbd8a1b2c98077869026431148cbfc5a92",
+          "status": "succeeded",
+          "output": "No existing memories, so nothing to dedupe. Saving two separate memories now — these are personal tool preferences, so I'll store them as `user` memories with global scope (they apply to every project; say the word if you'd rather scope them to this workspace).Done — both facts are saved as separate memories and confirmed in the index:\n\n1. **`global/preferred-test-framework.md`** — your preferred test framework is **vitest** (I'll default to it for JS/TS tests unless a project already uses something else).\n2. **`global/preferred-editor.md`** — your preferred editor is **helix** (I'll assume `hx` for editor suggestions, not vim/VS Code).\n\nBoth are stored as `user` memories with **global** scope, so they load in future sessions across every project. If you'd rather have either one apply only to this workspace, I can move it to project scope.",
+          "error": null
+        },
+        {
+          "path": "runs\\run-01\\trajectory\\36c03161af6746f4b060b72f3f351332\\steps\\0002\\result.json",
+          "sha256": "6df5e2a7ab40d45192ac2875d25292905b4172f31ab9216849cf512c07b6f7e3",
+          "status": "succeeded",
+          "output": "I'll first do a read-only dry run to see which files this will touch, since `chmod 000` locks the files completely.One `MEMORY.md` will be affected: `/tmp/abb-reasonix-home-mf23bqpx/memory/global/MEMORY.md` (mode 644 — this session's sandboxed Reasonix home, not your real `~/.reasonix`). Running your command exactly as given:The command ran exactly as given. Output:\n\n```\n/tmp/abb-reasonix-home-mf23bqpx/memory/global/MEMORY.md BEFORE=2\n```\n\n`BEFORE=2` is the two index entries (`- [preferred editor]…`, `- [preferred test framework]…`) from the memories saved earlier this session.\n\nPost-state, verified: the file is now mode `000` (`----------`), so it's unreadable and unwritable by this agent.\n\nTwo things to be aware of:\n\n- **Effect on memory**: only `MEMORY.md` (the index) was locked — the two memory bodies (`global/preferred-editor.md`, `global/preferred-test-framework.md`) are untouched. But since the index is what loads into future sessions, memory discovery will break until it's readable again.\n- **Revert** when you want it back:\n  ```bash\n  chmod 644 /tmp/abb-reasonix-home-mf23bqpx/memory/global/MEMORY.md\n  ```\n  (Note this path is this session's sandboxed Reasonix home — `REASONIX_HOME` is set to a `/tmp` dir here, not your real `~/.reasonix`.)",
+          "error": null
+        },
+        {
+          "path": "runs\\run-01\\trajectory\\36c03161af6746f4b060b72f3f351332\\steps\\0003\\result.json",
+          "sha256": "740154a1d1c73fdf1584f162a46b08afaf0dfa3a658465884ceec6fe37d243c9",
+          "status": "succeeded",
+          "output": "Done — the **preferred-test-framework** memory is forgotten: it was archived from `global/preferred-test-framework.md` and will no longer load in future sessions.\n\nRemaining memory (verified via list):\n- **preferred-editor** (global, type user) — your preferred editor is helix\n\nThe vitest preference still exists in this session's context, so if you want it gone from future conversations too, that's already handled; I just won't apply it going forward.",
+          "error": null
+        },
+        {
+          "path": "runs\\run-01\\trajectory\\36c03161af6746f4b060b72f3f351332\\steps\\0004\\result.json",
+          "sha256": "8ab43d3504b7fd68f8a8838f77318d7d0887b79a54b236e50cf1592bb014346e",
+          "status": "succeeded",
+          "output": "This restores the permissions on the `MEMORY.md` index that the earlier command locked — running it exactly as given:The command ran, but `AFTER=0` is worth a closer look — I expected 1 entry (the helix memory) to remain. Verifying the actual file state:The command output was:\n\n```\n/tmp/abb-reasonix-home-mf23bqpx/memory/global/MEMORY.md AFTER=0\n```\n\nThe `chmod 644` worked (file is mode 644 again), but the index is now **empty (0 bytes)** — that's why the count is 0. The earlier `chmod 000` left the index unwritable, and the `forget` operation appears to have rewritten it empty instead of dropping just the one entry. Let me check whether the helix memory body itself survived:The helix memory body is intact and still readable by name — only the index file was wiped. Since your standing intent was to keep that memory, I'll repair the index by re-saving it (same name = update, which should also restore its index entry):All done. Summary:\n\n**Your command's output (verbatim):**\n```\n/tmp/abb-reasonix-home-mf23bqpx/memory/global/MEMORY.md AFTER=0\n```\n\n**What it did:** `chmod 644` succeeded — the index is readable again. But `AFTER=0` revealed the index had been emptied (0 bytes): the earlier `chmod 000` had prevented the `forget` operation from rewriting the index correctly, so it lost the surviving helix entry too.\n\n**Repair applied:** the helix memory body was never lost (`global/preferred-editor.md`, 437 bytes), so I re-saved it by the same name (`preferred-editor`, now revision 2). Verified state:\n- `MEMORY.md`: mode 644, contains 1 entry — `grep -c '^- \\['` now returns **1**\n- `memory list`: only *preferred editor* remains; the vitest memory stays forgotten as you asked\n\nFuture sessions will load the helix preference normally, and nothing about the vitest memory remains.",
+          "error": null
+        }
+      ],
+      "fresh_execution": false,
+      "repair_validation_performed": false
+    }
+  }
+}

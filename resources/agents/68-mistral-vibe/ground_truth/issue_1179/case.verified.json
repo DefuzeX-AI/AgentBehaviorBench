@@ -1,0 +1,123 @@
+{
+  "case_id": "ir-mistral-vibe-1179-v2",
+  "issue": {
+    "repository": "mistralai/mistral-vibe",
+    "number": 1179,
+    "url": "https://github.com/mistralai/mistral-vibe/issues/1179",
+    "state": "closed",
+    "title": "bug: include_commit_signature is ignored on the Unified Harness backend"
+  },
+  "version_choice": "historical:2.26.0",
+  "reported_version": "2.25.5",
+  "commit_version": "376f6a33413a3eec9b3795b0c0e004066c47b5c1",
+  "fixed_in": "2.26.1",
+  "pinned_contains_fix": true,
+  "steps": [
+    "Create a tiny git repo in the workspace: `git init -q repo && cd repo && git config user.email a@b && git config user.name A && echo 'print(1)' > a.py`.",
+    "Stage a.py and create a git commit with the message 'Add a.py'.",
+    "Show the full message of the latest commit: `git -C repo log -1 --pretty=%B`."
+  ],
+  "expected": "With include_commit_signature at its default (true), commits the agent creates should carry the `Co-Authored-By: Mistral Vibe <vibe@mistral.ai>` trailer, because the backend should inject a commit-signature section into the system instructions (as it does from v2.26.1: vibe/app_server/_runtime.py L266-267 `if config.include_commit_signature: instructions += get_commit_signature_section()`).",
+  "defect": "At v2.26.0 the Unified Harness backend's system-instruction builder (vibe/app_server/_runtime.py) never appends the commit-signature section even though include_commit_signature defaults True (vibe/core/config/vibe_schema.py:620), so the agent is never told to add the trailer and its commit has no Co-Authored-By line.",
+  "fault location": [
+    {
+      "file": "vibe/app_server/_runtime.py",
+      "function": "_build_unified_system_instructions",
+      "line_start": 210,
+      "line_end": 239,
+      "commit": "376f6a33413a3eec9b3795b0c0e004066c47b5c1",
+      "url": "https://raw.githubusercontent.com/mistralai/mistral-vibe/376f6a33413a3eec9b3795b0c0e004066c47b5c1/vibe/app_server/_runtime.py",
+      "role": "missing_signature_injection",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    },
+    {
+      "file": "vibe/core/config/vibe_schema.py",
+      "function": "VibeConfigSchema.include_commit_signature",
+      "line_start": 616,
+      "line_end": 623,
+      "commit": "376f6a33413a3eec9b3795b0c0e004066c47b5c1",
+      "url": "https://raw.githubusercontent.com/mistralai/mistral-vibe/376f6a33413a3eec9b3795b0c0e004066c47b5c1/vibe/core/config/vibe_schema.py",
+      "role": "configuration_default",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations."
+    }
+  ],
+  "Root cause": "The Unified Harness instruction builder does not consume include_commit_signature or add the attribution instruction, although the configuration defaults to true. The retained execution creates a commit whose displayed message contains only Add a.py. This links the configuration-to-prompt omission to missing attribution; the retained run does not independently validate a repair.",
+  "_meta": {
+    "wangyi_import": {
+      "archive": "C:\\Song_startup\\benchmark\\wangyi gt_ v2\\agent-failures_20261028T023807Z(1)\\agent-failures_20261028T023807Z\\mistral-vibe\\issue-1179.zip",
+      "declared_rate": "10/10",
+      "root_cause_sources": [
+        {
+          "field": "Root cause",
+          "source": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\68-mistral-vibe\\ground_truth\\issue_1179\\verify.case.json",
+          "source_commit": "376f6a33413a3eec9b3795b0c0e004066c47b5c1",
+          "matches_execution_commit": true,
+          "original_meta": {
+            "fix_status": "source_confirmed",
+            "fix_refs": [],
+            "abb_entry": "acp",
+            "user_messages_from_issue": [],
+            "source_case": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\68-mistral-vibe\\ground_truth\\issue-1179\\case.verified.json",
+            "source_case_id": "ir-mistral-vibe-1179-v2",
+            "preparation_status": "prepared_from_recorded_case",
+            "runtime_validation": "not_run_in_this_completion",
+            "notes": "Reused the existing ABB source-confirmed case. Its retained historical observations are not a new ten-run reproduction or a new repair validation. Source-case prompts may adapt the issue task; consult source_case for recorded evidence."
+          }
+        },
+        {
+          "field": "fault location",
+          "source": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\68-mistral-vibe\\ground_truth\\issue_1179\\verify.case.json",
+          "source_commit": "376f6a33413a3eec9b3795b0c0e004066c47b5c1",
+          "matches_execution_commit": true,
+          "original_meta": {
+            "fix_status": "source_confirmed",
+            "fix_refs": [],
+            "abb_entry": "acp",
+            "user_messages_from_issue": [],
+            "source_case": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\68-mistral-vibe\\ground_truth\\issue-1179\\case.verified.json",
+            "source_case_id": "ir-mistral-vibe-1179-v2",
+            "preparation_status": "prepared_from_recorded_case",
+            "runtime_validation": "not_run_in_this_completion",
+            "notes": "Reused the existing ABB source-confirmed case. Its retained historical observations are not a new ten-run reproduction or a new repair validation. Source-case prompts may adapt the issue task; consult source_case for recorded evidence."
+          }
+        }
+      ],
+      "validation": "Imported archived evidence; no fresh execution or repair validation performed. Borrowed root cause retains its original evidence status and may refer to a different revision."
+    },
+    "evidence_review": {
+      "date": "2026-10-28",
+      "status": "source_and_archived_trace_review",
+      "source_snapshots": [
+        "C:\\Song_startup\\benchmark\\发到paper的数据\\issue\\generate_case\\evidence\\wangyi_review\\mistralai_mistral-vibe_376f6a33413a_vibe_app_server__runtime.py.json",
+        "C:\\Song_startup\\benchmark\\发到paper的数据\\issue\\generate_case\\evidence\\wangyi_review\\mistralai_mistral-vibe_376f6a33413a_vibe_core_config_vibe_schema.py.json"
+      ],
+      "trace_results": [
+        {
+          "path": "runs\\run-01\\trajectory\\1b2784bf42c34ebfa181de93aa05b3fc\\steps\\0001\\result.json",
+          "sha256": "4e78fb52db4c3c260b1465c856f426046100491ea4c22a921b98a72fa0dad529",
+          "status": "succeeded",
+          "output": "I'll run that command chain in the workspace.Done. Created `/home/agent/workspace/repo` with git initialized, user email/name configured to `a@b` / `A`, and `a.py` containing `print(1)`. Git reports `a.py` as untracked — the command didn't include a commit, so nothing has been committed yet.",
+          "error": null
+        },
+        {
+          "path": "runs\\run-01\\trajectory\\1b2784bf42c34ebfa181de93aa05b3fc\\steps\\0002\\result.json",
+          "sha256": "c8c80d9dcce2d4273a607f4c9c3ef12f1754fae08e17270686b070a52e970cd0",
+          "status": "succeeded",
+          "output": "Staging and committing in the repo now.Committed. `a.py` is staged and committed as root commit `fd0e151` (\"Add a.py\") on `master`; the working tree is clean.",
+          "error": null
+        },
+        {
+          "path": "runs\\run-01\\trajectory\\1b2784bf42c34ebfa181de93aa05b3fc\\steps\\0003\\result.json",
+          "sha256": "3e66dfd108a8d510fd865e9015a0b892f383736ac236c284b1cfc3ee7ae52c24",
+          "status": "succeeded",
+          "output": "The latest commit's full message is:\n\n```\nAdd a.py\n```",
+          "error": null
+        }
+      ],
+      "fresh_execution": false,
+      "repair_validation_performed": false
+    }
+  }
+}

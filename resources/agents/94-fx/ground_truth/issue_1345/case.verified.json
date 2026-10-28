@@ -1,0 +1,87 @@
+{
+  "case_id": "ir-fx-1345-v1",
+  "issue": {
+    "repository": "vercel-labs/fx",
+    "number": 1345,
+    "url": "https://github.com/vercel-labs/fx/issues/1345",
+    "state": "closed",
+    "title": "ACP: completed shell tool_call_update has a clipped JSON summary instead of the command output"
+  },
+  "version_choice": "pinned",
+  "reported_version": "0.0.14",
+  "commit_version": "1a070af32cdfaf8cd0da6de3dc7f053302828b17",
+  "fixed_in": "unknown",
+  "pinned_contains_fix": false,
+  "steps": [
+    "run `echo hello-$((6*7))` with your shell tool"
+  ],
+  "expected": "The final `tool_call_update` with `status: \"completed\"` for the `shell` call carries the command's output (`hello-42\\n`) in its `content` text (with a `... output truncated ...` marker if it is long), instead of a status JSON summary — per the issue's Expected section and the ACP tool-call `content` field semantics.",
+  "defect": "The `completed` tool_call_update's `content` is a JSON status summary clipped mid-string at ~200 characters (cut inside `full_output_handle`), so an ACP client that only reads the completed update never sees `hello-42` (the output exists only in the earlier `in_progress` updates).",
+  "fault location": [
+    {
+      "file": "src/acp/tool_call_presentation.zig",
+      "line_start": 111,
+      "line_end": 129,
+      "function": "toolUpdateContentText",
+      "verification": "source_review_at_execution_revision",
+      "explanation": "Contributing source location. See Root cause and the evidence review for observed behavior and limitations.",
+      "commit": "1a070af32cdfaf8cd0da6de3dc7f053302828b17",
+      "url": "https://raw.githubusercontent.com/vercel-labs/fx/1a070af32cdfaf8cd0da6de3dc7f053302828b17/src/acp/tool_call_presentation.zig"
+    }
+  ],
+  "Root cause": "The ACP completion presentation clips ordinary tool output to a 200-byte preview. For the shell tool this output is a JSON status summary rather than accumulated stdout. The recorded completed update ends inside full_output_handle and omits hello-42, although the final assistant answer reports the correct stdout. The defect concerns the completion-event contract, not command execution or the final answer.",
+  "_meta": {
+    "wangyi_import": {
+      "archive": "C:\\Song_startup\\benchmark\\wangyi gt_ v2\\agent-failures_20261028T023807Z(1)\\agent-failures_20261028T023807Z\\fx\\issue-1345.zip",
+      "declared_rate": "10/10",
+      "root_cause_sources": [
+        {
+          "field": "Root cause",
+          "source": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\94-fx\\ground_truth\\issue_1345\\verify.case.json",
+          "source_commit": "1a070af32cdfaf8cd0da6de3dc7f053302828b17",
+          "matches_execution_commit": true,
+          "original_meta": {
+            "fix_status": "fixed",
+            "fix_refs": [
+              "https://github.com/vercel-labs/fx/commit/a1412be9725fb2b75df346e9940bc815b28ab60a"
+            ],
+            "abb_entry": "acp",
+            "user_messages_from_issue": [],
+            "notes": "Evaluate the completed tool_call_update content, not the final agent reply or the earlier in_progress updates. The shell expression is from the issue.",
+            "preparation_status": "prepared",
+            "runtime_validation": "not_run_in_this_completion",
+            "root_cause_verification": "issue_derived_inference",
+            "unit_pin": "1a070af32cdfaf8cd0da6de3dc7f053302828b17",
+            "unit_path": "C:\\Song_startup\\benchmark\\AgentBehaviorBench\\resources\\agents\\94-fx",
+            "version_installation_validation": "not_executed; historical launch and dependency compatibility must be checked before running",
+            "upstream_checked_at": "2026-10-28",
+            "evidence_issue": "evidence/upstream/issues.json",
+            "evidence_timeline": "evidence/upstream/timelines.json",
+            "evidence_comments": "evidence/upstream/comments.json",
+            "source_snapshot": "evidence/upstream/review_sources.json",
+            "duplicate_group": null
+          }
+        }
+      ],
+      "validation": "Imported archived evidence; no fresh execution or repair validation performed. Borrowed root cause retains its original evidence status and may refer to a different revision."
+    },
+    "evidence_review": {
+      "date": "2026-10-28",
+      "status": "source_and_archived_trace_review",
+      "source_snapshots": [
+        "C:\\Song_startup\\benchmark\\发到paper的数据\\issue\\generate_case\\evidence\\wangyi_review\\vercel-labs_fx_1a070af32cdf_src_acp_tool_call_presentation.zig.json"
+      ],
+      "trace_results": [
+        {
+          "path": "runs\\run-01\\trajectory\\1ba20ef45adb4e3c8a19a22293c58938\\steps\\0001\\result.json",
+          "sha256": "11efd87dd7e53b70714ffc094313aa4fe74d76765f4d0157dd2aedbef903c884",
+          "status": "succeeded",
+          "output": "I'll run that command now.Output:\n\n```\nhello-42\n```\n\nExit code `0`. Arithmetic expansion worked as expected: `$((6*7))` evaluated to `42`.",
+          "error": null
+        }
+      ],
+      "fresh_execution": false,
+      "repair_validation_performed": false
+    }
+  }
+}
