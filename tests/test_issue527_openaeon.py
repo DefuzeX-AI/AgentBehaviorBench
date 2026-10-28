@@ -100,7 +100,7 @@ def test_manifest_keeps_bounded_startup_and_native_node_cache():
     assert config['adapter']['handshake_timeout']==300
     assert config['runtime']['timeout_sec']==900
     assert inspect.signature(m.wait_gateway).parameters['timeout'].default==180
-    recipe=(unit/'Dockerfile').read_text();assert 'cp -a /tmp/node-compile-cache/.' in recipe
+    recipe=(unit/'Dockerfile').read_text();assert 'cp -a /tmp/node-compile-cache/.' not in recipe
     assert 'chmod -R a+rX /opt/openaeon-node-cache /opt/openaeon-jiti-cache' in recipe
 
 
@@ -159,3 +159,32 @@ def test_registry_keeps_a_unique_numeric_directory_prefix():
     assert (ROOT/selected['path']).resolve()==P.parents[1].resolve()
     prefix=Path(selected['path']).name.split('-',1)[0]
     assert [r['agent_id'] for r in rows if Path(r['path']).name.split('-',1)[0]==prefix]==['openaeon']
+
+
+def test_cache_builder_uses_final_uid_and_independent_exit_budget(monkeypatch):
+    import inspect
+    unit=P.parents[1];recipe=(unit/'Dockerfile').read_text()
+    warm=recipe.index('RUN --network=none python3 /opt/agent/bootstrap/warm_cache.py')
+    assert recipe.rfind('USER agent',0,warm)>recipe.index('useradd --create-home --uid 10001 agent')
+    assert recipe.index('USER root',warm)>warm
+    spec=importlib.util.spec_from_file_location('openaeon_cache_builder',P.parent/'warm_cache.py')
+    builder=importlib.util.module_from_spec(spec);monkeypatch.setitem(sys.modules,'launch',m);spec.loader.exec_module(builder)
+    assert 'os.getuid() != 10001' in inspect.getsource(builder.main)
+    assert 'finish_cache_process(process,flushed=flushed is not None)' in inspect.getsource(builder.main)
+    assert 'timeout=30' in inspect.getsource(builder.finish_cache_process)
+    assert 'm.flushCompileCache()' in inspect.getsource(builder.write_flush_preload)
+    assert 'flush_native_cache(process,receipt)' in inspect.getsource(builder.main)
+    assert 'SIGUSR2' not in inspect.getsource(m)
+    assert '--require' not in inspect.getsource(m)
+    assert not hasattr(builder,'stop')
+
+
+def test_build_cache_refuses_failed_exit_or_invalid_flush_identity(monkeypatch,tmp_path):
+    spec=importlib.util.spec_from_file_location('openaeon_cache_exit',P.parent/'warm_cache.py')
+    builder=importlib.util.module_from_spec(spec);monkeypatch.setitem(sys.modules,'launch',m);spec.loader.exec_module(builder)
+    p=subprocess.Popen([sys.executable,'-c','raise SystemExit(7)'],start_new_session=True);p.wait()
+    with pytest.raises(RuntimeError,match='unsuccessfully'):builder.finish_cache_process(p)
+    # A receipt for another process never authorizes publishing a forced-exit cache.
+    receipt=tmp_path/'receipt.json';receipt.write_text(json.dumps({'pid':p.pid+1,'uid':10001,'cache':'/opt/openaeon-node-cache/other'}))
+    monkeypatch.setattr(builder.os,'kill',lambda *args:None)
+    with pytest.raises(RuntimeError,match='identity mismatch'):builder.flush_native_cache(p,receipt)

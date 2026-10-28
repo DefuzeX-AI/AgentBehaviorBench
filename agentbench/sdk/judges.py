@@ -57,12 +57,28 @@ def build_request(directory, registration, document):
                                    'size_bytes': path.stat().st_size}
         steps.append({'input': read(prefix + '/input.json'),
                       'result': read(prefix + '/result.json'), 'evidence_prefix': prefix})
+    workspace_evidence = 'local-workspace-evidence.json'
+    snapshot_path = root / workspace_evidence
+    if snapshot_path.is_symlink():
+        raise ValueError('Workspace evidence must not be a link')
+    try:
+        host = read('run.json')
+    except FileNotFoundError:
+        host = {}
+    if host.get('workspace_evidence') in ('complete', 'partial', 'failed') and not snapshot_path.is_file():
+        raise ValueError('Expected local workspace evidence is missing')
+    if snapshot_path.is_file():
+        content = artifact_file(root, workspace_evidence).read_bytes()
+        files[workspace_evidence] = {'sha256': hashlib.sha256(content).hexdigest(),
+                                     'size_bytes': len(content)}
     body = {'schema': 'abb.judge.request.v1', 'agent_id': registration.agent_id,
             'run_id': manifest['run_id'], 'case': document['case'],
             'case_sha256': digest(case_bytes(document['case'])),
             'workspace': document.get('workspace'), 'steps': steps, 'attachments': files,
             'evidence_status': manifest['evidence'],
             'unexecuted_input_ids': [item['input_id'] for item in document['case']['inputs'][len(steps):]]}
+    if workspace_evidence in files:
+        body['workspace_evidence'] = workspace_evidence
     body['request_id'] = digest(case_bytes(body))
     return body
 

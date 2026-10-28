@@ -9,7 +9,10 @@ RUN pnpm build
 RUN node openaeon.mjs --version && node openaeon.mjs acp --help && node openaeon.mjs gateway --help
 
 COPY bootstrap/launch.py bootstrap/warm_cache.py /opt/agent/bootstrap/
-RUN --network=none mkdir -p /opt/openaeon-node-cache /opt/openaeon-jiti-cache && cp -a /tmp/node-compile-cache/. /opt/openaeon-node-cache/ && python3 /opt/agent/bootstrap/warm_cache.py && chmod -R a+rX /opt/openaeon-node-cache /opt/openaeon-jiti-cache
+RUN useradd --create-home --uid 10001 agent && mkdir -p /opt/openaeon-node-cache /opt/openaeon-jiti-cache && chown agent:agent /opt/openaeon-node-cache /opt/openaeon-jiti-cache
+USER agent
+RUN --network=none python3 /opt/agent/bootstrap/warm_cache.py && chmod -R a+rX /opt/openaeon-node-cache /opt/openaeon-jiti-cache
+USER root
 
 RUN python3 -m venv /opt/venv && /opt/venv/bin/pip install --no-cache-dir 'agent-client-protocol==0.12.1' 'opentelemetry-sdk>=1.30,<2' 'jsonschema>=4.23,<5' 'python-dotenv>=1,<2'
 ENV PATH=/opt/venv/bin:$PATH PYTHONPATH=/opt/abb-runtime PYTHONUNBUFFERED=1
@@ -18,5 +21,5 @@ COPY .abb-runtime/ /opt/abb-runtime/
 COPY agent.toml ./
 COPY network/ ./network/
 COPY bootstrap/ ./bootstrap/
-RUN useradd --create-home --uid 10001 agent && mkdir -p /workspace/project && chown -R agent:agent /workspace /home/agent
+RUN mkdir -p /workspace/project && chown -R agent:agent /workspace /home/agent
 USER agent

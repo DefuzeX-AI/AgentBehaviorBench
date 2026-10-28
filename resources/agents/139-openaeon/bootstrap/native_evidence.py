@@ -3,6 +3,7 @@ from pathlib import Path
 import json
 import os
 import re
+import stat
 
 MAXIMUM=8*1024*1024
 
@@ -18,6 +19,8 @@ def checked(path, root, maximum=MAXIMUM):
 
 def read_from_home(session_id, home):
     home=Path(home)
+    if not isinstance(session_id,str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}',session_id):
+        raise ValueError('Invalid native ACP session identity')
     metadata=json.loads(checked(home/'abb-native-session.json',home,65536))
     key=metadata['session_key']
     if not re.fullmatch(r'agent:main:abb-[0-9a-f]{16}',key):
@@ -29,7 +32,42 @@ def read_from_home(session_id, home):
     state=Path(metadata['state_dir'])
     if not state.resolve().is_relative_to(home.resolve()):
         raise ValueError('Native state directory escapes its private home')
-    folder=state/'agents/main/sessions';store=json.loads(checked(folder/'sessions.json',home))
+    folder=state/'agents/main/sessions'
+    # A Gateway refusal before the first model call has no session store yet.
+    # Match only the bridge's own error for this ACP session; consume each
+    # occurrence once so an old refusal cannot hide a later missing transcript.
+    risk='high-risk code edit request requires explicit confirmDangerousCodeEdit=true'
+    until_next=r"(?:(?!Error handling request)[\s\S])*?"
+    pattern=(r"Error handling request \{"+until_next+r"sessionId: '"+re.escape(session_id)
+             +r"'"+until_next+r"\}\s*\{"+until_next+r"details: '"+re.escape(risk)+r"'"+until_next+r"\}")
+    refusal_count=len(re.findall(pattern,log))
+    marker=home/('abb-native-risk-count-'+session_id+'.json')
+    processed=0
+    if marker.exists():
+        saved=json.loads(checked(marker,home,65536))
+        if saved.get('session_id')!=session_id or type(saved.get('count')) is not int:
+            raise ValueError('Invalid native risk refusal counter')
+        processed=saved['count']
+    refusal=refusal_count>processed
+    if refusal:
+        flags=os.O_WRONLY|os.O_CREAT|getattr(os,'O_NOFOLLOW',0)|getattr(os,'O_NONBLOCK',0)
+        fd=os.open(marker,flags,0o600)
+        try:
+            info=os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink!=1:
+                raise ValueError('Native risk refusal counter must be a private regular file')
+            os.ftruncate(fd,0);os.fchmod(fd,0o600)
+            with os.fdopen(fd,'w') as stream:
+                fd=None
+                json.dump({'session_id':session_id,'count':refusal_count},stream)
+        finally:
+            if fd is not None:os.close(fd)
+    try:
+        store=json.loads(checked(folder/'sessions.json',home))
+    except FileNotFoundError:
+        if refusal:
+            return []
+        raise
     entry=store.get(key)
     if not isinstance(entry,dict) or not isinstance(entry.get('sessionId'),str):
         raise ValueError('Native bridge session has no persisted session entry')
@@ -67,3 +105,55 @@ def read_calls(session_id):
             continue
         found.extend(read_from_home(session_id,home))
     return found
+
+
+# Unit-owned compatibility recovery for the pinned OpenAEON transcript.
+# ACP notifications remain unchanged in the event stream; only the returned
+# final text is replaced, and only with a matching original native record.
+def recover_final(raw, parts, calls, session_id, stop_reason, maximum_bytes):
+    if stop_reason != 'end_turn' or not calls:
+        return raw, None
+    call = calls[-1]
+    if (not isinstance(call, dict) or call.get('native_session_id') != session_id
+            or call.get('source_contract') != 'openaeon.pinned-pi-session-jsonl.e9b35678'
+            or call.get('capture_status') != 'native_transcript'):
+        return raw, None
+    envelope = call.get('native_assistant_record')
+    if not isinstance(envelope, dict) or envelope.get('id') != call.get('native_call_id'):
+        return raw, None
+    message = envelope.get('message')
+    if (not isinstance(message, dict) or message.get('role') != 'assistant'
+            or message.get('stopReason') != 'stop'):
+        return raw, None
+    content = message.get('content')
+    if (not isinstance(content, list) or not content
+            or any(not isinstance(item, dict) or item.get('type') not in ('text', 'thinking')
+                   or (item.get('type') == 'text' and not isinstance(item.get('text'), str))
+                   for item in content)):
+        return raw, None
+    # Thinking blocks are never returned as user-facing text.
+    final = ''.join(item['text'] for item in content if item.get('type') == 'text')
+    # Do not restore text that the native Gateway may have intentionally hidden.
+    if not final or any(marker in final for marker in ('NO_REPLY', 'HEARTBEAT_OK', '[[reply_to_', 'MEDIA:')):
+        return raw, None
+    if raw.endswith(final):
+        return raw, None
+    # If any raw text was transmitted, require an informative matching chunk.
+    # A wholly missing stream can be recovered only from this turn's verified
+    # native record; refusal, non-text records and internal markers stay hidden.
+    if raw or parts:
+        tail = next((part for part in reversed(parts) if isinstance(part, str) and len(part) >= 8), '')
+        if not tail or tail not in final:
+            return raw, None
+    if len(final.encode('utf-8')) > maximum_bytes:
+        raise ValueError('Complete native reply exceeds configured output limit')
+    import hashlib
+    return final, {'reason': 'incomplete_acp_stream',
+                   'source_contract': call['source_contract'],
+                   'native_call_id': call['native_call_id'],
+                   'raw_output_sha256': hashlib.sha256(raw.encode('utf-8')).hexdigest(),
+                   'raw_output_chars': len(raw), 'native_final_chars': len(final)}
+
+
+# Explicit opt-in for the generic ACP adapter; raw ACP events remain intact.
+read_calls.recover_final = recover_final

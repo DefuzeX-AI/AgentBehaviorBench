@@ -72,7 +72,7 @@ def prepare(environ, home, workspace, *, source=Path('/opt/agent/agent'), compil
                 'OPENCODE_API_KEY', 'OPENROUTER_API_KEY', 'GOOGLE_API_KEY', 'GEMINI_API_KEY'):
             env.pop(key, None)
     env.update(HOME=str(home), OPENAEON_STATE_DIR=str(state), OPENAEON_CONFIG_PATH=str(path),
-               OPENAEON_GATEWAY_TOKEN=token, NODE_OPTIONS='--max-old-space-size=384',
+               OPENAEON_GATEWAY_TOKEN=token, NODE_OPTIONS='--max-old-space-size=512',
                NODE_COMPILE_CACHE=str(cache_home), JITI_FS_CACHE='true', TMPDIR=str(home / '.cache'))
     native = ['node', str(Path(source) / 'openaeon.mjs')]
     gateway = native + ['gateway', 'run', '--bind', 'loopback', '--port', str(port)]
@@ -139,30 +139,108 @@ def tee_native_stderr(stream, path):
             sys.stderr.buffer.write(chunk);sys.stderr.buffer.flush()
 
 
+# Translate one specifically identified upstream gate error to a truthful ACP refusal.
+# The upstream confirmation mechanism remains enabled and is never auto-approved.
+RISK_GATE_MESSAGE = 'high-risk code edit request requires explicit confirmDangerousCodeEdit=true'
+
+def record_native_request(line, pending):
+    try:
+        value = json.loads(line)
+        if (isinstance(value, dict) and value.get('method') == 'session/prompt'
+                and type(value.get('id')) in (int, str) and isinstance(value.get('params'), dict)
+                and isinstance(value['params'].get('sessionId'), str) and value['params']['sessionId']):
+            pending[value['id']] = value['params']['sessionId']
+    except (ValueError, TypeError, UnicodeDecodeError):
+        return
+
+def translate_native_response(line, pending):
+    try:
+        value = json.loads(line)
+        if not isinstance(value, dict) or type(value.get('id')) not in (int, str):
+            return line
+        if 'result' not in value and 'error' not in value:
+            return line  # Server requests have an independent id namespace.
+        ident = value['id']
+        session = pending.pop(ident, None)
+        error = value.get('error')
+        if (session is None or not isinstance(error, dict) or error.get('code') != -32603
+                or error.get('message') != 'Internal error' or not isinstance(error.get('data'), dict)
+                or error['data'].get('details') != RISK_GATE_MESSAGE):
+            return line
+        notice = {'jsonrpc':'2.0','method':'session/update','params':{'sessionId':session,
+                  'update':{'sessionUpdate':'agent_message_chunk','content':{'type':'text',
+                  'text':'[ABB adapter: upstream refusal] '+RISK_GATE_MESSAGE+'. This request was not sent to the model.'}}}}
+        result = {'jsonrpc':'2.0','id':ident,'result':{'stopReason':'refusal'}}
+        return (json.dumps(notice,ensure_ascii=False)+'\n'+json.dumps(result,ensure_ascii=False)+'\n').encode('utf-8')
+    except (ValueError, TypeError, UnicodeDecodeError):
+        return line
+
+def relay_native_input(fd, dest, pending, lock):
+    # os.read does not hold sys.stdin.buffer's lock during interpreter shutdown.
+    buffered = b''
+    try:
+        while True:
+            chunk = os.read(fd, 65536)
+            if not chunk:
+                break
+            buffered += chunk
+            while b'\n' in buffered:
+                line, buffered = buffered.split(b'\n', 1)
+                with lock:
+                    record_native_request(line, pending)
+            dest.write(chunk); dest.flush()
+    except (BrokenPipeError, OSError, ValueError):
+        pass
+    finally:
+        try: dest.close()
+        except (OSError, ValueError): pass
+
+
+def relay_native_output(source, dest, pending, lock):
+    try:
+        for line in source:
+            with lock:
+                output = translate_native_response(line, pending)
+            if output != line:
+                sys.stderr.write("[abb-acp] Native risk confirmation denied; preserving the guard and reporting ACP refusal.\n")
+                sys.stderr.flush()
+            dest.write(output); dest.flush()
+    except (BrokenPipeError, OSError, ValueError):
+        pass
+
+
 def main():
     gateway = acp = None
     stderr_thread = None
+    output_thread = None
     home = Path(tempfile.mkdtemp(prefix='abb-openaeon-'))
     def interrupted(signum, frame):
         raise SystemExit(128 + signum)
     signal.signal(signal.SIGTERM, interrupted); signal.signal(signal.SIGINT, interrupted)
     try:
         gcmd, acmd, env, port = prepare(os.environ, home, Path.cwd())
-        # No model/tool implementation is replaced. ACP stdout remains byte-for-byte native.
+        # Preserve native model/tool behavior; only the exact documented gate error is mapped to an explicit ACP refusal.
         gateway = subprocess.Popen(gcmd, env=env, stdin=subprocess.DEVNULL,
                                    stdout=sys.stderr, stderr=sys.stderr, start_new_session=True)
         wait_gateway(gateway, port)
-        acp = subprocess.Popen(acmd, env=env, stdin=sys.stdin, stdout=sys.stdout,
+        acp = subprocess.Popen(acmd, env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE, start_new_session=True)
+        pending = {}; lock = threading.Lock()
+        threading.Thread(target=relay_native_input,args=(sys.stdin.fileno(),acp.stdin,pending,lock),daemon=True).start()
+        output_thread=threading.Thread(target=relay_native_output,args=(acp.stdout,sys.stdout.buffer,pending,lock),daemon=True)
+        output_thread.start()
         stderr_thread=threading.Thread(target=tee_native_stderr,args=(acp.stderr,home/'acp-native.stderr.log'),daemon=True)
         stderr_thread.start()
         while acp.poll() is None:
             if gateway.poll() is not None:
                 raise RuntimeError('Native Gateway exited during the ACP session')
             time.sleep(0.1)
+        output_thread.join(timeout=0.5)
         return acp.returncode
     finally:
         stop_many(acp, gateway)
+        if output_thread is not None:
+            output_thread.join(timeout=0.5)
         if stderr_thread is not None:
             stderr_thread.join(timeout=0.2)
 
