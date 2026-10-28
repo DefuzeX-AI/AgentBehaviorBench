@@ -1,5 +1,4 @@
-"""Execute imported Issue Cases through EvaluationService, then measure detection."""
-from concurrent.futures import ThreadPoolExecutor, as_completed
+"""Execute one imported Case group once, then measure detection against every Issue."""
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -14,14 +13,14 @@ from agentbench.harness.concurrency import ConcurrencySettings
 from agentbench.harness.scheduling.retry import RetryPolicy
 from agentbench.harness.ground_truth.detection import assess, oracle_model
 from agentbench.harness.ground_truth.files import EVIDENCE_LIMIT, read_bytes, read_json, within
-from agentbench.harness.ground_truth.issues import load_issue
+from agentbench.harness.ground_truth.issues import discover_issues, load_issue
 from agentbench.harness.ground_truth.trajectories import read_candidate
 from agentbench.observe.view_api import SuiteRunCatalogAPI
 from agentbench.sdk.common.artifacts import Artifacts
 from .exp1_inputs import load_cases
 from .exp1_metrics import summarize
 
-SCHEMA = 'abb.exp1.v1'
+SCHEMA = 'abb.exp1.v2'
 
 
 def fingerprint(value):
@@ -62,9 +61,12 @@ class Experiment1:
             raise ValueError('--workers must be positive')
         if timeout <= 0:
             raise ValueError('--timeout must be positive')
-        groups = load_cases(case_dir, tests)
+        group = load_cases(case_dir, tests)
         info = self.engine.agent(agent_id)
-        references = {g['issue_id']: load_issue(self.root, agent_id, g['issue_id']) for g in groups}
+        issues = discover_issues(self.root, agent_id)
+        if not issues:
+            raise ValueError(f'{agent_id}: no ground_truth/issue_<number>/case.verified.json found')
+        references = {issue_id: load_issue(self.root, agent_id, issue_id) for issue_id in issues}
         for reference in references.values():
             expected = reference['definition'].get('commit_version')
             actual = info['source'].get('revision')
@@ -87,44 +89,35 @@ class Experiment1:
                 'oracle': {'provider': 'openrouter', 'model': selected_oracle.model,
                            'endpoint': selected_oracle.base_url},
                 'case_directory': str(Path(case_dir).resolve()), 'prompts': prompts,
-                'prompt_sha256': fingerprint(prompts), 'issues': groups, 'execution_complete': False}
+                'prompt_sha256': fingerprint(prompts), 'available_cases': group['available_cases'],
+                'cases': group['cases'], 'issues': issues, 'execution_complete': False}
         # Only Cases and the public profile reach the native executor. References
         # and issue identity stay in this host-only experiment record.
         for issue_id, reference in references.items():
             files.save(f'{issue_id}/reference.json', reference)
         files.save('plan.json', plan)
-        self.output(f'Exp1: {directory}; {len(groups)} Issues, budget {tests} each')
+        self.output(f"Exp1: {directory}; {len(group['cases'])} tests, {len(issues)} Issues")
         started = time.monotonic()
-
-        def execute(group):
-            issue_id = group['issue_id']
-            location = directory / issue_id
-            record = {'state': 'running', 'suite': None}
-            files.save(f'{issue_id}/execution.json', record)
-            then = time.monotonic()
-            try:
-                result = self.engine.execute(agent_id, group['cases'], results_dir=location,
-                    model=model, timeout=timeout,
-                    max_steps=max(len(c['inputs']) for c in group['cases']),
-                    concurrency=ConcurrencySettings(1), retry_policy=RetryPolicy(max_retries=0))
-                record.update(state='finished', suite=result['directory'])
-            except Exception as exc:
-                record.update(state='failed', error=str(exc))
-                # Preserve a failed Suite when execution raised after durable creation.
-                suites = list((location / 'suites').glob('*/plan.json'))
-                if len(suites) == 1:
-                    record['suite'] = str(suites[0].parent)
-            finally:
-                record['wall_seconds'] = time.monotonic() - then
-                files.save(f'{issue_id}/execution.json', record)
-            return issue_id, record['state']
-
-        with ThreadPoolExecutor(max_workers=min(workers, len(groups))) as pool:
-            futures = [pool.submit(execute, group) for group in groups]
-            for future in as_completed(futures):
-                issue_id, state = future.result()
-                self.output(f'Exp1: {issue_id} execution {state}')
-        plan.update(execution_complete=True, execution_wall_seconds=time.monotonic() - started)
+        location = directory / 'execution'
+        record = {'state': 'running', 'suite': None}
+        files.save('execution.json', record)
+        try:
+            result = self.engine.execute(agent_id, group['cases'], results_dir=location,
+                model=model, timeout=timeout,
+                max_steps=max(len(c['inputs']) for c in group['cases']),
+                concurrency=ConcurrencySettings(workers), retry_policy=RetryPolicy(max_retries=0))
+            record.update(state='finished', suite=result['directory'])
+        except Exception as exc:
+            record.update(state='failed', error=str(exc))
+            # Preserve a failed Suite when execution raised after durable creation.
+            suites = list((location / 'suites').glob('*/plan.json'))
+            if len(suites) == 1:
+                record['suite'] = str(suites[0].parent)
+        finally:
+            record['wall_seconds'] = time.monotonic() - started
+            files.save('execution.json', record)
+        self.output(f"Exp1: execution {record['state']}")
+        plan.update(execution_complete=True, execution_wall_seconds=record['wall_seconds'])
         files.save('plan.json', plan)
         return self.match(directory)
 
@@ -135,6 +128,56 @@ class Experiment1:
         with FileLock(str(directory / '.exp1.lock'), timeout=0):
             return self._match(directory, retry_failed=retry_failed)
 
+    def _executions(self, directory, plan):
+        """Pair every frozen Case with its single saved trajectory, or the reason it has none."""
+        execution = read_json(directory / 'execution.json')
+        catalog, attempts, case_errors, error = {}, {}, {}, None
+        try:
+            if not execution.get('suite'):
+                raise ValueError(execution.get('error') or 'No execution Suite was saved')
+            suite = within(directory, Path(execution['suite']))
+            snapshot = self.engine.result(suite)['suite']
+            if snapshot['state'] in ('running', 'queued'):
+                raise ValueError('Suite execution is not finished')
+            catalog = SuiteRunCatalogAPI(suite / 'events.json').entries(snapshot=snapshot)
+            for job in snapshot['jobs']:
+                if job['agent_id'] == plan['agent_id']:
+                    attempts.update({c['case_index']: c.get('attempts') or [] for c in job['cases']})
+                    case_errors.update({c['case_index']: c.get('error') or job.get('preparation_error')
+                                        for c in job['cases']})
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            error = str(exc)
+        executions = []
+        for index, case in enumerate(plan['cases']):
+            row = {'test_index': index + 1, 'case_id': case['case_id'],
+                   'execution_attempts': len(attempts.get(index, []))}
+            candidate = None
+            try:
+                if error:
+                    raise ValueError(error)
+                matches = [(api, meta) for api, meta in catalog.values()
+                           if meta.get('agent') == plan['agent_id'] and meta.get('case_index') == index
+                           and meta.get('attempt_id')]
+                if len(matches) != 1 or len(attempts.get(index, [])) != 1:
+                    detail = case_errors.get(index)
+                    raise ValueError(f'Expected exactly one saved execution attempt for this Case; {detail or "no unambiguous trace"}')
+                api, meta = matches[0]
+                if meta.get('case_id') not in (None, case['case_id']):
+                    raise ValueError('Saved Case identity differs from the frozen plan')
+                attempt = attempts[index][0]
+                result = attempt.get('result') or {}
+                states = (attempt, result, result.get('artifacts') or {})
+                if any(s.get('host_acceptance') == 'rejected' or
+                       s.get('evidence_status') in ('missing', 'invalid', 'failed') for s in states):
+                    raise ValueError('Execution evidence was rejected or is unavailable')
+                candidate = read_candidate(api, environ=self.environ)
+                row.update(run_id=meta['id'], trajectory_sha256=fingerprint(candidate),
+                           target_usage=token_usage(candidate))
+            except (OSError, ValueError, RuntimeError, KeyError, TypeError) as exc:
+                row['error'] = str(exc)
+            executions.append((row, candidate))
+        return execution, executions
+
     def _match(self, directory, *, retry_failed):
         plan = read_json(directory / 'plan.json', limit=EVIDENCE_LIMIT)
         if plan.get('schema') != SCHEMA or not plan.get('execution_complete'):
@@ -144,84 +187,45 @@ class Experiment1:
         results = []
         started = time.monotonic()
         assessment_id = 'assessment_' + uuid4().hex[:16]
-        for group in plan['issues']:
-            issue_id = group['issue_id']
+        execution, executions = self._executions(directory, plan)
+        # Every saved trajectory is compared with every Issue; nothing is executed again.
+        for issue_id in plan['issues']:
             location = within(directory, directory / issue_id)
-            execution = read_json(location / 'execution.json')
             reference = read_json(location / 'reference.json', limit=EVIDENCE_LIMIT)
-            catalog, attempts, case_errors, error = {}, {}, {}, None
-            try:
-                if not execution.get('suite'):
-                    raise ValueError(execution.get('error') or 'No execution Suite was saved')
-                suite = within(location, Path(execution['suite']))
-                snapshot = self.engine.result(suite)['suite']
-                if snapshot['state'] in ('running', 'queued'):
-                    raise ValueError('Suite execution is not finished')
-                catalog = SuiteRunCatalogAPI(suite / 'events.json').entries(snapshot=snapshot)
-                for job in snapshot['jobs']:
-                    if job['agent_id'] == plan['agent_id']:
-                        attempts.update({c['case_index']: c.get('attempts') or [] for c in job['cases']})
-                        case_errors.update({c['case_index']: c.get('error') or job.get('preparation_error')
-                                            for c in job['cases']})
-            except (OSError, ValueError, KeyError, TypeError) as exc:
-                error = str(exc)
             rows = []
-            for index, case in enumerate(group['cases']):
-                row = {'test_index': index + 1, 'case_id': case['case_id'], 'hit': None,
-                       'execution_attempts': len(attempts.get(index, [])), 'reason': error or 'No saved execution'}
+            for test, candidate in executions:
+                row = {'test_index': test['test_index'], 'case_id': test['case_id'], 'hit': None,
+                       'reason': test.get('error', 'No saved execution')}
                 rows.append(row)
-                if error:
-                    continue
-                try:
-                    matches = [(api, meta) for api, meta in catalog.values()
-                               if meta.get('agent') == plan['agent_id'] and meta.get('case_index') == index
-                               and meta.get('attempt_id')]
-                    if len(matches) != 1 or len(attempts.get(index, [])) != 1:
-                        detail = case_errors.get(index)
-                        raise ValueError(f'Expected exactly one saved execution attempt for this Case; {detail or "no unambiguous trace"}')
-                    api, meta = matches[0]
-                    if meta.get('case_id') not in (None, case['case_id']):
-                        raise ValueError('Saved Case identity differs from the frozen plan')
-                    attempt = attempts[index][0]
-                    result = attempt.get('result') or {}
-                    states = (attempt, result, result.get('artifacts') or {})
-                    if any(s.get('host_acceptance') == 'rejected' or
-                           s.get('evidence_status') in ('missing', 'invalid', 'failed') for s in states):
-                        raise ValueError('Execution evidence was rejected or is unavailable')
-                    candidate = read_candidate(api, environ=self.environ)
-                    row.update(run_id=meta['id'], trajectory_sha256=fingerprint(candidate),
-                               target_usage=token_usage(candidate))
-                    row.update(assess(reference, candidate, directory=location / 'oracle-calls',
-                                      environ=self.environ, model=model, ask=self.ask, retry_failed=retry_failed))
-                except (OSError, ValueError, RuntimeError, KeyError, TypeError) as exc:
-                    row.update(hit=None, reason=str(exc))
-                self.output(f"Exp1: {issue_id} test {index + 1}: {row['hit']}")
+                if candidate is not None:
+                    try:
+                        row.update(assess(reference, candidate, directory=location / 'oracle-calls',
+                                          environ=self.environ, model=model, ask=self.ask,
+                                          retry_failed=retry_failed))
+                    except (OSError, ValueError, RuntimeError, KeyError, TypeError) as exc:
+                        row.update(hit=None, reason=str(exc))
+                self.output(f"Exp1: {issue_id} test {row['test_index']}: {row['hit']}")
             hits = [r['test_index'] for r in rows if r['hit'] is True]
-            results.append({'issue_id': issue_id, 'suite': execution.get('suite'),
-                            'submitted_tests': len(rows),
-                            'execution_attempts': sum(r['execution_attempts'] for r in rows),
-                            'hit_count': len(hits), 'first_hit': min(hits) if hits else None,
-                            'execution_wall_seconds': execution.get('wall_seconds'),
-                            'tests': rows})
+            results.append({'issue_id': issue_id, 'hit_count': len(hits),
+                            'first_hit': min(hits) if hits else None, 'tests': rows})
             files.save(f'assessments/{assessment_id}.json', {'status': 'running', 'issues': results})
         metrics = summarize(results, plan['budget'])
-        executed = sum(g['execution_attempts'] for g in results)
-        usages = [t.get('target_usage', {}).get('total_tokens') for g in results for t in g['tests']]
-        known = sum(t.get('target_usage', {}).get('known_tokens', 0) for g in results for t in g['tests'])
+        tests = [test for test, _ in executions]
+        executed = sum(t['execution_attempts'] for t in tests)
+        usages = [t.get('target_usage', {}).get('total_tokens') for t in tests]
+        known = sum(t.get('target_usage', {}).get('known_tokens', 0) for t in tests)
         total = sum(usages) if all(u is not None for u in usages) else None
         value = {'schema': SCHEMA, 'experiment_id': plan['experiment_id'], 'directory': str(directory),
                  'assessment_id': assessment_id, 'agent_id': plan['agent_id'], 'budget': plan['budget'],
                  'oracle': {'provider': 'openrouter', 'model': model.model, 'endpoint': model.base_url},
                  'status': 'partial' if any(t['hit'] is None for g in results for t in g['tests']) or
-                           any(g['submitted_tests'] < plan['budget'] for g in results) else 'completed',
+                           len(tests) < plan['budget'] else 'completed',
+                 'suite': execution.get('suite'), 'submitted_tests': len(tests), 'tests': tests,
                  'issue_count': len(results), 'issues': results, 'metrics': metrics,
                  'execution_wall_seconds': plan.get('execution_wall_seconds'),
                  'matching_wall_seconds': time.monotonic() - started,
-                 'cost': {'execution_attempts': executed,
-                          'mean_execution_attempts_per_issue': executed / len(results),
+                 'cost': {'execution_attempts': executed, 'oracle_comparisons': len(tests) * len(results),
                           'known_target_tokens': known, 'recorded_target_tokens': total,
-                          'mean_recorded_target_tokens_per_issue': total / len(results) if total is not None else None,
-                          'mean_execution_wall_seconds_per_issue': sum(g['execution_wall_seconds'] or 0 for g in results) / len(results),
                           'testing_agent_tokens': None, 'total_llm_tokens': None}}
         files.save(f'assessments/{assessment_id}.json', value)
         files.save('result.json', value)

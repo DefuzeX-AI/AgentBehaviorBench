@@ -9,7 +9,7 @@ from agentbench.experiments.exp1 import Experiment1
 from agentbench.experiments.exp1_inputs import load_cases
 from agentbench.experiments.exp1_metrics import summarize
 from agentbench.harness.ground_truth import detection
-from agentbench.harness.ground_truth.issues import load_issue
+from agentbench.harness.ground_truth.issues import discover_issues, load_issue
 from tests.test_ground_truth import reference_attempt, write_json
 from tests.test_evaluation_service import project  # shared real scheduler / in-process target fixture
 from tests.test_sdk_defaults import inprocess_worker_permissions
@@ -43,15 +43,22 @@ def answer(hit=True):
             'candidate_step_ids': [1], 'candidate_decisive_step': 1 if hit else None}
 
 
+def inject_candidate(service, monkeypatch):
+    # The in-process Echo fixture has no model calls. Inject the existing trace
+    # fixture for the oracle while exercising real Case scheduling/persistence.
+    candidate = {k: v for k, v in load_issue(service.root, 'example', 'issue_1')['trajectories'][0].items()
+                 if k != 'attempt'}
+    monkeypatch.setattr('agentbench.experiments.exp1.read_candidate', lambda *a, **k: candidate)
+
+
 def test_case_order_budget_and_duplicate_identity(tmp_path):
-    folder = tmp_path / 'issue_1'
     for name in ('10', '2', '1'):
-        write_json(folder / f'{name}.json', case(name))
-    group = load_cases(tmp_path, 2)[0]
+        write_json(tmp_path / f'{name}.json', case(name))
+    group = load_cases(tmp_path, 2)
     assert [c['case_id'] for c in group['cases']] == ['1', '2']
     assert group['available_cases'] == 3
-    write_json(folder / '01.json', case('extra'))
-    with pytest.raises(ValueError, match='duplicate'):
+    write_json(tmp_path / '01.json', case('extra'))
+    with pytest.raises(ValueError, match='Duplicate'):
         load_cases(tmp_path, 50)
 
 
@@ -62,11 +69,16 @@ def test_budget_limits(tmp_path, budget):
 
 
 def test_collection_order_and_mixed_formats_rejected(tmp_path):
-    folder = tmp_path / 'issue_1'
-    write_json(folder / 'cases.json', {'schema': 'abb.cases.v1', 'cases': [case('z'), case('a')]})
-    assert [c['case_id'] for c in load_cases(tmp_path, 50)[0]['cases']] == ['z', 'a']
-    write_json(folder / '0001.json', case('b'))
+    write_json(tmp_path / 'cases.json', {'schema': 'abb.cases.v1', 'cases': [case('z'), case('a')]})
+    assert [c['case_id'] for c in load_cases(tmp_path, 50)['cases']] == ['z', 'a']
+    write_json(tmp_path / '0001.json', case('b'))
     with pytest.raises(ValueError, match='OR'):
+        load_cases(tmp_path, 50)
+
+
+def test_case_group_rejects_issue_folders(tmp_path):
+    write_json(tmp_path / 'issue_1/0001.json', case('a'))
+    with pytest.raises(ValueError, match='Unexpected folder'):
         load_cases(tmp_path, 50)
 
 
@@ -98,6 +110,15 @@ def test_issue_adapter_reads_current_layout_and_checks_identity(project):
         load_issue(service.root, 'example', 'issue_1')
 
 
+def test_issue_discovery_skips_folders_without_verified_case(project):
+    service, _, _ = project
+    for number in (10, 2):
+        install_issue(service, number)
+    (service.root / 'unit/ground_truth/issue_3/runs').mkdir(parents=True)
+    (service.root / 'unit/ground_truth/notes').mkdir()
+    assert discover_issues(service.root, 'example') == ['issue_2', 'issue_10']
+
+
 def test_execute_then_match_without_judge_and_without_rerunning(project, oracle, monkeypatch):
     from agentbench.harness.scheduling.retry import RetryPolicy
     policies = []
@@ -108,9 +129,9 @@ def test_execute_then_match_without_judge_and_without_rerunning(project, oracle,
     monkeypatch.setattr(RetryPolicy, 'permits', check_policy)
     service, agent, processes = project
     install_issue(service)
-    case_dir = service.root / 'cases'
-    write_json(case_dir / 'issue_1/0001.json', case('hello'))
-    write_json(case_dir / 'issue_1/0002.json', case('second'))
+    case_dir = service.root / 'cases/run-01'
+    write_json(case_dir / '0001.json', case('hello'))
+    write_json(case_dir / '0002.json', case('second'))
     seen = []
     def ask(model, *, system, payload):
         assert 'finding_summary' not in payload
@@ -118,22 +139,18 @@ def test_execute_then_match_without_judge_and_without_rerunning(project, oracle,
         seen.append(payload)
         return answer()
     experiment = Experiment1(service.root, execution_service=service, ask=ask, output=lambda _: None)
-    # The in-process Echo fixture has no model calls. Inject the existing trace
-    # fixture for the oracle while exercising real Case scheduling/persistence.
-    candidate = {k: v for k, v in load_issue(service.root, 'example', 'issue_1')['trajectories'][0].items()
-                 if k != 'attempt'}
-    monkeypatch.setattr('agentbench.experiments.exp1.read_candidate', lambda *a, **k: candidate)
+    inject_candidate(service, monkeypatch)
     result = experiment.run('example', case_dir, tests=1)
     assert len(seen) == 1, result
     assert result['metrics']['Detection@1']['value'] == 1
-    assert result['issues'][0]['execution_attempts'] == 1
+    assert result['cost']['execution_attempts'] == 1
     assert result['issues'][0]['hit_count'] == 1
     assert result['issues'][0]['first_hit'] == 1
     assert policies and set(policies) == {0}
     assert result['issues'][0]['tests'][0]['evidence']['candidate']
     assert len(agent.requests) == 1
     assert all(p.closed for p in processes)
-    suite = service.result(result['issues'][0]['suite'])
+    suite = service.result(result['suite'])
     assert suite['suite']['judge_counts'].get('issue', 0) == 0
     assert not list(Path(suite['directory']).rglob('report.json'))
     # The target sees exactly the submitted public payload, never hidden GT.
@@ -150,11 +167,46 @@ def test_execute_then_match_without_judge_and_without_rerunning(project, oracle,
     assert experiment.match(result['directory'])['metrics'] == result['metrics']
 
 
+def test_one_execution_is_matched_against_every_issue(project, oracle, monkeypatch):
+    service, agent, _ = project
+    for number in (1, 2):
+        install_issue(service, number)
+    (service.root / 'unit/ground_truth/issue_3').mkdir()
+    case_dir = service.root / 'cases/run-01'
+    write_json(case_dir / '0001.json', case('hello'))
+    write_json(case_dir / '0002.json', case('second'))
+    compared = []
+    def ask(model, *, system, payload):
+        number = payload['issue']['issue']['number']
+        compared.append(number)
+        return answer(number == 1)
+    inject_candidate(service, monkeypatch)
+    result = Experiment1(service.root, execution_service=service, ask=ask, output=lambda _: None).run(
+        'example', case_dir, tests=2)
+    assert len(agent.requests) == 2
+    assert result['cost']['execution_attempts'] == 2
+    # Both tests share one injected trajectory, so each Issue's second request reuses the first.
+    assert sorted(compared) == [1, 2]
+    assert [i['issue_id'] for i in result['issues']] == ['issue_1', 'issue_2']
+    assert [i['hit_count'] for i in result['issues']] == [2, 0]
+    assert [[t['cache_reused'] for t in i['tests']] for i in result['issues']] == [[False, True]] * 2
+    assert result['metrics']['Detection@1']['value'] == .5
+    assert result['status'] == 'completed'
+
+
+def test_no_verified_issue_blocks_before_execution(project, oracle, monkeypatch):
+    service, _, _ = project
+    write_json(service.root / 'cases/run-01/0001.json', case('hello'))
+    monkeypatch.setattr(service, 'execute', lambda *a, **k: pytest.fail('Must preflight'))
+    with pytest.raises(ValueError, match='case.verified.json'):
+        Experiment1(service.root, execution_service=service).run('example', service.root / 'cases/run-01')
+
+
 def test_missing_suite_keeps_issue_in_denominator(project, oracle, monkeypatch):
     service, _, _ = project
     install_issue(service)
-    folder = service.root / 'cases'
-    write_json(folder / 'issue_1/0001.json', case('hello'))
+    folder = service.root / 'cases/run-01'
+    write_json(folder / '0001.json', case('hello'))
     monkeypatch.setattr(service, 'execute', lambda *a, **k: (_ for _ in ()).throw(RuntimeError('Infrastructure unavailable')))
     experiment = Experiment1(service.root, execution_service=service,
                              ask=lambda *a, **k: pytest.fail('No evidence'), output=lambda _: None)
@@ -162,7 +214,8 @@ def test_missing_suite_keeps_issue_in_denominator(project, oracle, monkeypatch):
     assert result['issue_count'] == 1 and result['status'] == 'partial'
     assert result['metrics']['Detection@1']['value'] is None
     assert result['metrics']['Detection@1']['bounds'] == [0, 1]
-    assert result['issues'][0]['execution_attempts'] == 0
+    assert result['cost']['execution_attempts'] == 0
+    assert 'Infrastructure unavailable' in result['issues'][0]['tests'][0]['reason']
 
 
 def test_reference_version_mismatch_blocks_before_execution(project, oracle, monkeypatch):
@@ -171,10 +224,10 @@ def test_reference_version_mismatch_blocks_before_execution(project, oracle, mon
     path = folder / 'case.verified.json'
     doc = json.loads(path.read_text())
     write_json(path, {**doc, 'commit_version': 'wrong-version'})
-    write_json(service.root / 'cases/issue_1/0001.json', case('hello'))
+    write_json(service.root / 'cases/run-01/0001.json', case('hello'))
     monkeypatch.setattr(service, 'execute', lambda *a, **k: pytest.fail('Must preflight'))
     with pytest.raises(ValueError, match='revision'):
-        Experiment1(service.root, execution_service=service).run('example', service.root / 'cases')
+        Experiment1(service.root, execution_service=service).run('example', service.root / 'cases/run-01')
 
 
 def test_oracle_evidence_validation_failure_journal_and_explicit_retry(project, oracle, tmp_path):
@@ -231,33 +284,31 @@ def test_cli_registration_and_default_budget():
         build_parser().parse_args(['exp1', 'run', 'example'])
 
 
-def test_issue_workers_are_bounded_and_each_case_submitted_once(project, oracle, monkeypatch):
-    from threading import Barrier, Lock
+def test_case_workers_are_bounded_and_each_case_submitted_once(project, oracle, monkeypatch):
     service, _, _ = project
-    barrier, lock, calls = Barrier(2), Lock(), []
+    calls = []
     for number in (1, 2):
         install_issue(service, number)
-        write_json(service.root / f'cases/issue_{number}/cases.json', {
-            'schema': 'abb.cases.v1', 'cases': [case(f'{number}-{i}') for i in range(5)]})
+    write_json(service.root / 'cases/run-01/cases.json', {
+        'schema': 'abb.cases.v1', 'cases': [case(str(i)) for i in range(5)]})
     def execute(agent, cases, **kwargs):
         assert kwargs.get('judge') is None
-        assert kwargs['concurrency'].max_parallel_cases == 1
+        assert kwargs['concurrency'].max_parallel_cases == 2
         assert kwargs['retry_policy'].max_retries == 0
-        with lock:
-            calls.append([c['case_id'] for c in cases])
-        barrier.wait(timeout=5)
+        calls.append([c['case_id'] for c in cases])
         raise RuntimeError('Synthetic execution failure after submission')
     monkeypatch.setattr(service, 'execute', execute)
     result = Experiment1(service.root, execution_service=service, output=lambda _: None).run(
-        'example', service.root / 'cases', tests=3, workers=2)
-    assert sorted(calls) == [['1-0', '1-1', '1-2'], ['2-0', '2-1', '2-2']]
+        'example', service.root / 'cases/run-01', tests=3, workers=2)
+    assert calls == [['0', '1', '2']]
     assert result['issue_count'] == 2
-    assert all(i['submitted_tests'] == 3 for i in result['issues'])
+    assert result['submitted_tests'] == 3
+    assert all(len(i['tests']) == 3 for i in result['issues'])
 
 
 def test_cli_result_is_read_only_and_needs_no_credentials(tmp_path, capsys, monkeypatch):
     from agentbench.cli.main import cli
-    write_json(tmp_path / 'result.json', {'schema': 'abb.exp1.v1', 'status': 'completed'})
+    write_json(tmp_path / 'result.json', {'schema': 'abb.exp1.v2', 'status': 'completed'})
     monkeypatch.setattr('agentbench.cli.environment.load_execution_environment',
                         lambda *a, **k: pytest.fail('Read-only result must not load credentials'))
     assert cli(['exp1', 'result', '--experiment', str(tmp_path)]) == 0

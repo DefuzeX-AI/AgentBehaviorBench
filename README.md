@@ -51,8 +51,9 @@ Every testing Agent participating in AgentBehaviorBench must have the following 
 3. **Judging**: Determine whether the target Agent exhibits behavioral defects based on execution evidence, and report specific problems with supporting evidence.
 
 For the behavioural failure detection experiment, [`agentbench exp1`](docs/Experiment1.md)
-imports per-Issue Case directories, executes them with a bounded budget, and reports
-Detection@1/5/10/20/50 using an independent trajectory oracle without Judge reports.
+executes one imported Case group once, compares every trajectory with each of the
+Agent's ground-truth Issues, and reports Detection@1/5/10/20/50 using an independent
+trajectory oracle without Judge reports.
 
 ![AgentBehaviorBench architecture](docs/figures/abb-suite-sdk-roles.png)
 

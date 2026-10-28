@@ -1,27 +1,37 @@
 # Experiment 1: behavioural failure detection
 
-`agentbench exp1` executes externally supplied Cases and measures whether they
-trigger an Issue's reported failure. It does not generate Cases, request a
-testing-agent diagnosis, invoke a Judge, or open the viewer.
+`agentbench exp1` executes one externally supplied Case group once and measures
+whether its executions trigger the reported failure of each ground-truth Issue of
+the target Agent. It does not generate Cases, request a testing-agent diagnosis,
+invoke a Judge, or open the viewer.
+
+## Workflow
+
+1. A testing agent generates a Case group from the shared experiment prompt and
+   the Agent scenario.
+2. `exp1 run` executes every Case in the group once.
+3. Each saved trajectory is compared with every Issue of the Agent, and the
+   command reports per-Issue hits and Detection@k.
 
 ## Input
 
-Provide one directory per Issue. Each directory contains either numbered JSON
-files, each holding one native ABB Case, or a single `abb.cases.v1` collection
-named `cases.json`. Do not mix these formats. Numbered files use numeric order;
-collections use array order. Case IDs must be unique within each Issue.
+A Case group is one directory. It contains either numbered JSON files, each
+holding one native ABB Case, or a single `abb.cases.v1` collection named
+`cases.json`. Do not mix these formats or add subfolders. Numbered files use
+numeric order; collections use array order. Case IDs must be unique.
 
 ```text
 tmp/experiement1/agents/nanocoder/
   prompt-template.txt
   agent-scenario.txt
   cases/
-    issue_1057/
+    run-01/
       0001.json
       0002.json
-    issue_1237/
-      cases.json
 ```
+
+The Case group name (`run-01` above) is an opaque label chosen by the host. It is
+not tied to any Issue.
 
 Example `0001.json` (an input shape, not a recommended experimental test):
 
@@ -33,45 +43,50 @@ Multiple inputs form one Case/session and consume one execution, not one per
 input or tool call. The shared experiment prompt and Agent scenario belong to
 the upstream testing-agent workflow. Use fresh testing-agent sessions and keep
 Issue reports, reference trajectories, existing results and GT out of their
-context. The host maps submissions to Issue folders; every Issue for the same
-Agent receives the same Agent-level scenario. The CLI imports whatever Cases
-have already been supplied; it does not manage a live coding-agent session.
+context. The CLI imports whatever Cases have already been supplied; it does not
+manage a live coding-agent session.
+
+## Issues
+
+Issues are discovered from the registered Agent's ground truth: every
+`ground_truth/issue_<number>/` folder that contains `case.verified.json` takes
+part, in numeric order. Folders without `case.verified.json` are skipped. Each
+selected Issue must also provide a validated reference
+`runs/*/trajectory/*/trajectory.json`; an Issue that fails validation stops the
+command before any Case is executed. The legacy `gt` command is unchanged.
+
+The configured Agent revision must equal each reference's `commit_version` when
+declared; the command does not silently upgrade, downgrade or edit the target.
+Only Cases and the public Agent Profile are passed to execution; hidden reference
+definitions stay on the host.
 
 ## Run
 
 ```powershell
-python -m agentbench exp1 run nanocoder --case-dir tmp/experiement1/agents/nanocoder/cases
+python -m agentbench exp1 run nanocoder --case-dir tmp/experiement1/agents/nanocoder/cases/run-01
 
-python -m agentbench exp1 run nanocoder --case-dir tmp/experiement1/agents/nanocoder/cases --tests 30 --workers 4 --prompt-template tmp/experiement1/agents/nanocoder/prompt-template.txt --scenario-file tmp/experiement1/agents/nanocoder/agent-scenario.txt
+python -m agentbench exp1 run nanocoder --case-dir tmp/experiement1/agents/nanocoder/cases/run-01 --tests 10 --workers 2 --prompt-template tmp/experiement1/agents/nanocoder/prompt-template.txt --scenario-file tmp/experiement1/agents/nanocoder/agent-scenario.txt
 ```
 
-The budget is **per Issue**, defaults to 50, and accepts 1 through 50. Extra
-Cases are not executed. If fewer Cases are supplied, they run once without
-padding or retries; results identify the missing budget. Each invocation
-creates a new experiment: repeating `run` executes new tests and is not a resume.
-`--workers` limits concurrent Issues. Within each Issue, ABB's native scheduler
-has one Case worker and executes the frozen inputs once in order. A failed
+`--tests` is the number of Cases to execute. It defaults to 50 and accepts 1
+through 50. Extra Cases are not executed. If fewer Cases are supplied, they run
+once without padding or retries; results identify the missing budget. Each
+invocation creates a new experiment: repeating `run` executes new tests and is
+not a resume. All Cases run once in a single Suite through
+`EvaluationService.execute`; `--workers` limits concurrent Cases. A failed
 execution is retained; the command does not retry it to obtain a better outcome.
+The same executions are shared by every Issue, so the execution cost does not
+grow with the number of Issues.
 
-Each Issue gets a regular Suite through `EvaluationService.execute`. Existing
-preparation, container isolation, interception and trajectory storage are reused.
-`--model` affects the target Agent. `--timeout` is forwarded to native execution.
-The configured Agent revision must equal the reference's `commit_version` when
-declared; the command does not silently upgrade, downgrade or edit the target.
-Issues requiring different revisions must be run with the corresponding prepared
-Agent version. All selected references are validated before any Case execution.
+Existing preparation, container isolation, interception and trajectory storage
+are reused. `--model` affects the target Agent. `--timeout` is forwarded to
+native execution.
 
 The oracle always uses the default **OpenRouter** configuration
 (`OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, and its configured provider endpoint).
 Target-provider selection, `ABB_MODEL`, and legacy `ABB_LOCAL_JUDGE_*` / `ABB_GT_*`
 model overrides do not select this oracle. `ABB_GT_MAX_BYTES` bounds oracle
 context size; oversized evidence remains inconclusive instead of being truncated.
-
-GT is loaded from the registered Agent's
-`ground_truth/issue_<number>/case.verified.json` and validated reference
-`runs/*/trajectory/*/trajectory.json` files. This adapter does not change the
-existing legacy `gt` command. Only generated Cases and the public Agent Profile
-are passed to execution; hidden reference definitions stay on the host.
 
 ## Assess and read saved results
 
@@ -81,10 +96,12 @@ python -m agentbench exp1 result --experiment <experiment-directory>
 ```
 
 `match` never executes the target Agent. It uses frozen reference snapshots and
-saved Suite trajectories. It reuses completed, identical oracle requests.
-Failed or interrupted requests stay pending; `match --retry-failed` explicitly
-allows another oracle call, retains its previous journal entry, and consumes no
-target-test budget. Concurrent matching of one experiment is locked out.
+the saved Suite trajectories, comparing each trajectory with each Issue, so it
+makes up to tests × Issues oracle comparisons. It reuses completed, identical
+oracle requests. Failed or interrupted requests stay pending;
+`match --retry-failed` explicitly allows another oracle call, retains its previous
+journal entry, and consumes no target-test budget. Concurrent matching of one
+experiment is locked out.
 
 The oracle compares the reported failure with actual candidate actions and
 outputs and the reference evidence. It must cite valid trajectory steps.
@@ -94,17 +111,17 @@ Missing/rejected evidence, incomplete negative evidence, and oracle failures
 remain `null`, never automatic negatives. Execution failure alone is not a hit.
 
 Each experiment retains `plan.json`, optional prompt text, the public profile,
-per-Issue reference snapshots, Suite locations, execution records, full oracle
-requests/responses, assessment history, and `result.json`. Default output is
-`<case-dir>/../results/exp1_<id>/`; `--results-dir` selects another parent.
+per-Issue reference snapshots, the Suite location, the execution record, full
+oracle requests/responses, assessment history, and `result.json`. Default output
+is `<case-dir>/../results/exp1_<id>/`; `--results-dir` selects another parent.
 
-Results include per-test decisions, per-Issue execution attempts, hit counts,
-first-hit indices and Detection@1/5/10/20/50. The denominator is the frozen set
-of input Issue folders. Duplicate hits count once per Issue. Prefixes use input
-order, not completion order. A cutoff larger than `--tests` is `outside_budget`.
-For other cutoffs, pending decisions or insufficient tests leave the value null
-unless a hit already establishes that Issue's success. Bounds retain all Issues
-in the denominator. Rates are fractions in [0, 1].
+Results include the shared per-test execution records, per-Issue decisions for
+every test, hit counts, first-hit indices and Detection@1/5/10/20/50. The
+denominator is the set of discovered Issues. Duplicate hits count once per Issue.
+Prefixes use Case order, not completion order. A cutoff larger than `--tests` is
+`outside_budget`. For other cutoffs, pending decisions or insufficient tests leave
+the value null unless a hit already establishes that Issue's success. Bounds
+retain all Issues in the denominator. Rates are fractions in [0, 1].
 
 Execution and matching wall time are recorded separately. Available target-token
 usage and oracle usage are retained; missing usage is not invented. Upstream

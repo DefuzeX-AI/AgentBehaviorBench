@@ -1,6 +1,6 @@
 # Shared evaluation service
 
-For Issue-level detection from an imported Case directory, see
+For Issue-level detection from an imported Case group, see
 [Experiment 1](Experiment1.md). Its `exp1` command reuses this execution service
 and assesses trajectories directly without a Judge report.
 

@@ -1,14 +1,30 @@
 """Read current Issue references without changing the legacy GT/Judge contract."""
+import re
+
 from agentbench import trajectory
 from .files import read_json, text_field, within
 from .manifests import registered_units
 
 
-def load_issue(root, agent_id, issue_id):
+def registered_unit(root, agent_id):
     units, invalid, _ = registered_units(root)
     if agent_id not in units or invalid is None or agent_id in invalid:
         raise ValueError('Agent has no valid registration')
-    unit = units[agent_id]
+    return units[agent_id]
+
+
+def discover_issues(root, agent_id):
+    """Name every issue_<number> folder holding case.verified.json, in numeric order."""
+    folder = registered_unit(root, agent_id) / 'ground_truth'
+    if not folder.is_dir():
+        return []
+    names = [p.name for p in folder.iterdir()
+             if re.fullmatch(r'issue_[1-9][0-9]*', p.name) and (p / 'case.verified.json').is_file()]
+    return sorted(names, key=lambda name: int(name.split('_')[1]))
+
+
+def load_issue(root, agent_id, issue_id):
+    unit = registered_unit(root, agent_id)
     folder = within(unit, unit / 'ground_truth' / issue_id)
     document = read_json(within(folder, folder / 'case.verified.json'))
     issue = document.get('issue')
