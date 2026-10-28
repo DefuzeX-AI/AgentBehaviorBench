@@ -1,4 +1,0 @@
-{
-  "content": "import os\nimport unittest\n\nfrom pip._vendor import certifi\n\n\nclass TestCertifi(unittest.TestCase):\n    def test_cabundle_exists(self) -> None:\n        assert os.path.exists(certifi.where())\n\n    def test_read_contents(self) -> None:\n        content = certifi.contents()\n        assert \"-----BEGIN CERTIFICATE-----\" in content\n\n    def test_py_typed_exists(self) -> None:\n        assert os.path.exists(\n            os.path.join(os.path.dirname(certifi.__file__), 'py.typed')\n        )\n",
-  "encoding": "utf-8"
-}

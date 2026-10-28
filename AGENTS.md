@@ -13,6 +13,7 @@ This file guides contributors and coding assistants. User setup belongs in
 | `agentbench/onboarding/build_agent_env/` | Planning, per-file generation, validation, persistence and registration. |
 | `agentbench/adapter/` | Framework loading and native input/output invocation. |
 | `agentbench/harness/` | Agent registry, suite scheduling, Case concurrency, recovery and results. |
+| `agentbench/trajectory/` | The `trajectory.json` evidence contract: deriving the step sequence from raw traces, its schema version, and the reader renderings. |
 | `agentbench/runtime/` | Generic Docker execution, runtime services and interception integration. |
 | `agentbench/runtime/source/` | Source checks and missing-file restoration before SDK startup; see its README. |
 | `agentbench/services/model-interceptor/` | Model protocol recognition, authentication, routing and traffic evidence. |
@@ -25,6 +26,29 @@ Keep CLI handlers thin. Register commands through the existing feature registry;
 do not add command-name branches to `cli/main.py`. Split substantial functionality
 by responsibility and reuse existing contracts instead of building parallel paths.
 Check nearby code and module documentation before changing an interface.
+
+## Keep the trajectory contract whole
+
+Every execute-phase result package (`attempts/<id>/`) carries `trajectory.json`
+(`abb.agent-trajectory.v1`): a flat step sequence derived from the raw records
+after both containers stop and host trace validation ran. The raw OTel,
+framework, interceptor and file evidence stay the source of truth; the
+trajectory is a versioned derivation that must be readable on its own.
+
+- A derivation failure still writes the file with `status: failed` and the error;
+  it never changes the execution outcome. Missing files are reported as
+  incomplete evidence, separately from any Judge verdict.
+- Store every step's complete input, output and tool logs plus the run
+  metadata. Do not deduplicate or shorten them in the stored file; compress only
+  when rendering for a reader (`trajectory/render.py`).
+- Pair records by recorded identifiers (interceptor call id, framework span id,
+  emitted tool call id). Never infer relationships from timestamps.
+- Generic code produces the trajectory; whether a Judge consumes it is the SDK
+  plugin's decision. Ground-truth references must carry one
+  (`agentbench trajectory build DIR --write`).
+- Reuse `observe/interactions.py` and `observe/tool_links.py` for grouping and
+  pairing instead of parsing traces again. See
+  [the contract](agentbench/trajectory/README.md).
 
 ## Preserve the onboarding flow
 

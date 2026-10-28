@@ -1,3 +1,0 @@
-{
-  "query": "import os, glob\n\nprint(\"CWD:\", os.getcwd())\nhits = []\nfor pat in ['survey_points*.csv', '*.csv', '**/*.csv']:\n    hits += glob.glob(pat, recursive=True)\nhits = sorted(set(hits))\nprint(\"CSV files found:\", hits if hits else \"NONE\")\n\ndf = None\nif os.path.exists('survey_points.csv'):\n    import pandas as pd\n    df = pd.read_csv('survey_points.csv')\n    print(df.dtypes)\n    print(df.head())\nelse:\n    print(\"survey_points.csv still not present -> cannot determine source CRS.\")"
-}

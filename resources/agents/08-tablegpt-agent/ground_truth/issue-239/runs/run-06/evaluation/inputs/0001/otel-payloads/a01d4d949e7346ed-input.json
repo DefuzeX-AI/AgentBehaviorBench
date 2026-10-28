@@ -1,3 +1,0 @@
-{
-  "query": "import os\n\n# Search for any CSV files and any 'examples' directory\ncsv_files = []\nexamples_dirs = []\nfor root, dirs, files in os.walk('.'):\n    dirs[:] = [d for d in dirs if not d.startswith('.')]\n    if os.path.basename(root) == 'examples':\n        examples_dirs.append(root)\n    for f in files:\n        if f.endswith('.csv'):\n            csv_files.append(os.path.join(root, f))\n\nprint(\"'examples' dirs found:\", examples_dirs)\nprint(\"\\nCSV files found (up to 50):\")\nfor c in csv_files[:50]:\n    print(\" \", c)"
-}

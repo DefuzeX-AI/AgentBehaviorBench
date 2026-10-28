@@ -1,3 +1,0 @@
-{
-  "query": "import os, glob\nimport pyproj\nfrom pyproj import Transformer\n\nprint(\"pyproj version:\", pyproj.__version__)\n\npath = 'survey_points.csv'\nprint(\"File exists:\", os.path.exists(path))\nfound = sorted(set(glob.glob('**/*.csv', recursive=True)) | set(glob.glob('/tmp/**/survey*', recursive=True)))\nprint(\"Any CSV/survey files:\", found if found else \"NONE\")\n\nif os.path.exists(path):\n    import pandas as pd\n    df = pd.read_csv(path)\n    print(df.columns.tolist())\n    print(df.head(3))\n    # placeholder source; would be set from validated CRS\n    # t = Transformer.from_crs(<SRC>, \"EPSG:4979\", always_xy=True)\n    # print(t.transform(df.x, df.y, df.z))\nelse:\n    print(\"Cannot execute transformation: no source data available.\")"
-}

@@ -99,6 +99,12 @@ export function runsPlugin(root) {
           res.on('close', () => { if (!res.writableEnded) controller.abort(); });
           return reply(200, await interactionPage(root, timeline[1], {}, controller.signal, 'agentbench.observe.timeline'));
         }
+        const trajectory = /^\/api\/observe\/runs\/([a-zA-Z0-9_-]+)\/trajectory$/.exec(url.pathname);
+        if (trajectory) {
+          const controller = new AbortController();
+          res.on('close', () => { if (!res.writableEnded) controller.abort(); });
+          return reply(200, await interactionPage(root, trajectory[1], {}, controller.signal, 'agentbench.trajectory'));
+        }
         const eventMatch = /^\/api\/observe\/runs\/([a-zA-Z0-9_-]+)\/events$/.exec(url.pathname);
         if (eventMatch) return reply(200, await eventPage(root, eventMatch[1], Number(url.searchParams.get('offset') || 0)));
         const evaluated = /^\/api\/observe\/runs\/([a-zA-Z0-9_-]+)\/evaluation$/.exec(url.pathname);

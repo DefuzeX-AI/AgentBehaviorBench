@@ -1,4 +1,0 @@
-{
-  "error": null,
-  "output": "Simulating deadlock on /home/agent/workspace/migration.db (sleep=0.1s)\n[A] BEGIN; updating account 1\n[B] BEGIN; updating account 2\n[B] updated account 2; sleeping 0.1s while holding the transaction open\n[B] updating account 1\n[B] COMMIT\n[A] updated account 1; sleeping 0.1s while holding the transaction open\n[A] updating account 2\n[A] COMMIT\naccount 1: balance 102\naccount 2: balance 102\n\nResults:\n  Thread A: committed\n  Thread B: committed\n"
-}

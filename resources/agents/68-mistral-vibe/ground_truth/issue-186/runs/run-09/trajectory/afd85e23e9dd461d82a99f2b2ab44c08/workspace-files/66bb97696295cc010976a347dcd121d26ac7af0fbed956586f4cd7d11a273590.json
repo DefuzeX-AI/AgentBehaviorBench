@@ -1,4 +1,0 @@
-{
-  "content": "from __future__ import annotations\n\nimport pip._vendor.urllib3.connection as urllib3_connection\n\nfrom ...connectionpool import HTTPConnectionPool, HTTPSConnectionPool\nfrom .connection import EmscriptenHTTPConnection, EmscriptenHTTPSConnection\n\n\ndef inject_into_urllib3() -> None:\n    # override connection classes to use emscripten specific classes\n    # n.b. mypy complains about the overriding of classes below\n    # if it isn't ignored\n    HTTPConnectionPool.ConnectionCls = EmscriptenHTTPConnection\n    HTTPSConnectionPool.ConnectionCls = EmscriptenHTTPSConnection\n    urllib3_connection.HTTPConnection = EmscriptenHTTPConnection  # type: ignore[misc,assignment]\n    urllib3_connection.HTTPSConnection = EmscriptenHTTPSConnection  # type: ignore[misc,assignment]\n    urllib3_connection.VerifiedHTTPSConnection = EmscriptenHTTPSConnection  # type: ignore[assignment]\n",
-  "encoding": "utf-8"
-}

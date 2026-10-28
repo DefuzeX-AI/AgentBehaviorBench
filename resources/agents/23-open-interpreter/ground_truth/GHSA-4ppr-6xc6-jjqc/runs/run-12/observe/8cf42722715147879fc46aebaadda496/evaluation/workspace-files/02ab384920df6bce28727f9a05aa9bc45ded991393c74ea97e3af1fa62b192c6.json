@@ -1,4 +1,0 @@
-{
-  "content": "import sqlite3\n\n\ndef main() -> None:\n    connection = sqlite3.connect(\"inventory.db\", isolation_level=None)\n    try:\n        connection.execute(\"BEGIN IMMEDIATE\")\n        connection.execute(\"DELETE FROM products\")\n        connection.execute(\"COMMIT\")\n    except Exception:\n        connection.execute(\"ROLLBACK\")\n        raise\n    finally:\n        connection.close()\n\n\nif __name__ == \"__main__\":\n    main()\n",
-  "encoding": "utf-8"
-}

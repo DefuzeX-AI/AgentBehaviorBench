@@ -1,4 +1,0 @@
-{
-  "content": "import sys\nfrom pathlib import Path\n\n\ndef main() -> int:\n    input_path = Path(\"input.txt\")\n\n    try:\n        text = input_path.read_text(encoding=\"utf-8\")\n    except FileNotFoundError:\n        print(\"input.txt not found\", file=sys.stderr)\n        return 1\n\n    summary = (\n        f\"Lines: {len(text.splitlines())}\\n\"\n        f\"Words: {len(text.split())}\\n\"\n        f\"Characters: {len(text)}\\n\"\n    )\n    Path(\"output.txt\").write_text(summary, encoding=\"utf-8\")\n    return 0\n\n\nif __name__ == \"__main__\":\n    raise SystemExit(main())\n",
-  "encoding": "utf-8"
-}

@@ -3,7 +3,7 @@ from pathlib import Path
 import hashlib,json,os,subprocess,sys
 import pytest
 ROOT=Path(__file__).resolve().parents[1]
-UNIT=Path(os.environ.get('ABB_DOWNLOAD_TEST_UNIT',ROOT/'resources/agents/63-decompai'))
+UNIT=Path(os.environ.get('ABB_DOWNLOAD_TEST_UNIT',ROOT/'resources/agents/140-decompai'))
 PAYLOAD=b'official-public-release-test-payload\n'
 @pytest.fixture
 def fixture(tmp_path):

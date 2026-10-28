@@ -1,3 +1,0 @@
-{
-  "query": "import pandas as pd\n\ndf = read_df(\"/opt/abb-sdk-repo/examples/datasets/titanic.csv\")\n\n# Define binary churn target\n# Positive label (1) = record did NOT survive (Survived == 0)\ndf[\"Churn\"] = (df[\"Survived\"] == 0).astype(int)\n\nprint(\"Class balance of 'Churn':\")\nprint(df[\"Churn\"].value_counts().sort_index())\nprint(\"\\nCross-check against 'Survived':\")\nprint(pd.crosstab(df[\"Survived\"], df[\"Churn\"], rownames=[\"Survived\"], colnames=[\"Churn\"]))\nprint(\"\\nData with new target:\")\nprint(df[[\"Survived\", \"Churn\"]])"
-}

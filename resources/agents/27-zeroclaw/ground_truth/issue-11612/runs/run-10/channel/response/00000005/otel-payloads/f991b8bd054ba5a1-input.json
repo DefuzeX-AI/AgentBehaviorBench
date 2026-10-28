@@ -1,4 +1,0 @@
-{
-  "approved": true,
-  "command": "python3 -c \"\nfrom statistics import NormalDist\nnd = NormalDist()\nmu, sig, thr = 11.5, 3.0, 9.0\np_cold = nd.cdf((thr - mu) / sig)\np_ok = 1 - p_cold\nL_FN, L_FP = 10.0, 2.0           # unprepared-on-cold-day vs carried-unused-coat\ne_a1 = L_FP * p_ok               # act: take coat\ne_a0 = L_FN * p_cold             # no coat\ndelta = e_a0 - e_a1\n# value of information if NWP restores (sigma 3.0 -> 1.5, same center)\np_cold_nwp = nd.cdf((thr - mu) / 1.5)\nvoi = L_FN * p_cold - min(L_FN * p_cold_nwp, L_FP * (1 - p_cold_nwp))\nprint(f'P(Y<9) prior  = {p_cold:.4f}')\nprint(f'E[L(act)]     = {e_a1:.4f}')\nprint(f'E[L(no act)]  = {e_a0:.4f}')\nprint(f'delta         = {delta:.4f}  (act iff delta>0, threshold p>{L_FP/(L_FN+L_FP):.4f})')\nprint(f'P(Y<9) w/ NWP = {p_cold_nwp:.4f} -> decision would flip to no-coat')\nprint(f'VOI of restored NWP = {voi:.4f}')\n\""
-}

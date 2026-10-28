@@ -7,7 +7,7 @@ import hashlib
 from types import SimpleNamespace
 import pytest
 
-UNIT=Path(__file__).resolve().parents[1]/'resources/agents/63-decompai'
+UNIT=Path(__file__).resolve().parents[1]/'resources/agents/140-decompai'
 def module(name,file):
  s=importlib.util.spec_from_file_location(name,UNIT/'bindings'/file);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);return m
 bridge=module('issue375_bridge','bridge.py')

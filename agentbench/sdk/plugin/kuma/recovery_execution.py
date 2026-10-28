@@ -40,10 +40,6 @@ def recover_case(runner, registration, case, *, previous_result, validator, on_p
     directory = Path(original)
     if directory.is_symlink() or not directory.is_dir():
         raise ValueError('Recovery artifact directory is missing or linked')
-    from agentbench.observe.legacy_archive import restore_archive
-    from agentbench.observe.legacy_archive import archive_manifest
-    if archive_manifest(directory):
-        restore_archive(directory)
     timing_id = uuid4().hex
     timing_identity = runner._identity(registration, phase='recover', case_index=case.case_index, case_id=case.case_id)
     with timing_session(directory / f'timing-recovery-{timing_id}.jsonl', source='host',

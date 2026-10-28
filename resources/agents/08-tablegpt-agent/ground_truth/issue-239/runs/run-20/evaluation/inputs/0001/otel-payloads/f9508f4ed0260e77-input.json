@@ -1,3 +1,0 @@
-{
-  "query": "import os\n\nfor d in [\"/tmp/kuma\", \"/tmp/abb-tablegpt-9ei0hcul\", \"/tmp/.config\", \"/tmp/.cache\"]:\n    print(\"=\"*60)\n    print(d)\n    if os.path.isdir(d):\n        for root, dirs, files in os.walk(d):\n            depth = root[len(d):].count(os.sep)\n            if depth > 2:\n                dirs[:] = []\n                continue\n            print(root, \"| dirs:\", dirs[:10], \"| files:\", files[:20])\n    else:\n        print(\"not a dir\")"
-}

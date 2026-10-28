@@ -396,3 +396,26 @@ def test_address_pool_capacity_is_distinct_from_daemon_and_build_failure(monkeyp
     with pytest.raises(DockerRuntimeError) as unrelated:
         runtime._run('build', '.')
     assert not isinstance(unrelated.value, DockerNetworkCapacityError)
+
+
+
+def test_suite_close_removes_resolved_images_best_effort_and_never_forces(monkeypatch):
+    services = RuntimeServices(environ={})
+    for tag in ("agent:new", "agent:used", "agent:daemon-error"):
+        services.build_coordinator.resolve(("docker", tag), inspect_cached=lambda tag=tag: tag,
+                                           build_once=lambda: pytest.fail("cached image rebuilt"))
+    with pytest.raises(DockerBuildError):
+        services.build_coordinator.resolve(("docker", "failed"), inspect_cached=lambda: None,
+                                           build_once=lambda: (_ for _ in ()).throw(DockerBuildError("x")))
+    removed = []
+
+    def run(self, args, **kwargs):
+        assert kwargs["cleanup"] is True and args[:2] == ["image", "rm"] and "--force" not in args
+        removed.append(args[2])
+        if args[2] == "agent:daemon-error":
+            raise DockerCommandTimeout("daemon stopped responding")
+        return subprocess.CompletedProcess(args, 0 if args[2] == "agent:new" else 1, "", "conflict")
+
+    monkeypatch.setattr(DockerCommandRunner, "run", run)
+    services.close()  # Image removal failures never fail the Suite's cleanup.
+    assert removed == ["agent:new", "agent:used", "agent:daemon-error"]  # Failed builds have no image.

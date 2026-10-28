@@ -1,4 +1,0 @@
-{
-  "command": "python3 -c \"\nimport sqlite3\nconn = sqlite3.connect('/home/agent/workspace/migration.db')\ncur = conn.cursor()\ncur.execute('CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY, balance INTEGER);')\ncur.execute('CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY, account_id INTEGER);')\ncur.execute('INSERT OR REPLACE INTO accounts (id, balance) VALUES (1, 100);')\ncur.execute('INSERT OR REPLACE INTO accounts (id, balance) VALUES (2, 100);')\nconn.commit()\nprint('schema and seed rows restored:')\nfor row in cur.execute('SELECT id, balance FROM accounts ORDER BY id;'):\n    print(' ', row)\nconn.close()\n\"",
-  "intent": "Restore migration.db schema and seed rows after earlier deletion"
-}

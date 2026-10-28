@@ -270,7 +270,18 @@ def test_registered_units_omit_redundant_model_defaults():
         assert '# Model setup:' not in content
         if 'model' in manifest:
             declarations[manifest['agent_id']] = manifest['model']
-    assert set(declarations) == {'minimax-code', 'claude-agent-acp', 'qwen-code', 'hermes-agent'}
-    assert declarations['hermes-agent'] == {'metadata_paths': ['/models']}
-    assert {name: config['provider'] for name, config in declarations.items() if 'provider' in config} == {
-        'minimax-code': 'minimax', 'claude-agent-acp': 'codex', 'qwen-code': 'dashscope'}
+    # Units that need the optional GET <selected-base>/models metadata route
+    # (the ACP session model picker and per-turn cost estimation). They must
+    # declare nothing but metadata_paths.
+    metadata_only = {
+        'hermes-agent', 'coddy', 'octomind', 'qwenpaw', 'sudocode', 'whip',
+        'portable-hermes-agent'}
+    # Units with a fixed provider pin, and the provider each one names.
+    provider_pins = {
+        'minimax-code': 'minimax', 'claude-agent-acp': 'codex',
+        'qwen-code': 'dashscope', 'openharness': 'deepseek'}
+    assert set(declarations) == metadata_only | set(provider_pins)
+    assert {name: config['provider'] for name, config in declarations.items() if 'provider' in config} == provider_pins
+    for name in metadata_only:
+        assert set(declarations[name]) == {'metadata_paths'}, name
+        assert declarations[name]['metadata_paths'] in ([], ['/models']), name

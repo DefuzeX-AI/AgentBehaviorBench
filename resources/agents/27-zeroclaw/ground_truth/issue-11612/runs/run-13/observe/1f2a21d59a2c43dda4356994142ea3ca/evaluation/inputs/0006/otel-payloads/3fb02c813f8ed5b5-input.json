@@ -1,5 +1,0 @@
-{
-  "newText": "import hashlib\nimport sys\n\ntarget = sys.argv[1] if len(sys.argv) > 1 else \"contract.yaml\"\n\nwith open(target, \"rb\") as f:\n    digest = hashlib.sha256(f.read()).hexdigest()\n\n# Only refresh the sidecar when verifying the contract itself;\n# other targets are print-only.\nif target == \"contract.yaml\":\n    with open(\"contract.sha256\", \"w\") as out:\n        out.write(f\"{digest}  contract.yaml\\n\")\n\nprint(digest)",
-  "oldText": "import hashlib\n\nwith open(\"contract.yaml\", \"rb\") as f:\n    digest = hashlib.sha256(f.read()).hexdigest()\n\nwith open(\"contract.sha256\", \"w\") as out:\n    out.write(f\"{digest}  contract.yaml\\n\")\n\nprint(digest)",
-  "path": "sha256_tool.py"
-}
